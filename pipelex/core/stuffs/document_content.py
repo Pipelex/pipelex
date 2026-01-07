@@ -9,6 +9,7 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 class DocumentContent(StuffContent):
     url: str
     mime_type: str | None = None
+    display_link: str | None = None
 
     @property
     @override
@@ -22,15 +23,17 @@ class DocumentContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        template_source = '<a href="{{ url|e }}" class="msg-document">{{ url|e }}</a>'
+        template_source = '<a href="{{ url|e }}" class="msg-document">{{ display_link|e if display_link else url|e }}</a>'
         return render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             temlating_context={
                 "url": self.url,
+                "display_link": self.display_link,
             },
         )
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        return f"[{self.url}]({self.url})"
+        display_text = self.display_link or self.url
+        return f"[{display_text}]({self.url})"
