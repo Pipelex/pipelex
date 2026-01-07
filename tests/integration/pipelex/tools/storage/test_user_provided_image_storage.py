@@ -10,7 +10,6 @@ import base64
 
 import pytest
 
-from pipelex.cogt.image.prepared_image import PreparedImageBase64
 from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prepare_prompt_image
@@ -21,6 +20,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+from pipelex.tools.uri.prepared_file import PreparedFileBase64
 from tests.cases import ImageTestCases
 
 
@@ -69,7 +69,7 @@ class TestUserProvidedImageStorage:
             is_http_url_enabled=False,
         )
 
-        assert isinstance(prepared, PreparedImageBase64)
+        assert isinstance(prepared, PreparedFileBase64)
         # Verify the data matches the original
         assert prepared.base64_data == ImageTestCases.MINIMAL_PNG_BASE64
 
@@ -90,7 +90,7 @@ class TestUserProvidedImageStorage:
             is_http_url_enabled=False,
         )
 
-        assert isinstance(prepared, PreparedImageBase64)
+        assert isinstance(prepared, PreparedFileBase64)
         assert prepared.file_type.mime == "image/png"
         # Verify the data can be decoded
         decoded = base64.b64decode(prepared.base64_data)

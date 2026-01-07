@@ -9,13 +9,13 @@ from openai.types.chat import (
 )
 
 from pipelex.cogt.exceptions import CogtError
-from pipelex.cogt.image.prepared_image import PreparedImage, PreparedImageBase64, PreparedImageHttpUrl
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -60,11 +60,11 @@ class AnthropicFactory:
                 )
 
     @staticmethod
-    def _make_image_block_param(prepped_image: PreparedImage) -> "ImageBlockParam":
-        """Convert a PreparedImage to an Anthropic ImageBlockParam."""
+    def _make_image_block_param(prepped_image: PreparedFile) -> "ImageBlockParam":
+        """Convert a PreparedFile to an Anthropic ImageBlockParam."""
         image_block_param: ImageBlockParam
         match prepped_image:
-            case PreparedImageBase64():
+            case PreparedFileBase64():
                 image_block_param = {
                     "type": "image",
                     "source": {
@@ -73,7 +73,7 @@ class AnthropicFactory:
                         "data": prepped_image.base64_data,
                     },  # pyright: ignore[reportAssignmentType]
                 }
-            case PreparedImageHttpUrl():
+            case PreparedFileHttpUrl():
                 image_block_param = {
                     "type": "image",
                     "source": {
@@ -81,6 +81,9 @@ class AnthropicFactory:
                         "url": prepped_image.url,
                     },
                 }
+            case PreparedFileLocalPath():
+                msg = "PreparedFileLocalPath is not supported for images - should be converted to base64"
+                raise TypeError(msg)
         return image_block_param
 
     @classmethod
@@ -115,7 +118,7 @@ class AnthropicFactory:
     def openai_typed_user_message(
         cls,
         user_content_txt: str,
-        prepped_user_images: list[PreparedImage] | None = None,
+        prepped_user_images: list[PreparedFile] | None = None,
     ) -> ChatCompletionMessageParam:
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
@@ -149,7 +152,7 @@ class AnthropicFactory:
         if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
 
-        prepped_user_images: list[PreparedImage] | None
+        prepped_user_images: list[PreparedFile] | None
         if llm_prompt.user_images:
             prepped_user_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=False)
         else:

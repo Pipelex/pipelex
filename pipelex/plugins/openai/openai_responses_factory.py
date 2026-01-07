@@ -6,12 +6,12 @@ from openai.types.responses import ResponseInputImageParam
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMPromptParameterError
-from pipelex.cogt.image.prepared_image import PreparedImageBase64, PreparedImageHttpUrl
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.plugin_factory_abstract import PluginFactoryAbstract
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
     from openai.types.responses import (
@@ -46,10 +46,13 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
         for prepped_image in prepped_images:
             url: str
             match prepped_image:
-                case PreparedImageHttpUrl():
+                case PreparedFileHttpUrl():
                     url = prepped_image.url
-                case PreparedImageBase64():
+                case PreparedFileBase64():
                     url = prepped_image.as_data_url()
+                case PreparedFileLocalPath():
+                    msg = "PreparedFileLocalPath is not supported for images - should be converted to base64"
+                    raise TypeError(msg)
 
             image_param = ResponseInputImageParam(type="input_image", image_url=url, detail=detail.as_openai_detail)
             user_contents.append(image_param)

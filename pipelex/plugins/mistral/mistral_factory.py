@@ -29,15 +29,14 @@ from openai.types.chat.chat_completion_content_part_image_param import ImageURL 
 from pipelex import log
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
+from pipelex.cogt.file.file_preparation_utils import prepare_file_from_uri
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.image.prepared_image import PreparedImageBase64, PreparedImageHttpUrl
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images, prepare_prompt_image
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.mistral.mistral_exceptions import MistralExtractResponseError
-from pipelex.tools.uri.file_preparation_utils import prepare_file_from_uri
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 
@@ -85,10 +84,13 @@ class MistralFactory:
 
         image_url: str
         match prepared:
-            case PreparedImageBase64():
+            case PreparedFileBase64():
                 image_url = prepared.as_data_url()
-            case PreparedImageHttpUrl():
+            case PreparedFileHttpUrl():
                 image_url = prepared.url
+            case PreparedFileLocalPath():
+                msg = "PreparedFileLocalPath is not supported for images - should be converted to base64"
+                raise TypeError(msg)
 
         return ImageURLChunk(image_url=image_url)
 
@@ -119,10 +121,13 @@ class MistralFactory:
             for prepared in prepared_images:
                 url: str
                 match prepared:
-                    case PreparedImageBase64():
+                    case PreparedFileBase64():
                         url = prepared.as_data_url()
-                    case PreparedImageHttpUrl():
+                    case PreparedFileHttpUrl():
                         url = prepared.url
+                    case PreparedFileLocalPath():
+                        msg = "PreparedFileLocalPath is not supported for images - should be converted to base64"
+                        raise TypeError(msg)
 
                 image_url_obj = OpenAIImageURL(url=url, detail=detail.as_openai_detail)
                 image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
