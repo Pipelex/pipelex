@@ -21,7 +21,7 @@ def render_mermaid_html(
     mermaid_code: str,
     *,
     title: str = "Pipelex Graph",
-    theme: str = "default",
+    theme: str = "dark",
 ) -> str:
     """Render Mermaid code into a standalone HTML page (sync version).
 
@@ -31,7 +31,7 @@ def render_mermaid_html(
     Args:
         mermaid_code: The Mermaid flowchart code to embed.
         title: The page title (appears in browser tab and as h1).
-        theme: The Mermaid theme to use (default, base, dark, forest, neutral).
+        theme: The Mermaid theme to use (dark, default, base, forest, neutral).
 
     Returns:
         Complete HTML page as a string.
@@ -52,7 +52,7 @@ async def render_mermaid_html_async(
     mermaid_code: str,
     *,
     title: str = "Pipelex Graph",
-    theme: str = "default",
+    theme: str = "dark",
 ) -> str:
     """Render Mermaid code into a standalone HTML page (async version).
 
@@ -61,7 +61,7 @@ async def render_mermaid_html_async(
     Args:
         mermaid_code: The Mermaid flowchart code to embed.
         title: The page title (appears in browser tab and as h1).
-        theme: The Mermaid theme to use (default, base, dark, forest, neutral).
+        theme: The Mermaid theme to use (dark, default, base, forest, neutral).
 
     Returns:
         Complete HTML page as a string.
@@ -86,7 +86,7 @@ async def render_mermaid_html_with_data_async(
     stuff_metadata: dict[str, dict[str, str]] | None = None,
     *,
     title: str = "Pipelex Graph",
-    theme: str = "default",
+    theme: str = "dark",
 ) -> str:
     """Render Mermaid code with clickable stuff nodes into a standalone HTML page.
 
@@ -101,7 +101,7 @@ async def render_mermaid_html_with_data_async(
         stuff_data_html: Mapping from stuff mermaid IDs to their HTML representation.
         stuff_metadata: Mapping from stuff mermaid IDs to their display metadata (name, concept).
         title: The page title (appears in browser tab and as h1).
-        theme: The Mermaid theme to use (default, base, dark, forest, neutral).
+        theme: The Mermaid theme to use (dark, default, base, forest, neutral).
 
     Returns:
         Complete HTML page as a string with interactive data display.
