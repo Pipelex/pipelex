@@ -17,7 +17,6 @@ from pipelex.graph.mermaid import (
     collect_stuff_data_html,
     collect_stuff_data_text,
     graphspec_to_combo_mermaid,
-    graphspec_to_dataflow_mermaid,
 )
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
@@ -64,7 +63,6 @@ class TestGraphRenderersFromJson:
 
         This test generates:
 
-        - dataflow.mmd + dataflow.html (Mermaid dataflow view)
         - combo.mmd + combo.html (Mermaid combo view)
         - reactflow.html (ReactFlow interactive view)
         - viewspec.json (ViewSpec used by ReactFlow)
@@ -89,23 +87,6 @@ class TestGraphRenderersFromJson:
         pretty_print(graph_config, title="Graph config")
 
         # ==================== MERMAID OUTPUTS ====================
-
-        # Dataflow with data
-        dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
-        (output_dir / "dataflow.mmd").write_text(dataflow_output.mermaid_code, encoding="utf-8")
-        has_dataflow_data = dataflow_output.stuff_data or dataflow_output.stuff_data_text or dataflow_output.stuff_data_html
-        if has_dataflow_data:
-            dataflow_html = await render_mermaid_html_with_data_async(
-                dataflow_output.mermaid_code,
-                stuff_data=dataflow_output.stuff_data,
-                stuff_data_text=dataflow_output.stuff_data_text,
-                stuff_data_html=dataflow_output.stuff_data_html,
-                stuff_metadata=dataflow_output.stuff_metadata,
-                title=f"Dataflow (Interactive): {topic}",
-            )
-        else:
-            dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title=f"Dataflow: {topic}")
-        (output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
 
         # Combo with data
         combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
@@ -158,8 +139,6 @@ class TestGraphRenderersFromJson:
 
         # Verify all files were created
         expected_files = [
-            "dataflow.mmd",
-            "dataflow.html",
             "combo.mmd",
             "combo.html",
             "viewspec.json",
@@ -193,7 +172,6 @@ class TestGraphRenderersFromJson:
             f"✅ All renderings generated for '{topic}':\n"
             f"  📁 Output: {output_dir}\n"
             f"  📊 Mermaid:\n"
-            f"     - dataflow.html\n"
             f"     - combo.html\n"
             f"  🔷 ReactFlow:\n"
             f"     - reactflow.html"

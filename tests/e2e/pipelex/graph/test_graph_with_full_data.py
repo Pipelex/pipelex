@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from pipelex import log, pretty_print
+from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.graph.graph_analysis import GraphAnalysis
@@ -18,7 +18,6 @@ from pipelex.graph.graphspec_io import save_graphspec
 from pipelex.graph.mermaid import (
     FlowchartDirection,
     graphspec_to_combo_mermaid,
-    graphspec_to_dataflow_mermaid,
 )
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
@@ -64,28 +63,6 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     log.info(f"Saved graph.json to: {graph_json_path}")
 
     # Generate and save mermaid files
-    # Dataflow with data
-    dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
-    (output_dir / "dataflow.mmd").write_text(dataflow_output.mermaid_code, encoding="utf-8")
-
-    log.info(f"Dataflow stuff_data keys: {list(dataflow_output.stuff_data.keys()) if dataflow_output.stuff_data else []}")
-    pretty_print(dataflow_output.stuff_data, title="Dataflow stuff_data")
-
-    has_dataflow_data = dataflow_output.stuff_data or dataflow_output.stuff_data_text or dataflow_output.stuff_data_html
-    if has_dataflow_data:
-        dataflow_html = await render_mermaid_html_with_data_async(
-            dataflow_output.mermaid_code,
-            stuff_data=dataflow_output.stuff_data,
-            stuff_data_text=dataflow_output.stuff_data_text,
-            stuff_data_html=dataflow_output.stuff_data_html,
-            stuff_metadata=dataflow_output.stuff_metadata,
-            title="Dataflow (Interactive)",
-            theme=mermaid_theme,
-        )
-    else:
-        dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title="Dataflow", theme=mermaid_theme)
-    (output_dir / "dataflow.html").write_text(dataflow_html, encoding="utf-8")
-
     # Combo with data
     combo_output = graphspec_to_combo_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
     (output_dir / "combo.mmd").write_text(combo_output.mermaid_code, encoding="utf-8")
@@ -110,7 +87,6 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     log.info(f"✅ All graph outputs saved to: {output_dir}")
 
     return {
-        "dataflow_stuff_data_count": len(dataflow_output.stuff_data) if dataflow_output.stuff_data else 0,
         "combo_stuff_data_count": len(combo_output.stuff_data) if combo_output.stuff_data else 0,
     }
 
@@ -275,8 +251,8 @@ class TestGraphWithFullData:
         stats = await _save_graph_outputs(graph_spec, output_dir)
 
         # Verify stuff_data was collected
-        assert stats["dataflow_stuff_data_count"] > 0, (
-            f"Dataflow should have stuff_data extracted from graph. Graph has {inputs_with_data} inputs and {outputs_with_data} outputs with data."
+        assert stats["combo_stuff_data_count"] > 0, (
+            f"Combo should have stuff_data extracted from graph. Graph has {inputs_with_data} inputs and {outputs_with_data} outputs with data."
         )
 
         # Generate ReactFlow HTML
@@ -305,7 +281,6 @@ class TestGraphWithFullData:
             f"  - Edges: {len(graph_spec.edges)}\n"
             f"  - Inputs with data: {inputs_with_data}/{total_inputs}\n"
             f"  - Outputs with data: {outputs_with_data}/{total_outputs}\n"
-            f"  - Dataflow stuff_data entries: {stats['dataflow_stuff_data_count']}\n"
             f"  - Combo stuff_data entries: {stats['combo_stuff_data_count']}\n"
             f"  - ReactFlow HTML: {reactflow_path.stat().st_size} bytes"
         )

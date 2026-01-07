@@ -19,7 +19,6 @@ from pipelex.graph.mermaid import (
     collect_stuff_data_html,
     collect_stuff_data_text,
     graphspec_to_combo_mermaid,
-    graphspec_to_dataflow_mermaid,
 )
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
@@ -53,10 +52,6 @@ def graph_render_cmd(
         bool,
         typer.Option("--reactflow", "-r", help="Generate ReactFlow reactflow.html only"),
     ] = False,
-    all_views: Annotated[
-        bool,
-        typer.Option("--all", "-a", help="Generate all views: dataflow, combo (Mermaid) + ReactFlow"),
-    ] = False,
     subgraphs: Annotated[
         bool,
         typer.Option("--subgraphs/--no-subgraphs", help="Include controller subgraphs in combo Mermaid output"),
@@ -70,14 +65,12 @@ def graph_render_cmd(
 
     By default generates both combo.html (Mermaid) and reactflow.html.
     Use --mermaid or --reactflow to generate only one of them.
-    Use --all to generate all Mermaid views (dataflow, combo) + ReactFlow.
 
     Examples:
         pipelex graph render graph.json                    # combo.html + reactflow.html
         pipelex graph render graph.json --mermaid          # combo.html only
         pipelex graph render graph.json --reactflow        # reactflow.html only
-        pipelex graph render graph.json --all              # all views (dataflow, combo, reactflow)
-        pipelex graph render graph.json --mermaid --no-subgraphs  # flat combo view
+        pipelex graph render graph.json --mermaid --no-subgraphs  # flat combo view (no hierarchy)
         pipelex graph render graph.json --open             # open in browser
         pipelex graph render graph.json -o ./output/       # custom output directory
         pipelex graph render tests/data/graphs/cv_matching_graph.json --reactflow -o ./temp/test_outputs/
@@ -113,10 +106,8 @@ def graph_render_cmd(
         # - Default (no flags): combo.html + reactflow.html
         # - --mermaid: combo.html only
         # - --reactflow: reactflow.html only
-        # - --all: dataflow, combo + reactflow
-        generate_mermaid_combo = (not mermaid and not reactflow and not all_views) or mermaid or all_views
-        generate_reactflow = (not mermaid and not reactflow and not all_views) or reactflow or all_views
-        generate_dataflow = all_views
+        generate_mermaid_combo = (not mermaid and not reactflow) or mermaid
+        generate_reactflow = (not mermaid and not reactflow) or reactflow
 
         generated_files: list[Path] = []
 
@@ -137,26 +128,7 @@ def graph_render_cmd(
 
             flow_direction = direction or FlowchartDirection.TOP_DOWN
 
-            # Generate dataflow view (only with --all)
-            if generate_dataflow:
-                dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=flow_direction)
-                if dataflow_output.stuff_data:
-                    dataflow_html = await render_mermaid_html_with_data_async(
-                        dataflow_output.mermaid_code,
-                        stuff_data=dataflow_output.stuff_data,
-                        stuff_data_text=dataflow_output.stuff_data_text,
-                        stuff_data_html=dataflow_output.stuff_data_html,
-                        stuff_metadata=dataflow_output.stuff_metadata,
-                        title=f"Dataflow: {input_file.stem}",
-                    )
-                else:
-                    dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title=f"Dataflow: {input_file.stem}")
-                dataflow_html_path = output_dir / "dataflow.html"
-                dataflow_html_path.write_text(dataflow_html, encoding="utf-8")
-                generated_files.append(dataflow_html_path)
-                typer.secho("✅ dataflow.html", fg=typer.colors.GREEN, err=True)
-
-            # Generate combo view (default + --mermaid + --all)
+            # Generate combo view (default + --mermaid)
             if generate_mermaid_combo:
                 combo_output = graphspec_to_combo_mermaid(
                     graph_spec,
@@ -180,7 +152,7 @@ def graph_render_cmd(
                 generated_files.append(combo_html_path)
                 typer.secho("✅ combo.html", fg=typer.colors.GREEN, err=True)
 
-            # Generate ReactFlow view (default + --reactflow + --all)
+            # Generate ReactFlow view (default + --reactflow)
             if generate_reactflow:
                 # Create ViewSpec from GraphSpec
                 analysis = GraphAnalysis.from_graphspec(graph_spec)

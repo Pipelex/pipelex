@@ -259,8 +259,6 @@ stuff_html_content = true
 
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 graphspec_json = true
-dataflow_mmd = true
-dataflow_html = true
 combo_mmd = true
 combo_html = true
 reactflow_viewspec = true

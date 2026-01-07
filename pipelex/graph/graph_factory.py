@@ -1,7 +1,7 @@
 """Graph output factory for generating graph content.
 
 This module provides factory functions for generating graph outputs including
-JSON, Mermaid, ReactFlow, and HTML content for data flow and combo views.
+JSON, Mermaid, ReactFlow, and HTML content for combo views.
 """
 
 from __future__ import annotations
@@ -17,7 +17,6 @@ from pipelex.graph.mermaid import (
     collect_stuff_data_html,
     collect_stuff_data_text,
     graphspec_to_combo_mermaid,
-    graphspec_to_dataflow_mermaid,
 )
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
@@ -36,8 +35,6 @@ class GraphOutputs(BaseModel):
 
     Attributes:
         graphspec_json: The GraphSpec serialized as JSON.
-        dataflow_mmd: Data flow view as Mermaid flowchart code.
-        dataflow_html: Data flow view as standalone HTML page.
         combo_mmd: Combo view as Mermaid flowchart code.
         combo_html: Combo view as standalone HTML page.
         reactflow_viewspec: The ViewSpec serialized as JSON for ReactFlow rendering.
@@ -45,8 +42,6 @@ class GraphOutputs(BaseModel):
     """
 
     graphspec_json: str | None = None
-    dataflow_mmd: str | None = None
-    dataflow_html: str | None = None
     combo_mmd: str | None = None
     combo_html: str | None = None
     reactflow_viewspec: str | None = None
@@ -66,8 +61,7 @@ async def generate_graph_outputs(
 
     This can generate:
     - GraphSpec JSON: The canonical graph representation
-    - Data flow view: Shows how data flows between pipes (Mermaid)
-    - Combo view: Combined data flow with controller subgraphs (Mermaid)
+    - Combo view: Data flow with controller subgraphs (Mermaid)
     - ReactFlow ViewSpec: JSON for ReactFlow rendering
     - ReactFlow HTML: Interactive graph viewer
 
@@ -83,8 +77,6 @@ async def generate_graph_outputs(
     inclusion = graph_config.graphs_inclusion
 
     graphspec_json: str | None = None
-    dataflow_mmd: str | None = None
-    dataflow_html: str | None = None
     combo_mmd: str | None = None
     combo_html: str | None = None
     reactflow_viewspec: str | None = None
@@ -96,26 +88,6 @@ async def generate_graph_outputs(
 
     # Get the mermaid theme from config
     mermaid_theme = graph_config.mermaid_config.style.theme
-
-    # Generate data flow view
-    if inclusion.dataflow_mmd or inclusion.dataflow_html:
-        dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=direction)
-        if inclusion.dataflow_mmd:
-            dataflow_mmd = dataflow_output.mermaid_code
-        if inclusion.dataflow_html:
-            has_any_stuff_data = dataflow_output.stuff_data or dataflow_output.stuff_data_text or dataflow_output.stuff_data_html
-            if has_any_stuff_data:
-                dataflow_html = await render_mermaid_html_with_data_async(
-                    dataflow_output.mermaid_code,
-                    stuff_data=dataflow_output.stuff_data,
-                    stuff_data_text=dataflow_output.stuff_data_text,
-                    stuff_data_html=dataflow_output.stuff_data_html,
-                    stuff_metadata=dataflow_output.stuff_metadata,
-                    title=f"Data Flow: {pipe_code}",
-                    theme=mermaid_theme,
-                )
-            else:
-                dataflow_html = await render_mermaid_html_async(dataflow_output.mermaid_code, title=f"Data Flow: {pipe_code}", theme=mermaid_theme)
 
     # Generate combo view
     if inclusion.combo_mmd or inclusion.combo_html:
@@ -168,8 +140,6 @@ async def generate_graph_outputs(
 
     return GraphOutputs(
         graphspec_json=graphspec_json,
-        dataflow_mmd=dataflow_mmd,
-        dataflow_html=dataflow_html,
         combo_mmd=combo_mmd,
         combo_html=combo_html,
         reactflow_viewspec=reactflow_viewspec,
