@@ -138,25 +138,25 @@ def graph_render_cmd(
 
             # Generate mermaidflow view (default + --mermaidflow)
             if generate_mermaidflow:
-                mermaidflow = MermaidflowFactory.make_from_graphspec(
+                the_mermaidflow = MermaidflowFactory.make_from_graphspec(
                     graph_spec,
                     graph_config,
                     direction=flow_direction,
                     include_subgraphs=subgraphs,
                 )
-                if mermaidflow.stuff_data:
+                if the_mermaidflow.stuff_data:
                     mermaidflow_html = await render_mermaid_html_with_data_async(
-                        mermaidflow.mermaid_code,
-                        stuff_data=mermaidflow.stuff_data,
-                        stuff_data_text=mermaidflow.stuff_data_text,
-                        stuff_data_html=mermaidflow.stuff_data_html,
-                        stuff_metadata=mermaidflow.stuff_metadata,
+                        the_mermaidflow.mermaid_code,
+                        stuff_data=the_mermaidflow.stuff_data,
+                        stuff_data_text=the_mermaidflow.stuff_data_text,
+                        stuff_data_html=the_mermaidflow.stuff_data_html,
+                        stuff_metadata=the_mermaidflow.stuff_metadata,
                         title=f"Mermaidflow: {input_file.stem}",
                         theme=mermaid_theme,
                     )
                 else:
                     mermaidflow_html = await render_mermaid_html_async(
-                        mermaidflow.mermaid_code,
+                        the_mermaidflow.mermaid_code,
                         title=f"Mermaidflow: {input_file.stem}",
                         theme=mermaid_theme,
                     )
