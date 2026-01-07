@@ -11,14 +11,12 @@ import pytest
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.graph.graphspec_io import load_graphspec
-from pipelex.graph.mermaid import (
-    FlowchartDirection,
-    graphspec_to_mermaidflow,
-)
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
 )
+from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.conftest import TEST_OUTPUTS_DIR
 from tests.e2e.pipelex.graph.test_data import GraphTestData
@@ -78,23 +76,23 @@ class TestMermaidFromJson:
         graph_config = self._get_graph_config_with_data()
 
         # Generate mermaidflow Mermaid with data
-        mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
-        assert mermaid_flow_and_stuff.mermaid_code.startswith("flowchart TD")
+        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+        assert mermaidflow.mermaid_code.startswith("flowchart TD")
 
         mermaidflow_mmd_path = output_dir / "mermaidflow.mmd"
-        mermaidflow_mmd_path.write_text(mermaid_flow_and_stuff.mermaid_code, encoding="utf-8")
+        mermaidflow_mmd_path.write_text(mermaidflow.mermaid_code, encoding="utf-8")
         log.info(f"Saved mermaidflow.mmd: {mermaidflow_mmd_path}")
-        log.info(f"Mermaidflow stuff_data count: {len(mermaid_flow_and_stuff.stuff_data) if mermaid_flow_and_stuff.stuff_data else 0}")
+        log.info(f"Mermaidflow stuff_data count: {len(mermaidflow.stuff_data) if mermaidflow.stuff_data else 0}")
 
-        if mermaid_flow_and_stuff.stuff_data:
+        if mermaidflow.stuff_data:
             mermaidflow_html = await render_mermaid_html_with_data_async(
-                mermaid_flow_and_stuff.mermaid_code,
-                stuff_data=mermaid_flow_and_stuff.stuff_data,
-                stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+                mermaidflow.mermaid_code,
+                stuff_data=mermaidflow.stuff_data,
+                stuff_metadata=mermaidflow.stuff_metadata,
                 title=f"Mermaidflow (Interactive): {topic}",
             )
         else:
-            mermaidflow_html = await render_mermaid_html_async(mermaid_flow_and_stuff.mermaid_code, title=f"Mermaidflow: {topic}")
+            mermaidflow_html = await render_mermaid_html_async(mermaidflow.mermaid_code, title=f"Mermaidflow: {topic}")
 
         mermaidflow_html_path = output_dir / "mermaidflow.html"
         mermaidflow_html_path.write_text(mermaidflow_html, encoding="utf-8")
@@ -122,9 +120,9 @@ class TestMermaidFromJson:
 
         graph_spec = load_graphspec(Path(graph_json_path))
         graph_config = self._get_graph_config_with_data()
-        mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config)
+        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config)
 
-        mermaid_code = mermaid_flow_and_stuff.mermaid_code
+        mermaid_code = mermaidflow.mermaid_code
 
         # Verify mermaidflow has both orchestration elements (subgraphs) and dataflow elements (stuff)
         assert "flowchart" in mermaid_code

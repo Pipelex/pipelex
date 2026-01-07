@@ -12,11 +12,11 @@ from pipelex import log, pretty_print
 from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import load_graphspec
-from pipelex.graph.mermaid import graphspec_to_mermaidflow
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
 )
+from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
@@ -86,20 +86,20 @@ class TestGraphRenderersFromJson:
         # ==================== MERMAID OUTPUTS ====================
 
         # Mermaidflow with data
-        mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
-        (output_dir / "mermaidflow.mmd").write_text(mermaid_flow_and_stuff.mermaid_code, encoding="utf-8")
-        has_mermaidflow_data = mermaid_flow_and_stuff.stuff_data or mermaid_flow_and_stuff.stuff_data_text or mermaid_flow_and_stuff.stuff_data_html
+        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+        (output_dir / "mermaidflow.mmd").write_text(mermaidflow.mermaid_code, encoding="utf-8")
+        has_mermaidflow_data = mermaidflow.stuff_data or mermaidflow.stuff_data_text or mermaidflow.stuff_data_html
         if has_mermaidflow_data:
             mermaidflow_html = await render_mermaid_html_with_data_async(
-                mermaid_flow_and_stuff.mermaid_code,
-                stuff_data=mermaid_flow_and_stuff.stuff_data,
-                stuff_data_text=mermaid_flow_and_stuff.stuff_data_text,
-                stuff_data_html=mermaid_flow_and_stuff.stuff_data_html,
-                stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+                mermaidflow.mermaid_code,
+                stuff_data=mermaidflow.stuff_data,
+                stuff_data_text=mermaidflow.stuff_data_text,
+                stuff_data_html=mermaidflow.stuff_data_html,
+                stuff_metadata=mermaidflow.stuff_metadata,
                 title=f"Mermaidflow (Interactive): {topic}",
             )
         else:
-            mermaidflow_html = await render_mermaid_html_async(mermaid_flow_and_stuff.mermaid_code, title=f"Mermaidflow: {topic}")
+            mermaidflow_html = await render_mermaid_html_async(mermaidflow.mermaid_code, title=f"Mermaidflow: {topic}")
         (output_dir / "mermaidflow.html").write_text(mermaidflow_html, encoding="utf-8")
 
         # ==================== REACTFLOW OUTPUTS ====================
@@ -151,18 +151,18 @@ class TestGraphRenderersFromJson:
         # should generate text/html representations from them
         if graph_config.data_inclusion.stuff_json_content:
             # Verify that stuff_data is populated in mermaidflow output
-            assert mermaid_flow_and_stuff.stuff_data is not None, "stuff_data should be populated when stuff_json_content=True"
-            assert len(mermaid_flow_and_stuff.stuff_data) > 0, "stuff_data should not be empty when graph has stuff with data"
+            assert mermaidflow.stuff_data is not None, "stuff_data should be populated when stuff_json_content=True"
+            assert len(mermaidflow.stuff_data) > 0, "stuff_data should not be empty when graph has stuff with data"
 
         if graph_config.data_inclusion.stuff_text_content:
             # Verify that stuff_data_text is populated (either from data_text or fallback from data)
-            assert mermaid_flow_and_stuff.stuff_data_text is not None, "stuff_data_text should be populated when stuff_text_content=True"
-            assert len(mermaid_flow_and_stuff.stuff_data_text) > 0, "stuff_data_text should not be empty when graph has stuff with data"
+            assert mermaidflow.stuff_data_text is not None, "stuff_data_text should be populated when stuff_text_content=True"
+            assert len(mermaidflow.stuff_data_text) > 0, "stuff_data_text should not be empty when graph has stuff with data"
 
         if graph_config.data_inclusion.stuff_html_content:
             # Verify that stuff_data_html is populated (either from data_html or fallback from data)
-            assert mermaid_flow_and_stuff.stuff_data_html is not None, "stuff_data_html should be populated when stuff_html_content=True"
-            assert len(mermaid_flow_and_stuff.stuff_data_html) > 0, "stuff_data_html should not be empty when graph has stuff with data"
+            assert mermaidflow.stuff_data_html is not None, "stuff_data_html should be populated when stuff_html_content=True"
+            assert len(mermaidflow.stuff_data_html) > 0, "stuff_data_html should not be empty when graph has stuff with data"
 
         # Summary
         log.info(

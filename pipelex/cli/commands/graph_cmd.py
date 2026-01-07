@@ -20,8 +20,8 @@ from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import load_graphspec
-from pipelex.graph.mermaid import graphspec_to_mermaidflow
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
+from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
@@ -135,25 +135,25 @@ def graph_render_cmd(
 
             # Generate mermaidflow view (default + --mermaidflow)
             if generate_mermaidflow:
-                mermaid_flow_and_stuff = graphspec_to_mermaidflow(
+                mermaidflow = MermaidflowFactory.make_from_graphspec(
                     graph_spec,
                     graph_config,
                     direction=flow_direction,
                     include_subgraphs=subgraphs,
                 )
-                if mermaid_flow_and_stuff.stuff_data:
+                if mermaidflow.stuff_data:
                     mermaidflow_html = await render_mermaid_html_with_data_async(
-                        mermaid_flow_and_stuff.mermaid_code,
-                        stuff_data=mermaid_flow_and_stuff.stuff_data,
-                        stuff_data_text=mermaid_flow_and_stuff.stuff_data_text,
-                        stuff_data_html=mermaid_flow_and_stuff.stuff_data_html,
-                        stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+                        mermaidflow.mermaid_code,
+                        stuff_data=mermaidflow.stuff_data,
+                        stuff_data_text=mermaidflow.stuff_data_text,
+                        stuff_data_html=mermaidflow.stuff_data_html,
+                        stuff_metadata=mermaidflow.stuff_metadata,
                         title=f"Mermaidflow: {input_file.stem}",
                         theme=mermaid_theme,
                     )
                 else:
                     mermaidflow_html = await render_mermaid_html_async(
-                        mermaid_flow_and_stuff.mermaid_code,
+                        mermaidflow.mermaid_code,
                         title=f"Mermaidflow: {input_file.stem}",
                         theme=mermaid_theme,
                     )

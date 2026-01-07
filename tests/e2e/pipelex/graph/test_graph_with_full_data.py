@@ -15,18 +15,16 @@ from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.graphspec_io import save_graphspec
-from pipelex.graph.mermaid import (
-    FlowchartDirection,
-    graphspec_to_mermaidflow,
-)
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
 )
+from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.cases import PDFTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
@@ -64,30 +62,30 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
 
     # Generate and save mermaid files
     # Mermaidflow with data
-    mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
-    (output_dir / "mermaidflow.mmd").write_text(mermaid_flow_and_stuff.mermaid_code, encoding="utf-8")
+    mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
+    (output_dir / "mermaidflow.mmd").write_text(mermaidflow.mermaid_code, encoding="utf-8")
 
-    log.info(f"Mermaidflow stuff_data keys: {list(mermaid_flow_and_stuff.stuff_data.keys()) if mermaid_flow_and_stuff.stuff_data else []}")
+    log.info(f"Mermaidflow stuff_data keys: {list(mermaidflow.stuff_data.keys()) if mermaidflow.stuff_data else []}")
 
-    has_mermaidflow_data = mermaid_flow_and_stuff.stuff_data or mermaid_flow_and_stuff.stuff_data_text or mermaid_flow_and_stuff.stuff_data_html
+    has_mermaidflow_data = mermaidflow.stuff_data or mermaidflow.stuff_data_text or mermaidflow.stuff_data_html
     if has_mermaidflow_data:
         mermaidflow_html = await render_mermaid_html_with_data_async(
-            mermaid_flow_and_stuff.mermaid_code,
-            stuff_data=mermaid_flow_and_stuff.stuff_data,
-            stuff_data_text=mermaid_flow_and_stuff.stuff_data_text,
-            stuff_data_html=mermaid_flow_and_stuff.stuff_data_html,
-            stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+            mermaidflow.mermaid_code,
+            stuff_data=mermaidflow.stuff_data,
+            stuff_data_text=mermaidflow.stuff_data_text,
+            stuff_data_html=mermaidflow.stuff_data_html,
+            stuff_metadata=mermaidflow.stuff_metadata,
             title="Mermaidflow (Interactive)",
             theme=mermaid_theme,
         )
     else:
-        mermaidflow_html = await render_mermaid_html_async(mermaid_flow_and_stuff.mermaid_code, title="Mermaidflow", theme=mermaid_theme)
+        mermaidflow_html = await render_mermaid_html_async(mermaidflow.mermaid_code, title="Mermaidflow", theme=mermaid_theme)
     (output_dir / "mermaidflow.html").write_text(mermaidflow_html, encoding="utf-8")
 
     log.info(f"✅ All graph outputs saved to: {output_dir}")
 
     return {
-        "mermaidflow_stuff_data_count": len(mermaid_flow_and_stuff.stuff_data) if mermaid_flow_and_stuff.stuff_data else 0,
+        "mermaidflow_stuff_data_count": len(mermaidflow.stuff_data) if mermaidflow.stuff_data else 0,
     }
 
 

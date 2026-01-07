@@ -13,8 +13,8 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import graphspec_to_json
-from pipelex.graph.mermaid import graphspec_to_mermaidflow
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
+from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
@@ -88,25 +88,23 @@ async def generate_graph_outputs(
 
     # Generate mermaidflow view
     if inclusion.mermaidflow_mmd or inclusion.mermaidflow_html:
-        mermaid_flow_and_stuff = graphspec_to_mermaidflow(graph_spec, graph_config, direction=direction)
+        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=direction)
         if inclusion.mermaidflow_mmd:
-            mermaidflow_mmd = mermaid_flow_and_stuff.mermaid_code
+            mermaidflow_mmd = mermaidflow.mermaid_code
         if inclusion.mermaidflow_html:
-            has_any_stuff_data = mermaid_flow_and_stuff.stuff_data or mermaid_flow_and_stuff.stuff_data_text or mermaid_flow_and_stuff.stuff_data_html
+            has_any_stuff_data = mermaidflow.stuff_data or mermaidflow.stuff_data_text or mermaidflow.stuff_data_html
             if has_any_stuff_data:
                 mermaidflow_html = await render_mermaid_html_with_data_async(
-                    mermaid_flow_and_stuff.mermaid_code,
-                    stuff_data=mermaid_flow_and_stuff.stuff_data,
-                    stuff_data_text=mermaid_flow_and_stuff.stuff_data_text,
-                    stuff_data_html=mermaid_flow_and_stuff.stuff_data_html,
-                    stuff_metadata=mermaid_flow_and_stuff.stuff_metadata,
+                    mermaidflow.mermaid_code,
+                    stuff_data=mermaidflow.stuff_data,
+                    stuff_data_text=mermaidflow.stuff_data_text,
+                    stuff_data_html=mermaidflow.stuff_data_html,
+                    stuff_metadata=mermaidflow.stuff_metadata,
                     title=f"Mermaidflow: {pipe_code}",
                     theme=mermaid_theme,
                 )
             else:
-                mermaidflow_html = await render_mermaid_html_async(
-                    mermaid_flow_and_stuff.mermaid_code, title=f"Mermaidflow: {pipe_code}", theme=mermaid_theme
-                )
+                mermaidflow_html = await render_mermaid_html_async(mermaidflow.mermaid_code, title=f"Mermaidflow: {pipe_code}", theme=mermaid_theme)
 
     # Generate ReactFlow outputs
     if inclusion.reactflow_viewspec or inclusion.reactflow_html:
