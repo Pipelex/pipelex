@@ -12,7 +12,7 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_ji
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
 # Template registry keys
-_PIPELEX_TEMPLATE_KEY = "mermaid/pipelex.html.jinja2"
+_BASIC_TEMPLATE_KEY = "mermaid/basic.html.jinja2"
 _INTERACTIVE_TEMPLATE_KEY = "mermaid/interactive.html.jinja2"
 
 
@@ -35,7 +35,7 @@ def render_mermaid_html(
     Returns:
         Complete HTML page as a string.
     """
-    template_source = TemplateRegistry.get(_PIPELEX_TEMPLATE_KEY)
+    template_source = TemplateRegistry.get(_BASIC_TEMPLATE_KEY)
     return render_jinja2_sync(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
@@ -66,7 +66,7 @@ async def render_mermaid_html_async(
     Returns:
         Complete HTML page as a string.
     """
-    template_source = TemplateRegistry.get(_PIPELEX_TEMPLATE_KEY)
+    template_source = TemplateRegistry.get(_BASIC_TEMPLATE_KEY)
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,

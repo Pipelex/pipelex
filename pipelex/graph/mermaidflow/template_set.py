@@ -13,13 +13,13 @@ MERMAID_TEMPLATES_PACKAGE = "pipelex.graph.mermaidflow.templates"
 # List of (filename, registry_key) tuples
 MERMAID_TEMPLATES = [
     # Main templates
-    ("mermaid_pipelex.html.jinja2", "mermaid/pipelex.html.jinja2"),
+    ("mermaid_basic.html.jinja2", "mermaid/basic.html.jinja2"),
     ("mermaid_interactive.html.jinja2", "mermaid/interactive.html.jinja2"),
-    # Pipelex partials
-    ("_pipelex_head.html.jinja2", "mermaid/_pipelex_head.html.jinja2"),
-    ("_pipelex_styles.css.jinja2", "mermaid/_pipelex_styles.css.jinja2"),
-    ("_pipelex_body.html.jinja2", "mermaid/_pipelex_body.html.jinja2"),
-    ("_pipelex_scripts.js.jinja2", "mermaid/_pipelex_scripts.js.jinja2"),
+    # Basic partials
+    ("_basic_head.html.jinja2", "mermaid/_basic_head.html.jinja2"),
+    ("_basic_styles.css.jinja2", "mermaid/_basic_styles.css.jinja2"),
+    ("_basic_body.html.jinja2", "mermaid/_basic_body.html.jinja2"),
+    ("_basic_scripts.js.jinja2", "mermaid/_basic_scripts.js.jinja2"),
     # Interactive partials
     ("_interactive_head.html.jinja2", "mermaid/_interactive_head.html.jinja2"),
     ("_interactive_styles.css.jinja2", "mermaid/_interactive_styles.css.jinja2"),
