@@ -1,0 +1,73 @@
+<div id="app-container">
+    <header class="header">
+        <div class="header-left">
+            <img src="{{ logo_dark }}" alt="Pipelex" class="header-logo dark-logo">
+            <img src="{{ logo_light }}" alt="Pipelex" class="header-logo light-logo">
+            <span class="header-title">{{ title }}</span>
+        </div>
+        <button id="theme-toggle" class="theme-toggle" title="Toggle theme (Dark/Light/System)">
+            <span class="theme-icon dark-icon">🌙</span>
+            <span class="theme-icon light-icon">☀️</span>
+            <span class="theme-icon system-icon">💻</span>
+        </button>
+    </header>
+    <div id="root"></div>
+</div>
+
+<div id="inspector" class="inspector-panel">
+    <div class="inspector-resize-handle" id="inspector-resize-handle"></div>
+    <div class="inspector-header" id="inspector-header">
+        <div>
+            <div id="inspector-title" class="inspector-title">Node Details</div>
+            <div id="inspector-subtitle" class="inspector-subtitle"></div>
+        </div>
+        <span class="inspector-close" onclick="closeInspector()">&times;</span>
+    </div>
+    <div id="inspector-content" class="inspector-content"></div>
+</div>
+
+<div class="top-hint" id="top-hint">Click on nodes to view details</div>
+
+<!-- Full-screen modal for stuff data -->
+<div id="fullscreen-modal" class="fullscreen-modal">
+    <div class="fullscreen-header">
+        <div class="fullscreen-header-left">
+            <div id="fullscreen-title" class="fullscreen-title">Data</div>
+            <div id="fullscreen-subtitle" class="fullscreen-subtitle">Data Item</div>
+        </div>
+        <span class="fullscreen-close" onclick="closeFullscreen()">&times;</span>
+    </div>
+    <div class="fullscreen-toolbar">
+        <div class="format-tabs" id="fullscreen-format-tabs"></div>
+        <div class="format-actions">
+            <button class="action-btn" id="fullscreen-copy-btn" onclick="copyStuffContent()" title="Copy">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            </button>
+            <button class="action-btn" id="fullscreen-download-btn" onclick="downloadStuffContent()" title="Download">
+                <svg viewBox="0 0 24 24"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+            </button>
+        </div>
+    </div>
+    <div id="fullscreen-content" class="fullscreen-content"></div>
+</div>
+
+<footer class="footer">
+    <div class="footer-legend">
+        <div class="legend-item"><div class="legend-dot pipe"></div>Pipe</div>
+        <div class="legend-item"><div class="legend-dot stuff"></div>Data</div>
+        <div class="legend-item"><div class="legend-dot success"></div>Success</div>
+        <div class="legend-item"><div class="legend-dot error"></div>Failed</div>
+    </div>
+    <div class="footer-stats" id="footer-stats"></div>
+</footer>
+
+<!-- Embedded ViewSpec -->
+<script type="application/json" id="pipelex-viewspec">{{ viewspec_json }}</script>
+{% if graphspec_json %}
+<!-- Embedded GraphSpec (for dataflow extraction) -->
+<script type="application/json" id="pipelex-graphspec">{{ graphspec_json }}</script>
+{% endif %}
+<!-- Embedded stuff data in multiple formats for display toggle -->
+<script type="application/json" id="pipelex-stuff-data-text">{{ stuff_data_text_json }}</script>
+<script type="application/json" id="pipelex-stuff-data-html">{{ stuff_data_html_json }}</script>
+

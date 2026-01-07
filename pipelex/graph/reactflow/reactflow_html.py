@@ -51,7 +51,7 @@ def generate_reactflow_html(
     if graphspec:
         graphspec_json = json.dumps(graphspec.model_dump(mode="json"), indent=2)
 
-    # Render template
+    # Render template (use_registry=True to support {% include %} directives)
     return render_jinja2_sync(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
@@ -71,6 +71,7 @@ def generate_reactflow_html(
             "pan_to_top": config.pan_to_top,
             "initial_theme": config.style.theme,
         },
+        use_registry=True,
     )
 
 
@@ -109,7 +110,7 @@ async def generate_reactflow_html_async(
     if graphspec:
         graphspec_json = json.dumps(graphspec.model_dump(mode="json"), indent=2)
 
-    # Render template
+    # Render template (use_registry=True to support {% include %} directives)
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
@@ -129,4 +130,5 @@ async def generate_reactflow_html_async(
             "pan_to_top": config.pan_to_top,
             "initial_theme": config.style.theme,
         },
+        use_registry=True,
     )

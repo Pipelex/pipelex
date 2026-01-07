@@ -31,6 +31,11 @@ from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.validation import report_validation_error
+from pipelex.graph.reactflow.template_set import (
+    REACTFLOW_TEMPLATE_SET_NAME,
+    REACTFLOW_TEMPLATES,
+    REACTFLOW_TEMPLATES_PACKAGE,
+)
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -213,7 +218,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
-        # Load Jinja2 templates into registry
+        TemplateLoader.register_set(
+            name=REACTFLOW_TEMPLATE_SET_NAME,
+            package=REACTFLOW_TEMPLATES_PACKAGE,
+            templates=REACTFLOW_TEMPLATES,
+        )
         TemplateLoader.load_all()
 
         self.library_manager = library_manager or LibraryManager()

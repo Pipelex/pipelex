@@ -9,7 +9,10 @@ from jinja2.exceptions import (
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.tools.jinja2.jinja2_environment import make_jinja2_env_without_loader
+from pipelex.tools.jinja2.jinja2_environment import (
+    make_jinja2_env_from_registry,
+    make_jinja2_env_without_loader,
+)
 from pipelex.tools.jinja2.jinja2_errors import (
     Jinja2ContextError,
     Jinja2StuffError,
@@ -31,10 +34,16 @@ class _Jinja2Template(Protocol):
     def render_async(self, **kwargs: Any) -> Awaitable[str]: ...
 
 
-def _compile_jinja2_template(template_source: str, template_category: TemplateCategory) -> _Jinja2Template:
-    jinja2_env = make_jinja2_env_without_loader(
-        template_category=template_category,
-    )
+def _compile_jinja2_template(
+    template_source: str,
+    template_category: TemplateCategory,
+    *,
+    use_registry: bool = False,
+) -> _Jinja2Template:
+    if use_registry:
+        jinja2_env = make_jinja2_env_from_registry(template_category=template_category)
+    else:
+        jinja2_env = make_jinja2_env_without_loader(template_category=template_category)
 
     try:
         return jinja2_env.from_string(template_source)
@@ -128,10 +137,13 @@ def render_jinja2_sync(
     template_category: TemplateCategory,
     temlating_context: dict[str, Any],
     templating_style: TemplatingStyle | None = None,
+    *,
+    use_registry: bool = False,
 ) -> str:
     template = _compile_jinja2_template(
         template_source=template_source,
         template_category=template_category,
+        use_registry=use_registry,
     )
     prepared_templating_context = _prepare_templating_context(
         temlating_context=temlating_context,
@@ -149,10 +161,13 @@ async def render_jinja2_async(
     template_category: TemplateCategory,
     temlating_context: dict[str, Any],
     templating_style: TemplatingStyle | None = None,
+    *,
+    use_registry: bool = False,
 ) -> str:
     template = _compile_jinja2_template(
         template_source=template_source,
         template_category=template_category,
+        use_registry=use_registry,
     )
     prepared_templating_context = _prepare_templating_context(
         temlating_context=temlating_context,

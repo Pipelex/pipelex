@@ -116,63 +116,72 @@ class TestTemplateLoader:
     """Tests for the centralized TemplateLoader."""
 
     def setup_method(self) -> None:
-        """Clear registry and reload templates before each test."""
+        """Clear registry and loader state before each test."""
         TemplateRegistry.clear()
         TemplateLoader.reset()
-        TemplateLoader.load_all()
+        # Register a test template set for testing
+        TemplateLoader.register_set(
+            name="test_set",
+            package="pipelex.graph.reactflow.templates",
+            templates=[("reactflow.html.jinja2", "test/template.html.jinja2")],
+        )
 
-    def test_load_registers_reactflow_template(self) -> None:
-        """Test that load() registers the ReactFlow template."""
-        # Verify template is registered
-        assert TemplateRegistry.is_registered("reactflow/main.html.jinja2")
+    def test_register_set(self) -> None:
+        """Test that register_set() adds a template set."""
+        TemplateLoader.register_set(
+            name="another_set",
+            package="pipelex.graph.mermaidflow.templates",
+            templates=[("mermaid.html.jinja2", "mermaid/main.html.jinja2")],
+        )
+        assert "another_set" in TemplateLoader.available_sets()
 
-        # Verify content looks like the ReactFlow template
-        template_content = TemplateRegistry.get("reactflow/main.html.jinja2")
-        assert "<!DOCTYPE html>" in template_content
-        assert "ReactFlow" in template_content
+    def test_register_duplicate_is_idempotent(self) -> None:
+        """Test that registering duplicate set is idempotent."""
+        # Register again - should be no-op
+        TemplateLoader.register_set(
+            name="test_set",
+            package="pipelex.graph.reactflow.templates",
+            templates=[("reactflow.html.jinja2", "test/template.html.jinja2")],
+        )
+        # Should still be registered
+        assert "test_set" in TemplateLoader.available_sets()
+
+    def test_load_registers_template(self) -> None:
+        """Test that load() registers the specified template set."""
+        TemplateLoader.load("test_set")
+        assert TemplateRegistry.is_registered("test/template.html.jinja2")
 
     def test_load_is_idempotent(self) -> None:
         """Test that calling load() multiple times is safe."""
-        # Get initial content
-        initial_content = TemplateRegistry.get("reactflow/main.html.jinja2")
+        TemplateLoader.load("test_set")
+        initial_content = TemplateRegistry.get("test/template.html.jinja2")
+        TemplateLoader.load("test_set")
+        assert TemplateRegistry.get("test/template.html.jinja2") == initial_content
 
-        # Call again - should be no-op
-        TemplateLoader.load("reactflow")
+    def test_reload(self) -> None:
+        """Test that reload() forces a fresh load."""
+        TemplateLoader.load("test_set")
+        initial_content = TemplateRegistry.get("test/template.html.jinja2")
+        TemplateLoader.reload("test_set")
+        assert TemplateRegistry.get("test/template.html.jinja2") == initial_content
 
-        # Content should be identical
-        assert TemplateRegistry.get("reactflow/main.html.jinja2") == initial_content
-
-    def test_reload_specific_set(self) -> None:
-        """Test that reload() forces a fresh load of specific set."""
-        # Get initial content
-        initial_content = TemplateRegistry.get("reactflow/main.html.jinja2")
-
-        # Reload templates
-        TemplateLoader.reload("reactflow")
-
-        # Content should still be present after reload
-        assert TemplateRegistry.is_registered("reactflow/main.html.jinja2")
-        reloaded_content = TemplateRegistry.get("reactflow/main.html.jinja2")
-        assert reloaded_content == initial_content
-
-    def test_reload_all(self) -> None:
-        """Test that reload() without args reloads all sets."""
-        # Reload all
-        TemplateLoader.reload()
-
-        # ReactFlow should still be loaded
-        assert TemplateRegistry.is_registered("reactflow/main.html.jinja2")
+    def test_load_all(self) -> None:
+        """Test that load_all() loads all registered template sets."""
+        TemplateLoader.load_all()
+        assert TemplateRegistry.is_registered("test/template.html.jinja2")
 
     def test_load_unknown_set_raises(self) -> None:
         """Test that loading unknown template set raises ValueError."""
-        with pytest.raises(ValueError, match="Unknown template set"):
+        with pytest.raises(ValueError, match="Unknown template set 'nonexistent'"):
             TemplateLoader.load("nonexistent")
 
     def test_is_loaded(self) -> None:
         """Test that is_loaded() tracks loaded state."""
-        assert TemplateLoader.is_loaded("reactflow")
+        assert not TemplateLoader.is_loaded("test_set")
+        TemplateLoader.load("test_set")
+        assert TemplateLoader.is_loaded("test_set")
 
     def test_available_sets(self) -> None:
-        """Test that available_sets() returns defined sets."""
+        """Test that available_sets() returns registered sets."""
         sets = TemplateLoader.available_sets()
-        assert "reactflow" in sets
+        assert "test_set" in sets

@@ -81,32 +81,36 @@ def clear_template_cache() -> None:
 class TemplateLoader:
     """Centralized loader for all Jinja2 template sets.
 
-    Template sets are defined here with their package location and the
-    list of templates to load. The loading logic is centralized and shared.
+    Template sets are registered at boot time by feature modules,
+    then loaded into the TemplateRegistry for sandbox-safe rendering.
     """
 
     # Template set definitions: name -> (package, [(filename, registry_key), ...])
-    # Add new template sets here as needed
-    _TEMPLATE_SETS: ClassVar[dict[str, tuple[str, list[tuple[str, str]]]]] = {
-        "reactflow": (
-            "pipelex.graph.reactflow.templates",
-            [
-                ("reactflow.html.jinja2", "reactflow/main.html.jinja2"),
-                # Future: add partial templates here when splitting the main template
-                # ("_styles.css.jinja2", "reactflow/_styles.css.jinja2"),
-            ],
-        ),
-        # Future: add mermaid templates
-        # "mermaid": (
-        #     "pipelex.graph.mermaidflow.templates",
-        #     [
-        #         ("mermaid_pipelex.html.jinja2", "mermaid/pipelex.html.jinja2"),
-        #         ("mermaid_interactive.html.jinja2", "mermaid/interactive.html.jinja2"),
-        #     ],
-        # ),
-    }
+    _TEMPLATE_SETS: ClassVar[dict[str, tuple[str, list[tuple[str, str]]]]] = {}
 
     _loaded: ClassVar[set[str]] = set()
+
+    @classmethod
+    def register_set(
+        cls,
+        name: str,
+        package: str,
+        templates: list[tuple[str, str]],
+    ) -> None:
+        """Register a template set for loading.
+
+        This method is idempotent - registering the same set multiple times
+        is safe and will not raise an error.
+
+        Args:
+            name: The template set name (e.g., "reactflow").
+            package: The package path where templates are located.
+            templates: List of (filename, registry_key) tuples.
+        """
+        if name in cls._TEMPLATE_SETS:
+            # Idempotent - already registered
+            return
+        cls._TEMPLATE_SETS[name] = (package, templates)
 
     @classmethod
     def load(cls, name: str) -> None:
@@ -189,7 +193,8 @@ class TemplateLoader:
     def reset(cls) -> None:
         """Reset the loader state.
 
-        Clears the loaded tracking. Does not clear the registry itself.
-        Useful for testing.
+        Clears both the registered template sets and loaded tracking.
+        Does not clear the registry itself. Useful for testing.
         """
+        cls._TEMPLATE_SETS.clear()
         cls._loaded.clear()

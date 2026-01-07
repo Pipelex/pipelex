@@ -9,9 +9,15 @@ from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html
+from pipelex.graph.reactflow.template_set import (
+    REACTFLOW_TEMPLATE_SET_NAME,
+    REACTFLOW_TEMPLATES,
+    REACTFLOW_TEMPLATES_PACKAGE,
+)
 from pipelex.graph.reactflow.viewspec import ViewSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
+from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
 
 class TestReactFlowHtml:
@@ -20,6 +26,13 @@ class TestReactFlowHtml:
     @pytest.fixture(autouse=True)
     def setup_templates(self) -> None:
         """Ensure ReactFlow templates are loaded before tests."""
+        TemplateRegistry.clear()
+        TemplateLoader.reset()
+        TemplateLoader.register_set(
+            name=REACTFLOW_TEMPLATE_SET_NAME,
+            package=REACTFLOW_TEMPLATES_PACKAGE,
+            templates=REACTFLOW_TEMPLATES,
+        )
         TemplateLoader.load("reactflow")
 
     @pytest.fixture
