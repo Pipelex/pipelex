@@ -3341,12 +3341,14 @@ mistralai = [
     { name = "mistralai" },
 ]
 s3 = [
+    { name = "aioboto3" },
     { name = "boto3" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'bedrock'", specifier = ">=13.4.0" },
+    { name = "aioboto3", marker = "extra == 's3'", specifier = ">=13.4.0" },
     { name = "aiofiles", specifier = ">=23.2.1" },
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=0.60.0" },
     { name = "backports-strenum", marker = "python_full_version < '3.11'", specifier = ">=1.3.0" },
