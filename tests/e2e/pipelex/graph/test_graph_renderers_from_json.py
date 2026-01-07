@@ -18,7 +18,6 @@ from pipelex.graph.mermaid import (
     collect_stuff_data_text,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
-    graphspec_to_orchestration_mermaid,
 )
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
@@ -65,7 +64,6 @@ class TestGraphRenderersFromJson:
 
         This test generates:
 
-        - orchestration.mmd + orchestration.html (Mermaid orchestration view)
         - dataflow.mmd + dataflow.html (Mermaid dataflow view)
         - combo.mmd + combo.html (Mermaid combo view)
         - reactflow.html (ReactFlow interactive view)
@@ -91,12 +89,6 @@ class TestGraphRenderersFromJson:
         pretty_print(graph_config, title="Graph config")
 
         # ==================== MERMAID OUTPUTS ====================
-
-        # Orchestration
-        orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-        (output_dir / "orchestration.mmd").write_text(orch_mermaid, encoding="utf-8")
-        orch_html = await render_mermaid_html_async(orch_mermaid, title=f"Orchestration: {topic}")
-        (output_dir / "orchestration.html").write_text(orch_html, encoding="utf-8")
 
         # Dataflow with data
         dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
@@ -166,8 +158,6 @@ class TestGraphRenderersFromJson:
 
         # Verify all files were created
         expected_files = [
-            "orchestration.mmd",
-            "orchestration.html",
             "dataflow.mmd",
             "dataflow.html",
             "combo.mmd",
@@ -203,7 +193,6 @@ class TestGraphRenderersFromJson:
             f"✅ All renderings generated for '{topic}':\n"
             f"  📁 Output: {output_dir}\n"
             f"  📊 Mermaid:\n"
-            f"     - orchestration.html\n"
             f"     - dataflow.html\n"
             f"     - combo.html\n"
             f"  🔷 ReactFlow:\n"

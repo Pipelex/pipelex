@@ -253,16 +253,6 @@ def run_cmd(
                 typer.secho(f"\n✅ GraphSpec JSON saved to: {graph_output_dir / 'graphspec.json'}", fg=typer.colors.GREEN)
                 saved_count += 1
 
-            if graph_outputs.orchestration_mmd is not None:
-                (graph_output_dir / "orchestration.mmd").write_text(graph_outputs.orchestration_mmd, encoding="utf-8")
-                typer.secho(f"✅ Orchestration Mermaid saved to: {graph_output_dir / 'orchestration.mmd'}", fg=typer.colors.GREEN)
-                saved_count += 1
-
-            if graph_outputs.orchestration_html is not None:
-                (graph_output_dir / "orchestration.html").write_text(graph_outputs.orchestration_html, encoding="utf-8")
-                typer.secho(f"✅ Orchestration HTML saved to: {graph_output_dir / 'orchestration.html'}", fg=typer.colors.GREEN)
-                saved_count += 1
-
             if graph_outputs.dataflow_mmd is not None:
                 (graph_output_dir / "dataflow.mmd").write_text(graph_outputs.dataflow_mmd, encoding="utf-8")
                 typer.secho(f"✅ Data flow Mermaid saved to: {graph_output_dir / 'dataflow.mmd'}", fg=typer.colors.GREEN)

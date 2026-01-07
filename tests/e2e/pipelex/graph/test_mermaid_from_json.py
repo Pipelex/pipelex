@@ -15,7 +15,6 @@ from pipelex.graph.mermaid import (
     FlowchartDirection,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
-    graphspec_to_orchestration_mermaid,
 )
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
@@ -55,7 +54,7 @@ class TestMermaidFromJson:
         This test:
 
         1. Loads a GraphSpec from JSON
-        2. Generates orchestration, dataflow, and combo Mermaid diagrams
+        2. Generates dataflow and combo Mermaid diagrams
         3. Renders each to HTML (with interactive data where applicable)
         4. Saves all outputs to TEST_OUTPUTS_DIR
         5. Verifies the structure of generated diagrams and HTML
@@ -78,20 +77,6 @@ class TestMermaidFromJson:
         log.info(f"Saving Mermaid outputs to: {output_dir}")
 
         graph_config = self._get_graph_config_with_data()
-
-        # Generate orchestration Mermaid
-        orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-        assert orch_mermaid.startswith("flowchart TD")
-        assert "subgraph" in orch_mermaid  # Should have subgraphs for controllers
-
-        orch_mmd_path = output_dir / "orchestration.mmd"
-        orch_mmd_path.write_text(orch_mermaid, encoding="utf-8")
-        log.info(f"Saved orchestration.mmd: {orch_mmd_path}")
-
-        orch_html = await render_mermaid_html_async(orch_mermaid, title=f"Orchestration: {topic}")
-        orch_html_path = output_dir / "orchestration.html"
-        orch_html_path.write_text(orch_html, encoding="utf-8")
-        log.info(f"Saved orchestration.html: {orch_html_path}")
 
         # Generate dataflow Mermaid with data
         dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
@@ -140,15 +125,13 @@ class TestMermaidFromJson:
         log.info(f"Saved combo.html: {combo_html_path}")
 
         # Verify all files were saved
-        assert orch_mmd_path.exists()
-        assert orch_html_path.exists()
         assert dataflow_mmd_path.exists()
         assert dataflow_html_path.exists()
         assert combo_mmd_path.exists()
         assert combo_html_path.exists()
 
         # Verify HTML structure
-        for html_path in [orch_html_path, dataflow_html_path, combo_html_path]:
+        for html_path in [dataflow_html_path, combo_html_path]:
             html_content = html_path.read_text(encoding="utf-8")
             assert html_content.startswith("<!DOCTYPE html>")
             assert "mermaid" in html_content
@@ -156,31 +139,9 @@ class TestMermaidFromJson:
 
         log.info(
             f"✅ Mermaid generation complete for '{topic}':\n"
-            f"  - Orchestration: {orch_mmd_path.stat().st_size} bytes\n"
             f"  - Dataflow: {dataflow_mmd_path.stat().st_size} bytes\n"
             f"  - Combo: {combo_mmd_path.stat().st_size} bytes"
         )
-
-    @pytest.mark.parametrize(
-        ("topic", "graph_json_path"),
-        GraphTestData.GRAPH_JSON_TEST_CASES,
-    )
-    async def test_orchestration_mermaid_structure(self, topic: str, graph_json_path: str) -> None:
-        """Test that orchestration Mermaid has correct structure."""
-        _ = topic  # Used for test identification
-
-        graph_spec = load_graphspec(Path(graph_json_path))
-
-        # Generate orchestration with different directions
-        for direction in [FlowchartDirection.TOP_DOWN, FlowchartDirection.LEFT_TO_RIGHT]:
-            orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=direction)
-
-            # Verify direction is in header
-            assert f"flowchart {direction.mermaid_code}" in orch_mermaid
-
-            # Verify style definitions are present
-            assert "classDef failed" in orch_mermaid
-            assert "classDef controller" in orch_mermaid
 
     @pytest.mark.parametrize(
         ("topic", "graph_json_path"),

@@ -1,7 +1,7 @@
 """Graph output factory for generating graph content.
 
 This module provides factory functions for generating graph outputs including
-JSON, Mermaid, ReactFlow, and HTML content for orchestration, data flow, and combo views.
+JSON, Mermaid, ReactFlow, and HTML content for data flow and combo views.
 """
 
 from __future__ import annotations
@@ -18,7 +18,6 @@ from pipelex.graph.mermaid import (
     collect_stuff_data_text,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
-    graphspec_to_orchestration_mermaid,
 )
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
@@ -37,8 +36,6 @@ class GraphOutputs(BaseModel):
 
     Attributes:
         graphspec_json: The GraphSpec serialized as JSON.
-        orchestration_mmd: Orchestration view as Mermaid flowchart code.
-        orchestration_html: Orchestration view as standalone HTML page.
         dataflow_mmd: Data flow view as Mermaid flowchart code.
         dataflow_html: Data flow view as standalone HTML page.
         combo_mmd: Combo view as Mermaid flowchart code.
@@ -48,8 +45,6 @@ class GraphOutputs(BaseModel):
     """
 
     graphspec_json: str | None = None
-    orchestration_mmd: str | None = None
-    orchestration_html: str | None = None
     dataflow_mmd: str | None = None
     dataflow_html: str | None = None
     combo_mmd: str | None = None
@@ -71,7 +66,6 @@ async def generate_graph_outputs(
 
     This can generate:
     - GraphSpec JSON: The canonical graph representation
-    - Orchestration view: Shows control flow and controller containment (Mermaid)
     - Data flow view: Shows how data flows between pipes (Mermaid)
     - Combo view: Combined data flow with controller subgraphs (Mermaid)
     - ReactFlow ViewSpec: JSON for ReactFlow rendering
@@ -89,8 +83,6 @@ async def generate_graph_outputs(
     inclusion = graph_config.graphs_inclusion
 
     graphspec_json: str | None = None
-    orchestration_mmd: str | None = None
-    orchestration_html: str | None = None
     dataflow_mmd: str | None = None
     dataflow_html: str | None = None
     combo_mmd: str | None = None
@@ -104,15 +96,6 @@ async def generate_graph_outputs(
 
     # Get the mermaid theme from config
     mermaid_theme = graph_config.mermaid_config.style.theme
-
-    # Generate orchestration view
-    if inclusion.orchestration_mmd:
-        orchestration_mmd = graphspec_to_orchestration_mermaid(graph_spec, direction=direction)
-
-    if inclusion.orchestration_html:
-        # Need the mermaid code to generate HTML
-        mmd_for_html = orchestration_mmd or graphspec_to_orchestration_mermaid(graph_spec, direction=direction)
-        orchestration_html = await render_mermaid_html_async(mmd_for_html, title=f"Orchestration: {pipe_code}", theme=mermaid_theme)
 
     # Generate data flow view
     if inclusion.dataflow_mmd or inclusion.dataflow_html:
@@ -185,8 +168,6 @@ async def generate_graph_outputs(
 
     return GraphOutputs(
         graphspec_json=graphspec_json,
-        orchestration_mmd=orchestration_mmd,
-        orchestration_html=orchestration_html,
         dataflow_mmd=dataflow_mmd,
         dataflow_html=dataflow_html,
         combo_mmd=combo_mmd,

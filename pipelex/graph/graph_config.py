@@ -15,8 +15,6 @@ class GraphsInclusionConfig(ConfigModel):
     """Controls which graph outputs are generated."""
 
     graphspec_json: bool
-    orchestration_mmd: bool
-    orchestration_html: bool
     dataflow_mmd: bool
     dataflow_html: bool
     combo_mmd: bool

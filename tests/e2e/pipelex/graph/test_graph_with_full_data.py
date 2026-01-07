@@ -19,7 +19,6 @@ from pipelex.graph.mermaid import (
     FlowchartDirection,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
-    graphspec_to_orchestration_mermaid,
 )
 from pipelex.graph.mermaid_html import (
     render_mermaid_html_async,
@@ -65,12 +64,6 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
     log.info(f"Saved graph.json to: {graph_json_path}")
 
     # Generate and save mermaid files
-    # Orchestration
-    orch_mermaid = graphspec_to_orchestration_mermaid(graph_spec, direction=FlowchartDirection.TOP_DOWN)
-    (output_dir / "orchestration.mmd").write_text(orch_mermaid, encoding="utf-8")
-    orch_html = await render_mermaid_html_async(orch_mermaid, title="Orchestration", theme=mermaid_theme)
-    (output_dir / "orchestration.html").write_text(orch_html, encoding="utf-8")
-
     # Dataflow with data
     dataflow_output = graphspec_to_dataflow_mermaid(graph_spec, graph_config, direction=FlowchartDirection.TOP_DOWN)
     (output_dir / "dataflow.mmd").write_text(dataflow_output.mermaid_code, encoding="utf-8")

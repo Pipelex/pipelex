@@ -20,7 +20,6 @@ from pipelex.graph.mermaid import (
     collect_stuff_data_text,
     graphspec_to_combo_mermaid,
     graphspec_to_dataflow_mermaid,
-    graphspec_to_orchestration_mermaid,
 )
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
@@ -56,15 +55,7 @@ def graph_render_cmd(
     ] = False,
     all_views: Annotated[
         bool,
-        typer.Option("--all", "-a", help="Generate all views: orchestration, dataflow, combo (Mermaid) + ReactFlow"),
-    ] = False,
-    data_edges: Annotated[
-        bool,
-        typer.Option("--data-edges/--no-data-edges", help="Include data flow edges in orchestration Mermaid output"),
-    ] = True,
-    contains_edges: Annotated[
-        bool,
-        typer.Option("--contains-edges/--no-contains-edges", help="Include parent-child (contains) edges in orchestration Mermaid output"),
+        typer.Option("--all", "-a", help="Generate all views: dataflow, combo (Mermaid) + ReactFlow"),
     ] = False,
     subgraphs: Annotated[
         bool,
@@ -79,14 +70,13 @@ def graph_render_cmd(
 
     By default generates both combo.html (Mermaid) and reactflow.html.
     Use --mermaid or --reactflow to generate only one of them.
-    Use --all to generate all Mermaid views (orchestration, dataflow, combo) + ReactFlow.
+    Use --all to generate all Mermaid views (dataflow, combo) + ReactFlow.
 
     Examples:
         pipelex graph render graph.json                    # combo.html + reactflow.html
         pipelex graph render graph.json --mermaid          # combo.html only
         pipelex graph render graph.json --reactflow        # reactflow.html only
-        pipelex graph render graph.json --all              # all views
-        pipelex graph render graph.json --all --no-data-edges   # all views without data edges
+        pipelex graph render graph.json --all              # all views (dataflow, combo, reactflow)
         pipelex graph render graph.json --mermaid --no-subgraphs  # flat combo view
         pipelex graph render graph.json --open             # open in browser
         pipelex graph render graph.json -o ./output/       # custom output directory
@@ -123,10 +113,9 @@ def graph_render_cmd(
         # - Default (no flags): combo.html + reactflow.html
         # - --mermaid: combo.html only
         # - --reactflow: reactflow.html only
-        # - --all: orchestration, dataflow, combo + reactflow
+        # - --all: dataflow, combo + reactflow
         generate_mermaid_combo = (not mermaid and not reactflow and not all_views) or mermaid or all_views
         generate_reactflow = (not mermaid and not reactflow and not all_views) or reactflow or all_views
-        generate_orchestration = all_views
         generate_dataflow = all_views
 
         generated_files: list[Path] = []
@@ -147,20 +136,6 @@ def graph_render_cmd(
             graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
             flow_direction = direction or FlowchartDirection.TOP_DOWN
-
-            # Generate orchestration view (only with --all)
-            if generate_orchestration:
-                orch_mermaid = graphspec_to_orchestration_mermaid(
-                    graph_spec,
-                    direction=flow_direction,
-                    include_data_edges=data_edges,
-                    include_contains_edges=contains_edges,
-                )
-                orch_html = await render_mermaid_html_async(orch_mermaid, title=f"Orchestration: {input_file.stem}")
-                orch_html_path = output_dir / "orchestration.html"
-                orch_html_path.write_text(orch_html, encoding="utf-8")
-                generated_files.append(orch_html_path)
-                typer.secho("✅ orchestration.html", fg=typer.colors.GREEN, err=True)
 
             # Generate dataflow view (only with --all)
             if generate_dataflow:
