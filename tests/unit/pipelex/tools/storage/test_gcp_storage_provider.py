@@ -11,7 +11,7 @@ from pipelex.tools.storage.exceptions import (
     StorageGcpCredentialsError,
     StorageInvalidKeyError,
 )
-from pipelex.tools.storage.gcp_storage_provider import GcpStorageProvider
+from pipelex.tools.storage.gcp_storage_provider import GCS_SIGNED_URL_VERSION, GcpStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 
@@ -156,7 +156,9 @@ class TestGcpStorageProvider:
         mock_gcp_storage: dict[str, Any],
     ) -> None:
         """Test that loading a non-existent object raises StorageFileNotFoundError."""
-        mock_gcp_storage["blob"].exists.return_value = False
+        from google.api_core.exceptions import NotFound  # type: ignore[import-untyped]  # noqa: PLC0415
+
+        mock_gcp_storage["blob"].download_as_bytes.side_effect = NotFound("Object not found")
         nonexistent_uri = f"{PIPELEX_STORAGE_SCHEME}nonexistent/file.bin"
 
         with pytest.raises(StorageFileNotFoundError) as exc_info:
@@ -205,6 +207,7 @@ class TestGcpStorageProvider:
 
         assert display == expected_signed_url
         mock_gcp_storage["blob"].generate_signed_url.assert_called_once_with(
+            version=GCS_SIGNED_URL_VERSION,
             expiration=timedelta(seconds=3600),
             method="GET",
         )

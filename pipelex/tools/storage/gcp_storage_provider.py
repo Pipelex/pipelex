@@ -14,6 +14,9 @@ from pipelex.tools.storage.exceptions import (
 )
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
+# GCS signed URL signing process version (v4 is recommended, v2 is deprecated)
+GCS_SIGNED_URL_VERSION = "v4"
+
 
 class GcpStorageProvider(StorageProviderAbstract):
     """Storage provider implementation for Google Cloud Storage.
@@ -89,23 +92,25 @@ class GcpStorageProvider(StorageProviderAbstract):
 
         Raises:
             StorageFileNotFoundError: If the object does not exist.
+            StorageGcpError: If the GCS operation fails.
         """
         bucket = self._get_bucket()
 
-        from google.api_core.exceptions import NotFound  # type: ignore[import-untyped]  # noqa: PLC0415
+        from google.api_core.exceptions import (  # type: ignore[import-untyped]  # noqa: PLC0415 - optional dependency, lazy import
+            GoogleAPIError,
+            NotFound,
+        )
 
         try:
             blob = bucket.blob(key)
-            if not blob.exists():
-                msg = f"Object not found in GCS: '{key}'"
-                raise StorageFileNotFoundError(msg)
             data: bytes = blob.download_as_bytes()
             return data
-        except StorageFileNotFoundError:
-            raise
         except NotFound as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Object not found in GCS: '{key}'"
             raise StorageFileNotFoundError(msg) from exc
+        except GoogleAPIError as exc:  # pyright: ignore[reportUnknownVariableType]
+            msg = f"Failed to load object from GCS: '{key}': {exc}"
+            raise StorageGcpError(msg) from exc
 
     @override
     async def _load(self, key: str) -> bytes:
@@ -186,11 +191,15 @@ class GcpStorageProvider(StorageProviderAbstract):
         try:
             blob = bucket.blob(key)
             signed_url: str = blob.generate_signed_url(
+                version=GCS_SIGNED_URL_VERSION,
                 expiration=timedelta(seconds=self._signed_urls_lifespan or 0),
                 method="GET",
             )
             return signed_url
-        except GoogleAPIError:
+        except (GoogleAPIError, ValueError, TypeError, AttributeError):
+            # GoogleAPIError: GCS API failures
+            # ValueError/TypeError: invalid arguments
+            # AttributeError: credentials that cannot sign (e.g., Application Default Credentials)
             return self._make_public_url(key)
 
     @override
