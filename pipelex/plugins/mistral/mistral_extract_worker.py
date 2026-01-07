@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -50,14 +51,12 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         if image_uri := extract_job.extract_input.image_uri:
             extract_output = await self._extract_page_from_image(
                 image_uri=image_uri,
-                should_caption_image=extract_job.job_params.should_caption_images,
             )
 
         elif pdf_uri := extract_job.extract_input.pdf_uri:
             extract_output = await self._extract_pages_from_pdf(
                 pdf_uri=pdf_uri,
-                should_include_images=extract_job.job_params.should_include_images,
-                should_caption_images=extract_job.job_params.should_caption_images,
+                extract_job_params=extract_job.job_params,
             )
         else:
             msg = "No image nor PDF URI provided in ExtractJob"
@@ -67,11 +66,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
     async def _extract_page_from_image(
         self,
         image_uri: str,
-        should_caption_image: bool = False,
     ) -> ExtractOutput:
-        if should_caption_image:
-            msg = "Captioning is not implemented for Mistral OCR."
-            raise NotImplementedError(msg)
         resolved_uri = resolve_uri(image_uri)
         image_url: str
         match resolved_uri:
@@ -87,10 +82,9 @@ class MistralExtractWorker(ExtractWorkerAbstract):
     async def _extract_pages_from_pdf(
         self,
         pdf_uri: str,
-        should_include_images: bool,
-        should_caption_images: bool,
+        extract_job_params: ExtractJobParams,
     ) -> ExtractOutput:
-        if should_caption_images:
+        if extract_job_params.should_caption_images:
             msg = "Captioning is not implemented for Mistral OCR."
             raise ExtractCapabilityError(msg)
         resolved_uri = resolve_uri(pdf_uri)
@@ -105,7 +99,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
                 raise ExtractInputError(msg)
         return await self._extract_from_pdf_url(
             pdf_url=pdf_url,
-            should_include_images=should_include_images,
+            extract_job_params=extract_job_params,
         )
 
     async def _extract_from_image_url(
@@ -126,20 +120,27 @@ class MistralExtractWorker(ExtractWorkerAbstract):
     async def _extract_from_pdf_url(
         self,
         pdf_url: str,
-        should_include_images: bool = False,
+        extract_job_params: ExtractJobParams,
     ) -> ExtractOutput:
+        image_limit: int | None = extract_job_params.max_nb_images
+        image_min_size: int | None = extract_job_params.image_min_size
+        if not extract_job_params.should_include_images:
+            image_limit = None
+            image_min_size = None
         extract_response = await self.mistral_client.ocr.process_async(
             model=self.inference_model.model_id,
             document={
                 "type": "document_url",
                 "document_url": pdf_url,
             },
-            include_image_base64=should_include_images,
+            include_image_base64=True,
+            image_limit=image_limit,
+            image_min_size=image_min_size,
         )
 
         return await MistralFactory.make_extract_output_from_mistral_response(
             mistral_extract_response=extract_response,
-            should_include_images=should_include_images,
+            should_include_images=extract_job_params.should_include_images,
         )
 
     async def _get_signed_url_from_pdf_file(
