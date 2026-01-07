@@ -42,10 +42,10 @@
             "size": null,
             "digest": "WnvTT",
             "data": {
-              "url": "tests/data/documents/Job-Offer.pdf"
+              "url": "https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"
             },
-            "data_text": "{\n    \"url\": \"tests/data/documents/Job-Offer.pdf\"\n}\n",
-            "data_html": "<a href=\"tests/data/documents/Job-Offer.pdf\" class=\"msg-pdf\">tests/data/documents/Job-Offer.pdf</a>",
+            "data_text": "{\n    \"url\": \"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\"\n}\n",
+            "data_html": "<a href=\"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\" class=\"msg-pdf\">https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf</a>",
             "extra": {}
           }
         ],
@@ -132,10 +132,10 @@
             "size": null,
             "digest": "WnvTT",
             "data": {
-              "url": "tests/data/documents/Job-Offer.pdf"
+              "url": "https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"
             },
-            "data_text": "{\n    \"url\": \"tests/data/documents/Job-Offer.pdf\"\n}\n",
-            "data_html": "<a href=\"tests/data/documents/Job-Offer.pdf\" class=\"msg-pdf\">tests/data/documents/Job-Offer.pdf</a>",
+            "data_text": "{\n    \"url\": \"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\"\n}\n",
+            "data_html": "<a href=\"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\" class=\"msg-pdf\">https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf</a>",
             "extra": {}
           }
         ],
@@ -225,10 +225,10 @@
             "size": null,
             "digest": "WnvTT",
             "data": {
-              "url": "tests/data/documents/Job-Offer.pdf"
+              "url": "https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"
             },
-            "data_text": "{\n    \"url\": \"tests/data/documents/Job-Offer.pdf\"\n}\n",
-            "data_html": "<a href=\"tests/data/documents/Job-Offer.pdf\" class=\"msg-pdf\">tests/data/documents/Job-Offer.pdf</a>",
+            "data_text": "{\n    \"url\": \"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\"\n}\n",
+            "data_html": "<a href=\"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\" class=\"msg-pdf\">https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf</a>",
             "extra": {}
           }
         ],
