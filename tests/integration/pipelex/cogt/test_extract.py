@@ -34,7 +34,7 @@ class TestExtract:
             msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
         extract_job = ExtractJobFactory.make_extract_job(
-            extract_input=ExtractInput(pdf_uri=file_path),
+            extract_input=ExtractInput(document_uri=file_path),
             extract_job_params=extract_job_params,
             job_metadata=job_metadata,
         )
@@ -65,7 +65,7 @@ class TestExtract:
             msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
         extract_job = ExtractJobFactory.make_extract_job(
-            extract_input=ExtractInput(pdf_uri=url),
+            extract_input=ExtractInput(document_uri=url),
             extract_job_params=extract_job_params,
             job_metadata=job_metadata,
         )
@@ -142,7 +142,7 @@ class TestExtract:
             image_min_size=None,
         )
         extract_job = ExtractJobFactory.make_extract_job(
-            extract_input=ExtractInput(pdf_uri=file_path),
+            extract_input=ExtractInput(document_uri=file_path),
             extract_job_params=specific_extract_job_params,
             job_metadata=job_metadata,
         )

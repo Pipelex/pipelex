@@ -123,7 +123,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         )
         extract_input = ExtractInput(
             image_uri=image_uri,
-            pdf_uri=pdf_uri,
+            document_uri=pdf_uri,
         )
         page_contents = await content_generator.make_extract_pages(
             extract_input=extract_input,

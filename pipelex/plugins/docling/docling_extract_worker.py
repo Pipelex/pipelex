@@ -49,7 +49,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
         source_uri: str
         if image_uri := extract_job.extract_input.image_uri:
             source_uri = image_uri
-        elif pdf_uri := extract_job.extract_input.pdf_uri:
+        elif pdf_uri := extract_job.extract_input.document_uri:
             source_uri = pdf_uri
         else:
             msg = "Neither image URI nor PDF URI provided in ExtractJob"

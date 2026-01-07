@@ -29,7 +29,7 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
             msg = "Pypdfium2 only extracts text from PDFs, not from images"
             raise NotImplementedError(msg)
 
-        pdf_uri = extract_job.extract_input.pdf_uri
+        pdf_uri = extract_job.extract_input.document_uri
         if not pdf_uri:
             msg = "No PDF URI provided in ExtractJob"
             raise ExtractInputError(msg)

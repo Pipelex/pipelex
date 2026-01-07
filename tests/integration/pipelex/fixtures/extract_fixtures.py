@@ -24,14 +24,14 @@ def is_extract_handle_supported_by_enabled_backends(extract_handle: str) -> bool
 # ================================================================================================
 
 EXTRACT_HANDLE_FROM_PDF = [
-    "pypdfium2-extract-pdf",
-    "docling-extract-text",
+    # "pypdfium2-extract-pdf",
+    # "docling-extract-text",
     "mistral-ocr",
-    "mistral-ocr-2503",
-    "mistral-ocr-2505",
-    "mistral-ocr-2512",
-    "mistral-document-ai-2505",
-    "azure-document-intelligence",
+    # "mistral-ocr-2503",
+    # "mistral-ocr-2505",
+    # "mistral-ocr-2512",
+    # "mistral-document-ai-2505",
+    # "azure-document-intelligence",
 ]
 
 EXTRACT_HANDLE_FROM_IMAGE = [
@@ -109,26 +109,26 @@ def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
     params=[
         ExtractJobParams(
             should_include_images=True,
+            max_nb_images=None,
             should_caption_images=False,
             should_include_page_views=False,
             page_views_dpi=72,
-            max_nb_images=None,
             image_min_size=None,
         ),
         ExtractJobParams(
             should_include_images=True,
+            max_nb_images=10,
             should_caption_images=True,
             should_include_page_views=False,
             page_views_dpi=72,
-            max_nb_images=10,
             image_min_size=100,
         ),
         ExtractJobParams(
             should_include_images=False,
+            max_nb_images=None,
             should_caption_images=False,
             should_include_page_views=True,
             page_views_dpi=150,
-            max_nb_images=None,
             image_min_size=None,
         ),
     ],

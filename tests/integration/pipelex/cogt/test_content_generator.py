@@ -157,7 +157,7 @@ class TestContentGenerator:
         page_contents = await content_generator.make_extract_pages(
             job_metadata=job_metadata,
             extract_handle=extract_handle_from_pdf,
-            extract_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
+            extract_input=ExtractInput(document_uri=PDFTestCases.PDF_FILE_PATH_1),
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),
         )

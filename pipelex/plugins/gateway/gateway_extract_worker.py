@@ -92,7 +92,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                 should_include_images=False,
             )
 
-        elif pdf_uri := extract_job.extract_input.pdf_uri:
+        elif pdf_uri := extract_job.extract_input.document_uri:
             if extract_job.job_params.should_caption_images:
                 # TODO: handle model capability and skip UT when it's not supported
                 msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
