@@ -13,13 +13,10 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import graphspec_to_json
-from pipelex.graph.mermaid import (
-    collect_stuff_data_html,
-    collect_stuff_data_text,
-    graphspec_to_mermaidflow,
-)
+from pipelex.graph.mermaid import graphspec_to_mermaidflow
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 

@@ -20,13 +20,10 @@ from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import load_graphspec
-from pipelex.graph.mermaid import (
-    collect_stuff_data_html,
-    collect_stuff_data_text,
-    graphspec_to_mermaidflow,
-)
+from pipelex.graph.mermaid import graphspec_to_mermaidflow
 from pipelex.graph.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
 from pipelex.hub import get_console
 from pipelex.pipelex import Pipelex
