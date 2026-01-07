@@ -237,6 +237,11 @@
         .react-flow__edge-textbg {
             fill: var(--color-bg);
         }
+        /* Selected node highlight */
+        .react-flow__node.selected {
+            box-shadow: 0 0 0 3px var(--color-accent), var(--shadow-lg) !important;
+            z-index: 1000 !important;
+        }
 
         /* Inspector Sidebar */
         .inspector-panel {
@@ -320,10 +325,13 @@
             flex: 1;
             overflow-y: auto;
             padding: 16px;
+        }
+        /* Only apply flex behavior to the stuff data section, not all sections */
+        .inspector-content.stuff-inspector {
             display: flex;
             flex-direction: column;
         }
-        .inspector-content > .inspector-section {
+        .inspector-content.stuff-inspector > .inspector-section {
             display: flex;
             flex-direction: column;
             flex: 1;
@@ -1178,8 +1186,30 @@
 
             const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
             const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
+            const [selectedNodeId, setSelectedNodeId] = React.useState(null);
+
+            // Expose function to clear node selection globally
+            React.useEffect(() => {
+                window.clearNodeSelection = () => {
+                    setSelectedNodeId(null);
+                    setNodes((nds) =>
+                        nds.map((n) => ({
+                            ...n,
+                            selected: false,
+                        }))
+                    );
+                };
+            }, [setNodes]);
 
             const onNodeClick = (event, node) => {
+                // Update selected node state and highlight it
+                setSelectedNodeId(node.id);
+                setNodes((nds) =>
+                    nds.map((n) => ({
+                        ...n,
+                        selected: n.id === node.id,
+                    }))
+                );
                 const inspector = document.getElementById('inspector');
                 const inspectorContent = document.getElementById('inspector-content');
                 const inspectorTitle = document.getElementById('inspector-title');
@@ -1263,6 +1293,8 @@
                     }
 
                     inspectorContent.innerHTML = html;
+                    // Add class to enable flex behavior for stuff inspector
+                    inspectorContent.classList.add('stuff-inspector');
 
                     // Store current stuff data for format switching
                     window.currentStuffJsonData = stuffData.data;
@@ -1377,6 +1409,8 @@
                 }
 
                 inspectorContent.innerHTML = html || '<div style="color: var(--color-text-dim)">No additional information</div>';
+                // Remove stuff-specific flex behavior for pipe inspector
+                inspectorContent.classList.remove('stuff-inspector');
                 document.getElementById('top-hint').style.display = 'none';
                 inspector.classList.add('visible');
             };
@@ -1432,12 +1466,17 @@
 
         // Render the app
         const root = ReactDOM.createRoot(document.getElementById('root'));
+        const graphViewerRef = { current: null };
         root.render(React.createElement(GraphViewer));
 
         // Close inspector function
         function closeInspector() {
             document.getElementById('inspector').classList.remove('visible');
             document.getElementById('top-hint').style.display = '';
+            // Clear node selection/highlighting when closing inspector
+            if (window.clearNodeSelection) {
+                window.clearNodeSelection();
+            }
         }
 
         // Close inspector on Escape key
