@@ -1,6 +1,6 @@
 """Unit tests for the ViewSpec transformer."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, ClassVar
 
 from pipelex.graph.graph_analysis import GraphAnalysis
@@ -19,14 +19,13 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.graph.viewspec import LayoutSpec
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
-from pipelex.types import UTC
 
 
 class TestViewSpecTransformer:
     """Tests for graphspec_to_viewspec function."""
 
     GRAPH_ID: ClassVar[str] = "transformer_test:001"
-    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
 
     def _make_graph(
         self,
@@ -201,8 +200,8 @@ class TestViewSpecTransformer:
             "pipe_type": "PipeLLM",
             "status": NodeStatus.SUCCEEDED,
             "timing": TimingSpec(
-                started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC),
-                ended_at=datetime(2024, 1, 15, 10, 30, 5, tzinfo=UTC),
+                started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
+                ended_at=datetime(2024, 1, 15, 10, 30, 5, tzinfo=timezone.utc),
                 duration_ms=5000,
             ),
             "node_io": NodeIOSpec(

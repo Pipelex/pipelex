@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, final
 
 from opentelemetry import trace
@@ -33,7 +33,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
-from pipelex.types import UTC, Self
+from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.graph.graph_context import GraphContext
@@ -357,7 +357,7 @@ class PipeAbstract(ABC, BaseModel):
         if parent_graph_context is not None:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
-                started_at = datetime.now(UTC)
+                started_at = datetime.now(timezone.utc)
                 node_kind = NodeKind.CONTROLLER if self.type in _CONTROLLER_PIPE_TYPES else NodeKind.OPERATOR
 
                 # Capture input specs from working memory for data flow tracking
@@ -413,7 +413,7 @@ class PipeAbstract(ABC, BaseModel):
                 tracer_manager.on_pipe_end_error(
                     graph_id=parent_graph_context.graph_id,
                     node_id=graph_node_id,
-                    ended_at=datetime.now(UTC),
+                    ended_at=datetime.now(timezone.utc),
                     error_type=type(exc).__name__,
                     error_message=str(exc),
                 )
@@ -439,7 +439,7 @@ class PipeAbstract(ABC, BaseModel):
             tracer_manager.on_pipe_end_success(
                 graph_id=parent_graph_context.graph_id,
                 node_id=graph_node_id,
-                ended_at=datetime.now(UTC),
+                ended_at=datetime.now(timezone.utc),
                 output_spec=output_spec,
             )
 

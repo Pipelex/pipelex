@@ -1,6 +1,6 @@
 """Unit tests for the ViewSpec models."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pipelex.graph.viewspec import (
     CURRENT_VIEWSPEC_VERSION,
@@ -11,7 +11,6 @@ from pipelex.graph.viewspec import (
     ViewNode,
     ViewSpec,
 )
-from pipelex.types import UTC
 
 
 class TestViewNode:
@@ -189,7 +188,7 @@ class TestViewSpec:
     def test_minimal_view_spec(self) -> None:
         """Test creating a minimal ViewSpec with required fields."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="graph_001",
         )
         assert viewspec.schema_version == CURRENT_VIEWSPEC_VERSION
@@ -212,7 +211,7 @@ class TestViewSpec:
         layout = LayoutSpec(direction="LR")
 
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="graph_001",
             source={"graph_schema_version": "1.0", "producer": "pipelex 0.9.3"},
             options={"show_data_edges": True, "collapse_controllers": False},
@@ -237,7 +236,7 @@ class TestViewSpec:
         """Test that ViewSpec can be serialized to JSON."""
         node = ViewNode(id="node_1", label="Test Node", kind="operator", position={"x": 100.0, "y": 200.0})
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="graph_001",
             nodes=[node],
         )
@@ -251,7 +250,7 @@ class TestViewSpec:
 
     def test_view_spec_deserialization(self) -> None:
         """Test that ViewSpec can be deserialized from dict."""
-        created_at = datetime.now(UTC)
+        created_at = datetime.now(timezone.utc)
         data = {
             "schema_version": CURRENT_VIEWSPEC_VERSION,
             "created_at": created_at,
@@ -272,7 +271,7 @@ class TestViewSpec:
     def test_view_spec_default_layout(self) -> None:
         """Test that ViewSpec creates default LayoutSpec if not provided."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="graph_001",
         )
         assert isinstance(viewspec.layout, LayoutSpec)

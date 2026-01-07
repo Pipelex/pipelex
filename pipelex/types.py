@@ -13,11 +13,4 @@ try:
 except ModuleNotFoundError:  # Python 3.10
     from importlib.abc import Traversable  # type: ignore[assignment, no-redef]
 
-try:
-    from datetime import UTC  # Python 3.11+
-except ImportError:  # Python 3.10
-    import datetime
-
-    UTC = datetime.UTC  # type: ignore[misc]
-
-__all__ = ["Self", "StrEnum", "Traversable", "UTC"]
+__all__ = ["Self", "StrEnum", "Traversable"]

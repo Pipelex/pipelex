@@ -1,6 +1,6 @@
 """Unit tests for the graphspec_to_mermaidflow function."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, ClassVar
 
 from pipelex.graph.graphspec import (
@@ -15,7 +15,6 @@ from pipelex.graph.graphspec import (
     PipelineRef,
 )
 from pipelex.graph.mermaid import graphspec_to_mermaidflow
-from pipelex.types import UTC
 
 from .conftest import make_graph_config
 
@@ -24,7 +23,7 @@ class TestMermaidflow:
     """Tests for graphspec_to_mermaidflow function."""
 
     GRAPH_ID: ClassVar[str] = "mermaidflow_test:001"
-    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
 
     def _make_graph(
         self,

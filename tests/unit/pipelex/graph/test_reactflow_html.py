@@ -1,6 +1,6 @@
 """Unit tests for the ReactFlow HTML generator."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 import pytest
 
@@ -11,7 +11,6 @@ from pipelex.graph.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow_html import generate_reactflow_html
 from pipelex.graph.viewspec import ViewSpec
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
-from pipelex.types import UTC
 
 
 class TestReactFlowHtml:
@@ -25,7 +24,7 @@ class TestReactFlowHtml:
     def test_generates_html_with_embedded_viewspec(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that HTML contains embedded ViewSpec as JSON."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         html = generate_reactflow_html(viewspec, rf_config)
@@ -38,12 +37,12 @@ class TestReactFlowHtml:
     def test_embeds_graphspec_when_provided(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that GraphSpec is embedded when provided."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         graphspec = GraphSpec(
             graph_id="test_graph",
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             pipeline_ref=PipelineRef(),
             nodes=[],
             edges=[],
@@ -56,7 +55,7 @@ class TestReactFlowHtml:
     def test_does_not_embed_graphspec_when_not_provided(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that GraphSpec script tag is not present when not provided."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         html = generate_reactflow_html(viewspec, rf_config)
@@ -67,7 +66,7 @@ class TestReactFlowHtml:
     def test_cdn_mode_includes_cdn_scripts(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that CDN mode includes CDN script tags."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         cdn_config = rf_config.model_copy(update={"is_use_cdn": True})
@@ -81,7 +80,7 @@ class TestReactFlowHtml:
     def test_custom_title_in_html(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that custom title appears in HTML."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         html = generate_reactflow_html(viewspec, rf_config, title="My Custom Graph")
@@ -91,7 +90,7 @@ class TestReactFlowHtml:
     def test_includes_reactflow_viewer_code(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that HTML includes ReactFlow viewer JavaScript."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         html = generate_reactflow_html(viewspec, rf_config)
@@ -104,7 +103,7 @@ class TestReactFlowHtml:
     def test_includes_inspector_panel(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that HTML includes inspector panel markup."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         html = generate_reactflow_html(viewspec, rf_config)
@@ -124,7 +123,7 @@ class TestReactFlowHtml:
         )
         graph = GraphSpec(
             graph_id="test_graph",
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             pipeline_ref=PipelineRef(),
             nodes=[node],
             edges=[],
@@ -141,7 +140,7 @@ class TestReactFlowHtml:
     def test_html_is_valid_structure(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that generated HTML has valid structure."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         html = generate_reactflow_html(viewspec, rf_config)
@@ -157,7 +156,7 @@ class TestReactFlowHtml:
     def test_dagre_layout_included(self, rf_config: ReactFlowRenderingConfig) -> None:
         """Test that Dagre layout function is included."""
         viewspec = ViewSpec(
-            created_at=datetime.now(UTC),
+            created_at=datetime.now(timezone.utc),
             graph_id="test_graph",
         )
         html = generate_reactflow_html(viewspec, rf_config)

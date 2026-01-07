@@ -1,10 +1,9 @@
 """Unit tests for GraphTracer."""
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graphspec import EdgeKind, IOSpec, NodeKind, NodeStatus
-from pipelex.types import UTC
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 
@@ -49,7 +48,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="lifecycle-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         node_id, child_context = tracer.on_pipe_start(
             graph_context=context,
             pipe_code="test_pipe",
@@ -92,7 +91,7 @@ class TestGraphTracer:
         context = tracer.setup(graph_id="nested-test", data_inclusion=make_defaulted_data_inclusion_config())
 
         # Start parent (sequence controller)
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         parent_id, parent_child_ctx = tracer.on_pipe_start(
             graph_context=context,
             pipe_code="my_sequence",
@@ -152,7 +151,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="error-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         node_id, _ = tracer.on_pipe_start(
             graph_context=context,
             pipe_code="failing_pipe",
@@ -184,7 +183,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="cancel-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         _node_id, _ = tracer.on_pipe_start(
             graph_context=context,
             pipe_code="stuck_pipe",
@@ -207,7 +206,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="edge-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         node1_id, _ = tracer.on_pipe_start(
             graph_context=context,
             pipe_code="pipe_1",
@@ -249,7 +248,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="condition-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         condition_id, cond_ctx = tracer.on_pipe_start(
             graph_context=context,
             pipe_code="my_condition",
@@ -293,7 +292,7 @@ class TestGraphTracer:
             IOSpec(name="query", concept="Text", digest="def34"),
         ]
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         node_id, _ = tracer.on_pipe_start(
             graph_context=context,
             pipe_code="test_pipe",
@@ -326,7 +325,7 @@ class TestGraphTracer:
             digest="xyz99",
         )
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
         node_id, _ = tracer.on_pipe_start(
             graph_context=context,
             pipe_code="summarize",
@@ -354,7 +353,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="data-flow-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
 
         # Pipe 1: produces stuff with digest "stuff_001"
         node1_id, _ = tracer.on_pipe_start(
@@ -398,7 +397,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="no-producer-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
 
         # Pipe consumes stuff that wasn't produced by any tracked pipe
         node_id, _ = tracer.on_pipe_start(
@@ -425,7 +424,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="no-self-loop-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
 
         # Pipe produces and consumes the same stuff (shouldn't happen, but guard against it)
         node_id, _ = tracer.on_pipe_start(
@@ -454,7 +453,7 @@ class TestGraphTracer:
         tracer = GraphTracer()
         context = tracer.setup(graph_id="multi-consumer-test", data_inclusion=make_defaulted_data_inclusion_config())
 
-        started_at = datetime.now(UTC)
+        started_at = datetime.now(timezone.utc)
 
         # Producer pipe
         producer_id, _ = tracer.on_pipe_start(

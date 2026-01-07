@@ -1,10 +1,9 @@
 """Test data for GraphSpec unit tests."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, ClassVar
 
 from pipelex.graph.graphspec import EdgeKind, NodeKind, NodeStatus
-from pipelex.types import UTC
 
 
 class ValidGraphData:
@@ -12,7 +11,7 @@ class ValidGraphData:
 
     SCHEMA_VERSION: ClassVar[str] = "1.0"
     GRAPH_ID: ClassVar[str] = "run_abc123"
-    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
 
     PIPELINE_REF: ClassVar[dict[str, str | None]] = {
         "domain": "test_domain",
@@ -44,8 +43,8 @@ class ValidGraphData:
     }
 
     TIMING_SPEC: ClassVar[dict[str, Any]] = {
-        "started_at": datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC),
-        "ended_at": datetime(2024, 1, 15, 10, 30, 5, tzinfo=UTC),
+        "started_at": datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
+        "ended_at": datetime(2024, 1, 15, 10, 30, 5, tzinfo=timezone.utc),
         "duration_ms": 5000,
     }
 
@@ -92,8 +91,8 @@ class ValidGraphData:
         "pipe_type": "PipeLLM",
         "status": "succeeded",
         "timing": {
-            "started_at": datetime(2024, 1, 15, 10, 30, 1, tzinfo=UTC),
-            "ended_at": datetime(2024, 1, 15, 10, 30, 4, tzinfo=UTC),
+            "started_at": datetime(2024, 1, 15, 10, 30, 1, tzinfo=timezone.utc),
+            "ended_at": datetime(2024, 1, 15, 10, 30, 4, tzinfo=timezone.utc),
             "duration_ms": 3000,
         },
         "node_io": {
@@ -187,7 +186,7 @@ class InvalidGraphData:
     UNSUPPORTED_VERSION_GRAPH: ClassVar[dict[str, Any]] = {
         "schema_version": "99.0",
         "graph_id": "run_bad",
-        "created_at": datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC),
+        "created_at": datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
         "pipeline_ref": {"domain": None, "main_pipe": None, "entrypoint": None},
         "nodes": [],
         "edges": [],
@@ -258,7 +257,7 @@ class MermaidTestData:
     """Test data for Mermaid exporter tests."""
 
     GRAPH_ID: ClassVar[str] = "test_run:123"
-    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=UTC)
+    CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
 
     # Node with special characters in ID
     CONTROLLER_NODE: ClassVar[dict[str, Any]] = {

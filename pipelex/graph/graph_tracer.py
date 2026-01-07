@@ -1,6 +1,6 @@
 """GraphTracer implementation that builds GraphSpec during pipeline execution."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from typing_extensions import override
 
@@ -20,7 +20,6 @@ from pipelex.graph.graphspec import (
     PipelineRef,
     TimingSpec,
 )
-from pipelex.types import UTC
 
 
 class _MutableNodeData:
@@ -127,7 +126,7 @@ class GraphTracer(GraphTracerProtocol):
             domain=pipeline_ref_domain,
             main_pipe=pipeline_ref_main_pipe,
         )
-        self._created_at = datetime.now(UTC)
+        self._created_at = datetime.now(timezone.utc)
         self._nodes = {}
         self._edges = []
         self._node_sequence = 0
@@ -151,7 +150,7 @@ class GraphTracer(GraphTracerProtocol):
         for node_data in self._nodes.values():
             if node_data.status == NodeStatus.RUNNING:
                 node_data.status = NodeStatus.CANCELED
-                node_data.ended_at = datetime.now(UTC)
+                node_data.ended_at = datetime.now(timezone.utc)
 
         # Generate DATA edges by correlating input stuff_codes with producer nodes
         # (must happen before setting _is_active = False since add_edge checks it)
@@ -164,7 +163,7 @@ class GraphTracer(GraphTracerProtocol):
 
         graph = GraphSpec(
             graph_id=self._graph_id or "unknown",
-            created_at=self._created_at or datetime.now(UTC),
+            created_at=self._created_at or datetime.now(timezone.utc),
             pipeline_ref=self._pipeline_ref or PipelineRef(),
             nodes=nodes,
             edges=self._edges,

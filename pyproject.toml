@@ -386,6 +386,7 @@ ignore = [
     "TRY300",  # Consider moving this statement to an `else` block
     "UP035",   # `typing.List` is deprecated, use `list` instead
     "RET503",  # Missing explicit `return` at the end of function able to return non-`None` value
+    "UP017",   # Use `datetime.UTC` alias - but UTC only available in Python 3.11+
 ]
 
 [tool.ruff.lint.pydocstyle]

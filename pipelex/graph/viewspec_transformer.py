@@ -6,13 +6,12 @@ and other interactive graph viewers.
 """
 
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeKind, NodeStatus
 from pipelex.graph.viewspec import LayoutSpec, ViewEdge, ViewIndex, ViewNode, ViewSpec
-from pipelex.types import UTC
 
 
 def _map_node_kind_to_view_type(kind: NodeKind) -> str:
@@ -315,7 +314,7 @@ def graphspec_to_viewspec(
 
     # Create ViewSpec
     return ViewSpec(
-        created_at=datetime.now(UTC),
+        created_at=datetime.now(timezone.utc),
         graph_id=graph.graph_id,
         source=source_metadata,
         engine="reactflow",
