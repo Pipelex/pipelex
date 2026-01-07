@@ -39,9 +39,9 @@ FAL_IMG_GEN_MODELS = [
 
 # --- OpenAI Models ------------------------------------------------------------------------------
 OPENAI_IMG_GEN_MODELS = [
-    # "gpt-image-1",
+    "gpt-image-1",
     "gpt-image-1-mini",
-    # "gpt-image-1.5",
+    "gpt-image-1.5",
 ]
 
 # --- Google Models --------------------------------------------------------------------------
@@ -57,10 +57,10 @@ QWEN_IMG_GEN_MODELS = [
 
 # --- All Image Generation Handles ---------------------------------------------------------------
 ALL_IMG_GEN_HANDLES = [
-    # *FAL_IMG_GEN_MODELS,
-    # *GOOGLE_IMG_GEN_MODELS,
-    # *OPENAI_IMG_GEN_MODELS,
-    # *QWEN_IMG_GEN_MODELS,
+    *FAL_IMG_GEN_MODELS,
+    *GOOGLE_IMG_GEN_MODELS,
+    *OPENAI_IMG_GEN_MODELS,
+    *QWEN_IMG_GEN_MODELS,
     *STABLE_DIFFUSION_IMG_GEN_MODELS,
 ]
 
