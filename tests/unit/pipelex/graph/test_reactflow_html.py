@@ -7,10 +7,10 @@ import pytest
 from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
-from pipelex.graph.reactflow_config import ReactFlowRenderingConfig
-from pipelex.graph.reactflow_html import generate_reactflow_html
-from pipelex.graph.viewspec import ViewSpec
-from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
+from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
+from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html
+from pipelex.graph.reactflow.viewspec import ViewSpec
+from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 
 
 class TestReactFlowHtml:

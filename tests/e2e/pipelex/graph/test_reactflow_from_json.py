@@ -12,8 +12,8 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import load_graphspec
-from pipelex.graph.reactflow_html import generate_reactflow_html_async
-from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
+from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.conftest import TEST_OUTPUTS_DIR
 from tests.e2e.pipelex.graph.test_data import GraphTestData

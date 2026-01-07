@@ -8,8 +8,8 @@ import json
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.graph.reactflow_config import ReactFlowRenderingConfig
-from pipelex.graph.viewspec import ViewSpec
+from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
+from pipelex.graph.reactflow.viewspec import ViewSpec
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_template_loader import load_template
 from pipelex.urls import URLs

@@ -2,7 +2,7 @@
 
 from datetime import datetime, timezone
 
-from pipelex.graph.viewspec import (
+from pipelex.graph.reactflow.viewspec import (
     CURRENT_VIEWSPEC_VERSION,
     LayoutSpec,
     PayloadSpec,

@@ -12,14 +12,14 @@ from pipelex import log, pretty_print
 from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec_io import load_graphspec
-from pipelex.graph.mermaid_html import (
+from pipelex.graph.mermaidflow.mermaid_html import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
 )
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
-from pipelex.graph.reactflow_html import generate_reactflow_html_async
-from pipelex.graph.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
-from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
+from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
+from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
 from tests.conftest import TEST_OUTPUTS_DIR

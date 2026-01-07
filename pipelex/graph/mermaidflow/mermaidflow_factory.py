@@ -19,7 +19,7 @@ from pipelex.graph.graphspec import (
     NodeStatus,
 )
 from pipelex.graph.mermaidflow.mermaidflow import Mermaidflow
-from pipelex.graph.stuff_collector import (
+from pipelex.graph.mermaidflow.stuff_collector import (
     collect_stuff_data,
     collect_stuff_data_html,
     collect_stuff_data_text,

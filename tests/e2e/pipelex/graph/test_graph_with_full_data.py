@@ -15,13 +15,13 @@ from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.graphspec_io import save_graphspec
-from pipelex.graph.mermaid_html import (
+from pipelex.graph.mermaidflow.mermaid_html import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
 )
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
-from pipelex.graph.reactflow_html import generate_reactflow_html_async
-from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
+from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection

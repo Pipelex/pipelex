@@ -17,8 +17,8 @@ from pipelex.graph.graphspec import (
     PipelineRef,
     TimingSpec,
 )
-from pipelex.graph.viewspec import LayoutSpec
-from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
+from pipelex.graph.reactflow.viewspec import LayoutSpec
+from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 
 
 class TestViewSpecTransformer:

@@ -11,7 +11,7 @@ import pytest
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.graph.graphspec_io import load_graphspec
-from pipelex.graph.mermaid_html import (
+from pipelex.graph.mermaidflow.mermaid_html import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
 )

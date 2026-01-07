@@ -1,5 +1,5 @@
-from pipelex.graph.mermaid_config import MermaidRenderingConfig
-from pipelex.graph.reactflow_config import ReactFlowRenderingConfig
+from pipelex.graph.mermaidflow.mermaid_config import MermaidRenderingConfig
+from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.system.configuration.config_model import ConfigModel
 
 
