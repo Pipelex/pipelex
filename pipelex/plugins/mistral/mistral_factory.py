@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import os
 
 import aiofiles
@@ -6,7 +7,9 @@ import mistralai
 from mistralai import Mistral
 from mistralai.models import (
     ContentChunk,
+    DocumentURLChunkTypedDict,
     ImageURLChunk,
+    ImageURLChunkTypedDict,
     Messages,
     SystemMessage,
     TextChunk,
@@ -23,6 +26,7 @@ from openai.types.chat import (
 )
 from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
 
+from pipelex import log
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.image.image_size import ImageSize
@@ -33,6 +37,8 @@ from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.mistral.mistral_exceptions import MistralExtractResponseError
+from pipelex.tools.uri.file_preparation_utils import prepare_file_from_uri
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 
 class MistralFactory:
@@ -155,6 +161,62 @@ class MistralFactory:
         )
 
     @classmethod
+    def _clean_mistral_image_base64(cls, base64_str: str) -> str:
+        """Clean Mistral's base64 image data by removing prepended metadata bytes.
+
+        Mistral OCR sometimes prepends metadata bytes before the actual image data.
+        This method scans for the image magic number and removes everything before it.
+
+        Args:
+            base64_str: The base64-encoded image string from Mistral
+
+        Returns:
+            Cleaned base64 string with metadata removed if it was present
+        """
+        log.debug("=== Cleaning Mistral image base64 ===")
+        try:
+            decoded_bytes = base64.b64decode(base64_str)
+            log.debug(f"Decoded image length: {len(decoded_bytes)} bytes")
+            log.debug(f"First 24 bytes (hex): {decoded_bytes[:24].hex()}")
+
+            # Image file magic numbers
+            jpeg_magic = b"\xff\xd8"  # JPEG SOI (Start of Image) - FF D8
+            png_magic = b"\x89PNG"  # PNG signature
+
+            # Check if the data already starts with a valid image magic number
+            if decoded_bytes[:2] == jpeg_magic:
+                log.debug("Image already starts with JPEG magic (FF D8), no cleaning needed")
+                return base64_str
+            if decoded_bytes[:4] == png_magic:
+                log.debug("Image already starts with PNG magic, no cleaning needed")
+                return base64_str
+
+            # Scan for JPEG magic in the first 32 bytes
+            jpeg_pos = decoded_bytes[:32].find(jpeg_magic)
+            if jpeg_pos > 0:
+                log.debug(f"Found JPEG magic (FF D8) at byte position {jpeg_pos}")
+                cleaned_bytes = decoded_bytes[jpeg_pos:]
+                log.debug(f"Cleaned image length: {len(cleaned_bytes)} bytes")
+                log.debug(f"Cleaned first 20 bytes (hex): {cleaned_bytes[:20].hex()}")
+                return base64.b64encode(cleaned_bytes).decode("ascii")
+
+            # Scan for PNG magic in the first 32 bytes
+            png_pos = decoded_bytes[:32].find(png_magic)
+            if png_pos > 0:
+                log.debug(f"Found PNG magic at byte position {png_pos}")
+                cleaned_bytes = decoded_bytes[png_pos:]
+                log.debug(f"Cleaned image length: {len(cleaned_bytes)} bytes")
+                log.debug(f"Cleaned first 20 bytes (hex): {cleaned_bytes[:20].hex()}")
+                return base64.b64encode(cleaned_bytes).decode("ascii")
+
+            log.debug("No image magic number found in first 32 bytes, returning original")
+            return base64_str
+        except Exception as exc:
+            # If anything goes wrong, return the original base64 string
+            log.debug(f"Error cleaning base64: {exc}")
+            return base64_str
+
+    @classmethod
     def make_extracted_image_from_page_from_mistral_ocr_image_obj(
         cls,
         mistral_ocr_image_obj: mistralai.OCRImageObject,
@@ -162,6 +224,10 @@ class MistralFactory:
         if not mistral_ocr_image_obj.image_base64:
             msg = "Mistral OCR image object does not have an image base64"
             raise MistralExtractResponseError(msg)
+
+        # Clean the base64 data to remove any prepended metadata bytes
+        cleaned_base64 = cls._clean_mistral_image_base64(mistral_ocr_image_obj.image_base64)
+
         width: int | None = None
         height: int | None = None
         if mistral_ocr_image_obj.top_left_x is not None and mistral_ocr_image_obj.bottom_right_x is not None:
@@ -189,9 +255,113 @@ class MistralFactory:
 
         return ExtractedImageFromPage(
             size=size,
-            base64_str=mistral_ocr_image_obj.image_base64,
+            base64_str=cleaned_base64,
             mime_type="image/jpeg",  # Mistral OCR returns JPEG images
             bounding_box=bounding_box,
+        )
+
+    #########################################################
+    # Document preparation for OCR
+    #########################################################
+
+    @classmethod
+    async def make_image_url_document_from_uri(
+        cls,
+        uri: str,
+    ) -> ImageURLChunkTypedDict:
+        """Create a Mistral image_url document from a URI.
+
+        Resolves the URI and converts it to a format suitable for Mistral's OCR API.
+        Supports HTTP URLs (kept as-is) and local paths (converted to base64 data URLs).
+
+        Args:
+            uri: The URI string to resolve (HTTP URL, local path, etc.)
+
+        Returns:
+            An ImageURLChunkTypedDict suitable for Mistral OCR API
+
+        Example:
+            >>> doc = await make_image_url_document_from_uri("https://example.com/image.png")
+            >>> doc
+            {"type": "image_url", "image_url": "https://example.com/image.png"}
+        """
+        prepared = await prepare_file_from_uri(uri=uri, keep_http_url=True)
+
+        image_url: str
+        match prepared:
+            case PreparedFileHttpUrl():
+                image_url = prepared.url
+            case PreparedFileBase64():
+                image_url = prepared.as_data_url()
+            case PreparedFileLocalPath():
+                # This shouldn't happen since we don't use keep_local_path=True
+                # but handle it just in case by converting to base64
+                prepared_as_base64 = await prepare_file_from_uri(uri=uri, keep_http_url=False, keep_local_path=False)
+                if not isinstance(prepared_as_base64, PreparedFileBase64):
+                    msg = f"Failed to convert local path to base64: {uri}"
+                    raise TypeError(msg)
+                image_url = prepared_as_base64.as_data_url()
+
+        return ImageURLChunkTypedDict(
+            type="image_url",
+            image_url=image_url,
+        )
+
+    @classmethod
+    async def make_document_url_document_from_uri(
+        cls,
+        uri: str,
+        mistral_client: Mistral | None = None,
+    ) -> DocumentURLChunkTypedDict:
+        """Create a Mistral document_url document from a URI.
+
+        Resolves the URI and converts it to a format suitable for Mistral's OCR API.
+        For HTTP URLs: kept as-is
+        For local paths: uploads to Mistral and gets a signed URL
+
+        Args:
+            uri: The URI string to resolve (HTTP URL, local path, etc.)
+            mistral_client: Mistral client (required for local file uploads)
+
+        Returns:
+            A DocumentURLChunkTypedDict suitable for Mistral OCR API
+
+        Raises:
+            ValueError: If mistral_client is None and a local file needs to be uploaded
+
+        Example:
+            >>> doc = await make_document_url_document_from_uri("https://example.com/doc.pdf")
+            >>> doc
+            {"type": "document_url", "document_url": "https://example.com/doc.pdf"}
+        """
+        prepared = await prepare_file_from_uri(uri=uri, keep_http_url=True, keep_local_path=True)
+
+        document_url: str
+        match prepared:
+            case PreparedFileHttpUrl():
+                document_url = prepared.url
+            case PreparedFileLocalPath():
+                if mistral_client is None:
+                    msg = "mistral_client is required to upload local files"
+                    raise ValueError(msg)
+                uploaded_file_id = await cls.upload_file_to_mistral_for_ocr(
+                    mistral_client=mistral_client,
+                    file_path=prepared.path,
+                )
+                signed_url_response = await mistral_client.files.get_signed_url_async(file_id=uploaded_file_id)
+                document_url = signed_url_response.url
+            case _:
+                # For base64 or other types, we'd need to handle differently
+                # For now, convert to base64 data URL
+                prepared_as_base64 = await prepare_file_from_uri(uri=uri, keep_http_url=False, keep_local_path=False)
+                if not isinstance(prepared_as_base64, PreparedFileBase64):
+                    msg = f"Failed to convert URI to base64: {uri}"
+                    raise TypeError(msg)
+                document_url = prepared_as_base64.as_data_url()
+
+        return DocumentURLChunkTypedDict(
+            type="document_url",
+            document_url=document_url,
         )
 
     #########################################################

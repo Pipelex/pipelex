@@ -25,7 +25,7 @@ class TestExtract:
         extract_job_params: ExtractJobParams,
         file_path: str,
     ):
-        pretty_print(extract_job_params, title="Extract Job Params")
+        pretty_print(extract_job_params, title=f"Extract Job Params for {file_path}")
         extract_worker = get_extract_worker(extract_handle=extract_handle_from_pdf)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
