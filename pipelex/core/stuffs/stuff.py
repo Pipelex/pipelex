@@ -1,5 +1,6 @@
 from typing import Any, cast
 
+from kajson import kajson
 from pydantic import ConfigDict, ValidationError
 from typing_extensions import override
 
@@ -76,7 +77,7 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
 
     @override
     def __str__(self) -> str:
-        return f"{self.title}\n{self.content.rendered_json()}"
+        return f"{self.title}\n{kajson.dumps(self.content.smart_dump(), indent=4)}"
 
     @property
     def is_list(self) -> bool:
