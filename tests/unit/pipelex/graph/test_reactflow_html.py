@@ -11,10 +11,16 @@ from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html
 from pipelex.graph.reactflow.viewspec import ViewSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
+from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 
 
 class TestReactFlowHtml:
     """Tests for generate_reactflow_html function."""
+
+    @pytest.fixture(autouse=True)
+    def setup_templates(self) -> None:
+        """Ensure ReactFlow templates are loaded before tests."""
+        TemplateLoader.load("reactflow")
 
     @pytest.fixture
     def rf_config(self) -> ReactFlowRenderingConfig:

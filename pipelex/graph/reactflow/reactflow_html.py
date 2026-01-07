@@ -11,12 +11,11 @@ from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow.viewspec import ViewSpec
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
-from pipelex.tools.jinja2.jinja2_template_loader import load_template
+from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.urls import URLs
 
-# Template package and name
-_TEMPLATE_PACKAGE = "pipelex.graph.reactflow.templates"
-_REACTFLOW_TEMPLATE = "reactflow.html.jinja2"
+# Template key in the registry
+_REACTFLOW_TEMPLATE_KEY = "reactflow/main.html.jinja2"
 
 
 def generate_reactflow_html(
@@ -41,8 +40,8 @@ def generate_reactflow_html(
     Returns:
         Complete HTML page as a string with embedded ReactFlow viewer.
     """
-    # Load template from file
-    template_source = load_template(package=_TEMPLATE_PACKAGE, template_name=_REACTFLOW_TEMPLATE)
+    # Get template from pre-loaded registry (sandbox-safe, no I/O at render time)
+    template_source = TemplateRegistry.get(_REACTFLOW_TEMPLATE_KEY)
 
     # Serialize ViewSpec to JSON
     viewspec_json = json.dumps(viewspec.model_dump(mode="json"), indent=2)
@@ -99,8 +98,8 @@ async def generate_reactflow_html_async(
     Returns:
         Complete HTML page as a string with embedded ReactFlow viewer.
     """
-    # Load template from file
-    template_source = load_template(_TEMPLATE_PACKAGE, _REACTFLOW_TEMPLATE)
+    # Get template from pre-loaded registry (sandbox-safe, no I/O at render time)
+    template_source = TemplateRegistry.get(_REACTFLOW_TEMPLATE_KEY)
 
     # Serialize ViewSpec to JSON
     viewspec_json = json.dumps(viewspec.model_dump(mode="json"), indent=2)

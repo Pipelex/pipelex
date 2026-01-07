@@ -66,6 +66,7 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
+from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -211,6 +212,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_config = get_config().pipelex.storage_config
             storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
+
+        # Load Jinja2 templates into registry
+        TemplateLoader.load_all()
 
         self.library_manager = library_manager or LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
