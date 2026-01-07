@@ -18,6 +18,7 @@ from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, c
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.misc.chart_utils import FlowchartDirection
+from pipelex.tools.misc.string_utils import snake_to_title_case
 
 if TYPE_CHECKING:
     from pipelex.graph.graph_config import GraphConfig
@@ -100,11 +101,13 @@ async def generate_graph_outputs(
                     stuff_data_text=mermaidflow.stuff_data_text,
                     stuff_data_html=mermaidflow.stuff_data_html,
                     stuff_metadata=mermaidflow.stuff_metadata,
-                    title=f"Mermaidflow: {pipe_code}",
+                    title=f"Pipeline: {snake_to_title_case(pipe_code)}",
                     theme=mermaid_theme,
                 )
             else:
-                mermaidflow_html = await render_mermaid_html_async(mermaidflow.mermaid_code, title=f"Mermaidflow: {pipe_code}", theme=mermaid_theme)
+                mermaidflow_html = await render_mermaid_html_async(
+                    mermaidflow.mermaid_code, title=f"Pipeline: {snake_to_title_case(pipe_code)}", theme=mermaid_theme
+                )
 
     # Generate ReactFlow outputs
     if inclusion.reactflow_viewspec or inclusion.reactflow_html:
@@ -132,7 +135,7 @@ async def generate_graph_outputs(
                 graphspec=graph_spec,
                 stuff_data_text=rf_stuff_data_text,
                 stuff_data_html=rf_stuff_data_html,
-                title=f"ReactFlow: {pipe_code}",
+                title=f"Pipeline: {snake_to_title_case(pipe_code)}",
             )
 
     return GraphOutputs(

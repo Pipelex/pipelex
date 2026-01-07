@@ -29,6 +29,7 @@ from pipelex.hub import get_console
 from pipelex.pipelex import Pipelex
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import load_text_from_path
+from pipelex.tools.misc.string_utils import snake_to_title_case
 
 graph_app = typer.Typer(no_args_is_help=True)
 
@@ -151,13 +152,13 @@ def graph_render_cmd(
                         stuff_data_text=the_mermaidflow.stuff_data_text,
                         stuff_data_html=the_mermaidflow.stuff_data_html,
                         stuff_metadata=the_mermaidflow.stuff_metadata,
-                        title=f"Mermaidflow: {input_file.stem}",
+                        title=f"Pipeline: {snake_to_title_case(input_file.stem)}",
                         theme=mermaid_theme,
                     )
                 else:
                     mermaidflow_html = await render_mermaid_html_async(
                         the_mermaidflow.mermaid_code,
-                        title=f"Mermaidflow: {input_file.stem}",
+                        title=f"Pipeline: {snake_to_title_case(input_file.stem)}",
                         theme=mermaid_theme,
                     )
                 mermaidflow_html_path = output_dir / "mermaidflow.html"
@@ -182,7 +183,7 @@ def graph_render_cmd(
                     graphspec=graph_spec,
                     stuff_data_text=rf_stuff_data_text,
                     stuff_data_html=rf_stuff_data_html,
-                    title=f"ReactFlow: {input_file.stem}",
+                    title=f"Pipeline: {snake_to_title_case(input_file.stem)}",
                 )
                 reactflow_path = output_dir / "reactflow.html"
                 reactflow_path.write_text(reactflow_html, encoding="utf-8")
