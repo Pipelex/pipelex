@@ -15,7 +15,7 @@ from pipelex.tools.jinja2.jinja2_template_loader import load_template
 from pipelex.urls import URLs
 
 # Template package and name
-_TEMPLATE_PACKAGE = "pipelex.graph.templates"
+_TEMPLATE_PACKAGE = "pipelex.graph.reactflow.templates"
 _REACTFLOW_TEMPLATE = "reactflow.html.jinja2"
 
 

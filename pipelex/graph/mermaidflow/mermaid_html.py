@@ -12,7 +12,7 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_ji
 from pipelex.tools.jinja2.jinja2_template_loader import load_template
 
 # Template package and names
-_TEMPLATE_PACKAGE = "pipelex.graph.templates"
+_TEMPLATE_PACKAGE = "pipelex.graph.mermaidflow.templates"
 _PIPELEX_TEMPLATE = "mermaid_pipelex.html.jinja2"
 _INTERACTIVE_TEMPLATE = "mermaid_interactive.html.jinja2"
 
