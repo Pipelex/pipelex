@@ -18,3 +18,6 @@ REACTFLOW_TEMPLATES = [
     ("_body.html.jinja2", "reactflow/_body.html.jinja2"),
     ("_scripts.js.jinja2", "reactflow/_scripts.js.jinja2"),
 ]
+
+# Tuple of (name, package, templates) for convenient single import
+REACTFLOW_TEMPLATE_SET = (REACTFLOW_TEMPLATE_SET_NAME, REACTFLOW_TEMPLATES_PACKAGE, REACTFLOW_TEMPLATES)

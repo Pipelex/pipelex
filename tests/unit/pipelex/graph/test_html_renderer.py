@@ -3,11 +3,7 @@
 import pytest
 
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html
-from pipelex.graph.mermaidflow.template_set import (
-    MERMAID_TEMPLATE_SET_NAME,
-    MERMAID_TEMPLATES,
-    MERMAID_TEMPLATES_PACKAGE,
-)
+from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
@@ -20,12 +16,13 @@ class TestRenderMermaidHtml:
         """Ensure Mermaid templates are loaded before tests."""
         TemplateRegistry.clear()
         TemplateLoader.reset()
+        mermaid_name, mermaid_package, mermaid_templates = MERMAID_TEMPLATE_SET
         TemplateLoader.register_set(
-            name=MERMAID_TEMPLATE_SET_NAME,
-            package=MERMAID_TEMPLATES_PACKAGE,
-            templates=MERMAID_TEMPLATES,
+            name=mermaid_name,
+            package=mermaid_package,
+            templates=mermaid_templates,
         )
-        TemplateLoader.load(MERMAID_TEMPLATE_SET_NAME)
+        TemplateLoader.load(mermaid_name)
 
     SAMPLE_MERMAID_CODE = """flowchart TD
     n_abc123["generate_text"]

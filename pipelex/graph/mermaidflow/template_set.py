@@ -26,3 +26,6 @@ MERMAID_TEMPLATES = [
     ("_interactive_body.html.jinja2", "mermaid/_interactive_body.html.jinja2"),
     ("_interactive_scripts.js.jinja2", "mermaid/_interactive_scripts.js.jinja2"),
 ]
+
+# Tuple of (name, package, templates) for convenient single import
+MERMAID_TEMPLATE_SET = (MERMAID_TEMPLATE_SET_NAME, MERMAID_TEMPLATES_PACKAGE, MERMAID_TEMPLATES)
