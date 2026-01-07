@@ -191,10 +191,6 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
     def list_keys(self) -> list[str]:
         return list(self.root.keys()) + list(self.aliases.keys())
 
-    def pretty_print(self):
-        for name, stuff in self.root.items():
-            pretty_print(stuff.content.rendered_plain(), title=f"{name}: {stuff.concept.code}")
-
     ################################################################################################
     # ContextProviderAbstract
     ################################################################################################

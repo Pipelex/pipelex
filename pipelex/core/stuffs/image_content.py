@@ -39,7 +39,7 @@ class ImageContent(StuffContent):
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             temlating_context={
-                "url": self.display_link,
+                "url": self.display_link or self.url,
             },
         )
 
