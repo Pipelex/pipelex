@@ -12,6 +12,12 @@ MERMAID_TEMPLATES_PACKAGE = "pipelex.graph.mermaidflow.templates"
 
 # List of (filename, registry_key) tuples
 MERMAID_TEMPLATES = [
+    # Main templates
     ("mermaid_pipelex.html.jinja2", "mermaid/pipelex.html.jinja2"),
     ("mermaid_interactive.html.jinja2", "mermaid/interactive.html.jinja2"),
+    # Interactive partials
+    ("_interactive_head.html.jinja2", "mermaid/_interactive_head.html.jinja2"),
+    ("_interactive_styles.css.jinja2", "mermaid/_interactive_styles.css.jinja2"),
+    ("_interactive_body.html.jinja2", "mermaid/_interactive_body.html.jinja2"),
+    ("_interactive_scripts.js.jinja2", "mermaid/_interactive_scripts.js.jinja2"),
 ]

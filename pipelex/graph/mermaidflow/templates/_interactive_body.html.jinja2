@@ -1,0 +1,49 @@
+<div class="header">
+    <h1>{{ title }}</h1>
+    <div class="theme-selector">
+        <label for="theme-select">Theme:</label>
+        <select id="theme-select">
+            <option value="default">Default</option>
+            <option value="dark">Dark</option>
+            <option value="forest">Forest</option>
+            <option value="neutral">Neutral</option>
+            <option value="base">Base</option>
+        </select>
+    </div>
+</div>
+<div class="mermaid-container">
+    <div class="mermaid" id="mermaid-diagram">
+{{ mermaid_code }}
+    </div>
+</div>
+{% if has_data %}
+<p class="hint">Click on data nodes (rounded pills) to view their full content</p>
+{% endif %}
+<div class="data-modal-overlay" id="modal-overlay"></div>
+<div class="data-modal" id="data-modal">
+    <div class="data-modal-header">
+        <span class="data-modal-title" id="modal-title">Data Content</span>
+        <span class="data-modal-close" onclick="hideModal()">&times;</span>
+    </div>
+    <div class="format-toolbar">
+        <div class="format-tabs" id="format-tabs">
+            <button class="format-tab active" data-format="html" id="tab-html">HTML</button>
+            <button class="format-tab" data-format="json" id="tab-json">JSON</button>
+            <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
+        </div>
+        <div class="format-actions">
+            <button class="action-btn" id="copy-btn" onclick="copyContent()" title="Copy">
+                <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z
+                    m3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z
+                    m0 16H8V7h11v14z"/></svg>
+            </button>
+            <button class="action-btn" id="download-btn" onclick="downloadContent()" title="Download">
+                <svg viewBox="0 0 24 24">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+    <div class="data-modal-content" id="modal-content"></div>
+</div>
+

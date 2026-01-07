@@ -124,4 +124,5 @@ async def render_mermaid_html_with_data_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
         temlating_context=context,
+        use_registry=True,  # Use registry for templates with includes
     )
