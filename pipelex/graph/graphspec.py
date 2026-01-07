@@ -12,10 +12,6 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.types import StrEnum
 
-# Current supported schema version
-CURRENT_SCHEMA_VERSION = "1.0"
-SUPPORTED_SCHEMA_VERSIONS = {"1.0"}
-
 # Redaction limits
 MAX_PREVIEW_LENGTH = 200
 MAX_STACK_LENGTH = 2000
@@ -186,10 +182,12 @@ class GraphSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    schema_version: str = CURRENT_SCHEMA_VERSION
     graph_id: str
     created_at: datetime
     pipeline_ref: PipelineRef = Field(default_factory=PipelineRef)
     nodes: list[NodeSpec] = Field(default_factory=empty_list_factory_of(NodeSpec))
     edges: list[EdgeSpec] = Field(default_factory=empty_list_factory_of(EdgeSpec))
     meta: dict[str, Any] = Field(default_factory=dict)
+
+    def to_json(self) -> str:
+        return self.model_dump_json(serialize_as_any=True, by_alias=True, indent=2)

@@ -19,7 +19,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
-from pipelex.graph.graphspec_io import load_graphspec
+from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
@@ -28,6 +28,7 @@ from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.hub import get_console
 from pipelex.pipelex import Pipelex
 from pipelex.tools.misc.chart_utils import FlowchartDirection
+from pipelex.tools.misc.file_utils import load_text_from_path
 
 graph_app = typer.Typer(no_args_is_help=True)
 
@@ -92,7 +93,8 @@ def graph_render_cmd(
     try:
         # Load the graph
         typer.echo(f"Loading graph from: {input_file}", err=True)
-        graph_spec = load_graphspec(input_file)
+        json_str = load_text_from_path(str(input_file))
+        graph_spec = GraphSpec.model_validate_json(json_str)
         typer.secho(f"✅ Loaded graph with {len(graph_spec.nodes)} nodes", fg=typer.colors.GREEN, err=True)
 
         # Determine output directory

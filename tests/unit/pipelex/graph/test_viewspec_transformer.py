@@ -19,6 +19,7 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.graph.reactflow.viewspec import LayoutSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
+from pipelex.tools.misc.package_utils import get_package_version
 
 
 class TestViewSpecTransformer:
@@ -342,8 +343,7 @@ class TestViewSpecTransformer:
         analysis = GraphAnalysis.from_graphspec(graph)
         viewspec = graphspec_to_viewspec(graph, analysis)
 
-        assert viewspec.source["graph_schema_version"] == "1.0"
-        assert viewspec.source["producer"] == "pipelex"
+        assert viewspec.source["producer"] == f"pipelex {get_package_version()}"
         assert viewspec.source["domain"] == "test_domain"
         assert viewspec.source["main_pipe"] == "test_main_pipe"
 

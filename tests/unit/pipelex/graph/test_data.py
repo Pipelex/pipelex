@@ -9,7 +9,6 @@ from pipelex.graph.graphspec import EdgeKind, NodeKind, NodeStatus
 class ValidGraphData:
     """Valid graph test data using ClassVar pattern per repo standards."""
 
-    SCHEMA_VERSION: ClassVar[str] = "1.0"
     GRAPH_ID: ClassVar[str] = "run_abc123"
     CREATED_AT: ClassVar[datetime] = datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc)
 
@@ -33,7 +32,6 @@ class ValidGraphData:
     }
 
     MINIMAL_GRAPH: ClassVar[dict[str, Any]] = {
-        "schema_version": SCHEMA_VERSION,
         "graph_id": GRAPH_ID,
         "created_at": CREATED_AT,
         "pipeline_ref": PIPELINE_REF,
@@ -114,7 +112,6 @@ class ValidGraphData:
     }
 
     COMPLEX_GRAPH: ClassVar[dict[str, Any]] = {
-        "schema_version": SCHEMA_VERSION,
         "graph_id": "run_abc123",
         "created_at": CREATED_AT,
         "pipeline_ref": PIPELINE_REF,
@@ -180,17 +177,6 @@ class InvalidGraphData:
         "error": ERROR_SPEC,
         "tags": {},
         "metrics": {},
-    }
-
-    # Unsupported schema version
-    UNSUPPORTED_VERSION_GRAPH: ClassVar[dict[str, Any]] = {
-        "schema_version": "99.0",
-        "graph_id": "run_bad",
-        "created_at": datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
-        "pipeline_ref": {"domain": None, "main_pipe": None, "entrypoint": None},
-        "nodes": [],
-        "edges": [],
-        "meta": {},
     }
 
     # Duplicate node IDs

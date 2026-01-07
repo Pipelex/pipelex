@@ -14,7 +14,6 @@ from pipelex.config import get_config
 from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.graph.graphspec_io import save_graphspec
 from pipelex.graph.mermaidflow.mermaid_html import (
     render_mermaid_html_async,
     render_mermaid_html_with_data_async,
@@ -25,7 +24,7 @@ from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection
-from pipelex.tools.misc.file_utils import get_incremental_directory_path
+from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import PDFTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
 
@@ -57,7 +56,8 @@ async def _save_graph_outputs(graph_spec: GraphSpec, output_dir: Path) -> dict[s
 
     # Save graph.json
     graph_json_path = output_dir / "graph.json"
-    save_graphspec(graph_spec, graph_json_path)
+    graph_json = graph_spec.to_json()
+    save_text_to_path(graph_json, str(graph_json_path))
     log.info(f"Saved graph.json to: {graph_json_path}")
 
     # Generate and save mermaid files

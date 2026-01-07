@@ -12,7 +12,6 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.graph.graph_analysis import GraphAnalysis
-from pipelex.graph.graphspec_io import graphspec_to_json
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
@@ -81,7 +80,8 @@ async def generate_graph_outputs(
 
     # Generate GraphSpec JSON
     if inclusion.graphspec_json:
-        graphspec_json = graphspec_to_json(graph_spec)
+        # graphspec_json = graph_spec.model_dump_json(indent=2, by_alias=True)
+        graphspec_json = graph_spec.to_json()
 
     # Get the mermaid theme from config
     mermaid_theme = graph_config.mermaid_config.style.theme

@@ -11,10 +11,10 @@ import pytest
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.graph.graph_analysis import GraphAnalysis
-from pipelex.graph.graphspec_io import load_graphspec
+from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
-from pipelex.tools.misc.file_utils import get_incremental_directory_path
+from pipelex.tools.misc.file_utils import get_incremental_directory_path, load_text_from_path
 from tests.conftest import TEST_OUTPUTS_DIR
 from tests.e2e.pipelex.graph.test_data import GraphTestData
 
@@ -50,7 +50,8 @@ class TestReactFlowFromJson:
         json_path = Path(graph_json_path)
         assert json_path.exists(), f"Graph JSON file not found: {json_path}"
 
-        graph_spec = load_graphspec(json_path)
+        json_str = load_text_from_path(str(json_path))
+        graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Verify graph loaded correctly
         assert graph_spec is not None
@@ -114,7 +115,8 @@ class TestReactFlowFromJson:
         _ = topic  # Used for test identification
 
         # Load graph from JSON
-        graph_spec = load_graphspec(Path(graph_json_path))
+        json_str = load_text_from_path(graph_json_path)
+        graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Create ViewSpec
         analysis = GraphAnalysis.from_graphspec(graph_spec)
@@ -140,7 +142,8 @@ class TestReactFlowFromJson:
         _ = topic  # Used for test identification
 
         # Load graph from JSON
-        graph_spec = load_graphspec(Path(graph_json_path))
+        json_str = load_text_from_path(graph_json_path)
+        graph_spec = GraphSpec.model_validate_json(json_str)
 
         # Create ViewSpec
         analysis = GraphAnalysis.from_graphspec(graph_spec)

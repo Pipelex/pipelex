@@ -16,12 +16,7 @@ from pipelex.graph.graphspec import (
     PipelineRef,
     TimingSpec,
 )
-from pipelex.graph.graphspec_io import (
-    graphspec_from_json,
-    graphspec_to_json,
-    load_graphspec,
-    save_graphspec,
-)
+from pipelex.tools.misc.file_utils import load_text_from_path, save_text_to_path
 from tests.unit.pipelex.graph.test_data import (
     PreviewTruncationData,
     ValidGraphData,
@@ -34,7 +29,6 @@ class TestGraphSpecRoundtrip:
     def test_roundtrip_minimal_graph(self) -> None:
         """Test round-trip for a minimal graph with single node and no edges."""
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id=ValidGraphData.GRAPH_ID,
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(
@@ -54,10 +48,9 @@ class TestGraphSpecRoundtrip:
             edges=[],
         )
 
-        json_str = graphspec_to_json(graph)
-        restored = graphspec_from_json(json_str)
+        json_str = graph.to_json()
+        restored = GraphSpec.model_validate_json(json_str)
 
-        assert restored.schema_version == graph.schema_version
         assert restored.graph_id == graph.graph_id
         assert restored.created_at == graph.created_at
         assert restored.pipeline_ref == graph.pipeline_ref
@@ -129,7 +122,6 @@ class TestGraphSpecRoundtrip:
         )
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="run_abc123",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(
@@ -142,11 +134,10 @@ class TestGraphSpecRoundtrip:
             meta={"run_mode": "live"},
         )
 
-        json_str = graphspec_to_json(graph)
-        restored = graphspec_from_json(json_str)
+        json_str = graph.to_json()
+        restored = GraphSpec.model_validate_json(json_str)
 
         # Verify structure
-        assert restored.schema_version == graph.schema_version
         assert restored.graph_id == graph.graph_id
         assert restored.created_at == graph.created_at
         assert len(restored.nodes) == 2
@@ -192,7 +183,6 @@ class TestGraphSpecRoundtrip:
         )
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="run_failed",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -200,8 +190,8 @@ class TestGraphSpecRoundtrip:
             edges=[],
         )
 
-        json_str = graphspec_to_json(graph)
-        restored = graphspec_from_json(json_str)
+        json_str = graph.to_json()
+        restored = GraphSpec.model_validate_json(json_str)
 
         assert restored.nodes[0].status == NodeStatus.FAILED
         assert restored.nodes[0].error is not None
@@ -212,7 +202,6 @@ class TestGraphSpecRoundtrip:
     def test_roundtrip_file_save_load(self, tmp_path: Path) -> None:
         """Test save/load to file produces identical GraphSpec."""
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="file_test",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(domain="test"),
@@ -229,17 +218,16 @@ class TestGraphSpecRoundtrip:
         )
 
         file_path = tmp_path / "test_graph.json"
-        save_graphspec(graph, file_path)
-        restored = load_graphspec(file_path)
+        save_text_to_path(graph.to_json(), str(file_path))
+        json_str = load_text_from_path(str(file_path))
+        restored = GraphSpec.model_validate_json(json_str)
 
-        assert restored.schema_version == graph.schema_version
         assert restored.graph_id == graph.graph_id
         assert restored.nodes[0].node_id == graph.nodes[0].node_id
 
     def test_json_is_human_readable(self) -> None:
         """Test that generated JSON is indented and human-readable."""
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="readable_test",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -255,7 +243,7 @@ class TestGraphSpecRoundtrip:
             edges=[],
         )
 
-        json_str = graphspec_to_json(graph)
+        json_str = graph.to_json()
 
         # Check for indentation (newlines and spaces)
         assert "\n" in json_str
@@ -303,7 +291,6 @@ class TestGraphSpecRoundtrip:
         ]
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="all_kinds",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -311,8 +298,8 @@ class TestGraphSpecRoundtrip:
             edges=[],
         )
 
-        json_str = graphspec_to_json(graph)
-        restored = graphspec_from_json(json_str)
+        json_str = graph.to_json()
+        restored = GraphSpec.model_validate_json(json_str)
 
         for idx, kind in enumerate(NodeKind):
             assert restored.nodes[idx].kind == kind
@@ -342,7 +329,6 @@ class TestGraphSpecRoundtrip:
         ]
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="all_edge_kinds",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -350,8 +336,8 @@ class TestGraphSpecRoundtrip:
             edges=edges,
         )
 
-        json_str = graphspec_to_json(graph)
-        restored = graphspec_from_json(json_str)
+        json_str = graph.to_json()
+        restored = GraphSpec.model_validate_json(json_str)
 
         for idx, kind in enumerate(EdgeKind):
             assert restored.edges[idx].kind == kind
@@ -380,7 +366,6 @@ class TestGraphSpecRoundtrip:
             nodes.append(node)
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="all_statuses",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -388,8 +373,8 @@ class TestGraphSpecRoundtrip:
             edges=[],
         )
 
-        json_str = graphspec_to_json(graph)
-        restored = graphspec_from_json(json_str)
+        json_str = graph.to_json()
+        restored = GraphSpec.model_validate_json(json_str)
 
         status_list = list(NodeStatus)
         for idx, status in enumerate(status_list):

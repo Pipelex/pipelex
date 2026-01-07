@@ -39,12 +39,8 @@ stuff_html_content = true
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 # Uncomment to customize which graph outputs are generated (all enabled by default):
 # graphspec_json = false
-# orchestration_mmd = false
-# orchestration_html = false
-# dataflow_mmd = false
-# dataflow_html = false
-# combo_mmd = false
-# combo_html = false
+# mermaidflow_mmd = false
+# mermaidflow_html = false
 # reactflow_viewspec = false
 # reactflow_html = false
 

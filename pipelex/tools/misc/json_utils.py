@@ -103,7 +103,7 @@ def load_json_from_path(path: str) -> JsonContent:
         return json_content
 
 
-def load_json_dict_from_path(path: str) -> dict[Any, Any]:
+def load_json_dict_from_path(path: str) -> dict[str, Any]:
     """Loads a JSON file and ensures it contains a dictionary.
 
     This function reads a JSON file and verifies that its content is a dictionary.
@@ -113,7 +113,7 @@ def load_json_dict_from_path(path: str) -> dict[Any, Any]:
         path (str): The file path to the JSON file to be loaded.
 
     Returns:
-        Dict[Any, Any]: The parsed JSON content as a Python dictionary.
+        Dict[str, Any]: The parsed JSON content as a Python dictionary.
 
     Raises:
         JsonTypeError: If the JSON content is not a dictionary.

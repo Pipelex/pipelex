@@ -12,6 +12,7 @@ from typing import Any
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeKind, NodeStatus
 from pipelex.graph.reactflow.viewspec import LayoutSpec, ViewEdge, ViewIndex, ViewNode, ViewSpec
+from pipelex.tools.misc.package_utils import get_package_version
 
 
 def _map_node_kind_to_view_type(kind: NodeKind) -> str:
@@ -304,8 +305,7 @@ def graphspec_to_viewspec(
 
     # Build source metadata
     source_metadata: dict[str, Any] = {
-        "graph_schema_version": graph.schema_version,
-        "producer": "pipelex",
+        "producer": f"pipelex {get_package_version()}",
     }
     if graph.pipeline_ref.domain:
         source_metadata["domain"] = graph.pipeline_ref.domain

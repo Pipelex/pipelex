@@ -3,10 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from pipelex.graph.exceptions import (
-    GraphSpecValidationError,
-    GraphSpecVersionError,
-)
+from pipelex.graph.exceptions import GraphSpecValidationError
 from pipelex.graph.graphspec import (
     EdgeKind,
     EdgeSpec,
@@ -17,7 +14,6 @@ from pipelex.graph.graphspec import (
     NodeStatus,
     PipelineRef,
 )
-from pipelex.graph.graphspec_io import graphspec_from_json, graphspec_to_json
 from pipelex.graph.validation import validate_graphspec
 from tests.unit.pipelex.graph.test_data import ValidGraphData
 
@@ -43,7 +39,6 @@ class TestGraphSpecValidation:
         )
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="test_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -75,7 +70,6 @@ class TestGraphSpecValidation:
         )
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="test_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -108,7 +102,6 @@ class TestGraphSpecValidation:
         )
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="test_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -163,7 +156,6 @@ class TestGraphSpecValidation:
         )
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="test_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -221,7 +213,6 @@ class TestGraphSpecValidation:
         )
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="test_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -252,7 +243,6 @@ class TestGraphSpecValidation:
         )
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="test_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -262,36 +252,6 @@ class TestGraphSpecValidation:
 
         # Should not raise
         validate_graphspec(graph)
-
-    def test_reject_unsupported_schema_version_on_load(self) -> None:
-        """Test that loading a graph with unsupported schema version raises error."""
-        # Create a valid graph, serialize, then modify version in JSON
-        graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
-            graph_id="test_graph",
-            created_at=ValidGraphData.CREATED_AT,
-            pipeline_ref=PipelineRef(),
-            nodes=[
-                NodeSpec(
-                    node_id="node_001",
-                    kind=NodeKind.OPERATOR,
-                    pipe_code="test",
-                    pipe_type="PipeLLM",
-                    status=NodeStatus.SUCCEEDED,
-                )
-            ],
-            edges=[],
-        )
-
-        json_str = graphspec_to_json(graph)
-        # Replace version with unsupported one
-        bad_json = json_str.replace('"1.0"', '"99.0"')
-
-        with pytest.raises(GraphSpecVersionError) as exc_info:
-            graphspec_from_json(bad_json)
-
-        assert "99.0" in str(exc_info.value)
-        assert "unsupported" in str(exc_info.value).lower() or "version" in str(exc_info.value).lower()
 
     def test_valid_graph_passes_validation(self) -> None:
         """Test that a valid graph passes all validation checks."""
@@ -322,7 +282,6 @@ class TestGraphSpecValidation:
         ]
 
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="valid_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(
@@ -339,7 +298,6 @@ class TestGraphSpecValidation:
     def test_empty_graph_passes_validation(self) -> None:
         """Test that an empty graph (no nodes, no edges) passes validation."""
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="empty_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -353,7 +311,6 @@ class TestGraphSpecValidation:
     def test_reject_extra_fields_on_load(self) -> None:
         """Test that extra/unknown fields in JSON are rejected."""
         graph = GraphSpec(
-            schema_version=ValidGraphData.SCHEMA_VERSION,
             graph_id="test_graph",
             created_at=ValidGraphData.CREATED_AT,
             pipeline_ref=PipelineRef(),
@@ -369,12 +326,12 @@ class TestGraphSpecValidation:
             edges=[],
         )
 
-        json_str = graphspec_to_json(graph)
+        json_str = graph.to_json()
         # Add an unknown field
         bad_json = json_str.replace(
-            '"schema_version"',
-            '"unknown_field": "bad_value", "schema_version"',
+            '"graph_id"',
+            '"unknown_field": "bad_value", "graph_id"',
         )
 
         with pytest.raises((ValidationError, GraphSpecValidationError)):
-            graphspec_from_json(bad_json)
+            GraphSpec.model_validate_json(bad_json)
