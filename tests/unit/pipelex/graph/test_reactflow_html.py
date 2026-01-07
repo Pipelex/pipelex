@@ -1,6 +1,6 @@
 """Unit tests for the ReactFlow HTML generator."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 import pytest
 
@@ -11,6 +11,7 @@ from pipelex.graph.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow_html import generate_reactflow_html
 from pipelex.graph.viewspec import ViewSpec
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
+from pipelex.types import UTC
 
 
 class TestReactFlowHtml:

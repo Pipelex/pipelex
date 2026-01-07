@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import TYPE_CHECKING, Any, final
 
 from opentelemetry import trace
@@ -33,7 +33,7 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
-from pipelex.types import Self
+from pipelex.types import UTC, Self
 
 if TYPE_CHECKING:
     from pipelex.graph.graph_context import GraphContext

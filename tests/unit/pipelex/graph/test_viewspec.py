@@ -1,6 +1,6 @@
 """Unit tests for the ViewSpec models."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from pipelex.graph.viewspec import (
     CURRENT_VIEWSPEC_VERSION,
@@ -11,6 +11,7 @@ from pipelex.graph.viewspec import (
     ViewNode,
     ViewSpec,
 )
+from pipelex.types import UTC
 
 
 class TestViewNode:

@@ -1,6 +1,6 @@
 """Unit tests for the ViewSpec transformer."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, ClassVar
 
 from pipelex.graph.graph_analysis import GraphAnalysis
@@ -19,6 +19,7 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.graph.viewspec import LayoutSpec
 from pipelex.graph.viewspec_transformer import graphspec_to_viewspec
+from pipelex.types import UTC
 
 
 class TestViewSpecTransformer:

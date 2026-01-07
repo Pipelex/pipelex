@@ -1,6 +1,6 @@
 """GraphTracer implementation that builds GraphSpec during pipeline execution."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 
 from typing_extensions import override
 
@@ -20,6 +20,7 @@ from pipelex.graph.graphspec import (
     PipelineRef,
     TimingSpec,
 )
+from pipelex.types import UTC
 
 
 class _MutableNodeData:

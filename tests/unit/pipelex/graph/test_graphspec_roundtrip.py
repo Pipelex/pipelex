@@ -1,6 +1,6 @@
 """Unit tests for GraphSpec JSON round-trip serialization."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 
 from pipelex.graph.graphspec import (
@@ -22,6 +22,7 @@ from pipelex.graph.graphspec_io import (
     load_graphspec,
     save_graphspec,
 )
+from pipelex.types import UTC
 from tests.unit.pipelex.graph.test_data import (
     PreviewTruncationData,
     ValidGraphData,

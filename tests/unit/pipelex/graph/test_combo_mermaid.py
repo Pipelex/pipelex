@@ -1,6 +1,6 @@
 """Unit tests for the graphspec_to_mermaidflow function."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, ClassVar
 
 from pipelex.graph.graphspec import (
@@ -15,6 +15,7 @@ from pipelex.graph.graphspec import (
     PipelineRef,
 )
 from pipelex.graph.mermaid import graphspec_to_mermaidflow
+from pipelex.types import UTC
 
 from .conftest import make_graph_config
 

@@ -1,9 +1,10 @@
 """Test data for GraphSpec unit tests."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, ClassVar
 
 from pipelex.graph.graphspec import EdgeKind, NodeKind, NodeStatus
+from pipelex.types import UTC
 
 
 class ValidGraphData:

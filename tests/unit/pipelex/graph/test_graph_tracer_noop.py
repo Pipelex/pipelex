@@ -1,9 +1,10 @@
 """Unit tests for GraphTracerNoOp."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
 from pipelex.graph.graph_tracer_protocol import GraphTracerNoOp
 from pipelex.graph.graphspec import EdgeKind, NodeKind
+from pipelex.types import UTC
 from tests.unit.pipelex.graph.conftest import make_defaulted_data_inclusion_config
 
 

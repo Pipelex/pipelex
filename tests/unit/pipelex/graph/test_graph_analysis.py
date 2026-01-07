@@ -1,6 +1,6 @@
 """Unit tests for the GraphAnalysis model."""
 
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any, ClassVar
 
 from pipelex.graph.graph_analysis import GraphAnalysis
@@ -15,6 +15,7 @@ from pipelex.graph.graphspec import (
     NodeStatus,
     PipelineRef,
 )
+from pipelex.types import UTC
 
 
 class TestGraphAnalysis:

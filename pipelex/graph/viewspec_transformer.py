@@ -6,12 +6,13 @@ and other interactive graph viewers.
 """
 
 from collections import defaultdict
-from datetime import UTC, datetime
+from datetime import datetime
 from typing import Any
 
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeKind, NodeStatus
 from pipelex.graph.viewspec import LayoutSpec, ViewEdge, ViewIndex, ViewNode, ViewSpec
+from pipelex.types import UTC
 
 
 def _map_node_kind_to_view_type(kind: NodeKind) -> str:
