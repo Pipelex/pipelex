@@ -1,9 +1,9 @@
 import importlib.util
 from typing import TYPE_CHECKING
 
-from pipelex.cogt.exceptions import MissingDependencyError
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin

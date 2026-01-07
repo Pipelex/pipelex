@@ -51,6 +51,7 @@ from pipelex.system.exceptions import (
     ConfigValidationError,
     CredentialsError,
     FatalError,
+    MissingDependencyError,
     NestedKeyConflictError,
     ToolError,
     TracebackMessageError,
@@ -118,6 +119,7 @@ __all__ = [
     "CredentialsError",
     "TracebackMessageError",
     "FatalError",
+    "MissingDependencyError",
     "ConfigValidationError",
     "ConfigModelError",
 ]

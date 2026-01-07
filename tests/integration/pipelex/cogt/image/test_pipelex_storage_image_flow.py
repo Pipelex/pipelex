@@ -11,6 +11,7 @@ These tests verify the complete flow:
 import base64
 
 import pytest
+import pytest_asyncio
 from pytest_mock import MockerFixture
 
 from pipelex.cogt.image.prepared_image import PreparedImageBase64
@@ -27,14 +28,14 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 TEST_IMAGE_PATH = "tests/data/images/eiffel_tower.png"
 
 
-@pytest.fixture
-def storage_provider_with_test_image() -> tuple[InMemoryStorageProvider, str]:
+@pytest_asyncio.fixture
+async def storage_provider_with_test_image() -> tuple[InMemoryStorageProvider, str]:
     """Create an in-memory storage with a real test image and return (provider, uri)."""
     provider = InMemoryStorageProvider()
     # Load a real test image
     image_bytes = load_binary(path=TEST_IMAGE_PATH)
     key = "pipeline_run_123/generated_image.png"
-    uri = provider.store(data=image_bytes, key=key)
+    uri = await provider.store(data=image_bytes, key=key)
     return provider, uri
 
 

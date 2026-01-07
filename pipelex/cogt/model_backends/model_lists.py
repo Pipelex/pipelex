@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib.util
 
 from pipelex.cli.exceptions import PipelexCLIError
-from pipelex.cogt.exceptions import MissingDependencyError
+from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console, get_models_manager
 
 

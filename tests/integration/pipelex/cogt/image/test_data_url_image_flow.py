@@ -84,7 +84,7 @@ class TestDataUrlImageFlow:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize
-        normalized_memory = normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
 
         # Verify the URL was converted to pipelex-storage://
         normalized_stuff = normalized_memory.get_stuff("test_image")
@@ -92,7 +92,7 @@ class TestDataUrlImageFlow:
         assert normalized_stuff.content.url.startswith("pipelex-storage://")
 
         # Verify the data is stored correctly and matches original
-        stored_bytes = provider.load(uri=normalized_stuff.content.url)
+        stored_bytes = await provider.load(uri=normalized_stuff.content.url)
         # Extract base64 data from the data URL for comparison
         base64_data = data_url.split(",", 1)[1]
         expected_bytes = base64.b64decode(base64_data)
@@ -121,7 +121,7 @@ class TestDataUrlImageFlow:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize to storage
-        normalized_memory = normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
         normalized_stuff = normalized_memory.get_stuff("test_image")
         assert isinstance(normalized_stuff.content, ImageContent)
         storage_uri = normalized_stuff.content.url
@@ -162,7 +162,7 @@ class TestDataUrlImageFlow:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize
-        normalized_memory = normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
 
         # Verify all images were converted
         normalized_stuff = normalized_memory.get_stuff("image_list")
@@ -193,7 +193,7 @@ class TestDataUrlImageFlow:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize
-        normalized_memory = normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
 
         # Verify URL was NOT changed
         normalized_stuff = normalized_memory.get_stuff("test_image")
@@ -223,7 +223,7 @@ class TestDataUrlImageFlow:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize
-        normalized_memory = normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
 
         # Verify the embedded image URL was converted to pipelex-storage://
         normalized_stuff = normalized_memory.get_stuff("test_article")
@@ -234,7 +234,7 @@ class TestDataUrlImageFlow:
         assert normalized_article.image.url.startswith("pipelex-storage://")
 
         # Verify the stored data is correct
-        stored_bytes = provider.load(uri=normalized_article.image.url)
+        stored_bytes = await provider.load(uri=normalized_article.image.url)
         expected_bytes = base64.b64decode(ImageTestCases.MINIMAL_PNG_BASE64)
         assert stored_bytes == expected_bytes
 
@@ -263,7 +263,7 @@ class TestDataUrlImageFlow:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize
-        normalized_memory = normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
 
         # Verify all image URLs were converted
         normalized_stuff = normalized_memory.get_stuff("nested_article")
@@ -278,10 +278,10 @@ class TestDataUrlImageFlow:
         assert normalized_nested.related_image.url.startswith("pipelex-storage://")
 
         # Verify both stored data are correct
-        nested_stored = provider.load(uri=normalized_nested.main_article.image.url)
+        nested_stored = await provider.load(uri=normalized_nested.main_article.image.url)
         assert nested_stored == base64.b64decode(ImageTestCases.MINIMAL_PNG_BASE64)
 
-        related_stored = provider.load(uri=normalized_nested.related_image.url)
+        related_stored = await provider.load(uri=normalized_nested.related_image.url)
         assert related_stored == base64.b64decode(ImageTestCases.MINIMAL_JPEG_BASE64)
 
     async def test_normalization_with_list_in_structured_content(
@@ -313,7 +313,7 @@ class TestDataUrlImageFlow:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
 
         # Normalize
-        normalized_memory = normalize_data_urls_to_storage(working_memory)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
 
         # Verify all images in the list were converted
         normalized_stuff = normalized_memory.get_stuff("gallery")

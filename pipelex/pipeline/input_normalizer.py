@@ -21,13 +21,14 @@ from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
-def normalize_data_urls_to_storage(working_memory: WorkingMemory) -> WorkingMemory:
+async def normalize_data_urls_to_storage(working_memory: WorkingMemory) -> WorkingMemory:
     """Convert all data URLs in ImageContent to pipelex-storage:// URIs.
 
     Scans all stuffs in working memory and for any ImageContent with a data:...;base64,...
     URL, stores the data and replaces the URL with a pipelex-storage:// URI.
 
     This handles:
+
     - Direct ImageContent
     - ListContent containing ImageContent items
     - StructuredContent with nested ImageContent fields (recursive)
@@ -42,14 +43,14 @@ def normalize_data_urls_to_storage(working_memory: WorkingMemory) -> WorkingMemo
 
     for stuff in working_memory.root.values():
         content = stuff.content
-        normalized_content, changed = _normalize_value(value=content, storage=storage)
+        normalized_content, changed = await _normalize_value(value=content, storage=storage)
         if changed:
             stuff.content = normalized_content
 
     return working_memory
 
 
-def _normalize_value(
+async def _normalize_value(
     value: Any,
     storage: StorageProviderAbstract,
 ) -> tuple[Any, bool]:
@@ -64,26 +65,26 @@ def _normalize_value(
     """
     # Handle ImageContent directly
     if isinstance(value, ImageContent):
-        normalized = _normalize_image_content(image_content=value, storage=storage)
+        normalized = await _normalize_image_content(image_content=value, storage=storage)
         return normalized, normalized is not value
 
     # Handle StructuredContent (recursively process all fields)
     if isinstance(value, StructuredContent):
-        return _normalize_structured_content(structured_content=value, storage=storage)
+        return await _normalize_structured_content(structured_content=value, storage=storage)
 
     # Handle ListContent
     if isinstance(value, ListContent):
-        return _normalize_list_content(list_content=value, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
+        return await _normalize_list_content(list_content=value, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
 
     # Handle plain lists (might contain ImageContent or StructuredContent)
     if isinstance(value, list):
-        return _normalize_list(items=value, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
+        return await _normalize_list(items=value, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
 
     # Other types don't need normalization
     return value, False
 
 
-def _normalize_structured_content(
+async def _normalize_structured_content(
     structured_content: StructuredContent,
     storage: StorageProviderAbstract,
 ) -> tuple[StructuredContent, bool]:
@@ -100,7 +101,7 @@ def _normalize_structured_content(
     has_changes = False
 
     for field_name, field_value in structured_content:
-        normalized_value, changed = _normalize_value(value=field_value, storage=storage)
+        normalized_value, changed = await _normalize_value(value=field_value, storage=storage)
         if changed:
             updates[field_name] = normalized_value
             has_changes = True
@@ -113,7 +114,7 @@ def _normalize_structured_content(
     return structured_content.model_copy(update=updates), True
 
 
-def _normalize_list_content(
+async def _normalize_list_content(
     list_content: ListContent[Any],
     storage: StorageProviderAbstract,
 ) -> tuple[ListContent[Any], bool]:
@@ -130,7 +131,7 @@ def _normalize_list_content(
     if not raw_items:
         return list_content, False
 
-    normalized_items, has_changes = _normalize_list(items=raw_items, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
+    normalized_items, has_changes = await _normalize_list(items=raw_items, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
 
     if not has_changes:
         return list_content, False
@@ -144,7 +145,7 @@ def _normalize_list_content(
     return ListContent(items=normalized_items), True
 
 
-def _normalize_list(
+async def _normalize_list(
     items: list[Any],
     storage: StorageProviderAbstract,
 ) -> tuple[list[Any], bool]:
@@ -161,7 +162,7 @@ def _normalize_list(
     has_changes = False
 
     for item in items:
-        normalized_item, changed = _normalize_value(value=item, storage=storage)
+        normalized_item, changed = await _normalize_value(value=item, storage=storage)
         normalized_items.append(normalized_item)
         if changed:
             has_changes = True
@@ -169,7 +170,7 @@ def _normalize_list(
     return normalized_items, has_changes
 
 
-def _normalize_image_content(
+async def _normalize_image_content(
     image_content: ImageContent,
     storage: StorageProviderAbstract,
 ) -> ImageContent:
@@ -193,7 +194,7 @@ def _normalize_image_content(
     raw_bytes = base64.b64decode(resolved_uri.base64_data)
     file_type = detect_file_type_from_bytes(raw_bytes)
     key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
-    storage_uri = storage.store(data=raw_bytes, key=key)
+    storage_uri = await storage.store(data=raw_bytes, key=key)
 
     return ImageContent(
         url=storage_uri,

@@ -1,5 +1,4 @@
 import types
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from kajson.class_registry import ClassRegistry
@@ -46,7 +45,7 @@ from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig, StorageMethod
+from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
 )
@@ -70,9 +69,8 @@ from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
-from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
-from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.storage.storage_provider_factory import make_storage_provider_from_config
 from pipelex.types import Self
 from pipelex.urls import URLs
 
@@ -210,13 +208,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         if storage_provider is None:
-            match get_config().pipelex.storage_config.method:
-                case StorageMethod.LOCAL:
-                    log.dev(f"Using local storage at: {get_config().pipelex.storage_config.storage_path}")
-                    storage_provider = LocalStorageProvider(root_path=Path(get_config().pipelex.storage_config.storage_path))
-                case StorageMethod.IN_MEMORY:
-                    log.dev("Using in-memory storage")
-                    storage_provider = InMemoryStorageProvider()
+            storage_config = get_config().pipelex.storage_config
+            storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
         self.library_manager = library_manager or LibraryManager()

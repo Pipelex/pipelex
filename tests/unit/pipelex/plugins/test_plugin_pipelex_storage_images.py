@@ -4,6 +4,7 @@ These tests verify that all plugins can handle images stored via pipelex-storage
 """
 
 import pytest
+import pytest_asyncio
 from google.genai import types as genai_types
 from mistralai.models import ImageURLChunk
 from pytest_mock import MockerFixture
@@ -89,12 +90,12 @@ MINIMAL_PNG_BYTES = bytes(
 )
 
 
-@pytest.fixture
-def storage_with_image() -> tuple[InMemoryStorageProvider, str]:
+@pytest_asyncio.fixture
+async def storage_with_image() -> tuple[InMemoryStorageProvider, str]:
     """Create an in-memory storage with a test image and return (provider, uri)."""
     provider = InMemoryStorageProvider()
     key = "test_images/sample.png"
-    uri = provider.store(data=MINIMAL_PNG_BYTES, key=key)
+    uri = await provider.store(data=MINIMAL_PNG_BYTES, key=key)
     return provider, uri
 
 

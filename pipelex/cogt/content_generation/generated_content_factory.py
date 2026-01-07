@@ -107,7 +107,7 @@ class GeneratedContentFactory:
                     mime_type=raw_details.mime_type or base64_extracted_mime_type,
                     output_format=output_format,
                 )
-                url = self.storage_provider.store(data=actual_bytes, key=storage_key)
+                url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
                 is_remote_url = False
             else:
                 msg = "No URL or bytes found"
@@ -133,10 +133,10 @@ class GeneratedContentFactory:
                 mime_type=mime_type,
                 output_format=output_format,
             )
-            url = self.storage_provider.store(data=actual_bytes, key=storage_key)
-            display_link = self.storage_provider.display_link(uri=url)
+            url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
+            display_link = await self.storage_provider.display_link(uri=url)
         elif not is_remote_url:
-            display_link = self.storage_provider.display_link(uri=url)
+            display_link = await self.storage_provider.display_link(uri=url)
         else:
             display_link = url
 
