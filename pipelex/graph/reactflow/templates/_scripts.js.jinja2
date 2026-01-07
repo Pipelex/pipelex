@@ -1046,13 +1046,24 @@ function openFullscreen() {
     document.body.style.overflow = 'hidden';
 }
 
-// Close fullscreen view
+// Close fullscreen view (back to sidebar inspector)
 function closeFullscreen() {
     const modal = document.getElementById('fullscreen-modal');
     modal.classList.remove('visible');
-    
+
     // Re-enable body scroll
     document.body.style.overflow = '';
+}
+
+// Minimize fullscreen (alias for closeFullscreen - returns to sidebar)
+function minimizeFullscreen() {
+    closeFullscreen();
+}
+
+// Close both fullscreen and inspector panel
+function closeFullscreenAndInspector() {
+    closeFullscreen();
+    closeInspector();
 }
 
 // Close fullscreen on Escape key

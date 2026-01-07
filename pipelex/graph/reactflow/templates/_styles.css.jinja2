@@ -619,7 +619,11 @@ body {
     font-size: 13px;
     opacity: 0.9;
 }
-.fullscreen-close {
+.fullscreen-header-actions {
+    display: flex;
+    gap: 8px;
+}
+.fullscreen-action-btn {
     width: 36px;
     height: 36px;
     display: flex;
@@ -627,13 +631,18 @@ body {
     justify-content: center;
     cursor: pointer;
     background: rgba(255,255,255,0.2);
+    border: none;
     border-radius: var(--radius-md);
-    font-size: 24px;
-    line-height: 1;
+    color: white;
     transition: background 0.15s;
 }
-.fullscreen-close:hover {
+.fullscreen-action-btn:hover {
     background: rgba(255,255,255,0.3);
+}
+.fullscreen-action-btn svg {
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
 }
 .fullscreen-toolbar {
     display: flex;
