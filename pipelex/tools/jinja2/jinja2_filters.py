@@ -17,7 +17,7 @@ ALLOWED_FILTERS = ["tag", "format", "default"]
 
 # Filter to format some Stuff or any object with the appropriate text formatting methods
 @pass_context
-def text_format(context: Context, value: Any, text_format: TextFormat | None = None) -> Any:
+async def text_format(context: Context, value: Any, text_format: TextFormat | None = None) -> Any:
     if text_format:
         if isinstance(text_format, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             applied_text_format = TextFormat(text_format)
@@ -30,10 +30,10 @@ def text_format(context: Context, value: Any, text_format: TextFormat | None = N
         applied_text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
 
     if hasattr(value, "rendered_str"):
-        return value.rendered_str(text_format=applied_text_format)
+        return await value.rendered_str(text_format=applied_text_format)
     if hasattr(value, applied_text_format.render_method_name):
         render_method = getattr(value, applied_text_format.render_method_name)
-        return render_method()
+        return await render_method()
     if isinstance(value, StrEnum):
         return value.value
     return value
