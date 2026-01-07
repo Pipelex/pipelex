@@ -77,6 +77,7 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
+from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -342,6 +343,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if self.class_registry:
             self.class_registry.teardown()
         func_registry.teardown()
+        TemplateLoader.reset()
+        TemplateRegistry.clear()
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         self.pipelex_hub.reset_config()

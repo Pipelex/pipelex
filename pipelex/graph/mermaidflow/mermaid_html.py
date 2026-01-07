@@ -44,6 +44,7 @@ def render_mermaid_html(
             "mermaid_code": mermaid_code,
             "theme": theme,
         },
+        use_registry=True,  # Use registry for templates with includes
     )
 
 
@@ -74,6 +75,7 @@ async def render_mermaid_html_async(
             "mermaid_code": mermaid_code,
             "theme": theme,
         },
+        use_registry=True,  # Use registry for templates with includes
     )
 
 
