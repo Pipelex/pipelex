@@ -1,5 +1,6 @@
 import sys
 from contextvars import ContextVar
+from pathlib import Path
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -453,6 +454,18 @@ def get_required_pipe(pipe_code: str) -> PipeAbstract:
 
 def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
     return get_pipelex_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
+
+
+def get_pipe_source(pipe_code: str) -> Path | None:
+    """Get the source file path for a pipe.
+
+    Args:
+        pipe_code: The pipe code to look up.
+
+    Returns:
+        Path to the .plx file the pipe was loaded from, or None if unknown.
+    """
+    return get_pipelex_hub().get_library_manager().get_pipe_source(pipe_code=pipe_code)
 
 
 def get_concept_library() -> ConceptLibraryAbstract:

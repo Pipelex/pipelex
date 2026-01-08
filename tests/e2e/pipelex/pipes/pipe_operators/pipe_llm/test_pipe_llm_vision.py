@@ -71,6 +71,7 @@ class TestPipeLLMVision:
         # Execute the pipeline with a complex image
         pipe_output = await execute_pipeline(
             pipe_code="vision_analysis_e2e",
+            library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"],
             inputs={
                 "image": ImageContent(url=PipeTestCases.URL_IMG_GANTT_PNG),
             },

@@ -1,6 +1,7 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from pipelex import log
 from pipelex.client.protocol import PipelineInputs
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -29,7 +30,7 @@ from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.configuration.configs import PipelineExecutionConfig
-from pipelex.system.environment import get_optional_env
+from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_optional_env, get_pipelexpath_dirs
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -70,19 +71,19 @@ async def pipeline_run_setup(
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
         multiple library instances or maintain library state across executions.
     library_dirs:
-        List of directory paths to load pipe definitions from. If not provided, loads
-        from the current working directory (the directory from which the Python script
-        is executed). Ignored when ``plx_content`` is provided.
+        List of directory paths to load pipe definitions from. Combined with directories
+        from the ``PIPELEXPATH`` environment variable (PIPELEXPATH directories are searched
+        first). When provided alongside ``plx_content``, definitions from both sources
+        are loaded into the library.
     pipe_code:
         Code identifying the pipe to execute. Required when ``plx_content`` is not
         provided. When both ``plx_content`` and ``pipe_code`` are provided, the
         specified pipe from the PLX content will be executed (overriding any
         ``main_pipe`` defined in the content).
     plx_content:
-        Complete PLX file content as a string. When provided, only this content is
-        loaded into the library, creating an isolated execution environment. The pipe
-        to execute is determined by ``pipe_code`` (if provided) or the ``main_pipe``
-        property in the PLX content.
+        Complete PLX file content as a string. The pipe to execute is determined by
+        ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
+        Can be combined with ``library_dirs`` to load additional definitions.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -127,6 +128,25 @@ async def pipeline_run_setup(
     pipe: PipeAbstract | None = None
     blueprint: PipelexBundleBlueprint | None = None
 
+    # Combine PIPELEXPATH (env var) with library_dirs (CLI/API args)
+    # PIPELEXPATH provides base directories, library_dirs extends/overrides
+    pipelexpath_dirs = get_pipelexpath_dirs()
+    cli_dirs = [Path(lib_dir) for lib_dir in library_dirs] if library_dirs else []
+    effective_dirs = pipelexpath_dirs + cli_dirs
+
+    if effective_dirs:
+        log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies):")
+        for index_dir, dir_path in enumerate(effective_dirs):
+            source = f"({PIPELEXPATH_ENV_KEY})" if index_dir < len(pipelexpath_dirs) else "(--library-dir)"
+            log.verbose(f"  [{index_dir + 1}] {dir_path} {source}")
+        library_manager.load_libraries(
+            library_id=library_id,
+            library_dirs=effective_dirs,
+        )
+    else:
+        log.verbose("No library directories specified (PIPELEXPATH not set, no --library-dir provided)")
+
+    # Then handle plx_content or pipe_code
     if plx_content:
         validate_bundle_result = await validate_bundle(plx_content=plx_content)
         library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result.blueprints)
@@ -140,13 +160,6 @@ async def pipeline_run_setup(
             msg = "No pipe code or main pipe in the PLX content provided to the pipeline API."
             raise PipeExecutionError(message=msg)
     elif pipe_code:
-        if library_dirs:
-            library_manager.load_libraries(
-                library_id=library_id,
-                library_dirs=[Path(library_dir) for library_dir in library_dirs],
-            )
-        else:
-            library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
         msg = "Either provide pipe_code or plx_content to the pipeline API. 'pipe_code' must be provided when 'plx_content' is None"

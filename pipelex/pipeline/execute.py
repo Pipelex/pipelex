@@ -50,19 +50,19 @@ async def execute_pipeline(
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
         multiple library instances or maintain library state across executions.
     library_dirs:
-        List of directory paths to load pipe definitions from. If not provided, loads
-        from the current working directory (the directory from which the Python script
-        is executed). Ignored when ``plx_content`` is provided.
+        List of directory paths to load pipe definitions from. Combined with directories
+        from the ``PIPELEXPATH`` environment variable (PIPELEXPATH directories are searched
+        first). When provided alongside ``plx_content``, definitions from both sources
+        are loaded into the library.
     pipe_code:
         Code identifying the pipe to execute. Required when ``plx_content`` is not
         provided. When both ``plx_content`` and ``pipe_code`` are provided, the
         specified pipe from the PLX content will be executed (overriding any
         ``main_pipe`` defined in the plx_content).
     plx_content:
-        Complete PLX file content as a string. When provided, only this content is
-        loaded into the library, creating an isolated execution environment. The pipe
-        to execute is determined by ``pipe_code`` (if provided) or the ``main_pipe``
-        property in the PLX content.
+        Complete PLX file content as a string. The pipe to execute is determined by
+        ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
+        Can be combined with ``library_dirs`` to load additional definitions.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
