@@ -302,10 +302,14 @@ function updateTabAvailability(stuffId) {
 
     jsonTab.disabled = !stuffDataJson?.[stuffId];
     textTab.disabled = !stuffDataText?.[stuffId];
-    htmlTab.disabled = !stuffDataHtml?.[stuffId];
+
+    // For PDF and image content types, the tab can render from JSON data via extractUrl()
+    const contentType = stuffContentType?.[stuffId];
+    const jsonData = stuffDataJson?.[stuffId];
+    const canRenderFromJson = (contentType === 'application/pdf' || contentType?.startsWith('image/')) && extractUrl(jsonData);
+    htmlTab.disabled = !stuffDataHtml?.[stuffId] && !canRenderFromJson;
 
     // Update HTML tab label based on content type
-    const contentType = stuffContentType?.[stuffId];
     if (contentType === 'application/pdf') {
         htmlTab.textContent = 'PDF';
     } else if (contentType?.startsWith('image/')) {

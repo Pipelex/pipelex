@@ -581,7 +581,9 @@ function GraphViewer() {
             // First check graphspec-extracted data, then fallback to separate dictionaries
             const hasJson = !!stuffData.data;
             const hasText = !!stuffData.dataText || (stuffMermaidId && !!stuffDataText[stuffMermaidId]);
-            const hasHtml = !!stuffData.dataHtml || (stuffMermaidId && !!stuffDataHtml[stuffMermaidId]);
+            // For PDF and image content types, HTML tab can render from JSON data via extractUrl()
+            const canRenderFromJson = (stuffData.contentType === 'application/pdf' || stuffData.contentType?.startsWith('image/')) && extractUrl(stuffData.data);
+            const hasHtml = !!stuffData.dataHtml || (stuffMermaidId && !!stuffDataHtml[stuffMermaidId]) || canRenderFromJson;
             const hasMultipleFormats = [hasJson, hasText, hasHtml].filter(Boolean).length > 1;
 
             let html = '';
