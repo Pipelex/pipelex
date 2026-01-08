@@ -15,6 +15,7 @@ from pipelex.hub import (
     get_console,
     get_library_manager,
     get_optional_pipe,
+    get_pipe_source,
     get_telemetry_manager,
     set_current_library,
 )
@@ -53,6 +54,9 @@ def do_which_pipe(pipe_code: str, library_dirs: list[Path]) -> None:
         console.print(f"[green]Found:[/green] [bold]{pipe_code}[/bold]")
         console.print(f"  Type: [cyan]{pipe.pipe_type}[/cyan]")
         console.print(f"  Domain: [cyan]{pipe.domain_code}[/cyan]")
+        source_path = get_pipe_source(pipe_code=pipe_code)
+        if source_path:
+            console.print(f"  Source: [cyan]{source_path}[/cyan]")
         log.verbose(f"Pipe '{pipe_code}' resolved", title="which")
     else:
         console.print(f"[red]Not found:[/red] [bold]{pipe_code}[/bold]")
