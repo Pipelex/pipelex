@@ -10,6 +10,13 @@ let currentStuffId = null;
 let currentFormat = 'html';
 let currentTheme = '{{ theme }}';
 
+// Escape HTML to prevent XSS when displaying text content
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Theme-specific color palettes for custom node styling
 const themePalettes = {
     default: {
@@ -210,7 +217,7 @@ function renderContent(stuffId, format) {
         const data = stuffDataHtml?.[stuffId];
         if (data) {
             content.classList.add('html-content');
-            content.innerHTML = data;
+            content.innerHTML = DOMPurify.sanitize(data);
         } else {
             content.innerHTML = '';
             content.textContent = 'No HTML data available';
@@ -244,13 +251,13 @@ function showModal(stuffId) {
     const meta = stuffMetadata?.[stuffId];
     if (meta && (meta.name || meta.concept)) {
         const primaryParts = [];
-        if (meta.name) primaryParts.push(meta.name);
-        if (meta.concept) primaryParts.push(`(${meta.concept})`);
+        if (meta.name) primaryParts.push(escapeHtml(meta.name));
+        if (meta.concept) primaryParts.push(`(${escapeHtml(meta.concept)})`);
         const primary = `<span class="data-modal-title-primary">${primaryParts.join(' ')}</span>`;
-        const secondary = `<span class="data-modal-title-secondary">${stuffId}</span>`;
+        const secondary = `<span class="data-modal-title-secondary">${escapeHtml(stuffId)}</span>`;
         title.innerHTML = primary + secondary;
     } else {
-        title.innerHTML = `<span class="data-modal-title-primary">${stuffId}</span>`;
+        title.innerHTML = `<span class="data-modal-title-primary">${escapeHtml(stuffId)}</span>`;
     }
 
     // Update tab availability and select best format

@@ -902,7 +902,11 @@ function renderStuffContent(format) {
         const pdfUrl = jsonData?.url;
         if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
             container.className = 'inspector-pdf-content';
-            container.innerHTML = `<iframe src="${escapeHtml(pdfUrl)}" style="width:100%; height:100%; border:none;"></iframe>`;
+            container.innerHTML = '';
+            const iframe = document.createElement('iframe');
+            iframe.src = pdfUrl;
+            iframe.style.cssText = 'width:100%; height:100%; border:none;';
+            container.appendChild(iframe);
             return;
         }
     }
@@ -919,7 +923,7 @@ function renderStuffContent(format) {
     } else if (format === 'html') {
         const htmlContent = htmlData || 'No HTML data available';
         container.className = 'inspector-html-content';
-        container.innerHTML = htmlContent;
+        container.innerHTML = DOMPurify.sanitize(htmlContent);
         makeLinksOpenInNewWindow(container);
     }
 }
@@ -1144,7 +1148,11 @@ function renderStuffContentFullscreen(format) {
         const pdfUrl = jsonData?.url;
         if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
             container.className = 'fullscreen-content inspector-pdf-content';
-            container.innerHTML = `<iframe src="${escapeHtml(pdfUrl)}" style="width:100%; height:100%; border:none;"></iframe>`;
+            container.innerHTML = '';
+            const iframe = document.createElement('iframe');
+            iframe.src = pdfUrl;
+            iframe.style.cssText = 'width:100%; height:100%; border:none;';
+            container.appendChild(iframe);
             return;
         }
     }
@@ -1160,7 +1168,7 @@ function renderStuffContentFullscreen(format) {
     } else if (format === 'html') {
         const htmlContent = htmlData || 'No HTML data available';
         container.className = 'fullscreen-content inspector-html-content';
-        container.innerHTML = htmlContent;
+        container.innerHTML = DOMPurify.sanitize(htmlContent);
         makeLinksOpenInNewWindow(container);
     }
 }

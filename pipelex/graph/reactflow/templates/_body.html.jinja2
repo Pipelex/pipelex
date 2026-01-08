@@ -3,7 +3,7 @@
         <div class="header-left">
             <img src="{{ logo_dark }}" alt="Pipelex" class="header-logo dark-logo">
             <img src="{{ logo_light }}" alt="Pipelex" class="header-logo light-logo">
-            <span class="header-title">{{ title }}</span>
+            <span class="header-title">{{ title | e }}</span>
         </div>
         <button id="theme-toggle" class="theme-toggle" title="Toggle theme (Dark/Light/System)">
             <span class="theme-icon dark-icon">🌙</span>
