@@ -86,7 +86,9 @@ class TestLLMDocument:
     ):
         """Test that LLMCapabilityError is raised for providers that don't support documents."""
         # Only run this test for providers that don't support documents
-        unsupported_prefixes = ("gpt-", "o1", "o3", "o4", "mistral-", "pixtral-", "ministral-")
+        # Note: OpenAI models use Responses API which now supports documents,
+        # Mistral models use Chat Completions which doesn't support documents
+        unsupported_prefixes = ("mistral-", "pixtral-", "ministral-")
         if not any(llm_handle.startswith(prefix) for prefix in unsupported_prefixes):
             pytest.skip(f"Skipping capability error test for document-supporting LLM: {llm_handle}")
 

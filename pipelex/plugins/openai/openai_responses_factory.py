@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from openai.types.responses import ResponseInputImageParam
+from openai.types.responses import ResponseInputFileParam, ResponseInputImageParam
 from typing_extensions import override
 
+from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
+from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
@@ -57,6 +59,24 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
             image_param = ResponseInputImageParam(type="input_image", image_url=url, detail=detail.as_openai_detail)
             user_contents.append(image_param)
 
+        # Handle documents (PDF support via Responses API)
+        if llm_prompt.user_documents:
+            prepped_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=self.is_http_url_enabled)
+            for doc_index, prepped_document in enumerate(prepped_documents):
+                file_param: ResponseInputFileParam
+                match prepped_document:
+                    case PreparedFileHttpUrl():
+                        # Note: filename is not allowed when using file_url (mutually exclusive)
+                        file_param = ResponseInputFileParam(type="input_file", file_url=prepped_document.url)
+                    case PreparedFileBase64():
+                        filename = self._get_document_filename(llm_prompt.user_documents[doc_index])
+                        file_data = f"data:{prepped_document.mime_type};base64,{prepped_document.base64_data}"
+                        file_param = ResponseInputFileParam(type="input_file", file_data=file_data, filename=filename)
+                    case PreparedFileLocalPath():
+                        msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
+                        raise TypeError(msg)
+                user_contents.append(file_param)
+
         if not user_contents:
             msg = "LLM prompt must include text or images for the user input when using the OpenAI Responses API"
             raise LLMPromptParameterError(msg)
@@ -68,6 +88,22 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
             }
         )
         return input_items
+
+    @staticmethod
+    def _get_document_filename(prompt_document: PromptDocument) -> str:
+        """Extract the filename from a PromptDocument for OpenAI Responses API."""
+        # Use the title if available, otherwise extract from URI if it's a URI type
+        if prompt_document.title:
+            return prompt_document.title
+        match prompt_document:
+            case PromptDocumentUri():
+                # Extract filename from URI path
+                uri = prompt_document.uri
+                if "/" in uri:
+                    return uri.rsplit("/", 1)[-1]
+                return uri
+            case _:
+                return "document.pdf"
 
     def make_nb_tokens_by_category(self, usage: ResponseUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
