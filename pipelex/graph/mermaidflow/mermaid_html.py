@@ -39,7 +39,7 @@ def render_mermaid_html(
     return render_jinja2_sync(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        temlating_context={
+        templating_context={
             "title": title,
             "mermaid_code": mermaid_code,
             "theme": theme,
@@ -70,7 +70,7 @@ async def render_mermaid_html_async(
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        temlating_context={
+        templating_context={
             "title": title,
             "mermaid_code": mermaid_code,
             "theme": theme,
@@ -128,6 +128,6 @@ async def render_mermaid_html_with_data_async(
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        temlating_context=context,
+        templating_context=context,
         use_registry=True,  # Use registry for templates with includes
     )

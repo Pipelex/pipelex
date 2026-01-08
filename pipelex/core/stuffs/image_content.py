@@ -43,7 +43,7 @@ class ImageContent(StuffContent):
         return await render_jinja2_async(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
-            temlating_context={
+            templating_context={
                 "url": self.display_link or self.url,
             },
         )

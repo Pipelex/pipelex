@@ -55,7 +55,7 @@ def generate_reactflow_html(
     return render_jinja2_sync(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        temlating_context={
+        templating_context={
             "title": title or config.default_title,
             "logo_dark": URLs.logo_white_on_transparent,
             "logo_light": URLs.logo_black_on_transparent,
@@ -114,7 +114,7 @@ async def generate_reactflow_html_async(
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        temlating_context={
+        templating_context={
             "title": title or config.default_title,
             "logo_dark": URLs.logo_white_on_transparent,
             "logo_light": URLs.logo_black_on_transparent,
