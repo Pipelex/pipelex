@@ -13,10 +13,12 @@ from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity
+from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
 
@@ -26,15 +28,17 @@ class BuilderLoop:
         self,
         builder_pipe: str,
         inputs: PipelineInputs | None = None,
+        execution_config: PipelineExecutionConfig | None = None,
         is_save_first_iteration_enabled: bool = True,
         is_save_second_iteration_enabled: bool = True,
         is_save_working_memory_enabled: bool = True,
-    ) -> PipelexBundleSpec:
+    ) -> tuple[PipelexBundleSpec, GraphSpec | None]:
         # TODO: Doesn't make sense to be able to put a builder_pipe code but hardcoding the Path to the builder pipe.
         pipe_output = await execute_pipeline(
             pipe_code=builder_pipe,
             library_dirs=[str(Path(builder.__file__).parent)],
             inputs=inputs,
+            execution_config=execution_config,
         )
 
         if is_save_working_memory_enabled:
@@ -82,7 +86,7 @@ class BuilderLoop:
                     log.error(f"❌ Validation failed after {max_attempts} attempts, raising error")
                     raise
 
-        return pipelex_bundle_spec
+        return pipelex_bundle_spec, pipe_output.graph_spec
 
     def _fix_bundle_validation_error(
         self,
