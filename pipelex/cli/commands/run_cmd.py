@@ -89,6 +89,10 @@ def run_cmd(
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
     ] = False,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files). Can be specified multiple times."),
+    ] = None,
 ) -> None:
     """Execute a pipeline from a specific bundle file (or not), specifying its pipe code or not.
     If the bundle is provided, it will run its main pipe unless you specify a pipe code.
@@ -224,6 +228,7 @@ def run_cmd(
                 inputs=pipeline_inputs,
                 pipe_run_mode=pipe_run_mode,
                 execution_config=execution_config,
+                library_dirs=library_dir,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
