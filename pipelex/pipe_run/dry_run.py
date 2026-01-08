@@ -47,8 +47,8 @@ class DryRunOutput(BaseModel):
 
 async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
     try:
-        needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
-        working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
+        needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs_for_factory)
         pipe.validate_with_libraries()
         await pipe.run_pipe(
             job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED),
@@ -122,7 +122,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
     return results
 
 
-def _convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
+def convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
     """Convert PipeInput to the format needed by WorkingMemoryFactory.make_for_dry_run.
 
     Args:

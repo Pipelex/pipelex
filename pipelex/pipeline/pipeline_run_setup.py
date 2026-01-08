@@ -15,6 +15,7 @@ from pipelex.hub import (
     set_current_library,
     teardown_current_library,
 )
+from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -171,6 +172,7 @@ async def pipeline_run_setup(
     try:
         working_memory: WorkingMemory | None = None
 
+        # First, process user-provided inputs
         if inputs:
             if isinstance(inputs, WorkingMemory):
                 working_memory = inputs
@@ -179,6 +181,25 @@ async def pipeline_run_setup(
                     pipeline_inputs=inputs,
                     search_domain_codes=search_domain_codes,
                 )
+
+        # If mock inputs is enabled, generate mock data for missing required inputs
+        if execution_config.is_mock_inputs:
+            needed_inputs_spec = pipe.needed_inputs()
+            needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec)
+
+            # Filter out inputs that were already provided by the user
+            if working_memory:
+                provided_names = set(working_memory.root.keys())
+                missing_inputs = [spec for spec in needed_inputs_for_factory if spec.variable_name not in provided_names]
+            else:
+                missing_inputs = needed_inputs_for_factory
+                working_memory = WorkingMemoryFactory.make_empty()
+
+            # Generate mock data only for missing inputs
+            if missing_inputs:
+                mock_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=missing_inputs)
+                for name, stuff in mock_memory.root.items():
+                    working_memory.add_new_stuff(name=name, stuff=stuff)
 
         # Normalize data URLs to pipelex-storage:// URIs if configured
         if working_memory and execution_config.is_normalize_data_urls_to_storage:

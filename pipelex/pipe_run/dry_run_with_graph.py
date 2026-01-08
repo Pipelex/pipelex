@@ -1,14 +1,10 @@
-from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
-from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs, TypedNamedStuffSpec
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.core.stuffs.text_content import TextContent
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.hub import get_class_registry
+from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
@@ -49,8 +45,8 @@ async def dry_run_pipe_with_graph(
         )
 
         # Get needed inputs and create working memory
-        needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
-        working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
+        needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs_for_factory)
 
         # Validate the pipe
         pipe.validate_with_libraries()
@@ -82,41 +78,3 @@ async def dry_run_pipe_with_graph(
         # Clean up the tracer on error
         manager.close_tracer(effective_graph_id)
         raise
-
-
-def _convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
-    """Convert PipeInput to the format needed by WorkingMemoryFactory.make_for_dry_run."""
-    needed_inputs_for_factory: list[TypedNamedStuffSpec] = []
-    class_registry = get_class_registry()
-
-    for named_stuff_spec in needed_inputs_spec.named_stuff_specs:
-        try:
-            concept = named_stuff_spec.concept
-            structure_class_name = concept.structure_class_name
-            structure_class = class_registry.get_class(name=structure_class_name)
-
-            if structure_class and issubclass(structure_class, StuffContent):
-                typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
-                    named=named_stuff_spec,
-                    structure_class=structure_class,
-                )
-                needed_inputs_for_factory.append(typed_named_stuff_spec)
-            else:
-                log.verbose(
-                    f"Could not get structure class '{structure_class_name}' for "
-                    f"concept '{named_stuff_spec.concept.code}', falling back to TextContent",
-                )
-                text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
-                    named=named_stuff_spec,
-                    structure_class=TextContent,
-                )
-                needed_inputs_for_factory.append(text_typed_named_stuff_spec)
-        except Exception as exc:
-            log.warning(f"Error getting structure class for concept '{named_stuff_spec.concept.code}': {exc}, falling back to TextContent")
-            text_typed_named_stuff_spec = TypedNamedStuffSpec.make_from_named(
-                named=named_stuff_spec,
-                structure_class=TextContent,
-            )
-            needed_inputs_for_factory.append(text_typed_named_stuff_spec)
-
-    return needed_inputs_for_factory

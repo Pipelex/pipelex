@@ -28,7 +28,7 @@ async def test_review_analysis_sequence_with_batching(
     """Test customer review analysis sequence with batching."""
     # Create test input - a document with reviews
     if pipe_run_mode.is_dry:
-        working_memory = WorkingMemoryFactory.make_for_dry_run(
+        working_memory = WorkingMemoryFactory.make_mock_inputs(
             needed_inputs=[
                 TypedNamedStuffSpec(
                     variable_name="document",
