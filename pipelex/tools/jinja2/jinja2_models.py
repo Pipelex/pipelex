@@ -9,6 +9,7 @@ from pipelex.types import StrEnum
 class Jinja2FilterName(StrEnum):
     FORMAT = "format"
     TAG = "tag"
+    ESCAPE_SCRIPT_TAG = "escape_script_tag"
 
 
 class Jinja2ContextKey(StrEnum):

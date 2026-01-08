@@ -1,10 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from jinja2.runtime import Context
-
-from pipelex.cogt.templating.templating_style import TextFormat
-from pipelex.tools.jinja2.jinja2_filters import tag, text_format
+from pipelex.tools.jinja2.jinja2_filters import escape_script_tag, tag, text_format
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
 from pipelex.types import StrEnum
 
@@ -19,7 +16,7 @@ class TemplateCategory(StrEnum):
     IMG_GEN_PROMPT = "img_gen_prompt"
 
     @property
-    def filters(self) -> dict[Jinja2FilterName, Callable[[Context, Any, TextFormat | None], Any]]:
+    def filters(self) -> dict[Jinja2FilterName, Callable[..., Any]]:
         match self:
             case TemplateCategory.BASIC:
                 return {
@@ -32,6 +29,7 @@ class TemplateCategory(StrEnum):
                 return {
                     Jinja2FilterName.FORMAT: text_format,
                     Jinja2FilterName.TAG: tag,
+                    Jinja2FilterName.ESCAPE_SCRIPT_TAG: escape_script_tag,
                 }
             case TemplateCategory.LLM_PROMPT:
                 return {

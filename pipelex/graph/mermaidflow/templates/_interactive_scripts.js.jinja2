@@ -1,8 +1,8 @@
 // Embedded stuff data from graph (all formats)
-const stuffDataJson = {{ stuff_data_json }};
-const stuffDataText = {{ stuff_data_text_json }};
-const stuffDataHtml = {{ stuff_data_html_json }};
-const stuffMetadata = {{ stuff_metadata_json }};
+const stuffDataJson = {{ stuff_data_json | escape_script_tag }};
+const stuffDataText = {{ stuff_data_text_json | escape_script_tag }};
+const stuffDataHtml = {{ stuff_data_html_json | escape_script_tag }};
+const stuffMetadata = {{ stuff_metadata_json | escape_script_tag }};
 const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
 
 // Track current state
