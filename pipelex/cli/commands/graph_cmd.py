@@ -77,8 +77,8 @@ def graph_render_cmd(
         pipelex graph render graph.json --mermaidflow --no-subgraphs  # flat mermaidflow (no hierarchy)
         pipelex graph render graph.json --open                 # open in browser
         pipelex graph render graph.json -o ./output/           # custom output directory
-        pipelex graph render tests/data/graphs/cv_and_offer.json -o ./temp/test_outputs/
-        pipelex graph render tests/data/graphs/cv_and_offer.json --reactflow -o ./temp/test_outputs/
+        pipelex graph render tests/data/graphs/cv_job_match.json -o ./temp/test_outputs/
+        pipelex graph render tests/data/graphs/cv_job_match.json --reactflow -o ./temp/test_outputs/
     """
     # Validate input file exists
     if not input_file.exists():
