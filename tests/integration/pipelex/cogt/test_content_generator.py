@@ -12,7 +12,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.cases import ImageTestCases, PDFTestCases
+from tests.cases import DocumentTestCases, ImageTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
 
 USER_TEXT_FOR_BASE = """
@@ -157,7 +157,7 @@ class TestContentGenerator:
         page_contents = await content_generator.make_extract_pages(
             job_metadata=job_metadata,
             extract_handle=extract_handle_from_pdf,
-            extract_input=ExtractInput(document_uri=PDFTestCases.PDF_FILE_PATH_1),
+            extract_input=ExtractInput(document_uri=DocumentTestCases.PDF_FILE_PATH_1),
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),
         )

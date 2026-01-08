@@ -6,7 +6,7 @@ from pipelex import pretty_print
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
-from tests.cases import PDFTestCases
+from tests.cases import DocumentTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_compose.cv_job_matching_itvw_sheet import InterviewSheet
 
 
@@ -24,8 +24,8 @@ class TestPipeComposeAfterInference:
             pipe_code="cv_job_matcher",
             library_dirs=["tests/e2e/pipelex/pipes/pipe_operators/pipe_compose"],
             inputs={
-                "cv_pdf": DocumentContent(url=PDFTestCases.PDF_FILE_PATH_CV),
-                "job_offer_pdf": DocumentContent(url=PDFTestCases.PDF_FILE_PATH_2),
+                "cv_pdf": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_CV),
+                "job_offer_pdf": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2),
             },
             pipe_run_mode=pipe_run_mode,
         )

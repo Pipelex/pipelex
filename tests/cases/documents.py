@@ -3,8 +3,8 @@
 from typing import ClassVar
 
 
-class PDFTestCases:
-    """PDF document test constants."""
+class DocumentTestCases:
+    """Document test constants."""
 
     # Directory paths
     TEST_DOCUMENT_DIRECTORY = "tests/data/documents"
@@ -26,8 +26,8 @@ class PDFTestCases:
         # PDF_FILE_PATH_1,
         # PDF_FILE_PATH_2,
         # PDF_FILE_PATH_3,
-        # PDF_FILE_PATH_4,
-        DOCX_FILE_PATH_1,
+        PDF_FILE_PATH_4,
+        # DOCX_FILE_PATH_1,
     ]
 
     # Remote URLs
