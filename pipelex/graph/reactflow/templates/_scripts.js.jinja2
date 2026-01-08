@@ -76,6 +76,7 @@ function buildDataflowAnalysis(graphspec) {
                 stuffRegistry[output.digest] = {
                     name: output.name,
                     concept: output.concept,
+                    contentType: output.content_type,
                     data: output.data,
                     dataText: output.data_text,
                     dataHtml: output.data_html,
@@ -92,6 +93,7 @@ function buildDataflowAnalysis(graphspec) {
                     stuffRegistry[input.digest] = {
                         name: input.name,
                         concept: input.concept,
+                        contentType: input.content_type,
                         data: input.data,
                         dataText: input.data_text,
                         dataHtml: input.data_html,
@@ -650,6 +652,7 @@ function GraphViewer() {
             // Store current stuff data for format switching
             window.currentStuffJsonData = stuffData.data;
             window.currentStuffMermaidId = stuffMermaidId;
+            window.currentStuffContentType = stuffData.contentType;
             // Store graphspec-extracted text/html data (preferred over dictionary lookups)
             window.currentStuffDataText = stuffData.dataText;
             window.currentStuffDataHtml = stuffData.dataHtml;
@@ -889,9 +892,20 @@ function renderStuffContent(format) {
 
     const stuffMermaidId = window.currentStuffMermaidId;
     const jsonData = window.currentStuffJsonData;
+    const contentType = window.currentStuffContentType;
     // Prefer graphspec-extracted data, fallback to dictionary lookups
     const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
     const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+
+    // Handle PDF content type with iframe viewer
+    if (format === 'html' && contentType === 'application/pdf') {
+        const pdfUrl = jsonData?.url;
+        if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
+            container.className = 'inspector-pdf-content';
+            container.innerHTML = `<iframe src="${escapeHtml(pdfUrl)}" style="width:100%; height:100%; border:none;"></iframe>`;
+            return;
+        }
+    }
 
     if (format === 'json') {
         container.className = '';
@@ -1121,8 +1135,19 @@ function renderStuffContentFullscreen(format) {
 
     const stuffMermaidId = window.currentStuffMermaidId;
     const jsonData = window.currentStuffJsonData;
+    const contentType = window.currentStuffContentType;
     const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
     const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+
+    // Handle PDF content type with iframe viewer
+    if (format === 'html' && contentType === 'application/pdf') {
+        const pdfUrl = jsonData?.url;
+        if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
+            container.className = 'fullscreen-content inspector-pdf-content';
+            container.innerHTML = `<iframe src="${escapeHtml(pdfUrl)}" style="width:100%; height:100%; border:none;"></iframe>`;
+            return;
+        }
+    }
 
     if (format === 'json') {
         container.className = 'fullscreen-content';

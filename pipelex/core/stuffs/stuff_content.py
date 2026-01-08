@@ -14,6 +14,11 @@ StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     @property
+    def content_type(self) -> str | None:
+        """Return the MIME type of the content, or None if not applicable."""
+        return None
+
+    @property
     def short_desc(self) -> str:
         return f"some {self.__class__.__name__}"
 

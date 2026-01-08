@@ -368,7 +368,7 @@ class PipeAbstract(ABC, BaseModel):
                         input_spec = IOSpec(
                             name=var_name,
                             concept=stuff.concept.code,
-                            content_type=stuff.content.__class__.__name__,
+                            content_type=stuff.content.content_type,
                             digest=stuff.stuff_code,
                             data=stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
                             data_text=stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
@@ -429,7 +429,7 @@ class PipeAbstract(ABC, BaseModel):
                 output_spec = IOSpec(
                     name=output_name or main_stuff.stuff_name or "main_stuff",
                     concept=main_stuff.concept.code,
-                    content_type=main_stuff.content.__class__.__name__,
+                    content_type=main_stuff.content.content_type,
                     digest=main_stuff.stuff_code,
                     data=main_stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
                     data_text=main_stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
