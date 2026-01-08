@@ -28,7 +28,7 @@ from pipelex.tools.misc.package_utils import get_package_version
 COMMAND = "which"
 
 
-def do_which_pipe(pipe_code: str, library_dirs: list[Path]) -> None:
+def do_which_pipe(pipe_code: str, library_dirs: list[Path]) -> bool:
     """Locate where a pipe is defined."""
     console = get_console()
 
@@ -58,12 +58,14 @@ def do_which_pipe(pipe_code: str, library_dirs: list[Path]) -> None:
         if source_path:
             console.print(f"  Source: [cyan]{source_path}[/cyan]")
         log.verbose(f"Pipe '{pipe_code}' resolved", title="which")
+        console.print("")
+        return True
     else:
         console.print(f"[red]Not found:[/red] [bold]{pipe_code}[/bold]")
         console.print("\n[dim]Tip: Check that the pipe code is correct and that the containing[/dim]")
         console.print(f"[dim]directory is in {PIPELEXPATH_ENV_KEY} or passed via --library-dir[/dim]")
-
-    console.print("")
+        console.print("")
+        return False
 
 
 def which_cmd(
@@ -102,7 +104,9 @@ def which_cmd(
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=COMMAND)
 
-            do_which_pipe(pipe_code=pipe_code, library_dirs=cli_dirs)
+            found = do_which_pipe(pipe_code=pipe_code, library_dirs=cli_dirs)
             get_telemetry_manager().track_event(EventName.PIPE_SHOW)
+            if not found:
+                raise typer.Exit(1)
     finally:
         Pipelex.teardown_if_needed()

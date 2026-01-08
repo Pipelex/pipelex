@@ -59,6 +59,9 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Trying to teardown a library that does not exist: '{library_id}'"
                 raise LibraryError(msg)
             library = self._libraries[library_id]
+            # Remove source map entries for pipes in this library
+            for pipe_code in library.pipe_library.root:
+                self._pipe_source_map.pop(pipe_code, None)
             library.teardown()
             del self._libraries[library_id]
             return
