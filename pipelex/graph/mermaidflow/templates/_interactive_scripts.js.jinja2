@@ -36,7 +36,7 @@ function extractUrl(jsonData) {
         return jsonData;
     }
     // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
-    return jsonData.display_link || jsonData.src || jsonData.href || jsonData.uri || null;
+    return jsonData.display_link || jsonData.src || jsonData.href || jsonData.uri || jsonData.url || null;
 }
 
 // Theme-specific color palettes for custom node styling
