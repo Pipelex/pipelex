@@ -84,7 +84,7 @@ class TestPipeConditionSimple:
         )
 
         # Test with proper working memory - should SUCCEED or fail at expression evaluation (not missing inputs)
-        working_memory = WorkingMemoryFactory.make_for_dry_run(
+        working_memory = WorkingMemoryFactory.make_mock_inputs(
             needed_inputs=[
                 TypedNamedStuffSpec(
                     variable_name="user_status",

@@ -84,7 +84,8 @@ async def execute_pipeline(
     execution_config:
         Pipeline execution configuration including graph tracing settings.
         If provided, uses this config directly. If None, uses the default from
-        ``get_config().pipelex.pipeline_execution_config``.
+        ``get_config().pipelex.pipeline_execution_config``. Use the ``mock_inputs``
+        field to generate mock data for missing required inputs during dry-run.
 
     Returns:
     -------

@@ -131,6 +131,7 @@ class BuilderConfig(ConfigModel):
 
 class PipelineExecutionConfig(ConfigModel):
     is_normalize_data_urls_to_storage: bool
+    is_mock_inputs: bool
     is_generate_graph: bool
     graph_config: GraphConfig
 
@@ -138,13 +139,16 @@ class PipelineExecutionConfig(ConfigModel):
         self,
         generate_graph: bool | None = None,
         include_full_data: bool | None = None,
+        mock_inputs: bool | None = None,
     ) -> Self:
-        """Create a copy of this config with optional graph-related overrides.
+        """Create a copy of this config with optional overrides.
 
         Args:
             generate_graph: If not None, overrides is_generate_graph.
             include_full_data: If not None, overrides all graph_config.data_inclusion flags
                 (stuff_json_content, stuff_text_content, stuff_html_content).
+            mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock
+                data for missing required inputs (for dry-run validation).
 
         Returns:
             A new PipelineExecutionConfig with the specified overrides applied.
@@ -153,6 +157,9 @@ class PipelineExecutionConfig(ConfigModel):
 
         if generate_graph is not None:
             updates["is_generate_graph"] = generate_graph
+
+        if mock_inputs is not None:
+            updates["is_mock_inputs"] = mock_inputs
 
         if include_full_data is not None:
             new_data_inclusion = self.graph_config.data_inclusion.model_copy(

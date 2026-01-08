@@ -73,8 +73,9 @@ async def start_pipeline(
     execution_config:
         Pipeline execution configuration including graph tracing settings.
         If not provided, uses the default from
-        ``get_config().pipelex.pipeline_execution_config``. Since this function
-        returns immediately, the caller is responsible for calling
+        ``get_config().pipelex.pipeline_execution_config``. Use the ``mock_inputs``
+        field to generate mock data for missing required inputs during dry-run.
+        Since this function returns immediately, the caller is responsible for calling
         ``GraphTracerManager.get_instance().close_tracer(pipeline_run_id)``
         after the task completes to retrieve the GraphSpec.
 

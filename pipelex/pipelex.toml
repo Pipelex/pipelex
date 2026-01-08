@@ -265,6 +265,7 @@ pipe_stack_limit = 20
 
 [pipelex.pipeline_execution_config]
 is_normalize_data_urls_to_storage = true
+is_mock_inputs = false
 is_generate_graph = false
 
 [pipelex.pipeline_execution_config.graph_config]

@@ -91,8 +91,8 @@ class WorkingMemoryFactory(BaseModel):
         return MockFactory.build(factory_use_construct=True)  # type: ignore[no-any-return]
 
     @classmethod
-    def make_for_dry_run(cls, needed_inputs: list[TypedNamedStuffSpec]) -> "WorkingMemory":
-        """Create a WorkingMemory with mock objects for dry run mode.
+    def make_mock_inputs(cls, needed_inputs: list[TypedNamedStuffSpec]) -> "WorkingMemory":
+        """Create a WorkingMemory with mock objects for the needed inputs.
 
         Args:
             needed_inputs: List of tuples (stuff_name, concept_code, structure_class)

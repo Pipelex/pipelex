@@ -85,6 +85,10 @@ def run_cmd(
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
+    mock_inputs: Annotated[
+        bool,
+        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
+    ] = False,
 ) -> None:
     """Execute a pipeline from a specific bundle file (or not), specifying its pipe code or not.
     If the bundle is provided, it will run its main pipe unless you specify a pipe code.
@@ -101,6 +105,7 @@ def run_cmd(
         pipelex run my_pipe --graph --graph-dir ./analysis
         pipelex run my_pipe --graph --graph-full-data
         pipelex run my_pipe --dry-run
+        pipelex run my_pipe --dry-run --mock-inputs
     """
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -108,6 +113,15 @@ def run_cmd(
         ctx: click.Context = click.get_current_context()
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
+
+    # Validate --mock-inputs requires --dry-run
+    if mock_inputs and not dry_run:
+        typer.secho(
+            "Failed to run: --mock-inputs requires --dry-run",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
 
     # Let's analyze the options and determine what pipe code to use and if we need to load a bundle
     pipe_code: str | None = None
@@ -201,6 +215,7 @@ def run_cmd(
         execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
             generate_graph=graph,
             include_full_data=graph_full_data or None,
+            mock_inputs=mock_inputs or None,
         )
 
         try:
