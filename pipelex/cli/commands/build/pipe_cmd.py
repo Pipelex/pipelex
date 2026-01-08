@@ -481,7 +481,7 @@ def build_partial_cmd(
         str,
         typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
     ] = "pipe_builder",
-    output_dir_path: Annotated[
+    output_dir: Annotated[
         str,
         typer.Option("--output", "-o", help="Path to save the generated PLX file"),
     ] = "./results",
@@ -516,7 +516,7 @@ def build_partial_cmd(
             typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
         else:
             output_path = get_incremental_file_path(
-                base_path=output_dir_path,
+                base_path=output_dir,
                 base_name=output_base_name,
                 extension=extension,
             )
