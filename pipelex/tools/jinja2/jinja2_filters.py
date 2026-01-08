@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from jinja2 import pass_context
@@ -98,14 +99,15 @@ def escape_script_tag(value: Any) -> Any:
 
     When embedding JSON in <script type="application/json"> tags, a malicious
     string containing </script> could break out of the script block and inject
-    arbitrary HTML/JavaScript.
+    arbitrary HTML/JavaScript. HTML tag names are case-insensitive, so this
+    function uses case-insensitive matching to catch all variants.
 
     Args:
         value: The string to escape. Non-string values are returned unchanged.
 
     Returns:
-        The escaped string with </script> replaced by <\/script>.
+        The escaped string with </script> (any case) replaced by <\/script>.
     """
     if not isinstance(value, str):
         return value
-    return value.replace("</script>", r"<\/script>").replace("</SCRIPT>", r"<\/SCRIPT>")
+    return re.sub(r"</script>", r"<\/script>", value, flags=re.IGNORECASE)
