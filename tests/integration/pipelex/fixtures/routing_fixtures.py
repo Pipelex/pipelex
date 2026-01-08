@@ -20,23 +20,23 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_to
 # ================================================================================================
 
 ALL_BACKENDS = [
-    # "pipelex_gateway",
+    "pipelex_gateway",
     "anthropic",
-    # "azure_openai",
-    # "bedrock",
-    # "blackboxai",
-    # "fal",
+    "azure_openai",
+    "bedrock",
+    "blackboxai",
+    "fal",
     "google",
-    # "groq",
-    # "huggingface",
+    "groq",
+    "huggingface",
     "mistral",
-    # "ollama",
+    "ollama",
     "openai",
-    # "portkey",
-    # "scaleway",
-    # "vertexai",
-    # "xai",
-    # "internal",
+    "portkey",
+    "scaleway",
+    "vertexai",
+    "xai",
+    "internal",
 ]
 
 

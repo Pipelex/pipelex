@@ -53,15 +53,15 @@ AMAZON_MODELS = [
 
 # --- Anthropic Models (Claude) ------------------------------------------------------------------
 ANTHROPIC_MODELS = [
-    # "claude-3-haiku",
-    # "claude-3.7-sonnet",
-    # "claude-4-opus",
-    # "claude-4-sonnet",
-    # "claude-4.1-opus",
+    "claude-3-haiku",
+    "claude-3.7-sonnet",
+    "claude-4-opus",
+    "claude-4-sonnet",
+    "claude-4.1-opus",
     "claude-4.5-haiku",
-    # "claude-4.5-sonnet",
-    # "claude-opus-4",
-    # "claude-4.5-opus",
+    "claude-4.5-sonnet",
+    "claude-opus-4",
+    "claude-4.5-opus",
 ]
 
 # --- DeepSeek Models ----------------------------------------------------------------------------
@@ -74,13 +74,13 @@ DEEPSEEK_MODELS = [
 
 # --- Google Models (Gemini) ---------------------------------------------------------------------
 GOOGLE_MODELS = [
-    # "gemini-flash-1.5-8b",
-    # "gemini-2.0-flash",
-    # "gemini-2.5-flash",
+    "gemini-flash-1.5-8b",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
-    # "gemini-2.5-pro",
-    # "gemini-3.0-pro",
-    # "gemini-3.0-flash-preview",
+    "gemini-2.5-pro",
+    "gemini-3.0-pro",
+    "gemini-3.0-flash-preview",
 ]
 
 # --- Groq Models --------------------------------------------------------------------------------
@@ -104,21 +104,21 @@ META_MODELS = [
 
 # --- Mistral Models -----------------------------------------------------------------------------
 MISTRALAI_MODELS = [
-    # "bedrock-mistral-large",
-    # "ministral-3b",
-    # "ministral-8b",
-    # "mistral-7b-2312",
-    # "mistral-8x7b-2312",
-    # "mistral-codestral-2405",
-    # "mistral-large",
-    # "mistral-large-2402",
+    "bedrock-mistral-large",
+    "ministral-3b",
+    "ministral-8b",
+    "mistral-7b-2312",
+    "mistral-8x7b-2312",
+    "mistral-codestral-2405",
+    "mistral-large",
+    "mistral-large-2402",
     "mistral-medium",
-    # "mistral-medium-2508",
-    # "mistral-small",
-    # "mistral-small-2402",
-    # "pixtral-12b",
-    # "pixtral-large",
-    # "pixtral-large-2411",
+    "mistral-medium-2508",
+    "mistral-small",
+    "mistral-small-2402",
+    "pixtral-12b",
+    "pixtral-large",
+    "pixtral-large-2411",
 ]
 
 # --- Moonshot AI Models -------------------------------------------------------------------------
@@ -129,26 +129,26 @@ MOONSHOTAI_MODELS = [
 # --- OpenAI Models ------------------------------------------------------------------------------
 OPENAI_MODELS = [
     "gpt-4o-mini",
-    # "gpt-4o",
-    # "gpt-4.1-nano",
-    # "gpt-4.1-mini",
-    # "gpt-4.1",
-    # "o1-mini",
-    # "o1",
-    # "o3-mini",
-    # "o3",
-    # "o4-mini",
-    # "gpt-5-nano",
-    # "gpt-5-mini",
-    # "gpt-5-chat",
-    # "gpt-5",
-    # "gpt-5-codex",
-    # "gpt-5.1-codex",
-    # "gpt-5.1-codex-max",
-    # "gpt-5.1-chat",
-    # "gpt-5.1",
+    "gpt-4o",
+    "gpt-4.1-nano",
+    "gpt-4.1-mini",
+    "gpt-4.1",
+    "o1-mini",
+    "o1",
+    "o3-mini",
+    "o3",
+    "o4-mini",
+    "gpt-5-nano",
+    "gpt-5-mini",
+    "gpt-5-chat",
+    "gpt-5",
+    "gpt-5-codex",
+    "gpt-5.1-codex",
+    "gpt-5.1-codex-max",
+    "gpt-5.1-chat",
+    "gpt-5.1",
     "gpt-5.2",
-    # "gpt-5.2-chat",
+    "gpt-5.2-chat",
 ]
 
 # --- OpenAI OSS Models --------------------------------------------------------------------------
@@ -181,18 +181,18 @@ XAI_MODELS = [
 
 # --- All LLM Handles ----------------------------------------------------------------------------
 ALL_LLM_HANDLES = [
-    # *AMAZON_MODELS,
+    *AMAZON_MODELS,
     *ANTHROPIC_MODELS,
-    # *DEEPSEEK_MODELS,
+    *DEEPSEEK_MODELS,
     *GOOGLE_MODELS,
-    # *GROQ_MODELS,
-    # *META_MODELS,
+    *GROQ_MODELS,
+    *META_MODELS,
     *MISTRALAI_MODELS,
-    # *MOONSHOTAI_MODELS,
+    *MOONSHOTAI_MODELS,
     *OPENAI_MODELS,
-    # *OPENAI_OSS_MODELS,
-    # *QWEN_MODELS,
-    # *XAI_MODELS,
+    *OPENAI_OSS_MODELS,
+    *QWEN_MODELS,
+    *XAI_MODELS,
 ]
 
 
@@ -268,14 +268,14 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
     params=[
         # Anthropic Claude models with native document support
         "claude-4.5-haiku",
-        "claude-4.5-sonnet",
+        # "claude-4.5-sonnet",
         # Google Gemini models with native document support
         "gemini-2.5-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
+        # "gemini-2.5-flash",
+        # "gemini-2.5-pro",
         # OpenAI models using Responses API (supports PDF input)
         # "gpt-5.2",
-        "gpt-5",
+        # "gpt-5",
         # "gpt-5-chat",
         "gpt-4o-mini",
         "mistral-medium",
