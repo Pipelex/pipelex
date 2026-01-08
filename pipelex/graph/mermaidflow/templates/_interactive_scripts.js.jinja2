@@ -1,15 +1,15 @@
 // Embedded stuff data from graph (all formats)
-const stuffDataJson = {{ stuff_data_json | escape_script_tag }};
-const stuffDataText = {{ stuff_data_text_json | escape_script_tag }};
-const stuffDataHtml = {{ stuff_data_html_json | escape_script_tag }};
-const stuffMetadata = {{ stuff_metadata_json | escape_script_tag }};
-const stuffContentType = {{ stuff_content_type_json | escape_script_tag }};
-const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
+const stuffDataJson = {{ stuff_data_json | escape_script_tag | safe }};
+const stuffDataText = {{ stuff_data_text_json | escape_script_tag | safe }};
+const stuffDataHtml = {{ stuff_data_html_json | escape_script_tag | safe }};
+const stuffMetadata = {{ stuff_metadata_json | escape_script_tag | safe }};
+const stuffContentType = {{ stuff_content_type_json | escape_script_tag | safe }};
+const mermaidCode = {{ mermaid_code | tojson }};
 
 // Track current state
 let currentStuffId = null;
 let currentFormat = 'html';
-let currentTheme = '{{ theme }}';
+let currentTheme = {{ theme | tojson }};
 
 // Escape HTML to prevent XSS when displaying text content
 function escapeHtml(text) {
@@ -28,15 +28,26 @@ function makeLinksOpenInNewWindow(container) {
     });
 }
 
+// Validate that a URL is a safe HTTP/HTTPS URL (prevents javascript: and data: URL injection)
+function isValidHttpUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('https://') || url.startsWith('http://');
+}
+
 // Extract URL from stuff data (handles various data structures)
+// Returns null for invalid/unsafe URLs (javascript:, data:, etc.)
 function extractUrl(jsonData) {
     if (!jsonData) return null;
     // Check if data itself is a URL string
-    if (typeof jsonData === 'string' && (jsonData.startsWith('http://') || jsonData.startsWith('https://'))) {
-        return jsonData;
+    if (typeof jsonData === 'string') {
+        return isValidHttpUrl(jsonData) ? jsonData : null;
     }
     // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
-    return jsonData.display_link || jsonData.src || jsonData.href || jsonData.uri || jsonData.url || null;
+    const candidates = [jsonData.display_link, jsonData.src, jsonData.href, jsonData.uri, jsonData.url];
+    for (const candidate of candidates) {
+        if (isValidHttpUrl(candidate)) return candidate;
+    }
+    return null;
 }
 
 // Theme-specific color palettes for custom node styling
@@ -429,6 +440,32 @@ function downloadContent() {
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
+            return;
+        }
+    }
+
+    // For PDFs, download the actual PDF file directly
+    // Must fetch and create blob to work around cross-origin download restrictions
+    if (contentType === 'application/pdf') {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
+            const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+            fetch(pdfUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => {
+                    console.error('Failed to download PDF:', err);
+                    window.open(pdfUrl, '_blank');
+                });
             return;
         }
     }

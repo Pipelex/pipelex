@@ -114,14 +114,24 @@ def sanitize_mermaid_id(node_id: str) -> str:
 def escape_mermaid_label(label: str) -> str:
     """Escape special characters in Mermaid labels.
 
+    Handles characters that could break Mermaid syntax or inject directives.
+
     Args:
         label: The label text to escape.
 
     Returns:
         Escaped label safe for use in Mermaid syntax.
     """
-    # Escape quotes and other special characters
-    return label.replace('"', "'").replace("[", "(").replace("]", ")")
+    result = label
+    result = result.replace("\\", "\\\\")  # Escape backslashes first
+    result = result.replace('"', "'")
+    result = result.replace("[", "(")
+    result = result.replace("]", ")")
+    result = result.replace("{", "(")
+    result = result.replace("}", ")")
+    result = result.replace("<", "&lt;")
+    result = result.replace(">", "&gt;")
+    return result.replace("|", "/")  # Pipe can break node syntax
 
 
 # -----------------------------------------------------------------------------

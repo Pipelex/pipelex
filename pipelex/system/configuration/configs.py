@@ -146,7 +146,7 @@ class PipelineExecutionConfig(ConfigModel):
         Args:
             generate_graph: If not None, overrides is_generate_graph.
             include_full_data: If not None, overrides all graph_config.data_inclusion flags
-                (stuff_json_content, stuff_text_content, stuff_html_content).
+                (stuff_json_content, stuff_text_content, stuff_html_content, error_stack_traces).
             mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock
                 data for missing required inputs (for dry-run validation).
 
@@ -167,6 +167,7 @@ class PipelineExecutionConfig(ConfigModel):
                     "stuff_json_content": include_full_data,
                     "stuff_text_content": include_full_data,
                     "stuff_html_content": include_full_data,
+                    "error_stack_traces": include_full_data,
                 }
             )
             updates["graph_config"] = self.graph_config.model_copy(update={"data_inclusion": new_data_inclusion})

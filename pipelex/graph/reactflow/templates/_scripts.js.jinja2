@@ -1,5 +1,5 @@
 const themes = ['dark', 'light', 'system'];
-const initialTheme = '{{ initial_theme }}';
+const initialTheme = {{ initial_theme | tojson }};
 let currentThemeIndex = themes.indexOf(localStorage.getItem('pipelex-theme') || initialTheme);
 if (currentThemeIndex === -1) currentThemeIndex = 0;
 
@@ -164,8 +164,8 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
     g.setDefaultEdgeLabel(() => ({}));
     g.setGraph({
         rankdir: direction,
-        nodesep: {{ nodesep }},
-        ranksep: {{ ranksep }},
+        nodesep: {{ nodesep | tojson }},
+        ranksep: {{ ranksep | tojson }},
         edgesep: 20,
         marginx: 40,
         marginy: 40,
@@ -340,7 +340,7 @@ function buildDataflowGraph(graphspec, analysis) {
             id: `edge_${edgeId++}`,
             source: producerNodeId,
             target: stuffId,
-            type: '{{ edge_type }}',
+            type: {{ edge_type | tojson }},
             animated: false,
             style: {
                 stroke: 'var(--color-pipe)',
@@ -361,7 +361,7 @@ function buildDataflowGraph(graphspec, analysis) {
                 id: `edge_${edgeId++}`,
                 source: stuffId,
                 target: consumerNodeId,
-                type: '{{ edge_type }}',
+                type: {{ edge_type | tojson }},
                 animated: false,
                 style: {
                     stroke: 'var(--color-pipe)',
@@ -483,7 +483,7 @@ function buildOrchestrationGraph(viewspec) {
         id: edge.id,
         source: edge.source,
         target: edge.target,
-        type: '{{ edge_type }}',
+        type: {{ edge_type | tojson }},
         animated: edge.animated || false,
         label: edge.label,
         labelStyle: {
@@ -814,8 +814,8 @@ function GraphViewer() {
             onNodeClick: onNodeClick,
             {% if pan_to_top %}onInit: onInit,{% endif %}
             fitView: true,
-            fitViewOptions: { padding: 0.1, minZoom: {{ initial_zoom }} },
-            defaultEdgeOptions: { type: '{{ edge_type }}' },
+            fitViewOptions: { padding: 0.1, minZoom: {{ initial_zoom | tojson }} },
+            defaultEdgeOptions: { type: {{ edge_type | tojson }} },
             proOptions: { hideAttribution: true },
         },
             Background ? React.createElement(Background, {
@@ -1034,6 +1034,32 @@ function downloadStuffContent() {
         }
     }
 
+    // For PDFs, download the actual PDF file directly
+    // Must fetch and create blob to work around cross-origin download restrictions
+    if (contentType === 'application/pdf') {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
+            const filename = `${baseName}.pdf`;
+            fetch(pdfUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => {
+                    console.error('Failed to download PDF:', err);
+                    window.open(pdfUrl, '_blank');
+                });
+            return;
+        }
+    }
+
     const data = getCurrentStuffContent();
     if (!data) return;
 
@@ -1073,15 +1099,26 @@ function getHtmlTabLabel(contentType) {
     return 'HTML';
 }
 
+// Validate that a URL is a safe HTTP/HTTPS URL (prevents javascript: and data: URL injection)
+function isValidHttpUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('https://') || url.startsWith('http://');
+}
+
 // Extract URL from stuff data (handles various data structures)
+// Returns null for invalid/unsafe URLs (javascript:, data:, etc.)
 function extractUrl(jsonData) {
     if (!jsonData) return null;
     // Check if data itself is a URL string
-    if (typeof jsonData === 'string' && (jsonData.startsWith('http://') || jsonData.startsWith('https://'))) {
-        return jsonData;
+    if (typeof jsonData === 'string') {
+        return isValidHttpUrl(jsonData) ? jsonData : null;
     }
     // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
-    return jsonData.display_link || jsonData.src || jsonData.href || jsonData.uri || jsonData.url || null;
+    const candidates = [jsonData.display_link, jsonData.src, jsonData.href, jsonData.uri, jsonData.url];
+    for (const candidate of candidates) {
+        if (isValidHttpUrl(candidate)) return candidate;
+    }
+    return null;
 }
 
 // Open external URL for PDF content
@@ -1137,7 +1174,10 @@ function openFullscreen() {
     const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
     const hasJson = !!jsonData;
     const hasText = !!textData;
-    const hasHtml = !!htmlData;
+    // For PDF and image content types, HTML tab can render from JSON data via extractUrl()
+    const contentType = window.currentStuffContentType;
+    const canRenderFromJson = (contentType === 'application/pdf' || contentType?.startsWith('image/')) && extractUrl(jsonData);
+    const hasHtml = !!htmlData || canRenderFromJson;
     const hasMultipleFormats = [hasJson, hasText, hasHtml].filter(Boolean).length > 1;
     
     if (hasMultipleFormats) {

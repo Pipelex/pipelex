@@ -9,6 +9,7 @@ class DataInclusionConfig(ConfigModel):
     stuff_json_content: bool
     stuff_text_content: bool
     stuff_html_content: bool
+    error_stack_traces: bool
 
 
 class GraphsInclusionConfig(ConfigModel):

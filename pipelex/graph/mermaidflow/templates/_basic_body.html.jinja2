@@ -1,5 +1,5 @@
 <div class="header">
-    <h1>{{ title | e }}</h1>
+    <h1>{{ title }}</h1>
     <div class="theme-selector">
         <label for="theme-select">Theme:</label>
         <select id="theme-select">
@@ -12,9 +12,8 @@
     </div>
 </div>
 <div class="mermaid-container">
-    <div class="mermaid" id="mermaid-diagram">
-{{ mermaid_code }}
-    </div>
+    <div class="mermaid" id="mermaid-diagram"></div>
 </div>
 
-
+<!-- Embedded mermaid code as JSON for safe rendering -->
+<script type="application/json" id="mermaid-code-data">{{ mermaid_code | tojson }}</script>

@@ -1,3 +1,4 @@
+import traceback
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, final
@@ -410,12 +411,16 @@ class PipeAbstract(ABC, BaseModel):
         except Exception as exc:
             # Record graph tracing error
             if tracer_manager is not None and parent_graph_context is not None:
+                error_stack: str | None = None
+                if parent_graph_context.data_inclusion.error_stack_traces:
+                    error_stack = traceback.format_exc()
                 tracer_manager.on_pipe_end_error(
                     graph_id=parent_graph_context.graph_id,
                     node_id=graph_node_id,
                     ended_at=datetime.now(timezone.utc),
                     error_type=type(exc).__name__,
                     error_message=str(exc),
+                    error_stack=error_stack,
                 )
             raise
 
