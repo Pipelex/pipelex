@@ -18,6 +18,16 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Make all links in a container open in new windows
+function makeLinksOpenInNewWindow(container) {
+    if (!container) return;
+    const links = container.querySelectorAll('a');
+    links.forEach(link => {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+    });
+}
+
 // Theme-specific color palettes for custom node styling
 const themePalettes = {
     default: {
@@ -203,12 +213,13 @@ function setFormat(format) {
 
 function renderContent(stuffId, format) {
     const content = document.getElementById('modal-content');
-    content.classList.remove('html-content', 'text-content', 'pdf-content');
+    content.classList.remove('html-content', 'text-content', 'pdf-content', 'image-content');
 
     // Handle PDF content type with iframe viewer
     const contentType = stuffContentType?.[stuffId];
+    const jsonData = stuffDataJson?.[stuffId];
+
     if (format === 'html' && contentType === 'application/pdf') {
-        const jsonData = stuffDataJson?.[stuffId];
         const pdfUrl = jsonData?.url;
         if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
             content.classList.add('pdf-content');
@@ -217,6 +228,23 @@ function renderContent(stuffId, format) {
             iframe.src = pdfUrl;
             iframe.style.cssText = 'width:100%; height:100%; border:none; min-height:500px;';
             content.appendChild(iframe);
+            updateOpenExternalButton(stuffId, contentType, jsonData);
+            return;
+        }
+    }
+
+    // Handle image content type
+    if (format === 'html' && contentType?.startsWith('image/')) {
+        const imageUrl = jsonData?.url;
+        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+            content.classList.add('image-content');
+            content.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
+            img.alt = 'Image content';
+            content.appendChild(img);
+            updateOpenExternalButton(stuffId, contentType, jsonData);
             return;
         }
     }
@@ -235,11 +263,25 @@ function renderContent(stuffId, format) {
         if (data) {
             content.classList.add('html-content');
             content.innerHTML = DOMPurify.sanitize(data);
+            makeLinksOpenInNewWindow(content);
         } else {
             content.innerHTML = '';
             content.textContent = 'No HTML data available';
         }
     }
+
+    updateOpenExternalButton(stuffId, contentType, jsonData);
+}
+
+// Update visibility of the "open in new window" button
+function updateOpenExternalButton(stuffId, contentType, jsonData) {
+    const openExternalBtn = document.getElementById('open-external-btn');
+    if (!openExternalBtn) return;
+
+    const url = jsonData?.url;
+    const shouldShow = (contentType === 'application/pdf' || contentType?.startsWith('image/'))
+        && url && (url.startsWith('http://') || url.startsWith('https://'));
+    openExternalBtn.style.display = shouldShow ? '' : 'none';
 }
 
 function updateTabAvailability(stuffId) {
@@ -250,6 +292,16 @@ function updateTabAvailability(stuffId) {
     jsonTab.disabled = !stuffDataJson?.[stuffId];
     textTab.disabled = !stuffDataText?.[stuffId];
     htmlTab.disabled = !stuffDataHtml?.[stuffId];
+
+    // Update HTML tab label based on content type
+    const contentType = stuffContentType?.[stuffId];
+    if (contentType === 'application/pdf') {
+        htmlTab.textContent = 'PDF';
+    } else if (contentType?.startsWith('image/')) {
+        htmlTab.textContent = 'Image';
+    } else {
+        htmlTab.textContent = 'HTML';
+    }
 
     // Find first available format (HTML -> JSON -> Pretty)
     if (!htmlTab.disabled) return 'html';
@@ -368,4 +420,18 @@ document.getElementById('modal-overlay').addEventListener('click', hideModal);
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hideModal();
 });
+
+// Open external URL for PDF/image content
+function openExternal() {
+    if (!currentStuffId) return;
+    const contentType = stuffContentType?.[currentStuffId];
+    const jsonData = stuffDataJson?.[currentStuffId];
+
+    if (contentType === 'application/pdf' || contentType?.startsWith('image/')) {
+        const url = jsonData?.url;
+        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+    }
+}
 

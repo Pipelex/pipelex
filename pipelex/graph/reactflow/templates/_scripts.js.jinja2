@@ -594,14 +594,19 @@ function GraphViewer() {
                 const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
                 const textActive = currentStuffFormat === 'text' ? 'active' : '';
                 const htmlActive = currentStuffFormat === 'html' ? 'active' : '';
+                const htmlTabLabel = getHtmlTabLabel(stuffData.contentType);
                 html += `<button class="format-tab ${htmlActive}" data-format="html" `;
-                html += `${!hasHtml ? 'disabled' : ''}>HTML</button>`;
+                html += `${!hasHtml ? 'disabled' : ''}>${htmlTabLabel}</button>`;
                 html += `<button class="format-tab ${jsonActive}" data-format="json" `;
                 html += `${!hasJson ? 'disabled' : ''}>JSON</button>`;
                 html += `<button class="format-tab ${textActive}" data-format="text" `;
                 html += `${!hasText ? 'disabled' : ''}>Pretty</button>`;
                 html += '</div>';
                 html += '<div class="format-actions">';
+                html += '<button class="action-btn" id="open-external-btn" ';
+                html += 'onclick="openExternal()" title="Open in new window" style="display: none;">';
+                html += '<svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+                html += '</button>';
                 html += '<button class="action-btn" id="fullscreen-open-btn" ';
                 html += 'onclick="openFullscreen()" title="Fullscreen">';
                 html += '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
@@ -625,6 +630,10 @@ function GraphViewer() {
                 html += '<div class="format-toolbar">';
                 html += '<div class="format-tabs"></div>';
                 html += '<div class="format-actions">';
+                html += '<button class="action-btn" id="open-external-btn" ';
+                html += 'onclick="openExternal()" title="Open in new window" style="display: none;">';
+                html += '<svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+                html += '</button>';
                 html += '<button class="action-btn" id="fullscreen-open-btn" ';
                 html += 'onclick="openFullscreen()" title="Fullscreen">';
                 html += '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
@@ -907,6 +916,23 @@ function renderStuffContent(format) {
             iframe.src = pdfUrl;
             iframe.style.cssText = 'width:100%; height:100%; border:none;';
             container.appendChild(iframe);
+            updateOpenExternalButton();
+            return;
+        }
+    }
+
+    // Handle image content type
+    if (format === 'html' && contentType?.startsWith('image/')) {
+        const imageUrl = jsonData?.url;
+        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+            container.className = 'inspector-image-content';
+            container.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
+            img.alt = 'Image content';
+            container.appendChild(img);
+            updateOpenExternalButton();
             return;
         }
     }
@@ -926,6 +952,8 @@ function renderStuffContent(format) {
         container.innerHTML = DOMPurify.sanitize(htmlContent);
         makeLinksOpenInNewWindow(container);
     }
+
+    updateOpenExternalButton();
 }
 
 // Get current stuff content based on active format
@@ -1017,6 +1045,45 @@ function makeLinksOpenInNewWindow(container) {
     });
 }
 
+// Get appropriate tab label based on content type
+function getHtmlTabLabel(contentType) {
+    if (contentType === 'application/pdf') return 'PDF';
+    if (contentType?.startsWith('image/')) return 'Image';
+    return 'HTML';
+}
+
+// Open external URL for PDF/image content
+function openExternal() {
+    const contentType = window.currentStuffContentType;
+    const jsonData = window.currentStuffJsonData;
+
+    if (contentType === 'application/pdf' || contentType?.startsWith('image/')) {
+        const url = jsonData?.url;
+        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+    }
+}
+
+// Update visibility of the "open in new window" button
+function updateOpenExternalButton() {
+    const openExternalBtn = document.getElementById('open-external-btn');
+    const fullscreenOpenExternalBtn = document.getElementById('fullscreen-open-external-btn');
+
+    const contentType = window.currentStuffContentType;
+    const jsonData = window.currentStuffJsonData;
+    const url = jsonData?.url;
+    const shouldShow = (contentType === 'application/pdf' || contentType?.startsWith('image/'))
+        && url && (url.startsWith('http://') || url.startsWith('https://'));
+
+    if (openExternalBtn) {
+        openExternalBtn.style.display = shouldShow ? '' : 'none';
+    }
+    if (fullscreenOpenExternalBtn) {
+        fullscreenOpenExternalBtn.style.display = shouldShow ? '' : 'none';
+    }
+}
+
 // Open fullscreen view
 function openFullscreen() {
     const modal = document.getElementById('fullscreen-modal');
@@ -1045,9 +1112,10 @@ function openFullscreen() {
         const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
         const textActive = currentStuffFormat === 'text' ? 'active' : '';
         const htmlActive = currentStuffFormat === 'html' ? 'active' : '';
+        const htmlTabLabel = getHtmlTabLabel(window.currentStuffContentType);
         let tabsHtml = '';
         tabsHtml += `<button class="format-tab ${htmlActive}" data-format="html" `;
-        tabsHtml += `${!hasHtml ? 'disabled' : ''}>HTML</button>`;
+        tabsHtml += `${!hasHtml ? 'disabled' : ''}>${htmlTabLabel}</button>`;
         tabsHtml += `<button class="format-tab ${jsonActive}" data-format="json" `;
         tabsHtml += `${!hasJson ? 'disabled' : ''}>JSON</button>`;
         tabsHtml += `<button class="format-tab ${textActive}" data-format="text" `;
@@ -1153,6 +1221,23 @@ function renderStuffContentFullscreen(format) {
             iframe.src = pdfUrl;
             iframe.style.cssText = 'width:100%; height:100%; border:none;';
             container.appendChild(iframe);
+            updateOpenExternalButton();
+            return;
+        }
+    }
+
+    // Handle image content type
+    if (format === 'html' && contentType?.startsWith('image/')) {
+        const imageUrl = jsonData?.url;
+        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+            container.className = 'fullscreen-content inspector-image-content';
+            container.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
+            img.alt = 'Image content';
+            container.appendChild(img);
+            updateOpenExternalButton();
             return;
         }
     }
@@ -1171,4 +1256,6 @@ function renderStuffContentFullscreen(format) {
         container.innerHTML = DOMPurify.sanitize(htmlContent);
         makeLinksOpenInNewWindow(container);
     }
+
+    updateOpenExternalButton();
 }
