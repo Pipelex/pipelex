@@ -24,14 +24,14 @@ def is_extract_handle_supported_by_enabled_backends(extract_handle: str) -> bool
 # ================================================================================================
 
 EXTRACT_HANDLE_FROM_PDF = [
-    # "pypdfium2-extract-pdf",
-    # "docling-extract-text",
+    "pypdfium2-extract-pdf",
+    "docling-extract-text",
     "mistral-ocr",
-    # "mistral-ocr-2503",
-    # "mistral-ocr-2505",
-    # "mistral-ocr-2512",
-    # "mistral-document-ai-2505",
-    # "azure-document-intelligence",
+    "mistral-ocr-2503",
+    "mistral-ocr-2505",
+    "mistral-ocr-2512",
+    "mistral-document-ai-2505",
+    "azure-document-intelligence",
 ]
 
 EXTRACT_HANDLE_FROM_IMAGE = [

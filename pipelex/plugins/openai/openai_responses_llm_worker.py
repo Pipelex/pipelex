@@ -8,7 +8,7 @@ from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.config import get_config
@@ -69,6 +69,10 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
+        if llm_job.llm_prompt.user_documents:
+            msg = f"Document input is not supported for OpenAI Responses API. Model: {self.inference_model.desc}"
+            raise LLMCapabilityError(msg)
+
         job_params = llm_job.applied_job_params or llm_job.job_params
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
         try:
@@ -113,6 +117,10 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
+        if llm_job.llm_prompt.user_documents:
+            msg = f"Document input is not supported for OpenAI Responses API. Model: {self.inference_model.desc}"
+            raise LLMCapabilityError(msg)
+
         job_params = llm_job.applied_job_params or llm_job.job_params
         try:
             if not hasattr(self.instructor_for_objects, "responses"):

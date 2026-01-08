@@ -21,15 +21,15 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_to
 
 ALL_BACKENDS = [
     # "pipelex_gateway",
-    # "anthropic",
+    "anthropic",
     # "azure_openai",
     # "bedrock",
     # "blackboxai",
     # "fal",
-    # "google",
+    "google",
     # "groq",
     # "huggingface",
-    "mistral",
+    # "mistral",
     # "ollama",
     # "openai",
     # "portkey",

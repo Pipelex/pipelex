@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -68,6 +68,10 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
+        if llm_job.llm_prompt.user_documents:
+            msg = f"Document input is not supported for OpenAI chat completions. Model: {self.inference_model.desc}"
+            raise LLMCapabilityError(msg)
+
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
 
@@ -113,6 +117,10 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
+        if llm_job.llm_prompt.user_documents:
+            msg = f"Document input is not supported for OpenAI chat completions. Model: {self.inference_model.desc}"
+            raise LLMCapabilityError(msg)
+
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         try:

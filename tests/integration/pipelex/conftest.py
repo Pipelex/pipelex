@@ -18,7 +18,7 @@ from .fixtures.extract_fixtures import (
 )
 from .fixtures.generator_fixtures import content_generator, generated_content_factory
 from .fixtures.img_gen_fixtures import img_gen_handle, img_gen_job_params
-from .fixtures.llm_fixtures import llm_handle, llm_job_params, llm_preset_id
+from .fixtures.llm_fixtures import llm_handle, llm_handle_for_documents, llm_handle_for_vision, llm_job_params, llm_preset_id
 from .fixtures.plugin_fixtures import plugin_for_anthropic, plugin_for_openai
 from .fixtures.routing_fixtures import (
     check_backend_supports_model,
@@ -36,6 +36,8 @@ __all__ = [
     # LLM fixtures
     "llm_preset_id",
     "llm_handle",
+    "llm_handle_for_vision",
+    "llm_handle_for_documents",
     "llm_job_params",
     # Plugin fixtures
     "plugin_for_openai",

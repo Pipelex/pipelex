@@ -2,12 +2,16 @@ from typing import TYPE_CHECKING
 
 from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
 from anthropic.types import Usage
+from anthropic.types.document_block_param import DocumentBlockParam
+from anthropic.types.image_block_param import ImageBlockParam
 from anthropic.types.message_param import MessageParam
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
 )
 
+from pipelex.cogt.document.prompt_document import PromptDocument
+from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -19,7 +23,6 @@ from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, Pr
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from anthropic.types.image_block_param import ImageBlockParam
     from anthropic.types.text_block_param import TextBlockParam
 
 
@@ -60,7 +63,7 @@ class AnthropicFactory:
                 )
 
     @staticmethod
-    def _make_image_block_param(prepped_image: PreparedFile) -> "ImageBlockParam":
+    def _make_image_block_param(prepped_image: PreparedFile) -> ImageBlockParam:
         """Convert a PreparedFile to an Anthropic ImageBlockParam."""
         image_block_param: ImageBlockParam
         match prepped_image:
@@ -86,13 +89,45 @@ class AnthropicFactory:
                 raise TypeError(msg)
         return image_block_param
 
+    @staticmethod
+    def _make_document_block_param(prepped_document: PreparedFile, title: str | None = None) -> DocumentBlockParam:
+        """Convert a PreparedFile to an Anthropic DocumentBlockParam."""
+        document_block_param: DocumentBlockParam
+        match prepped_document:
+            case PreparedFileBase64():
+                source_dict: dict[str, str] = {
+                    "type": "base64",
+                    "media_type": prepped_document.mime_type,
+                    "data": prepped_document.base64_data,
+                }
+                document_block_param = {
+                    "type": "document",
+                    "source": source_dict,  # type: ignore[typeddict-item]
+                }  # pyright: ignore[reportAssignmentType]
+                if title:
+                    document_block_param["title"] = title
+            case PreparedFileHttpUrl():
+                document_block_param = {
+                    "type": "document",
+                    "source": {
+                        "type": "url",
+                        "url": prepped_document.url,
+                    },
+                }  # pyright: ignore[reportAssignmentType]
+                if title:
+                    document_block_param["title"] = title
+            case PreparedFileLocalPath():
+                msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
+                raise TypeError(msg)
+        return document_block_param
+
     @classmethod
     async def make_user_message(
         cls,
         llm_job: LLMJob,
     ) -> MessageParam:
         message: MessageParam
-        content: list[TextBlockParam | ImageBlockParam] = []
+        content: list[TextBlockParam | ImageBlockParam | DocumentBlockParam] = []
         llm_prompt = llm_job.llm_prompt
 
         if user_text := llm_prompt.user_text:
@@ -105,6 +140,11 @@ class AnthropicFactory:
             prepped_user_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=False)
             for prepped_image in prepped_user_images:
                 content.append(cls._make_image_block_param(prepped_image))
+        if llm_prompt.user_documents:
+            prepped_user_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
+            for doc_index, prepped_document in enumerate(prepped_user_documents):
+                document_title = cls._get_document_title(llm_prompt.user_documents[doc_index])
+                content.append(cls._make_document_block_param(prepped_document, title=document_title))
 
         message = {
             "role": "user",
@@ -113,31 +153,38 @@ class AnthropicFactory:
 
         return message
 
+    @staticmethod
+    def _get_document_title(prompt_document: PromptDocument) -> str | None:
+        """Extract the title from a PromptDocument if available."""
+        return prompt_document.title
+
     # This creates a MessageParam disguised as a ChatCompletionMessageParam to please instructor type checking
     @classmethod
     def openai_typed_user_message(
         cls,
         user_content_txt: str,
         prepped_user_images: list[PreparedFile] | None = None,
+        prepped_user_documents: list[tuple[PreparedFile, str | None]] | None = None,
     ) -> ChatCompletionMessageParam:
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
+
+        content: list[TextBlockParam | ImageBlockParam | DocumentBlockParam] = []
+
         if prepped_user_images is not None:
-            images_block_params: list[ImageBlockParam] = []
             for prepped_image in prepped_user_images:
-                images_block_params.append(cls._make_image_block_param(prepped_image))
+                content.append(cls._make_image_block_param(prepped_image))
 
-            content: list[TextBlockParam | ImageBlockParam] = [*images_block_params, text_block_param]
-            message = {
-                "role": "user",
-                "content": content,
-            }
+        if prepped_user_documents is not None:
+            for prepped_document, title in prepped_user_documents:
+                content.append(cls._make_document_block_param(prepped_document, title=title))
 
-        else:
-            message = {
-                "role": "user",
-                "content": [text_block_param],
-            }
+        content.append(text_block_param)
+
+        message = {
+            "role": "user",
+            "content": content,
+        }
 
         return message  # type: ignore[return-value, valid-type] # pyright: ignore[reportReturnType]
 
@@ -158,11 +205,21 @@ class AnthropicFactory:
         else:
             prepped_user_images = None
 
+        prepped_user_documents: list[tuple[PreparedFile, str | None]] | None
+        if llm_prompt.user_documents:
+            prepped_docs = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
+            prepped_user_documents = [
+                (prepped_doc, cls._get_document_title(llm_prompt.user_documents[doc_index])) for doc_index, prepped_doc in enumerate(prepped_docs)
+            ]
+        else:
+            prepped_user_documents = None
+
         # Concatenation ####
         messages.append(
             cls.openai_typed_user_message(
                 user_content_txt=llm_prompt.user_text or "",
                 prepped_user_images=prepped_user_images,
+                prepped_user_documents=prepped_user_documents,
             ),
         )
         return messages
