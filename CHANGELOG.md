@@ -64,6 +64,7 @@
 - Test suite pre-flight check: Verifies Gateway terms acceptance before running tests, providing clear error messages.
 - "Gateway Available Models" documentation page: Auto-generated reference of all LLM, Document Extraction, and Image Generation models available through the Gateway.
 - **Dry Run Mode**: `pipelex run --dry-run` executes pipeline logic without API calls, useful for validating structure and generating orchestration graphs.
+- **`--library-dir` CLI Option**: Added `--library-dir` / `-L` option to `pipelex run`, `pipelex validate`, and `pipelex build` subcommands (`one-shot-pipe`, `partial-pipe`) to specify additional directories for searching pipe definitions. Can be specified multiple times. For `pipelex build pipe`, the option only affects the dry-run graph generation of the built pipeline.
 
 ### Fixed
 - Fixed a bug with the validation of the multiplicity of the output of the `PipeCondition`.
