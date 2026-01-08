@@ -9,9 +9,12 @@ from openai.types.chat import (
     ChatCompletionUserMessageParam,
 )
 from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
+from openai.types.chat.chat_completion_content_part_param import File as ChatCompletionContentPartFileParam
 from openai.types.completion_usage import CompletionUsage
 from typing_extensions import override
 
+from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
+from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
@@ -60,8 +63,47 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
                 image_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                 user_contents.append(image_param)
 
+        # Handle documents (PDF support via Chat Completions API)
+        if llm_prompt.user_documents:
+            prepped_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=self.is_http_url_enabled)
+            for doc_index, prepped_document in enumerate(prepped_documents):
+                match prepped_document:
+                    case PreparedFileHttpUrl():
+                        # For HTTP URLs, we need to convert to base64 since Chat Completions
+                        # file type doesn't support file_url directly like Responses API
+                        # The prep_prompt_documents should handle this when is_http_url_enabled=False
+                        msg = "HTTP URLs for documents require conversion to base64 - set is_http_url_enabled=False"
+                        raise TypeError(msg)
+                    case PreparedFileBase64():
+                        filename = self._get_document_filename(llm_prompt.user_documents[doc_index])
+                        file_data = f"data:{prepped_document.mime_type};base64,{prepped_document.base64_data}"
+                        file_param = ChatCompletionContentPartFileParam(
+                            type="file",
+                            file={"file_data": file_data, "filename": filename},
+                        )
+                        user_contents.append(file_param)
+                    case PreparedFileLocalPath():
+                        msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
+                        raise TypeError(msg)
+
         messages.append(ChatCompletionUserMessageParam(role="user", content=user_contents))
         return messages
+
+    @staticmethod
+    def _get_document_filename(prompt_document: PromptDocument) -> str:
+        """Extract the filename from a PromptDocument for OpenAI Chat Completions API."""
+        # Use the title if available, otherwise extract from URI if it's a URI type
+        if prompt_document.title:
+            return prompt_document.title
+        match prompt_document:
+            case PromptDocumentUri():
+                # Extract filename from URI path
+                uri = prompt_document.uri
+                if "/" in uri:
+                    return uri.rsplit("/", 1)[-1]
+                return uri
+            case _:
+                return "document.pdf"
 
     def make_nb_tokens_by_category(self, usage: CompletionUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
