@@ -28,6 +28,17 @@ function makeLinksOpenInNewWindow(container) {
     });
 }
 
+// Extract URL from stuff data (handles various data structures)
+function extractUrl(jsonData) {
+    if (!jsonData) return null;
+    // Check if data itself is a URL string
+    if (typeof jsonData === 'string' && (jsonData.startsWith('http://') || jsonData.startsWith('https://'))) {
+        return jsonData;
+    }
+    // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
+    return jsonData.display_link || jsonData.src || jsonData.href || jsonData.uri || null;
+}
+
 // Theme-specific color palettes for custom node styling
 const themePalettes = {
     default: {
@@ -220,8 +231,8 @@ function renderContent(stuffId, format) {
     const jsonData = stuffDataJson?.[stuffId];
 
     if (format === 'html' && contentType === 'application/pdf') {
-        const pdfUrl = jsonData?.url;
-        if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
             content.classList.add('pdf-content');
             content.innerHTML = '';
             const iframe = document.createElement('iframe');
@@ -235,8 +246,8 @@ function renderContent(stuffId, format) {
 
     // Handle image content type
     if (format === 'html' && contentType?.startsWith('image/')) {
-        const imageUrl = jsonData?.url;
-        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
             content.classList.add('image-content');
             content.innerHTML = '';
             const img = document.createElement('img');
@@ -273,14 +284,14 @@ function renderContent(stuffId, format) {
     updateOpenExternalButton(stuffId, contentType, jsonData);
 }
 
-// Update visibility of the "open in new window" button
+// Update visibility of the "open in new window" button (PDF only)
 function updateOpenExternalButton(stuffId, contentType, jsonData) {
     const openExternalBtn = document.getElementById('open-external-btn');
     if (!openExternalBtn) return;
 
-    const url = jsonData?.url;
-    const shouldShow = (contentType === 'application/pdf' || contentType?.startsWith('image/'))
-        && url && (url.startsWith('http://') || url.startsWith('https://'));
+    const url = extractUrl(jsonData);
+    // Only show for PDFs (images are handled by the download button)
+    const shouldShow = contentType === 'application/pdf' && !!url;
     openExternalBtn.style.display = shouldShow ? '' : 'none';
 }
 
@@ -394,14 +405,34 @@ function copyContent() {
 
 // Download content as file
 function downloadContent() {
-    const data = getCurrentContent();
-    if (!data) return;
+    if (!currentStuffId) return;
 
     // Get name from metadata or use ID
     const meta = stuffMetadata?.[currentStuffId];
     const baseName = meta?.name || currentStuffId || 'data';
-    const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${data.ext}`;
+    const contentType = stuffContentType?.[currentStuffId];
+    const jsonData = stuffDataJson?.[currentStuffId];
 
+    // For images, download the actual image file directly
+    if (contentType?.startsWith('image/')) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
+            const ext = contentType.split('/')[1] || 'png';
+            const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`;
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        }
+    }
+
+    const data = getCurrentContent();
+    if (!data) return;
+
+    const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${data.ext}`;
     const blob = new Blob([data.content], { type: data.mime });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -421,15 +452,15 @@ document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hideModal();
 });
 
-// Open external URL for PDF/image content
+// Open external URL for PDF content
 function openExternal() {
     if (!currentStuffId) return;
     const contentType = stuffContentType?.[currentStuffId];
     const jsonData = stuffDataJson?.[currentStuffId];
 
-    if (contentType === 'application/pdf' || contentType?.startsWith('image/')) {
-        const url = jsonData?.url;
-        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+    if (contentType === 'application/pdf') {
+        const url = extractUrl(jsonData);
+        if (url) {
             window.open(url, '_blank', 'noopener,noreferrer');
         }
     }

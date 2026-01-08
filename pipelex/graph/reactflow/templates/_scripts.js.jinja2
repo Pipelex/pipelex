@@ -908,8 +908,8 @@ function renderStuffContent(format) {
 
     // Handle PDF content type with iframe viewer
     if (format === 'html' && contentType === 'application/pdf') {
-        const pdfUrl = jsonData?.url;
-        if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
             container.className = 'inspector-pdf-content';
             container.innerHTML = '';
             const iframe = document.createElement('iframe');
@@ -923,8 +923,8 @@ function renderStuffContent(format) {
 
     // Handle image content type
     if (format === 'html' && contentType?.startsWith('image/')) {
-        const imageUrl = jsonData?.url;
-        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
             container.className = 'inspector-image-content';
             container.innerHTML = '';
             const img = document.createElement('img');
@@ -1011,12 +1011,31 @@ function copyStuffContent() {
 
 // Download stuff content as file
 function downloadStuffContent() {
+    const stuffName = document.getElementById('inspector-title')?.textContent || 'data';
+    const baseName = stuffName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const contentType = window.currentStuffContentType;
+    const jsonData = window.currentStuffJsonData;
+
+    // For images, download the actual image file directly
+    if (contentType?.startsWith('image/')) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
+            const ext = contentType.split('/')[1] || 'png';
+            const filename = `${baseName}.${ext}`;
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        }
+    }
+
     const data = getCurrentStuffContent();
     if (!data) return;
 
-    const stuffName = document.getElementById('inspector-title')?.textContent || 'data';
-    const filename = `${stuffName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${data.ext}`;
-
+    const filename = `${baseName}.${data.ext}`;
     const blob = new Blob([data.content], { type: data.mime });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -1052,29 +1071,40 @@ function getHtmlTabLabel(contentType) {
     return 'HTML';
 }
 
-// Open external URL for PDF/image content
+// Extract URL from stuff data (handles various data structures)
+function extractUrl(jsonData) {
+    if (!jsonData) return null;
+    // Check if data itself is a URL string
+    if (typeof jsonData === 'string' && (jsonData.startsWith('http://') || jsonData.startsWith('https://'))) {
+        return jsonData;
+    }
+    // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
+    return jsonData.display_link || jsonData.src || jsonData.href || jsonData.uri || null;
+}
+
+// Open external URL for PDF content
 function openExternal() {
     const contentType = window.currentStuffContentType;
     const jsonData = window.currentStuffJsonData;
 
-    if (contentType === 'application/pdf' || contentType?.startsWith('image/')) {
-        const url = jsonData?.url;
-        if (url && (url.startsWith('http://') || url.startsWith('https://'))) {
+    if (contentType === 'application/pdf') {
+        const url = extractUrl(jsonData);
+        if (url) {
             window.open(url, '_blank', 'noopener,noreferrer');
         }
     }
 }
 
-// Update visibility of the "open in new window" button
+// Update visibility of the "open in new window" button (PDF only)
 function updateOpenExternalButton() {
     const openExternalBtn = document.getElementById('open-external-btn');
     const fullscreenOpenExternalBtn = document.getElementById('fullscreen-open-external-btn');
 
     const contentType = window.currentStuffContentType;
     const jsonData = window.currentStuffJsonData;
-    const url = jsonData?.url;
-    const shouldShow = (contentType === 'application/pdf' || contentType?.startsWith('image/'))
-        && url && (url.startsWith('http://') || url.startsWith('https://'));
+    const url = extractUrl(jsonData);
+    // Only show for PDFs (images are handled by the download button)
+    const shouldShow = contentType === 'application/pdf' && !!url;
 
     if (openExternalBtn) {
         openExternalBtn.style.display = shouldShow ? '' : 'none';
@@ -1213,8 +1243,8 @@ function renderStuffContentFullscreen(format) {
 
     // Handle PDF content type with iframe viewer
     if (format === 'html' && contentType === 'application/pdf') {
-        const pdfUrl = jsonData?.url;
-        if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
             container.className = 'fullscreen-content inspector-pdf-content';
             container.innerHTML = '';
             const iframe = document.createElement('iframe');
@@ -1228,8 +1258,8 @@ function renderStuffContentFullscreen(format) {
 
     // Handle image content type
     if (format === 'html' && contentType?.startsWith('image/')) {
-        const imageUrl = jsonData?.url;
-        if (imageUrl && (imageUrl.startsWith('http://') || imageUrl.startsWith('https://'))) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
             container.className = 'fullscreen-content inspector-image-content';
             container.innerHTML = '';
             const img = document.createElement('img');
