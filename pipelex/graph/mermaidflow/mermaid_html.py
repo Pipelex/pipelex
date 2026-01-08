@@ -85,6 +85,7 @@ async def render_mermaid_html_with_data_async(
     stuff_data_text: dict[str, str] | None = None,
     stuff_data_html: dict[str, str] | None = None,
     stuff_metadata: dict[str, dict[str, str]] | None = None,
+    stuff_content_type: dict[str, str] | None = None,
     *,
     title: str = "Pipelex Graph",
     theme: str = "dark",
@@ -101,6 +102,7 @@ async def render_mermaid_html_with_data_async(
         stuff_data_text: Mapping from stuff mermaid IDs to their ASCII text representation.
         stuff_data_html: Mapping from stuff mermaid IDs to their HTML representation.
         stuff_metadata: Mapping from stuff mermaid IDs to their display metadata (name, concept).
+        stuff_content_type: Mapping from stuff mermaid IDs to their content_type (e.g., 'application/pdf').
         title: The page title (appears in browser tab and as h1).
         theme: The Mermaid theme to use (dark, default, base, forest, neutral).
 
@@ -118,6 +120,7 @@ async def render_mermaid_html_with_data_async(
         "stuff_data_text_json": json.dumps(stuff_data_text or {}),
         "stuff_data_html_json": json.dumps(stuff_data_html or {}),
         "stuff_metadata_json": json.dumps(stuff_metadata or {}),
+        "stuff_content_type_json": json.dumps(stuff_content_type or {}),
         "has_data": has_data,
         "theme": theme,
     }

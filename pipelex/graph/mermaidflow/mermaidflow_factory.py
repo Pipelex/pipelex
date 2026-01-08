@@ -19,7 +19,9 @@ from pipelex.graph.graphspec import (
     NodeStatus,
 )
 from pipelex.graph.mermaidflow.mermaidflow import Mermaidflow
+from pipelex.graph.mermaidflow.mermaidflow_utils import make_stuff_id
 from pipelex.graph.mermaidflow.stuff_collector import (
+    collect_stuff_content_type,
     collect_stuff_data,
     collect_stuff_data_html,
     collect_stuff_data_text,
@@ -238,10 +240,12 @@ class MermaidflowFactory:
         if graph_config.data_inclusion.stuff_html_content:
             stuff_data_html = collect_stuff_data_html(graph=graph)
 
-        # Collect metadata if any stuff data is present
+        # Collect metadata and content_type if any stuff data is present
         stuff_metadata: dict[str, dict[str, str]] | None = None
+        stuff_content_type: dict[str, str] | None = None
         if stuff_data or stuff_data_text or stuff_data_html:
             stuff_metadata = collect_stuff_metadata(graph=graph)
+            stuff_content_type = collect_stuff_content_type(graph=graph)
 
         return Mermaidflow(
             mermaid_code=mermaid_code,
@@ -249,6 +253,7 @@ class MermaidflowFactory:
             stuff_data_text=stuff_data_text,
             stuff_data_html=stuff_data_html,
             stuff_metadata=stuff_metadata,
+            stuff_content_type=stuff_content_type,
         )
 
     @classmethod
@@ -329,7 +334,7 @@ class MermaidflowFactory:
         Returns:
             Mermaid stuff node declaration string.
         """
-        stuff_mermaid_id = f"s_{sanitize_mermaid_id(digest)[2:]}"
+        stuff_mermaid_id = make_stuff_id(digest)
         stuff_id_mapping[digest] = stuff_mermaid_id
 
         # Build label

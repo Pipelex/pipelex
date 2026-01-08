@@ -11,7 +11,7 @@ from typing import Any
 
 from pipelex import log
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.tools.mermaid.mermaid_utils import sanitize_mermaid_id
+from pipelex.graph.mermaidflow.mermaidflow_utils import make_stuff_id
 
 
 def collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
@@ -41,14 +41,14 @@ def collect_stuff_data(graph: GraphSpec) -> dict[str, Any]:
         for output_spec in node.node_io.outputs:
             log.verbose(f"    Output: digest={output_spec.digest}, has_data={output_spec.data is not None}")
             if output_spec.digest and output_spec.data is not None:
-                stuff_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
+                stuff_id = make_stuff_id(output_spec.digest)
                 stuff_data[stuff_id] = output_spec.data
 
         # Collect data from inputs (for pipeline inputs without a producer)
         for input_spec in node.node_io.inputs:
             log.verbose(f"    Input: digest={input_spec.digest}, has_data={input_spec.data is not None}")
             if input_spec.digest and input_spec.data is not None:
-                stuff_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
+                stuff_id = make_stuff_id(input_spec.digest)
                 # Don't overwrite if already captured from output
                 if stuff_id not in stuff_data:
                     stuff_data[stuff_id] = input_spec.data
@@ -78,13 +78,13 @@ def collect_stuff_data_text(graph: GraphSpec) -> dict[str, str]:
         # Collect data_text from outputs
         for output_spec in node.node_io.outputs:
             if output_spec.digest and output_spec.data_text is not None:
-                stuff_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
+                stuff_id = make_stuff_id(output_spec.digest)
                 stuff_data_text[stuff_id] = output_spec.data_text
 
         # Collect data_text from inputs (for pipeline inputs without a producer)
         for input_spec in node.node_io.inputs:
             if input_spec.digest and input_spec.data_text is not None:
-                stuff_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
+                stuff_id = make_stuff_id(input_spec.digest)
                 # Don't overwrite if already captured from output
                 if stuff_id not in stuff_data_text:
                     stuff_data_text[stuff_id] = input_spec.data_text
@@ -112,13 +112,13 @@ def collect_stuff_data_html(graph: GraphSpec) -> dict[str, str]:
         # Collect data_html from outputs
         for output_spec in node.node_io.outputs:
             if output_spec.digest and output_spec.data_html is not None:
-                stuff_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
+                stuff_id = make_stuff_id(output_spec.digest)
                 stuff_data_html[stuff_id] = output_spec.data_html
 
         # Collect data_html from inputs (for pipeline inputs without a producer)
         for input_spec in node.node_io.inputs:
             if input_spec.digest and input_spec.data_html is not None:
-                stuff_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
+                stuff_id = make_stuff_id(input_spec.digest)
                 # Don't overwrite if already captured from output
                 if stuff_id not in stuff_data_html:
                     stuff_data_html[stuff_id] = input_spec.data_html
@@ -145,7 +145,7 @@ def collect_stuff_metadata(graph: GraphSpec) -> dict[str, dict[str, str]]:
         # Collect metadata from outputs
         for output_spec in node.node_io.outputs:
             if output_spec.digest:
-                stuff_id = f"s_{sanitize_mermaid_id(output_spec.digest)[2:]}"
+                stuff_id = make_stuff_id(output_spec.digest)
                 meta: dict[str, str] = {"name": output_spec.name}
                 if output_spec.concept:
                     meta["concept"] = output_spec.concept
@@ -154,7 +154,7 @@ def collect_stuff_metadata(graph: GraphSpec) -> dict[str, dict[str, str]]:
         # Collect metadata from inputs (for pipeline inputs without a producer)
         for input_spec in node.node_io.inputs:
             if input_spec.digest:
-                stuff_id = f"s_{sanitize_mermaid_id(input_spec.digest)[2:]}"
+                stuff_id = make_stuff_id(input_spec.digest)
                 # Don't overwrite if already captured from output
                 if stuff_id not in stuff_metadata:
                     meta = {"name": input_spec.name}
@@ -163,3 +163,39 @@ def collect_stuff_metadata(graph: GraphSpec) -> dict[str, dict[str, str]]:
                     stuff_metadata[stuff_id] = meta
 
     return stuff_metadata
+
+
+def collect_stuff_content_type(graph: GraphSpec) -> dict[str, str]:
+    """Collect IOSpec content_type from all stuff nodes in the graph.
+
+    This is useful for rendering PDF and other special content types.
+
+    Note: We collect data from ALL nodes including controllers, because:
+    - The root controller has the pipeline inputs with data
+    - Controllers also capture their outputs with data
+
+    Args:
+        graph: The GraphSpec to extract content_type from.
+
+    Returns:
+        Dict mapping stuff IDs (s_xxx format) to their content_type.
+        Only includes entries where content_type is not None.
+    """
+    stuff_content_type: dict[str, str] = {}
+
+    for node in graph.nodes:
+        # Collect content_type from outputs
+        for output_spec in node.node_io.outputs:
+            if output_spec.digest and output_spec.content_type is not None:
+                stuff_id = make_stuff_id(output_spec.digest)
+                stuff_content_type[stuff_id] = output_spec.content_type
+
+        # Collect content_type from inputs (for pipeline inputs without a producer)
+        for input_spec in node.node_io.inputs:
+            if input_spec.digest and input_spec.content_type is not None:
+                stuff_id = make_stuff_id(input_spec.digest)
+                # Don't overwrite if already captured from output
+                if stuff_id not in stuff_content_type:
+                    stuff_content_type[stuff_id] = input_spec.content_type
+
+    return stuff_content_type

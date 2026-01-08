@@ -3,6 +3,7 @@ const stuffDataJson = {{ stuff_data_json | escape_script_tag }};
 const stuffDataText = {{ stuff_data_text_json | escape_script_tag }};
 const stuffDataHtml = {{ stuff_data_html_json | escape_script_tag }};
 const stuffMetadata = {{ stuff_metadata_json | escape_script_tag }};
+const stuffContentType = {{ stuff_content_type_json | escape_script_tag }};
 const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
 
 // Track current state
@@ -202,7 +203,23 @@ function setFormat(format) {
 
 function renderContent(stuffId, format) {
     const content = document.getElementById('modal-content');
-    content.classList.remove('html-content', 'text-content');
+    content.classList.remove('html-content', 'text-content', 'pdf-content');
+
+    // Handle PDF content type with iframe viewer
+    const contentType = stuffContentType?.[stuffId];
+    if (format === 'html' && contentType === 'application/pdf') {
+        const jsonData = stuffDataJson?.[stuffId];
+        const pdfUrl = jsonData?.url;
+        if (pdfUrl && (pdfUrl.startsWith('http://') || pdfUrl.startsWith('https://'))) {
+            content.classList.add('pdf-content');
+            content.innerHTML = '';
+            const iframe = document.createElement('iframe');
+            iframe.src = pdfUrl;
+            iframe.style.cssText = 'width:100%; height:100%; border:none; min-height:500px;';
+            content.appendChild(iframe);
+            return;
+        }
+    }
 
     if (format === 'json') {
         const data = stuffDataJson?.[stuffId];
