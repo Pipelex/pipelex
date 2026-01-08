@@ -7,7 +7,7 @@ if TYPE_CHECKING:
     from mistralai.models import ChatCompletionResponse
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -53,10 +53,6 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         self,
         llm_job: LLMJob,
     ) -> str:
-        if llm_job.llm_prompt.user_documents:
-            msg = f"Document input is not supported for Mistral chat completions. Model: {self.inference_model.desc}"
-            raise LLMCapabilityError(msg)
-
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.mistral_factory.make_simple_messages(llm_job=llm_job)
         response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
@@ -87,10 +83,6 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         llm_job: LLMJob,
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
-        if llm_job.llm_prompt.user_documents:
-            msg = f"Document input is not supported for Mistral chat completions. Model: {self.inference_model.desc}"
-            raise LLMCapabilityError(msg)
-
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(

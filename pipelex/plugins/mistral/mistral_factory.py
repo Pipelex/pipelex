@@ -7,6 +7,7 @@ import mistralai
 from mistralai import Mistral
 from mistralai.models import (
     ContentChunk,
+    DocumentURLChunk,
     DocumentURLChunkTypedDict,
     ImageURLChunk,
     ImageURLChunkTypedDict,
@@ -27,6 +28,8 @@ from openai.types.chat import (
 from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
 
 from pipelex import log
+from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
+from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.file.file_preparation_utils import prepare_file_from_uri
@@ -65,6 +68,9 @@ class MistralFactory:
         if user_images := llm_job.llm_prompt.user_images:
             image_chunks = await asyncio.gather(*(self.make_mistral_image_url(prompt_image=img) for img in user_images))
             user_content.extend(image_chunks)
+        if user_documents := llm_job.llm_prompt.user_documents:
+            document_chunks = await asyncio.gather(*(self.make_mistral_document_url(prompt_document=doc) for doc in user_documents))
+            user_content.extend(document_chunks)
         if user_content:
             messages.append(UserMessage(content=user_content))
 
@@ -93,6 +99,45 @@ class MistralFactory:
                 raise TypeError(msg)
 
         return ImageURLChunk(image_url=image_url)
+
+    async def make_mistral_document_url(self, prompt_document: PromptDocument) -> DocumentURLChunk:
+        """Convert a PromptDocument to a Mistral DocumentURLChunk.
+
+        Uses the unified prep_prompt_documents() which supports all URI types
+        including pipelex-storage://.
+        """
+        # Mistral accepts HTTP URLs directly, so we enable them
+        prepped_documents = await prep_prompt_documents(prompt_documents=[prompt_document], is_http_url_enabled=True)
+        prepped = prepped_documents[0]
+
+        document_url: str
+        match prepped:
+            case PreparedFileBase64():
+                document_url = prepped.as_data_url()
+            case PreparedFileHttpUrl():
+                document_url = prepped.url
+            case PreparedFileLocalPath():
+                msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
+                raise TypeError(msg)
+
+        document_name = self._get_document_name(prompt_document)
+        return DocumentURLChunk(document_url=document_url, document_name=document_name)
+
+    @staticmethod
+    def _get_document_name(prompt_document: PromptDocument) -> str | None:
+        """Extract the document name from a PromptDocument for Mistral API."""
+        # Use the title if available, otherwise extract from URI if it's a URI type
+        if prompt_document.title:
+            return prompt_document.title
+        match prompt_document:
+            case PromptDocumentUri():
+                # Extract filename from URI path
+                uri = prompt_document.uri
+                if "/" in uri:
+                    return uri.rsplit("/", 1)[-1]
+                return uri
+            case _:
+                return None
 
     async def make_simple_messages_openai_typed(
         self,

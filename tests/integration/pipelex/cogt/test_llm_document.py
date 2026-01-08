@@ -77,31 +77,3 @@ class TestLLMDocument:
             pretty_print(generated_text, title=f"Document summary of {topic} (URL)")
         except LLMCapabilityError as exc:
             pytest.skip(f"Document capability not supported for this LLM: {llm_handle_for_documents} because {exc}")
-
-    async def test_document_capability_error_for_unsupported_provider(
-        self,
-        job_metadata: JobMetadata,
-        llm_job_params: LLMJobParams,
-        llm_handle: str,
-    ):
-        """Test that LLMCapabilityError is raised for providers that don't support documents."""
-        # Only run this test for providers that don't support documents
-        # Note: OpenAI models use Responses API which now supports documents,
-        # Mistral models use Chat Completions which doesn't support documents
-        unsupported_prefixes = ("mistral-", "pixtral-", "ministral-")
-        if not any(llm_handle.startswith(prefix) for prefix in unsupported_prefixes):
-            pytest.skip(f"Skipping capability error test for document-supporting LLM: {llm_handle}")
-
-        prompt_document = PromptDocumentUri(uri=LLMDocumentTestCases.PDF_DOCUMENT_PATHS[0][1])
-        llm_worker = get_llm_worker(llm_handle=llm_handle)
-        llm_job = LLMJobFactory.make_llm_job(
-            llm_prompt=LLMPrompt(
-                user_text=LLMDocumentTestCases.DOCUMENT_USER_TEXT,
-                user_documents=[prompt_document],
-            ),
-            job_metadata=job_metadata,
-            llm_job_params=llm_job_params,
-        )
-
-        with pytest.raises(LLMCapabilityError):
-            await llm_worker.gen_text(llm_job=llm_job)
