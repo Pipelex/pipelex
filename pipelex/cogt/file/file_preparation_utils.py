@@ -22,8 +22,8 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 
 async def prepare_file_from_uri(
     uri: str,
-    keep_http_url: bool = False,
-    keep_local_path: bool = False,
+    keep_http_url: bool,
+    keep_local_path: bool,
 ) -> PreparedFile:
     """Prepare a file from a URI for consumption by various APIs.
 
@@ -76,6 +76,7 @@ async def prepare_file_from_uri(
                 )
 
         case ResolvedPipelexStorage():
+            # TODO: possibility to keep http url or local path if applicable
             storage = get_storage_provider()
             raw_bytes = await storage.load(uri=resolved_uri.storage_uri)
             prepared = PreparedFileBase64(
@@ -84,6 +85,7 @@ async def prepare_file_from_uri(
             )
 
         case ResolvedBase64DataUrl():
+            # TODO: possibility to not keep base64 data url
             # base64_data from ResolvedBase64DataUrl is already a string
             base64_data = resolved_uri.base64_data
             prepared = PreparedFileBase64(

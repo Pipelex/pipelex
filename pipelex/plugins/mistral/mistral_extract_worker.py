@@ -59,7 +59,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         self,
         image_uri: str,
     ) -> ExtractOutput:
-        document = await MistralFactory.make_image_url_document_from_uri(uri=image_uri)
+        document = await MistralFactory.make_mistral_image_url_chunk_from_uri(uri=image_uri)
         extract_response = await self.mistral_client.ocr.process_async(
             model=self.inference_model.model_id,
             document=document,
@@ -77,9 +77,9 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             msg = "Captioning is not implemented for Mistral OCR."
             raise ExtractCapabilityError(msg)
 
-        document = await MistralFactory.make_document_url_document_from_uri(
-            uri=document_uri,
+        document = await MistralFactory.make_mistral_document_url_chunk_from_uri(
             mistral_client=self.mistral_client,
+            uri=document_uri,
         )
 
         image_limit: int | None = extract_job_params.max_nb_images

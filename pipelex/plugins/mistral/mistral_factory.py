@@ -270,7 +270,7 @@ class MistralFactory:
     #########################################################
 
     @classmethod
-    async def make_image_url_document_from_uri(
+    async def make_mistral_image_url_chunk_from_uri(
         cls,
         uri: str,
     ) -> ImageURLChunkTypedDict:
@@ -286,11 +286,11 @@ class MistralFactory:
             An ImageURLChunkTypedDict suitable for Mistral OCR API
 
         Example:
-            >>> doc = await make_image_url_document_from_uri("https://example.com/image.png")
+            >>> doc = await make_mistral_image_url_chunk_from_uri("https://example.com/image.png")
             >>> doc
             {"type": "image_url", "image_url": "https://example.com/image.png"}
         """
-        prepared = await prepare_file_from_uri(uri=uri, keep_http_url=True)
+        prepared = await prepare_file_from_uri(uri=uri, keep_http_url=True, keep_local_path=False)
 
         image_url: str
         match prepared:
@@ -299,13 +299,9 @@ class MistralFactory:
             case PreparedFileBase64():
                 image_url = prepared.as_data_url()
             case PreparedFileLocalPath():
-                # This shouldn't happen since we don't use keep_local_path=True
-                # but handle it just in case by converting to base64
-                prepared_as_base64 = await prepare_file_from_uri(uri=uri, keep_http_url=False, keep_local_path=False)
-                if not isinstance(prepared_as_base64, PreparedFileBase64):
-                    msg = f"Failed to convert local path to base64: {uri}"
-                    raise TypeError(msg)
-                image_url = prepared_as_base64.as_data_url()
+                # This shouldn't happen since we use keep_local_path=False
+                msg = f"Unexpected PreparedFileLocalPath for URI: {uri}"
+                raise TypeError(msg)
 
         return ImageURLChunkTypedDict(
             type="image_url",
@@ -313,10 +309,10 @@ class MistralFactory:
         )
 
     @classmethod
-    async def make_document_url_document_from_uri(
+    async def make_mistral_document_url_chunk_from_uri(
         cls,
+        mistral_client: Mistral,
         uri: str,
-        mistral_client: Mistral | None = None,
     ) -> DocumentURLChunkTypedDict:
         """Create a Mistral document_url document from a URI.
 
@@ -325,8 +321,8 @@ class MistralFactory:
         For local paths: uploads to Mistral and gets a signed URL
 
         Args:
-            uri: The URI string to resolve (HTTP URL, local path, etc.)
             mistral_client: Mistral client (required for local file uploads)
+            uri: The URI string to resolve (HTTP URL, local path, etc.)
 
         Returns:
             A DocumentURLChunkTypedDict suitable for Mistral OCR API
@@ -335,7 +331,7 @@ class MistralFactory:
             ValueError: If mistral_client is None and a local file needs to be uploaded
 
         Example:
-            >>> doc = await make_document_url_document_from_uri("https://example.com/doc.pdf")
+            >>> doc = await make_mistral_document_url_chunk_from_uri("https://example.com/doc.pdf")
             >>> doc
             {"type": "document_url", "document_url": "https://example.com/doc.pdf"}
         """
@@ -346,16 +342,13 @@ class MistralFactory:
             case PreparedFileHttpUrl():
                 document_url = prepared.url
             case PreparedFileLocalPath():
-                if mistral_client is None:
-                    msg = "mistral_client is required to upload local files"
-                    raise ValueError(msg)
                 uploaded_file_id = await cls.upload_file_to_mistral_for_ocr(
                     mistral_client=mistral_client,
                     file_path=prepared.path,
                 )
                 signed_url_response = await mistral_client.files.get_signed_url_async(file_id=uploaded_file_id)
                 document_url = signed_url_response.url
-            case _:
+            case PreparedFileBase64():
                 # For base64 or other types, we'd need to handle differently
                 # For now, convert to base64 data URL
                 prepared_as_base64 = await prepare_file_from_uri(uri=uri, keep_http_url=False, keep_local_path=False)
