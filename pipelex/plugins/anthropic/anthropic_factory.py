@@ -10,7 +10,6 @@ from openai.types.chat import (
     ChatCompletionSystemMessageParam,
 )
 
-from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.exceptions import CogtError
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
@@ -142,9 +141,8 @@ class AnthropicFactory:
                 content.append(cls._make_image_block_param(prepped_image))
         if llm_prompt.user_documents:
             prepped_user_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
-            for doc_index, prepped_document in enumerate(prepped_user_documents):
-                document_title = cls._get_document_title(llm_prompt.user_documents[doc_index])
-                content.append(cls._make_document_block_param(prepped_document, title=document_title))
+            for prepped_document in prepped_user_documents:
+                content.append(cls._make_document_block_param(prepped_document))
 
         message = {
             "role": "user",
@@ -152,11 +150,6 @@ class AnthropicFactory:
         }
 
         return message
-
-    @staticmethod
-    def _get_document_title(prompt_document: PromptDocument) -> str | None:
-        """Extract the title from a PromptDocument if available."""
-        return prompt_document.title
 
     # This creates a MessageParam disguised as a ChatCompletionMessageParam to please instructor type checking
     @classmethod
@@ -208,9 +201,7 @@ class AnthropicFactory:
         prepped_user_documents: list[tuple[PreparedFile, str | None]] | None
         if llm_prompt.user_documents:
             prepped_docs = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
-            prepped_user_documents = [
-                (prepped_doc, cls._get_document_title(llm_prompt.user_documents[doc_index])) for doc_index, prepped_doc in enumerate(prepped_docs)
-            ]
+            prepped_user_documents = [(prepped_doc, None) for prepped_doc in prepped_docs]
         else:
             prepped_user_documents = None
 

@@ -28,7 +28,7 @@ from openai.types.chat import (
 from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
 
 from pipelex import log
-from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
+from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
@@ -120,24 +120,7 @@ class MistralFactory:
                 msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
                 raise TypeError(msg)
 
-        document_name = self._get_document_name(prompt_document)
-        return DocumentURLChunk(document_url=document_url, document_name=document_name)
-
-    @staticmethod
-    def _get_document_name(prompt_document: PromptDocument) -> str | None:
-        """Extract the document name from a PromptDocument for Mistral API."""
-        # Use the title if available, otherwise extract from URI if it's a URI type
-        if prompt_document.title:
-            return prompt_document.title
-        match prompt_document:
-            case PromptDocumentUri():
-                # Extract filename from URI path
-                uri = prompt_document.uri
-                if "/" in uri:
-                    return uri.rsplit("/", 1)[-1]
-                return uri
-            case _:
-                return None
+        return DocumentURLChunk(document_url=document_url)
 
     async def make_simple_messages_openai_typed(
         self,

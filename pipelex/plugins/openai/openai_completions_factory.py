@@ -92,9 +92,6 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
     @staticmethod
     def _get_document_filename(prompt_document: PromptDocument) -> str:
         """Extract the filename from a PromptDocument for OpenAI Chat Completions API."""
-        # Use the title if available, otherwise extract from URI if it's a URI type
-        if prompt_document.title:
-            return prompt_document.title
         match prompt_document:
             case PromptDocumentUri():
                 # Extract filename from URI path

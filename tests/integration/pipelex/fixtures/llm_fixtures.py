@@ -268,15 +268,25 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
     params=[
         # Anthropic Claude models with native document support
         "claude-4.5-haiku",
-        # "claude-4.5-sonnet",
+        "claude-4.5-sonnet",
         # Google Gemini models with native document support
-        # "gemini-2.5-flash-lite",
-        # "gemini-2.5-flash",
-        # "gemini-2.5-pro",
+        "gemini-2.5-flash-lite",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        # OpenAI models using Responses API (supports PDF input)
+        # "gpt-5.2",
+        "gpt-5",
+        # "gpt-5-chat",
+        "gpt-4o-mini",
+        "mistral-medium",
     ],
 )
 def llm_handle_for_documents(request: pytest.FixtureRequest) -> str:
-    """Fixture for LLM handles that support document input (PDF, DOCX)."""
+    """Fixture for LLM handles that support document input (PDF, DOCX).
+
+    Note: OpenAI models starting with gpt-5 and later use the Responses API
+    which supports PDF input via input_file type.
+    """
     assert isinstance(request.param, str)
     llm_handle_param = request.param
     if not is_llm_handle_supported(llm_handle_param):

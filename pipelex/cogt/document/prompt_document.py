@@ -27,7 +27,6 @@ class PromptDocumentUri(BaseModel):
 
     kind: Literal["uri"] = "uri"
     uri: str
-    title: str | None = None
 
     @field_validator("uri", mode="before")
     @classmethod
@@ -45,8 +44,7 @@ class PromptDocumentUri(BaseModel):
     @override
     def __str__(self) -> str:
         truncated_uri = AttributePolisher.get_truncated_value(value=self.uri)
-        title_str = f", title={self.title!r}" if self.title else ""
-        return f"PromptDocumentUri(uri={truncated_uri!r}{title_str})"
+        return f"PromptDocumentUri(uri={truncated_uri!r})"
 
     @override
     def __format__(self, format_spec: str) -> str:
@@ -54,8 +52,7 @@ class PromptDocumentUri(BaseModel):
 
     def short_description(self) -> str:
         """Return a short description of the document."""
-        title_part = f" ({self.title})" if self.title else ""
-        return f"{self.resolved.kind.desc}: {self.uri[:100]}{title_part}"
+        return f"{self.resolved.kind.desc}: {self.uri[:100]}"
 
 
 class PromptDocumentBase64(BaseModel):
@@ -63,7 +60,6 @@ class PromptDocumentBase64(BaseModel):
 
     kind: Literal["base64"] = "base64"
     base64_data: str
-    title: str | None = None
 
     def get_file_type(self) -> FileType:
         return detect_file_type_from_base64(self.base64_data)
@@ -77,8 +73,7 @@ class PromptDocumentBase64(BaseModel):
     @override
     def __str__(self) -> str:
         truncated_base64 = AttributePolisher.get_truncated_value(value=self.base64_data)
-        title_str = f", title={self.title!r}" if self.title else ""
-        return f"PromptDocumentBase64(base64_data={truncated_base64!r}{title_str})"
+        return f"PromptDocumentBase64(base64_data={truncated_base64!r})"
 
     @override
     def __repr__(self) -> str:
@@ -90,8 +85,7 @@ class PromptDocumentBase64(BaseModel):
 
     def short_description(self) -> str:
         """Return a short description of the document."""
-        title_part = f" ({self.title})" if self.title else ""
-        return f"base64: {self.base64_data[:50]}...{title_part}"
+        return f"base64: {self.base64_data[:50]}..."
 
 
 class PromptDocumentBinary(BaseModel):
@@ -99,7 +93,6 @@ class PromptDocumentBinary(BaseModel):
 
     kind: Literal["binary"] = "binary"
     raw_bytes: bytes
-    title: str | None = None
 
     def get_file_type(self) -> FileType:
         return detect_file_type_from_bytes(self.raw_bytes)
@@ -109,8 +102,7 @@ class PromptDocumentBinary(BaseModel):
 
     @override
     def __str__(self) -> str:
-        title_str = f", title={self.title!r}" if self.title else ""
-        return f"PromptDocumentBinary(raw_bytes=...{title_str})"
+        return "PromptDocumentBinary(raw_bytes=...)"
 
     @override
     def __repr__(self) -> str:
@@ -118,8 +110,7 @@ class PromptDocumentBinary(BaseModel):
 
     def short_description(self) -> str:
         """Return a short description of the document."""
-        title_part = f" ({self.title})" if self.title else ""
-        return f"binary: {self.raw_bytes[:50].hex()}...{title_part}"
+        return f"binary: {self.raw_bytes[:50].hex()}..."
 
 
 PromptDocument = Annotated[
