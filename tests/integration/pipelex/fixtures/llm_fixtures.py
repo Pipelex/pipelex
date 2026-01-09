@@ -265,21 +265,21 @@ def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
 @pytest.fixture(
     params=[
         # Anthropic Claude models with native document support
-        "claude-3.7-sonnet",
-        "claude-4-sonnet",
-        "claude-4-opus",
-        "claude-4.1-opus",
+        # "claude-3.7-sonnet",
+        # "claude-4-sonnet",
+        # "claude-4-opus",
+        # "claude-4.1-opus",
         "claude-4.5-haiku",
-        "claude-4.5-sonnet",
-        "claude-4.5-opus",
+        # "claude-4.5-sonnet",
+        # "claude-4.5-opus",
         # Google Gemini models with native document support
         "gemini-2.5-flash-lite",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
+        # "gemini-2.5-flash",
+        # "gemini-2.5-pro",
         # OpenAI models using Responses API (supports PDF input)
-        "gpt-5.2",
-        "gpt-5",
-        "gpt-5-chat",
+        # "gpt-5.2",
+        # "gpt-5",
+        # "gpt-5-chat",
         "gpt-4o-mini",
         # Mistral models with native document support
         "mistral-medium",

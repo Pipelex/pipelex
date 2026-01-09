@@ -19,6 +19,7 @@ from pipelex.tools.misc.filetype_utils import (
     detect_file_type_from_bytes,
     mime_type_to_extension,
 )
+from pipelex.tools.misc.hash_utils import hash_sha256
 from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
 from pipelex.tools.uri.resolved_uri import ResolvedUri
 from pipelex.tools.uri.uri_resolver import resolve_uri
@@ -67,6 +68,10 @@ class PromptDocumentUri(BaseModel):
             return mime_type_to_extension(self.mime_type)
         return UNKNOWN_FILE_TYPE
 
+    def get_content_hash(self, length: int | None = None) -> str:
+        """Return a hash of the document content."""
+        return hash_sha256(self.uri, length=length)
+
 
 class PromptDocumentBase64(BaseModel):
     """A prompt document as base64-encoded string."""
@@ -104,6 +109,10 @@ class PromptDocumentBase64(BaseModel):
         """Get the document type (extension) from the file contents."""
         return self.get_file_type().extension
 
+    def get_content_hash(self, length: int | None = None) -> str:
+        """Return a hash of the document content."""
+        return hash_sha256(self.base64_data, length=length)
+
 
 class PromptDocumentBinary(BaseModel):
     """A prompt document as raw binary bytes."""
@@ -132,6 +141,10 @@ class PromptDocumentBinary(BaseModel):
     def get_document_type(self) -> str:
         """Get the document type (extension) from the file contents."""
         return self.get_file_type().extension
+
+    def get_content_hash(self, length: int | None = None) -> str:
+        """Return a hash of the document content."""
+        return hash_sha256(self.raw_bytes, length=length)
 
 
 PromptDocument = Annotated[

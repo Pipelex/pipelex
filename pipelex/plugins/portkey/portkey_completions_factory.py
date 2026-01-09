@@ -68,21 +68,19 @@ class PortkeyCompletionsFactory(OpenAICompletionsFactory):
                 user_contents.append(image_param)
 
         # Handle documents using image_url format with data URL - Portkey translates this to provider-specific format
+        # Documents must always be base64 encoded for the image_url format
         if llm_prompt.user_documents:
-            prepped_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=self.is_http_url_enabled)
+            prepped_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
             for prepped_document in prepped_documents:
                 match prepped_document:
-                    case PreparedFileHttpUrl():
-                        msg = "HTTP URLs for documents require conversion to base64 - set is_http_url_enabled=False"
-                        raise TypeError(msg)
                     case PreparedFileBase64():
                         # Use image_url format with data URL - Portkey translates this to provider-specific format
                         doc_url = prepped_document.as_data_url()
                         image_url_obj = OpenAIImageURL(url=doc_url, detail="auto")
                         doc_param = ChatCompletionContentPartImageParam(image_url=image_url_obj, type="image_url")
                         user_contents.append(doc_param)
-                    case PreparedFileLocalPath():
-                        msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
+                    case PreparedFileHttpUrl() | PreparedFileLocalPath():
+                        msg = f"{type(prepped_document).__name__} is not supported for documents - should be converted to base64"
                         raise TypeError(msg)
 
         messages.append(ChatCompletionUserMessageParam(role="user", content=user_contents))
