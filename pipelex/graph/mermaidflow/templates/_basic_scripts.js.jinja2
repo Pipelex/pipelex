@@ -1,5 +1,7 @@
-const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
-let currentTheme = '{{ theme }}';
+// Parse mermaid code from embedded JSON (safe from XSS)
+const mermaidCodeElement = document.getElementById('mermaid-code-data');
+const mermaidCode = JSON.parse(mermaidCodeElement.textContent);
+let currentTheme = {{ theme | tojson }};
 
 // Theme-specific color palettes for custom node styling
 const themePalettes = {

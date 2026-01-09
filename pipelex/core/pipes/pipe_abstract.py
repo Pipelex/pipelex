@@ -1,3 +1,4 @@
+import traceback
 from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, final
@@ -368,7 +369,7 @@ class PipeAbstract(ABC, BaseModel):
                         input_spec = IOSpec(
                             name=var_name,
                             concept=stuff.concept.code,
-                            content_type=stuff.content.__class__.__name__,
+                            content_type=stuff.content.content_type,
                             digest=stuff.stuff_code,
                             data=stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
                             data_text=stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
@@ -410,12 +411,16 @@ class PipeAbstract(ABC, BaseModel):
         except Exception as exc:
             # Record graph tracing error
             if tracer_manager is not None and parent_graph_context is not None:
+                error_stack: str | None = None
+                if parent_graph_context.data_inclusion.error_stack_traces:
+                    error_stack = traceback.format_exc()
                 tracer_manager.on_pipe_end_error(
                     graph_id=parent_graph_context.graph_id,
                     node_id=graph_node_id,
                     ended_at=datetime.now(timezone.utc),
                     error_type=type(exc).__name__,
                     error_message=str(exc),
+                    error_stack=error_stack,
                 )
             raise
 
@@ -429,7 +434,7 @@ class PipeAbstract(ABC, BaseModel):
                 output_spec = IOSpec(
                     name=output_name or main_stuff.stuff_name or "main_stuff",
                     concept=main_stuff.concept.code,
-                    content_type=main_stuff.content.__class__.__name__,
+                    content_type=main_stuff.content.content_type,
                     digest=main_stuff.stuff_code,
                     data=main_stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
                     data_text=main_stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,

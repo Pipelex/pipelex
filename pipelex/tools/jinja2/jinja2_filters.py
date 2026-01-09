@@ -1,3 +1,4 @@
+import re
 from typing import Any
 
 from jinja2 import pass_context
@@ -12,7 +13,7 @@ from pipelex.types import StrEnum
 # Jinja2 filters
 ########################################################################################
 
-ALLOWED_FILTERS = ["tag", "format", "default"]
+ALLOWED_FILTERS = ["tag", "format", "default", "escape_script_tag"]
 
 
 # Filter to format some Stuff or any object with the appropriate text formatting methods
@@ -91,3 +92,22 @@ def render_any_tagged_for_jinja2(context: Context, value: Any, tag_name: str | N
                 fallback_tag_name = "data"
                 tagged = f"[{fallback_tag_name}]\n{value}\n[/{fallback_tag_name}]"
     return tagged
+
+
+def escape_script_tag(value: Any) -> Any:
+    r"""Escape </script> to prevent script tag injection in JSON embeddings.
+
+    When embedding JSON in <script type="application/json"> tags, a malicious
+    string containing </script> could break out of the script block and inject
+    arbitrary HTML/JavaScript. HTML tag names are case-insensitive, so this
+    function uses case-insensitive matching to catch all variants.
+
+    Args:
+        value: The string to escape. Non-string values are returned unchanged.
+
+    Returns:
+        The escaped string with </script> (any case) replaced by <\/script>.
+    """
+    if not isinstance(value, str):
+        return value
+    return re.sub(r"</script>", r"<\/script>", value, flags=re.IGNORECASE)

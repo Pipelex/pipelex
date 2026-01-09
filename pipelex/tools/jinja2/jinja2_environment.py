@@ -21,7 +21,7 @@ def make_jinja2_env_from_loader(
             trim_blocks = False
             lstrip_blocks = False
         case TemplateCategory.HTML:
-            autoescape = False
+            autoescape = True
             trim_blocks = True
             lstrip_blocks = True
         case TemplateCategory.MARKDOWN:

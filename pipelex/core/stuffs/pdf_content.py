@@ -11,6 +11,11 @@ class PDFContent(StuffContent):
 
     @property
     @override
+    def content_type(self) -> str | None:
+        return "application/pdf"
+
+    @property
+    @override
     def short_desc(self) -> str:
         url_desc = resolve_uri(self.url).kind.desc
         return f"{url_desc} of a PDF document"
@@ -25,7 +30,7 @@ class PDFContent(StuffContent):
         return await render_jinja2_async(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
-            temlating_context={
+            templating_context={
                 "url": self.url,
             },
         )

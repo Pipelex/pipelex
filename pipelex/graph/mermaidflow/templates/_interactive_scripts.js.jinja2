@@ -1,14 +1,54 @@
 // Embedded stuff data from graph (all formats)
-const stuffDataJson = {{ stuff_data_json }};
-const stuffDataText = {{ stuff_data_text_json }};
-const stuffDataHtml = {{ stuff_data_html_json }};
-const stuffMetadata = {{ stuff_metadata_json }};
-const mermaidCode = `{{ mermaid_code | replace('`', '\\`') | replace('${', '\\${') }}`;
+const stuffDataJson = {{ stuff_data_json | escape_script_tag | safe }};
+const stuffDataText = {{ stuff_data_text_json | escape_script_tag | safe }};
+const stuffDataHtml = {{ stuff_data_html_json | escape_script_tag | safe }};
+const stuffMetadata = {{ stuff_metadata_json | escape_script_tag | safe }};
+const stuffContentType = {{ stuff_content_type_json | escape_script_tag | safe }};
+const mermaidCode = {{ mermaid_code | tojson }};
 
 // Track current state
 let currentStuffId = null;
 let currentFormat = 'html';
-let currentTheme = '{{ theme }}';
+let currentTheme = {{ theme | tojson }};
+
+// Escape HTML to prevent XSS when displaying text content
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Make all links in a container open in new windows
+function makeLinksOpenInNewWindow(container) {
+    if (!container) return;
+    const links = container.querySelectorAll('a');
+    links.forEach(link => {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+    });
+}
+
+// Validate that a URL is a safe HTTP/HTTPS URL (prevents javascript: and data: URL injection)
+function isValidHttpUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('https://') || url.startsWith('http://');
+}
+
+// Extract URL from stuff data (handles various data structures)
+// Returns null for invalid/unsafe URLs (javascript:, data:, etc.)
+function extractUrl(jsonData) {
+    if (!jsonData) return null;
+    // Check if data itself is a URL string
+    if (typeof jsonData === 'string') {
+        return isValidHttpUrl(jsonData) ? jsonData : null;
+    }
+    // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
+    const candidates = [jsonData.display_link, jsonData.src, jsonData.href, jsonData.uri, jsonData.url];
+    for (const candidate of candidates) {
+        if (isValidHttpUrl(candidate)) return candidate;
+    }
+    return null;
+}
 
 // Theme-specific color palettes for custom node styling
 const themePalettes = {
@@ -195,7 +235,41 @@ function setFormat(format) {
 
 function renderContent(stuffId, format) {
     const content = document.getElementById('modal-content');
-    content.classList.remove('html-content', 'text-content');
+    content.classList.remove('html-content', 'text-content', 'pdf-content', 'image-content');
+
+    // Handle PDF content type with iframe viewer
+    const contentType = stuffContentType?.[stuffId];
+    const jsonData = stuffDataJson?.[stuffId];
+
+    if (format === 'html' && contentType === 'application/pdf') {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
+            content.classList.add('pdf-content');
+            content.innerHTML = '';
+            const iframe = document.createElement('iframe');
+            iframe.src = pdfUrl;
+            iframe.style.cssText = 'width:100%; height:100%; border:none; min-height:500px;';
+            content.appendChild(iframe);
+            updateOpenExternalButton(stuffId, contentType, jsonData);
+            return;
+        }
+    }
+
+    // Handle image content type
+    if (format === 'html' && contentType?.startsWith('image/')) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
+            content.classList.add('image-content');
+            content.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
+            img.alt = 'Image content';
+            content.appendChild(img);
+            updateOpenExternalButton(stuffId, contentType, jsonData);
+            return;
+        }
+    }
 
     if (format === 'json') {
         const data = stuffDataJson?.[stuffId];
@@ -210,12 +284,26 @@ function renderContent(stuffId, format) {
         const data = stuffDataHtml?.[stuffId];
         if (data) {
             content.classList.add('html-content');
-            content.innerHTML = data;
+            content.innerHTML = DOMPurify.sanitize(data);
+            makeLinksOpenInNewWindow(content);
         } else {
             content.innerHTML = '';
             content.textContent = 'No HTML data available';
         }
     }
+
+    updateOpenExternalButton(stuffId, contentType, jsonData);
+}
+
+// Update visibility of the "open in new window" button (PDF only)
+function updateOpenExternalButton(stuffId, contentType, jsonData) {
+    const openExternalBtn = document.getElementById('open-external-btn');
+    if (!openExternalBtn) return;
+
+    const url = extractUrl(jsonData);
+    // Only show for PDFs (images are handled by the download button)
+    const shouldShow = contentType === 'application/pdf' && !!url;
+    openExternalBtn.style.display = shouldShow ? '' : 'none';
 }
 
 function updateTabAvailability(stuffId) {
@@ -225,7 +313,21 @@ function updateTabAvailability(stuffId) {
 
     jsonTab.disabled = !stuffDataJson?.[stuffId];
     textTab.disabled = !stuffDataText?.[stuffId];
-    htmlTab.disabled = !stuffDataHtml?.[stuffId];
+
+    // For PDF and image content types, the tab can render from JSON data via extractUrl()
+    const contentType = stuffContentType?.[stuffId];
+    const jsonData = stuffDataJson?.[stuffId];
+    const canRenderFromJson = (contentType === 'application/pdf' || contentType?.startsWith('image/')) && extractUrl(jsonData);
+    htmlTab.disabled = !stuffDataHtml?.[stuffId] && !canRenderFromJson;
+
+    // Update HTML tab label based on content type
+    if (contentType === 'application/pdf') {
+        htmlTab.textContent = 'PDF';
+    } else if (contentType?.startsWith('image/')) {
+        htmlTab.textContent = 'Image';
+    } else {
+        htmlTab.textContent = 'HTML';
+    }
 
     // Find first available format (HTML -> JSON -> Pretty)
     if (!htmlTab.disabled) return 'html';
@@ -244,13 +346,13 @@ function showModal(stuffId) {
     const meta = stuffMetadata?.[stuffId];
     if (meta && (meta.name || meta.concept)) {
         const primaryParts = [];
-        if (meta.name) primaryParts.push(meta.name);
-        if (meta.concept) primaryParts.push(`(${meta.concept})`);
+        if (meta.name) primaryParts.push(escapeHtml(meta.name));
+        if (meta.concept) primaryParts.push(`(${escapeHtml(meta.concept)})`);
         const primary = `<span class="data-modal-title-primary">${primaryParts.join(' ')}</span>`;
-        const secondary = `<span class="data-modal-title-secondary">${stuffId}</span>`;
+        const secondary = `<span class="data-modal-title-secondary">${escapeHtml(stuffId)}</span>`;
         title.innerHTML = primary + secondary;
     } else {
-        title.innerHTML = `<span class="data-modal-title-primary">${stuffId}</span>`;
+        title.innerHTML = `<span class="data-modal-title-primary">${escapeHtml(stuffId)}</span>`;
     }
 
     // Update tab availability and select best format
@@ -318,14 +420,60 @@ function copyContent() {
 
 // Download content as file
 function downloadContent() {
-    const data = getCurrentContent();
-    if (!data) return;
+    if (!currentStuffId) return;
 
     // Get name from metadata or use ID
     const meta = stuffMetadata?.[currentStuffId];
     const baseName = meta?.name || currentStuffId || 'data';
-    const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${data.ext}`;
+    const contentType = stuffContentType?.[currentStuffId];
+    const jsonData = stuffDataJson?.[currentStuffId];
 
+    // For images, download the actual image file directly
+    if (contentType?.startsWith('image/')) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
+            const ext = contentType.split('/')[1] || 'png';
+            const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${ext}`;
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        }
+    }
+
+    // For PDFs, download the actual PDF file directly
+    // Must fetch and create blob to work around cross-origin download restrictions
+    if (contentType === 'application/pdf') {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
+            const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
+            fetch(pdfUrl)
+                .then(response => response.blob())
+                .then(blob => {
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => {
+                    console.error('Failed to download PDF:', err);
+                    window.open(pdfUrl, '_blank');
+                });
+            return;
+        }
+    }
+
+    const data = getCurrentContent();
+    if (!data) return;
+
+    const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.${data.ext}`;
     const blob = new Blob([data.content], { type: data.mime });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -344,4 +492,18 @@ document.getElementById('modal-overlay').addEventListener('click', hideModal);
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') hideModal();
 });
+
+// Open external URL for PDF content
+function openExternal() {
+    if (!currentStuffId) return;
+    const contentType = stuffContentType?.[currentStuffId];
+    const jsonData = stuffDataJson?.[currentStuffId];
+
+    if (contentType === 'application/pdf') {
+        const url = extractUrl(jsonData);
+        if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+    }
+}
 

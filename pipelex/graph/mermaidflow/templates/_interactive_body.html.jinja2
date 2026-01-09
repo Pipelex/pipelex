@@ -1,5 +1,5 @@
 <div class="header">
-    <h1>{{ title }}</h1>
+    <h1>{{ title | e }}</h1>
     <div class="theme-selector">
         <label for="theme-select">Theme:</label>
         <select id="theme-select">
@@ -12,9 +12,7 @@
     </div>
 </div>
 <div class="mermaid-container">
-    <div class="mermaid" id="mermaid-diagram">
-{{ mermaid_code }}
-    </div>
+    <div class="mermaid" id="mermaid-diagram"></div>
 </div>
 {% if has_data %}
 <p class="hint">Click on data nodes (rounded pills) to view their full content</p>
@@ -32,6 +30,9 @@
             <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
         </div>
         <div class="format-actions">
+            <button class="action-btn" id="open-external-btn" onclick="openExternal()" title="Open in new window" style="display: none;">
+                <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+            </button>
             <button class="action-btn" id="copy-btn" onclick="copyContent()" title="Copy">
                 <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z
                     m3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z

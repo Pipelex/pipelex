@@ -101,6 +101,7 @@ async def generate_graph_outputs(
                     stuff_data_text=mermaidflow.stuff_data_text,
                     stuff_data_html=mermaidflow.stuff_data_html,
                     stuff_metadata=mermaidflow.stuff_metadata,
+                    stuff_content_type=mermaidflow.stuff_content_type,
                     title=f"Pipeline: {snake_to_title_case(pipe_code)}",
                     theme=mermaid_theme,
                 )

@@ -30,11 +30,17 @@ class TestRenderMermaidHtml:
     n_abc123 --> n_def456"""
 
     def test_html_contains_mermaid_code(self) -> None:
-        """Test that the rendered HTML contains the Mermaid code."""
+        """Test that the rendered HTML contains the Mermaid code.
+
+        Note: The mermaid code is embedded as JSON, where '>' is Unicode-escaped
+        for XSS protection. We check for node labels and IDs which are preserved.
+        """
         result = render_mermaid_html(self.SAMPLE_MERMAID_CODE)
         assert "generate_text" in result
         assert "compose_output" in result
-        assert "n_abc123 --> n_def456" in result
+        # Edge syntax is JSON-encoded: --> becomes --\u003e
+        assert "n_abc123" in result
+        assert "n_def456" in result
 
     def test_html_has_mermaid_container(self) -> None:
         """Test that the rendered HTML has a mermaid container div."""
@@ -80,16 +86,24 @@ class TestRenderMermaidHtml:
         result = render_mermaid_html(self.SAMPLE_MERMAID_CODE)
         assert 'charset="UTF-8"' in result
 
-    def test_mermaid_code_not_escaped(self) -> None:
-        """Test that Mermaid code is not HTML-escaped."""
-        # Mermaid code with special characters that would be escaped
+    def test_mermaid_code_preserved_in_json(self) -> None:
+        """Test that Mermaid code is preserved correctly in JSON embedding.
+
+        With autoescape=True, the mermaid code is embedded as JSON which
+        properly escapes special characters for XSS protection while
+        preserving the code for JavaScript parsing.
+        """
+        # Mermaid code with special characters
         mermaid_with_special = """flowchart TD
     n_a["Label with <angle> brackets"]
     n_b["Another & ampersand"]"""
         result = render_mermaid_html(mermaid_with_special)
-        # The raw characters should appear (not escaped) since Mermaid needs them
-        # Note: Jinja2 with autoescape=False (which we use for HTML templates) won't escape
-        assert "Label with <angle> brackets" in result or "Label with" in result
+        # The label text should be present (JSON-escaped but readable by JS)
+        assert "Label with" in result
+        assert "Another" in result
+        # Verify JSON embedding is present
+        assert 'type="application/json"' in result
+        assert 'id="mermaid-code-data"' in result
 
     def test_empty_mermaid_code(self) -> None:
         """Test rendering with empty Mermaid code."""

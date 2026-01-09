@@ -7,12 +7,14 @@ class GraphTestData:
     """Graph test data constants."""
 
     # Directory paths
-    TEST_GRAPH_DIRECTORY: ClassVar[str] = "tests/data/graphs"
+    TEST_GRAPH_DIRECTORY = "tests/data/graphs"
 
     # Graph JSON file paths
-    CV_MATCHING_GRAPH_JSON: ClassVar[str] = f"{TEST_GRAPH_DIRECTORY}/cv_matching_graph.json"
+    CV_JOB_MATCH_GRAPH_JSON = f"{TEST_GRAPH_DIRECTORY}/cv_job_match.json"
+    CV_BATCH_GRAPH_JSON = f"{TEST_GRAPH_DIRECTORY}/cv_batch.json"
 
     # Test cases: (topic, graph_json_path)
     GRAPH_JSON_TEST_CASES: ClassVar[list[tuple[str, str]]] = [
-        ("CV Matching", CV_MATCHING_GRAPH_JSON),
+        ("CV Job Match", CV_JOB_MATCH_GRAPH_JSON),
+        ("CV Batch", CV_BATCH_GRAPH_JSON),
     ]

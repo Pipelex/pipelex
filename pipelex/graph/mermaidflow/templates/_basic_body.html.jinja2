@@ -12,9 +12,8 @@
     </div>
 </div>
 <div class="mermaid-container">
-    <div class="mermaid" id="mermaid-diagram">
-{{ mermaid_code }}
-    </div>
+    <div class="mermaid" id="mermaid-diagram"></div>
 </div>
 
-
+<!-- Embedded mermaid code as JSON for safe rendering -->
+<script type="application/json" id="mermaid-code-data">{{ mermaid_code | tojson }}</script>

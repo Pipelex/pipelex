@@ -274,6 +274,7 @@ is_generate_graph = false
 stuff_json_content = true
 stuff_text_content = true
 stuff_html_content = true
+error_stack_traces = true
 
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 graphspec_json = true

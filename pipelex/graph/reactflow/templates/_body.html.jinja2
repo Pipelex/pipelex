@@ -3,7 +3,7 @@
         <div class="header-left">
             <img src="{{ logo_dark }}" alt="Pipelex" class="header-logo dark-logo">
             <img src="{{ logo_light }}" alt="Pipelex" class="header-logo light-logo">
-            <span class="header-title">{{ title }}</span>
+            <span class="header-title">{{ title | e }}</span>
         </div>
         <button id="theme-toggle" class="theme-toggle" title="Toggle theme (Dark/Light/System)">
             <span class="theme-icon dark-icon">🌙</span>
@@ -47,6 +47,9 @@
     <div class="fullscreen-toolbar">
         <div class="format-tabs" id="fullscreen-format-tabs"></div>
         <div class="format-actions">
+            <button class="action-btn" id="fullscreen-open-external-btn" onclick="openExternal()" title="Open in new window" style="display: none;">
+                <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+            </button>
             <button class="action-btn" id="fullscreen-copy-btn" onclick="copyStuffContent()" title="Copy">
                 <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
             </button>
@@ -69,12 +72,12 @@
 </footer>
 
 <!-- Embedded ViewSpec -->
-<script type="application/json" id="pipelex-viewspec">{{ viewspec_json }}</script>
+<script type="application/json" id="pipelex-viewspec">{{ viewspec_json | escape_script_tag | safe }}</script>
 {% if graphspec_json %}
 <!-- Embedded GraphSpec (for dataflow extraction) -->
-<script type="application/json" id="pipelex-graphspec">{{ graphspec_json }}</script>
+<script type="application/json" id="pipelex-graphspec">{{ graphspec_json | escape_script_tag | safe }}</script>
 {% endif %}
 <!-- Embedded stuff data in multiple formats for display toggle -->
-<script type="application/json" id="pipelex-stuff-data-text">{{ stuff_data_text_json }}</script>
-<script type="application/json" id="pipelex-stuff-data-html">{{ stuff_data_html_json }}</script>
+<script type="application/json" id="pipelex-stuff-data-text">{{ stuff_data_text_json | escape_script_tag | safe }}</script>
+<script type="application/json" id="pipelex-stuff-data-html">{{ stuff_data_html_json | escape_script_tag | safe }}</script>
 

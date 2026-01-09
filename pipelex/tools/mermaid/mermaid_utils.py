@@ -114,14 +114,24 @@ def sanitize_mermaid_id(node_id: str) -> str:
 def escape_mermaid_label(label: str) -> str:
     """Escape special characters in Mermaid labels.
 
+    Handles characters that could break Mermaid syntax or inject directives.
+
     Args:
         label: The label text to escape.
 
     Returns:
         Escaped label safe for use in Mermaid syntax.
     """
-    # Escape quotes and other special characters
-    return label.replace('"', "'").replace("[", "(").replace("]", ")")
+    result = label
+    result = result.replace("\\", "\\\\")  # Escape backslashes first
+    result = result.replace('"', "'")
+    result = result.replace("[", "(")
+    result = result.replace("]", ")")
+    result = result.replace("{", "(")
+    result = result.replace("}", ")")
+    result = result.replace("<", "&lt;")
+    result = result.replace(">", "&gt;")
+    return result.replace("|", "/")  # Pipe can break node syntax
 
 
 # -----------------------------------------------------------------------------
@@ -152,7 +162,7 @@ def render_mermaid_html_generic(
     return render_jinja2_sync(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        temlating_context={
+        templating_context={
             "title": title,
             "mermaid_code": mermaid_code,
             "theme": theme,
@@ -183,7 +193,7 @@ async def render_mermaid_html_generic_async(
     return await render_jinja2_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
-        temlating_context={
+        templating_context={
             "title": title,
             "mermaid_code": mermaid_code,
             "theme": theme,

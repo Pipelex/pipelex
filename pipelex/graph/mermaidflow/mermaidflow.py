@@ -16,6 +16,8 @@ class Mermaidflow(BaseModel):
             Only populated when GraphConfig.data_inclusion.stuff_html_content is True.
         stuff_metadata: Optional mapping from stuff mermaid IDs to their display metadata (name, concept).
             Always populated when any stuff data is present.
+        stuff_content_type: Optional mapping from stuff mermaid IDs to their content_type (e.g., 'application/pdf').
+            Used for special rendering of content types like PDFs.
     """
 
     mermaid_code: str
@@ -23,3 +25,4 @@ class Mermaidflow(BaseModel):
     stuff_data_text: dict[str, str] | None = None
     stuff_data_html: dict[str, str] | None = None
     stuff_metadata: dict[str, dict[str, str]] | None = None
+    stuff_content_type: dict[str, str] | None = None

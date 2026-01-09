@@ -11,6 +11,7 @@ def make_defaulted_data_inclusion_config(
     stuff_json_content: bool = False,
     stuff_text_content: bool = False,
     stuff_html_content: bool = False,
+    error_stack_traces: bool = False,
 ) -> DataInclusionConfig:
     """Create a DataInclusionConfig for testing.
 
@@ -18,6 +19,7 @@ def make_defaulted_data_inclusion_config(
         stuff_json_content: Whether to include JSON stuff data.
         stuff_text_content: Whether to include plain text stuff data.
         stuff_html_content: Whether to include HTML stuff data.
+        error_stack_traces: Whether to include error stack traces.
 
     Returns:
         A DataInclusionConfig configured for testing.
@@ -26,6 +28,7 @@ def make_defaulted_data_inclusion_config(
         stuff_json_content=stuff_json_content,
         stuff_text_content=stuff_text_content,
         stuff_html_content=stuff_html_content,
+        error_stack_traces=error_stack_traces,
     )
 
 
@@ -36,6 +39,7 @@ def make_graph_context(
     stuff_json_content: bool = False,
     stuff_text_content: bool = False,
     stuff_html_content: bool = False,
+    error_stack_traces: bool = False,
 ) -> GraphContext:
     """Create a GraphContext for testing.
 
@@ -46,6 +50,7 @@ def make_graph_context(
         stuff_json_content: Whether to include JSON stuff data.
         stuff_text_content: Whether to include plain text stuff data.
         stuff_html_content: Whether to include HTML stuff data.
+        error_stack_traces: Whether to include error stack traces.
 
     Returns:
         A GraphContext configured for testing.
@@ -58,6 +63,7 @@ def make_graph_context(
             stuff_json_content=stuff_json_content,
             stuff_text_content=stuff_text_content,
             stuff_html_content=stuff_html_content,
+            error_stack_traces=error_stack_traces,
         ),
     )
 
