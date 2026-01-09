@@ -1,7 +1,7 @@
 from typing import TYPE_CHECKING, Any
 
 import instructor
-from anthropic import APIConnectionError, AsyncAnthropic, AsyncAnthropicBedrock, BadRequestError, omit
+from anthropic import APIConnectionError, AsyncAnthropic, AsyncAnthropicBedrock, AuthenticationError, BadRequestError, omit
 from typing_extensions import override
 
 if TYPE_CHECKING:
@@ -110,9 +110,9 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         except APIConnectionError as exc:
             msg = f"Anthropic API connection error: {exc}"
             raise LLMCompletionError(msg) from exc
-        except AnthropicCredentialsError as exc:
+        except AuthenticationError as exc:
             msg = f"Anthropic credentials error: {exc}"
-            raise LLMCompletionError(msg) from exc
+            raise AnthropicCredentialsError(msg) from exc
 
         single_content_block = final_message.content[0]
         if single_content_block.type != "text":
@@ -161,9 +161,9 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         except APIConnectionError as exc:
             msg = f"Anthropic API connection error: {exc}"
             raise LLMCompletionError(msg) from exc
-        except AnthropicCredentialsError as exc:
+        except AuthenticationError as exc:
             msg = f"Anthropic credentials error: {exc}"
-            raise LLMCompletionError(msg) from exc
+            raise AnthropicCredentialsError(msg) from exc
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 
