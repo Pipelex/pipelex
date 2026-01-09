@@ -1,10 +1,12 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import instructor
-from anthropic import AsyncAnthropic, AsyncAnthropicBedrock, omit
+from anthropic import APIConnectionError, AsyncAnthropic, AsyncAnthropicBedrock, BadRequestError, omit
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexError
+if TYPE_CHECKING:
+    from anthropic.types import Message
+
 from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_utils import (
@@ -23,19 +25,12 @@ from pipelex.plugins.anthropic.anthropic_factory import (
     AnthropicSdkVariant,
 )
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class AnthropicLLMWorkerError(PipelexError):
-    """Base exception for Anthropic LLM Worker errors."""
-
-
-class AnthropicBadRequestError(AnthropicLLMWorkerError):
-    """Raised when Anthropic API returns a BadRequestError."""
-
-
-class AnthropicInstructorError(AnthropicLLMWorkerError):
-    """Raised when Instructor encounters an error with Anthropic."""
+class AnthropicCredentialsError(CredentialsError):
+    pass
 
 
 class AnthropicLLMWorker(LLMWorkerInternalAbstract):
@@ -98,22 +93,35 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
         message = await AnthropicFactory.make_user_message(llm_job=llm_job)
-        response = await self.anthropic_async_client.messages.create(
-            messages=[message],
-            system=llm_job.llm_prompt.system_text or omit,
-            model=self.inference_model.model_id,
-            temperature=job_params.temperature,
-            max_tokens=job_params.max_tokens or self.default_max_tokens,
-        )
 
-        single_content_block = response.content[0]
+        try:
+            # Use streaming internally to avoid SDK long-request protection
+            async with self.anthropic_async_client.messages.stream(
+                messages=[message],
+                system=llm_job.llm_prompt.system_text or omit,
+                model=self.inference_model.model_id,
+                temperature=job_params.temperature,
+                max_tokens=job_params.max_tokens or self.default_max_tokens,
+            ) as stream:
+                final_message: Message = await stream.get_final_message()
+        except BadRequestError as exc:
+            msg = f"Anthropic bad request error: {exc}"
+            raise LLMCompletionError(msg) from exc
+        except APIConnectionError as exc:
+            msg = f"Anthropic API connection error: {exc}"
+            raise LLMCompletionError(msg) from exc
+        except AnthropicCredentialsError as exc:
+            msg = f"Anthropic credentials error: {exc}"
+            raise LLMCompletionError(msg) from exc
+
+        single_content_block = final_message.content[0]
         if single_content_block.type != "text":
             msg = f"Unexpected content block type: {single_content_block.type}\nmodel: {self.inference_model.desc}"
             raise LLMCompletionError(msg)
         full_reply_content = single_content_block.text
 
-        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := response.usage):
-            llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
+        if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and final_message.usage:
+            llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=final_message.usage)
 
         return full_reply_content
 
@@ -125,17 +133,37 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
-        (
-            result_object,
-            completion,
-        ) = await self.instructor_for_objects.chat.completions.create_with_completion(
-            messages=messages,
-            response_model=schema,
-            max_retries=llm_job.job_config.max_retries,
-            model=self.inference_model.model_id,
-            temperature=job_params.temperature,
-            max_tokens=job_params.max_tokens or self.default_max_tokens,
-        )
+
+        # Get Anthropic-specific config for structured output
+        anthropic_config = get_config().cogt.llm_config.anthropic_config
+        timeout_seconds = anthropic_config.structured_output_timeout_seconds
+
+        # Calculate safe max_tokens based on timeout
+        safe_max_tokens = AnthropicFactory.calculate_safe_max_tokens_for_timeout(timeout_seconds)
+
+        # Use minimum of requested and safe limit
+        requested_max_tokens = job_params.max_tokens or self.default_max_tokens
+        effective_max_tokens = min(requested_max_tokens, safe_max_tokens)
+
+        try:
+            result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+                messages=messages,
+                response_model=schema,
+                max_retries=llm_job.job_config.max_retries,
+                model=self.inference_model.model_id,
+                temperature=job_params.temperature,
+                max_tokens=effective_max_tokens,
+                timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
+            )
+        except BadRequestError as exc:
+            msg = f"Anthropic bad request error: {exc}"
+            raise LLMCompletionError(msg) from exc
+        except APIConnectionError as exc:
+            msg = f"Anthropic API connection error: {exc}"
+            raise LLMCompletionError(msg) from exc
+        except AnthropicCredentialsError as exc:
+            msg = f"Anthropic credentials error: {exc}"
+            raise LLMCompletionError(msg) from exc
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = AnthropicFactory.make_nb_tokens_by_category(usage=usage)
 
