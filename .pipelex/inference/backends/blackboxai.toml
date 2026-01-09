@@ -73,7 +73,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3.00, output = 15.00 }
 
-[claude-opus-4]
+[claude-4-opus]
 model_id = "blackboxai/anthropic/claude-opus-4"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
@@ -103,12 +103,6 @@ model_id = "blackboxai/google/gemini-2.5-pro"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.00 }
-
-["gemini-flash-1.5-8b"]
-model_id = "blackboxai/google/gemini-flash-1.5-8b"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 0.04, output = 0.15 }
 
 # --- Mistral Models -----------------------------------------------------------
 [mistral-large]

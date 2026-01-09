@@ -1,7 +1,7 @@
 # Pipelex Gateway - Available Models
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-07T00:44:26Z
+> Last updated: 2026-01-09T00:51:21Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
 
@@ -12,44 +12,44 @@ For configuration details, see the [documentation](https://docs.pipelex.com/home
 
 | Model | Inputs | Outputs | SDK | Structure Method |
 |-------|--------|---------|-----|------------------|
-| claude-3.7-sonnet | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4-opus | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4-sonnet | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4.1-opus | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4.5-haiku | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4.5-opus | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4.5-sonnet | text, images | text, structured | gateway_completions | instructor/openai_tools |
+| claude-3.7-sonnet | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| claude-4-opus | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| claude-4-sonnet | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| claude-4.1-opus | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| claude-4.5-haiku | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| claude-4.5-opus | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| claude-4.5-sonnet | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
 | deepseek-v3.1 | text | text, structured | gateway_completions | instructor/json |
-| gemini-2.0-flash | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-2.5-flash | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-2.5-flash-lite | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-2.5-pro | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-3.0-flash-preview | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-3.0-pro | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| gpt-4.1 | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-4.1-mini | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-4.1-nano | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-4o | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-4o-mini | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5 | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5-chat | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5-mini | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5-nano | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.1 | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.1-chat | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.1-codex | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.2 | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.2-chat | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gemini-2.0-flash | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| gemini-2.5-flash | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| gemini-2.5-flash-lite | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| gemini-2.5-pro | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| gemini-3.0-flash-preview | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| gemini-3.0-pro | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
+| gpt-4.1 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-4.1-mini | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-4.1-nano | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-4o | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-4o-mini | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5-chat | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5-mini | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5-nano | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5.1 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5.1-chat | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5.1-codex | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5.2 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
+| gpt-5.2-chat | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
 | gpt-oss-120b | text | text, structured | gateway_completions | instructor/openai_tools |
 | gpt-oss-20b | text | text, structured | gateway_completions | instructor/openai_tools |
 | grok-3 | text | text, structured | gateway_completions | instructor/openai_tools |
 | grok-3-mini | text | text, structured | gateway_completions | instructor/openai_tools |
 | grok-4-fast-non-reasoning | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| o1 | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
+| o1 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
 | o1-mini | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| o3 | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
+| o3 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
 | o3-mini | text | text, structured | gateway_responses | instructor/openai_responses_tools |
-| o4-mini | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
+| o4-mini | text | text, structured | gateway_responses | instructor/openai_responses_tools |
 | qwen3-vl-235b-a22b | text, images | text, structured | gateway_completions | instructor/json |
 
 ## Document Extraction Models

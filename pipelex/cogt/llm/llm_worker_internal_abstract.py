@@ -12,6 +12,7 @@ from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedCons
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.filetype_utils import UNKNOWN_FILE_TYPE
 
 
 class LLMWorkerInternalAbstract(LLMWorkerAbstract):
@@ -152,6 +153,7 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
     def _check_can_perform_job(self, llm_job: LLMJob):
         # This can be overridden by subclasses for specific checks
         self._check_vision_support(llm_job=llm_job)
+        self._check_document_support(llm_job=llm_job)
 
     def _check_vision_support(self, llm_job: LLMJob):
         if llm_job.llm_prompt.user_images:
@@ -163,4 +165,23 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
             max_prompt_images = self.inference_model.max_prompt_images or 5000
             if nb_images > max_prompt_images:
                 msg = f"LLM Engine '{self.inference_model.tag}' does not accept that many images: {nb_images}."
+                raise LLMCapabilityError(msg)
+
+    def _check_document_support(self, llm_job: LLMJob):
+        if not llm_job.llm_prompt.user_documents:
+            return
+
+        if not self.inference_model.is_document_supported:
+            msg = f"LLM Engine '{self.inference_model.tag}' does not support documents."
+            raise LLMCapabilityError(msg)
+
+        # Check each document's type is supported
+        supported = self.inference_model.supported_document_types
+        for doc in llm_job.llm_prompt.user_documents:
+            doc_type = doc.get_document_type()
+            # Skip validation for unknown types - let the provider handle it
+            if doc_type == UNKNOWN_FILE_TYPE:
+                continue
+            if doc_type not in supported:
+                msg = f"LLM Engine '{self.inference_model.tag}' does not support {doc_type} documents."
                 raise LLMCapabilityError(msg)

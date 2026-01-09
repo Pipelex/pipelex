@@ -13,9 +13,11 @@ from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.filetype_utils import (
+    UNKNOWN_FILE_TYPE,
     FileType,
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
+    mime_type_to_extension,
 )
 from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
 from pipelex.tools.uri.resolved_uri import ResolvedUri
@@ -27,6 +29,7 @@ class PromptDocumentUri(BaseModel):
 
     kind: Literal["uri"] = "uri"
     uri: str
+    mime_type: str | None = None
 
     @field_validator("uri", mode="before")
     @classmethod
@@ -53,6 +56,16 @@ class PromptDocumentUri(BaseModel):
     def short_description(self) -> str:
         """Return a short description of the document."""
         return f"{self.resolved.kind.desc}: {self.uri[:100]}"
+
+    def get_document_type(self) -> str:
+        """Get the document type (extension) from stored mime_type.
+
+        Returns:
+            File extension (e.g., "pdf", "docx") or UNKNOWN_FILE_TYPE if mime_type is not set.
+        """
+        if self.mime_type:
+            return mime_type_to_extension(self.mime_type)
+        return UNKNOWN_FILE_TYPE
 
 
 class PromptDocumentBase64(BaseModel):
@@ -87,6 +100,10 @@ class PromptDocumentBase64(BaseModel):
         """Return a short description of the document."""
         return f"base64: {self.base64_data[:50]}..."
 
+    def get_document_type(self) -> str:
+        """Get the document type (extension) from the file contents."""
+        return self.get_file_type().extension
+
 
 class PromptDocumentBinary(BaseModel):
     """A prompt document as raw binary bytes."""
@@ -111,6 +128,10 @@ class PromptDocumentBinary(BaseModel):
     def short_description(self) -> str:
         """Return a short description of the document."""
         return f"binary: {self.raw_bytes[:50].hex()}..."
+
+    def get_document_type(self) -> str:
+        """Get the document type (extension) from the file contents."""
+        return self.get_file_type().extension
 
 
 PromptDocument = Annotated[
