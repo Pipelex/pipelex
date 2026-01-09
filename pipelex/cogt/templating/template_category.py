@@ -34,9 +34,14 @@ class TemplateCategory(StrEnum):
                     Jinja2FilterName.TAG: tag,
                 }
             case TemplateCategory.LLM_PROMPT:
+                # KLUDGE: avoid
+                # Lazy import to avoid circular imports
+                from pipelex.tools.jinja2.jinja2_with_images_filter import with_images  # noqa: PLC0415
+
                 return {
                     Jinja2FilterName.FORMAT: text_format,
                     Jinja2FilterName.TAG: tag,
+                    Jinja2FilterName.WITH_IMAGES: with_images,
                 }
             case TemplateCategory.IMG_GEN_PROMPT:
                 return {

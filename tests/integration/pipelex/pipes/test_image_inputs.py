@@ -111,10 +111,11 @@ class TestImageInputs:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
 
-    async def test_image_input_within_concept_with_text(self, load_test_library: Callable[[list[Path]], None]) -> None:
+    async def test_image_input_within_concept_without_filter(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that nested images are NOT included without the | with_images filter."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
         pipe_llm_blueprint = PipeLLMBlueprint(
-            description="Test that a pipe can accept a PageContent input, give to the LLM the image via subattributes",
+            description="Test that a pipe with nested images in input does NOT send images without | with_images filter",
             inputs={"page": "Page"},
             output="Text",
             prompt="Describe the page: @page",
@@ -122,12 +123,198 @@ class TestImageInputs:
 
         pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
             domain_code="test_pipes",
-            pipe_code="test_image_input_within_concept_with_text",
+            pipe_code="test_image_input_within_concept_without_filter",
             blueprint=pipe_llm_blueprint,
         )
 
-        # Should find both the list of images in text_and_images and the single page_view image
-        assert pipe_llm.llm_prompt_spec.user_images == ["page.text_and_images.images", "page.page_view"]
+        # Without | with_images filter, no images should be included (text-only rendering)
+        assert pipe_llm.llm_prompt_spec.image_references is None
+
+    async def test_image_input_within_concept_with_filter(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that nested images ARE included when using the | with_images filter."""
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test that a pipe with | with_images filter DOES send nested images",
+            inputs={"page": "Page"},
+            output="Text",
+            prompt="Describe the page: {{ page | with_images }}",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_image_input_within_concept_with_filter",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        # With | with_images filter, images should be included as NESTED reference
+        assert pipe_llm.llm_prompt_spec.image_references is not None
+        assert len(pipe_llm.llm_prompt_spec.image_references) == 1
+        image_ref = pipe_llm.llm_prompt_spec.image_references[0]
+        assert image_ref.variable_path == "page"
+        assert image_ref.kind.value == "nested"
+        # Should have nested image paths
+        assert image_ref.nested_image_paths is not None
+        assert "text_and_images.images" in image_ref.nested_image_paths
+        assert "page_view" in image_ref.nested_image_paths
+
+    async def test_prompt_text_has_image_tokens_for_direct_image(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that prompt text contains [Image N] tokens, not image URLs, for direct Image input."""
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        # Create a pipe with direct Image input
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test prompt text for direct image",
+            inputs={"image": "Image"},
+            output="Text",
+            prompt="Describe this image: @image",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_prompt_text_direct_image",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        # Create working memory with an image
+        image_url = ImageTestCases.IMAGE_FILE_PATH_PNG_1
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.IMAGE),
+                content=ImageContent(url=image_url),
+                name="image",
+            ),
+        )
+
+        # Build the prompt
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # Verify prompt text contains [Image 1] token
+        assert llm_prompt.user_text is not None
+        assert "[Image 1]" in llm_prompt.user_text
+
+        # Verify prompt text does NOT contain the image URL
+        assert image_url not in llm_prompt.user_text
+        assert "ai_lympics" not in llm_prompt.user_text
+
+    async def test_prompt_text_has_image_tokens_for_image_list(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that prompt text contains [Image N] tokens, not image URLs, for Image[] input."""
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        # Create a pipe with Image[] input
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test prompt text for image list",
+            inputs={"images": "Image[]"},
+            output="Text",
+            prompt="Analyze these images: $images",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_prompt_text_image_list",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        # Create working memory with a list of images
+        image_urls = [
+            ImageTestCases.IMAGE_FILE_PATH_PNG_1,
+            ImageTestCases.IMAGE_FILE_PATH_JPG_1,
+        ]
+        image_list = ListContent[ImageContent](items=[ImageContent(url=url) for url in image_urls])
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.IMAGE),
+                content=image_list,
+                name="images",
+            ),
+        )
+
+        # Build the prompt
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # Verify prompt text contains [Image N] tokens
+        assert llm_prompt.user_text is not None
+        assert "[Image 1]" in llm_prompt.user_text
+        assert "[Image 2]" in llm_prompt.user_text
+
+        # Verify prompt text does NOT contain image URLs
+        for image_url in image_urls:
+            assert image_url not in llm_prompt.user_text
+        assert "ai_lympics" not in llm_prompt.user_text
+        assert "animal_lympics" not in llm_prompt.user_text
+
+    async def test_prompt_text_has_image_tokens_for_multiple_image_lists(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that prompt text contains correct [Image N] tokens for multiple Image[] inputs."""
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        # Create a pipe with two Image[] inputs
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test prompt text for multiple image lists",
+            inputs={"collection_a": "Image[]", "collection_b": "Image[]"},
+            output="Text",
+            prompt="First: $collection_a\nSecond: $collection_b",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_prompt_text_multiple_lists",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        # Create working memory with two lists of images
+        collection_a = ListContent[ImageContent](
+            items=[
+                ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
+                ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_JPG_1),
+            ]
+        )
+        collection_b = ListContent[ImageContent](
+            items=[
+                ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_JPG_2),
+                ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_JPG_3),
+            ]
+        )
+
+        working_memory = WorkingMemoryFactory.make_from_multiple_stuffs(
+            stuff_list=[
+                StuffFactory.make_stuff(
+                    concept=get_native_concept(NativeConceptCode.IMAGE),
+                    content=collection_a,
+                    name="collection_a",
+                ),
+                StuffFactory.make_stuff(
+                    concept=get_native_concept(NativeConceptCode.IMAGE),
+                    content=collection_b,
+                    name="collection_b",
+                ),
+            ],
+        )
+
+        # Build the prompt
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # Verify prompt text contains [Image N] tokens for all 4 images
+        assert llm_prompt.user_text is not None
+        assert "[Image 1]" in llm_prompt.user_text
+        assert "[Image 2]" in llm_prompt.user_text
+        assert "[Image 3]" in llm_prompt.user_text
+        assert "[Image 4]" in llm_prompt.user_text
+
+        # Verify prompt text does NOT contain any image URLs or filenames
+        assert "ai_lympics" not in llm_prompt.user_text
+        assert "animal_lympics" not in llm_prompt.user_text
+        assert "solar_system" not in llm_prompt.user_text
+        assert "eiffel_tower" not in llm_prompt.user_text
+        assert ".png" not in llm_prompt.user_text
+        assert ".jpg" not in llm_prompt.user_text
 
     async def test_analyze_image_collection(
         self,
