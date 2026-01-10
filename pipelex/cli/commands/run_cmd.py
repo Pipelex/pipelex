@@ -166,9 +166,11 @@ def run_cmd(
 
     async def run_pipeline(pipe_code: str | None = None, bundle_path: str | None = None):
         source_description: str
+        plx_content: str | None = None
         if bundle_path:
             try:
-                validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
+                plx_content = Path(bundle_path).read_text(encoding="utf-8")
+                validate_bundle_result = await validate_bundle(plx_content=plx_content)
                 if not pipe_code:
                     main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
                     if not main_pipe_code:
@@ -225,6 +227,7 @@ def run_cmd(
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
+                plx_content=plx_content,
                 inputs=pipeline_inputs,
                 pipe_run_mode=pipe_run_mode,
                 execution_config=execution_config,
