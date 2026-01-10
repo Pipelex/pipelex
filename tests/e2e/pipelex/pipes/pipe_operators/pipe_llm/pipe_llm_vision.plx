@@ -51,8 +51,7 @@ output = "VisionAnalysisE2E"
 model = "llm_for_diagram_to_text"
 system_prompt = "You are an expert image analyst. Provide detailed, accurate descriptions."
 prompt = """
-Analyze this image and describe what's the main topic etc.
+Analyze this image and describe what's the main topic (be concise).
 $image
---------------------------------
 """
 
