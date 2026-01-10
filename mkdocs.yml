@@ -198,6 +198,7 @@ nav:
   - Under the Hood:
     - Overview: under-the-hood/index.md
     - Architecture Overview: under-the-hood/architecture-overview.md
+    - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
   - API: https://pipelex.github.io/pipelex-api/
   - MCP: https://pipelex.github.io/pipelex-mcp/
   - n8n: https://pipelex.github.io/n8n-nodes-pipelex/

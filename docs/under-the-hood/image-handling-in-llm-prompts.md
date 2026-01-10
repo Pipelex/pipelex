@@ -1,0 +1,387 @@
+---
+title: "Image Handling in LLM Prompts"
+---
+
+# Image Handling in LLM Prompts
+
+This document describes how Pipelex handles images in PipeLLM prompts. The system implements a **prompt template-driven inclusion model** where images are sent to the LLM if and only if the prompt template explicitly references them.
+
+---
+
+## Design Principle
+
+Images are included based on **what the prompt template references**, not on **what the input types contain**.
+
+| Scenario | Images Sent? |
+|----------|-------------|
+| Input is `Image`, prompt template uses `@image` or `$image` | Yes |
+| Input is `Page` with nested images, prompt template uses `@page` or `$page` | No |
+| Input is `Page` with nested images, prompt template uses `{{ page \| with_images }}` | Yes |
+
+This design prevents accidental image leakage and gives prompt template authors explicit control over what visual content reaches the LLM.
+
+!!! info "Why Prompt Template-Driven?"
+    Sending images to LLMs costs tokens and processing time. Prompt template-driven inclusion ensures you only pay for images you actually need the LLM to see.
+
+---
+
+## Three Reference Kinds
+
+The system recognizes three distinct ways images can be referenced in prompt templates:
+
+```
+ImageReferenceKind
+├── DIRECT       → Variable is ImageContent itself
+├── DIRECT_LIST  → Variable is list[ImageContent] or Image[]
+└── NESTED       → Variable is struct with nested images, using | with_images filter
+```
+
+### DIRECT References
+
+When a prompt template variable directly points to an `Image` type:
+
+```toml
+[pipe.describe_photo]
+inputs = { photo = "Image" }
+prompt = "Describe this photo: @photo"
+```
+
+The image is automatically included. The `@photo` (or `$photo`) reference renders as `[Image 1]` in the prompt text.
+
+### DIRECT_LIST References
+
+When a prompt template variable points to an `Image[]` (list of images):
+
+```toml
+[pipe.analyze_gallery]
+inputs = { photos = "Image[]" }
+prompt = "Analyze these photos: $photos"
+```
+
+All images in the list are included. The `$photos` (or `@photos`) reference renders as:
+```
+[Image 1]
+[Image 2]
+[Image 3]
+```
+
+### NESTED References
+
+When a struct contains images but isn't itself an image type, you must explicitly request image extraction:
+
+```toml
+[pipe.describe_document]
+inputs = { doc = "Document" }
+prompt = "{{ doc | with_images }}"
+```
+
+Without `| with_images`, only the text representation is sent. With it, nested images are extracted and included.
+
+---
+
+## The `| with_images` Filter
+
+The `with_images` filter is the key mechanism for extracting images from complex structures.
+
+### What It Does
+
+1. Walks the structure recursively
+2. Finds all `ImageContent` instances
+3. Registers each image with a sequential number
+4. Returns the text representation with `[Image N]` tokens inline
+
+### Example Output
+
+Given a `Page` with text and images:
+
+```python
+PageContent(
+    text_and_images=TextAndImagesContent(
+        text=TextContent(text="Welcome to the guide"),
+        images=[ImageContent(url="...")]
+    ),
+    page_view=ImageContent(url="...")
+)
+```
+
+The filter produces:
+
+```
+text_and_images:
+  text: Welcome to the guide
+  images: [Image 1]
+page_view: [Image 2]
+```
+
+### When to Use It
+
+| Structure | Without Filter | With Filter |
+|-----------|---------------|-------------|
+| `Page` | Text only | Text + images |
+| `Document` | Text only | Text + images |
+| `list[Article]` | Text only | Text + all nested images |
+| Custom struct with images | Text only | Text + images |
+
+---
+
+## Architecture
+
+### Component Overview
+
+```mermaid
+flowchart TB
+    subgraph FT["FACTORY TIME"]
+        direction TB
+        BP["PipeLLMBlueprint"]
+        TA["TemplateImageAnalyzer"]
+        IR["ImageReference[]"]
+
+        BP -->|"template + inputs"| TA
+        TA -->|"analyzes"| IR
+    end
+
+    subgraph RT["RUNTIME"]
+        direction TB
+        WM["Working Memory"]
+        REG["ImageRegistry"]
+        FLT["with_images filter"]
+        LP["LLMPrompt"]
+
+        WM -->|"values"| FLT
+        FLT -->|"registers"| REG
+        REG -->|"images"| LP
+    end
+
+    FT -->|"image_references"| RT
+```
+
+### Factory Time: Prompt Template Analysis
+
+When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines the prompt template:
+
+1. **Parse prompt template AST** - Extract all variable references with their filters
+2. **Resolve types** - Look up each variable's type from input specifications
+3. **Determine reference kind** - Based on type and filters applied
+4. **Pre-compute nested paths** - For NESTED references, identify where images live in the structure
+
+```python
+# Stored in PipeLLM after analysis
+image_references = [
+    ImageReference(
+        variable_path="page",
+        kind=ImageReferenceKind.NESTED,
+        nested_image_paths=["text_and_images.images", "page_view"]
+    )
+]
+```
+
+### Runtime: Image Collection
+
+When the prompt is built:
+
+1. **Create registry** - Fresh `ImageRegistry` for this prompt
+2. **Inject into context** - Registry available to Jinja2 filters
+3. **Render prompt template** - `with_images` filter populates registry during rendering
+4. **Collect images** - Retrieve registered images after rendering
+5. **Build prompt** - Text has tokens, images in separate list
+
+---
+
+## Data Flow
+
+```mermaid
+flowchart TB
+    subgraph FT["FACTORY TIME"]
+        direction TB
+        PT[/"PipeLLM Blueprint"/]
+        TA["TemplateImageAnalyzer"]
+        IR[("ImageReference[]")]
+
+        PT -->|"prompt + inputs"| TA
+        TA -->|"analyzes"| IR
+    end
+
+    subgraph RT["RUNTIME"]
+        direction TB
+        WM[("Working Memory")]
+        REG["ImageRegistry"]
+        RENDER["with_images filter"]
+        LP[/"LLMPrompt"/]
+
+        WM -->|"values"| RENDER
+        RENDER -->|"registers"| REG
+        REG -->|"images"| LP
+    end
+
+    IR -->|"image_references"| RT
+```
+
+**Factory Time**: The `TemplateImageAnalyzer` parses the prompt template, finds variables with the `| with_images` filter, looks up their types, and pre-computes nested image paths.
+
+**Runtime**: Values from working memory are passed through the `with_images` filter, which registers images to the `ImageRegistry` and returns text with `[Image N]` tokens. The final `LLMPrompt` contains both the text and the collected images.
+
+---
+
+## Image Registry
+
+The `ImageRegistry` manages image numbering during prompt construction.
+
+### Key Properties
+
+- **1-indexed** - Numbers start at 1 for readability
+- **Sequential** - Images numbered in order of registration
+- **Deduplicated** - Same URL gets same number
+
+```python
+class ImageRegistry:
+    def register_image(self, image: ImageContent) -> int:
+        """Returns image number. Same URL = same number."""
+        if image.url in self._url_to_number:
+            return self._url_to_number[image.url]
+
+        number = len(self._images) + 1
+        self._images.append(image)
+        self._url_to_number[image.url] = number
+        return number
+```
+
+### Deduplication Example
+
+If the same image appears in multiple places:
+
+```python
+# First registration
+registry.register_image(img_a)  # Returns 1
+
+# Second registration of same URL
+registry.register_image(img_a)  # Returns 1 (not 2)
+
+# Different image
+registry.register_image(img_b)  # Returns 2
+```
+
+---
+
+## Working with StuffArtefact
+
+Values from working memory arrive wrapped in `StuffArtefact`, a Pydantic `RootModel` that provides template-friendly access.
+
+### Structure
+
+```python
+StuffArtefact(root={
+    "_stuff_name": "page",
+    "_content_class": "PageContent",
+    "_content": PageContent(...)  # The actual content
+})
+```
+
+### Filter Handling
+
+The `with_images` filter handles this wrapping transparently:
+
+```python
+def _render_value_with_images(value, registry, text_format):
+    # Unwrap StuffArtefact to get actual content
+    if _is_stuff_artefact(value):
+        actual_content = value.root.get("_content")
+        return _render_value_with_images(actual_content, registry, text_format)
+
+    # Handle ImageContent
+    if _is_image_content(value):
+        number = registry.register_image(value)
+        return f"[Image {number}]"
+
+    # Recurse into struct fields, lists, etc.
+    ...
+```
+
+!!! note "Duck Typing"
+    The filter uses duck typing (checking class names and attributes) rather than `isinstance()` to avoid circular imports between the tools and core modules.
+
+---
+
+## Validation
+
+The system validates image usage at factory time:
+
+| Condition | Error |
+|-----------|-------|
+| `\| with_images` on `Image` type | "Cannot use with_images on direct Image" |
+| `\| with_images` on type with no nested images | "Type X has no nested image fields" |
+| `with_images` on undefined value | "Cannot use with_images filter on undefined value" |
+
+---
+
+## Prompt Template Syntax Reference
+
+### Direct Image
+
+```toml
+inputs = { photo = "Image" }
+prompt = "$photo"
+```
+
+### Image List
+
+```toml
+inputs = { gallery = "Image[]" }
+prompt = "$gallery"
+```
+
+### Multiple Image Lists
+
+```toml
+inputs = { before = "Image[]", after = "Image[]" }
+prompt = """
+Before: $before
+
+After: $after
+"""
+```
+
+### Nested Images
+
+```toml
+inputs = { report = "Report" }
+prompt = "{{ report | with_images }}"
+```
+
+### Mixed
+
+```toml
+inputs = { cover = "Image", pages = "Page[]" }
+prompt = """
+Cover: $cover
+
+Pages:
+{{ pages | with_images }}
+"""
+```
+
+---
+
+## Files Reference
+
+### Core Implementation
+
+| File | Purpose |
+|------|---------|
+| `pipelex/pipe_operators/llm/image_reference.py` | `ImageReference` and `ImageReferenceKind` models |
+| `pipelex/pipe_operators/llm/template_image_analyzer.py` | Factory-time template analysis |
+| `pipelex/tools/jinja2/image_registry.py` | Runtime image tracking |
+| `pipelex/tools/jinja2/jinja2_with_images_filter.py` | The `with_images` filter implementation |
+
+### Supporting Files
+
+| File | Purpose |
+|------|---------|
+| `pipelex/tools/jinja2/jinja2_required_variables.py` | `VariableReference` for filter detection |
+| `pipelex/pipe_operators/llm/llm_prompt_spec.py` | Prompt building with image collection |
+
+---
+
+## Next Steps
+
+- [:material-book-open: Learn about PipeLLM](../home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md){ .md-button }
+- [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button }
