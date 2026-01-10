@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from posthog import tag
 
-from pipelex import pretty_print
+from pipelex import log, pretty_print
 from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
@@ -330,14 +330,16 @@ def build_pipe_cmd(
                         # Run built pipeline in dry-run mode to generate its graph
                         try:
                             built_pipe_execution_config = execution_config.with_graph_config_overrides(mock_inputs=True)
+
                             built_pipe_output = await execute_pipeline(
-                                pipe_code=main_pipe_code,
+                                plx_content=plx_content,
                                 pipe_run_mode=PipeRunMode.DRY,
                                 execution_config=built_pipe_execution_config,
                                 library_dirs=library_dir,
                             )
                             if built_pipe_output.graph_spec:
                                 pipeline_graph_dir = Path(extras_output_dir) / "pipeline_graph"
+                                log.dev(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
                                 pipeline_graph_count = await _save_graph_outputs_to_dir(
                                     graph_spec=built_pipe_output.graph_spec,
                                     graph_config=execution_config.graph_config,

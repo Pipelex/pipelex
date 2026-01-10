@@ -324,7 +324,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             and self.telemetry_config.pipelex_gateway.portkey.force_tracing_enabled
             and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
         ):
-            log.dev(
+            log.verbose(
                 "Force-enabling Pipelex Gateway Portkey tracing "
                 "because pipelex_gateway.portkey.force_tracing_enabled is set in telemetry configuration"
             )
