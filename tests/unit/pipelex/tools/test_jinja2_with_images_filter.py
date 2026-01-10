@@ -407,3 +407,25 @@ class TestWithImagesFilter:
 
         assert "photo: [Image 1]" in result
         assert len(registry.images) == 1
+
+    def test_with_images_returns_string_type(self) -> None:
+        """Test that with_images always returns a string, not a structured object.
+
+        This is critical: because with_images returns a plain string, it must come
+        LAST in any filter chain. Subsequent filters expecting structured data
+        would receive a string instead and fail.
+        """
+        registry = ImageRegistry()
+        context = self._make_context(registry=registry)
+
+        # Test with image
+        img_result = with_images(context, ImageContent(url="http://example.com/test.png"))
+        assert isinstance(img_result, str)
+
+        # Test with struct
+        struct_result = with_images(context, PersonWithPhoto(name="Test", photo=None))
+        assert isinstance(struct_result, str)
+
+        # Test with list
+        list_result = with_images(context, [ImageContent(url="http://example.com/1.png")])
+        assert isinstance(list_result, str)

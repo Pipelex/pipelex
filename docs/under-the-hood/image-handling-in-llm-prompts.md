@@ -359,6 +359,22 @@ Pages:
 """
 ```
 
+!!! warning "Filter Chaining: Order Matters"
+    The `with_images` filter extracts images from structured data and returns a string with `[Image N]` tokens. The `tag` filter wraps its input in tags (```...``` or XML). **Order matters** when chaining these filters.
+
+    **What works:**
+
+    - ✅ `{{ pages | with_images }}` - extracts images with tokens
+    - ✅ `{{ pages | tag }}` - formats text output (no images)
+    - ✅ `{{ pages | with_images | tag }}` - extracts images, then wraps result in tags
+    - ✅ `{{ pages | first | with_images }}` - non-terminal filter before `with_images` is fine
+
+    **What doesn't work:**
+
+    - ❌ `{{ pages | tag | with_images }}` - `tag` stringifies first, so `with_images` receives a string and can't extract images
+
+    **Rule of thumb:** `with_images` must receive structured data to extract images. Place it before any filter that converts to string (like `tag`).
+
 ---
 
 ## Files Reference

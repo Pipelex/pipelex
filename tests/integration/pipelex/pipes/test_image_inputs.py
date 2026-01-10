@@ -11,6 +11,7 @@ from typing import Callable
 
 import pytest
 
+from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -500,6 +501,173 @@ class TestPromptImageExtraction:
         # Images should be extracted to user_images
         assert llm_prompt.user_images is not None
         assert len(llm_prompt.user_images) == 2
+        pretty_print(llm_prompt.user_text, title="with_images filter - 2 images extracted")
+
+    async def test_tag_then_with_images_does_not_extract_images(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that {{ pages | tag | with_images }} does NOT extract images.
+
+        Both tag and with_images are terminal filters that return plain strings.
+        When chained, the second filter receives a string, not structured data.
+        The tag filter stringifies first, so with_images has nothing to extract.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        # Test chaining tag | with_images - should NOT extract images
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test terminal filters cannot be chained",
+            inputs={"pages": "Page[]"},
+            output="Text",
+            prompt="{{ pages | tag | with_images }}",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_chained_filters",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        pages = ListContent[PageContent](
+            items=[
+                PageContent(
+                    text_and_images=TextAndImagesContent(
+                        text=TextContent(text="Page 1 text"),
+                        images=[ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1)],
+                    ),
+                    page_view=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_JPG_1),
+                ),
+            ]
+        )
+
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PAGE),
+                content=pages,
+                name="pages",
+            ),
+        )
+
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # CRITICAL: Images should NOT be extracted when chaining terminal filters
+        # The tag filter returns a string, so with_images receives a string, not structured data
+        assert llm_prompt.user_text is not None
+        assert "[Image 1]" not in llm_prompt.user_text  # No image tokens - tag stringified first
+        assert llm_prompt.user_images is None or len(llm_prompt.user_images) == 0
+        pretty_print(llm_prompt.user_text, title="Chained filters (tag | with_images) - images NOT extracted")
+
+    async def test_tag_filter_renders_text(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that tag filter alone correctly wraps content in tags.
+
+        This demonstrates the CORRECT way to use the tag filter for formatted output.
+        Note: tag returns a string, so no images are extracted (use with_images for that).
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test tag filter alone",
+            inputs={"pages": "Page[]"},
+            output="Text",
+            prompt="{{ pages | tag }}",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_tag_only",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        pages = ListContent[PageContent](
+            items=[
+                PageContent(
+                    text_and_images=TextAndImagesContent(
+                        text=TextContent(text="Page 1 text"),
+                        images=[ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1)],
+                    ),
+                    page_view=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_JPG_1),
+                ),
+            ]
+        )
+
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PAGE),
+                content=pages,
+                name="pages",
+            ),
+        )
+
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # Tag filter produces formatted text output but NO image tokens or extraction
+        assert llm_prompt.user_text is not None
+        assert "```" in llm_prompt.user_text  # Tag wraps in code blocks by default
+        assert "[Image 1]" not in llm_prompt.user_text  # No image tokens from tag
+        assert llm_prompt.user_images is None or len(llm_prompt.user_images) == 0
+        pretty_print(llm_prompt.user_text, title="tag filter prompt - formatted text, no images")
+
+    async def test_with_images_then_tag_extracts_and_wraps(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that {{ pages | with_images | tag }} extracts images AND wraps in tags.
+
+        This order works because:
+        1. with_images extracts images and returns string with [Image N] tokens
+        2. tag wraps that string in tags (```...``` or XML)
+
+        The images are extracted because with_images processes structured data first.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test with_images then tag",
+            inputs={"pages": "Page[]"},
+            output="Text",
+            prompt="{{ pages | with_images | tag }}",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_with_images_then_tag",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        pages = ListContent[PageContent](
+            items=[
+                PageContent(
+                    text_and_images=TextAndImagesContent(
+                        text=TextContent(text="Page 1 text"),
+                        images=[ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1)],
+                    ),
+                    page_view=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_JPG_1),
+                ),
+            ]
+        )
+
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PAGE),
+                content=pages,
+                name="pages",
+            ),
+        )
+
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # with_images | tag: images ARE extracted AND content is wrapped in tags
+        assert llm_prompt.user_text is not None
+        assert "```" in llm_prompt.user_text  # Tag wraps in code blocks
+        assert "[Image 1]" in llm_prompt.user_text  # Image tokens present
+        assert "[Image 2]" in llm_prompt.user_text
+        assert llm_prompt.user_images is not None
+        assert len(llm_prompt.user_images) == 2
+        pretty_print(llm_prompt.user_text, title="with_images | tag - images extracted AND wrapped in tags")
 
 
 # =============================================================================
