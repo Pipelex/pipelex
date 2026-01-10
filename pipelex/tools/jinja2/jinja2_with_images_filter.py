@@ -41,8 +41,30 @@ def _is_stuff_content(value: Any) -> bool:
 
     StuffContent is a Pydantic model, so it has 'model_fields' attribute.
     We check that it's NOT an ImageContent (which is also a StuffContent).
+    We also exclude StuffArtefact (which wraps content in a dict-like structure).
     """
-    return hasattr(value, "model_fields") and not _is_image_content(value) and not _is_list_content(value)
+    if not hasattr(value, "model_fields"):
+        return False
+    if _is_image_content(value) or _is_list_content(value):
+        return False
+    # Exclude StuffArtefact (RootModel with _content key)
+    return not _is_stuff_artefact(value)
+
+
+def _is_stuff_artefact(value: Any) -> bool:
+    """Check if a value is a StuffArtefact using duck typing.
+
+    StuffArtefact is identified by:
+    - Being a RootModel (has 'root' attribute that is a dict)
+    - Having a '_content' key in the root dict
+    - Class name is 'StuffArtefact'
+    """
+    if type(value).__name__ != "StuffArtefact":
+        return False
+    if not hasattr(value, "root"):
+        return False
+    root = getattr(value, "root", None)
+    return isinstance(root, dict) and "_content" in root
 
 
 def _render_value_with_images(value: Any, registry: ImageRegistry, text_format: "TextFormat") -> str:
@@ -56,6 +78,14 @@ def _render_value_with_images(value: Any, registry: ImageRegistry, text_format: 
     Returns:
         String representation with [Image N] tokens where images appear
     """
+    # Handle StuffArtefact first - extract the actual content
+    if _is_stuff_artefact(value):
+        actual_content = value.root.get("_content")  # pyright: ignore[reportUnknownMemberType]
+        if actual_content is not None:
+            return _render_value_with_images(actual_content, registry, text_format)
+        # Fallback if no _content (shouldn't happen)
+        return str(value)
+
     # Handle ImageContent directly (using duck typing)
     if _is_image_content(value):
         image_num = registry.register_image(value)
