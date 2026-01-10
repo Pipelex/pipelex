@@ -30,10 +30,10 @@ from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
+from pipelex.core.stuffs.template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import report_validation_error
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
-from pipelex.graph.shared.template_set import SHARED_TEMPLATE_SET
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -217,12 +217,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
-        # Register shared templates first (used by both mermaid and reactflow)
-        shared_name, shared_package, shared_templates = SHARED_TEMPLATE_SET
+        # Register stuff templates first (used by mermaid, reactflow, and stuff_html)
+        stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET
         TemplateLoader.register_set(
-            name=shared_name,
-            package=shared_package,
-            templates=shared_templates,
+            name=stuff_name,
+            package=stuff_package,
+            templates=stuff_templates,
         )
         reactflow_name, reactflow_package, reactflow_templates = REACTFLOW_TEMPLATE_SET
         TemplateLoader.register_set(

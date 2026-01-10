@@ -19,6 +19,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
+from pipelex.core.stuffs.stuff_html import render_stuff_html
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -325,6 +326,13 @@ def run_cmd(
                 main_stuff_md_path.write_text(main_stuff_md, encoding="utf-8")
                 log.verbose(f"Main stuff Markdown saved to: {main_stuff_md_path}")
                 saved_main_stuff_formats.append("md")
+
+                # Save HTML format (interactive viewer with format tabs)
+                main_stuff_html = await render_stuff_html(main_stuff)
+                main_stuff_html_path = output_dir / "main_stuff.html"
+                main_stuff_html_path.write_text(main_stuff_html, encoding="utf-8")
+                log.verbose(f"Main stuff HTML saved to: {main_stuff_html_path}")
+                saved_main_stuff_formats.append("html")
 
         # Save working memory to JSON if enabled
         working_memory_output_path: str | None = None
