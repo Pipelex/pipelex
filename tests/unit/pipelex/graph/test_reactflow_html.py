@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from pipelex.config import get_config
-from pipelex.core.stuffs.template_set import STUFF_TEMPLATE_SET
+from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
