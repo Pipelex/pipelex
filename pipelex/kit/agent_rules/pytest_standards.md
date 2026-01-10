@@ -23,11 +23,12 @@ NEVER EVER put more than one TestClass into a test module.
 ### Markers
 
 Apply the appropriate markers:
+- "gha_disabled: will not be able to run properly on GitHub Actions"
 - "llm: uses an LLM to generate text or objects"
 - "img_gen: uses an image generation AI"
 - "extract: uses text/image extraction from documents"
 - "inference: uses either an LLM or an image generation AI"
-- "gha_disabled: will not be able to run properly on GitHub Actions"
+- never add "@pytest.mark.dry_runnable" if you haven't set the "inference" marker
 
 Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
 

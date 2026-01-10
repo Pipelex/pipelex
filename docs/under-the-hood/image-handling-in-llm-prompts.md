@@ -303,13 +303,23 @@ def _render_value_with_images(value, registry, text_format):
 
 ## Validation
 
-The system validates image usage at factory time:
+The system validates image usage at both factory time and runtime:
+
+### Factory Time
 
 | Condition | Error |
 |-----------|-------|
 | `\| with_images` on `Image` type | "Cannot use with_images on direct Image" |
 | `\| with_images` on type with no nested images | "Type X has no nested image fields" |
+
+### Runtime
+
+| Condition | Error |
+|-----------|-------|
 | `with_images` on undefined value | "Cannot use with_images filter on undefined value" |
+| `with_images` on non-structured data (e.g., string) | "The with_images filter received a X which cannot contain images" |
+
+The runtime check catches cases where filter chaining converts structured data to a string before `with_images` runs (e.g., `{{ pages | tag | with_images }}`).
 
 ---
 

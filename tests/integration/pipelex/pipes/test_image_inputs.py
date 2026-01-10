@@ -30,6 +30,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateRenderError
 from tests.cases import ImageTestCases
 from tests.integration.pipelex.pipes.pipelines.test_structures import Article
 
@@ -160,7 +161,6 @@ class TestImageReferencesFactoryLevel:
 # =============================================================================
 
 
-@pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestPromptTextTokenSubstitution:
     """Tests for [Image N] token substitution in prompt text."""
@@ -503,18 +503,16 @@ class TestPromptImageExtraction:
         assert len(llm_prompt.user_images) == 2
         pretty_print(llm_prompt.user_text, title="with_images filter - 2 images extracted")
 
-    async def test_tag_then_with_images_does_not_extract_images(self, load_test_library: Callable[[list[Path]], None]) -> None:
-        """Test that {{ pages | tag | with_images }} does NOT extract images.
+    async def test_tag_then_with_images_raises_error(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that {{ pages | tag | with_images }} raises an error.
 
-        Both tag and with_images are terminal filters that return plain strings.
-        When chained, the second filter receives a string, not structured data.
-        The tag filter stringifies first, so with_images has nothing to extract.
+        The tag filter converts to string first, so with_images receives a string
+        instead of structured data. This is detected and raises a clear error.
         """
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
 
-        # Test chaining tag | with_images - should NOT extract images
         pipe_llm_blueprint = PipeLLMBlueprint(
-            description="Test terminal filters cannot be chained",
+            description="Test tag then with_images raises error",
             inputs={"pages": "Page[]"},
             output="Text",
             prompt="{{ pages | tag | with_images }}",
@@ -546,17 +544,12 @@ class TestPromptImageExtraction:
             ),
         )
 
-        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
-            output_concept_ref="Text",
-            context_provider=working_memory,
-        )
-
-        # CRITICAL: Images should NOT be extracted when chaining terminal filters
-        # The tag filter returns a string, so with_images receives a string, not structured data
-        assert llm_prompt.user_text is not None
-        assert "[Image 1]" not in llm_prompt.user_text  # No image tokens - tag stringified first
-        assert llm_prompt.user_images is None or len(llm_prompt.user_images) == 0
-        pretty_print(llm_prompt.user_text, title="Chained filters (tag | with_images) - images NOT extracted")
+        # Should raise error because tag converts to string before with_images
+        with pytest.raises(Jinja2TemplateRenderError, match="cannot contain images"):
+            await pipe_llm.llm_prompt_spec.make_llm_prompt(
+                output_concept_ref="Text",
+                context_provider=working_memory,
+            )
 
     async def test_tag_filter_renders_text(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that tag filter alone correctly wraps content in tags.

@@ -429,3 +429,31 @@ class TestWithImagesFilter:
         # Test with list
         list_result = with_images(context, [ImageContent(url="http://example.com/1.png")])
         assert isinstance(list_result, str)
+
+    def test_with_images_raises_on_string_input(self) -> None:
+        """Test with_images raises error when receiving a plain string.
+
+        This catches the common mistake of chaining filters in wrong order,
+        e.g., {{ pages | tag | with_images }} where tag converts to string first.
+        """
+        registry = ImageRegistry()
+        context = self._make_context(registry=registry)
+
+        with pytest.raises(Jinja2ContextError, match="cannot contain images"):
+            with_images(context, "This is a plain string")
+
+    def test_with_images_raises_on_number_input(self) -> None:
+        """Test with_images raises error when receiving a number."""
+        registry = ImageRegistry()
+        context = self._make_context(registry=registry)
+
+        with pytest.raises(Jinja2ContextError, match="cannot contain images"):
+            with_images(context, 42)
+
+    def test_with_images_raises_on_dict_input(self) -> None:
+        """Test with_images raises error when receiving a plain dict."""
+        registry = ImageRegistry()
+        context = self._make_context(registry=registry)
+
+        with pytest.raises(Jinja2ContextError, match="cannot contain images"):
+            with_images(context, {"key": "value"})

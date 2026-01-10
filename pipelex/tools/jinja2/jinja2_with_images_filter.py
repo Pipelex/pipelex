@@ -67,6 +67,31 @@ def _is_stuff_artefact(value: Any) -> bool:
     return isinstance(root, dict) and "_content" in root
 
 
+def _can_contain_images(value: Any) -> bool:
+    """Check if a value is a type that with_images can extract images from.
+
+    Returns True for types that can potentially contain images:
+    - StuffArtefact (wraps content that may have images)
+    - ImageContent (is an image itself)
+    - list/tuple (may contain images or structs with images)
+    - ListContent (items may contain images)
+    - StuffContent (may have nested image fields)
+
+    Returns False for types that cannot contain images (e.g., plain strings,
+    numbers, etc.) which would result from a previous filter already converting
+    to string.
+    """
+    if _is_stuff_artefact(value):
+        return True
+    if _is_image_content(value):
+        return True
+    if isinstance(value, (list, tuple)):
+        return True
+    if _is_list_content(value):
+        return True
+    return _is_stuff_content(value)
+
+
 def _render_value_with_images(value: Any, registry: ImageRegistry, text_format: "TextFormat") -> str:
     """Recursively render a value with image tokens inline.
 
@@ -163,6 +188,16 @@ def with_images(context: Context, value: Any, _unused: Any = None) -> str:
 
     if isinstance(value, Undefined):
         msg = "Cannot use with_images filter on undefined value"
+        raise Jinja2ContextError(msg)
+
+    # Check if the value is a type that can contain images
+    if not _can_contain_images(value):
+        msg = (
+            f"The with_images filter received a {type(value).__name__} which cannot contain images. "
+            "This filter requires structured data (StuffContent, ListContent, ImageContent, list, etc.). "
+            "If chaining filters, ensure with_images receives structured data "
+            "(e.g., use '| with_images | tag' not '| tag | with_images')."
+        )
         raise Jinja2ContextError(msg)
 
     # Get or create the image registry from context
