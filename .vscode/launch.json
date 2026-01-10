@@ -99,9 +99,11 @@
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
-                "results/pipeline_01/bundle.plx",
-                "--inputs",
-                "results/pipeline_01/inputs.json",
+                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.plx",
+                // "--inputs",
+                // "results/pipeline_01/inputs.json",
+                "--graph",
+                "--graph-full-data",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

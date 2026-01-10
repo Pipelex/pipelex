@@ -1,3 +1,4 @@
+{% from 'shared/_stuff_icons.html.jinja2' import icon_copy, icon_download, icon_external %}
 <div class="header">
     <h1>{{ title | e }}</h1>
     <div class="theme-selector">
@@ -31,20 +32,15 @@
         </div>
         <div class="format-actions">
             <button class="action-btn" id="open-external-btn" onclick="openExternal()" title="Open in new window" style="display: none;">
-                <svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>
+                {{ icon_external() }}
             </button>
             <button class="action-btn" id="copy-btn" onclick="copyContent()" title="Copy">
-                <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z
-                    m3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z
-                    m0 16H8V7h11v14z"/></svg>
+                {{ icon_copy() }}
             </button>
             <button class="action-btn" id="download-btn" onclick="downloadContent()" title="Download">
-                <svg viewBox="0 0 24 24">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                </svg>
+                {{ icon_download() }}
             </button>
         </div>
     </div>
     <div class="data-modal-content" id="modal-content"></div>
 </div>
-

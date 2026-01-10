@@ -1,5 +1,6 @@
 domain = "test_image_in_out"
 description = "Test domain for verifying image output / input support"
+main_pipe = "image_out_in"
 
 
 [pipe]
