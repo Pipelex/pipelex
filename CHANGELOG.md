@@ -121,6 +121,7 @@
 
 ### Refactored
 
+- **Anthropic Backend**: Internal streaming for standard completions to prevent SDK timeouts, configurable structured output timeout (`structured_output_timeout_seconds`), improved error mapping, and increased Bedrock Claude `max_tokens` (8K → 64K) with removal of `max_output_tokens_limit` constraint.
 - `ConceptFactory.make_from_blueprint` method now correctly handles native concepts
 - The output (and inputs) of a pipe is now a `StuffSpec` object instead, that holds the concept and the multiplicity.
 - Renamed `domain` into `domain_code` when relevant.

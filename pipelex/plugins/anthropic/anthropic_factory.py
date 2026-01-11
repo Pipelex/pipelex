@@ -1,3 +1,4 @@
+import math
 from typing import TYPE_CHECKING
 
 from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
@@ -230,3 +231,12 @@ class AnthropicFactory:
             TokenCategory.OUTPUT: nb_output,
         }
         return nb_tokens_by_category
+
+    @staticmethod
+    def calculate_safe_max_tokens_for_timeout(timeout_seconds: int) -> int:
+        """Calculate max_tokens that won't trigger SDK timeout protection.
+
+        Formula: max_tokens = timeout_seconds * 128000 / 3600
+        Based on SDK heuristic: expected_time_seconds = 3600 * max_tokens / 128000
+        """
+        return math.floor(timeout_seconds * 128000 / 3600)

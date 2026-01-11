@@ -114,14 +114,6 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
             new_temperature = fixed_temperature
             has_changes = True
 
-        # Max tokens limit (valued constraint)
-        max_limit = self.inference_model.valued_constraints.get(ValuedConstraint.MAX_OUTPUT_TOKENS_LIMIT)
-        if max_limit is not None and max_tokens is not None and max_tokens > max_limit:
-            # TODO: support streaming to avoid timeout errors with high max tokens
-            log.warning(f"Max tokens {new_max_tokens} is greater than the limit {max_limit}, reducing to {max_limit}")
-            new_max_tokens = max_limit
-            has_changes = True
-
         if not has_changes:
             return None
 
