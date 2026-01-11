@@ -246,9 +246,9 @@ class LLMPromptBlueprint(BaseModel):
                 accept_list=True,
             )
             if isinstance(prompt_image_content, list):
-                prompt_image_content = cast("list[ImageContent]", prompt_image_content)
+                prompt_image_content = cast("list[Any]", prompt_image_content)
                 for list_position, image_item in enumerate(prompt_image_content, start=1):
-                    if not isinstance(image_item, ImageContent):  # pyright: ignore[reportUnnecessaryIsInstance]
+                    if not isinstance(image_item, ImageContent):
                         msg = f"Item of '{image_ref.variable_path}' is of type '{type(image_item).__name__}', expected ImageContent"
                         raise LLMPromptBlueprintValueError(msg)
                     registry_index = image_registry.register_image(image_item)
@@ -256,8 +256,11 @@ class LLMPromptBlueprint(BaseModel):
                     image_item_name = f"{image_ref.variable_path}[{list_position}]"
                     image_registry_indices[image_item_name] = registry_index
             elif isinstance(prompt_image_content, tuple):
-                content_tuple: tuple[ImageContent, ...] = cast("tuple[ImageContent, ...]", prompt_image_content)
+                content_tuple: tuple[Any, ...] = cast("tuple[Any, ...]", prompt_image_content)
                 for list_position, image_item in enumerate(content_tuple, start=1):
+                    if not isinstance(image_item, ImageContent):
+                        msg = f"Item of '{image_ref.variable_path}' is of type '{type(image_item).__name__}', expected ImageContent"
+                        raise LLMPromptBlueprintValueError(msg)
                     registry_index = image_registry.register_image(image_item)
                     image_item_name = f"{image_ref.variable_path}[{list_position}]"
                     image_registry_indices[image_item_name] = registry_index
@@ -341,9 +344,9 @@ class LLMPromptBlueprint(BaseModel):
                 accept_list=True,
             )
             if isinstance(prompt_document_content, list):
-                prompt_document_content = cast("list[DocumentContent]", prompt_document_content)
+                prompt_document_content = cast("list[Any]", prompt_document_content)
                 for doc_index, doc_item in enumerate(prompt_document_content, start=1):
-                    if not isinstance(doc_item, DocumentContent):  # pyright: ignore[reportUnnecessaryIsInstance]
+                    if not isinstance(doc_item, DocumentContent):
                         msg = f"Item of '{doc_ref.variable_path}' is of type '{type(doc_item).__name__}', expected DocumentContent"
                         raise LLMPromptBlueprintValueError(msg)
                     user_document = PromptDocumentFactory.make_prompt_document(
@@ -353,8 +356,11 @@ class LLMPromptBlueprint(BaseModel):
                     user_document_item_name = f"{doc_ref.variable_path}[{doc_index}]"
                     prompt_user_documents[user_document_item_name] = user_document
             elif isinstance(prompt_document_content, tuple):
-                content_tuple: tuple[DocumentContent, ...] = cast("tuple[DocumentContent, ...]", prompt_document_content)
+                content_tuple: tuple[Any, ...] = cast("tuple[Any, ...]", prompt_document_content)
                 for doc_index, doc_item in enumerate(content_tuple, start=1):
+                    if not isinstance(doc_item, DocumentContent):
+                        msg = f"Item of '{doc_ref.variable_path}' is of type '{type(doc_item).__name__}', expected DocumentContent"
+                        raise LLMPromptBlueprintValueError(msg)
                     user_document = PromptDocumentFactory.make_prompt_document(
                         uri=doc_item.url,
                         mime_type=doc_item.mime_type,
