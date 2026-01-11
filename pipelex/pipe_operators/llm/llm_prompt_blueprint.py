@@ -207,6 +207,21 @@ class LLMPromptBlueprint(BaseModel):
                 if doc_list_tokens:
                     extra_params[doc_list_ref.variable_path] = "\n".join(doc_list_tokens)
 
+        ############################################################
+        # System text (rendered FIRST so nested images get lower numbers)
+        ############################################################
+        system_text: str | None = None
+        if self.system_prompt_blueprint:
+            system_text = await self._unravel_text(
+                context_provider=context_provider,
+                jinja2_blueprint=self.system_prompt_blueprint,
+                extra_params=extra_params,
+                image_registry=image_registry,
+            )
+
+        ############################################################
+        # User text (rendered AFTER system text for consistent image ordering)
+        ############################################################
         user_text: str | None = None
         if self.prompt_blueprint:
             user_text = await self._unravel_text(
@@ -223,18 +238,6 @@ class LLMPromptBlueprint(BaseModel):
             # it's OK to have a null user_text
 
         log.verbose(f"User text with {output_concept_ref=}:\n {user_text}")
-
-        ############################################################
-        # System text
-        ############################################################
-        system_text: str | None = None
-        if self.system_prompt_blueprint:
-            system_text = await self._unravel_text(
-                context_provider=context_provider,
-                jinja2_blueprint=self.system_prompt_blueprint,
-                extra_params=extra_params,
-                image_registry=image_registry,
-            )
 
         ############################################################
         # Collect all images from registry (single source of truth)
