@@ -30,7 +30,7 @@ from pipelex.tools.misc.package_utils import get_package_version
 COMMAND = "validate"
 
 
-def do_validate_all_libraries_and_dry_run() -> None:
+def do_validate_all_libraries_and_dry_run(library_dirs: list[Path] | None = None) -> None:
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -40,7 +40,7 @@ def do_validate_all_libraries_and_dry_run() -> None:
             library_manager = get_library_manager()
             library_id, library = library_manager.open_library()
             set_current_library(library_id=library_id)
-            library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+            library_manager.load_libraries(library_id=library_id, library_dirs=library_dirs or [Path.cwd()])
 
             pipes = library.get_pipe_library().get_pipes()
             for pipe in pipes:
@@ -69,6 +69,14 @@ def validate_cmd(
         str | None,
         typer.Option("--bundle", help="Bundle file path (.plx) - validates all pipes in the bundle"),
     ] = None,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--library-dir",
+            "-L",
+            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+        ),
+    ] = None,
 ) -> None:
     """Validate and dry run a pipe or a bundle or all pipes.
 
@@ -83,7 +91,8 @@ def validate_cmd(
     if target == "all" and not pipe and not bundle:
         try:
             make_pipelex_for_cli(context=ErrorContext.VALIDATION)
-            do_validate_all_libraries_and_dry_run()
+            library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
+            do_validate_all_libraries_and_dry_run(library_dirs=library_dirs_paths)
         finally:
             Pipelex.teardown_if_needed()
         return
@@ -148,7 +157,8 @@ def validate_cmd(
             library_manager = get_library_manager()
             library_id, _ = library_manager.open_library()
             set_current_library(library_id=library_id)
-            library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+            library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else [Path.cwd()]
+            library_manager.load_libraries(library_id=library_id, library_dirs=library_dirs_paths)
 
             pipe = get_required_pipe(pipe_code=pipe_code)
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})

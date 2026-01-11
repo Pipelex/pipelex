@@ -59,7 +59,7 @@ For details on how to structure concepts with fields, see the "Structuring Model
 ## Pipe Base Definition
 
 ```plx
-[pipe.your_pipe_name]
+[pipe.your_pipe_code]
 type = "PipeLLM"
 description = "A description of what your pipe does"
 inputs = { input_1 = "ConceptName1", input_2 = "ConceptName2" }

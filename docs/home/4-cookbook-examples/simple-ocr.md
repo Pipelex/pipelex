@@ -17,7 +17,7 @@ async def simple_ocr(pdf_url: str) -> ListContent[PageContent]:
     pipe_output = await execute_pipeline(
         pipe_code="extract_page_contents_from_pdf",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
     page_content_list: ListContent[PageContent] = pipe_output.main_stuff_as_list(item_type=PageContent)

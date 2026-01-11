@@ -145,7 +145,7 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
         Complete Markdown content for the reference file.
     """
     models_by_type = extract_reference_data(model_specs)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     sections = [
         "# Pipelex Gateway - Available Models",

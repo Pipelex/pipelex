@@ -1,12 +1,14 @@
 import asyncio
 
 from pipelex.client.protocol import PipelineInputs
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.hub import get_pipe_router
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
 async def start_pipeline(
@@ -21,6 +23,7 @@ async def start_pipeline(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
+    execution_config: PipelineExecutionConfig | None = None,
 ) -> tuple[str, asyncio.Task[PipeOutput]]:
     """Start a pipeline in the background.
 
@@ -36,19 +39,19 @@ async def start_pipeline(
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
         multiple library instances or maintain library state across executions.
     library_dirs:
-        List of directory paths to load pipe definitions from. If not provided, loads
-        from the current working directory (the directory from which the Python script
-        is executed). Ignored when ``plx_content`` is provided.
+        List of directory paths to load pipe definitions from. Combined with directories
+        from the ``PIPELEXPATH`` environment variable (PIPELEXPATH directories are searched
+        first). When provided alongside ``plx_content``, definitions from both sources
+        are loaded into the library.
     pipe_code:
         Code identifying the pipe to execute. Required when ``plx_content`` is not
         provided. When both ``plx_content`` and ``pipe_code`` are provided, the
         specified pipe from the PLX content will be executed (overriding any
         ``main_pipe`` defined in the content).
     plx_content:
-        Complete PLX file content as a string. When provided, only this content is
-        loaded into the library, creating an isolated execution environment. The pipe
-        to execute is determined by ``pipe_code`` (if provided) or the ``main_pipe``
-        property in the PLX content.
+        Complete PLX file content as a string. The pipe to execute is determined by
+        ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
+        Can be combined with ``library_dirs`` to load additional definitions.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -67,6 +70,14 @@ async def start_pipeline(
         added if not already present.
     user_id:
         Unique identifier for the user.
+    execution_config:
+        Pipeline execution configuration including graph tracing settings.
+        If not provided, uses the default from
+        ``get_config().pipelex.pipeline_execution_config``. Use the ``mock_inputs``
+        field to generate mock data for missing required inputs during dry-run.
+        Since this function returns immediately, the caller is responsible for calling
+        ``GraphTracerManager.get_instance().close_tracer(pipeline_run_id)``
+        after the task completes to retrieve the GraphSpec.
 
     Returns:
     -------
@@ -75,7 +86,12 @@ async def start_pipeline(
         can be awaited to get the pipe output.
 
     """
-    pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
+    # Use provided config or get default
+    execution_config = execution_config or get_config().pipelex.pipeline_execution_config
+
+    # TODO: make sure we close the graph tracer after the task completes
+    pipe_job, pipeline_run_id, _library_id = await pipeline_run_setup(
+        execution_config=execution_config,
         library_id=library_id,
         library_dirs=library_dirs,
         pipe_code=pipe_code,

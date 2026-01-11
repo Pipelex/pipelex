@@ -23,17 +23,17 @@ class NumberContent(StuffContent):
         return str(self.number)
 
     @override
-    def rendered_plain(self) -> str:
+    async def rendered_plain(self) -> str:
         return str(self.number)
 
     @override
-    def rendered_html(self) -> str:
+    async def rendered_html(self) -> str:
         return str(self.number)
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return str(self.number)
 
     @override
-    def rendered_json(self) -> str:
+    async def rendered_json(self) -> str:
         return json.dumps({"number": self.number})

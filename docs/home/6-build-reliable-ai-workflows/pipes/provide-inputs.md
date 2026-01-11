@@ -466,11 +466,11 @@ inputs = {
 ### Pattern 2: Native Content Types (PDF, Image)
 
 ```python
-from pipelex.core.stuffs.pdf_content import PDFContent
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 
 inputs = {
-    "document": PDFContent(url="invoice.pdf"),
+    "document": DocumentContent(url="invoice.pdf"),
     "photo": ImageContent(url="photo.jpg"),
 }
 ```

@@ -121,8 +121,5 @@ class TestPipeSequenceWithInputMemory:
         assert optimized_tweet
         assert isinstance(optimized_tweet, OptimizedTweet)
         assert len(optimized_tweet.lead_tweet.strip()) > 0
-        match pipe_run_mode:
-            case PipeRunMode.DRY:
-                pass
-            case PipeRunMode.LIVE:
-                assert "Maria Rodriguez" in optimized_tweet.lead_tweet
+        if pipe_run_mode.is_live:
+            assert "Maria Rodriguez" in optimized_tweet.lead_tweet

@@ -199,6 +199,26 @@ def snake_to_capitalize_first_letter(snake_str: str) -> str:
     return phrase.capitalize()
 
 
+def snake_to_title_case(snake_str: str) -> str:
+    """Converts a snake_case string to Title Case with spaces.
+
+    This function splits the string at underscores, joins the components with spaces,
+    and capitalizes the first letter of each word.
+
+    Args:
+        snake_str (str): The snake_case string to convert (e.g., "hello_world").
+
+    Returns:
+        str: The Title Case string with spaces (e.g., "Hello World").
+
+    Example:
+        >>> snake_to_title_case("cv_matching_graph")
+        'Cv Matching Graph'
+
+    """
+    return snake_str.replace("_", " ").title()
+
+
 def is_snake_case(word: str) -> bool:
     return re.match(r"^[a-z][a-z0-9_]*$", word) is not None
 

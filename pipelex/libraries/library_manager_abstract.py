@@ -34,6 +34,17 @@ class LibraryManagerAbstract(ABC):
     def get_current_library(self) -> "Library":
         """Get the Library object for the current library."""
 
+    def get_pipe_source(self, pipe_code: str) -> Path | None:  # noqa: ARG002
+        """Get the source file path for a pipe.
+
+        Args:
+            pipe_code: The pipe code to look up.
+
+        Returns:
+            Path to the .plx file the pipe was loaded from, or None if unknown.
+        """
+        return None
+
     @abstractmethod
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         pass

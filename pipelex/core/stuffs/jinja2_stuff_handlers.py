@@ -103,14 +103,9 @@ def render_value_with_images(value: Any, registry: ImageRegistry, text_format: T
                 parts.append(f"{field_name}: {rendered}")
         return "\n".join(parts)
 
-    # For other values, use text_format rendering if available
-    if hasattr(value, "rendered_str"):  # pyright: ignore[reportUnknownArgumentType]
-        return value.rendered_str(text_format=text_format)  # type: ignore[no-any-return]
-    if hasattr(value, text_format.render_method_name):  # pyright: ignore[reportUnknownArgumentType]
-        render_method = getattr(value, text_format.render_method_name)  # pyright: ignore[reportUnknownArgumentType]
-        return render_method()  # type: ignore[no-any-return]
-
-    # Fallback to str
+    # Fallback to str for primitive types (strings, numbers, etc.)
+    # Note: StuffContent/StuffArtefact with rendered_str are handled above via isinstance checks
+    # TODO: refactor rendering to text
     return str(value)  # type: ignore[no-any-return]
 
 

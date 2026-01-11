@@ -8,12 +8,14 @@ from typing_extensions import override
 
 from pipelex.cli.commands.build import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
+from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
+from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
@@ -25,7 +27,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["init", "doctor", "kit", "build", "validate", "run", "show"]
+        return ["init", "doctor", "kit", "build", "validate", "run", "graph", "show", "which"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -129,4 +131,6 @@ app.command(name="validate", help="Validate pipes: static validation for syntax 
     validate_cmd
 )
 app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.plx)")(run_cmd)
+app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
+app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)

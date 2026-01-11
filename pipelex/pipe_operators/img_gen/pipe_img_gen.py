@@ -27,9 +27,7 @@ from pipelex.hub import get_class_registry, get_concept_library, get_content_gen
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenRunError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -274,7 +272,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
-            pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            pipe_run_params=pipe_run_params,
             output_name=output_name,
             content_generator=ContentGeneratorDry(),
         )

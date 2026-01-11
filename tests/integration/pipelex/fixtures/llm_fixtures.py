@@ -170,7 +170,6 @@ QWEN_MODELS = [
 XAI_MODELS = [
     "grok-3",
     "grok-3-mini",
-    "grok-4",
     "grok-3-fast",
     "grok-3-mini-fast",
     "grok-4-fast-reasoning",

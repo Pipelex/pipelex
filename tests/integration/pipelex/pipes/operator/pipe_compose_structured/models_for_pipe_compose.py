@@ -252,7 +252,7 @@ class LocationHolder(StructuredContent):
 
 
 # ============================================================================
-# Models for StuffContent subclass testing (ImageContent, PDFContent, etc.)
+# Models for StuffContent subclass testing (ImageContent, DocumentContent, etc.)
 # ============================================================================
 
 

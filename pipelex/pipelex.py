@@ -1,4 +1,5 @@
 import types
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from kajson.class_registry import ClassRegistry
@@ -30,7 +31,10 @@ from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
+from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import report_validation_error
+from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
+from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -46,6 +50,7 @@ from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtoco
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
+from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
 )
@@ -66,6 +71,8 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
+from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
+from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -161,6 +168,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         library_manager: LibraryManagerAbstract | None = None,
+        library_dirs: list[str | Path] | None = None,
         **kwargs: Any,
     ):
         if kwargs:
@@ -211,6 +219,27 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_config = get_config().pipelex.storage_config
             storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
+
+        # Register stuff templates first (used by mermaid, reactflow, and stuff_viewer)
+        stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET
+        TemplateLoader.register_set(
+            name=stuff_name,
+            package=stuff_package,
+            templates=stuff_templates,
+        )
+        reactflow_name, reactflow_package, reactflow_templates = REACTFLOW_TEMPLATE_SET
+        TemplateLoader.register_set(
+            name=reactflow_name,
+            package=reactflow_package,
+            templates=reactflow_templates,
+        )
+        mermaid_name, mermaid_package, mermaid_templates = MERMAID_TEMPLATE_SET
+        TemplateLoader.register_set(
+            name=mermaid_name,
+            package=mermaid_package,
+            templates=mermaid_templates,
+        )
+        TemplateLoader.load_all()
 
         self.library_manager = library_manager or LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
@@ -283,6 +312,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.library_manager = library_manager or LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
+        # Resolve library_dirs: explicit value replaces PIPELEXPATH, otherwise use env var as fallback
+        # When library_dirs is explicitly provided (even if empty), it overrides the env var
+        if library_dirs is not None:
+            resolved_library_dirs = [Path(dir_path) for dir_path in library_dirs]
+            self.pipelex_hub.set_default_library_dirs(resolved_library_dirs)
+        else:
+            pipelexpath_dirs = get_pipelexpath_dirs()
+            if pipelexpath_dirs is not None:
+                self.pipelex_hub.set_default_library_dirs(pipelexpath_dirs)
+
         self.pipeline_manager = pipeline_manager or PipelineManager()
         self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
         self.pipeline_manager.setup()
@@ -324,6 +363,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if self.class_registry:
             self.class_registry.teardown()
         func_registry.teardown()
+        TemplateLoader.reset()
+        TemplateRegistry.clear()
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         self.pipelex_hub.reset_config()
@@ -353,6 +394,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
+        library_dirs: list[str | Path] | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create and initialize a Pipelex singleton instance.
@@ -375,6 +417,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             telemetry_config: Custom telemetry configuration
             telemetry_manager: Custom telemetry manager
             observers: Custom observers for pipeline events
+            library_dirs: Default library directories for pipeline execution. If provided, these
+                directories will be used instead of the PIPELEXPATH environment variable.
+                Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
             **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
 
         Returns:
@@ -404,6 +449,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 telemetry_config=telemetry_config,
                 telemetry_manager=telemetry_manager,
                 observers=observers,
+                library_dirs=library_dirs,
                 **kwargs,
             )
             pipelex_instance.models_manager.validate_model_deck()
