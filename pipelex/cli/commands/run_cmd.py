@@ -362,7 +362,7 @@ def run_cmd(
             if saved_main_stuff_formats:
                 console.print(f"    [green]✓[/green] main_stuff: {', '.join(saved_main_stuff_formats)}")
             if working_memory_output_path:
-                if working_memory_output_path.startswith(str(output_dir)):
+                if Path(working_memory_output_path).is_relative_to(output_dir):
                     console.print("    [green]✓[/green] working_memory.json")
                 else:
                     console.print(f"    [green]✓[/green] working_memory: {working_memory_output_path}")
