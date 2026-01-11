@@ -77,9 +77,13 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
                 suffix = f".{prepared.file_type.extension}" if prepared.file_type.extension else ".pdf"
                 with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
                     temp_path = Path(temp_file.name)
-                async with aiofiles.open(temp_path, "wb") as file:
-                    await file.write(base64.b64decode(prepared.base64_data))
-                docling_source = str(temp_path)
+                try:
+                    async with aiofiles.open(temp_path, "wb") as file:
+                        await file.write(base64.b64decode(prepared.base64_data))
+                    docling_source = str(temp_path)
+                except BaseException:
+                    temp_path.unlink(missing_ok=True)
+                    raise
 
         try:
             # Run synchronous Docling conversion in a thread pool to avoid blocking
@@ -87,4 +91,4 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
             return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)
         finally:
             if temp_path:
-                temp_path.unlink()
+                temp_path.unlink(missing_ok=True)
