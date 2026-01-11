@@ -1,6 +1,7 @@
 import types
 from typing import Any, Union, cast, get_args, get_origin
 
+from kajson import kajson
 from pydantic import ValidationError
 
 from pipelex import log
@@ -13,7 +14,11 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint, ConstructFieldBlueprint, ConstructFieldMethod
-from pipelex.pipe_operators.compose.exceptions import StructuredContentComposerTypeError, StructuredContentComposerValueError
+from pipelex.pipe_operators.compose.exceptions import (
+    StructuredContentComposerTypeError,
+    StructuredContentComposerValidationError,
+    StructuredContentComposerValueError,
+)
 from pipelex.tools.typing.class_utils import are_classes_equivalent
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -59,7 +64,13 @@ class StructuredContentComposer:
             Populated StructuredContent instance
         """
         field_values = await self._resolve_all_fields()
-        return self.output_class.model_validate(field_values)
+        try:
+            return self.output_class.model_validate(field_values)
+        except ValidationError as exc:
+            formatted_error = format_pydantic_validation_error(exc)
+            msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}"
+            msg += f"\nField values: {kajson.dumps(field_values, indent=4)}"
+            raise StructuredContentComposerValidationError(msg) from exc
 
     async def _resolve_all_fields(self) -> dict[str, Any]:
         """Resolve all fields in the blueprint to their values.

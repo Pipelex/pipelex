@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Annotated
 import typer
 from posthog import tag
 
-from pipelex import pretty_print
+from pipelex import log, pretty_print
 from pipelex.builder.builder import PipelexBundleSpec
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
@@ -22,9 +22,13 @@ from pipelex.cli.error_handlers import (
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.graph.graph_config import GraphConfig
+from pipelex.graph.graph_factory import generate_graph_outputs
+from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_console, get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
@@ -46,6 +50,61 @@ COMMAND = "build"
 SUB_COMMAND_PIPE = "pipe"
 SUB_COMMAND_ONE_SHOT_PIPE = "one-shot-pipe"
 SUB_COMMAND_PARTIAL_PIPE = "partial-pipe"
+
+
+async def _save_graph_outputs_to_dir(
+    graph_spec: GraphSpec,
+    graph_config: GraphConfig,
+    pipe_code: str,
+    output_dir: Path,
+) -> int:
+    """Save graph outputs to a directory.
+
+    Args:
+        graph_spec: The graph specification to render.
+        graph_config: Configuration for graph generation.
+        pipe_code: The pipe code for use in titles.
+        output_dir: Directory where graph files will be saved.
+
+    Returns:
+        Count of saved files.
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    graph_outputs = await generate_graph_outputs(
+        graph_spec=graph_spec,
+        graph_config=graph_config,
+        pipe_code=pipe_code,
+    )
+
+    saved_count = 0
+    if graph_outputs.graphspec_json is not None:
+        (output_dir / "graphspec.json").write_text(graph_outputs.graphspec_json, encoding="utf-8")
+        typer.secho(f"✅ GraphSpec JSON saved to: {output_dir / 'graphspec.json'}", fg=typer.colors.GREEN)
+        saved_count += 1
+
+    if graph_outputs.mermaidflow_mmd is not None:
+        (output_dir / "mermaidflow.mmd").write_text(graph_outputs.mermaidflow_mmd, encoding="utf-8")
+        typer.secho(f"✅ Mermaidflow Mermaid saved to: {output_dir / 'mermaidflow.mmd'}", fg=typer.colors.GREEN)
+        saved_count += 1
+
+    if graph_outputs.mermaidflow_html is not None:
+        (output_dir / "mermaidflow.html").write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
+        typer.secho(f"✅ Mermaidflow HTML saved to: {output_dir / 'mermaidflow.html'}", fg=typer.colors.GREEN)
+        saved_count += 1
+
+    if graph_outputs.reactflow_viewspec is not None:
+        (output_dir / "viewspec.json").write_text(graph_outputs.reactflow_viewspec, encoding="utf-8")
+        typer.secho(f"✅ ReactFlow ViewSpec saved to: {output_dir / 'viewspec.json'}", fg=typer.colors.GREEN)
+        saved_count += 1
+
+    if graph_outputs.reactflow_html is not None:
+        (output_dir / "reactflow.html").write_text(graph_outputs.reactflow_html, encoding="utf-8")
+        typer.secho(f"✅ ReactFlow HTML saved to: {output_dir / 'reactflow.html'}", fg=typer.colors.GREEN)
+        saved_count += 1
+
+    return saved_count
+
 
 """
 Today's example:
@@ -102,6 +161,25 @@ def build_pipe_cmd(
         bool,
         typer.Option("--no-extras", help="Skip generating inputs.json and runner.py, only generate the PLX file"),
     ] = False,
+    graph: Annotated[
+        bool | None,
+        typer.Option("--graph/--no-graph", help="Generate execution graphs for both build process and built pipeline"),
+    ] = None,
+    graph_full_data: Annotated[
+        bool | None,
+        typer.Option(
+            "--graph-full-data/--graph-no-data",
+            help="Override config: include or exclude full serialized data in graphs (requires --graph)",
+        ),
+    ] = None,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--library-dir",
+            "-L",
+            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+        ),
+    ] = None,
 ) -> None:
     # Import here to avoid circular imports
     from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints  # noqa: PLC0415
@@ -119,10 +197,20 @@ def build_pipe_cmd(
         if no_output:
             typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
 
+        # Build execution config with graph overrides if --graph is enabled
+        execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+            generate_graph=graph,
+            force_include_full_data=graph_full_data,
+        )
+
         # Build the pipeline
         builder_loop = BuilderLoop()
         try:
-            pipelex_bundle_spec = await builder_loop.build_and_fix(builder_pipe=builder_pipe, inputs={"brief": prompt})
+            pipelex_bundle_spec, builder_graph_spec = await builder_loop.build_and_fix(
+                builder_pipe=builder_pipe,
+                inputs={"brief": prompt},
+                execution_config=execution_config,
+            )
         except PipeBuilderError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."
             if exc.working_memory:
@@ -227,6 +315,48 @@ def build_pipe_cmd(
                     save_text_to_path(text="", path=init_path)
                     typer.secho(f"✅ Package init file saved to: {init_path}", fg=typer.colors.GREEN)
 
+                    # Generate graphs if --graph is enabled
+                    if graph and builder_graph_spec:
+                        typer.secho("\n📊 Generating graphs...", fg=typer.colors.CYAN)
+
+                        # Save builder pipeline graph
+                        builder_graph_dir = Path(extras_output_dir) / "builder_graph"
+                        builder_graph_count = await _save_graph_outputs_to_dir(
+                            graph_spec=builder_graph_spec,
+                            graph_config=execution_config.graph_config,
+                            pipe_code=builder_pipe,
+                            output_dir=builder_graph_dir,
+                        )
+                        if builder_graph_count > 0:
+                            typer.secho(f"📊 {builder_graph_count} builder graph outputs saved to: {builder_graph_dir}", fg=typer.colors.CYAN)
+
+                        # Run built pipeline in dry-run mode to generate its graph
+                        try:
+                            built_pipe_execution_config = execution_config.with_graph_config_overrides(mock_inputs=True)
+
+                            built_pipe_output = await execute_pipeline(
+                                plx_content=plx_content,
+                                pipe_run_mode=PipeRunMode.DRY,
+                                execution_config=built_pipe_execution_config,
+                                library_dirs=library_dir,
+                            )
+                            if built_pipe_output.graph_spec:
+                                pipeline_graph_dir = Path(extras_output_dir) / "pipeline_graph"
+                                log.dev(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
+                                pipeline_graph_count = await _save_graph_outputs_to_dir(
+                                    graph_spec=built_pipe_output.graph_spec,
+                                    graph_config=execution_config.graph_config,
+                                    pipe_code=main_pipe_code,
+                                    output_dir=pipeline_graph_dir,
+                                )
+                                if pipeline_graph_count > 0:
+                                    typer.secho(
+                                        f"📊 {pipeline_graph_count} pipeline graph outputs saved to: {pipeline_graph_dir}",
+                                        fg=typer.colors.CYAN,
+                                    )
+                        except Exception as graph_exc:
+                            typer.secho(f"⚠️  Warning: Could not generate built pipeline graph: {graph_exc}", fg=typer.colors.YELLOW)
+
                     end_time = time.time()
                     typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds\n", fg=typer.colors.WHITE)
 
@@ -277,6 +407,14 @@ def build_one_shot_cmd(
         bool,
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--library-dir",
+            "-L",
+            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+        ),
+    ] = None,
 ) -> None:
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
 
@@ -295,6 +433,7 @@ def build_one_shot_cmd(
             pipe_output = await execute_pipeline(
                 pipe_code=builder_pipe,
                 inputs={"brief": brief},
+                library_dirs=library_dir,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
@@ -347,7 +486,7 @@ def build_partial_cmd(
         str,
         typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
     ] = "pipe_builder",
-    output_dir_path: Annotated[
+    output_dir: Annotated[
         str,
         typer.Option("--output", "-o", help="Path to save the generated PLX file"),
     ] = "./results",
@@ -363,6 +502,14 @@ def build_partial_cmd(
         bool,
         typer.Option("--no-output", help="Skip saving the pipeline to file"),
     ] = False,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--library-dir",
+            "-L",
+            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+        ),
+    ] = None,
 ) -> None:
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
 
@@ -374,7 +521,7 @@ def build_partial_cmd(
             typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
         else:
             output_path = get_incremental_file_path(
-                base_path=output_dir_path,
+                base_path=output_dir,
                 base_name=output_base_name,
                 extension=extension,
             )
@@ -389,6 +536,7 @@ def build_partial_cmd(
             pipe_output = await execute_pipeline(
                 pipe_code=builder_pipe,
                 inputs=pipeline_inputs,
+                library_dirs=library_dir,
             )
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
@@ -397,13 +545,13 @@ def build_partial_cmd(
         if output_path:
             match extension:
                 case "md":
-                    markdown_output = pipe_output.main_stuff.content.rendered_markdown()
+                    markdown_output = await pipe_output.main_stuff.content.rendered_markdown()
                     save_text_to_path(text=markdown_output, path=output_path)
                 case "txt":
-                    text_output = pipe_output.main_stuff.content.rendered_plain()
+                    text_output = await pipe_output.main_stuff.content.rendered_plain()
                     save_text_to_path(text=text_output, path=output_path)
                 case "html":
-                    html_output = pipe_output.main_stuff.content.rendered_html()
+                    html_output = await pipe_output.main_stuff.content.rendered_html()
                     save_text_to_path(text=html_output, path=output_path)
                 case "json":
                     json_output = pipe_output.main_stuff.content.smart_dump()

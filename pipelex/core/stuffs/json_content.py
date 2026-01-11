@@ -29,7 +29,7 @@ class JSONContent(StuffContent):
         return value
 
     @override
-    def rendered_html(self) -> str:
+    async def rendered_html(self) -> str:
         html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
             json=self.json_obj,  # pyright: ignore[reportArgumentType]
             clubbing=True,
@@ -38,15 +38,15 @@ class JSONContent(StuffContent):
         return html
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return convert_to_markdown(data=self.json_obj, level=level, is_pretty=is_pretty)
 
     @override
-    def rendered_plain(self) -> str:
+    async def rendered_plain(self) -> str:
         return json.dumps(self.json_obj, indent=4)
 
     @override
-    def rendered_json(self) -> str:
+    async def rendered_json(self) -> str:
         return json.dumps(self.json_obj, indent=4)
 
     @override

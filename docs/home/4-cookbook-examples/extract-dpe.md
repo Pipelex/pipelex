@@ -15,7 +15,7 @@ async def extract_dpe(pdf_url: str) -> Dpe:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_dpe",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
     working_memory = pipe_output.working_memory

@@ -1,9 +1,11 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.client.protocol import PipelineInputs
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,
@@ -15,7 +17,11 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
+from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
+
+if TYPE_CHECKING:
+    from pipelex.pipe_run.pipe_job import PipeJob
 
 
 async def execute_pipeline(
@@ -30,6 +36,7 @@ async def execute_pipeline(
     dynamic_output_concept_code: str | None = None,
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
+    execution_config: PipelineExecutionConfig | None = None,
 ) -> PipeOutput:
     """Execute a pipeline and wait for its completion.
 
@@ -43,19 +50,19 @@ async def execute_pipeline(
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
         multiple library instances or maintain library state across executions.
     library_dirs:
-        List of directory paths to load pipe definitions from. If not provided, loads
-        from the current working directory (the directory from which the Python script
-        is executed). Ignored when ``plx_content`` is provided.
+        List of directory paths to load pipe definitions from. Combined with directories
+        from the ``PIPELEXPATH`` environment variable (PIPELEXPATH directories are searched
+        first). When provided alongside ``plx_content``, definitions from both sources
+        are loaded into the library.
     pipe_code:
         Code identifying the pipe to execute. Required when ``plx_content`` is not
         provided. When both ``plx_content`` and ``pipe_code`` are provided, the
         specified pipe from the PLX content will be executed (overriding any
         ``main_pipe`` defined in the plx_content).
     plx_content:
-        Complete PLX file content as a string. When provided, only this content is
-        loaded into the library, creating an isolated execution environment. The pipe
-        to execute is determined by ``pipe_code`` (if provided) or the ``main_pipe``
-        property in the PLX content.
+        Complete PLX file content as a string. The pipe to execute is determined by
+        ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
+        Can be combined with ``library_dirs`` to load additional definitions.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -74,31 +81,47 @@ async def execute_pipeline(
         added if not already present.
     user_id:
         Unique identifier for the user.
+    execution_config:
+        Pipeline execution configuration including graph tracing settings.
+        If provided, uses this config directly. If None, uses the default from
+        ``get_config().pipelex.pipeline_execution_config``. Use the ``mock_inputs``
+        field to generate mock data for missing required inputs during dry-run.
 
     Returns:
     -------
     PipeOutput
-        The pipe output from the execution.
+        The pipe output from the execution. If ``generate_graph`` was True, the
+        execution graph is available in ``pipe_output.graph_spec``.
 
     """
-    pipe_job, pipeline_run_id, library_id = await pipeline_run_setup(
-        library_id=library_id,
-        library_dirs=library_dirs,
-        pipe_code=pipe_code,
-        plx_content=plx_content,
-        inputs=inputs,
-        output_name=output_name,
-        output_multiplicity=output_multiplicity,
-        dynamic_output_concept_code=dynamic_output_concept_code,
-        pipe_run_mode=pipe_run_mode,
-        search_domain_codes=search_domain_codes,
-        user_id=user_id,
-    )
+    # Use provided config or get default
+    execution_config = execution_config or get_config().pipelex.pipeline_execution_config
 
     properties: dict[EventProperty, Any]
+    graph_spec_result = None
+    # These variables are set in pipeline_run_setup and needed in finally/except blocks
+    pipeline_run_id: str | None = None
+    library_id_resolved: str | None = None
+    pipe_job: PipeJob | None = None
     try:
+        pipe_job, pipeline_run_id, library_id_resolved = await pipeline_run_setup(
+            execution_config=execution_config,
+            library_id=library_id,
+            library_dirs=library_dirs,
+            pipe_code=pipe_code,
+            plx_content=plx_content,
+            inputs=inputs,
+            output_name=output_name,
+            output_multiplicity=output_multiplicity,
+            dynamic_output_concept_code=dynamic_output_concept_code,
+            pipe_run_mode=pipe_run_mode,
+            search_domain_codes=search_domain_codes,
+            user_id=user_id,
+        )
         pipe_output = await get_pipe_router().run(pipe_job)
     except PipeRouterError as exc:
+        # PipeRouterError can only be raised by get_pipe_router().run(), so pipe_job is guaranteed to exist
+        assert pipe_job is not None  # for type checker
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
@@ -115,6 +138,9 @@ async def execute_pipeline(
     except PipelexError as exc:
         # Catch other Pipelex errors that bypass the router's PipeRunError handling
         # (e.g., PipeRunInputsError raised directly from pipe_abstract.py)
+        # If pipe_job is None, the error occurred during pipeline_run_setup before pipe_job was created
+        if pipe_job is None:
+            raise
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,
@@ -129,9 +155,23 @@ async def execute_pipeline(
             pipe_stack=pipe_job.pipe_run_params.pipe_stack,
         ) from exc
     finally:
-        library = get_library_manager().get_library(library_id=library_id)
-        library.teardown()
-        teardown_current_library()
+        # Close graph tracer if it was opened (capture graph even on failure)
+        # pipeline_run_id may be None if pipeline_run_setup failed early
+        if execution_config.is_generate_graph and pipeline_run_id is not None:
+            tracer_manager = GraphTracerManager.get_instance()
+            if tracer_manager is not None:
+                graph_spec_result = tracer_manager.close_tracer(pipeline_run_id)
+
+        # Only teardown library if it was successfully created
+        if library_id_resolved is not None:
+            library = get_library_manager().get_library(library_id=library_id_resolved)
+            library.teardown()
+            teardown_current_library()
+
+    # Assign graph spec to output (only reached on success, when pipe_output is bound)
+    if graph_spec_result is not None:
+        pipe_output.graph_spec = graph_spec_result
+
     properties = {
         EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
         EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,

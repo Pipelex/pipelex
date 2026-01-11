@@ -1,0 +1,80 @@
+/* ============================================================
+   Shared Format Toolbar & Tabs Styling
+   Uses CSS variables with fallbacks for both implementations
+   ============================================================ */
+
+.format-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    gap: 8px;
+}
+
+.format-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.format-tab {
+    padding: 6px 12px;
+    border-radius: var(--radius-sm, 4px);
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    background: var(--color-surface-hover, #333);
+    color: var(--color-text-muted, #888);
+    border: none;
+    transition: all 0.2s;
+}
+
+.format-tab:hover {
+    background: var(--color-border, #444);
+    color: var(--color-text, #ccc);
+}
+
+.format-tab.active {
+    background: var(--color-accent, #3b82f6);
+    color: #fff;
+}
+
+.format-tab:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.format-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: var(--radius-sm, 4px);
+    cursor: pointer;
+    font-size: 14px;
+    background: var(--color-surface-hover, #333);
+    color: var(--color-text-muted, #888);
+    border: none;
+    transition: all 0.2s;
+}
+
+.action-btn:hover {
+    background: var(--color-border, #444);
+    color: var(--color-text, #fff);
+}
+
+.action-btn.copied {
+    background: var(--color-success-bg, rgba(16, 185, 129, 0.2));
+    color: var(--color-success, #10b981);
+}
+
+.action-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+}

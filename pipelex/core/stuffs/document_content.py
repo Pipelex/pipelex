@@ -2,7 +2,7 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
@@ -13,27 +13,31 @@ class DocumentContent(StuffContent):
 
     @property
     @override
+    def content_type(self) -> str | None:
+        return "application/pdf"
+
+    @property
+    @override
     def short_desc(self) -> str:
         url_desc = resolve_uri(self.url).kind.desc
         return f"{url_desc} of a document"
 
     @override
-    def rendered_plain(self) -> str:
+    async def rendered_plain(self) -> str:
         return self.url
 
     @override
-    def rendered_html(self) -> str:
-        template_source = '<a href="{{ url|e }}" class="msg-document">{{ display_link|e if display_link else url|e }}</a>'
-        return render_jinja2_sync(
+    async def rendered_html(self) -> str:
+        template_source = '<a href="{{ url|e }}" class="msg-document">{{ url|e }}</a>'
+        return await render_jinja2_async(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
-            temlating_context={
+            templating_context={
                 "url": self.url,
                 "display_link": self.display_link,
             },
         )
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        display_text = self.display_link or self.url
-        return f"[{display_text}]({self.url})"
+    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        return f"[{self.url}]({self.url})"

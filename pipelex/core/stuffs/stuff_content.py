@@ -14,44 +14,49 @@ StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     @property
+    def content_type(self) -> str | None:
+        """Return the MIME type of the content, or None if not applicable."""
+        return None
+
+    @property
     def short_desc(self) -> str:
         return f"some {self.__class__.__name__}"
 
     def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
         return self.model_dump(serialize_as_any=True)
 
-    @override
-    def __str__(self) -> str:
-        return self.rendered_json()
+    # @override
+    # def __str__(self) -> str:
+    #     return kajson.dumps(self.smart_dump(), indent=4)
 
-    def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    async def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
-                return self.rendered_plain()
+                return await self.rendered_plain()
             case TextFormat.HTML:
-                return self.rendered_html()
+                return await self.rendered_html()
             case TextFormat.MARKDOWN:
-                return self.rendered_markdown()
+                return await self.rendered_markdown()
             case TextFormat.JSON:
-                return self.rendered_json()
+                return await self.rendered_json()
             case TextFormat.SPREADSHEET:
-                return self.render_spreadsheet()
+                return await self.render_spreadsheet()
 
-    def rendered_plain(self) -> str:
-        return self.rendered_markdown()
+    async def rendered_plain(self) -> str:
+        return await self.rendered_markdown()
 
-    def rendered_html(self) -> str:
+    async def rendered_html(self) -> str:
         """Default HTML rendering - subclasses can override for custom rendering."""
-        return f"<pre>{self.rendered_json()}</pre>"
+        return f"<pre>{await self.rendered_json()}</pre>"
 
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
+    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
         """Default Markdown rendering - subclasses can override for custom rendering."""
-        return f"```json\n{self.rendered_json()}\n```"
+        return f"```json\n{await self.rendered_json()}\n```"
 
-    def render_spreadsheet(self) -> str:
-        return self.rendered_plain()
+    async def render_spreadsheet(self) -> str:
+        return await self.rendered_plain()
 
-    def rendered_json(self) -> str:
+    async def rendered_json(self) -> str:
         return kajson.dumps(self.smart_dump(), indent=4)
 
     @override
@@ -69,3 +74,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
         pretty = self.rendered_pretty()
         width = PrettyPrinter.pretty_width()
         pretty_print(pretty, title=title, width=width)
+
+    @override
+    async def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
+        return await self.rendered_html()

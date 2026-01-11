@@ -107,6 +107,10 @@ make docs                     - Serve documentation locally with mkdocs
 make docs-check               - Check documentation build with mkdocs
 make docs-deploy              - Deploy documentation with mkdocs
 
+make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
+make stop-graph-server        - Stop the graph viewer HTTP server
+make view-graph               - Start server and open ReactFlow graph in browser
+
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
 make cc                       - Shorthand -> cleanderived check
@@ -129,7 +133,8 @@ export HELP
 	validate v check c cc agent-check \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-TODOs docs docs-check docs-deploy \
-	test-count check-test-badge update-gateway-models ugm check-gateway-models cgm up
+	test-count check-test-badge update-gateway-models ugm check-gateway-models cgm up \
+	serve-graph serve-graph-bg stop-graph-server view-graph sg vg
 
 all help:
 	@echo "$$HELP"
@@ -595,6 +600,46 @@ docs-check: env
 docs-deploy: env
 	$(call PRINT_TITLE,"Deploying documentation with mkdocs")
 	$(VENV_MKDOCS) gh-deploy --force --clean -s
+
+##########################################################################################
+### GRAPH VIEWER
+##########################################################################################
+
+GRAPH_SERVER_PORT ?= 8765
+GRAPH_SERVER_DIR ?= temp/test_outputs
+
+serve-graph:
+	$(call PRINT_TITLE,"Starting HTTP server for ReactFlow graphs on port $(GRAPH_SERVER_PORT)")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@echo "Serving $(GRAPH_SERVER_DIR) at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Press Ctrl+C to stop the server"
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR)
+
+serve-graph-bg:
+	$(call PRINT_TITLE,"Starting HTTP server for ReactFlow graphs on port $(GRAPH_SERVER_PORT) (background)")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR) &
+	@echo "Server running at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Run 'make stop-graph-server' to stop"
+
+stop-graph-server:
+	$(call PRINT_TITLE,"Stopping graph viewer HTTP server")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null && echo "Server stopped" || echo "No server running on port $(GRAPH_SERVER_PORT)"
+
+view-graph:
+	$(call PRINT_TITLE,"Opening ReactFlow graph viewer")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR) &
+	@sleep 1
+	@open "http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Server running at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Run 'make stop-graph-server' to stop"
+
+sg: serve-graph
+	@echo "> done: sg = serve-graph"
+
+vg: view-graph
+	@echo "> done: vg = view-graph"
 
 ##########################################################################################
 ### SHORTHANDS

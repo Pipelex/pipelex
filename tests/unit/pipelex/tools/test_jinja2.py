@@ -17,7 +17,7 @@ class TestRenderJinja2:
     @pytest.mark.parametrize("template", JINJA2TestCases.JINJA2_FOR_ANY)
     @pytest.mark.parametrize("color", JINJA2TestCases.COLOR)
     async def test_render_jinja2_from_text(self, template: str, color: str):
-        temlating_context = {PLACE_HOLDER: color}
+        templating_context = {PLACE_HOLDER: color}
         templating_style = TemplatingStyle(
             tag_style=TagStyle.NO_TAG,
             text_format=TextFormat.MARKDOWN,
@@ -25,7 +25,7 @@ class TestRenderJinja2:
 
         jinja2_text: str = await render_jinja2_async(
             template_category=TemplateCategory.LLM_PROMPT,
-            temlating_context=temlating_context,
+            templating_context=templating_context,
             template_source=template,
             templating_style=templating_style,
         )
@@ -34,7 +34,7 @@ class TestRenderJinja2:
     @pytest.mark.parametrize("template", JINJA2TestCases.JINJA2_FOR_ANY)
     @pytest.mark.parametrize("fruit", JINJA2TestCases.FRUIT)
     async def test_render_jinja2_from_specific_object(self, template: str, fruit: Fruit):
-        temlating_context = {PLACE_HOLDER: fruit}
+        templating_context = {PLACE_HOLDER: fruit}
         templating_style = TemplatingStyle(
             tag_style=TagStyle.NO_TAG,
             text_format=TextFormat.MARKDOWN,
@@ -42,7 +42,7 @@ class TestRenderJinja2:
 
         jinja2_text: str = await render_jinja2_async(
             template_category=TemplateCategory.LLM_PROMPT,
-            temlating_context=temlating_context,
+            templating_context=templating_context,
             template_source=template,
             templating_style=templating_style,
         )
@@ -52,11 +52,11 @@ class TestRenderJinja2:
     @pytest.mark.parametrize("templating_style", JINJA2TestCases.STYLE)
     @pytest.mark.parametrize(("topic", "any_object"), JINJA2TestCases.ANY_OBJECT)
     async def test_render_jinja2_from_any_object(self, template: str, templating_style: TemplatingStyle, topic: str, any_object: Any):
-        temlating_context = {PLACE_HOLDER: any_object}
+        templating_context = {PLACE_HOLDER: any_object}
         log.verbose(f"Rendering Jinja2 for '{topic}' with style '{templating_style}'")
         jinja2_text: str = await render_jinja2_async(
             template_category=TemplateCategory.LLM_PROMPT,
-            temlating_context=temlating_context,
+            templating_context=templating_context,
             template_source=template,
             templating_style=templating_style,
         )

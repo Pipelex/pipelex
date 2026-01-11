@@ -26,20 +26,20 @@ class TextContent(StuffContent):
         return self.text
 
     @override
-    def rendered_plain(self) -> str:
+    async def rendered_plain(self) -> str:
         return self.text
 
     @override
-    def rendered_html(self) -> str:
+    async def rendered_html(self) -> str:
         # Convert a markdown string to HTML and return HTML as a Unicode string.
         return markdown.markdown(self.text)
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return self.text
 
     @override
-    def rendered_json(self) -> str:
+    async def rendered_json(self) -> str:
         return json.dumps({"text": self.text})
 
     @override

@@ -1,0 +1,50 @@
+// ============================================================
+// Shared Stuff Display Utilities
+// Used by both mermaidflow and reactflow implementations
+// ============================================================
+
+// XSS-safe HTML escaping
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// Make all links in a container open in new windows
+function makeLinksOpenInNewWindow(container) {
+    if (!container) return;
+    const links = container.querySelectorAll('a');
+    links.forEach(link => {
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+    });
+}
+
+// Validate that a URL is a safe HTTP/HTTPS URL (prevents javascript: and data: URL injection)
+function isValidHttpUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    return url.startsWith('https://') || url.startsWith('http://');
+}
+
+// Extract URL from stuff data (handles various data structures)
+// Returns null for invalid/unsafe URLs (javascript:, data:, etc.)
+function extractUrl(jsonData) {
+    if (!jsonData) return null;
+    // Check if data itself is a URL string
+    if (typeof jsonData === 'string') {
+        return isValidHttpUrl(jsonData) ? jsonData : null;
+    }
+    // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
+    const candidates = [jsonData.display_link, jsonData.src, jsonData.href, jsonData.uri, jsonData.url];
+    for (const candidate of candidates) {
+        if (isValidHttpUrl(candidate)) return candidate;
+    }
+    return null;
+}
+
+// Get appropriate tab label based on content type
+function getHtmlTabLabel(contentType) {
+    if (contentType === 'application/pdf') return 'PDF';
+    if (contentType?.startsWith('image/')) return 'Image';
+    return 'HTML';
+}

@@ -73,18 +73,18 @@ class StuffArtefact(RootModel[dict[str, Any]], Jinja2TaggableAbstract):
     def items(self):
         return self.root.items()
 
-    def rendered_str(self, text_format: TextFormat) -> str:
+    async def rendered_str(self, text_format: TextFormat) -> str:
         content = self.root[BaseStuffArtefactField.CONTENT]
         if not isinstance(content, StuffContent):
             msg = f"StuffArtefact has no StuffContent, content: {self}"
             raise StuffArtefactError(msg)
-        return content.rendered_str(text_format=text_format)
+        return await content.rendered_str(text_format=text_format)
 
     @override
-    def render_tagged_for_jinja2(self, context: Context, tag_name: str | None = None) -> tuple[Any, str | None]:
+    async def render_tagged_for_jinja2(self, context: Context, tag_name: str | None = None) -> tuple[Any, str | None]:
         # TODO: factorize the text formatting with the jinja2 "text_format" filter
         text_format = context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN)
-        rendered_str = self.rendered_str(text_format=text_format)
+        rendered_str = await self.rendered_str(text_format=text_format)
 
         tag_name = tag_name or self.get(BaseStuffArtefactField.STUFF_NAME)
 

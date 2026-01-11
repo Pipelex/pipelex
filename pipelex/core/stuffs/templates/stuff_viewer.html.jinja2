@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title | e }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"
+        integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu"
+        crossorigin="anonymous"></script>
+    <style>
+        :root {
+            --color-bg: #1a1a2e;
+            --color-surface: #16213e;
+            --color-surface-hover: #1f2b47;
+            --color-border: #2a3a5a;
+            --color-text: #e0e0e0;
+            --color-text-muted: #a0a0a0;
+            --color-accent: #3b82f6;
+            --color-success: #10b981;
+            --color-success-bg: rgba(16, 185, 129, 0.2);
+            --radius-sm: 4px;
+            --radius-md: 8px;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--color-bg);
+            color: var(--color-text);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--color-border);
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .header .subtitle {
+            font-size: 14px;
+            color: var(--color-text-muted);
+        }
+
+        .stuff-viewer {
+            background: var(--color-surface);
+            border-radius: var(--radius-md);
+            padding: 20px;
+            border: 1px solid var(--color-border);
+        }
+
+        {% include 'stuff/_stuff_format_tabs.css.jinja2' %}
+        {% include 'stuff/_stuff_content_styles.css.jinja2' %}
+
+        .stuff-content {
+            background: var(--color-bg);
+            border-radius: var(--radius-md);
+            padding: 16px;
+            min-height: 200px;
+            overflow: auto;
+        }
+    </style>
+</head>
+<body>
+    {% from 'stuff/_stuff_icons.html.jinja2' import icon_copy, icon_download, icon_external %}
+    <div class="container">
+        <div class="header">
+            <h1>{{ title | e }}</h1>
+            {% if subtitle %}
+            <div class="subtitle">{{ subtitle | e }}</div>
+            {% endif %}
+        </div>
+
+        <div class="stuff-viewer">
+            <div class="format-toolbar">
+                <div class="format-tabs" id="format-tabs">
+                    <button class="format-tab active" data-format="html" id="tab-html">{{ html_tab_label }}</button>
+                    <button class="format-tab" data-format="json" id="tab-json">JSON</button>
+                    <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
+                </div>
+                <div class="format-actions">
+                    <button class="action-btn" id="open-external-btn" onclick="openExternal()" title="Open in new window" style="display: none;">
+                        {{ icon_external() }}
+                    </button>
+                    <button class="action-btn" id="copy-btn" onclick="copyContent()" title="Copy">
+                        {{ icon_copy() }}
+                    </button>
+                    <button class="action-btn" id="download-btn" onclick="downloadContent()" title="Download">
+                        {{ icon_download() }}
+                    </button>
+                </div>
+            </div>
+            <div class="stuff-content" id="stuff-content"></div>
+        </div>
+    </div>
+
+    <script>
+        {% include 'stuff/_stuff_utils.js.jinja2' %}
+
+        // Stuff data embedded in page
+        const stuffData = {{ stuff_data_json | escape_script_tag | safe }};
+        const stuffDataText = {{ stuff_data_text_json | escape_script_tag | safe }};
+        const stuffDataHtml = {{ stuff_data_html_json | escape_script_tag | safe }};
+        const contentType = {{ content_type_json | escape_script_tag | safe }};
+
+        let currentFormat = 'html';
+        let externalUrl = null;
+
+        function initViewer() {
+            // Check for external URL
+            externalUrl = extractUrl(stuffData);
+            if (externalUrl) {
+                document.getElementById('open-external-btn').style.display = 'flex';
+            }
+
+            // Set up tab click handlers
+            document.querySelectorAll('.format-tab').forEach(tab => {
+                tab.addEventListener('click', () => switchFormat(tab.dataset.format));
+            });
+
+            // Initial render
+            switchFormat('html');
+        }
+
+        function switchFormat(format) {
+            currentFormat = format;
+
+            // Update tab styles
+            document.querySelectorAll('.format-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.format === format);
+            });
+
+            // Render content
+            const container = document.getElementById('stuff-content');
+
+            switch (format) {
+                case 'html':
+                    renderHtmlContent(container);
+                    break;
+                case 'json':
+                    renderJsonContent(container);
+                    break;
+                case 'text':
+                    renderTextContent(container);
+                    break;
+            }
+        }
+
+        function renderHtmlContent(container) {
+            // Handle PDF
+            if (contentType === 'application/pdf') {
+                const url = extractUrl(stuffData);
+                if (url) {
+                    container.innerHTML = `<div class="stuff-content-pdf"><iframe src="${escapeHtml(url)}"></iframe></div>`;
+                } else {
+                    container.innerHTML = '<div class="stuff-content-text">PDF content (no URL available)</div>';
+                }
+                return;
+            }
+
+            // Handle images
+            if (contentType && contentType.startsWith('image/')) {
+                const url = extractUrl(stuffData);
+                if (url) {
+                    container.innerHTML = `<div class="stuff-content-image"><img src="${escapeHtml(url)}" alt="Image content"></div>`;
+                } else {
+                    container.innerHTML = '<div class="stuff-content-text">Image content (no URL available)</div>';
+                }
+                return;
+            }
+
+            // Handle HTML content
+            if (stuffDataHtml) {
+                container.innerHTML = '<div class="stuff-content-html">' + DOMPurify.sanitize(stuffDataHtml) + '</div>';
+                makeLinksOpenInNewWindow(container);
+            } else {
+                // Fall back to JSON
+                renderJsonContent(container);
+            }
+        }
+
+        function renderJsonContent(container) {
+            const jsonStr = JSON.stringify(stuffData, null, 2);
+            container.innerHTML = '<pre class="stuff-content-text">' + escapeHtml(jsonStr) + '</pre>';
+        }
+
+        function renderTextContent(container) {
+            if (stuffDataText) {
+                container.innerHTML = '<pre class="stuff-content-text nowrap">' + escapeHtml(stuffDataText) + '</pre>';
+            } else {
+                renderJsonContent(container);
+            }
+        }
+
+        function copyContent() {
+            let textToCopy;
+            switch (currentFormat) {
+                case 'json':
+                    textToCopy = JSON.stringify(stuffData, null, 2);
+                    break;
+                case 'text':
+                    textToCopy = stuffDataText || JSON.stringify(stuffData, null, 2);
+                    break;
+                default:
+                    textToCopy = stuffDataHtml || JSON.stringify(stuffData, null, 2);
+            }
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const btn = document.getElementById('copy-btn');
+                btn.classList.add('copied');
+                setTimeout(() => btn.classList.remove('copied'), 1500);
+            });
+        }
+
+        function downloadContent() {
+            // For images, download the actual image file directly
+            if (contentType && contentType.startsWith('image/')) {
+                const imageUrl = extractUrl(stuffData);
+                if (imageUrl) {
+                    const ext = contentType.split('/')[1] || 'png';
+                    const filename = `stuff.${ext}`;
+                    const link = document.createElement('a');
+                    link.href = imageUrl;
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    return;
+                }
+            }
+
+            // For PDFs, download the actual PDF file directly
+            if (contentType === 'application/pdf') {
+                const pdfUrl = extractUrl(stuffData);
+                if (pdfUrl) {
+                    const filename = 'stuff.pdf';
+                    const link = document.createElement('a');
+                    link.href = pdfUrl;
+                    link.download = filename;
+                    link.target = '_blank';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    return;
+                }
+            }
+
+            let content, filename, mimeType;
+            switch (currentFormat) {
+                case 'json':
+                    content = JSON.stringify(stuffData, null, 2);
+                    filename = 'stuff.json';
+                    mimeType = 'application/json';
+                    break;
+                case 'text':
+                    content = stuffDataText || JSON.stringify(stuffData, null, 2);
+                    filename = 'stuff.txt';
+                    mimeType = 'text/plain';
+                    break;
+                default:
+                    content = stuffDataHtml || JSON.stringify(stuffData, null, 2);
+                    filename = 'stuff.html';
+                    mimeType = 'text/html';
+            }
+
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function openExternal() {
+            if (externalUrl) {
+                window.open(externalUrl, '_blank', 'noopener,noreferrer');
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', initViewer);
+    </script>
+</body>
+</html>

@@ -20,9 +20,7 @@ from pipelex.hub import get_class_registry, get_concept_library, get_content_gen
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -268,7 +266,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         return await self._live_run_operator_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
-            pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            pipe_run_params=pipe_run_params,
             output_name=output_name,
             content_generator=content_generator_used,
         )

@@ -55,11 +55,11 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return obj_dict
 
     @override
-    def rendered_plain(self) -> str:
-        return self.rendered_markdown()
+    async def rendered_plain(self) -> str:
+        return await self.rendered_markdown()
 
     @override
-    def rendered_html(self) -> str:
+    async def rendered_html(self) -> str:
         list_dump = [item.smart_dump() for item in self.items]
 
         html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
@@ -70,7 +70,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return html
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:
@@ -78,7 +78,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         else:
             for item_index, item in enumerate(self.items):
                 rendered += f"\n • item #{item_index + 1}:\n\n"
-                rendered += item.rendered_str(text_format=TextFormat.MARKDOWN)
+                rendered += await item.rendered_str(text_format=TextFormat.MARKDOWN)
                 rendered += "\n"
         return rendered
 

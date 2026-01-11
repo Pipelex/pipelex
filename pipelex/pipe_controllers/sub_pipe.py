@@ -78,7 +78,7 @@ class SubPipe(BaseModel):
                 },
             )
 
-            pipe_batch_adhoc_pipe_code = f"{self.pipe_code}_adhoc_batch"
+            pipe_batch_adhoc_pipe_code = f"{self.pipe_code}_batch"
             pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
                 domain_code=sub_pipe.domain_code,
                 pipe_code=pipe_batch_adhoc_pipe_code,

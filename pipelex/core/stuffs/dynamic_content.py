@@ -10,9 +10,9 @@ class DynamicContent(StuffContent):
         return "some dynamic concept"
 
     @override
-    def rendered_html(self) -> str:
+    async def rendered_html(self) -> str:
         return str(self.smart_dump())
 
     @override
-    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return str(self.smart_dump())
