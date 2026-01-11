@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title | e }}</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.4/dist/purify.min.js"
+        integrity="sha384-eEu5CTj3qGvu9PdJuS+YlkNi7d2XxQROAFYOr59zgObtlcux1ae1Il3u7jvdCSWu"
+        crossorigin="anonymous"></script>
     <style>
         :root {
             --color-bg: #1a1a2e;
@@ -114,10 +116,10 @@
         {% include 'stuff/_stuff_utils.js.jinja2' %}
 
         // Stuff data embedded in page
-        const stuffData = {{ stuff_data_json | safe }};
-        const stuffDataText = {{ stuff_data_text_json | safe }};
-        const stuffDataHtml = {{ stuff_data_html_json | safe }};
-        const contentType = {{ content_type_json | safe }};
+        const stuffData = {{ stuff_data_json | escape_script_tag | safe }};
+        const stuffDataText = {{ stuff_data_text_json | escape_script_tag | safe }};
+        const stuffDataHtml = {{ stuff_data_html_json | escape_script_tag | safe }};
+        const contentType = {{ content_type_json | escape_script_tag | safe }};
 
         let currentFormat = 'html';
         let externalUrl = null;
