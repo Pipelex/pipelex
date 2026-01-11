@@ -1,12 +1,15 @@
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
-from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+
+if TYPE_CHECKING:
+    from pipelex.cogt.image.prompt_image import PromptImage
+
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.templating_style import TemplatingStyle
@@ -62,7 +65,8 @@ class LLMPromptBlueprint(BaseModel):
         # Image Registry and Direct Image Extraction
         ############################################################
         image_registry = ImageRegistry()
-        prompt_user_images: dict[str, PromptImage] = {}
+        # Maps image variable name to its 0-based registry index (for placeholder generation)
+        image_registry_indices: dict[str, int] = {}
         # Track which variable paths are lists, so we can substitute the whole list
         list_image_refs: list[ImageReference] = []
 
@@ -76,7 +80,7 @@ class LLMPromptBlueprint(BaseModel):
                             image_ref=image_ref,
                             context_provider=context_provider,
                             image_registry=image_registry,
-                            prompt_user_images=prompt_user_images,
+                            image_registry_indices=image_registry_indices,
                         )
                     case ImageReferenceKind.DIRECT_LIST:
                         # List of ImageContent reference
@@ -84,7 +88,7 @@ class LLMPromptBlueprint(BaseModel):
                             image_ref=image_ref,
                             context_provider=context_provider,
                             image_registry=image_registry,
-                            prompt_user_images=prompt_user_images,
+                            image_registry_indices=image_registry_indices,
                         )
                         list_image_refs.append(image_ref)
                     case ImageReferenceKind.NESTED:
@@ -118,18 +122,17 @@ class LLMPromptBlueprint(BaseModel):
         ############################################################
         # User text
         ############################################################
-        # Replace direct image variables with numbered tags
+        # Replace direct image variables with numbered tags using registry indices
         extra_params = extra_params or {}
-        if prompt_user_images:
-            image_names = list(prompt_user_images.keys())
-            for image_index, image_name in enumerate(image_names):
-                extra_params[image_name] = f"[Image {image_index + 1}]"
+        if image_registry_indices:
+            for image_name, registry_index in image_registry_indices.items():
+                extra_params[image_name] = f"[Image {registry_index + 1}]"
 
             # For list image references, also substitute the list variable itself
             # with a string containing all the [Image N] tokens for items in that list
             for list_ref in list_image_refs:
                 list_tokens: list[str] = []
-                for image_name in image_names:
+                for image_name in image_registry_indices:
                     # Check if this image belongs to this list (e.g., "collection_a[1]" belongs to "collection_a")
                     if image_name.startswith(f"{list_ref.variable_path}["):
                         list_tokens.append(extra_params[image_name])
@@ -181,15 +184,11 @@ class LLMPromptBlueprint(BaseModel):
             )
 
         ############################################################
-        # Collect all images (direct + nested from registry)
+        # Collect all images from registry (single source of truth)
         ############################################################
-        # Get any additional images registered by the | with_images filter
-        all_images: list[PromptImage] = list(prompt_user_images.values())
-        for registry_image in image_registry.images:
-            # Only add if not already in prompt_user_images (avoid duplicates)
-            prompt_image = PromptImageFactory.make_prompt_image(uri=registry_image.url)
-            if prompt_image not in all_images:
-                all_images.append(prompt_image)
+        # The registry contains all images (direct + nested) in the correct order,
+        # already deduplicated by URL. This ensures [Image N] tokens match positions.
+        all_images: list[PromptImage] = [PromptImageFactory.make_prompt_image(uri=registry_image.url) for registry_image in image_registry.images]
 
         ############################################################
         # Collect all documents
@@ -211,9 +210,9 @@ class LLMPromptBlueprint(BaseModel):
         image_ref: ImageReference,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
-        prompt_user_images: dict[str, PromptImage],
+        image_registry_indices: dict[str, int],
     ) -> None:
-        """Extract a single ImageContent from context."""
+        """Extract a single ImageContent from context and register it."""
         log.verbose(f"Getting direct image '{image_ref.variable_path}' from context")
         try:
             prompt_image_content = context_provider.get_typed_object_or_attribute(
@@ -222,9 +221,8 @@ class LLMPromptBlueprint(BaseModel):
                 accept_list=False,
             )
             if isinstance(prompt_image_content, ImageContent):
-                image_registry.register_image(prompt_image_content)
-                user_image = PromptImageFactory.make_prompt_image(uri=prompt_image_content.url)
-                prompt_user_images[image_ref.variable_path] = user_image
+                registry_index = image_registry.register_image(prompt_image_content)
+                image_registry_indices[image_ref.variable_path] = registry_index
             else:
                 msg = f"Image reference '{image_ref.variable_path}' is of type '{type(prompt_image_content).__name__}', expected ImageContent"
                 raise LLMPromptBlueprintValueError(msg)
@@ -237,9 +235,9 @@ class LLMPromptBlueprint(BaseModel):
         image_ref: ImageReference,
         context_provider: ContextProviderAbstract,
         image_registry: ImageRegistry,
-        prompt_user_images: dict[str, PromptImage],
+        image_registry_indices: dict[str, int],
     ) -> None:
-        """Extract a list of ImageContent from context."""
+        """Extract a list of ImageContent from context and register them."""
         log.verbose(f"Getting image list '{image_ref.variable_path}' from context")
         try:
             prompt_image_content = context_provider.get_typed_object_or_attribute(
@@ -249,21 +247,20 @@ class LLMPromptBlueprint(BaseModel):
             )
             if isinstance(prompt_image_content, list):
                 prompt_image_content = cast("list[ImageContent]", prompt_image_content)
-                for image_index, image_item in enumerate(prompt_image_content, start=1):
+                for list_position, image_item in enumerate(prompt_image_content, start=1):
                     if not isinstance(image_item, ImageContent):  # pyright: ignore[reportUnnecessaryIsInstance]
                         msg = f"Item of '{image_ref.variable_path}' is of type '{type(image_item).__name__}', expected ImageContent"
                         raise LLMPromptBlueprintValueError(msg)
-                    image_registry.register_image(image_item)
-                    user_image = PromptImageFactory.make_prompt_image(uri=image_item.url)
-                    user_image_item_name = f"{image_ref.variable_path}[{image_index}]"
-                    prompt_user_images[user_image_item_name] = user_image
+                    registry_index = image_registry.register_image(image_item)
+                    # Use list position (1-based) for variable name, registry index for image number
+                    image_item_name = f"{image_ref.variable_path}[{list_position}]"
+                    image_registry_indices[image_item_name] = registry_index
             elif isinstance(prompt_image_content, tuple):
                 content_tuple: tuple[ImageContent, ...] = cast("tuple[ImageContent, ...]", prompt_image_content)
-                for image_index, image_item in enumerate(content_tuple, start=1):
-                    image_registry.register_image(image_item)
-                    user_image = PromptImageFactory.make_prompt_image(uri=image_item.url)
-                    user_image_item_name = f"{image_ref.variable_path}[{image_index}]"
-                    prompt_user_images[user_image_item_name] = user_image
+                for list_position, image_item in enumerate(content_tuple, start=1):
+                    registry_index = image_registry.register_image(image_item)
+                    image_item_name = f"{image_ref.variable_path}[{list_position}]"
+                    image_registry_indices[image_item_name] = registry_index
             else:
                 msg = (
                     f"Image list reference '{image_ref.variable_path}' is of type '{type(prompt_image_content).__name__}', "
