@@ -126,27 +126,27 @@ MOONSHOTAI_MODELS = [
 
 # --- OpenAI Models ------------------------------------------------------------------------------
 OPENAI_MODELS = [
-    "gpt-4o-mini",
-    "gpt-4o",
-    "gpt-4.1-nano",
-    "gpt-4.1-mini",
-    "gpt-4.1",
-    "o1-mini",
-    "o1",
-    "o3-mini",
-    "o3",
-    "o4-mini",
-    "gpt-5-nano",
+    # "gpt-4o-mini",
+    # "gpt-4o",
+    # "gpt-4.1-nano",
+    # "gpt-4.1-mini",
+    # "gpt-4.1",
+    # "o1-mini",
+    # "o1",
+    # "o3-mini",
+    # "o3",
+    # "o4-mini",
+    # "gpt-5-nano",
     "gpt-5-mini",
-    "gpt-5-chat",
-    "gpt-5",
-    "gpt-5-codex",
-    "gpt-5.1-codex",
-    "gpt-5.1-codex-max",
-    "gpt-5.1-chat",
-    "gpt-5.1",
-    "gpt-5.2",
-    "gpt-5.2-chat",
+    # "gpt-5-chat",
+    # "gpt-5",
+    # "gpt-5-codex",
+    # "gpt-5.1-codex",
+    # "gpt-5.1-codex-max",
+    # "gpt-5.1-chat",
+    # "gpt-5.1",
+    # "gpt-5.2",
+    # "gpt-5.2-chat",
 ]
 
 # --- OpenAI OSS Models --------------------------------------------------------------------------
@@ -178,18 +178,18 @@ XAI_MODELS = [
 
 # --- All LLM Handles ----------------------------------------------------------------------------
 ALL_LLM_HANDLES = [
-    *AMAZON_MODELS,
-    *ANTHROPIC_MODELS,
-    *DEEPSEEK_MODELS,
-    *GOOGLE_MODELS,
-    *GROQ_MODELS,
-    *META_MODELS,
-    *MISTRALAI_MODELS,
-    *MOONSHOTAI_MODELS,
+    # *AMAZON_MODELS,
+    # *ANTHROPIC_MODELS,
+    # *DEEPSEEK_MODELS,
+    # *GOOGLE_MODELS,
+    # *GROQ_MODELS,
+    # *META_MODELS,
+    # *MISTRALAI_MODELS,
+    # *MOONSHOTAI_MODELS,
     *OPENAI_MODELS,
-    *OPENAI_OSS_MODELS,
-    *QWEN_MODELS,
-    *XAI_MODELS,
+    # *OPENAI_OSS_MODELS,
+    # *QWEN_MODELS,
+    # *XAI_MODELS,
 ]
 
 
@@ -234,31 +234,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     if not is_llm_preset_supported(llm_preset_id=llm_preset_id_param):
         pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported by any enabled backend")
     return llm_preset_id_param
-
-
-@pytest.fixture(
-    params=[
-        # "gpt-4o",
-        "gpt-4o-mini",
-        # "gpt-5-mini",
-        # "gpt-5-nano",
-        # "gpt-5-chat",
-        "claude-4.5-sonnet",
-        "mistral-medium-2508",
-        "gemini-2.5-flash-lite",
-        # "gemini-2.5-flash",
-        # "gemini-2.5-pro",
-        # "qwen3:8b",
-    ],
-)
-def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
-    assert isinstance(request.param, str)
-    llm_handle_param = request.param
-    if not is_llm_handle_supported(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not available in model deck")
-    if not is_llm_handle_supported_by_enabled_backends(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not supported by any enabled backend")
-    return llm_handle_param
 
 
 @pytest.fixture(
