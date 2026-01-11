@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 import pytest
 
 from pipelex.config import get_config
+from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
@@ -12,7 +13,6 @@ from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html
 from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.graph.reactflow.viewspec import ViewSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
-from pipelex.graph.shared.template_set import SHARED_TEMPLATE_SET
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
@@ -25,14 +25,14 @@ class TestReactFlowHtml:
         """Ensure ReactFlow and shared templates are loaded before tests."""
         TemplateRegistry.clear()
         TemplateLoader.reset()
-        # Load shared templates first (used by ReactFlow templates)
-        shared_name, shared_package, shared_templates = SHARED_TEMPLATE_SET
+        # Load stuff templates first (used by ReactFlow templates)
+        stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET
         TemplateLoader.register_set(
-            name=shared_name,
-            package=shared_package,
-            templates=shared_templates,
+            name=stuff_name,
+            package=stuff_package,
+            templates=stuff_templates,
         )
-        TemplateLoader.load("shared")
+        TemplateLoader.load("stuff")
         # Load ReactFlow templates
         reactflow_name, reactflow_package, reactflow_templates = REACTFLOW_TEMPLATE_SET
         TemplateLoader.register_set(

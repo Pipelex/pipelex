@@ -1,4 +1,3 @@
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from pipelex import log
@@ -13,6 +12,7 @@ from pipelex.hub import (
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
+    resolve_library_dirs,
     set_current_library,
     teardown_current_library,
 )
@@ -30,7 +30,7 @@ from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
 from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.configuration.configs import PipelineExecutionConfig
-from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_optional_env, get_pipelexpath_dirs
+from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.otel_factory import OtelFactory
@@ -128,23 +128,18 @@ async def pipeline_run_setup(
     pipe: PipeAbstract | None = None
     blueprint: PipelexBundleBlueprint | None = None
 
-    # Combine PIPELEXPATH (env var) with library_dirs (CLI/API args)
-    # PIPELEXPATH provides base directories, library_dirs extends/overrides
-    pipelexpath_dirs = get_pipelexpath_dirs()
-    cli_dirs = [Path(lib_dir) for lib_dir in library_dirs] if library_dirs else []
-    effective_dirs = pipelexpath_dirs + cli_dirs
+    effective_dirs, source_label = resolve_library_dirs(library_dirs)
 
     if effective_dirs:
-        log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies):")
+        log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}):")
         for index_dir, dir_path in enumerate(effective_dirs):
-            source = f"({PIPELEXPATH_ENV_KEY})" if index_dir < len(pipelexpath_dirs) else "(--library-dir)"
-            log.verbose(f"  [{index_dir + 1}] {dir_path} {source}")
+            log.verbose(f"  [{index_dir + 1}] {dir_path}")
         library_manager.load_libraries(
             library_id=library_id,
             library_dirs=effective_dirs,
         )
     else:
-        log.verbose("No library directories specified (PIPELEXPATH not set, no --library-dir provided)")
+        log.verbose(f"No library directories to load ({source_label})")
 
     # Then handle plx_content or pipe_code
     if plx_content:

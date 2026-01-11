@@ -102,7 +102,7 @@ class TestGraphWithFullData:
 
         This test:
 
-        1. Runs a pipeline with generate_graph=True and include_full_data=True
+        1. Runs a pipeline with generate_graph=True and force_include_full_data=True
         2. Verifies the graph_spec is populated with data in IOSpec fields
         3. Saves all outputs (graph.json, mermaid, HTML) to a numbered folder
         4. Verifies interactive rendering works with the captured data
@@ -110,7 +110,7 @@ class TestGraphWithFullData:
         # Build effective config with graph tracing and full data capture enabled
         exec_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
             generate_graph=True,
-            include_full_data=True,
+            force_include_full_data=True,
         )
 
         # Run pipeline with graph tracing and full data capture
@@ -210,36 +210,38 @@ class TestGraphWithFullData:
 
         # CRITICAL: All nodes with inputs should have data on ALL their inputs
         assert inputs_with_data == total_inputs, (
-            f"All inputs should have data when include_full_data=True. "
+            f"All inputs should have data when force_include_full_data=True. "
             f"Got {inputs_with_data}/{total_inputs} inputs with data. "
             f"Nodes missing input data: {nodes_missing_input_data}"
         )
 
         # CRITICAL: All nodes with outputs should have data on ALL their outputs
         assert outputs_with_data == total_outputs, (
-            f"All outputs should have data when include_full_data=True. "
+            f"All outputs should have data when force_include_full_data=True. "
             f"Got {outputs_with_data}/{total_outputs} outputs with data. "
             f"Nodes missing output data: {nodes_missing_output_data}"
         )
 
         # CRITICAL: All nodes with inputs should have data_text on ALL their inputs
         assert inputs_with_data_text == total_inputs, (
-            f"All inputs should have data_text when include_full_data=True. Got {inputs_with_data_text}/{total_inputs} inputs with data_text."
+            f"All inputs should have data_text when force_include_full_data=True. Got {inputs_with_data_text}/{total_inputs} inputs with data_text."
         )
 
         # CRITICAL: All nodes with outputs should have data_text on ALL their outputs
         assert outputs_with_data_text == total_outputs, (
-            f"All outputs should have data_text when include_full_data=True. Got {outputs_with_data_text}/{total_outputs} outputs with data_text."
+            f"All outputs should have data_text when force_include_full_data=True. "
+            f"Got {outputs_with_data_text}/{total_outputs} outputs with data_text."
         )
 
         # CRITICAL: All nodes with inputs should have data_html on ALL their inputs
         assert inputs_with_data_html == total_inputs, (
-            f"All inputs should have data_html when include_full_data=True. Got {inputs_with_data_html}/{total_inputs} inputs with data_html."
+            f"All inputs should have data_html when force_include_full_data=True. Got {inputs_with_data_html}/{total_inputs} inputs with data_html."
         )
 
         # CRITICAL: All nodes with outputs should have data_html on ALL their outputs
         assert outputs_with_data_html == total_outputs, (
-            f"All outputs should have data_html when include_full_data=True. Got {outputs_with_data_html}/{total_outputs} outputs with data_html."
+            f"All outputs should have data_html when force_include_full_data=True. "
+            f"Got {outputs_with_data_html}/{total_outputs} outputs with data_html."
         )
 
         # Save all outputs to numbered folder

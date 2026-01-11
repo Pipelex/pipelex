@@ -138,14 +138,14 @@ class PipelineExecutionConfig(ConfigModel):
     def with_graph_config_overrides(
         self,
         generate_graph: bool | None = None,
-        include_full_data: bool | None = None,
+        force_include_full_data: bool | None = None,
         mock_inputs: bool | None = None,
     ) -> Self:
         """Create a copy of this config with optional overrides.
 
         Args:
             generate_graph: If not None, overrides is_generate_graph.
-            include_full_data: If not None, overrides all graph_config.data_inclusion flags
+            force_include_full_data: If not None, overrides all graph_config.data_inclusion flags
                 (stuff_json_content, stuff_text_content, stuff_html_content, error_stack_traces).
             mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock
                 data for missing required inputs (for dry-run validation).
@@ -161,13 +161,13 @@ class PipelineExecutionConfig(ConfigModel):
         if mock_inputs is not None:
             updates["is_mock_inputs"] = mock_inputs
 
-        if include_full_data is not None:
+        if force_include_full_data is not None:
             new_data_inclusion = self.graph_config.data_inclusion.model_copy(
                 update={
-                    "stuff_json_content": include_full_data,
-                    "stuff_text_content": include_full_data,
-                    "stuff_html_content": include_full_data,
-                    "error_stack_traces": include_full_data,
+                    "stuff_json_content": force_include_full_data,
+                    "stuff_text_content": force_include_full_data,
+                    "stuff_html_content": force_include_full_data,
+                    "error_stack_traces": force_include_full_data,
                 }
             )
             updates["graph_config"] = self.graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
