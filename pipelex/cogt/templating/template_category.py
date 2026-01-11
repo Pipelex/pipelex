@@ -3,9 +3,10 @@ from typing import Any
 
 from jinja2.runtime import Context
 
-from pipelex.cogt.templating.templating_style import TextFormat
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.tools.jinja2.jinja2_filters import tag, text_format
 from pipelex.tools.jinja2.jinja2_models import Jinja2FilterName
+from pipelex.tools.jinja2.jinja2_with_images_filter import with_images
 from pipelex.types import StrEnum
 
 
@@ -37,6 +38,7 @@ class TemplateCategory(StrEnum):
                 return {
                     Jinja2FilterName.FORMAT: text_format,
                     Jinja2FilterName.TAG: tag,
+                    Jinja2FilterName.WITH_IMAGES: with_images,
                 }
             case TemplateCategory.IMG_GEN_PROMPT:
                 return {

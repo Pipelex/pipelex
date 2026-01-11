@@ -3,7 +3,8 @@ from typing import ClassVar
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 
 

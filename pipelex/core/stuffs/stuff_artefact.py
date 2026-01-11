@@ -4,7 +4,7 @@ from jinja2.runtime import Context
 from pydantic import RootModel
 from typing_extensions import override
 
-from pipelex.cogt.templating.templating_style import TextFormat
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.exceptions import StuffArtefactError
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey, Jinja2TaggableAbstract

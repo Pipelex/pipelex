@@ -5,7 +5,7 @@ from rich.pretty import Pretty
 from rich.table import Table
 from typing_extensions import override
 
-from pipelex.cogt.templating.templating_style import TextFormat
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, PrettyPrinter
 

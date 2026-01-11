@@ -215,6 +215,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.library_manager = library_manager or LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
+        # Register Jinja2 handlers for Stuff types
+        from pipelex.core.stuffs.jinja2_stuff_handlers import register_jinja2_stuff_handlers  # noqa: PLC0415
+
+        register_jinja2_stuff_handlers()
+
         # --- AI Models and Inference Management ------------------------------------------------
 
         self.plugin_manager.setup()
