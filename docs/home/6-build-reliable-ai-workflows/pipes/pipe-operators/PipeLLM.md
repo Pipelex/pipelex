@@ -110,6 +110,94 @@ Analyze the document page shown in the image and explain how it relates to the p
 """
 ```
 
+## Working with Documents
+
+`PipeLLM` supports including documents (PDFs, etc.) in prompts. Documents are passed to the LLM along with your text prompt, allowing the model to analyze their content.
+
+### Basic Document Input
+
+Documents must be declared in the `inputs` section of your pipe definition. The document will be automatically passed to the LLM along with your text prompt.
+
+```plx
+[pipe.summarize_document]
+type = "PipeLLM"
+description = "Summarize a document"
+inputs = { document = "Document" }
+output = "DocumentSummary"
+prompt = """
+Summarize the key points from this document: @document
+"""
+```
+
+!!! important "Document Variable Tagging"
+    It is necessary to tag document variables with `@document` or `$document`, just like with regular objects. This works in both `prompt` and `system_prompt`.
+
+**Flexible Document Inputs**
+
+You can use any concept that refines `Document` as an input, and choose descriptive variable names that fit your use case:
+
+```plx
+[pipe.analyze_report]
+type = "PipeLLM"
+description = "Analyze financial report"
+inputs = { financial_report = "FinancialReport" }
+output = "ReportAnalysis"
+prompt = """
+Analyze this financial report and extract the key metrics: $financial_report
+"""
+```
+
+### Multiple Documents
+
+You can include multiple documents in a single prompt by listing them in the inputs:
+
+```plx
+[pipe.compare_documents]
+type = "PipeLLM"
+description = "Compare two documents"
+inputs = { first_doc = "Document", second_doc = "Document" }
+output = "DocumentComparison"
+prompt = """
+Compare these two documents and describe their similarities and differences: $first_doc and $second_doc
+"""
+```
+
+For a variable number of documents, use the list syntax:
+
+```plx
+[pipe.merge_documents]
+type = "PipeLLM"
+description = "Merge multiple documents"
+inputs = { documents = "Document[]" }
+output = "MergedContent"
+prompt = """
+Combine the information from all these documents into a single coherent summary: $documents
+"""
+```
+
+### Combining Text, Images, and Documents
+
+You can mix text, image, and document inputs in the same pipe:
+
+```plx
+[pipe.analyze_with_context]
+type = "PipeLLM"
+description = "Analyze a document with context"
+inputs = {
+    context = "Text",
+    screenshot = "Image",
+    reference_doc = "Document"
+}
+output = "ContextualAnalysis"
+prompt = """
+Given this context: $context
+
+And this screenshot for reference: $screenshot
+
+Analyze the document and explain how it relates to the context: $reference_doc
+"""
+```
+
 ## Configuration
 
 `PipeLLM` is configured in your pipeline's `.plx` file.
