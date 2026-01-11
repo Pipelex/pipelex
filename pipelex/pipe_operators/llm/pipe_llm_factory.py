@@ -15,6 +15,7 @@ from pipelex.pipe_operators.llm.exceptions import PipeLLMFactoryError
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocumentAnalyzer
 from pipelex.pipe_operators.llm.template_image_analyzer import TemplateImageAnalyzer
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 
@@ -77,10 +78,23 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 or None
             )
 
+        # Analyze template for document references
+        document_references = None
+        if blueprint.prompt and blueprint.inputs:
+            document_references = (
+                TemplateDocumentAnalyzer.analyze_template_for_documents(
+                    template_source=blueprint.prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                )
+                or None
+            )
+
         llm_prompt_spec = LLMPromptBlueprint(
             system_prompt_blueprint=system_prompt_jinja2_blueprint,
             prompt_blueprint=user_text_jinja2_blueprint,
             image_references=image_references,
+            document_references=document_references,
         )
 
         llm_choices = LLMSettingChoices(

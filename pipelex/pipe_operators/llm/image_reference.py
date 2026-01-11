@@ -1,7 +1,7 @@
 """Data structures for representing image references in LLM prompt templates.
 
 These models describe how images are referenced in templates and guide
-the image extraction process at runtime.
+the image resolution process at runtime.
 """
 
 from pydantic import BaseModel, Field

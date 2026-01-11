@@ -39,7 +39,6 @@ from tests.integration.pipelex.pipes.pipelines.test_structures import Article
 # =============================================================================
 
 
-@pytest.mark.dry_runnable
 class TestImageReferencesFactoryLevel:
     """Tests for ImageReference creation at factory time (PipeFactory.make_from_blueprint)."""
 
@@ -374,7 +373,6 @@ class TestPromptTextTokenSubstitution:
 # =============================================================================
 
 
-@pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestPromptImageExtraction:
     """Tests for image extraction into user_images list."""

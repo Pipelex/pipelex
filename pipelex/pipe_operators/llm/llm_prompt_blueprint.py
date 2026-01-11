@@ -3,13 +3,17 @@ from typing import Any, cast
 from pydantic import BaseModel
 
 from pipelex import log
+from pipelex.cogt.document.prompt_document import PromptDocument
+from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.templating_style import TemplatingStyle
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_content_generator
+from pipelex.pipe_operators.llm.document_reference import DocumentReference, DocumentReferenceKind
 from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
 from pipelex.pipe_operators.llm.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.image_registry import ImageRegistry
@@ -24,12 +28,16 @@ class LLMPromptBlueprint(BaseModel):
     system_prompt_blueprint: TemplateBlueprint | None = None
     prompt_blueprint: TemplateBlueprint | None = None
     image_references: list[ImageReference] | None = None
+    document_references: list[DocumentReference] | None = None
 
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
         if self.image_references:
             image_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.image_references]
             required_variables.update(image_ref_root_names)
+        if self.document_references:
+            doc_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.document_references]
+            required_variables.update(doc_ref_root_names)
 
         if self.prompt_blueprint:
             required_variables.update(self.prompt_blueprint.required_variables())
@@ -85,6 +93,29 @@ class LLMPromptBlueprint(BaseModel):
                         pass
 
         ############################################################
+        # Direct Document Extraction
+        ############################################################
+        prompt_user_documents: dict[str, PromptDocument] = {}
+        list_document_refs: list[DocumentReference] = []
+
+        if self.document_references:
+            for doc_ref in self.document_references:
+                match doc_ref.kind:
+                    case DocumentReferenceKind.DIRECT:
+                        self._extract_direct_document(
+                            doc_ref=doc_ref,
+                            context_provider=context_provider,
+                            prompt_user_documents=prompt_user_documents,
+                        )
+                    case DocumentReferenceKind.DIRECT_LIST:
+                        self._extract_direct_list_documents(
+                            doc_ref=doc_ref,
+                            context_provider=context_provider,
+                            prompt_user_documents=prompt_user_documents,
+                        )
+                        list_document_refs.append(doc_ref)
+
+        ############################################################
         # User text
         ############################################################
         # Replace direct image variables with numbered tags
@@ -104,6 +135,21 @@ class LLMPromptBlueprint(BaseModel):
                         list_tokens.append(extra_params[image_name])
                 if list_tokens:
                     extra_params[list_ref.variable_path] = "\n".join(list_tokens)
+
+        # Replace direct document variables with numbered tags
+        if prompt_user_documents:
+            document_names = list(prompt_user_documents.keys())
+            for document_index, document_name in enumerate(document_names):
+                extra_params[document_name] = f"[Document {document_index + 1}]"
+
+            # For list document references, also substitute the list variable itself
+            for doc_list_ref in list_document_refs:
+                doc_list_tokens: list[str] = []
+                for document_name in document_names:
+                    if document_name.startswith(f"{doc_list_ref.variable_path}["):
+                        doc_list_tokens.append(extra_params[document_name])
+                if doc_list_tokens:
+                    extra_params[doc_list_ref.variable_path] = "\n".join(doc_list_tokens)
 
         user_text: str | None = None
         if self.prompt_blueprint:
@@ -146,12 +192,18 @@ class LLMPromptBlueprint(BaseModel):
                 all_images.append(prompt_image)
 
         ############################################################
+        # Collect all documents
+        ############################################################
+        all_documents: list[PromptDocument] = list(prompt_user_documents.values())
+
+        ############################################################
         # Full LLMPrompt
         ############################################################
         return LLMPrompt(
             system_text=system_text,
             user_text=user_text,
             user_images=all_images,
+            user_documents=all_documents,
         )
 
     def _extract_direct_image(
@@ -249,3 +301,75 @@ class LLMPromptBlueprint(BaseModel):
             templating_style=self.templating_style,
             template_category=jinja2_blueprint.category,
         )
+
+    def _extract_direct_document(
+        self,
+        doc_ref: DocumentReference,
+        context_provider: ContextProviderAbstract,
+        prompt_user_documents: dict[str, PromptDocument],
+    ) -> None:
+        """Extract a single DocumentContent from context."""
+        log.verbose(f"Getting direct document '{doc_ref.variable_path}' from context")
+        try:
+            prompt_document_content = context_provider.get_typed_object_or_attribute(
+                name=doc_ref.variable_path,
+                wanted_type=DocumentContent,
+                accept_list=False,
+            )
+            if isinstance(prompt_document_content, DocumentContent):
+                user_document = PromptDocumentFactory.make_prompt_document(
+                    uri=prompt_document_content.url,
+                    mime_type=prompt_document_content.mime_type,
+                )
+                prompt_user_documents[doc_ref.variable_path] = user_document
+            else:
+                msg = f"Document reference '{doc_ref.variable_path}' is of type '{type(prompt_document_content).__name__}', expected DocumentContent"
+                raise LLMPromptBlueprintValueError(msg)
+        except ContextProviderError as exc:
+            msg = f"Could not find document '{doc_ref.variable_path}' in context: {exc}"
+            raise LLMPromptBlueprintValueError(msg) from exc
+
+    def _extract_direct_list_documents(
+        self,
+        doc_ref: DocumentReference,
+        context_provider: ContextProviderAbstract,
+        prompt_user_documents: dict[str, PromptDocument],
+    ) -> None:
+        """Extract a list of DocumentContent from context."""
+        log.verbose(f"Getting document list '{doc_ref.variable_path}' from context")
+        try:
+            prompt_document_content = context_provider.get_typed_object_or_attribute(
+                name=doc_ref.variable_path,
+                wanted_type=DocumentContent,
+                accept_list=True,
+            )
+            if isinstance(prompt_document_content, list):
+                prompt_document_content = cast("list[DocumentContent]", prompt_document_content)
+                for doc_index, doc_item in enumerate(prompt_document_content, start=1):
+                    if not isinstance(doc_item, DocumentContent):  # pyright: ignore[reportUnnecessaryIsInstance]
+                        msg = f"Item of '{doc_ref.variable_path}' is of type '{type(doc_item).__name__}', expected DocumentContent"
+                        raise LLMPromptBlueprintValueError(msg)
+                    user_document = PromptDocumentFactory.make_prompt_document(
+                        uri=doc_item.url,
+                        mime_type=doc_item.mime_type,
+                    )
+                    user_document_item_name = f"{doc_ref.variable_path}[{doc_index}]"
+                    prompt_user_documents[user_document_item_name] = user_document
+            elif isinstance(prompt_document_content, tuple):
+                content_tuple: tuple[DocumentContent, ...] = cast("tuple[DocumentContent, ...]", prompt_document_content)
+                for doc_index, doc_item in enumerate(content_tuple, start=1):
+                    user_document = PromptDocumentFactory.make_prompt_document(
+                        uri=doc_item.url,
+                        mime_type=doc_item.mime_type,
+                    )
+                    user_document_item_name = f"{doc_ref.variable_path}[{doc_index}]"
+                    prompt_user_documents[user_document_item_name] = user_document
+            else:
+                msg = (
+                    f"Document list reference '{doc_ref.variable_path}' is of type '{type(prompt_document_content).__name__}', "
+                    "expected list or tuple of DocumentContent"
+                )
+                raise LLMPromptBlueprintValueError(msg)
+        except ContextProviderError as exc:
+            msg = f"Could not find document list '{doc_ref.variable_path}' in context: {exc}"
+            raise LLMPromptBlueprintValueError(msg) from exc
