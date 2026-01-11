@@ -63,8 +63,8 @@ def render_value_with_images(value: Any, registry: ImageRegistry, text_format: T
 
     # Handle ImageContent directly
     if isinstance(value, ImageContent):
-        image_num = registry.register_image(value)
-        return f"[Image {image_num}]"
+        image_index = registry.register_image(value)
+        return f"[Image {image_index + 1}]"
 
     # Handle lists/tuples
     if isinstance(value, (list, tuple)):

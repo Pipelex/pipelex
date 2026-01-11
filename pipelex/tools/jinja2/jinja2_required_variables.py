@@ -12,7 +12,6 @@ from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError, Jinja
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
-# KLUDGE: use BaseModel instead of dataclass
 @dataclass
 class VariableReference:
     """Represents a variable reference in a Jinja2 template with its applied filters.

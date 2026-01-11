@@ -13,17 +13,17 @@ class MockImageContent:
 class TestImageRegistry:
     """Tests for ImageRegistry class used by the | with_images filter."""
 
-    def test_register_single_image_returns_1(self) -> None:
-        """First registered image should get number 1."""
+    def test_register_single_image_returns_index_0(self) -> None:
+        """First registered image should get index 0."""
         registry = ImageRegistry()
         image = MockImageContent(url="http://example.com/image1.png")
 
         result = registry.register_image(image)
 
-        assert result == 1
+        assert result == 0
 
-    def test_register_second_image_returns_2(self) -> None:
-        """Second registered image should get number 2."""
+    def test_register_second_image_returns_index_1(self) -> None:
+        """Second registered image should get index 1."""
         registry = ImageRegistry()
         image1 = MockImageContent(url="http://example.com/image1.png")
         image2 = MockImageContent(url="http://example.com/image2.png")
@@ -31,10 +31,10 @@ class TestImageRegistry:
         registry.register_image(image1)
         result = registry.register_image(image2)
 
-        assert result == 2
+        assert result == 1
 
-    def test_register_same_url_twice_returns_same_number(self) -> None:
-        """Registering the same URL twice should return the original number."""
+    def test_register_same_url_twice_returns_same_index(self) -> None:
+        """Registering the same URL twice should return the original index."""
         registry = ImageRegistry()
         image1 = MockImageContent(url="http://example.com/same.png")
         image2 = MockImageContent(url="http://example.com/same.png")
@@ -42,13 +42,13 @@ class TestImageRegistry:
         first_result = registry.register_image(image1)
         second_result = registry.register_image(image2)
 
-        assert first_result == 1
-        assert second_result == 1
+        assert first_result == 0
+        assert second_result == 0
         # Should only have one image in the registry
         assert len(registry.images) == 1
 
-    def test_register_multiple_images_sequential_numbering(self) -> None:
-        """Multiple different images should get sequential numbers."""
+    def test_register_multiple_images_sequential_indexing(self) -> None:
+        """Multiple different images should get sequential 0-based indexes."""
         registry = ImageRegistry()
         urls = [
             "http://example.com/a.png",
@@ -62,7 +62,7 @@ class TestImageRegistry:
             image = MockImageContent(url=url)
             results.append(registry.register_image(image))
 
-        assert results == [1, 2, 3, 4]
+        assert results == [0, 1, 2, 3]
 
     def test_images_property_returns_copy(self) -> None:
         """The images property should return a copy, not the internal list."""
