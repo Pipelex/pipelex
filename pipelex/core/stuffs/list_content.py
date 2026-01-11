@@ -55,11 +55,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return obj_dict
 
     @override
-    async def rendered_plain(self) -> str:
-        return await self.rendered_markdown()
-
-    @override
-    async def rendered_html(self) -> str:
+    def _render_html(self) -> str:
         list_dump = [item.smart_dump() for item in self.items]
 
         html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
@@ -68,6 +64,11 @@ class ListContent(StuffContent, Generic[StuffContentType]):
             table_attributes="",
         )
         return html
+
+    # Keep async for recursive methods that need to await nested content
+    @override
+    async def rendered_plain(self) -> str:
+        return await self.rendered_markdown()
 
     @override
     async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:

@@ -2,7 +2,7 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
@@ -23,14 +23,14 @@ class DocumentContent(StuffContent):
         return f"{url_desc} of a document"
 
     @override
-    async def rendered_plain(self) -> str:
+    def _render_plain(self) -> str:
         return self.url
 
     @override
-    async def rendered_html(self) -> str:
+    def _render_html(self) -> str:
         # The |e filter escapes HTML special characters to prevent XSS attacks
         template_source = '<a href="{{ url|e }}" class="msg-document">{{ display_text|e }}</a>'
-        return await render_jinja2_async(
+        return render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             templating_context={
@@ -40,6 +40,6 @@ class DocumentContent(StuffContent):
         )
 
     @override
-    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def _render_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         display_text = self.display_link or self.url
         return f"[{display_text}]({self.url})"
