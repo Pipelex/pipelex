@@ -14,7 +14,7 @@ class DocumentContent(StuffContent):
     @property
     @override
     def content_type(self) -> str | None:
-        return "application/pdf"
+        return self.mime_type or "application/pdf"
 
     @property
     @override
