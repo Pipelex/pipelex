@@ -28,16 +28,18 @@ class DocumentContent(StuffContent):
 
     @override
     async def rendered_html(self) -> str:
-        template_source = '<a href="{{ url|e }}" class="msg-document">{{ url|e }}</a>'
+        # The |e filter escapes HTML special characters to prevent XSS attacks
+        template_source = '<a href="{{ url|e }}" class="msg-document">{{ display_text|e }}</a>'
         return await render_jinja2_async(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             templating_context={
                 "url": self.url,
-                "display_link": self.display_link,
+                "display_text": self.display_link or self.url,
             },
         )
 
     @override
     async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        return f"[{self.url}]({self.url})"
+        display_text = self.display_link or self.url
+        return f"[{display_text}]({self.url})"
