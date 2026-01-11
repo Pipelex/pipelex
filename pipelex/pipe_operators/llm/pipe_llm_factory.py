@@ -66,10 +66,10 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
-        # Analyze template for image references using the new template-based approach
-        image_references = None
+        # Analyze template for image references
+        user_image_references = None
         if blueprint.prompt and blueprint.inputs:
-            image_references = (
+            user_image_references = (
                 TemplateImageAnalyzer.analyze_template_for_images(
                     template_source=blueprint.prompt,
                     input_specs=blueprint.inputs,
@@ -79,11 +79,35 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
             )
 
         # Analyze template for document references
-        document_references = None
+        user_document_references = None
         if blueprint.prompt and blueprint.inputs:
-            document_references = (
+            user_document_references = (
                 TemplateDocumentAnalyzer.analyze_template_for_documents(
                     template_source=blueprint.prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                )
+                or None
+            )
+
+        # Analyze system prompt for image references
+        system_image_references = None
+        if blueprint.system_prompt and blueprint.inputs:
+            system_image_references = (
+                TemplateImageAnalyzer.analyze_template_for_images(
+                    template_source=blueprint.system_prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                )
+                or None
+            )
+
+        # Analyze system prompt for document references
+        system_document_references = None
+        if blueprint.system_prompt and blueprint.inputs:
+            system_document_references = (
+                TemplateDocumentAnalyzer.analyze_template_for_documents(
+                    template_source=blueprint.system_prompt,
                     input_specs=blueprint.inputs,
                     domain_code=domain_code,
                 )
@@ -93,8 +117,10 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         llm_prompt_spec = LLMPromptBlueprint(
             system_prompt_blueprint=system_prompt_jinja2_blueprint,
             prompt_blueprint=user_text_jinja2_blueprint,
-            image_references=image_references,
-            document_references=document_references,
+            user_image_references=user_image_references,
+            user_document_references=user_document_references,
+            system_image_references=system_image_references,
+            system_document_references=system_document_references,
         )
 
         llm_choices = LLMSettingChoices(

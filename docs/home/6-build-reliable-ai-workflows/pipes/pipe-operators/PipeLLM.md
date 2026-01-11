@@ -33,7 +33,7 @@ Describe the provided image in great detail: $image
 ```
 
 !!! important "Image Variable Tagging"
-    It is necessary to tag the image variable in the prompt with `@image` or `$image`, just like with regular objects.
+    It is necessary to tag image variables with `@image` or `$image`, just like with regular objects. This works in both `prompt` and `system_prompt`.
 
 **Flexible Image Inputs**
 
@@ -124,8 +124,8 @@ Analyze the document page shown in the image and explain how it relates to the p
 | `output`                    | string              | The output concept produced by the LLM operation with multiplicity notation using brackets (e.g., `"Text"`, `"Text[]"`, `"Text[3]"`).                                                | Yes      |
 | `model`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use.              | No       |
 | `model_to_structure`                       | string or table     | Specifies the LLM choice by name, setting, or preset to use for structuring after preliminary text generation.              | No       |
-| `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Can be inline text or a reference to a template file (`"file:path/to/prompt.md"`).  | No       |
-| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). Image variables should also be tagged with `$` or `@`.                 | No       |
+| `system_prompt`             | string              | A system-level prompt to guide the LLM's behavior (e.g., "You are a helpful assistant"). Supports the same variable syntax as `prompt`, including image and document references.  | No       |
+| `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). Image and document variables should also be tagged with `$` or `@`.                 | No       |
 | `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
 
 ### Output Multiplicity

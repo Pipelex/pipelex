@@ -29,9 +29,9 @@ class TestImageReferencesFactoryLevel:
             blueprint=pipe_llm_blueprint,
         )
 
-        assert pipe_llm.llm_prompt_spec.image_references is not None
-        assert len(pipe_llm.llm_prompt_spec.image_references) == 1
-        ref = pipe_llm.llm_prompt_spec.image_references[0]
+        assert pipe_llm.llm_prompt_spec.user_image_references is not None
+        assert len(pipe_llm.llm_prompt_spec.user_image_references) == 1
+        ref = pipe_llm.llm_prompt_spec.user_image_references[0]
         assert ref.kind == ImageReferenceKind.DIRECT
         assert ref.variable_path == "image"
 
@@ -52,9 +52,9 @@ class TestImageReferencesFactoryLevel:
             blueprint=pipe_llm_blueprint,
         )
 
-        assert pipe_llm.llm_prompt_spec.image_references is not None
-        assert len(pipe_llm.llm_prompt_spec.image_references) == 1
-        ref = pipe_llm.llm_prompt_spec.image_references[0]
+        assert pipe_llm.llm_prompt_spec.user_image_references is not None
+        assert len(pipe_llm.llm_prompt_spec.user_image_references) == 1
+        ref = pipe_llm.llm_prompt_spec.user_image_references[0]
         assert ref.kind == ImageReferenceKind.DIRECT_LIST
         assert ref.variable_path == "images"
 
@@ -76,7 +76,7 @@ class TestImageReferencesFactoryLevel:
         )
 
         # Without | with_images filter, no images should be included
-        assert pipe_llm.llm_prompt_spec.image_references is None
+        assert pipe_llm.llm_prompt_spec.user_image_references is None
 
     def test_nested_image_with_filter_creates_nested_reference(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that struct with | with_images creates a NESTED reference."""
@@ -95,9 +95,9 @@ class TestImageReferencesFactoryLevel:
             blueprint=pipe_llm_blueprint,
         )
 
-        assert pipe_llm.llm_prompt_spec.image_references is not None
-        assert len(pipe_llm.llm_prompt_spec.image_references) == 1
-        ref = pipe_llm.llm_prompt_spec.image_references[0]
+        assert pipe_llm.llm_prompt_spec.user_image_references is not None
+        assert len(pipe_llm.llm_prompt_spec.user_image_references) == 1
+        ref = pipe_llm.llm_prompt_spec.user_image_references[0]
         assert ref.kind == ImageReferenceKind.NESTED
         assert ref.variable_path == "page"
 
@@ -118,8 +118,8 @@ class TestImageReferencesFactoryLevel:
             blueprint=pipe_llm_blueprint,
         )
 
-        assert pipe_llm.llm_prompt_spec.image_references is not None
-        ref = pipe_llm.llm_prompt_spec.image_references[0]
+        assert pipe_llm.llm_prompt_spec.user_image_references is not None
+        ref = pipe_llm.llm_prompt_spec.user_image_references[0]
         assert ref.nested_image_paths is not None
         assert "text_and_images.images" in ref.nested_image_paths
         assert "page_view" in ref.nested_image_paths

@@ -30,17 +30,25 @@ class LLMPromptBlueprint(BaseModel):
     templating_style: TemplatingStyle | None = None
     system_prompt_blueprint: TemplateBlueprint | None = None
     prompt_blueprint: TemplateBlueprint | None = None
-    image_references: list[ImageReference] | None = None
-    document_references: list[DocumentReference] | None = None
+    user_image_references: list[ImageReference] | None = None
+    user_document_references: list[DocumentReference] | None = None
+    system_image_references: list[ImageReference] | None = None
+    system_document_references: list[DocumentReference] | None = None
 
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
-        if self.image_references:
-            image_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.image_references]
+        if self.user_image_references:
+            image_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.user_image_references]
             required_variables.update(image_ref_root_names)
-        if self.document_references:
-            doc_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.document_references]
+        if self.user_document_references:
+            doc_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.user_document_references]
             required_variables.update(doc_ref_root_names)
+        if self.system_image_references:
+            system_image_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.system_image_references]
+            required_variables.update(system_image_ref_root_names)
+        if self.system_document_references:
+            system_doc_ref_root_names = [get_root_from_dotted_path(ref.variable_path) for ref in self.system_document_references]
+            required_variables.update(system_doc_ref_root_names)
 
         if self.prompt_blueprint:
             required_variables.update(self.prompt_blueprint.required_variables())
@@ -63,6 +71,7 @@ class LLMPromptBlueprint(BaseModel):
     ) -> LLMPrompt:
         ############################################################
         # Image Registry and Direct Image Extraction
+        # Extract system prompt images FIRST, then user prompt images
         ############################################################
         image_registry = ImageRegistry()
         # Maps image variable name to its 0-based registry index (for placeholder generation)
@@ -70,9 +79,33 @@ class LLMPromptBlueprint(BaseModel):
         # Track which variable paths are lists, so we can substitute the whole list
         list_image_refs: list[ImageReference] = []
 
-        # Process direct image references (DIRECT and DIRECT_LIST kinds)
-        if self.image_references:
-            for image_ref in self.image_references:
+        # Process system prompt image references first (so they get lower numbers)
+        if self.system_image_references:
+            for image_ref in self.system_image_references:
+                match image_ref.kind:
+                    case ImageReferenceKind.DIRECT:
+                        self._extract_direct_image(
+                            image_ref=image_ref,
+                            context_provider=context_provider,
+                            image_registry=image_registry,
+                            image_registry_indices=image_registry_indices,
+                        )
+                    case ImageReferenceKind.DIRECT_LIST:
+                        self._extract_direct_list_images(
+                            image_ref=image_ref,
+                            context_provider=context_provider,
+                            image_registry=image_registry,
+                            image_registry_indices=image_registry_indices,
+                        )
+                        list_image_refs.append(image_ref)
+                    case ImageReferenceKind.NESTED:
+                        # Nested images will be extracted by the | with_images filter
+                        # during template rendering - the registry is passed in context
+                        pass
+
+        # Process user prompt image references (DIRECT and DIRECT_LIST kinds)
+        if self.user_image_references:
+            for image_ref in self.user_image_references:
                 match image_ref.kind:
                     case ImageReferenceKind.DIRECT:
                         # Single ImageContent reference
@@ -98,12 +131,32 @@ class LLMPromptBlueprint(BaseModel):
 
         ############################################################
         # Direct Document Extraction
+        # Extract system prompt documents FIRST, then user prompt documents
         ############################################################
         prompt_user_documents: dict[str, PromptDocument] = {}
         list_document_refs: list[DocumentReference] = []
 
-        if self.document_references:
-            for doc_ref in self.document_references:
+        # Process system prompt document references first (so they get lower numbers)
+        if self.system_document_references:
+            for doc_ref in self.system_document_references:
+                match doc_ref.kind:
+                    case DocumentReferenceKind.DIRECT:
+                        self._extract_direct_document(
+                            doc_ref=doc_ref,
+                            context_provider=context_provider,
+                            prompt_user_documents=prompt_user_documents,
+                        )
+                    case DocumentReferenceKind.DIRECT_LIST:
+                        self._extract_direct_list_documents(
+                            doc_ref=doc_ref,
+                            context_provider=context_provider,
+                            prompt_user_documents=prompt_user_documents,
+                        )
+                        list_document_refs.append(doc_ref)
+
+        # Process user prompt document references
+        if self.user_document_references:
+            for doc_ref in self.user_document_references:
                 match doc_ref.kind:
                     case DocumentReferenceKind.DIRECT:
                         self._extract_direct_document(

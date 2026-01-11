@@ -29,9 +29,9 @@ class TestDocumentReferencesFactoryLevel:
             blueprint=pipe_llm_blueprint,
         )
 
-        assert pipe_llm.llm_prompt_spec.document_references is not None
-        assert len(pipe_llm.llm_prompt_spec.document_references) == 1
-        ref = pipe_llm.llm_prompt_spec.document_references[0]
+        assert pipe_llm.llm_prompt_spec.user_document_references is not None
+        assert len(pipe_llm.llm_prompt_spec.user_document_references) == 1
+        ref = pipe_llm.llm_prompt_spec.user_document_references[0]
         assert ref.kind == DocumentReferenceKind.DIRECT
         assert ref.variable_path == "document"
 
@@ -52,9 +52,9 @@ class TestDocumentReferencesFactoryLevel:
             blueprint=pipe_llm_blueprint,
         )
 
-        assert pipe_llm.llm_prompt_spec.document_references is not None
-        assert len(pipe_llm.llm_prompt_spec.document_references) == 1
-        ref = pipe_llm.llm_prompt_spec.document_references[0]
+        assert pipe_llm.llm_prompt_spec.user_document_references is not None
+        assert len(pipe_llm.llm_prompt_spec.user_document_references) == 1
+        ref = pipe_llm.llm_prompt_spec.user_document_references[0]
         assert ref.kind == DocumentReferenceKind.DIRECT_LIST
         assert ref.variable_path == "documents"
 
@@ -76,14 +76,14 @@ class TestDocumentReferencesFactoryLevel:
         )
 
         # Should have document reference
-        assert pipe_llm.llm_prompt_spec.document_references is not None
-        assert len(pipe_llm.llm_prompt_spec.document_references) == 1
-        assert pipe_llm.llm_prompt_spec.document_references[0].variable_path == "doc"
+        assert pipe_llm.llm_prompt_spec.user_document_references is not None
+        assert len(pipe_llm.llm_prompt_spec.user_document_references) == 1
+        assert pipe_llm.llm_prompt_spec.user_document_references[0].variable_path == "doc"
 
         # Should have image reference
-        assert pipe_llm.llm_prompt_spec.image_references is not None
-        assert len(pipe_llm.llm_prompt_spec.image_references) == 1
-        assert pipe_llm.llm_prompt_spec.image_references[0].variable_path == "image"
+        assert pipe_llm.llm_prompt_spec.user_image_references is not None
+        assert len(pipe_llm.llm_prompt_spec.user_image_references) == 1
+        assert pipe_llm.llm_prompt_spec.user_image_references[0].variable_path == "image"
 
     def test_text_input_creates_no_document_reference(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that Text input does NOT create document reference."""
@@ -102,4 +102,4 @@ class TestDocumentReferencesFactoryLevel:
             blueprint=pipe_llm_blueprint,
         )
 
-        assert pipe_llm.llm_prompt_spec.document_references is None
+        assert pipe_llm.llm_prompt_spec.user_document_references is None

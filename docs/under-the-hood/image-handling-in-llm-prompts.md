@@ -4,7 +4,9 @@ title: "Image Handling in LLM Prompts"
 
 # Image Handling in LLM Prompts
 
-This document describes how Pipelex handles images in PipeLLM prompts. The system implements a **prompt template-driven inclusion model** where images are sent to the LLM if and only if the prompt template explicitly references them.
+This document describes how Pipelex handles images in PipeLLM prompts. The system implements a **prompt template-driven inclusion model** where images are sent to the LLM if and only if the prompt templates explicitly reference them.
+
+Both `prompt` (user prompt) and `system_prompt` support image references using the same syntax.
 
 ---
 
@@ -76,6 +78,44 @@ prompt = "{{ doc | with_images }}"
 ```
 
 Without `| with_images`, only the text representation is sent. With it, nested images are extracted and included.
+
+---
+
+## System Prompt Support
+
+Images can be referenced in both `system_prompt` and `prompt` using identical syntax:
+
+```toml
+[pipe.analyze_with_context]
+inputs = { context_image = "Image", query_image = "Image" }
+system_prompt = "You are analyzing images. Here is context: $context_image"
+prompt = "Now analyze this image: $query_image"
+```
+
+### Global Numbering
+
+When images appear in both prompts, they share a **global sequential numbering**:
+
+1. **System prompt images are extracted first** - they get lower numbers (`[Image 1]`, `[Image 2]`, etc.)
+2. **User prompt images are extracted second** - they continue the sequence (`[Image 3]`, `[Image 4]`, etc.)
+
+This ensures consistent numbering across the entire prompt sent to the LLM.
+
+### Example
+
+```toml
+[pipe.compare_styles]
+inputs = { reference = "Image", subject = "Image" }
+system_prompt = "Use this reference image for style comparison: $reference"
+prompt = "Analyze the style of this image: $subject"
+```
+
+Results in:
+
+- System prompt: `"Use this reference image for style comparison: [Image 1]"`
+- User prompt: `"Analyze the style of this image: [Image 2]"`
+
+Both images are sent to the LLM in order: `[Image 1]` (reference), `[Image 2]` (subject).
 
 ---
 
@@ -157,7 +197,7 @@ flowchart TB
 
 ### Factory Time: Prompt Template Analysis
 
-When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines the prompt template:
+When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines both `prompt` and `system_prompt` templates:
 
 1. **Parse prompt template AST** - Extract all variable references with their filters
 2. **Resolve types** - Look up each variable's type from input specifications
@@ -166,11 +206,18 @@ When a PipeLLM is created from a blueprint, the `TemplateImageAnalyzer` examines
 
 ```python
 # Stored in PipeLLM after analysis
-image_references = [
+user_image_references = [
     ImageReference(
         variable_path="page",
         kind=ImageReferenceKind.NESTED,
         nested_image_paths=["text_and_images.images", "page_view"]
+    )
+]
+system_image_references = [
+    ImageReference(
+        variable_path="context_image",
+        kind=ImageReferenceKind.DIRECT,
+        nested_image_paths=None
     )
 ]
 ```
@@ -180,10 +227,12 @@ image_references = [
 When the prompt is built:
 
 1. **Create registry** - Fresh `ImageRegistry` for this prompt
-2. **Inject into context** - Registry available to Jinja2 filters
-3. **Render prompt template** - `with_images` filter populates registry during rendering
-4. **Collect images** - Retrieve registered images after rendering
-5. **Build prompt** - Text has tokens, images in separate list
+2. **Extract system prompt images first** - Direct and list references from `system_prompt` are processed first, getting lower numbers
+3. **Extract user prompt images second** - Direct and list references from `prompt` continue the numbering sequence
+4. **Inject registry into context** - Registry available to Jinja2 filters for nested image extraction
+5. **Render both templates** - `with_images` filter populates registry during rendering
+6. **Collect images** - Retrieve all registered images after rendering
+7. **Build prompt** - Both texts have tokens, images in separate list
 
 ---
 
@@ -216,9 +265,9 @@ flowchart TB
     IR -->|"image_references"| RT
 ```
 
-**Factory Time**: The `TemplateImageAnalyzer` parses the prompt template, finds variables with the `| with_images` filter, looks up their types, and pre-computes nested image paths.
+**Factory Time**: The `TemplateImageAnalyzer` parses both `system_prompt` and `prompt` templates, finds variables with image types or the `| with_images` filter, looks up their types, and pre-computes nested image paths.
 
-**Runtime**: Values from working memory are passed through the `with_images` filter, which registers images to the `ImageRegistry` and returns text with `[Image N]` tokens. The final `LLMPrompt` contains both the text and the collected images.
+**Runtime**: System prompt images are extracted first, then user prompt images, ensuring global sequential numbering. Values with nested images are passed through the `with_images` filter, which registers images to the `ImageRegistry` and returns text with `[Image N]` tokens. The final `LLMPrompt` contains both texts and the collected images.
 
 ---
 
