@@ -1,6 +1,6 @@
-"""Standalone HTML rendering for Stuff content.
+"""Standalone HTML viewer rendering for Stuff content.
 
-This module provides functions to render a Stuff object as a standalone HTML page
+This module provides functions to render a Stuff object as a standalone HTML viewer page
 with format tabs (HTML/JSON/Pretty) and action buttons (copy, download, open external).
 """
 
@@ -17,13 +17,13 @@ from pipelex.tools.misc.pretty import PRETTY_WIDTH_FOR_EXPORT
 _STUFF_VIEWER_TEMPLATE_KEY = "stuff/stuff_viewer.html.jinja2"
 
 
-async def render_stuff_html(
+async def render_stuff_viewer(
     stuff: Stuff,
     *,
     title: str | None = None,
     subtitle: str | None = None,
 ) -> str:
-    """Render a Stuff object as a standalone HTML page.
+    """Render a Stuff object as a standalone HTML viewer page.
 
     Creates an HTML page with format tabs (HTML/JSON/Pretty) and action buttons
     (copy, download, open external). Uses the shared templates for consistent
@@ -68,7 +68,7 @@ async def render_stuff_html(
     )
 
 
-async def render_stuff_content_html(
+async def render_stuff_content_viewer(
     stuff_data: str | dict[str, Any] | list[str] | list[dict[str, Any]],
     stuff_data_text: str,
     stuff_data_html: str,
@@ -77,7 +77,7 @@ async def render_stuff_content_html(
     title: str = "Stuff Content",
     subtitle: str | None = None,
 ) -> str:
-    """Render pre-computed stuff content as a standalone HTML page.
+    """Render pre-computed stuff content as a standalone HTML viewer page.
 
     Use this when you already have the various content representations
     (e.g., from IOSpec objects or pre-computed data).

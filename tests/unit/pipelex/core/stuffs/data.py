@@ -727,8 +727,8 @@ class RenderedHtmlTestData:
     ]
 
 
-class StuffHtmlTestData:
-    """Test data for render_stuff_html tests."""
+class StuffViewerTestData:
+    """Test data for render_stuff_viewer tests."""
 
     # Tab label test cases: (content_type, expected_label)
     TAB_LABEL_CASES: ClassVar[list[tuple[str | None, str]]] = [
@@ -769,7 +769,7 @@ class StuffHtmlTestData:
             stuff_code="txt01",
             stuff_name="test_text",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
-            content=StuffHtmlTestData.TEXT_CONTENT,
+            content=StuffViewerTestData.TEXT_CONTENT,
         )
 
     @staticmethod
@@ -784,7 +784,7 @@ class StuffHtmlTestData:
                 description="HTML content",
                 structure_class_name="HtmlContent",
             ),
-            content=StuffHtmlTestData.HTML_CONTENT,
+            content=StuffViewerTestData.HTML_CONTENT,
         )
 
     @staticmethod
@@ -794,7 +794,7 @@ class StuffHtmlTestData:
             stuff_code="img01",
             stuff_name="test_image",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
-            content=StuffHtmlTestData.IMAGE_CONTENT,
+            content=StuffViewerTestData.IMAGE_CONTENT,
         )
 
     @staticmethod
@@ -804,7 +804,7 @@ class StuffHtmlTestData:
             stuff_code="pdf01",
             stuff_name="test_pdf",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PDF),
-            content=StuffHtmlTestData.PDF_CONTENT,
+            content=StuffViewerTestData.PDF_CONTENT,
         )
 
     @staticmethod
@@ -819,7 +819,7 @@ class StuffHtmlTestData:
                 description="Mermaid diagram content",
                 structure_class_name="MermaidContent",
             ),
-            content=StuffHtmlTestData.MERMAID_CONTENT,
+            content=StuffViewerTestData.MERMAID_CONTENT,
         )
 
     @staticmethod
@@ -829,5 +829,5 @@ class StuffHtmlTestData:
             stuff_code="spc01",
             stuff_name="test_special",
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
-            content=StuffHtmlTestData.SPECIAL_CHARS_CONTENT,
+            content=StuffViewerTestData.SPECIAL_CHARS_CONTENT,
         )

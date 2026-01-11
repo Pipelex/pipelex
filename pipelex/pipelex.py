@@ -217,7 +217,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
-        # Register stuff templates first (used by mermaid, reactflow, and stuff_html)
+        # Register stuff templates first (used by mermaid, reactflow, and stuff_viewer)
         stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET
         TemplateLoader.register_set(
             name=stuff_name,

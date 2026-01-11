@@ -1,6 +1,6 @@
-"""Integration tests for stuff_html module.
+"""Integration tests for stuff_viewer module.
 
-These tests verify end-to-end HTML rendering with real templates
+These tests verify end-to-end HTML viewer rendering with real templates
 and the Pipelex framework fully initialized.
 """
 
@@ -11,8 +11,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
-from pipelex.core.stuffs.stuff_html import render_stuff_html
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
+from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
@@ -27,8 +27,8 @@ class SampleDataModel(StructuredContent):
 
 
 @pytest.mark.asyncio(loop_scope="class")
-class TestStuffHtmlIntegration:
-    """Integration tests for render_stuff_html with full framework."""
+class TestStuffViewerIntegration:
+    """Integration tests for render_stuff_viewer with full framework."""
 
     @pytest.fixture(autouse=True)
     def setup_templates(self) -> None:
@@ -53,7 +53,7 @@ class TestStuffHtmlIntegration:
             content=text_content,
         )
 
-        html = await render_stuff_html(stuff)
+        html = await render_stuff_viewer(stuff)
 
         # Verify the complete rendering pipeline works
         assert "<!DOCTYPE html>" in html
@@ -79,7 +79,7 @@ class TestStuffHtmlIntegration:
             content=structured_content,
         )
 
-        html = await render_stuff_html(stuff)
+        html = await render_stuff_viewer(stuff)
 
         # Verify structured data is rendered
         assert "<!DOCTYPE html>" in html
@@ -95,7 +95,7 @@ class TestStuffHtmlIntegration:
             content=TextContent(text="Toolbar test"),
         )
 
-        html = await render_stuff_html(stuff)
+        html = await render_stuff_viewer(stuff)
 
         # Check for format tab elements
         assert "format-tabs" in html or "tab" in html.lower()
@@ -110,7 +110,7 @@ class TestStuffHtmlIntegration:
             content=TextContent(text="Buttons test"),
         )
 
-        html = await render_stuff_html(stuff)
+        html = await render_stuff_viewer(stuff)
 
         # Check for action button elements (copy, download, etc.)
         assert "copy" in html.lower() or "download" in html.lower() or "action" in html.lower()
@@ -124,7 +124,7 @@ class TestStuffHtmlIntegration:
             content=TextContent(text="Structure test"),
         )
 
-        html = await render_stuff_html(stuff)
+        html = await render_stuff_viewer(stuff)
 
         # Verify HTML structure
         assert html.startswith("<!DOCTYPE html>")

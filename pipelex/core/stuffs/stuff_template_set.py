@@ -2,7 +2,7 @@
 
 This module defines the stuff presentation templates used for displaying
 stuff (data) content in HTML viewers. These templates are used by:
-- Standalone stuff HTML viewer (stuff_html.py)
+- Standalone stuff HTML viewer (stuff_viewer.py)
 - Graph visualizations (mermaidflow, reactflow)
 """
 
