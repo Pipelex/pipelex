@@ -6,7 +6,9 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
@@ -32,11 +34,6 @@ class ImageContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        # KLUDGE: avoid
-        # Lazy imports to avoid circular imports
-        from pipelex.cogt.templating.template_category import TemplateCategory  # noqa: PLC0415
-        from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync  # noqa: PLC0415
-
         template_source = '<img src="{{ url|e }}" class="msg-img">'
         return render_jinja2_sync(
             template_source=template_source,

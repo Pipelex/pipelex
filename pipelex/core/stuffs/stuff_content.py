@@ -5,7 +5,7 @@ from kajson import kajson
 from rich.json import JSON
 from typing_extensions import override
 
-from pipelex.cogt.templating.templating_style import TextFormat
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, PrettyRenderable, pretty_print
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 

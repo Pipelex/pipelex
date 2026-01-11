@@ -3,7 +3,8 @@ from typing import Any
 from jinja2 import pass_context
 from jinja2.runtime import Context, Undefined
 
-from pipelex.cogt.templating.templating_style import TagStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.tools.jinja2.jinja2_errors import Jinja2ContextError
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey, Jinja2TaggableAbstract
 from pipelex.types import StrEnum

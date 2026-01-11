@@ -1,19 +1,8 @@
 from pydantic import BaseModel, Field
 from typing_extensions import override
 
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.types import Self, StrEnum
-
-
-class TextFormat(StrEnum):
-    PLAIN = "plain"
-    MARKDOWN = "markdown"
-    HTML = "html"
-    JSON = "json"
-    SPREADSHEET = "spreadsheet"
-
-    @property
-    def render_method_name(self):
-        return f"rendered_{self}"
 
 
 class TagStyle(StrEnum):

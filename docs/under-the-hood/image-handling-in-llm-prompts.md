@@ -281,14 +281,14 @@ StuffArtefact(root={
 The `with_images` filter handles this wrapping transparently:
 
 ```python
-def _render_value_with_images(value, registry, text_format):
+def render_value_with_images(value, registry, text_format):
     # Unwrap StuffArtefact to get actual content
-    if _is_stuff_artefact(value):
+    if isinstance(value, StuffArtefact):
         actual_content = value.root.get("_content")
-        return _render_value_with_images(actual_content, registry, text_format)
+        return render_value_with_images(actual_content, registry, text_format)
 
     # Handle ImageContent
-    if _is_image_content(value):
+    if isinstance(value, ImageContent):
         number = registry.register_image(value)
         return f"[Image {number}]"
 
@@ -296,8 +296,8 @@ def _render_value_with_images(value, registry, text_format):
     ...
 ```
 
-!!! note "Duck Typing"
-    The filter uses duck typing (checking class names and attributes) rather than `isinstance()` to avoid circular imports between the tools and core modules.
+!!! note "Registry Pattern"
+    The type-checking and rendering logic is registered via `Jinja2Registry` during application boot, allowing the low-level filter to use `isinstance()` checks without circular imports.
 
 ---
 
