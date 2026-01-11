@@ -409,27 +409,17 @@ function downloadContent() {
     }
 
     // For PDFs, download the actual PDF file directly
-    // Must fetch and create blob to work around cross-origin download restrictions
     if (contentType === 'application/pdf') {
         const pdfUrl = extractUrl(jsonData);
         if (pdfUrl) {
             const filename = `${baseName.replace(/[^a-zA-Z0-9_-]/g, '_')}.pdf`;
-            fetch(pdfUrl)
-                .then(response => response.blob())
-                .then(blob => {
-                    const url = URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = filename;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                })
-                .catch(err => {
-                    console.error('Failed to download PDF:', err);
-                    window.open(pdfUrl, '_blank');
-                });
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = filename;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
             return;
         }
     }
