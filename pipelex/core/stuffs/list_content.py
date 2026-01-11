@@ -7,6 +7,8 @@ from typing_extensions import override
 
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
+from pipelex.tools.jinja2.image_registry import ImageRegistry
+from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, PrettyPrinter
 
 
@@ -82,6 +84,23 @@ class ListContent(StuffContent, Generic[StuffContentType]):
                 rendered += await item.rendered_str(text_format=TextFormat.MARKDOWN)
                 rendered += "\n"
         return rendered
+
+    @override
+    def render_with_images(
+        self,
+        registry: ImageRegistry,
+        text_format: TextFormat,
+    ) -> str:
+        """Render each item with images."""
+        parts: list[str] = []
+        for item in self.items:
+            if isinstance(item, ImageRenderable):  # pyright: ignore[reportUnnecessaryIsInstance]
+                rendered = item.render_with_images(registry, text_format)
+            else:
+                rendered = str(item)
+            if rendered:
+                parts.append(rendered)
+        return "\n".join(parts)
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

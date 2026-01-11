@@ -6,6 +6,7 @@ from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.cogt.templating.text_format import TextFormat
+from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, PrettyRenderable, pretty_print
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
@@ -83,6 +84,46 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
 
     async def rendered_json(self) -> str:
         return self._render_json()
+
+    # -------------------------------------------------------------------------
+    # ImageRenderable protocol implementation
+    # -------------------------------------------------------------------------
+
+    def render_with_images(
+        self,
+        registry: ImageRegistry,
+        text_format: TextFormat,
+    ) -> str:
+        """Render with image extraction - default iterates model fields.
+
+        This base implementation iterates through all model fields and recursively
+        renders any nested ImageRenderable objects, registering images as it goes.
+
+        Args:
+            registry: ImageRegistry to track discovered images
+            text_format: Format for rendering text content
+
+        Returns:
+            String with [Image N] tokens where images appear
+        """
+        from pipelex.tools.jinja2.image_renderable import ImageRenderable  # noqa: PLC0415
+
+        parts: list[str] = []
+        for field_name in type(self).model_fields:
+            field_value = getattr(self, field_name)
+            if field_value is None:
+                continue
+            if isinstance(field_value, ImageRenderable):
+                rendered = field_value.render_with_images(registry, text_format)
+            else:
+                rendered = str(field_value)
+            if rendered:
+                parts.append(f"{field_name}: {rendered}")
+        return "\n".join(parts)
+
+    # -------------------------------------------------------------------------
+    # Pretty printing
+    # -------------------------------------------------------------------------
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

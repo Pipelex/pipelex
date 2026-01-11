@@ -1,17 +1,42 @@
-from typing import Any
+"""StuffArtefact - Thin adapter providing Jinja2-compatible access to Stuff.
 
-from jinja2.runtime import Context
-from pydantic import RootModel
+This module provides StuffArtefact, a lightweight wrapper around Stuff objects
+that enables them to be used in Jinja2 templates. Unlike the previous implementation
+which flattened Stuff into a dictionary, this version delegates attribute access
+to the underlying Stuff and StuffContent objects.
+
+Example template usage:
+    {{ my_stuff.field_name }}       # Access content field
+    {{ my_stuff._stuff_name }}      # Access metadata
+    {{ my_stuff | tag }}            # Use tag filter
+    {{ my_stuff | with_images }}    # Use with_images filter
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, Iterator
+
 from typing_extensions import override
 
 from pipelex.cogt.templating.text_format import TextFormat
-from pipelex.core.stuffs.exceptions import StuffArtefactError
-from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey, Jinja2TaggableAbstract
 from pipelex.types import StrEnum
 
+if TYPE_CHECKING:
+    from jinja2.runtime import Context
+
+    from pipelex.core.stuffs.stuff import Stuff
+    from pipelex.tools.jinja2.image_registry import ImageRegistry
+
 
 class BaseStuffArtefactField(StrEnum):
+    """Reserved field names for StuffArtefact metadata.
+
+    These fields are accessible via the artefact but are not part of the
+    content model. They use underscore prefixes to avoid conflicts with
+    user-defined content fields.
+    """
+
     STUFF_NAME = "_stuff_name"
     CONTENT_CLASS = "_content_class"
     CONCEPT_CODE = "_concept_code"
@@ -19,73 +44,300 @@ class BaseStuffArtefactField(StrEnum):
     CONTENT = "_content"
 
 
-class StuffArtefact(RootModel[dict[str, Any]], Jinja2TaggableAbstract):
-    """A flattened representation of Stuff and its content as a dictionary.
+# Attributes that should NOT be intercepted and delegated to content
+_PASSTHROUGH_ATTRS = frozenset(
+    {
+        # Core object attributes
+        "_stuff",
+        "_extra",  # Storage for additional attributes set via __setitem__
+        "__class__",
+        "__dict__",
+        "__doc__",
+        # Methods that must remain accessible
+        "render_tagged_for_jinja2",
+        "rendered_str",
+        "render_with_images",
+        "stuff",
+        # Dict-like methods for template iteration
+        "iter_keys",
+        "iter_items",
+        "iter_values",
+        "get",
+        # Magic methods
+        "__getitem__",
+        "__setitem__",
+        "__contains__",
+        "__repr__",
+        "__str__",
+        "__init__",
+        "__getattribute__",
+    }
+)
 
-    This RootModel implementation allows for subscript access to the underlying dictionary
-    while maintaining type safety. It's particularly useful for injecting into jinja2 templates
-    as a context variable.
 
-    Note that in jinja2, subscripts to access the dict values are compatible with the dot notation
-    e.g. {{ variable.field_name }} is equivalent to {{ variable['field_name'] }}
+class StuffArtefact(Jinja2TaggableAbstract):
+    """Thin adapter providing Jinja2-compatible access to Stuff.
+
+    Enables templates to access content fields via dot notation:
+        {{ my_stuff.field_name }}
+        {{ my_stuff._stuff_name }}
+        {{ my_stuff | tag }}
+        {{ my_stuff | with_images }}
+
+    Unlike the previous implementation, this does NOT flatten data.
+    It delegates to the underlying Stuff and StuffContent on access.
+
+    IMPORTANT: Content fields take priority over class methods. This means
+    if your content has a field named 'items', accessing `artefact.items`
+    will return that field value, not the dict-like iteration method.
+    Use `artefact.iter_items()` for explicit dict-like iteration.
+
+    Attributes:
+        _stuff: The underlying Stuff object being wrapped.
     """
+
+    __slots__ = ("_extra", "_stuff")
+
+    def __init__(self, stuff: Stuff) -> None:
+        """Initialize the artefact with a Stuff object.
+
+        Args:
+            stuff: The Stuff object to wrap.
+        """
+        object.__setattr__(self, "_stuff", stuff)
+        object.__setattr__(self, "_extra", {})
+
+    # -------------------------------------------------------------------------
+    # Attribute access for Jinja2 templates
+    # -------------------------------------------------------------------------
 
     @override
     def __getattribute__(self, key: str) -> Any:
-        """Prioritize dict keys over methods for attribute access in Jinja2 templates.
+        """Provide attribute access prioritizing content fields.
 
-        This allows templates to use {{ stuff.items }} to access the 'items' key
-        instead of getting the dict.items() method.
+        Priority:
+        1. Passthrough attributes (_stuff, methods, magic methods)
+        2. Content fields (from stuff.content)
+        3. Metadata fields (_stuff_name, _content_class, etc.)
+        4. Fall back to normal attribute lookup
+
+        Args:
+            key: The attribute name to access.
+
+        Returns:
+            The attribute value.
+
+        Raises:
+            AttributeError: If the attribute is not found.
         """
-        # Allow access to special attributes, 'root', and model-related attributes
-        if key.startswith("_") or key in {"root", "model_dump", "model_config"}:
+        # Always allow access to passthrough attributes
+        if key in _PASSTHROUGH_ATTRS or key.startswith("__"):
             return object.__getattribute__(self, key)
 
-        # Check if it's a key in the root dict first
-        try:
-            root_dict = object.__getattribute__(self, "root")
-            if key in root_dict:
-                return root_dict[key]
-        except AttributeError:
-            pass
+        # Get the underlying stuff - use object.__getattribute__ to avoid recursion
+        stuff = object.__getattribute__(self, "_stuff")
+        content = stuff.content
 
-        # Fall back to normal attribute/method access
-        return object.__getattribute__(self, key)
+        # Check content fields (most common access pattern in templates)
+        content_fields = type(content).model_fields  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        if key in content_fields:
+            return getattr(content, key)
+
+        # Metadata accessors (underscore-prefixed)
+        match key:
+            case "_stuff_name":
+                return stuff.stuff_name
+            case "_content_class":
+                return content.__class__.__name__
+            case "_concept_code":
+                return stuff.concept.code
+            case "_stuff_code":
+                return stuff.stuff_code
+            case "_content":
+                return content
+            case _:
+                # Check extra attributes (set via __setitem__)
+                extra = object.__getattribute__(self, "_extra")
+                if key in extra:
+                    return extra[key]
+                # Fall back to normal attribute lookup for methods etc.
+                return object.__getattribute__(self, key)
 
     def __getitem__(self, key: str) -> Any:
-        return self.root[key]
+        """Support bracket notation: stuff['field'].
+
+        Args:
+            key: The key to access.
+
+        Returns:
+            The value for the key.
+
+        Raises:
+            KeyError: If the key is not found.
+        """
+        try:
+            return getattr(self, key)
+        except AttributeError as exc:
+            raise KeyError(key) from exc
 
     def __setitem__(self, key: str, value: Any) -> None:
-        self.root[key] = value
+        """Support setting values via bracket notation: stuff['field'] = value.
+
+        Note: This stores the value in an internal dict, not in the underlying
+        content. This is needed for backwards compatibility with code that
+        treats StuffArtefact as a mutable dict.
+
+        Args:
+            key: The key to set.
+            value: The value to store.
+        """
+        self._extra[key] = value
 
     def get(self, key: str, default: Any = None) -> Any:
-        return self.root.get(key, default)
+        """Dict-like get method.
+
+        Args:
+            key: The key to access.
+            default: Value to return if key not found.
+
+        Returns:
+            The value for the key, or default if not found.
+        """
+        try:
+            return getattr(self, key)
+        except AttributeError:
+            return default
 
     def __contains__(self, key: str) -> bool:
-        return key in self.root
+        """Support 'in' operator.
 
-    def keys(self):
-        return self.root.keys()
+        Args:
+            key: The key to check.
 
-    def values(self):
-        return self.root.values()
+        Returns:
+            True if the key is accessible, False otherwise.
+        """
+        content_fields = type(self._stuff.content).model_fields  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
-    def items(self):
-        return self.root.items()
+        # Check content fields
+        if key in content_fields:
+            return True
 
-    async def rendered_str(self, text_format: TextFormat) -> str:
-        content = self.root[BaseStuffArtefactField.CONTENT]
-        if not isinstance(content, StuffContent):
-            msg = f"StuffArtefact has no StuffContent, content: {self}"
-            raise StuffArtefactError(msg)
-        return await content.rendered_str(text_format=text_format)
+        # Check metadata fields
+        return key in {"_stuff_name", "_content_class", "_concept_code", "_stuff_code", "_content"}
+
+    # -------------------------------------------------------------------------
+    # Dict-like iteration (for template compatibility)
+    # Named with 'iter_' prefix to avoid conflicts with content fields
+    # -------------------------------------------------------------------------
+
+    def iter_keys(self) -> Iterator[str]:
+        """Yield accessible keys (content fields + metadata).
+
+        Note: Named 'iter_keys' to avoid conflicts with content fields named 'keys'.
+
+        Yields:
+            Field names from content, followed by metadata field names.
+        """
+        # Content fields (use self._stuff since it's in _PASSTHROUGH_ATTRS)
+        yield from type(self._stuff.content).model_fields  # pyright: ignore[reportUnknownMemberType]
+        # Metadata fields
+        for field in BaseStuffArtefactField:
+            yield field.value
+
+    def iter_items(self) -> Iterator[tuple[str, Any]]:
+        """Yield (key, value) pairs.
+
+        Note: Named 'iter_items' to avoid conflicts with content fields named 'items'.
+
+        Yields:
+            Tuples of (key, value) for all accessible fields.
+        """
+        for key in self.iter_keys():
+            yield key, self.get(key)
+
+    def iter_values(self) -> Iterator[Any]:
+        """Yield values.
+
+        Note: Named 'iter_values' to avoid conflicts with content fields named 'values'.
+
+        Yields:
+            Values for all accessible fields.
+        """
+        for key in self.iter_keys():
+            yield self.get(key)
+
+    # -------------------------------------------------------------------------
+    # Jinja2TaggableAbstract implementation
+    # -------------------------------------------------------------------------
 
     @override
-    async def render_tagged_for_jinja2(self, context: Context, tag_name: str | None = None) -> tuple[Any, str | None]:
-        # TODO: factorize the text formatting with the jinja2 "text_format" filter
+    async def render_tagged_for_jinja2(
+        self,
+        context: Context,
+        tag_name: str | None = None,
+    ) -> tuple[Any, str | None]:
+        """Render content with optional tagging.
+
+        Args:
+            context: The Jinja2 context.
+            tag_name: Optional tag name override.
+
+        Returns:
+            Tuple of (rendered_string, tag_name).
+        """
         text_format = context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN)
-        rendered_str = await self.rendered_str(text_format=text_format)
+        rendered_str = await self._stuff.content.rendered_str(text_format=text_format)
+        tag_name = tag_name or self._stuff.stuff_name
+        return rendered_str, tag_name  # pyright: ignore[reportUnknownVariableType]
 
-        tag_name = tag_name or self.get(BaseStuffArtefactField.STUFF_NAME)
+    async def rendered_str(self, text_format: TextFormat) -> str:
+        """Render content as string.
 
-        return rendered_str, tag_name
+        Args:
+            text_format: The format for rendering.
+
+        Returns:
+            The rendered string.
+        """
+        result: str = await self._stuff.content.rendered_str(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
+        return result  # pyright: ignore[reportUnknownVariableType]
+
+    # -------------------------------------------------------------------------
+    # ImageRenderable protocol implementation
+    # -------------------------------------------------------------------------
+
+    def render_with_images(
+        self,
+        registry: ImageRegistry,
+        text_format: TextFormat,
+    ) -> str:
+        """Delegate to content's render_with_images.
+
+        Args:
+            registry: ImageRegistry to track discovered images.
+            text_format: Format for rendering text content.
+
+        Returns:
+            String with [Image N] tokens where images appear.
+        """
+        result: str = self._stuff.content.render_with_images(registry, text_format)  # pyright: ignore[reportUnknownVariableType]
+        return result  # pyright: ignore[reportUnknownVariableType]
+
+    # -------------------------------------------------------------------------
+    # Access to underlying Stuff
+    # -------------------------------------------------------------------------
+
+    @property
+    def stuff(self) -> Stuff:
+        """Access the underlying Stuff object.
+
+        Returns:
+            The wrapped Stuff object.
+        """
+        return self._stuff  # type: ignore[no-any-return]
+
+    @override
+    def __repr__(self) -> str:
+        """Return string representation."""
+        return f"StuffArtefact({self._stuff.stuff_name or 'unnamed'})"

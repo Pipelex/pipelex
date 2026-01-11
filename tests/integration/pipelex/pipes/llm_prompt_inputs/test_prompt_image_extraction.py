@@ -193,7 +193,7 @@ class TestPromptImageExtraction:
         )
 
         # Should raise error because tag converts to string before with_images
-        with pytest.raises(Jinja2TemplateRenderError, match="cannot contain images"):
+        with pytest.raises(Jinja2TemplateRenderError, match="does not implement the ImageRenderable protocol"):
             await pipe_llm.llm_prompt_spec.make_llm_prompt(
                 output_concept_ref="Text",
                 context_provider=working_memory,
