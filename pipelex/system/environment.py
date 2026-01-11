@@ -54,15 +54,15 @@ def is_env_var_truthy(key: str) -> bool:
     return (value is not None) and (value.lower() not in {"false", "0"})
 
 
-def get_pipelexpath_dirs() -> list[Path]:
+def get_pipelexpath_dirs() -> list[Path] | None:
     """Get library directories from PIPELEXPATH environment variable.
 
     PIPELEXPATH uses PATH-style syntax: colon-separated on Unix, semicolon-separated on Windows.
 
     Returns:
-        List of Path objects for each directory in PIPELEXPATH, or empty list if not set.
+        List of Path objects for each directory in PIPELEXPATH, or None if not set.
     """
     pipelexpath = get_optional_env(PIPELEXPATH_ENV_KEY)
-    if not pipelexpath:
-        return []
+    if pipelexpath is None:
+        return None
     return [Path(path_str) for path_str in pipelexpath.split(os.pathsep) if path_str]

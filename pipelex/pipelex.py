@@ -308,12 +308,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
         # Resolve library_dirs: explicit value replaces PIPELEXPATH, otherwise use env var as fallback
+        # When library_dirs is explicitly provided (even if empty), it overrides the env var
         if library_dirs is not None:
             resolved_library_dirs = [Path(dir_path) for dir_path in library_dirs]
-        else:
-            resolved_library_dirs = get_pipelexpath_dirs()
-        if resolved_library_dirs:
             self.pipelex_hub.set_default_library_dirs(resolved_library_dirs)
+        else:
+            pipelexpath_dirs = get_pipelexpath_dirs()
+            if pipelexpath_dirs is not None:
+                self.pipelex_hub.set_default_library_dirs(pipelexpath_dirs)
 
         self.pipeline_manager = pipeline_manager or PipelineManager()
         self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)

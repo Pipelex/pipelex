@@ -1,4 +1,5 @@
 import sys
+from collections.abc import Sequence
 from contextvars import ContextVar
 from pathlib import Path
 from typing import ClassVar, Optional
@@ -35,6 +36,7 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
 from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -437,6 +439,39 @@ def get_current_library() -> str:
 def teardown_current_library() -> None:
     """Teardown the library_id for the current async context."""
     _library_id.set(None)
+
+
+def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tuple[list[Path], str]:
+    """Resolve library directories following the standard 3-tier priority.
+
+    Resolution priority:
+    1. Per-call library_dirs (explicit override)
+    2. Instance-level defaults from Pipelex.make()
+    3. PIPELEXPATH environment variable (fallback)
+
+    Note: An empty list [] is a valid explicit value that disables library loading.
+
+    Args:
+        library_dirs: Optional per-call override. If provided (even if empty),
+            takes precedence over instance defaults and PIPELEXPATH.
+
+    Returns:
+        A tuple of (effective_dirs, source_label) where:
+        - effective_dirs: The resolved list of Path objects
+        - source_label: A string describing the source for logging (e.g., "per-call")
+    """
+    if library_dirs is not None:
+        return [Path(lib_dir) for lib_dir in library_dirs], "per-call"
+
+    hub_defaults = get_pipelex_hub().get_default_library_dirs()
+    if hub_defaults is not None:
+        return hub_defaults, "instance default"
+
+    pipelexpath_dirs = get_pipelexpath_dirs()
+    if pipelexpath_dirs is not None:
+        return pipelexpath_dirs, PIPELEXPATH_ENV_KEY
+
+    return [], "none configured"
 
 
 def get_required_domain(domain_code: str) -> Domain:
