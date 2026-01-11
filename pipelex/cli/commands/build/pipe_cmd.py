@@ -166,9 +166,12 @@ def build_pipe_cmd(
         typer.Option("--graph/--no-graph", help="Generate execution graphs for both build process and built pipeline"),
     ] = None,
     graph_full_data: Annotated[
-        bool,
-        typer.Option("--graph-full-data", help="Include full serialized input/output data in graphs (requires --graph)"),
-    ] = False,
+        bool | None,
+        typer.Option(
+            "--graph-full-data/--graph-no-data",
+            help="Override config: include or exclude full serialized data in graphs (requires --graph)",
+        ),
+    ] = None,
     library_dir: Annotated[
         list[str] | None,
         typer.Option(
@@ -197,7 +200,7 @@ def build_pipe_cmd(
         # Build execution config with graph overrides if --graph is enabled
         execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
             generate_graph=graph,
-            include_full_data=graph_full_data or None,
+            force_include_full_data=graph_full_data,
         )
 
         # Build the pipeline
