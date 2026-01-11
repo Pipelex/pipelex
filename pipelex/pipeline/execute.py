@@ -30,6 +30,7 @@ async def execute_pipeline(
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
+    bundle_path: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
     output_multiplicity: VariableMultiplicity | None = None,
@@ -63,6 +64,10 @@ async def execute_pipeline(
         Complete PLX file content as a string. The pipe to execute is determined by
         ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
         Can be combined with ``library_dirs`` to load additional definitions.
+    bundle_path:
+        Path to the bundle file that ``plx_content`` was loaded from. Used to detect
+        if the bundle was already loaded from library directories (e.g., via PIPELEXPATH)
+        to avoid duplicate domain registration.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -110,6 +115,7 @@ async def execute_pipeline(
             library_dirs=library_dirs,
             pipe_code=pipe_code,
             plx_content=plx_content,
+            bundle_path=bundle_path,
             inputs=inputs,
             output_name=output_name,
             output_multiplicity=output_multiplicity,

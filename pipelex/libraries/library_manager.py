@@ -283,7 +283,14 @@ class LibraryManager(LibraryManagerAbstract):
                 ) from interpreter_error
             blueprints.append(blueprint)
 
-        self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
+        # Store resolved absolute paths for duplicate detection
+        for plx_file_path in valid_plx_paths:
+            try:
+                resolved_path = str(plx_file_path.resolve())
+            except (OSError, RuntimeError):
+                resolved_path = str(plx_file_path)
+            self.loaded_plx_paths.append(resolved_path)
+
         return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
