@@ -87,6 +87,7 @@ class OpenAICompletionsFactory(PluginFactoryAbstract):
     @staticmethod
     def _get_document_filename(prompt_document: PromptDocument) -> str:
         """Generate a filename from a PromptDocument for OpenAI Chat Completions API."""
+        # Note: we hardocde the extension to pdf because OpenAI Chat Completions API only supports PDF files at this stage
         return f"document_{prompt_document.get_content_hash(length=12)}.pdf"
 
     def make_nb_tokens_by_category(self, usage: CompletionUsage) -> NbTokensByCategoryDict:

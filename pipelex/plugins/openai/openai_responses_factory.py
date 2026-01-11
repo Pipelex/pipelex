@@ -5,7 +5,6 @@ from typing import TYPE_CHECKING, Any
 from openai.types.responses import ResponseInputFileParam, ResponseInputImageParam
 from typing_extensions import override
 
-from pipelex.cogt.document.prompt_document import PromptDocument, PromptDocumentUri
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImageDetail
@@ -23,6 +22,7 @@ if TYPE_CHECKING:
         ResponseUsage,
     )
 
+    from pipelex.cogt.document.prompt_document import PromptDocument
     from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
     from pipelex.cogt.llm.llm_job import LLMJob
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -91,16 +91,9 @@ class OpenAIResponsesFactory(PluginFactoryAbstract):
 
     @staticmethod
     def _get_document_filename(prompt_document: PromptDocument) -> str:
-        """Extract the filename from a PromptDocument for OpenAI Responses API."""
-        match prompt_document:
-            case PromptDocumentUri():
-                # Extract filename from URI path
-                uri = prompt_document.uri
-                if "/" in uri:
-                    return uri.rsplit("/", 1)[-1]
-                return uri
-            case _:
-                return "document.pdf"
+        """Generate a filename from a PromptDocument for OpenAI Responses API."""
+        # Note: we hardocde the extension to pdf because OpenAI Responses API only supports PDF files at this stage
+        return f"document_{prompt_document.get_content_hash(length=12)}.pdf"
 
     def make_nb_tokens_by_category(self, usage: ResponseUsage) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
