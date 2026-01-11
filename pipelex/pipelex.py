@@ -1,4 +1,5 @@
 import types
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from kajson.class_registry import ClassRegistry
@@ -49,6 +50,7 @@ from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtoco
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
+from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
 )
@@ -166,6 +168,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         library_manager: LibraryManagerAbstract | None = None,
+        library_dirs: list[str | Path] | None = None,
         **kwargs: Any,
     ):
         if kwargs:
@@ -304,6 +307,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.library_manager = library_manager or LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
+        # Resolve library_dirs: explicit value replaces PIPELEXPATH, otherwise use env var as fallback
+        if library_dirs is not None:
+            resolved_library_dirs = [Path(dir_path) for dir_path in library_dirs]
+        else:
+            resolved_library_dirs = get_pipelexpath_dirs()
+        if resolved_library_dirs:
+            self.pipelex_hub.set_default_library_dirs(resolved_library_dirs)
+
         self.pipeline_manager = pipeline_manager or PipelineManager()
         self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
         self.pipeline_manager.setup()
@@ -376,6 +387,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
+        library_dirs: list[str | Path] | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create and initialize a Pipelex singleton instance.
@@ -398,6 +410,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             telemetry_config: Custom telemetry configuration
             telemetry_manager: Custom telemetry manager
             observers: Custom observers for pipeline events
+            library_dirs: Default library directories for pipeline execution. If provided, these
+                directories will be used instead of the PIPELEXPATH environment variable.
+                Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
             **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
 
         Returns:
@@ -427,6 +442,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 telemetry_config=telemetry_config,
                 telemetry_manager=telemetry_manager,
                 observers=observers,
+                library_dirs=library_dirs,
                 **kwargs,
             )
             pipelex_instance.models_manager.validate_model_deck()

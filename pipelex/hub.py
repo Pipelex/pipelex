@@ -66,6 +66,7 @@ class PipelexHub:
 
         # pipelex
         self._library_manager: LibraryManagerAbstract | None = None
+        self._default_library_dirs: list[Path] | None = None
         self._domain_library: DomainLibraryAbstract | None = None
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
@@ -307,6 +308,12 @@ class PipelexHub:
 
     def set_library_manager(self, library_manager: LibraryManagerAbstract):
         self._library_manager = library_manager
+
+    def set_default_library_dirs(self, library_dirs: list[Path] | None) -> None:
+        self._default_library_dirs = library_dirs
+
+    def get_default_library_dirs(self) -> list[Path] | None:
+        return self._default_library_dirs
 
     def get_library(self) -> Library:
         if self._library_manager is not None:

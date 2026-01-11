@@ -9,6 +9,7 @@ from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
     get_otel_tracer,
+    get_pipelex_hub,
     get_pipeline_manager,
     get_report_delegate,
     get_required_pipe,
@@ -128,23 +129,34 @@ async def pipeline_run_setup(
     pipe: PipeAbstract | None = None
     blueprint: PipelexBundleBlueprint | None = None
 
-    # Combine PIPELEXPATH (env var) with library_dirs (CLI/API args)
-    # PIPELEXPATH provides base directories, library_dirs extends/overrides
-    pipelexpath_dirs = get_pipelexpath_dirs()
-    cli_dirs = [Path(lib_dir) for lib_dir in library_dirs] if library_dirs else []
-    effective_dirs = pipelexpath_dirs + cli_dirs
+    # Library directories resolution priority:
+    # 1. Per-call library_dirs (explicit override)
+    # 2. Instance-level defaults from Pipelex.make()
+    # 3. PIPELEXPATH environment variable (fallback)
+    effective_dirs: list[Path]
+    source_label: str
+    if library_dirs:
+        effective_dirs = [Path(lib_dir) for lib_dir in library_dirs]
+        source_label = "(per-call)"
+    else:
+        hub_defaults = get_pipelex_hub().get_default_library_dirs()
+        if hub_defaults:
+            effective_dirs = hub_defaults
+            source_label = "(instance default)"
+        else:
+            effective_dirs = get_pipelexpath_dirs()
+            source_label = f"({PIPELEXPATH_ENV_KEY})"
 
     if effective_dirs:
-        log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies):")
+        log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) {source_label}:")
         for index_dir, dir_path in enumerate(effective_dirs):
-            source = f"({PIPELEXPATH_ENV_KEY})" if index_dir < len(pipelexpath_dirs) else "(--library-dir)"
-            log.verbose(f"  [{index_dir + 1}] {dir_path} {source}")
+            log.verbose(f"  [{index_dir + 1}] {dir_path}")
         library_manager.load_libraries(
             library_id=library_id,
             library_dirs=effective_dirs,
         )
     else:
-        log.verbose("No library directories specified (PIPELEXPATH not set, no --library-dir provided)")
+        log.verbose("No library directories specified (no per-call dirs, no instance default, PIPELEXPATH not set)")
 
     # Then handle plx_content or pipe_code
     if plx_content:
