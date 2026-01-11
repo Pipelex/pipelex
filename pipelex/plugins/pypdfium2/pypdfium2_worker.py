@@ -3,6 +3,7 @@ from typing import Any
 
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
@@ -73,16 +74,41 @@ class Pypdfium2Worker(ExtractWorkerAbstract):
         # Resolve storage/base64 URIs at worker level; HTTP/local paths pass through
         pdf_input = await self._resolve_pdf_uri(pdf_uri)
 
-        if extract_job.job_params.should_include_images:
+        # max_nb_images: None=unlimited, 0=no images, N=limit to N images
+        max_nb_images = extract_job.job_params.max_nb_images
+        should_extract_images = max_nb_images is None or max_nb_images > 0
+
+        if should_extract_images:
             all_page_images = await pypdfium2_renderer.extract_embedded_images_from_pdf(pdf_input=pdf_input)
         else:
             all_page_images = {}
 
         all_page_texts = await pypdfium2_renderer.extract_text_from_pdf_pages(pdf_input=pdf_input)
         pages: dict[int, Page] = {}
+        total_images_count = 0
+
         for page_index, page_text in enumerate(all_page_texts):
-            if extract_job.job_params.should_include_images:
-                pages[page_index + 1] = Page(text=page_text, extracted_images=all_page_images[page_index + 1])
+            page_number = page_index + 1
+            if should_extract_images and page_number in all_page_images:
+                page_images = all_page_images[page_number]
+                # Apply truncation if max_nb_images is set
+                if max_nb_images is not None:
+                    remaining_slots = max_nb_images - total_images_count
+                    if remaining_slots <= 0:
+                        page_images = []
+                    elif len(page_images) > remaining_slots:
+                        original_count = len(page_images)
+                        page_images = page_images[:remaining_slots]
+                        log.warning(
+                            f"Pypdfium2 extracted {original_count} images on page {page_number}, "
+                            f"truncated to {len(page_images)} (max_nb_images={max_nb_images})"
+                        )
+                total_images_count += len(page_images)
+                pages[page_number] = Page(text=page_text, extracted_images=page_images)
             else:
-                pages[page_index + 1] = Page(text=page_text)
+                pages[page_number] = Page(text=page_text)
+
+        if max_nb_images is not None and total_images_count < sum(len(imgs) for imgs in all_page_images.values()):
+            log.warning(f"Pypdfium2 does not support native image limiting. Extracted all images then truncated to {max_nb_images}.")
+
         return ExtractOutput(pages=pages)

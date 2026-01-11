@@ -10,7 +10,7 @@ class PipeExtractBlueprint(PipeBlueprint):
     type: Literal["PipeExtract"] = "PipeExtract"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     model: ExtractModelChoice | None = None
-    page_images: bool | None = None
+    max_page_images: int | None = None
     page_image_captions: bool | None = None
     page_views: bool | None = None
     page_views_dpi: int | None = None

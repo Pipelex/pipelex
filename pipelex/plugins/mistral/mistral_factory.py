@@ -175,18 +175,21 @@ class MistralFactory:
     async def make_extract_output_from_mistral_response(
         cls,
         mistral_extract_response: mistralai.OCRResponse,
-        should_include_images: bool = False,
     ) -> ExtractOutput:
+        """Convert Mistral OCR response to ExtractOutput.
+
+        Images are included if present in the response (controlled by image_limit in the API call).
+        """
         pages: dict[int, Page] = {}
         for response_page in mistral_extract_response.pages:
+            extracted_images: list[ExtractedImageFromPage] = []
+            for mistral_ocr_image_obj in response_page.images:
+                extracted_image = cls.make_extracted_image_from_page_from_mistral_ocr_image_obj(mistral_ocr_image_obj)
+                extracted_images.append(extracted_image)
             page = Page(
                 text=response_page.markdown,
-                extracted_images=[],
+                extracted_images=extracted_images,
             )
-            if should_include_images:
-                for mistral_ocr_image_obj in response_page.images:
-                    extracted_image = cls.make_extracted_image_from_page_from_mistral_ocr_image_obj(mistral_ocr_image_obj)
-                    page.extracted_images.append(extracted_image)
             pages[response_page.index] = page
 
         return ExtractOutput(

@@ -80,11 +80,16 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         self,
         extract_job: ExtractJob,
     ) -> ExtractOutput:
+        # max_nb_images: None=unlimited, 0=no images, N=limit to N images
+        max_nb_images = extract_job.job_params.max_nb_images
+        should_include_images = max_nb_images is None or max_nb_images > 0
+
         if image_uri := extract_job.extract_input.image_uri:
             if extract_job.job_params.should_caption_images:
                 msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
                 raise NotImplementedError(msg)
             base64_url = await make_base64_url_from_any_uri(uri=image_uri)
+            # Images (as input) don't have embedded images to extract
             extract_output = await self._extract_base64_url(
                 extract_job=extract_job,
                 base64_url=base64_url,
@@ -102,7 +107,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                 extract_job=extract_job,
                 base64_url=base64_url,
                 document_type=DocumentKind.DOCUMENT,
-                should_include_images=extract_job.job_params.should_include_images,
+                should_include_images=should_include_images,
             )
         else:
             msg = "No image nor document URI provided in ExtractJob"

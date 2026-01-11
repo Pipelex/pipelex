@@ -134,11 +134,10 @@ class TestExtract:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
         specific_extract_job_params = ExtractJobParams(
-            should_include_images=True,
+            max_nb_images=None,
             should_caption_images=False,
             should_include_page_views=False,
             page_views_dpi=72,
-            max_nb_images=None,
             image_min_size=None,
         )
         extract_job = ExtractJobFactory.make_extract_job(

@@ -38,7 +38,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     type: Literal["PipeExtract"] = "PipeExtract"
     extract_choice: ExtractModelChoice | None
     should_caption_images: bool
-    should_include_images: bool
+    max_page_images: int | None
     should_include_page_views: bool
     page_views_dpi: int
 
@@ -113,12 +113,14 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         extract_choice: ExtractModelChoice = self.extract_choice or get_model_deck().extract_choice_default
         extract_setting: ExtractSetting = get_model_deck().get_extract_setting(extract_choice=extract_choice)
 
+        # PLX-level max_page_images takes precedence if set, otherwise use ExtractSetting
+        max_nb_images = self.max_page_images if self.max_page_images is not None else extract_setting.max_nb_images
+
         extract_job_params = ExtractJobParams(
-            should_include_images=self.should_include_images,
             should_caption_images=self.should_caption_images,
             should_include_page_views=self.should_include_page_views,
             page_views_dpi=self.page_views_dpi,
-            max_nb_images=extract_setting.max_nb_images,
+            max_nb_images=max_nb_images,
             image_min_size=extract_setting.image_min_size,
         )
         extract_input = ExtractInput(

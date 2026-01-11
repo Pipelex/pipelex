@@ -26,12 +26,12 @@ class PipeExtractInputTestCases:
     )
 
     VALID_IMAGE_WITH_PAGE_IMAGES: ClassVar[tuple[str, PipeExtractBlueprint]] = (
-        "valid_image_with_page_images",
+        "valid_image_with_max_page_images",
         PipeExtractBlueprint(
-            description="Test case: valid_image_with_page_images",
+            description="Test case: valid_image_with_max_page_images",
             inputs={"invoice_image": "native.Image"},
             output="native.Page[]",
-            page_images=True,
+            max_page_images=None,
         ),
     )
 
@@ -52,7 +52,7 @@ class PipeExtractInputTestCases:
             description="Test case: valid_image_with_captions",
             inputs={"report_image": "native.Image"},
             output="native.Page[]",
-            page_images=True,
+            max_page_images=None,
             page_image_captions=True,
         ),
     )

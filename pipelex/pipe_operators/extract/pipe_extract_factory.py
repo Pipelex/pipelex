@@ -66,7 +66,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             extract_choice=blueprint.model,
             image_stuff_name=image_stuff_name,
             document_stuff_name=document_stuff_name,
-            should_include_images=blueprint.page_images or False,
+            max_page_images=blueprint.max_page_images,
             should_caption_images=blueprint.page_image_captions or False,
             should_include_page_views=blueprint.page_views or False,
             page_views_dpi=page_views_dpi,

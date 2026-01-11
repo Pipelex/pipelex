@@ -82,13 +82,12 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             uri=document_uri,
         )
 
+        # max_nb_images: None=unlimited, 0=no images, N=limit to N images
         image_limit: int | None = extract_job_params.max_nb_images
-        image_min_size: int | None = extract_job_params.image_min_size
-        if not extract_job_params.should_include_images:
-            image_limit = 0
-            image_min_size = None
+        image_min_size: int | None = extract_job_params.image_min_size if image_limit != 0 else None
 
-        include_image_base64 = True  # This is only to specify the return format, it's inneffective if should_include_images is False
+        # include_image_base64 specifies return format; image_limit=0 means no images extracted
+        include_image_base64 = True
         extract_response = await self.mistral_client.ocr.process_async(
             model=self.inference_model.model_id,
             document=document,
@@ -99,5 +98,4 @@ class MistralExtractWorker(ExtractWorkerAbstract):
 
         return await MistralFactory.make_extract_output_from_mistral_response(
             mistral_extract_response=extract_response,
-            should_include_images=extract_job_params.should_include_images,
         )

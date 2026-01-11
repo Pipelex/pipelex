@@ -13,6 +13,9 @@ def dump_prompt(llm_prompt: LLMPrompt) -> None:
     if llm_prompt.user_images:
         images_desc = "\n".join([f"-  {image_index + 1}: {image}" for image_index, image in enumerate(llm_prompt.user_images)])
         prompt_dump += f"\n# User images:\n{images_desc}\n"
+    if llm_prompt.user_documents:
+        documents_desc = "\n".join([f"-  {document_index + 1}: {document}" for document_index, document in enumerate(llm_prompt.user_documents)])
+        prompt_dump += f"\n# User documents:\n{documents_desc}\n"
     pretty_print(prompt_dump, title="Prompt sent to LLM provider")
 
 
