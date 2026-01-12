@@ -48,7 +48,7 @@ async def pipeline_run_setup(
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
-    bundle_path: str | None = None,
+    bundle_uri: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
     output_multiplicity: VariableMultiplicity | None = None,
@@ -86,11 +86,11 @@ async def pipeline_run_setup(
         Complete PLX file content as a string. The pipe to execute is determined by
         ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
         Can be combined with ``library_dirs`` to load additional definitions.
-    bundle_path:
-        Path to the bundle file that ``plx_content`` was loaded from. Used to detect
-        if the bundle was already loaded from library directories (e.g., via PIPELEXPATH)
-        to avoid duplicate domain registration. If provided and the resolved absolute path
-        is already in the loaded PLX paths, the ``plx_content`` loading will be skipped.
+    bundle_uri:
+        URI identifying the bundle. Used to detect if the bundle was already loaded
+        from library directories (e.g., via PIPELEXPATH) to avoid duplicate domain
+        registration. If provided and the resolved absolute path is already in the
+        loaded PLX paths, the ``plx_content`` loading will be skipped.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -154,17 +154,17 @@ async def pipeline_run_setup(
 
         # Check if this bundle was already loaded from library directories
         bundle_already_loaded = False
-        if bundle_path:
+        if bundle_uri:
             try:
-                resolved_bundle_path = str(Path(bundle_path).resolve())
+                resolved_bundle_uri = str(Path(bundle_uri).resolve())
             except (OSError, RuntimeError):
                 # Use str(Path(...)) to normalize the path (e.g., "./file.plx" -> "file.plx")
                 # to match the normalization done in library_manager._load_plx_files_into_library
-                resolved_bundle_path = str(Path(bundle_path))
+                resolved_bundle_uri = str(Path(bundle_uri))
             current_library = library_manager.get_library(library_id=library_id)
-            bundle_already_loaded = resolved_bundle_path in current_library.loaded_plx_paths
+            bundle_already_loaded = resolved_bundle_uri in current_library.loaded_plx_paths
             if bundle_already_loaded:
-                log.verbose(f"Bundle '{bundle_path}' already loaded from library directories, skipping duplicate load")
+                log.verbose(f"Bundle '{bundle_uri}' already loaded from library directories, skipping duplicate load")
 
         if not bundle_already_loaded:
             library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result.blueprints)
