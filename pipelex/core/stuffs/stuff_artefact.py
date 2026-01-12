@@ -230,7 +230,11 @@ class StuffArtefact:
             return True
 
         # Check metadata fields
-        return key in {"_stuff_name", "_content_class", "_concept_code", "_stuff_code", "_content"}
+        if key in {"_stuff_name", "_content_class", "_concept_code", "_stuff_code", "_content"}:
+            return True
+
+        # Check extra attributes (set via __setitem__)
+        return key in self._extra
 
     # -------------------------------------------------------------------------
     # Dict-like iteration (for template compatibility)
