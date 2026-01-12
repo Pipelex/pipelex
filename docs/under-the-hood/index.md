@@ -9,6 +9,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 ## What You'll Find Here
 
 - **Architecture Overview** - The two-layer design and how components fit together
+- **Execution Graph Tracing** - How pipeline executions are captured as graphs for visualization
 - **Image Handling in LLM Prompts** - How images flow from inputs to LLM calls
 - **StuffArtefact & Image Rendering** - How template access and image extraction work
 - **Technical Design Decisions** - Why we chose X over Y
@@ -22,5 +23,6 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 ## Start Exploring
 
 - [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button .md-button--primary }
+- [:material-graph: Execution Graph Tracing](./execution-graph-tracing.md){ .md-button }
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button }
 - [:material-code-braces: StuffArtefact & Image Rendering](./stuffartefact-and-image-rendering.md){ .md-button }
