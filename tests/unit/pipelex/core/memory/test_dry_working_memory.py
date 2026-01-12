@@ -104,7 +104,7 @@ class TestDryWorkingMemory:
         assert thoughtful_answer_content.the_answer is not None
 
         log.info("Created mock working memory with structured content:")
-        await dry_memory.pretty_print_summary()
+        dry_memory.pretty_print_summary()
 
     async def test_make_mock_inputs_with_text_content_fallback(self):
         log.info("Testing dry run with TextContent fallback")
@@ -149,7 +149,7 @@ class TestDryWorkingMemory:
         assert conclusion_stuff.concept.domain_code == "test_tricky_questions"
 
         log.info("Created mock working memory with TextContent fallback:")
-        await dry_memory.pretty_print_summary()
+        dry_memory.pretty_print_summary()
 
     async def test_make_mock_inputs_mixed_content_types(self):
         log.info("Testing dry run with mixed content types")
@@ -204,7 +204,7 @@ class TestDryWorkingMemory:
         assert analysis_result_stuff.concept.domain_code == "test_tricky_questions"
 
         log.info("Created mock working memory with mixed content types:")
-        await dry_memory.pretty_print_summary()
+        dry_memory.pretty_print_summary()
 
     async def test_make_mock_inputs_empty_inputs(self):
         log.info("Testing dry run with empty inputs")
@@ -282,7 +282,7 @@ class TestDryWorkingMemory:
         assert len(ta_content.the_answer) > 0
 
         log.info("Created realistic pipeline mock memory:")
-        await dry_memory.pretty_print_summary()
+        dry_memory.pretty_print_summary()
 
         # Log the detailed thoughtful answer content for verification
         log.info("Mock ThoughtfulAnswer details:")
