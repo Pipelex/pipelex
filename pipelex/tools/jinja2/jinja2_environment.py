@@ -7,6 +7,8 @@ from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 def make_jinja2_env_from_loader(
     template_category: TemplateCategory,
     loader: BaseLoader,
+    *,
+    enable_async: bool = True,
 ) -> Environment:
     autoescape: bool
     trim_blocks: bool
@@ -43,7 +45,7 @@ def make_jinja2_env_from_loader(
 
     return Environment(
         loader=loader,
-        enable_async=True,
+        enable_async=enable_async,
         autoescape=autoescape,
         trim_blocks=trim_blocks,
         lstrip_blocks=lstrip_blocks,
@@ -52,9 +54,15 @@ def make_jinja2_env_from_loader(
 
 def make_jinja2_env_without_loader(
     template_category: TemplateCategory,
+    *,
+    enable_async: bool = True,
 ) -> Environment:
     loader = BaseLoader()
-    jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)
+    jinja2_env = make_jinja2_env_from_loader(
+        template_category=template_category,
+        loader=loader,
+        enable_async=enable_async,
+    )
 
     filters = template_category.filters
     for filter_name, filter_function in filters.items():
@@ -64,6 +72,8 @@ def make_jinja2_env_without_loader(
 
 def make_jinja2_env_from_registry(
     template_category: TemplateCategory,
+    *,
+    enable_async: bool = True,
 ) -> Environment:
     """Create Environment with DictLoader from pre-loaded registry.
 
@@ -73,12 +83,17 @@ def make_jinja2_env_from_registry(
 
     Args:
         template_category: The category of templates being rendered.
+        enable_async: Whether to enable async mode for the environment.
 
     Returns:
         A Jinja2 Environment with DictLoader and appropriate filters.
     """
     loader = TemplateRegistry.get_dict_loader()
-    jinja2_env = make_jinja2_env_from_loader(template_category=template_category, loader=loader)
+    jinja2_env = make_jinja2_env_from_loader(
+        template_category=template_category,
+        loader=loader,
+        enable_async=enable_async,
+    )
 
     filters = template_category.filters
     for filter_name, filter_function in filters.items():

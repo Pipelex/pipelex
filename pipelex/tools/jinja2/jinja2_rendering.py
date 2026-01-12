@@ -39,11 +39,18 @@ def _compile_jinja2_template(
     template_category: TemplateCategory,
     *,
     use_registry: bool = False,
+    enable_async: bool = True,
 ) -> _Jinja2Template:
     if use_registry:
-        jinja2_env = make_jinja2_env_from_registry(template_category=template_category)
+        jinja2_env = make_jinja2_env_from_registry(
+            template_category=template_category,
+            enable_async=enable_async,
+        )
     else:
-        jinja2_env = make_jinja2_env_without_loader(template_category=template_category)
+        jinja2_env = make_jinja2_env_without_loader(
+            template_category=template_category,
+            enable_async=enable_async,
+        )
 
     try:
         return jinja2_env.from_string(template_source)
@@ -144,6 +151,7 @@ def render_jinja2_sync(
         template_source=template_source,
         template_category=template_category,
         use_registry=use_registry,
+        enable_async=False,
     )
     prepared_templating_context = _prepare_templating_context(
         templating_context=templating_context,

@@ -72,7 +72,9 @@ class GatewayFactory:
             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
 
         if isinstance(inference_job, ExtractJob):
-            should_include_images = inference_job.job_params.should_include_images
+            # Derive boolean from max_nb_images: None/positive = True, 0 = False
+            max_nb_images = inference_job.job_params.max_nb_images
+            should_include_images = max_nb_images is None or max_nb_images > 0
             extract_protocol = GatewayExtractProtocol.make_from_model_handle(model_handle=inference_model.name)
             match extract_protocol:
                 case GatewayExtractProtocol.MISTRAL_DOC_AI:

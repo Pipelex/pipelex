@@ -4,9 +4,11 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.misc.pretty import PrettyPrintable
 
 
@@ -21,21 +23,64 @@ class TextAndImagesContent(StuffContent):
         image_count = len(self.images) if self.images else 0
         return f"text and image content ({text_count} text, {image_count} images)"
 
+    # -------------------------------------------------------------------------------------
+    # Sync implementations
+    # -------------------------------------------------------------------------------------
+
     @override
-    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_plain(self) -> str:
         if self.text:
-            rendered = await self.text.rendered_markdown(level=level, is_pretty=is_pretty)
+            return self.text.rendered_plain()
+        return ""
+
+    @override
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        if self.text:
+            return self.text.rendered_markdown(level=level, is_pretty=is_pretty)
+        return ""
+
+    # TODO: include the images into the HTML rendering
+    @override
+    def rendered_html(self) -> str:
+        if self.text:
+            return self.text.rendered_html()
+        return ""
+
+    # -------------------------------------------------------------------------------------
+    # Async implementations
+    # -------------------------------------------------------------------------------------
+
+    @override
+    async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
+        if self.text:
+            rendered = await self.text.rendered_markdown_async(level=level, is_pretty=is_pretty)
         else:
             rendered = ""
         return rendered
 
+    # TODO: include the images into the HTML rendering
     @override
-    async def rendered_html(self) -> str:
+    async def rendered_html_async(self) -> str:
         if self.text:
-            rendered = await self.text.rendered_html()
+            rendered = await self.text.rendered_html_async()
         else:
             rendered = ""
         return rendered
+
+    def render_with_images(
+        self,
+        registry: ImageRegistry,
+        text_format: TextFormat,
+    ) -> str:
+        """Render text, then register images."""
+        parts: list[str] = []
+        if self.text:
+            parts.append(self.text.rendered_str(text_format))
+        if self.images:
+            for image in self.images:
+                image_index = registry.register_image(image)
+                parts.append(f"[Image {image_index + 1}]")
+        return "\n".join(parts)
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

@@ -14,7 +14,7 @@ type = "PipeSequence"
 description = """
 Main pipeline that processes CV and job offer PDFs, analyzes their match, and generates targeted interview questions. This is the entry point for the CV-job matching workflow.
 """
-inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
+inputs = { cv_pdf = "Document", job_offer_pdf = "Document" }
 output = "InterviewSheet"
 steps = [
     { pipe = "extract_documents", result = "extracted_documents" },
@@ -27,7 +27,7 @@ steps = [
 [pipe.extract_documents]
 type = "PipeParallel"
 description = "Extracts text content from both the CV and job offer PDFs concurrently"
-inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
+inputs = { cv_pdf = "Document", job_offer_pdf = "Document" }
 output = "Page[]"
 parallels = [
     { pipe = "extract_cv", result = "cv_pages" },
@@ -38,14 +38,14 @@ add_each_output = true
 [pipe.extract_cv]
 type = "PipeExtract"
 description = "Extracts text content from the CV PDF document"
-inputs = { cv_pdf = "PDF" }
+inputs = { cv_pdf = "Document" }
 output = "Page[]"
 model = "pdf_text_extractor"
 
 [pipe.extract_job_offer]
 type = "PipeExtract"
 description = "Extracts text content from the job offer PDF document"
-inputs = { job_offer_pdf = "PDF" }
+inputs = { job_offer_pdf = "Document" }
 output = "Page[]"
 model = "pdf_text_extractor"
 

@@ -50,44 +50,44 @@ costs = { input = 10.0, output = 30.0 }
 
 # --- GPT-4o Series ------------------------------------------------------------
 [gpt-4o-2024-11-20]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 2.5, output = 10.0 }
 
 [gpt-4o]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 2.5, output = 10.0 }
 
 [gpt-4o-mini-2024-07-18]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
 [gpt-4o-mini]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
 # --- GPT-4.1 Series -----------------------------------------------------------
 ["gpt-4.1"]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
 
 ["gpt-4.1-mini"]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.4, output = 1.6 }
 
 ["gpt-4.1-nano"]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
 
 # --- o Series ----------------------------------------------------------------
 [o1]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 15.0, output = 60.0 }
 valued_constraints = { fixed_temperature = 1 }
@@ -99,7 +99,7 @@ costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
 
 [o3]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 10.0, output = 40.0 }
 valued_constraints = { fixed_temperature = 1 }
@@ -112,70 +112,70 @@ valued_constraints = { fixed_temperature = 1 }
 
 # --- GPT-5 Series -------------------------------------------------------------
 [gpt-5]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
 [gpt-5-mini]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.0 }
 valued_constraints = { fixed_temperature = 1 }
 
 [gpt-5-nano]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.4 }
 valued_constraints = { fixed_temperature = 1 }
 
 [gpt-5-chat]
 model_id = "gpt-5-chat-latest"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
 [gpt-5-codex]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
 # --- GPT-5.1 Series -------------------------------------------------------------
 ["gpt-5.1"]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 
 ["gpt-5.1-chat"]
 model_id = "gpt-5.1-chat-latest"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
 ["gpt-5.1-codex"]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
 ["gpt-5.1-codex-max"]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 
 # --- GPT-5.2 Series -------------------------------------------------------------
 ["gpt-5.2"]
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.75, output = 14.0 }
 
 ["gpt-5.2-chat"]
 model_id = "gpt-5.2-chat-latest"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.75, output = 14.0 }
 valued_constraints = { fixed_temperature = 1 }

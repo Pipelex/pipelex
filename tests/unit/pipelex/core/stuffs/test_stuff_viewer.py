@@ -196,7 +196,7 @@ class TestRenderStuffViewer:
         assert ">Image<" in html
 
     async def test_renders_pdf_content_with_pdf_tab_label(self) -> None:
-        """Test that PDFContent has PDF tab label."""
+        """Test that DocumentContent has PDF tab label."""
         stuff = StuffViewerTestData.make_pdf_stuff()
 
         html = await render_stuff_viewer(stuff)

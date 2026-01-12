@@ -6,7 +6,7 @@ For an introduction to concepts, see [Define Your Concepts](define_your_concepts
 
 ## What Are Native Concepts?
 
-Native concepts are ready-to-use building blocks for AI workflows. They represent common data types you'll frequently work with: text, images, PDFs, numbers, and combinations thereof.
+Native concepts are ready-to-use building blocks for AI workflows. They represent common data types you'll frequently work with: text, images, documents, numbers, and combinations thereof.
 
 **Key characteristics:**
 
@@ -23,7 +23,7 @@ Here are all the native concepts you can use out of the box:
 |-----------------|-------------|---------------------|
 | `Text` | A text | `TextContent` |
 | `Image` | An image | `ImageContent` |
-| `PDF` | A PDF document | `PDFContent` |
+| `Document` | A document (PDF, DOCX, PPTX) | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
 | `Number` | A number | `NumberContent` |
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
@@ -66,19 +66,22 @@ class ImageContent(StuffContent):
 
 **Use for:** Photos, generated images, diagrams, screenshots.
 
-### PDFContent
+### DocumentContent
 
-Represents a PDF document:
+Represents a document (PDF, DOCX, PPTX, etc.):
 
 ```python
-class PDFContent(StuffContent):
+class DocumentContent(StuffContent):
     url: str
+    mime_type: str | None = None
 ```
 
 **Fields:**
-- `url`: Location of the PDF file (file path or URL)
 
-**Use for:** Contracts, invoices, reports, any PDF document.
+- `url`: Location of the document file (file path or URL)
+- `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+
+**Use for:** Contracts, invoices, reports, presentations, any document file.
 
 ### NumberContent
 
@@ -155,8 +158,8 @@ Native concepts can be used directly in your pipeline definitions without any ad
 ```plx
 [pipe.analyze_document]
 type = "PipeLLM"
-description = "Analyze a PDF document"
-inputs = { document = "PDF" }
+description = "Analyze a document"
+inputs = { document = "Document" }
 output = "Text"
 prompt = "Analyze this document and provide a summary"
 ```
@@ -180,7 +183,7 @@ The `Page` concept is particularly useful with `PipeExtract`:
 [pipe.extract_pages]
 type = "PipeExtract"
 description = "Extract content from a document"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Page"
 ```
 
@@ -203,7 +206,7 @@ steps = [
 
 ## Refining Native Concepts
 
-You can create more specific concepts by refining native ones—for example, creating an `Invoice` concept that refines `PDF` or a `ProductPhoto` that refines `Image`. This gives you semantic clarity while inheriting the native concept's structure.
+You can create more specific concepts by refining native ones—for example, creating an `Invoice` concept that refines `Document` or a `ProductPhoto` that refines `Image`. This gives you semantic clarity while inheriting the native concept's structure.
 
 **For complete details on refinement syntax, type compatibility, limitations, best practices, and future features, see [Refining Concepts](refining-concepts.md).**
 
@@ -218,7 +221,7 @@ Use native concepts directly when:
 
 Refine native concepts when:
 
-- ✅ You need semantic specificity (e.g., `Invoice` vs `PDF`)
+- ✅ You need semantic specificity (e.g., `Invoice` vs `Document`)
 - ✅ You want to add custom structure on top of the base structure
 - ✅ Building domain-specific workflows
 - ✅ Need type safety for specific document types
@@ -242,7 +245,7 @@ prompt = "Summarize this content: @content"
 [pipe.extract_pages]
 type = "PipeExtract"
 description = "Extract content from a document"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Page[]"
 
 [pipe.analyze_page]
@@ -256,8 +259,8 @@ prompt = """Analyze those pages:
 
 [pipe.extract_and_analyze]
 type = "PipeSequence"
-description = "Extract and analyze a PDF"
-inputs = { document = "PDF" }
+description = "Extract and analyze a document"
+inputs = { document = "Document" }
 output = "Text"
 steps = [
     { pipe = "extract_pages", result = "pages" },

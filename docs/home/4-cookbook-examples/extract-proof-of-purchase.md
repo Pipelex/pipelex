@@ -15,7 +15,7 @@ async def extract_proof_of_purchase(pdf_url: str) -> ProofOfPurchase:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_proof_of_purchase",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
     working_memory = pipe_output.working_memory

@@ -10,7 +10,8 @@ from typing_extensions import override
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import StrEnum
@@ -21,7 +22,6 @@ class TargetFormat(StrEnum):
     MARKDOWN = "markdown"
     HTML = "html"
     JSON = "json"
-    SPREADSHEET = "spreadsheet"
     MERMAID = "mermaid"
 
     @property
@@ -35,8 +35,6 @@ class TargetFormat(StrEnum):
                 return TagStyle.XML
             case TargetFormat.JSON:
                 return TagStyle.SQUARE_BRACKETS
-            case TargetFormat.SPREADSHEET:
-                return TagStyle.NO_TAG
             case TargetFormat.MERMAID:
                 return TagStyle.NO_TAG
 
@@ -51,8 +49,6 @@ class TargetFormat(StrEnum):
                 return TextFormat.HTML
             case TargetFormat.JSON:
                 return TextFormat.JSON
-            case TargetFormat.SPREADSHEET:
-                return TextFormat.SPREADSHEET
             case TargetFormat.MERMAID:
                 return TextFormat.PLAIN
 
@@ -70,8 +66,6 @@ class TargetFormat(StrEnum):
             case TargetFormat.HTML:
                 return TemplateCategory.HTML
             case TargetFormat.JSON:
-                return TemplateCategory.HTML
-            case TargetFormat.SPREADSHEET:
                 return TemplateCategory.HTML
             case TargetFormat.MERMAID:
                 return TemplateCategory.MERMAID

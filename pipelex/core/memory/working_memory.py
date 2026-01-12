@@ -11,12 +11,12 @@ from pipelex.core.memory.exceptions import (
     WorkingMemoryStuffNotFoundError,
     WorkingMemoryTypeError,
 )
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContentType
@@ -60,7 +60,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
     async def pretty_print_summary(self):
         for stuff in self.root.values():
-            content = await stuff.content.rendered_plain()
+            content = await stuff.content.rendered_plain_async()
             if len(content) > PRETTY_PRINT_MAX_LENGTH:
                 content = content[:PRETTY_PRINT_MAX_LENGTH] + "..."
             pretty_print(content, title=f"{stuff.stuff_name} ({stuff.concept.code})")
@@ -211,7 +211,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         This method is primarily used to:
 
         - Find specific content types that require special handling when passed to LLMs,
-          such as Images and Documents (PDFs). These types need to be formatted differently
+          such as Images and Documents. These types need to be formatted differently
           in LLM prompts compared to plain text content.
         - Find the list of items to iterate over in a PipeBatch operation.
 
@@ -223,7 +223,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
                   (e.g., "my_stuff" or "my_stuff.nested_attr.deeper_attr")
             wanted_type: Optional type to validate the retrieved content against. If provided
                          and the content doesn't match, raises WorkingMemoryTypeError.
-                         Commonly used with ImageContent, PDFContent, etc.
+                         Commonly used with ImageContent, DocumentContent, etc.
             accept_list: If True, allows retrieval from ListContent stuffs. If False and the
                          content is ListContent, raises WorkingMemoryTypeError
 
@@ -342,7 +342,7 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         Args:
             list_content: The ListContent to extract items from
             wanted_type: Optional type to validate each item against (e.g., ImageContent,
-                         PDFContent). If None, no type checking is performed
+                         DocumentContent). If None, no type checking is performed
 
         Returns:
             A list of extracted items if all items pass type validation,
@@ -401,9 +401,9 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
         """Get stuff content as TextAndImageContent if applicable."""
         return self.get_stuff(name=name).as_text_and_image
 
-    def get_stuff_as_pdf(self, name: str) -> PDFContent:
-        """Get stuff content as PDFContent if applicable."""
-        return self.get_stuff(name=name).as_pdf
+    def get_stuff_as_document(self, name: str) -> DocumentContent:
+        """Get stuff content as DocumentContent if applicable."""
+        return self.get_stuff(name=name).as_document
 
     def get_stuff_as_number(self, name: str) -> NumberContent:
         """Get stuff content as NumberContent if applicable."""

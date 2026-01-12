@@ -42,17 +42,17 @@ class TestWorkingMemoryGenerateContext:
         # Verify MAIN_STUFF_NAME points to the same artefact
         assert context[MAIN_STUFF_NAME] is context["sample_text"]
 
-    def test_generate_context_single_pdf(self, single_pdf_memory: WorkingMemory):
-        """Test generate_context with single PDF content."""
-        context = single_pdf_memory.generate_context()
+    def test_generate_context_single_document(self, single_document_memory: WorkingMemory):
+        """Test generate_context with single document content."""
+        context = single_document_memory.generate_context()
 
         assert isinstance(context, dict)
-        assert len(context) == 2  # pdf_document + MAIN_STUFF_NAME alias
-        assert "pdf_document" in context
+        assert len(context) == 2  # document_file + MAIN_STUFF_NAME alias
+        assert "document_file" in context
         assert MAIN_STUFF_NAME in context
 
         # Verify artefact structure
-        artefact = context["pdf_document"]
+        artefact = context["document_file"]
         assert isinstance(artefact, StuffArtefact)
         assert BaseStuffArtefactField.CONTENT in artefact
 
@@ -60,7 +60,7 @@ class TestWorkingMemoryGenerateContext:
         assert artefact[BaseStuffArtefactField.CONTENT].url == TestWorkingMemoryData.SAMPLE_PDF_URL
 
         # Verify MAIN_STUFF_NAME points to the same artefact
-        assert context[MAIN_STUFF_NAME] is context["pdf_document"]
+        assert context[MAIN_STUFF_NAME] is context["document_file"]
 
     def test_generate_context_single_image(self, single_image_memory: WorkingMemory):
         """Test generate_context with single image content."""

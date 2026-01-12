@@ -141,7 +141,7 @@ class StructuredCompatibilityTestData:
 
 
 class StuffContentSubclassTestData:
-    """Test data for StuffContent subclass composition tests (ImageContent, PDFContent, etc.)."""
+    """Test data for StuffContent subclass composition tests (ImageContent, DocumentContent, etc.)."""
 
     # ImageContent composition
     IMAGE_GALLERY_CONSTRUCT: ClassVar[dict[str, Any]] = {
@@ -155,7 +155,7 @@ class StuffContentSubclassTestData:
         "cover_image": {"from": "cover"},
     }
 
-    # PDFContent composition
+    # DocumentContent composition
     DOCUMENT_ARCHIVE_CONSTRUCT: ClassVar[dict[str, Any]] = {
         "archive_name": "Legal Documents Archive",
         "main_document": {"from": "main_pdf"},
@@ -211,7 +211,7 @@ class StuffContentSubclassTestData:
         "images": {"from": "image_list"},
     }
 
-    # List of PDFContent
+    # List of DocumentContent
     DOCUMENT_BUNDLE_CONSTRUCT: ClassVar[dict[str, Any]] = {
         "bundle_name": "Contract Bundle",
         "documents": {"from": "pdf_list"},

@@ -18,7 +18,6 @@ api_key = "${PIPELEX_GATEWAY_API_KEY}"
 [anthropic]
 enabled = true
 api_key = "${ANTHROPIC_API_KEY}"
-valued_constraints = { max_output_tokens_limit = 8192 }
 
 [azure_openai]
 display_name = "Azure OpenAI"

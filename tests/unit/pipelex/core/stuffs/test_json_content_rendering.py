@@ -25,7 +25,7 @@ class TestJSONContentRendering:
         """Test plain rendering of simple JSON."""
         json_obj = {"name": "test", "value": 42}
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_plain()
+        output = await content.rendered_plain_async()
 
         # Should be valid JSON
         parsed = json.loads(output)
@@ -41,7 +41,7 @@ class TestJSONContentRendering:
             "active": True,
         }
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_plain()
+        output = await content.rendered_plain_async()
 
         parsed = json.loads(output)
         assert parsed == json_obj
@@ -52,7 +52,7 @@ class TestJSONContentRendering:
         """Test plain rendering of empty JSON."""
         json_obj: dict[str, Any] = {}
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_plain()
+        output = await content.rendered_plain_async()
 
         assert output.strip() == "{}"
 
@@ -63,8 +63,8 @@ class TestJSONContentRendering:
         json_obj = {"name": "test", "value": 42, "nested": {"key": "value"}}
         content = JSONContent(json_obj=json_obj)
 
-        json_output = await content.rendered_json()
-        plain_output = await content.rendered_plain()
+        json_output = await content.rendered_json_async()
+        plain_output = await content.rendered_plain_async()
 
         assert json_output == plain_output
 
@@ -72,7 +72,7 @@ class TestJSONContentRendering:
         """Test that rendered_json produces valid JSON."""
         json_obj = {"items": [1, 2, 3], "metadata": {"count": 3}}
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_json()
+        output = await content.rendered_json_async()
 
         # Should be parseable
         parsed = json.loads(output)
@@ -84,7 +84,7 @@ class TestJSONContentRendering:
         """Test markdown rendering of simple JSON."""
         json_obj = {"name": "test", "value": 42}
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_markdown()
+        output = await content.rendered_markdown_async()
 
         # Should contain key-value pairs
         assert "name" in output
@@ -97,9 +97,9 @@ class TestJSONContentRendering:
         json_obj = {"title": "Test"}
         content = JSONContent(json_obj=json_obj)
 
-        output_level1 = await content.rendered_markdown(level=1)
-        output_level2 = await content.rendered_markdown(level=2)
-        output_level3 = await content.rendered_markdown(level=3)
+        output_level1 = await content.rendered_markdown_async(level=1)
+        output_level2 = await content.rendered_markdown_async(level=2)
+        output_level3 = await content.rendered_markdown_async(level=3)
 
         # Different levels should produce different output
         # (exact format depends on convert_to_markdown implementation)
@@ -113,7 +113,7 @@ class TestJSONContentRendering:
             "settings": {"theme": "dark"},
         }
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_markdown()
+        output = await content.rendered_markdown_async()
 
         # Should contain nested structure
         assert "user" in output
@@ -126,8 +126,8 @@ class TestJSONContentRendering:
         json_obj = {"name": "test", "value": 42}
         content = JSONContent(json_obj=json_obj)
 
-        output_normal = await content.rendered_markdown(is_pretty=False)
-        output_pretty = await content.rendered_markdown(is_pretty=True)
+        output_normal = await content.rendered_markdown_async(is_pretty=False)
+        output_pretty = await content.rendered_markdown_async(is_pretty=True)
 
         # Both should contain the data (pretty mode may capitalize)
         assert "name" in output_normal.lower()
@@ -141,7 +141,7 @@ class TestJSONContentRendering:
         """Test HTML rendering of simple JSON."""
         json_obj = {"name": "test", "value": 42}
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_html()
+        output = await content.rendered_html_async()
 
         # Should contain HTML table structure
         assert "<" in output  # HTML tags
@@ -156,7 +156,7 @@ class TestJSONContentRendering:
             "items": ["apple", "banana"],
         }
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_html()
+        output = await content.rendered_html_async()
 
         # Should contain HTML markup
         assert "<" in output
@@ -168,7 +168,7 @@ class TestJSONContentRendering:
         """Test HTML rendering of empty JSON."""
         json_obj: dict[str, Any] = {}
         content = JSONContent(json_obj=json_obj)
-        output = await content.rendered_html()
+        output = await content.rendered_html_async()
 
         # Should still produce some HTML output
         # (exact format depends on json2html implementation)

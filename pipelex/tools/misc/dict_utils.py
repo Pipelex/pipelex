@@ -114,7 +114,8 @@ def substitute_nested_in_context(context: dict[str, Any], extra_params: dict[str
         The mutated context dictionary
 
     Raises:
-        NestedKeyConflictError: When attempting to create nested keys under a non-dict value
+        NestedKeyConflictError: When attempting to create nested keys under a non-dict value,
+            or under an immutable object that doesn't support item assignment
 
     Example:
         >>> context = {}
@@ -143,10 +144,19 @@ def substitute_nested_in_context(context: dict[str, Any], extra_params: dict[str
                 if segment not in current:
                     # Create new nested dict
                     current[segment] = {}
-                elif not (hasattr(current[segment], "__getitem__") and hasattr(current[segment], "__setitem__")):
-                    # Conflict: trying to nest under a non-dict-like value
-                    # Must support both __getitem__ and __setitem__ to be dict-like (e.g., dict, StuffArtefact)
+                elif not hasattr(current[segment], "__getitem__"):
+                    # Conflict: trying to nest under a primitive value (string, int, etc.)
                     error_message = f"Cannot set nested key '{key}': '{segment}' is not a dict-like object"
+                    log.error(original_context, title="original_context")
+                    log.error(extra_params, title="extra_params")
+                    raise NestedKeyConflictError(error_message)
+                elif not hasattr(current[segment], "__setitem__"):
+                    # Conflict: trying to nest under an immutable object (e.g., StuffArtefact)
+                    error_message = (
+                        f"Cannot set nested key '{key}': '{segment}' is a {type(current[segment]).__name__} "
+                        f"which is immutable (supports reading but not writing). "
+                        f"Use the appropriate filter (e.g., | with_images) instead of nested key substitution."
+                    )
                     log.error(original_context, title="original_context")
                     log.error(extra_params, title="extra_params")
                     raise NestedKeyConflictError(error_message)

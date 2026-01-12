@@ -854,7 +854,7 @@ The monolithic `pipelex.core.stuffs.stuff_content` module has been split into in
 | `TextContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.text_content` |
 | `ImageContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.image_content` |
 | `ListContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.list_content` |
-| `PDFContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.pdf_content` |
+| `DocumentContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.pdf_content` |
 | `PageContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.page_content` |
 | `NumberContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.number_content` |
 | `HtmlContent` | `pipelex.core.stuffs.stuff_content` | `pipelex.core.stuffs.html_content` |
@@ -974,7 +974,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 pipe_output = await execute_pipeline(
     pipe_code="ocr_page_contents_from_pdf",
     inputs={
-        "ocr_input": PDFContent(url=pdf_url),
+        "ocr_input": DocumentContent(url=pdf_url),
     },
 )
 ```
@@ -984,7 +984,7 @@ pipe_output = await execute_pipeline(
 pipe_output = await execute_pipeline(
     pipe_code="extract_page_contents_from_pdf",
     inputs={
-        "document": PDFContent(url=pdf_url),
+        "document": DocumentContent(url=pdf_url),
     },
 )
 ```

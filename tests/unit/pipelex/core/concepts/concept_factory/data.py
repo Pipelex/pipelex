@@ -44,8 +44,8 @@ class TestCases:
         ("my_domain", "Text", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Text")),
         # Test case 4: Native concept code (Image)
         ("my_domain", "Image", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Image")),
-        # Test case 5: Native concept code (PDF)
-        ("my_domain", "PDF", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="PDF")),
+        # Test case 5: Native concept code (Document)
+        ("my_domain", "Document", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Document")),
         # Test case 6: Native concept code with same domain codes provided (native takes precedence)
         ("my_domain", "Text", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Text")),
         # Test case 7: Concept code from same domain

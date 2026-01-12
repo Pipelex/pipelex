@@ -316,12 +316,12 @@ class ContentGenerator(ContentGeneratorProtocol):
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
     ) -> list[ImageContent]:
-        if not extract_input.pdf_uri:
+        if not extract_input.document_uri:
             msg = "PDF URI is required to render page views"
             raise ValueError(msg)
         job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
-        page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.pdf_uri, dpi=page_views_dpi)
+        page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.document_uri, dpi=page_views_dpi)
         page_view_images_resolved: list[ImageContent] = []
         for page_view_image in page_view_images:
             image_content = await self.make_image_content(
@@ -361,7 +361,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         )
         if extract_job_params and extract_job_params.should_include_page_views:
             page_view_contents: list[ImageContent] = []
-            if extract_input.pdf_uri:
+            if extract_input.document_uri:
                 page_view_contents = await self.make_render_page_views(
                     extract_input=extract_input,
                     extract_handle=extract_handle,

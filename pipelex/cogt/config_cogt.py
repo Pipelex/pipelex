@@ -62,8 +62,13 @@ class InstructorConfig(ConfigModel):
     is_dump_error_enabled: bool
 
 
+class AnthropicConfig(ConfigModel):
+    structured_output_timeout_seconds: int
+
+
 class LLMConfig(ConfigModel):
     instructor_config: InstructorConfig
+    anthropic_config: AnthropicConfig
     llm_job_config: LLMJobConfig
     is_structure_prompt_enabled: bool
     default_max_images: int

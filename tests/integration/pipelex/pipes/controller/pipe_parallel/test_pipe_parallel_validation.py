@@ -23,7 +23,7 @@ class TestPipeParallelValidation:
         concept_blueprint = ConceptBlueprint(description="A test document")
         concept_1 = ConceptFactory.make_from_blueprint(
             domain_code=domain_code,
-            concept_code="Document",
+            concept_code="TestDocument",
             blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(
@@ -104,7 +104,7 @@ class TestPipeParallelValidation:
         concept_blueprint = ConceptBlueprint(description="Lorem Ipsum")
         concept_1 = ConceptFactory.make_from_blueprint(
             domain_code=domain_code,
-            concept_code="Document",
+            concept_code="TestDocument",
             blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(
@@ -155,7 +155,7 @@ class TestPipeParallelValidation:
         concept_blueprint = ConceptBlueprint(description="A test document")
         concept_1 = ConceptFactory.make_from_blueprint(
             domain_code=domain_code,
-            concept_code="Document",
+            concept_code="TestDocument",
             blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(

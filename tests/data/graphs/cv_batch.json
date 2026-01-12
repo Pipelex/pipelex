@@ -31,7 +31,7 @@
               "url": "https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"
             },
             "data_text": "{\n    \"url\": \"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\"\n}\n",
-            "data_html": "<a href=\"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\" class=\"msg-pdf\">https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf</a>",
+            "data_html": "<a href=\"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\" class=\"msg-document\">https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf</a>",
             "extra": {}
           },
           {
@@ -114,7 +114,7 @@
               "url": "https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf"
             },
             "data_text": "{\n    \"url\": \"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\"\n}\n",
-            "data_html": "<a href=\"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\" class=\"msg-pdf\">https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf</a>",
+            "data_html": "<a href=\"https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf\" class=\"msg-document\">https://pipelex-web.s3.amazonaws.com/demo/Job-Offer.pdf</a>",
             "extra": {}
           }
         ],
@@ -322,7 +322,7 @@
               "url": "data/CVx5/CV-01.pdf"
             },
             "data_text": "{\n    \"url\": \"data/CVx5/CV-01.pdf\"\n}\n",
-            "data_html": "<a href=\"data/CVx5/CV-01.pdf\" class=\"msg-pdf\">data/CVx5/CV-01.pdf</a>",
+            "data_html": "<a href=\"data/CVx5/CV-01.pdf\" class=\"msg-document\">data/CVx5/CV-01.pdf</a>",
             "extra": {}
           },
           {
@@ -391,7 +391,7 @@
               "url": "data/CVx5/CV-01.pdf"
             },
             "data_text": "{\n    \"url\": \"data/CVx5/CV-01.pdf\"\n}\n",
-            "data_html": "<a href=\"data/CVx5/CV-01.pdf\" class=\"msg-pdf\">data/CVx5/CV-01.pdf</a>",
+            "data_html": "<a href=\"data/CVx5/CV-01.pdf\" class=\"msg-document\">data/CVx5/CV-01.pdf</a>",
             "extra": {}
           }
         ],
@@ -450,7 +450,7 @@
               "url": "data/CVx5/CV-02.pdf"
             },
             "data_text": "{\n    \"url\": \"data/CVx5/CV-02.pdf\"\n}\n",
-            "data_html": "<a href=\"data/CVx5/CV-02.pdf\" class=\"msg-pdf\">data/CVx5/CV-02.pdf</a>",
+            "data_html": "<a href=\"data/CVx5/CV-02.pdf\" class=\"msg-document\">data/CVx5/CV-02.pdf</a>",
             "extra": {}
           },
           {
@@ -519,7 +519,7 @@
               "url": "data/CVx5/CV-02.pdf"
             },
             "data_text": "{\n    \"url\": \"data/CVx5/CV-02.pdf\"\n}\n",
-            "data_html": "<a href=\"data/CVx5/CV-02.pdf\" class=\"msg-pdf\">data/CVx5/CV-02.pdf</a>",
+            "data_html": "<a href=\"data/CVx5/CV-02.pdf\" class=\"msg-document\">data/CVx5/CV-02.pdf</a>",
             "extra": {}
           }
         ],

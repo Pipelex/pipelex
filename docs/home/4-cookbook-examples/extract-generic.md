@@ -15,7 +15,7 @@ async def extract_generic(pdf_url: str) -> TextAndImagesContent:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
     working_memory = pipe_output.working_memory

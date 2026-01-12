@@ -7,11 +7,11 @@ from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -698,8 +698,8 @@ class RenderedHtmlTestData:
     MERMAID_CODE = 'graph TD; A-- "<b>&</b>" -->B'
     MERMAID_EXPECTED = f'<div class="mermaid">{escape(MERMAID_CODE)!s}</div>'
 
-    PDF_URL = "https://example.com/doc.pdf?x=1&y=2"
-    PDF_EXPECTED = f'<a href="{escape(PDF_URL)!s}" class="msg-pdf">{escape(PDF_URL)!s}</a>'
+    DOCUMENT_URL = "https://example.com/doc.pdf?x=1&y=2"
+    DOCUMENT_EXPECTED = f'<a href="{escape(DOCUMENT_URL)!s}" class="msg-document">{escape(DOCUMENT_URL)!s}</a>'
 
     RENDERED_HTML_TEST_CASES: ClassVar[list[tuple[StuffContent, str]]] = [
         (
@@ -721,8 +721,8 @@ class RenderedHtmlTestData:
             MERMAID_EXPECTED,
         ),
         (
-            PDFContent(url=PDF_URL),
-            PDF_EXPECTED,
+            DocumentContent(url=DOCUMENT_URL),
+            DOCUMENT_EXPECTED,
         ),
     ]
 
@@ -752,7 +752,7 @@ class StuffViewerTestData:
         css_class="test-class",
     )
     IMAGE_CONTENT: ClassVar[ImageContent] = ImageContent(url="https://example.com/image.png", mime_type="image/png")
-    PDF_CONTENT: ClassVar[PDFContent] = PDFContent(url="https://example.com/doc.pdf")
+    PDF_CONTENT: ClassVar[DocumentContent] = DocumentContent(url="https://example.com/doc.pdf")
     MERMAID_CONTENT: ClassVar[MermaidContent] = MermaidContent(
         mermaid_code="graph TD; A-->B",
         mermaid_url="https://mermaid.live/view#abc",
@@ -799,11 +799,11 @@ class StuffViewerTestData:
 
     @staticmethod
     def make_pdf_stuff() -> Stuff:
-        """Create a Stuff with PDFContent."""
+        """Create a Stuff with DocumentContent."""
         return Stuff(
             stuff_code="pdf01",
             stuff_name="test_pdf",
-            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PDF),
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
             content=StuffViewerTestData.PDF_CONTENT,
         )
 

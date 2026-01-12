@@ -4,7 +4,8 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
 from tests.cases import Fruit, JINJA2TestCases
 

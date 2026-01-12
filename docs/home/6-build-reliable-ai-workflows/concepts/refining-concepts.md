@@ -9,7 +9,7 @@ Refinement is the process of creating a specialized concept from a more general 
 - **Inherits the structure** of the base concept
 - **Adds semantic specificity** to clarify its purpose
 
-Think of it as creating a subtype: an `Invoice` is a specific kind of `PDF`, and a `Photo` is a specific kind of `Image`.
+Think of it as creating a subtype: an `Invoice` is a specific kind of `Document`, and a `Photo` is a specific kind of `Image`.
 
 ## Why Refine Concepts?
 
@@ -46,11 +46,11 @@ domain = "finance"
 
 [concept.Invoice]
 description = "A commercial invoice"
-refines = "PDF"
+refines = "Document"
 
 [concept.Receipt]
 description = "Proof of payment"
-refines = "PDF"
+refines = "Document"
 
 [pipe.process_invoice]
 type = "PipeLLM"
@@ -84,22 +84,22 @@ output = "Analysis"
     When you refine a concept, you **cannot** add an inline structure or specify a `structure_class_name`. This limitation will be lifted in future releases.
     
     **Not allowed:**
-    ```plx
-    [concept.Invoice]
-    description = "A commercial invoice"
-    refines = "PDF"
-    structure_class_name = "InvoiceModel"  # ❌ Not allowed
-    
-    [concept.Invoice.structure]  # ❌ Not allowed
-    invoice_number = "Invoice ID"
-    ```
-    
-    **Allowed:**
-    ```plx
-    [concept.Invoice]
-    description = "A commercial invoice"
-    refines = "PDF"  # ✅ Inherits PDFContent structure
-    ```
+```plx
+[concept.Invoice]
+description = "A commercial invoice"
+refines = "Document"
+structure_class_name = "InvoiceModel"  # ❌ Not allowed
+
+[concept.Invoice.structure]  # ❌ Not allowed
+invoice_number = "Invoice ID"
+```
+
+**Allowed:**
+```plx
+[concept.Invoice]
+description = "A commercial invoice"
+refines = "Document"  # ✅ Inherits DocumentContent structure
+```
 
 ## Basic Refinement Syntax
 
@@ -111,19 +111,19 @@ description = "Description of the refined concept"
 refines = "NativeConceptName"
 ```
 
-### Refining PDF
+### Refining Document
 
 ```plx
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
-refines = "PDF"
+refines = "Document"
 
 [concept.Contract]
 description = "A legally binding agreement between parties"
-refines = "PDF"
+refines = "Document"
 ```
 
-Both concepts inherit the `PDFContent` structure (with a `url` field) but represent semantically distinct document types.
+Both concepts inherit the `DocumentContent` structure (with a `url` field) but represent semantically distinct document types.
 
 ### Refining Image
 
@@ -160,10 +160,10 @@ Understanding how refined concepts interact with pipe inputs is crucial.
 !!! important "Key Rule"
     A pipe that accepts a **native concept** will **NOT** accept concepts that refine it.
     
-    ```plx
-    [pipe.extract_text]
-    inputs = { document = "PDF" }  # Only accepts PDF, not Invoice or Contract
-    ```
+```plx
+[pipe.extract_text]
+inputs = { document = "Document" }  # Only accepts Document, not Invoice or Contract
+```
     
     If you want a pipe to accept both a native concept and its refinements, you must explicitly define the pipe to accept the refined concepts or use a more general approach.
 
@@ -171,15 +171,15 @@ Understanding how refined concepts interact with pipe inputs is crucial.
 
 ```plx
 [concept.Invoice]
-refines = "PDF"
+refines = "Document"
 
 [concept.Contract]
-refines = "PDF"
+refines = "Document"
 
-# This pipe only accepts generic PDFs
-[pipe.extract_from_pdf]
+# This pipe only accepts generic documents
+[pipe.extract_from_document]
 type = "PipeExtract"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Page"
 
 # This pipe only accepts Invoices
@@ -197,7 +197,7 @@ output = "ContractData"
 
 In this setup:
 
-- `extract_from_pdf` expects exactly `PDF` (not `Invoice` or `Contract`)
+- `extract_from_document` expects exactly `Document` (not `Invoice` or `Contract`)
 - `process_invoice` expects exactly `Invoice`
 - `process_contract` expects exactly `Contract`
 
@@ -208,11 +208,11 @@ In this setup:
 ```plx
 # ❌ Avoid generic or vague names
 [concept.Document1]
-refines = "PDF"
+refines = "Document"
 
 # ✅ Use specific, descriptive names
 [concept.Invoice]
-refines = "PDF"
+refines = "Document"
 ```
 
 ### 2. Write Clear Descriptions
@@ -221,12 +221,12 @@ refines = "PDF"
 # ❌ Too vague
 [concept.Invoice]
 description = "A document"
-refines = "PDF"
+refines = "Document"
 
 # ✅ Clear and specific
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer, detailing products or services provided and payment terms"
-refines = "PDF"
+refines = "Document"
 ```
 
 ### 3. Don't Over-Refine
@@ -235,16 +235,16 @@ refines = "PDF"
 # ❌ Too specific, creates unnecessary complexity
 [concept.SmallInvoice]
 description = "An invoice under $100"
-refines = "PDF"
+refines = "Document"
 
 [concept.LargeInvoice]
 description = "An invoice over $1000"
-refines = "PDF"
+refines = "Document"
 
 # ✅ Keep it general, handle specifics in processing logic
 [concept.Invoice]
 description = "A commercial invoice"
-refines = "PDF"
+refines = "Document"
 ```
 
 ## When to Refine vs. When to Create New Concepts
@@ -258,8 +258,8 @@ refines = "PDF"
 
 **Example:**
 ```plx
-[concept.Invoice]  # Clearly a type of PDF
-refines = "PDF"
+[concept.Invoice]  # Clearly a type of Document
+refines = "Document"
 ```
 
 ### Create New Concept When:

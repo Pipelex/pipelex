@@ -468,7 +468,7 @@ The PipeExtract operator is used to extract text and images from an image or a P
 [pipe.extract_info]
 type = "PipeExtract"
 description = "extract the information"
-inputs = { document = "PDF" } # or { image = "Image" } if it's an image. This is the only input.
+inputs = { document = "Document" } # or { image = "Image" } if it's an image. This is the only input.
 output = "Page"
 ```
 
@@ -477,7 +477,7 @@ Using Extract Model Settings:
 [pipe.extract_with_model]
 type = "PipeExtract"
 description = "Extract with specific model"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Page"
 model = "base_extract_mistral"  # Use predefined extract preset or model alias
 ```

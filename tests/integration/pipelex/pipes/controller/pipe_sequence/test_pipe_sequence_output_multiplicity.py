@@ -349,7 +349,7 @@ class TestPipeSequenceOutputMultiplicity:
         # Create a PipeLLM with single output (process_cv in the example)
         llm_blueprint = PipeLLMBlueprint(
             description="LLM that processes single item",
-            inputs={"cv_pdf": "PDF"},
+            inputs={"cv_pdf": "Document"},
             output="Text",  # Single output
             model="llm_for_testing_gen_text",
             prompt="@cv_pdf",
@@ -364,7 +364,7 @@ class TestPipeSequenceOutputMultiplicity:
         # Create a PipeSequence with variable multiplicity where last step batches
         sequence_blueprint = PipeSequenceBlueprint(
             description="Sequence that batches over CVs",
-            inputs={"cvs": "PDF[]"},  # Multiple PDFs input
+            inputs={"cvs": "Document[]"},  # Multiple PDFs input
             output="Text[]",  # Variable multiplicity output - should match batch_over effect
             steps=[
                 SubPipeBlueprint(
@@ -406,7 +406,7 @@ class TestPipeSequenceOutputMultiplicity:
         # Create a PipeLLM with single output
         llm_blueprint = PipeLLMBlueprint(
             description="LLM that processes single item",
-            inputs={"cv_pdf": "PDF"},
+            inputs={"cv_pdf": "Document"},
             output="Text",  # Single output
             model="llm_for_testing_gen_text",
             prompt="@cv_pdf",
@@ -421,7 +421,7 @@ class TestPipeSequenceOutputMultiplicity:
         # Create a PipeSequence with NO multiplicity where last step batches - MISMATCH
         sequence_blueprint = PipeSequenceBlueprint(
             description="Sequence that batches but declares single output",
-            inputs={"cvs": "PDF[]"},  # Multiple PDFs input
+            inputs={"cvs": "Document[]"},  # Multiple PDFs input
             output="Text",  # No multiplicity - MISMATCH with batch effect!
             steps=[
                 SubPipeBlueprint(
@@ -467,7 +467,7 @@ class TestPipeSequenceOutputMultiplicity:
         # Create a PipeLLM with single output
         llm_blueprint = PipeLLMBlueprint(
             description="LLM that processes single item",
-            inputs={"cv_pdf": "PDF"},
+            inputs={"cv_pdf": "Document"},
             output="Text",  # Single output
             model="llm_for_testing_gen_text",
             prompt="@cv_pdf",
@@ -482,7 +482,7 @@ class TestPipeSequenceOutputMultiplicity:
         # Create a PipeSequence with fixed multiplicity where last step batches with nb_output
         sequence_blueprint = PipeSequenceBlueprint(
             description="Sequence that batches with fixed output count",
-            inputs={"cvs": "PDF[]"},  # Multiple PDFs input
+            inputs={"cvs": "Document[]"},  # Multiple PDFs input
             output="Text[6]",  # Fixed multiplicity - should match nb_output
             steps=[
                 SubPipeBlueprint(

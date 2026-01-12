@@ -311,21 +311,21 @@ def run_cmd(
             main_stuff = pipe_output.working_memory.get_optional_main_stuff()
             if main_stuff:
                 # Save JSON format
-                main_stuff_json = await main_stuff.content.rendered_json()
+                main_stuff_json = await main_stuff.content.rendered_json_async()
                 main_stuff_json_path = output_path / "main_stuff.json"
                 main_stuff_json_path.write_text(main_stuff_json, encoding="utf-8")
                 log.verbose(f"Main stuff JSON saved to: {main_stuff_json_path}")
                 saved_main_stuff_formats.append("json")
 
                 # Save Markdown format
-                main_stuff_md = await main_stuff.content.rendered_markdown()
+                main_stuff_md = await main_stuff.content.rendered_markdown_async()
                 main_stuff_md_path = output_path / "main_stuff.md"
                 main_stuff_md_path.write_text(main_stuff_md, encoding="utf-8")
                 log.verbose(f"Main stuff Markdown saved to: {main_stuff_md_path}")
                 saved_main_stuff_formats.append("md")
 
                 # Save pure HTML rendering
-                main_stuff_html = await main_stuff.content.rendered_html()
+                main_stuff_html = await main_stuff.content.rendered_html_async()
                 main_stuff_html_path = output_path / "main_stuff.html"
                 main_stuff_html_path.write_text(main_stuff_html, encoding="utf-8")
                 log.verbose(f"Main stuff HTML saved to: {main_stuff_html_path}")

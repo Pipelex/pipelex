@@ -6,13 +6,13 @@ system_prompt = "You are an expert at analyzing customer feedback and sentiment"
 CustomerReview = "A single customer review text"
 SentimentAnalysis = "Sentiment analysis result for a review"
 ProductRating = "Overall product rating based on reviews"
-Document = "A document containing multiple customer reviews"
+ReviewDocument = "A document containing multiple customer reviews"
 
 [pipe]
 [pipe.analyze_reviews_sequence]
 type = "PipeSequence"
 description = "Process customer reviews with sentiment analysis"
-inputs = { document = "Document" }
+inputs = { document = "ReviewDocument" }
 output = "ProductRating"
 steps = [
     { pipe = "extract_individual_reviews", result = "review_list" },
@@ -23,7 +23,7 @@ steps = [
 [pipe.extract_individual_reviews]
 type = "PipeLLM"
 description = "Extract individual reviews from document"
-inputs = { document = "Document" }
+inputs = { document = "ReviewDocument" }
 output = "CustomerReview[]"
 model = "llm_for_testing_gen_text"
 prompt = """

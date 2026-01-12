@@ -4,7 +4,19 @@ from pipelex.system.configuration.config_model import ConfigModel
 
 
 class ExtractJobParams(BaseModel):
-    should_include_images: bool
+    """Parameters for extraction jobs.
+
+    Attributes:
+        max_nb_images: Maximum number of images to extract from pages.
+            - None: Extract all images (unlimited)
+            - 0: Extract no images
+            - Positive int: Limit to N images
+        image_min_size: Minimum size in pixels for extracted images.
+        should_caption_images: Whether to generate captions for images.
+        should_include_page_views: Whether to include rendered page views.
+        page_views_dpi: DPI for rendered page views.
+    """
+
     max_nb_images: int | None
     image_min_size: int | None
     should_caption_images: bool
@@ -18,7 +30,6 @@ class ExtractJobParams(BaseModel):
             max_nb_images=None,
             image_min_size=None,
             should_include_page_views=False,
-            should_include_images=True,
             page_views_dpi=None,
         )
 
