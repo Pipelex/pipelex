@@ -6,6 +6,7 @@ from jinja2.runtime import Context, Undefined
 
 from pipelex.cogt.templating.templating_style import TagStyle
 from pipelex.cogt.templating.text_format import TextFormat
+from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_errors import Jinja2ContextError
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.tag_renderable import TagRenderable
@@ -51,6 +52,9 @@ def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
         {{ variable | tag("custom_name") }} # Uses custom tag name
         {{ variable | format | tag }}       # Format first, then tag
 
+    If an ImageRegistry is present in the context and the value is a registered image,
+    returns the image placeholder (e.g., "[Image 1]") instead of rendering the image.
+
     Args:
         context: Jinja2 context (passed automatically via @pass_context).
         value: The value to tag. If it implements TagRenderable, uses render_for_tag().
@@ -67,6 +71,13 @@ def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
         if tag_name:
             msg = f"Cannot use tag filter on undefined value with tag_name '{tag_name}'"
         raise Jinja2ContextError(msg)
+
+    # Check if this is a registered image that should be replaced with a placeholder
+    registry = context.get(Jinja2ContextKey.IMAGE_REGISTRY)
+    if isinstance(registry, ImageRegistry) and hasattr(value, "url"):
+        placeholder = registry.get_placeholder(value)
+        if placeholder is not None:
+            return placeholder
 
     # Protocol-based rendering
     rendered_value: str

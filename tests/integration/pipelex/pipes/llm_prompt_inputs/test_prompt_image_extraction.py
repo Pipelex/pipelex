@@ -309,3 +309,60 @@ class TestPromptImageExtraction:
         assert llm_prompt.user_images is not None
         assert len(llm_prompt.user_images) == 2
         pretty_print(llm_prompt.user_text, title="with_images | tag - images extracted AND wrapped in tags")
+
+    async def test_direct_nested_image_via_dotted_path(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that direct nested image reference via dotted path produces [Image N] token.
+
+        This tests the case where:
+        - inputs declares a dotted path to an image field: {"page.page_view": "Image"}
+        - prompt uses @page.page_view which becomes {{ page.page_view|tag("page.page_view") }}
+        - The tag filter should detect the registered image and return [Image N]
+
+        This verifies that the tag filter correctly substitutes registered images,
+        which is essential for nested image fields on structured content like PageContent.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test direct nested image reference",
+            inputs={"page.page_view": "Image", "page": "Page"},
+            output="Text",
+            prompt="Describe this image: @page.page_view",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_direct_nested_image",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        page_content = PageContent(
+            text_and_images=TextAndImagesContent(
+                text=TextContent(text="Some text content"),
+                images=[],
+            ),
+            page_view=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PAGE),
+                content=page_content,
+                name="page",
+            ),
+        )
+
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # The nested image should be extracted to user_images
+        assert llm_prompt.user_images is not None
+        assert len(llm_prompt.user_images) == 1
+
+        # The prompt text should contain [Image 1] placeholder, NOT the raw ImageContent
+        assert llm_prompt.user_text is not None
+        assert "[Image 1]" in llm_prompt.user_text
+        # Verify it doesn't contain the URL directly (would indicate failed substitution)
+        assert ImageTestCases.IMAGE_FILE_PATH_PNG_1 not in llm_prompt.user_text
+        pretty_print(llm_prompt.user_text, title="Direct nested image via dotted path")

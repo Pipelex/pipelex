@@ -47,7 +47,6 @@ _PASSTHROUGH_ATTRS = frozenset(
     {
         # Core object attributes
         "_stuff",
-        "_extra",  # Storage for additional attributes set via __setitem__
         "__class__",
         "__dict__",
         "__doc__",
@@ -66,7 +65,6 @@ _PASSTHROUGH_ATTRS = frozenset(
         "get",
         # Magic methods
         "__getitem__",
-        "__setitem__",
         "__contains__",
         "__repr__",
         "__str__",
@@ -103,7 +101,7 @@ class StuffArtefact:
         _stuff: The underlying Stuff object being wrapped.
     """
 
-    __slots__ = ("_extra", "_stuff")
+    __slots__ = ("_stuff",)
 
     def __init__(self, stuff: Stuff) -> None:
         """Initialize the artefact with a Stuff object.
@@ -112,7 +110,6 @@ class StuffArtefact:
             stuff: The Stuff object to wrap.
         """
         object.__setattr__(self, "_stuff", stuff)
-        object.__setattr__(self, "_extra", {})
 
     # -------------------------------------------------------------------------
     # Attribute access for Jinja2 templates
@@ -163,10 +160,6 @@ class StuffArtefact:
             case "_content":
                 return content
             case _:
-                # Check extra attributes (set via __setitem__)
-                extra = object.__getattribute__(self, "_extra")
-                if key in extra:
-                    return extra[key]
                 # Fall back to normal attribute lookup for methods etc.
                 return object.__getattribute__(self, key)
 
@@ -186,19 +179,6 @@ class StuffArtefact:
             return getattr(self, key)
         except AttributeError as exc:
             raise KeyError(key) from exc
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        """Support setting values via bracket notation: stuff['field'] = value.
-
-        Note: This stores the value in an internal dict, not in the underlying
-        content. This is needed for backwards compatibility with code that
-        treats StuffArtefact as a mutable dict.
-
-        Args:
-            key: The key to set.
-            value: The value to store.
-        """
-        self._extra[key] = value
 
     def get(self, key: str, default: Any = None) -> Any:
         """Dict-like get method.
@@ -231,11 +211,7 @@ class StuffArtefact:
             return True
 
         # Check metadata fields
-        if key in {"_stuff_name", "_content_class", "_concept_code", "_stuff_code", "_content"}:
-            return True
-
-        # Check extra attributes (set via __setitem__)
-        return key in self._extra
+        return key in {"_stuff_name", "_content_class", "_concept_code", "_stuff_code", "_content"}
 
     # -------------------------------------------------------------------------
     # Dict-like iteration (for template compatibility)

@@ -175,20 +175,19 @@ class LLMPromptBlueprint(BaseModel):
         ############################################################
         # User text
         ############################################################
-        # Replace direct image variables with numbered tags using registry indices
+        # Note: Individual image placeholders are NOT added to extra_params because:
+        # 1. The tag filter handles substitution via ImageRegistry.get_placeholder()
+        # 2. Dotted paths (e.g., "page.page_view") cannot be substituted in immutable StuffArtefacts
         extra_params = extra_params or {}
         if image_registry_indices:
-            for image_name, registry_index in image_registry_indices.items():
-                extra_params[image_name] = f"[Image {registry_index + 1}]"
-
-            # For list image references, also substitute the list variable itself
+            # For list image references, substitute the list variable itself
             # with a string containing all the [Image N] tokens for items in that list
             for list_ref in list_image_refs:
                 list_tokens: list[str] = []
-                for image_name in image_registry_indices:
+                for image_name, registry_index in image_registry_indices.items():
                     # Check if this image belongs to this list (e.g., "collection_a[1]" belongs to "collection_a")
                     if image_name.startswith(f"{list_ref.variable_path}["):
-                        list_tokens.append(extra_params[image_name])
+                        list_tokens.append(f"[Image {registry_index + 1}]")
                 if list_tokens:
                     extra_params[list_ref.variable_path] = "\n".join(list_tokens)
 
