@@ -58,11 +58,10 @@ class ImageContent(StuffContent):
     def rendered_json(self) -> str:
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
 
-    @override
     def render_with_images(
         self,
         registry: ImageRegistry,
-        text_format: TextFormat,
+        text_format: TextFormat,  # noqa: ARG002
     ) -> str:
         """Register this image and return a token."""
         image_index = registry.register_image(self)

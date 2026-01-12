@@ -109,7 +109,6 @@ class ListContent(StuffContent, Generic[StuffContentType]):
                 rendered += "\n"
         return rendered
 
-    @override
     def render_with_images(
         self,
         registry: ImageRegistry,

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from typing_extensions import override
 
+from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -332,9 +333,19 @@ class StuffArtefact:
 
         Returns:
             String with [Image N] tokens where images appear.
+
+        Raises:
+            TypeError: If content type does not implement ImageRenderable.
         """
-        result: str = self._stuff.content.render_with_images(registry, text_format)  # pyright: ignore[reportUnknownVariableType]
-        return result  # pyright: ignore[reportUnknownVariableType]
+        content = self._stuff.content
+        if not isinstance(content, ImageRenderable):
+            msg = (
+                f"Content type {type(content).__name__} does not implement ImageRenderable. "
+                f"The | with_images filter can only be used with content types that may contain images: "
+                f"ImageContent, TextAndImagesContent, ListContent, StructuredContent (and subclasses like PageContent)."
+            )
+            raise TypeError(msg)
+        return content.render_with_images(registry, text_format)
 
     # -------------------------------------------------------------------------
     # Access to underlying Stuff

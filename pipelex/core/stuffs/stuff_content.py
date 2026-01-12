@@ -6,7 +6,6 @@ from rich.json import JSON
 from typing_extensions import override
 
 from pipelex.cogt.templating.text_format import TextFormat
-from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.misc.pretty import PrettyPrintable, PrettyPrinter, PrettyRenderable, pretty_print
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 
@@ -46,6 +45,21 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
         """Sync JSON rendering - defaults to kajson.dumps of smart_dump."""
         return kajson.dumps(self.smart_dump(), indent=4)
 
+    def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+        """Sync rendering based on text format."""
+        match text_format:
+            case TextFormat.PLAIN:
+                return self.rendered_plain()
+            case TextFormat.HTML:
+                return self.rendered_html()
+            case TextFormat.MARKDOWN:
+                return self.rendered_markdown()
+            case TextFormat.JSON:
+                return self.rendered_json()
+            case TextFormat.CSV:
+                msg = "CSV rendering is not supported yet"
+                raise NotImplementedError(msg)
+
     # -------------------------------------------------------------------------------------
     # Override these in subclasses that need async operations
     # -------------------------------------------------------------------------------------
@@ -77,42 +91,6 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
 
     async def rendered_json_async(self) -> str:
         return self.rendered_json()
-
-    # -------------------------------------------------------------------------
-    # ImageRenderable protocol implementation
-    # -------------------------------------------------------------------------
-
-    def render_with_images(
-        self,
-        registry: ImageRegistry,
-        text_format: TextFormat,
-    ) -> str:
-        """Render with image extraction - default iterates model fields.
-
-        This base implementation iterates through all model fields and recursively
-        renders any nested ImageRenderable objects, registering images as it goes.
-
-        Args:
-            registry: ImageRegistry to track discovered images
-            text_format: Format for rendering text content
-
-        Returns:
-            String with [Image N] tokens where images appear
-        """
-        from pipelex.tools.jinja2.image_renderable import ImageRenderable  # noqa: PLC0415
-
-        parts: list[str] = []
-        for field_name in type(self).model_fields:
-            field_value = getattr(self, field_name)
-            if field_value is None:
-                continue
-            if isinstance(field_value, ImageRenderable):
-                rendered = field_value.render_with_images(registry, text_format)
-            else:
-                rendered = str(field_value)
-            if rendered:
-                parts.append(f"{field_name}: {rendered}")
-        return "\n".join(parts)
 
     # -------------------------------------------------------------------------
     # Pretty printing

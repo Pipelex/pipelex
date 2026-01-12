@@ -67,7 +67,6 @@ class TextAndImagesContent(StuffContent):
             rendered = ""
         return rendered
 
-    @override
     def render_with_images(
         self,
         registry: ImageRegistry,
@@ -76,7 +75,7 @@ class TextAndImagesContent(StuffContent):
         """Render text, then register images."""
         parts: list[str] = []
         if self.text:
-            parts.append(self.text.rendered_plain())  # pyright: ignore[reportPrivateUsage]
+            parts.append(self.text.rendered_str(text_format))
         if self.images:
             for image in self.images:
                 image_index = registry.register_image(image)
