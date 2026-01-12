@@ -67,7 +67,31 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         )
         return html
 
-    # Keep async for recursive methods that need to await nested content
+    # -------------------------------------------------------------------------------------
+    # Sync implementations
+    # -------------------------------------------------------------------------------------
+
+    @override
+    def rendered_plain(self) -> str:
+        return self.rendered_markdown()
+
+    @override
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        rendered = ""
+        if self._single_class_name == "TextContent":
+            for item in self.items:
+                rendered += f" • {item}\n"
+        else:
+            for item_index, item in enumerate(self.items):
+                rendered += f"\n • item #{item_index + 1}:\n\n"
+                rendered += item.rendered_markdown(level=level, is_pretty=is_pretty)
+                rendered += "\n"
+        return rendered
+
+    # -------------------------------------------------------------------------------------
+    # Async implementations - kept for recursive methods that may need to await nested content
+    # -------------------------------------------------------------------------------------
+
     @override
     async def rendered_plain_async(self) -> str:
         return await self.rendered_markdown_async()

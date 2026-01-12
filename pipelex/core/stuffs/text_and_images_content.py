@@ -23,6 +23,33 @@ class TextAndImagesContent(StuffContent):
         image_count = len(self.images) if self.images else 0
         return f"text and image content ({text_count} text, {image_count} images)"
 
+    # -------------------------------------------------------------------------------------
+    # Sync implementations
+    # -------------------------------------------------------------------------------------
+
+    @override
+    def rendered_plain(self) -> str:
+        if self.text:
+            return self.text.rendered_plain()
+        return ""
+
+    @override
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+        if self.text:
+            return self.text.rendered_markdown(level=level, is_pretty=is_pretty)
+        return ""
+
+    # TODO: include the images into the HTML rendering
+    @override
+    def rendered_html(self) -> str:
+        if self.text:
+            return self.text.rendered_html()
+        return ""
+
+    # -------------------------------------------------------------------------------------
+    # Async implementations
+    # -------------------------------------------------------------------------------------
+
     @override
     async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
         if self.text:
@@ -31,6 +58,7 @@ class TextAndImagesContent(StuffContent):
             rendered = ""
         return rendered
 
+    # TODO: include the images into the HTML rendering
     @override
     async def rendered_html_async(self) -> str:
         if self.text:
