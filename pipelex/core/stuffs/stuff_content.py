@@ -56,9 +56,6 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
                 return self.rendered_markdown()
             case TextFormat.JSON:
                 return self.rendered_json()
-            case TextFormat.CSV:
-                msg = "CSV rendering is not supported yet"
-                raise NotImplementedError(msg)
 
     # -------------------------------------------------------------------------------------
     # Override these in subclasses that need async operations
@@ -74,9 +71,6 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
                 return await self.rendered_markdown_async()
             case TextFormat.JSON:
                 return await self.rendered_json_async()
-            case TextFormat.CSV:
-                msg = "CSV rendering is not supported yet"
-                raise NotImplementedError(msg)
 
     async def rendered_plain_async(self) -> str:
         return self.rendered_plain()

@@ -6,7 +6,6 @@ class TextFormat(StrEnum):
     MARKDOWN = "markdown"
     HTML = "html"
     JSON = "json"
-    CSV = "csv"
 
     @property
     def render_method_name(self):
