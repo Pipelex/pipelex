@@ -594,7 +594,7 @@ class TestPromptImageExtraction:
         assert prompt_dollar.user_images is not None
         assert len(prompt_at.user_images) == len(prompt_dollar.user_images) == 3
 
-        # $images should produce [Image 1]\n[Image 2]\n[Image 3] inline
+        # $images should produce [Image 1], [Image 2], [Image 3] inline
         assert prompt_dollar.user_text is not None
         assert "[Image 1]" in prompt_dollar.user_text
         assert "[Image 2]" in prompt_dollar.user_text
