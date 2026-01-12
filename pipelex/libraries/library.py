@@ -39,6 +39,7 @@ class Library(BaseModel):
         self.pipe_library.teardown()
         self.concept_library.teardown()
         self.domain_library.teardown()
+        self.loaded_plx_paths = []
 
     def validate_library(self) -> None:
         self.validate_pipe_library_with_libraries()

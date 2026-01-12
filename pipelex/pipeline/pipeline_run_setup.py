@@ -297,7 +297,6 @@ async def pipeline_run_setup(
             if tracer_manager is not None:
                 tracer_manager.close_tracer(pipeline_run_id)
         # Cleanup library
-        library = library_manager.get_library(library_id=library_id)
-        library.teardown()
+        library_manager.teardown(library_id=library_id)
         teardown_current_library()
         raise
