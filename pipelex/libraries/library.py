@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.libraries.concept.concept_library import ConceptLibrary
@@ -24,6 +24,7 @@ class Library(BaseModel):
     domain_library: DomainLibrary
     concept_library: ConceptLibrary
     pipe_library: PipeLibrary
+    loaded_plx_paths: list[str] = Field(default_factory=list)
 
     def get_domain_library(self) -> DomainLibrary:
         return self.domain_library

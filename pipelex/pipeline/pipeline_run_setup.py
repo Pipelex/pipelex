@@ -159,7 +159,8 @@ async def pipeline_run_setup(
                 resolved_bundle_path = str(Path(bundle_path).resolve())
             except (OSError, RuntimeError):
                 resolved_bundle_path = bundle_path
-            bundle_already_loaded = resolved_bundle_path in library_manager.loaded_plx_paths
+            current_library = library_manager.get_library(library_id=library_id)
+            bundle_already_loaded = resolved_bundle_path in current_library.loaded_plx_paths
             if bundle_already_loaded:
                 log.verbose(f"Bundle '{bundle_path}' already loaded from library directories, skipping duplicate load")
 

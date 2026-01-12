@@ -10,8 +10,6 @@ if TYPE_CHECKING:
 
 
 class LibraryManagerAbstract(ABC):
-    loaded_plx_paths: list[str]
-
     @abstractmethod
     def setup(self) -> None:
         pass

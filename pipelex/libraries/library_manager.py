@@ -39,7 +39,6 @@ class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
-        self.loaded_plx_paths: list[str] = []
         self._pipe_source_map: dict[str, Path] = {}  # pipe_code -> source .plx file
 
     ############################################################
@@ -283,13 +282,14 @@ class LibraryManager(LibraryManagerAbstract):
                 ) from interpreter_error
             blueprints.append(blueprint)
 
-        # Store resolved absolute paths for duplicate detection
+        # Store resolved absolute paths for duplicate detection in the library
+        library = self.get_library(library_id=library_id)
         for plx_file_path in valid_plx_paths:
             try:
                 resolved_path = str(plx_file_path.resolve())
             except (OSError, RuntimeError):
                 resolved_path = str(plx_file_path)
-            self.loaded_plx_paths.append(resolved_path)
+            library.loaded_plx_paths.append(resolved_path)
 
         return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
