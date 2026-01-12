@@ -46,10 +46,6 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
         """Sync JSON rendering - defaults to kajson.dumps of smart_dump."""
         return kajson.dumps(self.smart_dump(), indent=4)
 
-    def rendered_spreadsheet(self) -> str:
-        """Sync spreadsheet rendering - defaults to plain text."""
-        return self.rendered_plain()
-
     # -------------------------------------------------------------------------------------
     # Override these in subclasses that need async operations
     # -------------------------------------------------------------------------------------
@@ -64,8 +60,9 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
                 return await self.rendered_markdown_async()
             case TextFormat.JSON:
                 return await self.rendered_json_async()
-            case TextFormat.SPREADSHEET:
-                return await self.render_spreadsheet_async()
+            case TextFormat.CSV:
+                msg = "CSV rendering is not supported yet"
+                raise NotImplementedError(msg)
 
     async def rendered_plain_async(self) -> str:
         return self.rendered_plain()
@@ -77,9 +74,6 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
         """Default Markdown rendering - subclasses can override for custom rendering."""
         return self.rendered_markdown(level=level, is_pretty=is_pretty)
-
-    async def render_spreadsheet_async(self) -> str:
-        return self.rendered_spreadsheet()
 
     async def rendered_json_async(self) -> str:
         return self.rendered_json()

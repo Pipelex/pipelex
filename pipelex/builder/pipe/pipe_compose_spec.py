@@ -53,7 +53,7 @@ class TargetFormat(StrEnum):
             case TargetFormat.JSON:
                 return TextFormat.JSON
             case TargetFormat.SPREADSHEET:
-                return TextFormat.SPREADSHEET
+                return TextFormat.CSV
             case TargetFormat.MERMAID:
                 return TextFormat.PLAIN
 
