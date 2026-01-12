@@ -35,7 +35,7 @@ jobs:
         with:
           path-to-signatures: "signatures/version1/cla.json"
           path-to-document: "https://github.com/Pipelex/pipelex/blob/main/CLA.md"
-          branch: fix/cla
+          branch: main
           allowlist: ${{ vars.CLA_ALLOWLIST }}
           remote-organization-name: Pipelex
           remote-repository-name: cla-signatures
