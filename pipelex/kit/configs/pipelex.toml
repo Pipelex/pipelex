@@ -18,7 +18,7 @@
 # - Logging levels and behavior
 # - Excluded directories for scanning
 # - LLM prompt dumping for debugging
-# - Feature flags for tracking and reporting
+# - Feature flags
 # - Observer and reporting output directories
 #
 # Documentation: https://docs.pipelex.com
@@ -124,7 +124,6 @@ error_stack_traces = true
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags:
-# is_pipeline_tracking_enabled = false
 # is_reporting_enabled = true
 
 [pipelex.reporting_config]
