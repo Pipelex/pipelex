@@ -313,40 +313,35 @@ registry.register_image(img_b)  # Returns 2
 
 ## Working with StuffArtefact
 
-Values from working memory arrive wrapped in `StuffArtefact`, a Pydantic `RootModel` that provides template-friendly access.
+Values from working memory arrive wrapped in `StuffArtefact`, a thin delegation adapter that provides template-friendly access to content fields.
 
-### Structure
+### Template Access
+
+StuffArtefact delegates attribute access to the underlying content:
 
 ```python
-StuffArtefact(root={
-    "_stuff_name": "page",
-    "_content_class": "PageContent",
-    "_content": PageContent(...)  # The actual content
-})
+# In template: {{ page.title }}
+# StuffArtefact delegates to: page._stuff.content.title
 ```
 
 ### Filter Handling
 
-The `with_images` filter handles this wrapping transparently:
+The `with_images` filter uses the `ImageRenderable` protocol to handle StuffArtefact transparently:
 
 ```python
-def render_value_with_images(value, registry, text_format):
-    # Unwrap StuffArtefact to get actual content
-    if isinstance(value, StuffArtefact):
-        actual_content = value.root.get("_content")
-        return render_value_with_images(actual_content, registry, text_format)
+# StuffArtefact implements ImageRenderable
+if isinstance(value, ImageRenderable):
+    return value.render_with_images(registry, text_format)
 
-    # Handle ImageContent
-    if isinstance(value, ImageContent):
-        number = registry.register_image(value)
-        return f"[Image {number}]"
-
-    # Recurse into struct fields, lists, etc.
-    ...
+# StuffArtefact.render_with_images() delegates to content
+def render_with_images(self, registry, text_format) -> str:
+    return self._stuff.content.render_with_images(registry, text_format)
 ```
 
-!!! note "Registry Pattern"
-    The type-checking and rendering logic is registered via `Jinja2Registry` during application boot, allowing the low-level filter to use `isinstance()` checks without circular imports.
+!!! note "ImageRenderable Protocol"
+    The `ImageRenderable` protocol uses `@runtime_checkable` to enable `isinstance()` checks without importing concrete types—avoiding circular imports between the Jinja2 layer and domain layer.
+
+For detailed information on StuffArtefact's delegation pattern and the ImageRenderable protocol, see [:material-code-braces: StuffArtefact & Image Rendering](./stuffartefact-and-image-rendering.md).
 
 ---
 
@@ -366,7 +361,7 @@ The system validates image usage at both factory time and runtime:
 | Condition | Error |
 |-----------|-------|
 | `with_images` on undefined value | "Cannot use with_images filter on undefined value" |
-| `with_images` on non-structured data (e.g., string) | "The with_images filter received a X which cannot contain images" |
+| `with_images` on non-ImageRenderable type (e.g., string) | "X does not implement the ImageRenderable protocol" |
 
 The runtime check catches cases where filter chaining converts structured data to a string before `with_images` runs (e.g., `{{ pages | tag | with_images }}`).
 

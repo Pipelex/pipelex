@@ -10,6 +10,6 @@ class TestRenderedHtml:
 
     @pytest.mark.parametrize(("content", "expected"), RenderedHtmlTestData.RENDERED_HTML_TEST_CASES)
     async def test_rendered_html(self, content: StuffContent, expected: str):
-        rendered = await content.rendered_html()
+        rendered = await content.rendered_html_async()
 
         assert rendered == expected

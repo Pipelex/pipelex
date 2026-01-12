@@ -11,11 +11,13 @@ import pytest
 from jinja2.runtime import Context, Undefined
 
 from pipelex.cogt.templating.text_format import TextFormat
-from pipelex.core.stuffs.jinja2_stuff_handlers import render_value_with_images
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_errors import Jinja2ContextError
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
-from pipelex.tools.jinja2.jinja2_with_images_filter import with_images
+from pipelex.tools.jinja2.jinja2_with_images_filter import (
+    _render_sequence_with_images,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    with_images,
+)
 
 
 class TestWithImagesFilterValidation:
@@ -55,7 +57,7 @@ class TestWithImagesFilterValidation:
         context = MagicMock(spec=Context)
         context.get = lambda key, default=None: context_dict.get(key, default)  # pyright: ignore[reportUnknownLambdaType, reportUnknownArgumentType]
 
-        # Pass a list (which CAN contain images) to trigger the registry type check
+        # Pass a list (which is accepted by the filter) to trigger the registry type check
         with pytest.raises(Jinja2ContextError, match="Expected ImageRegistry"):
             with_images(context, [])
 
@@ -68,7 +70,7 @@ class TestWithImagesFilterValidation:
         registry = ImageRegistry()
         context = self._make_context(registry=registry)
 
-        with pytest.raises(Jinja2ContextError, match="cannot contain images"):
+        with pytest.raises(Jinja2ContextError, match="does not implement the ImageRenderable protocol"):
             with_images(context, "This is a plain string")
 
     def test_with_images_raises_on_number_input(self) -> None:
@@ -76,7 +78,7 @@ class TestWithImagesFilterValidation:
         registry = ImageRegistry()
         context = self._make_context(registry=registry)
 
-        with pytest.raises(Jinja2ContextError, match="cannot contain images"):
+        with pytest.raises(Jinja2ContextError, match="does not implement the ImageRenderable protocol"):
             with_images(context, 42)
 
     def test_with_images_raises_on_dict_input(self) -> None:
@@ -84,26 +86,49 @@ class TestWithImagesFilterValidation:
         registry = ImageRegistry()
         context = self._make_context(registry=registry)
 
-        with pytest.raises(Jinja2ContextError, match="cannot contain images"):
+        with pytest.raises(Jinja2ContextError, match="does not implement the ImageRenderable protocol"):
             with_images(context, {"key": "value"})
 
+    def test_with_images_accepts_empty_list(self) -> None:
+        """Test with_images handles empty list gracefully."""
+        registry = ImageRegistry()
+        context = self._make_context(registry=registry)
 
-class TestRenderValueWithImagesEdgeCases:
-    """Edge case tests for render_value_with_images that don't need real Stuff classes."""
+        result = with_images(context, [])
+
+        assert result == ""
+        assert len(registry.images) == 0
+
+
+class TestRenderSequenceWithImages:
+    """Tests for _render_sequence_with_images helper function."""
 
     def test_empty_list_returns_empty_string(self) -> None:
         """Test empty list returns empty string."""
         registry = ImageRegistry()
 
-        result = render_value_with_images([], registry, TextFormat.PLAIN)
+        result = _render_sequence_with_images([], registry, TextFormat.PLAIN)
 
         assert result == ""
         assert len(registry.images) == 0
 
-    def test_plain_string_value(self) -> None:
-        """Test plain string value is rendered as-is."""
+    def test_empty_tuple_returns_empty_string(self) -> None:
+        """Test empty tuple returns empty string."""
         registry = ImageRegistry()
 
-        result = render_value_with_images("Hello World", registry, TextFormat.PLAIN)
+        result = _render_sequence_with_images((), registry, TextFormat.PLAIN)
 
-        assert result == "Hello World"
+        assert result == ""
+        assert len(registry.images) == 0
+
+    def test_non_image_renderable_items_converted_to_string(self) -> None:
+        """Test that non-ImageRenderable items are converted to string."""
+        registry = ImageRegistry()
+
+        result = _render_sequence_with_images(["hello", 42, None], registry, TextFormat.PLAIN)
+
+        # Items that convert to truthy strings are included
+        assert "hello" in result
+        assert "42" in result
+        # None converts to "None" which is truthy
+        assert "None" in result

@@ -238,31 +238,6 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        # "gpt-4o",
-        "gpt-4o-mini",
-        # "gpt-5-mini",
-        # "gpt-5-nano",
-        # "gpt-5-chat",
-        "claude-4.5-sonnet",
-        "mistral-medium-2508",
-        "gemini-2.5-flash-lite",
-        # "gemini-2.5-flash",
-        # "gemini-2.5-pro",
-        # "qwen3:8b",
-    ],
-)
-def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
-    assert isinstance(request.param, str)
-    llm_handle_param = request.param
-    if not is_llm_handle_supported(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not available in model deck")
-    if not is_llm_handle_supported_by_enabled_backends(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not supported by any enabled backend")
-    return llm_handle_param
-
-
-@pytest.fixture(
-    params=[
         # Anthropic Claude models with native document support
         # "claude-3.7-sonnet",
         # "claude-4-sonnet",

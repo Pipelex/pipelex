@@ -25,39 +25,70 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
         return self.model_dump(serialize_as_any=True)
 
-    # @override
-    # def __str__(self) -> str:
-    #     return kajson.dumps(self.smart_dump(), indent=4)
+    # -------------------------------------------------------------------------------------
+    # Sync implementations - override these in subclasses for sync operations
+    # -------------------------------------------------------------------------------------
 
-    async def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    def rendered_plain(self) -> str:
+        """Sync plain text rendering - defaults to markdown."""
+        return self.rendered_markdown()
+
+    def rendered_html(self) -> str:
+        """Sync HTML rendering - defaults to JSON in pre tags."""
+        return f"<pre>{self.rendered_json()}</pre>"
+
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
+        """Sync Markdown rendering - defaults to JSON in code block."""
+        return f"```json\n{self.rendered_json()}\n```"
+
+    def rendered_json(self) -> str:
+        """Sync JSON rendering - defaults to kajson.dumps of smart_dump."""
+        return kajson.dumps(self.smart_dump(), indent=4)
+
+    def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+        """Sync rendering based on text format."""
         match text_format:
             case TextFormat.PLAIN:
-                return await self.rendered_plain()
+                return self.rendered_plain()
             case TextFormat.HTML:
-                return await self.rendered_html()
+                return self.rendered_html()
             case TextFormat.MARKDOWN:
-                return await self.rendered_markdown()
+                return self.rendered_markdown()
             case TextFormat.JSON:
-                return await self.rendered_json()
-            case TextFormat.SPREADSHEET:
-                return await self.render_spreadsheet()
+                return self.rendered_json()
 
-    async def rendered_plain(self) -> str:
-        return await self.rendered_markdown()
+    # -------------------------------------------------------------------------------------
+    # Override these in subclasses that need async operations
+    # -------------------------------------------------------------------------------------
 
-    async def rendered_html(self) -> str:
+    async def rendered_str_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+        match text_format:
+            case TextFormat.PLAIN:
+                return await self.rendered_plain_async()
+            case TextFormat.HTML:
+                return await self.rendered_html_async()
+            case TextFormat.MARKDOWN:
+                return await self.rendered_markdown_async()
+            case TextFormat.JSON:
+                return await self.rendered_json_async()
+
+    async def rendered_plain_async(self) -> str:
+        return self.rendered_plain()
+
+    async def rendered_html_async(self) -> str:
         """Default HTML rendering - subclasses can override for custom rendering."""
-        return f"<pre>{await self.rendered_json()}</pre>"
+        return self.rendered_html()
 
-    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
+    async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
         """Default Markdown rendering - subclasses can override for custom rendering."""
-        return f"```json\n{await self.rendered_json()}\n```"
+        return self.rendered_markdown(level=level, is_pretty=is_pretty)
 
-    async def render_spreadsheet(self) -> str:
-        return await self.rendered_plain()
+    async def rendered_json_async(self) -> str:
+        return self.rendered_json()
 
-    async def rendered_json(self) -> str:
-        return kajson.dumps(self.smart_dump(), indent=4)
+    # -------------------------------------------------------------------------
+    # Pretty printing
+    # -------------------------------------------------------------------------
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
@@ -77,4 +108,4 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
 
     @override
     async def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
-        return await self.rendered_html()
+        return await self.rendered_html_async()

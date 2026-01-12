@@ -61,13 +61,11 @@ class TestImageInputsInference:
 
         if pipe_run_mode.is_live:
             article = pipe_output.main_stuff_as(content_type=Article)
-            assert article.title in {
-                "2037 AI-Lympics Paris",
-                "2037 AI-Lympics PARIS",
-                "2037 AI-Lympics",
-                "2037 AI-LYMPICS PARIS",
-                "2037 AI-LYMPICS",
-            }
+            title_lower = article.title.lower()
+            assert "ai-lympics" in title_lower or "ai-olympics" in title_lower or "ailympics" in title_lower
+            location_lower = article.location.lower()
+            assert "paris" in location_lower or "paris, france" in location_lower
+            assert article.year == 2037
 
     async def test_describe_page_with_nested_images(
         self,
@@ -106,10 +104,11 @@ class TestImageInputsInference:
 
         if pipe_run_mode.is_live:
             article = pipe_output.main_stuff_as(content_type=Article)
-            assert article.title.lower() in {
-                "2037 ai-lympics paris",
-                "2037 ai-lympics",
-            }
+            title_lower = article.title.lower()
+            assert "ai-lympics" in title_lower or "ai-olympics" in title_lower or "ailympics" in title_lower
+            location_lower = article.location.lower()
+            assert "paris" in location_lower or "paris, france" in location_lower
+            assert article.year == 2037
             assert "slartibartfast" in article.description.lower()
 
     async def test_analyze_image_collection(
@@ -202,7 +201,7 @@ class TestImageInputsInference:
             # Verify that the output is the Analysis concept from the PLX file
             assert pipe_output.main_stuff.concept.code == "Analysis"
 
-    @pytest.mark.parametrize(("_topic", "data_url"), ImageTestCases.DATA_URL_TEST_CASES)
+    @pytest.mark.parametrize(("_topic", "data_url"), ImageTestCases.DATA_URL_VISION_TEST_CASES)
     async def test_image_input_with_data_url(
         self,
         job_metadata: JobMetadata,
@@ -224,7 +223,7 @@ class TestImageInputsInference:
 
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
-                pipe=get_required_pipe(pipe_code="extract_article_from_image"),
+                pipe=get_required_pipe(pipe_code="describe_image"),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,

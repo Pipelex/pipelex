@@ -51,11 +51,6 @@ Format filter html:
 {{ place_holder | format("html") }}
 """
 
-    JINJA2_FILTER_FORMAT_SPREADSHEET = """
-Format filter spreadsheet:
-{{ place_holder | format("spreadsheet") }}
-"""
-
     JINJA2_ALL_METHODS = """
 Direct (no filter):
 {{ place_holder }}
@@ -85,7 +80,6 @@ Format filter html:
         JINJA2_FILTER_FORMAT_JSON,
         JINJA2_FILTER_FORMAT_MARKDOWN,
         JINJA2_FILTER_FORMAT_HTML,
-        JINJA2_FILTER_FORMAT_SPREADSHEET,
         JINJA2_ALL_METHODS,
     ]
 

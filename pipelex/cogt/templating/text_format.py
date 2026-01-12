@@ -6,7 +6,6 @@ class TextFormat(StrEnum):
     MARKDOWN = "markdown"
     HTML = "html"
     JSON = "json"
-    SPREADSHEET = "spreadsheet"
 
     @property
     def render_method_name(self):

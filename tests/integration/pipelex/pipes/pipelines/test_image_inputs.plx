@@ -14,8 +14,8 @@ system_prompt = """
 You are an expert at describing page contents.
 """
 prompt = """
-Extract the full text (all the text that represents a "title") and the date of the article in the image.
-@image
+Extract the full text (all the text that represents a "title") and the year of the article in the image.
+$image
 """
 
 [pipe.describe_page]
@@ -27,7 +27,7 @@ system_prompt = """
 You are an expert at describing page contents.
 """
 prompt = """
-Extract the date and title.
+Extract the year and title.
 
 @page.page_view
 

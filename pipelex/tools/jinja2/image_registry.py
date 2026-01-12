@@ -44,6 +44,21 @@ class ImageRegistry:
         self._image_urls.add(image.url)
         return len(self._images) - 1
 
+    def get_image_placeholder(self, image: Any) -> str | None:
+        """Return the placeholder string for a registered image.
+
+        Args:
+            image: An ImageContent instance with a `url` attribute
+
+        Returns:
+            The placeholder string (e.g., "[Image 1]") if the image is registered,
+            or None if the image is not in the registry.
+        """
+        for index, existing in enumerate(self._images):
+            if existing.url == image.url:
+                return f"[Image {index + 1}]"
+        return None
+
     @property
     def images(self) -> list[Any]:
         """Return all registered images in order.

@@ -7,8 +7,10 @@ from typing_extensions import override
 
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async
+from pipelex.tools.jinja2.image_registry import ImageRegistry
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
@@ -34,13 +36,13 @@ class ImageContent(StuffContent):
         return f"{url_desc} of an image"
 
     @override
-    async def rendered_plain(self) -> str:
+    def rendered_plain(self) -> str:
         return self.url[:500]
 
     @override
-    async def rendered_html(self) -> str:
+    def rendered_html(self) -> str:
         template_source = '<img src="{{ url|e }}" class="msg-img">'
-        return await render_jinja2_async(
+        return render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             templating_context={
@@ -49,12 +51,21 @@ class ImageContent(StuffContent):
         )
 
     @override
-    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return f"![{self.url[:100]}]({self.url})"
 
     @override
-    async def rendered_json(self) -> str:
+    def rendered_json(self) -> str:
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
+
+    def render_with_images(
+        self,
+        registry: ImageRegistry,
+        text_format: TextFormat,  # noqa: ARG002
+    ) -> str:
+        """Register this image and return a token."""
+        image_index = registry.register_image(self)
+        return f"[Image {image_index + 1}]"
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

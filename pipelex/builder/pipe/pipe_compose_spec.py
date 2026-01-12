@@ -22,7 +22,6 @@ class TargetFormat(StrEnum):
     MARKDOWN = "markdown"
     HTML = "html"
     JSON = "json"
-    SPREADSHEET = "spreadsheet"
     MERMAID = "mermaid"
 
     @property
@@ -36,8 +35,6 @@ class TargetFormat(StrEnum):
                 return TagStyle.XML
             case TargetFormat.JSON:
                 return TagStyle.SQUARE_BRACKETS
-            case TargetFormat.SPREADSHEET:
-                return TagStyle.NO_TAG
             case TargetFormat.MERMAID:
                 return TagStyle.NO_TAG
 
@@ -52,8 +49,6 @@ class TargetFormat(StrEnum):
                 return TextFormat.HTML
             case TargetFormat.JSON:
                 return TextFormat.JSON
-            case TargetFormat.SPREADSHEET:
-                return TextFormat.SPREADSHEET
             case TargetFormat.MERMAID:
                 return TextFormat.PLAIN
 
@@ -71,8 +66,6 @@ class TargetFormat(StrEnum):
             case TargetFormat.HTML:
                 return TemplateCategory.HTML
             case TargetFormat.JSON:
-                return TemplateCategory.HTML
-            case TargetFormat.SPREADSHEET:
                 return TemplateCategory.HTML
             case TargetFormat.MERMAID:
                 return TemplateCategory.MERMAID
