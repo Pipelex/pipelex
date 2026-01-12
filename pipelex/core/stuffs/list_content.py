@@ -105,7 +105,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         else:
             for item_index, item in enumerate(self.items):
                 rendered += f"\n • item #{item_index + 1}:\n\n"
-                rendered += await item.rendered_str_async(text_format=TextFormat.MARKDOWN)
+                rendered += await item.rendered_markdown_async(level=level, is_pretty=is_pretty)
                 rendered += "\n"
         return rendered
 
