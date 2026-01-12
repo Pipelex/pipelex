@@ -9,6 +9,7 @@ from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.tools.jinja2.jinja2_errors import Jinja2ContextError
 from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.tag_renderable import TagRenderable
+from pipelex.tools.jinja2.text_format_renderable import TextFormatRenderable
 from pipelex.types import StrEnum
 
 ########################################################################################
@@ -32,11 +33,9 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | No
     else:
         applied_text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
 
-    if hasattr(value, "rendered_str_async"):
+    # Protocol-based rendering
+    if isinstance(value, TextFormatRenderable):
         return await value.rendered_str_async(text_format=applied_text_format)
-    if hasattr(value, applied_text_format.render_method_name):
-        render_method = getattr(value, applied_text_format.render_method_name)
-        return await render_method()
     if isinstance(value, StrEnum):
         return value.value
     return value

@@ -82,6 +82,7 @@ class StuffArtefact:
         {{ my_stuff.field_name }}
         {{ my_stuff._stuff_name }}
         {{ my_stuff | tag }}
+        {{ my_stuff | format }}
         {{ my_stuff | with_images }}
 
     Unlike the previous implementation, this does NOT flatten data.
@@ -94,6 +95,7 @@ class StuffArtefact:
 
     Implements:
         - TagRenderable protocol (render_for_tag, default_tag_name)
+        - TextFormatRenderable protocol (rendered_str_async)
         - ImageRenderable protocol (render_with_images)
 
     Attributes:
@@ -294,7 +296,7 @@ class StuffArtefact:
         return self._stuff.stuff_name or "data"  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
 
     # -------------------------------------------------------------------------
-    # Other rendering methods
+    # TextFormatRenderable protocol implementation
     # -------------------------------------------------------------------------
 
     async def rendered_str_async(self, text_format: TextFormat) -> str:

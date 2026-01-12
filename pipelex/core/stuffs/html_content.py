@@ -16,9 +16,9 @@ class HtmlContent(StuffContent):
     def short_desc(self) -> str:
         return f"some html ({len(self.inner_html)} chars)"
 
-    # @override
-    # def __str__(self) -> str:
-    #     return asyncio.run(self.rendered_html())
+    @override
+    def __str__(self) -> str:
+        return self.rendered_html()
 
     @override
     def rendered_plain(self) -> str:
