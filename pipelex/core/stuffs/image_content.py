@@ -36,11 +36,11 @@ class ImageContent(StuffContent):
         return f"{url_desc} of an image"
 
     @override
-    def _render_plain(self) -> str:
+    def rendered_plain(self) -> str:
         return self.url[:500]
 
     @override
-    def _render_html(self) -> str:
+    def rendered_html(self) -> str:
         template_source = '<img src="{{ url|e }}" class="msg-img">'
         return render_jinja2_sync(
             template_source=template_source,
@@ -51,11 +51,11 @@ class ImageContent(StuffContent):
         )
 
     @override
-    def _render_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return f"![{self.url[:100]}]({self.url})"
 
     @override
-    def _render_json(self) -> str:
+    def rendered_json(self) -> str:
         return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
 
     @override

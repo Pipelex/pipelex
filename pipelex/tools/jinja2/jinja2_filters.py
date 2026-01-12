@@ -32,8 +32,8 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | No
     else:
         applied_text_format = TextFormat(context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN))
 
-    if hasattr(value, "rendered_str"):
-        return await value.rendered_str(text_format=applied_text_format)
+    if hasattr(value, "rendered_str_async"):
+        return await value.rendered_str_async(text_format=applied_text_format)
     if hasattr(value, applied_text_format.render_method_name):
         render_method = getattr(value, applied_text_format.render_method_name)
         return await render_method()

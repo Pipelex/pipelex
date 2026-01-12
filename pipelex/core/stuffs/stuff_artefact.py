@@ -56,7 +56,7 @@ _PASSTHROUGH_ATTRS = frozenset(
         # Methods that must remain accessible (ImageRenderable protocol)
         "render_with_images",
         # Other methods
-        "rendered_str",
+        "rendered_str_async",
         "stuff",
         # Dict-like methods for template iteration
         "iter_keys",
@@ -279,9 +279,9 @@ class StuffArtefact:
         """Render content as plain string for tagging.
 
         Returns:
-            Plain text representation via _render_plain().
+            Plain text representation via rendered_plain().
         """
-        result: str = self._stuff.content._render_plain()  # noqa: SLF001  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        result: str = self._stuff.content.rendered_plain()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         return result  # pyright: ignore[reportUnknownVariableType]
 
     @property
@@ -297,7 +297,7 @@ class StuffArtefact:
     # Other rendering methods
     # -------------------------------------------------------------------------
 
-    async def rendered_str(self, text_format: TextFormat) -> str:
+    async def rendered_str_async(self, text_format: TextFormat) -> str:
         """Render content as string.
 
         Args:
@@ -306,7 +306,7 @@ class StuffArtefact:
         Returns:
             The rendered string.
         """
-        result: str = await self._stuff.content.rendered_str(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
+        result: str = await self._stuff.content.rendered_str_async(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
         return result  # pyright: ignore[reportUnknownVariableType]
 
     # -------------------------------------------------------------------------

@@ -21,11 +21,11 @@ class MermaidContent(StuffContent):
         return self.mermaid_code
 
     @override
-    def _render_plain(self) -> str:
+    def rendered_plain(self) -> str:
         return self.mermaid_code
 
     @override
-    def _render_html(self) -> str:
+    def rendered_html(self) -> str:
         template_source = '<div class="mermaid">{{ mermaid_code|e }}</div>'
         return render_jinja2_sync(
             template_source=template_source,
@@ -36,9 +36,9 @@ class MermaidContent(StuffContent):
         )
 
     @override
-    def _render_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return self.mermaid_code
 
     @override
-    def _render_json(self) -> str:
+    def rendered_json(self) -> str:
         return json.dumps({"mermaid": self.mermaid_code})

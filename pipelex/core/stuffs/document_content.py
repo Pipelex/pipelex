@@ -23,11 +23,11 @@ class DocumentContent(StuffContent):
         return f"{url_desc} of a document"
 
     @override
-    def _render_plain(self) -> str:
+    def rendered_plain(self) -> str:
         return self.url
 
     @override
-    def _render_html(self) -> str:
+    def rendered_html(self) -> str:
         # The |e filter escapes HTML special characters to prevent XSS attacks
         template_source = '<a href="{{ url|e }}" class="msg-document">{{ display_text|e }}</a>'
         return render_jinja2_sync(
@@ -40,6 +40,6 @@ class DocumentContent(StuffContent):
         )
 
     @override
-    def _render_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         display_text = self.display_link or self.url
         return f"[{display_text}]({self.url})"

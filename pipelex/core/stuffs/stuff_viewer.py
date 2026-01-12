@@ -44,7 +44,7 @@ async def render_stuff_viewer(
     # Get content data in various formats
     stuff_data = stuff.content.smart_dump()
     stuff_data_text = stuff.content.rendered_pretty_text(width=PRETTY_WIDTH_FOR_EXPORT)
-    stuff_data_html = await stuff.content.rendered_html()
+    stuff_data_html = await stuff.content.rendered_html_async()
     content_type = stuff.content.content_type
 
     # Determine HTML tab label based on content type

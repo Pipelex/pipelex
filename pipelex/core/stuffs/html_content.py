@@ -21,11 +21,11 @@ class HtmlContent(StuffContent):
     #     return asyncio.run(self.rendered_html())
 
     @override
-    def _render_plain(self) -> str:
+    def rendered_plain(self) -> str:
         return self.inner_html
 
     @override
-    def _render_html(self) -> str:
+    def rendered_html(self) -> str:
         template_source = '<div class="{{ css_class|e }}">{{ inner_html | safe }}</div>'
         return render_jinja2_sync(
             template_source=template_source,
@@ -37,9 +37,9 @@ class HtmlContent(StuffContent):
         )
 
     @override
-    def _render_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return self.inner_html
 
     @override
-    def _render_json(self) -> str:
+    def rendered_json(self) -> str:
         return json.dumps({"html": self.inner_html, "css_class": self.css_class})

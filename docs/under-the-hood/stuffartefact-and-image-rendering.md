@@ -210,7 +210,7 @@ Renders text first, then registers each image:
 def render_with_images(self, registry, text_format) -> str:
     parts: list[str] = []
     if self.text:
-        parts.append(self.text._render_plain())
+        parts.append(self.text.rendered_plain())
     if self.images:
         for image in self.images:
             image_index = registry.register_image(image)

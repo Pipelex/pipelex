@@ -15,13 +15,13 @@ class TestJSONContentEdgeCases:
         content = JSONContent(json_obj=json_obj)
 
         # Should handle Unicode in all rendering methods
-        plain = await content.rendered_plain()
+        plain = await content.rendered_plain_async()
         assert "世界" in plain or "\\u" in plain  # Either literal or escaped
 
-        markdown = await content.rendered_markdown()
+        markdown = await content.rendered_markdown_async()
         assert "message" in markdown
 
-        html = await content.rendered_html()
+        html = await content.rendered_html_async()
         assert isinstance(html, str)
 
     async def test_json_with_special_characters(self):
@@ -33,7 +33,7 @@ class TestJSONContentEdgeCases:
         }
         content = JSONContent(json_obj=json_obj)
 
-        plain = await content.rendered_plain()
+        plain = await content.rendered_plain_async()
         parsed = json.loads(plain)
         assert parsed == json_obj
 
@@ -48,7 +48,7 @@ class TestJSONContentEdgeCases:
         }
         content = JSONContent(json_obj=json_obj)
 
-        plain = await content.rendered_plain()
+        plain = await content.rendered_plain_async()
         parsed = json.loads(plain)
         assert parsed == json_obj
 
@@ -61,7 +61,7 @@ class TestJSONContentEdgeCases:
         }
         content = JSONContent(json_obj=json_obj)
 
-        plain = await content.rendered_plain()
+        plain = await content.rendered_plain_async()
         parsed = json.loads(plain)
         assert parsed == json_obj
         assert parsed["is_active"] is True
@@ -83,7 +83,7 @@ class TestJSONContentEdgeCases:
         }
         content = JSONContent(json_obj=json_obj)
 
-        plain = await content.rendered_plain()
+        plain = await content.rendered_plain_async()
         parsed = json.loads(plain)
         assert parsed == json_obj
         assert parsed["level1"]["level2"]["level3"]["level4"]["level5"]["value"] == "deep"
@@ -93,7 +93,7 @@ class TestJSONContentEdgeCases:
         json_obj = {"numbers": list(range(100))}
         content = JSONContent(json_obj=json_obj)
 
-        plain = await content.rendered_plain()
+        plain = await content.rendered_plain_async()
         parsed = json.loads(plain)
         assert parsed == json_obj
         assert len(parsed["numbers"]) == 100

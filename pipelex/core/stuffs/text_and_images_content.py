@@ -24,17 +24,17 @@ class TextAndImagesContent(StuffContent):
         return f"text and image content ({text_count} text, {image_count} images)"
 
     @override
-    async def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
+    async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
         if self.text:
-            rendered = await self.text.rendered_markdown(level=level, is_pretty=is_pretty)
+            rendered = await self.text.rendered_markdown_async(level=level, is_pretty=is_pretty)
         else:
             rendered = ""
         return rendered
 
     @override
-    async def rendered_html(self) -> str:
+    async def rendered_html_async(self) -> str:
         if self.text:
-            rendered = await self.text.rendered_html()
+            rendered = await self.text.rendered_html_async()
         else:
             rendered = ""
         return rendered
@@ -48,7 +48,7 @@ class TextAndImagesContent(StuffContent):
         """Render text, then register images."""
         parts: list[str] = []
         if self.text:
-            parts.append(self.text._render_plain())  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            parts.append(self.text.rendered_plain())  # pyright: ignore[reportPrivateUsage]
         if self.images:
             for image in self.images:
                 image_index = registry.register_image(image)

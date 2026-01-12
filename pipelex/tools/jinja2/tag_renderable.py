@@ -23,7 +23,7 @@ class TagRenderable(Protocol):
     and `default_tag_name` to get the suggested tag name.
 
     Implementations:
-    - StuffArtefact: renders via _render_plain(), uses stuff_name as default tag
+    - StuffArtefact: renders via rendered_plain(), uses stuff_name as default tag
     """
 
     def render_for_tag(self) -> str:
