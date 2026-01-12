@@ -261,6 +261,25 @@ class GraphContext(BaseModel):
         )
 ```
 
+### Producer/Consumer Paradigm
+
+Data flow in the graph follows a producer/consumer model:
+
+- **Producers**: Nodes that create or output data (stuff). When a pipe outputs a value, it becomes the producer of that data item.
+- **Consumers**: Nodes that receive or use data as input. When a pipe takes a value as input, it becomes a consumer of that data item.
+
+Each piece of data is identified by a **digest** (a unique hash). This allows the tracer to track where data originates and where it flows, even when the same value passes through multiple pipes.
+
+```
+Producer Node ──(outputs)──► Stuff (digest: abc123) ──(inputs)──► Consumer Node
+```
+
+This paradigm enables:
+
+- Automatic DATA edge generation without explicit wiring
+- Visualization of data lineage across the execution graph
+- Debugging by tracing which pipe produced unexpected output
+
 ### Data Flow Edge Generation
 
 DATA edges are generated at teardown by correlating input/output digests:
