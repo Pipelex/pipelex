@@ -10,6 +10,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 
 - **Architecture Overview** - The two-layer design and how components fit together
 - **Image Handling in LLM Prompts** - How images flow from inputs to LLM calls
+- **StuffArtefact & Image Rendering** - How template access and image extraction work
 - **Technical Design Decisions** - Why we chose X over Y
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
@@ -22,3 +23,4 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 
 - [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button .md-button--primary }
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button }
+- [:material-code-braces: StuffArtefact & Image Rendering](./stuffartefact-and-image-rendering.md){ .md-button }
