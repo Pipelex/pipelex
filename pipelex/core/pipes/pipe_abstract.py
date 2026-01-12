@@ -39,9 +39,6 @@ from pipelex.types import Self
 if TYPE_CHECKING:
     from pipelex.graph.graph_context import GraphContext
 
-# Controller pipe types for graph node classification
-_CONTROLLER_PIPE_TYPES = {"PipeSequence", "PipeCondition", "PipeBatch", "PipeParallel"}
-
 PipeAbstractType = type["PipeAbstract"]
 
 
@@ -59,6 +56,10 @@ class PipeAbstract(ABC, BaseModel):
     @property
     def pipe_type(self) -> str:
         return self.__class__.__name__
+
+    @property
+    def is_controller(self) -> bool:
+        return PipeCategory.is_controller_by_str(self.pipe_category)
 
     @property
     def concept_dependencies(self) -> list[Concept]:
@@ -172,7 +173,7 @@ class PipeAbstract(ABC, BaseModel):
                 )
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
-            if PipeCategory.is_controller_by_str(self.pipe_category):
+            if self.is_controller:
                 # Compare the essential parts of StuffSpec (concept code + multiplicity)
                 # Skip validation if the needed stuff_spec is Dynamic or Anything (flexible output types)
                 declared_stuff_spec = self.inputs.root[var_name]
@@ -349,7 +350,7 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
 
-        # Handle graph tracing if enabled (using singleton to avoid hub import cycle)
+        # Handle graph tracing if enabled
         graph_node_id: str | None = None
         child_graph_context: GraphContext | None = None
         tracer_manager = None
@@ -359,7 +360,7 @@ class PipeAbstract(ABC, BaseModel):
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 started_at = datetime.now(timezone.utc)
-                node_kind = NodeKind.CONTROLLER if self.type in _CONTROLLER_PIPE_TYPES else NodeKind.OPERATOR
+                node_kind = NodeKind.CONTROLLER if self.is_controller else NodeKind.OPERATOR
 
                 # Capture input specs from working memory for data flow tracking
                 input_specs: list[IOSpec] = []
