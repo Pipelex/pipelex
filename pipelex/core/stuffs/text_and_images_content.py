@@ -1,5 +1,3 @@
-from typing import TYPE_CHECKING
-
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.table import Table

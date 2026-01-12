@@ -325,8 +325,10 @@ def with_images(context: Context, value: Any, _: Any = None) -> str:
 | File | Purpose |
 |------|---------|
 | `pipelex/core/stuffs/stuff_artefact.py` | Thin delegation adapter for Jinja2 |
-| `pipelex/tools/jinja2/image_renderable.py` | `@runtime_checkable` Protocol |
+| `pipelex/tools/jinja2/image_renderable.py` | `@runtime_checkable` Protocol for images |
+| `pipelex/tools/jinja2/tag_renderable.py` | `@runtime_checkable` Protocol for tagging |
 | `pipelex/tools/jinja2/jinja2_with_images_filter.py` | `with_images` filter |
+| `pipelex/tools/jinja2/jinja2_filters.py` | `tag` and `format` filters |
 | `pipelex/tools/jinja2/image_registry.py` | Image tracking with deduplication |
 | `pipelex/core/stuffs/stuff_content.py` | Base `render_with_images()` |
 | `pipelex/core/stuffs/image_content.py` | Self-registering image token |

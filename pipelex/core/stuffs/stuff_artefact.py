@@ -18,13 +18,10 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from typing_extensions import override
 
-from pipelex.cogt.templating.text_format import TextFormat
-from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey, Jinja2TaggableAbstract
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from jinja2.runtime import Context
-
+    from pipelex.cogt.templating.text_format import TextFormat
     from pipelex.core.stuffs.stuff import Stuff
     from pipelex.tools.jinja2.image_registry import ImageRegistry
 
@@ -53,10 +50,13 @@ _PASSTHROUGH_ATTRS = frozenset(
         "__class__",
         "__dict__",
         "__doc__",
-        # Methods that must remain accessible
-        "render_tagged_for_jinja2",
-        "rendered_str",
+        # Methods that must remain accessible (TagRenderable protocol)
+        "render_for_tag",
+        "default_tag_name",
+        # Methods that must remain accessible (ImageRenderable protocol)
         "render_with_images",
+        # Other methods
+        "rendered_str",
         "stuff",
         # Dict-like methods for template iteration
         "iter_keys",
@@ -75,7 +75,7 @@ _PASSTHROUGH_ATTRS = frozenset(
 )
 
 
-class StuffArtefact(Jinja2TaggableAbstract):
+class StuffArtefact:
     """Thin adapter providing Jinja2-compatible access to Stuff.
 
     Enables templates to access content fields via dot notation:
@@ -91,6 +91,10 @@ class StuffArtefact(Jinja2TaggableAbstract):
     if your content has a field named 'items', accessing `artefact.items`
     will return that field value, not the dict-like iteration method.
     Use `artefact.iter_items()` for explicit dict-like iteration.
+
+    Implements:
+        - TagRenderable protocol (render_for_tag, default_tag_name)
+        - ImageRenderable protocol (render_with_images)
 
     Attributes:
         _stuff: The underlying Stuff object being wrapped.
@@ -268,28 +272,30 @@ class StuffArtefact(Jinja2TaggableAbstract):
             yield self.get(key)
 
     # -------------------------------------------------------------------------
-    # Jinja2TaggableAbstract implementation
+    # TagRenderable protocol implementation
     # -------------------------------------------------------------------------
 
-    @override
-    async def render_tagged_for_jinja2(
-        self,
-        context: Context,
-        tag_name: str | None = None,
-    ) -> tuple[Any, str | None]:
-        """Render content with optional tagging.
-
-        Args:
-            context: The Jinja2 context.
-            tag_name: Optional tag name override.
+    def render_for_tag(self) -> str:
+        """Render content as plain string for tagging.
 
         Returns:
-            Tuple of (rendered_string, tag_name).
+            Plain text representation via _render_plain().
         """
-        text_format = context.get(Jinja2ContextKey.TEXT_FORMAT, default=TextFormat.PLAIN)
-        rendered_str = await self._stuff.content.rendered_str(text_format=text_format)
-        tag_name = tag_name or self._stuff.stuff_name
-        return rendered_str, tag_name  # pyright: ignore[reportUnknownVariableType]
+        result: str = self._stuff.content._render_plain()  # noqa: SLF001  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        return result  # pyright: ignore[reportUnknownVariableType]
+
+    @property
+    def default_tag_name(self) -> str:
+        """Get the default tag name (stuff_name).
+
+        Returns:
+            The stuff_name of the wrapped Stuff object.
+        """
+        return self._stuff.stuff_name or "data"  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+
+    # -------------------------------------------------------------------------
+    # Other rendering methods
+    # -------------------------------------------------------------------------
 
     async def rendered_str(self, text_format: TextFormat) -> str:
         """Render content as string.

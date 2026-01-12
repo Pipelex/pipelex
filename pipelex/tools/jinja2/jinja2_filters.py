@@ -7,7 +7,8 @@ from jinja2.runtime import Context, Undefined
 from pipelex.cogt.templating.templating_style import TagStyle
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.tools.jinja2.jinja2_errors import Jinja2ContextError
-from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey, Jinja2TaggableAbstract
+from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
+from pipelex.tools.jinja2.tag_renderable import TagRenderable
 from pipelex.types import StrEnum
 
 ########################################################################################
@@ -41,58 +42,74 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | No
     return value
 
 
-# TODO: better separate tag and render
-# Filter to tag the variable with a tag style and a provided name, appropriate for tagging in a prompt
+# Filter to wrap content in tags according to the tag style
 @pass_context
-async def tag(context: Context, value: Any, tag_name: str | None = None) -> Any:
+def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
+    """Filter to wrap content in tags.
+
+    Usage in templates:
+        {{ variable | tag }}                # Uses default tag name from TagRenderable
+        {{ variable | tag("custom_name") }} # Uses custom tag name
+        {{ variable | format | tag }}       # Format first, then tag
+
+    Args:
+        context: Jinja2 context (passed automatically via @pass_context).
+        value: The value to tag. If it implements TagRenderable, uses render_for_tag().
+        tag_name: Optional tag name override.
+
+    Returns:
+        Tagged content as string.
+
+    Raises:
+        Jinja2ContextError: If value is undefined.
+    """
     if isinstance(value, Undefined):
-        # maybe we don't need this check
+        msg = "Cannot use tag filter on undefined value"
         if tag_name:
-            msg = f"Jinja2 undefined value with tag_name '{tag_name}'"
-            raise Jinja2ContextError(msg)
-        msg = "Jinja2 undefined value."
+            msg = f"Cannot use tag filter on undefined value with tag_name '{tag_name}'"
         raise Jinja2ContextError(msg)
 
-    if isinstance(value, Jinja2TaggableAbstract):
-        value, tag_name = await value.render_tagged_for_jinja2(context=context, tag_name=tag_name)
+    # Protocol-based rendering
+    rendered_value: str
+    final_tag_name: str | None = tag_name
 
-    return render_any_tagged_for_jinja2(context=context, value=value, tag_name=tag_name)
+    if isinstance(value, TagRenderable):
+        rendered_value = value.render_for_tag()
+        if final_tag_name is None:
+            final_tag_name = value.default_tag_name
+    else:
+        rendered_value = str(value)
+
+    return apply_tag_style(context, rendered_value, final_tag_name)
 
 
-def render_any_tagged_for_jinja2(context: Context, value: Any, tag_name: str | None = None) -> Any:
+def apply_tag_style(context: Context, value: str, tag_name: str | None = None) -> str:
+    """Apply tag style wrapping to content.
+
+    Args:
+        context: Jinja2 context containing TAG_STYLE.
+        value: The string content to wrap in tags.
+        tag_name: Optional tag name. If None, behavior depends on tag style.
+
+    Returns:
+        Content wrapped in tags according to the style.
+    """
     tag_style_str = context.get(Jinja2ContextKey.TAG_STYLE)
-    tag_style: TagStyle
-    if tag_style_str:
-        tag_style = TagStyle(tag_style_str)
-    else:
-        # raise Jinja2ContextError(f"Tag style is required for Jinja2 tag filter (context.name = {context.name})")
-        # TODO: ignoring this error is a workaround, the real bug will be fixed as part of a full refactor of the jinja2 filters
-        tag_style = TagStyle.TICKS
+    tag_style = TagStyle(tag_style_str) if tag_style_str else TagStyle.TICKS
 
-    tagged: Any
-    if tag_name:
-        match tag_style:
-            case TagStyle.NO_TAG:
-                tagged = value
-            case TagStyle.TICKS:
-                tagged = f"{tag_name}: ```\n{value}\n```"
-            case TagStyle.XML:
-                tagged = f"<{tag_name}>\n{value}\n</{tag_name}>"
-            case TagStyle.SQUARE_BRACKETS:
-                tagged = f"[{tag_name}]\n{value}\n[/{tag_name}]"
-    else:
-        match tag_style:
-            case TagStyle.NO_TAG:
-                tagged = value
-            case TagStyle.TICKS:
-                tagged = f"```\n{value}\n```"
-            case TagStyle.XML:
-                fallback_tag_name = "data"
-                tagged = f"<{fallback_tag_name}>\n{value}\n</{fallback_tag_name}>"
-            case TagStyle.SQUARE_BRACKETS:
-                fallback_tag_name = "data"
-                tagged = f"[{fallback_tag_name}]\n{value}\n[/{fallback_tag_name}]"
-    return tagged
+    match tag_style:
+        case TagStyle.NO_TAG:
+            return value
+        case TagStyle.TICKS:
+            if tag_name:
+                return f"{tag_name}: ```\n{value}\n```"
+            return f"```\n{value}\n```"
+        case TagStyle.XML:
+            effective_tag = tag_name or "data"
+            return f"<{effective_tag}>\n{value}\n</{effective_tag}>"
+        case TagStyle.SQUARE_BRACKETS:
+            effective_tag = tag_name or "data"
+            return f"[{effective_tag}]\n{value}\n[/{effective_tag}]"
 
 
 def escape_script_tag(value: Any) -> Any:
