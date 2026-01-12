@@ -168,7 +168,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         library_manager: LibraryManagerAbstract | None = None,
-        library_dirs: list[str | Path] | None = None,
+        library_dirs: list[str] | list[Path] | None = None,
         **kwargs: Any,
     ):
         if kwargs:
@@ -389,7 +389,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
-        library_dirs: list[str | Path] | None = None,
+        library_dirs: list[str] | list[Path] | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create and initialize a Pipelex singleton instance.
