@@ -44,7 +44,7 @@ class ImageRegistry:
         self._image_urls.add(image.url)
         return len(self._images) - 1
 
-    def get_placeholder(self, image: Any) -> str | None:
+    def get_image_placeholder(self, image: Any) -> str | None:
         """Return the placeholder string for a registered image.
 
         Args:

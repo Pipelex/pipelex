@@ -175,11 +175,30 @@ class LLMPromptBlueprint(BaseModel):
         ############################################################
         # User text
         ############################################################
-        # Note: Individual image placeholders are NOT added to extra_params because:
-        # 1. The tag filter handles substitution via ImageRegistry.get_placeholder()
-        # 2. Dotted paths (e.g., "page.page_view") cannot be substituted in immutable StuffArtefacts
+        # Add image placeholders to extra_params for substitution in template
+        # - Direct images (non-dotted paths like "image"): add placeholder directly
+        # - List images: add list variable with all tokens joined
+        # - Dotted paths (e.g., "page.page_view"): handled by tag filter via ImageRegistry.get_image_placeholder()
+        #   because dotted paths cannot be substituted in immutable StuffArtefacts
         extra_params = extra_params or {}
         if image_registry_indices:
+            # Collect list variable paths for exclusion from direct substitution
+            list_variable_paths = {list_ref.variable_path for list_ref in list_image_refs}
+
+            # Add placeholders for direct (non-dotted, non-list) images
+            for image_name, registry_index in image_registry_indices.items():
+                # Skip list item references (e.g., "images[1]")
+                if "[" in image_name:
+                    continue
+                # Skip dotted paths (e.g., "page.page_view") - handled by tag filter
+                if "." in image_name:
+                    continue
+                # Skip list variable references (handled separately below)
+                if image_name in list_variable_paths:
+                    continue
+                # Add direct image placeholder
+                extra_params[image_name] = f"[Image {registry_index + 1}]"
+
             # For list image references, substitute the list variable itself
             # with a string containing all the [Image N] tokens for items in that list
             for list_ref in list_image_refs:
@@ -189,7 +208,7 @@ class LLMPromptBlueprint(BaseModel):
                     if image_name.startswith(f"{list_ref.variable_path}["):
                         list_tokens.append(f"[Image {registry_index + 1}]")
                 if list_tokens:
-                    extra_params[list_ref.variable_path] = "\n".join(list_tokens)
+                    extra_params[list_ref.variable_path] = ", ".join(list_tokens)
 
         # Replace direct document variables with numbered tags
         if prompt_user_documents:

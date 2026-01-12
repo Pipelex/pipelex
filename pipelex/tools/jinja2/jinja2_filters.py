@@ -52,9 +52,6 @@ def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
         {{ variable | tag("custom_name") }} # Uses custom tag name
         {{ variable | format | tag }}       # Format first, then tag
 
-    If an ImageRegistry is present in the context and the value is a registered image,
-    returns the image placeholder (e.g., "[Image 1]") instead of rendering the image.
-
     Args:
         context: Jinja2 context (passed automatically via @pass_context).
         value: The value to tag. If it implements TagRenderable, uses render_for_tag().
@@ -72,18 +69,27 @@ def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
             msg = f"Cannot use tag filter on undefined value with tag_name '{tag_name}'"
         raise Jinja2ContextError(msg)
 
-    # Check if this is a registered image that should be replaced with a placeholder
-    registry = context.get(Jinja2ContextKey.IMAGE_REGISTRY)
-    if isinstance(registry, ImageRegistry) and hasattr(value, "url"):
-        placeholder = registry.get_placeholder(value)
-        if placeholder is not None:
-            return placeholder
-
     # Protocol-based rendering
     rendered_value: str
     final_tag_name: str | None = tag_name
 
-    if isinstance(value, TagRenderable):
+    # Check if this is a registered image - use placeholder as content
+    # This handles nested image paths like page.page_view where extra_params
+    # substitution cannot reach due to immutable StuffArtefacts
+    registry = context.get(Jinja2ContextKey.IMAGE_REGISTRY)
+    if isinstance(registry, ImageRegistry) and hasattr(value, "url"):
+        placeholder = registry.get_image_placeholder(value)
+        if placeholder is not None:
+            rendered_value = placeholder
+            # For registered images, use tag_name if provided, otherwise no default
+            # (the placeholder already identifies the image)
+        elif isinstance(value, TagRenderable):
+            rendered_value = value.render_for_tag()
+            if final_tag_name is None:
+                final_tag_name = value.default_tag_name
+        else:
+            rendered_value = str(value)
+    elif isinstance(value, TagRenderable):
         rendered_value = value.render_for_tag()
         if final_tag_name is None:
             final_tag_name = value.default_tag_name
