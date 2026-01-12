@@ -1,4 +1,5 @@
 import asyncio
+from pathlib import Path
 
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
@@ -16,6 +17,7 @@ async def start_pipeline(
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
     plx_content: str | None = None,
+    bundle_uri: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
     output_multiplicity: VariableMultiplicity | None = None,
@@ -52,6 +54,11 @@ async def start_pipeline(
         Complete PLX file content as a string. The pipe to execute is determined by
         ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
         Can be combined with ``library_dirs`` to load additional definitions.
+    bundle_uri:
+        URI identifying the bundle. If ``plx_content`` is not provided and ``bundle_uri``
+        points to a local file path, the content will be read from that file. Also used
+        to detect if the bundle was already loaded from library directories (e.g., via
+        PIPELEXPATH) to avoid duplicate domain registration.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -89,6 +96,12 @@ async def start_pipeline(
     # Use provided config or get default
     execution_config = execution_config or get_config().pipelex.pipeline_execution_config
 
+    # If plx_content is not provided but bundle_uri points to a file, read it
+    if plx_content is None and bundle_uri is not None:
+        bundle_path = Path(bundle_uri)
+        if bundle_path.is_file():
+            plx_content = bundle_path.read_text(encoding="utf-8")
+
     # TODO: make sure we close the graph tracer after the task completes
     pipe_job, pipeline_run_id, _library_id = await pipeline_run_setup(
         execution_config=execution_config,
@@ -96,6 +109,7 @@ async def start_pipeline(
         library_dirs=library_dirs,
         pipe_code=pipe_code,
         plx_content=plx_content,
+        bundle_uri=bundle_uri,
         inputs=inputs,
         output_name=output_name,
         output_multiplicity=output_multiplicity,

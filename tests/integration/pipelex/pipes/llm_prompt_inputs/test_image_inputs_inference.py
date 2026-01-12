@@ -104,7 +104,7 @@ class TestImageInputsInference:
         assert pipe_output is not None
         assert pipe_output.main_stuff is not None
 
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             article = pipe_output.main_stuff_as(content_type=Article)
             assert article.title.lower() in {
                 "2037 ai-lympics paris",

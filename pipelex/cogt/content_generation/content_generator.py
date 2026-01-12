@@ -376,7 +376,5 @@ class ContentGenerator(ContentGeneratorProtocol):
                 raise ValueError(msg)
             for page_content in page_contents:
                 page_content.page_view = page_view_contents.pop(0)
-        else:
-            log.dev(f"No page views to make because: {extract_job_params} and {extract_input}")
 
         return page_contents

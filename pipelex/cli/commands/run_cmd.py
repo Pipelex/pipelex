@@ -233,6 +233,7 @@ def run_cmd(
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
                 plx_content=plx_content,
+                bundle_uri=bundle_path,
                 inputs=pipeline_inputs,
                 pipe_run_mode=pipe_run_mode,
                 execution_config=execution_config,
