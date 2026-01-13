@@ -714,8 +714,8 @@ function GraphViewer() {
         } else if (status === 'failed') {
             html += '<span class="inspector-badge error">✕ Failed</span>';
         }
-        if (timing?.duration_ms) {
-            html += `<span class="inspector-badge neutral">⏱ ${timing.duration_ms}ms</span>`;
+        if (timing?.duration) {
+            html += `<span class="inspector-badge neutral">⏱ ${timing.duration}s</span>`;
         }
         html += '</div>';
 
@@ -747,7 +747,7 @@ function GraphViewer() {
                 </div>
                 <div class="inspector-row">
                     <span class="inspector-row-label">Duration</span>
-                    <span class="inspector-row-value">${timing.duration_ms}ms</span>
+                    <span class="inspector-row-value">${((new Date(timing.ended_at) - new Date(timing.started_at)) / 1000).toFixed(2)}s</span>
                 </div>
             </div>`;
         }

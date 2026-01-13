@@ -178,7 +178,10 @@ class TestViewSpecTransformer:
             "kind": NodeKind.OPERATOR,
             "pipe_code": "test_pipe",
             "status": NodeStatus.SUCCEEDED,
-            "timing": TimingSpec(duration_ms=132),
+            "timing": TimingSpec(
+                started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
+                ended_at=datetime(2024, 1, 15, 10, 30, 0, 132000, tzinfo=timezone.utc),
+            ),
             "metrics": {"llm_tokens": 150.0, "cost_usd": 0.0015},
         }
         graph = self._make_graph(nodes=[node])
@@ -188,7 +191,7 @@ class TestViewSpecTransformer:
         view_node = viewspec.nodes[0]
         assert "badges" in view_node.ui
         badges = view_node.ui["badges"]
-        assert "132ms" in badges
+        assert "0.13s" in badges
         assert "150 tokens" in badges
         assert "$0.0015" in badges
 
@@ -203,7 +206,6 @@ class TestViewSpecTransformer:
             "timing": TimingSpec(
                 started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
                 ended_at=datetime(2024, 1, 15, 10, 30, 5, tzinfo=timezone.utc),
-                duration_ms=5000,
             ),
             "node_io": NodeIOSpec(
                 inputs=[IOSpec(name="input", concept="Text", preview="Hello", digest="digest_001")],
@@ -220,7 +222,8 @@ class TestViewSpecTransformer:
         assert view_node.inspector["pipe_code"] == "extract_text"
         assert view_node.inspector["pipe_type"] == "PipeLLM"
         assert "timing" in view_node.inspector
-        assert view_node.inspector["timing"]["duration_ms"] == 5000
+        assert "started_at" in view_node.inspector["timing"]
+        assert "ended_at" in view_node.inspector["timing"]
         assert "io_preview" in view_node.inspector
         assert len(view_node.inspector["io_preview"]["inputs"]) == 1
         assert len(view_node.inspector["io_preview"]["outputs"]) == 1

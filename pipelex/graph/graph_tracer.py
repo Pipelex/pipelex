@@ -51,13 +51,10 @@ class _MutableNodeData:
 
     def to_node_spec(self) -> NodeSpec:
         """Convert to immutable NodeSpec."""
-        duration_ms: int | None = None
-        if self.ended_at is not None:
-            duration_ms = int((self.ended_at - self.started_at).total_seconds() * 1000)
+        assert self.started_at is not None and self.ended_at is not None
         timing = TimingSpec(
             started_at=self.started_at,
             ended_at=self.ended_at,
-            duration_ms=duration_ms,
         )
 
         # Build NodeIOSpec from captured input/output specs

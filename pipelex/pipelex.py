@@ -38,7 +38,7 @@ from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
-from pipelex.observer.local_observer import LocalObserver
+from pipelex.observer.multi_observer import MultiObserver
 from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
@@ -328,14 +328,15 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # --- Observers -------------------------------------------------------------------------
 
         if not observers:
-            local_observer = LocalObserver()
+            no_op_observer = ObserverNoOp()
             observer_telemetry = ObserverTelemetry(telemetry_manager=self.telemetry_manager)
-            observers = {"local": local_observer, "telemetry": observer_telemetry}
-        self.pipelex_hub.set_observer(observer=ObserverNoOp())
+            observers = {"noop": no_op_observer, "telemetry": observer_telemetry}
+        multi_observer = MultiObserver(observers=observers)
+        self.pipelex_hub.set_observer(observer=multi_observer)
 
         # --- Pipe Router -----------------------------------------------------------------------
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=ObserverNoOp()))
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 

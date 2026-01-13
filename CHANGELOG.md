@@ -136,6 +136,7 @@
 
 - **`openai_utils` Module**: Removed `pipelex.plugins.openai.openai_utils`; logic now in centralized image preparation utilities.
 - **Pipeline Tracking feature**: Removed entirely, including the `pipelex/pipeline/track` module, `PipelineTracker` components, related configuration, tracker calls in pipe controllers, and associated documentation.
+- Removed the old `Flow` generator.
 
 ### Deprecated
 

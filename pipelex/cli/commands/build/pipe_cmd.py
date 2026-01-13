@@ -117,20 +117,20 @@ pipelex build pipe "Imagine a cute animal mascot for a startup based on its elev
         at the end we want the rendered image" -o mascot
 
 pipelex build pipe "Given an expense report, apply company rules"
-pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match"
-pipelex build pipe "Take a CV in a PDF file and a Job offer text, analyze if they match and generate 5 questions for the interview"
-pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview"
+pipelex build pipe "Take a CV, a Job offer text, and analyze if they match"
+pipelex build pipe "Take a CV and a Job offer text, analyze if they match and generate 5 questions for the interview"
+pipelex build pipe "Take a CV and a Job offer, analyze if they match and generate 5 questions for the interview"
 
 pipelex build pipe \
-    "Take a Job offer text and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
+    "Take a Job offer text and a bunch of CVs, analyze how each CV matches the Job offer and generate 5 questions for each interview"
 
 pipelex build pipe \
-    "Take a Job offer and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
+    "Take a Job offer and a bunch of CVs, analyze how each CV matches the Job offer and generate 5 questions for each interview"
 
 # Other ideas:
 pipelex build pipe "Take a photo as input, and render the opposite of the photo, don't structure anything, use only text content, be super concise"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
-pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
+pipelex build pipe "Given an RDFP, build a compliance matrix"
 pipelex build pipe "Given a theme, write a Haiku"
 """
 
@@ -366,7 +366,9 @@ def build_pipe_cmd(
                     console = get_console()
                     console.print("\n📋 [cyan]To run your pipeline:[/cyan]")
                     console.print(f"   [cyan]• Execute the runner:[/cyan] python {runner_path}")
-                    console.print(f"   [cyan]• Or use CLI:[/cyan] pipelex run {main_pipe_code} --inputs {inputs_json_path}\n")
+                    console.print(
+                        f"   [cyan]• Or use CLI:[/cyan] pipelex run {main_pipe_code} --inputs {inputs_json_path} --library-dir {extras_output_dir}\n"
+                    )
 
                 except Exception as exc:
                     typer.secho(f"⚠️  Warning: Could not generate extras: {exc}", fg=typer.colors.YELLOW)

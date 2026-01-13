@@ -282,5 +282,5 @@ class TestGenerateRunnerCode:
 
         runner_code = generate_runner_code(mock_pipe)
         # Custom imports should NOT use relative import (no leading dot) for standalone scripts
-        assert "from structures.test_domain_CustomOutput import CustomOutput" in runner_code
+        assert "from structures.test_domain__custom_output import CustomOutput" in runner_code
         assert "from .structures" not in runner_code

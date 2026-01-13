@@ -43,22 +43,22 @@ class BuilderLoop:
 
         if is_save_working_memory_enabled:
             working_memory_path = get_incremental_file_path(
-                base_path="results",
+                base_path="results/pipe-builder",
                 base_name="working_memory",
                 extension="json",
             )
-            save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=working_memory_path)
+            save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=working_memory_path, create_directory=True)
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
 
         if is_save_first_iteration_enabled:
             first_iteration_path = get_incremental_file_path(
-                base_path="results",
+                base_path="results/pipe-builder",
                 base_name="generated_pipeline_1st_iteration",
                 extension="plx",
             )
-            save_text_to_path(text=plx_content, path=first_iteration_path)
+            save_text_to_path(text=plx_content, path=first_iteration_path, create_directory=True)
 
         bundle_blueprint = pipelex_bundle_spec.to_blueprint()
         max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts

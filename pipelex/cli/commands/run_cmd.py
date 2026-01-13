@@ -70,15 +70,15 @@ def run_cmd(
         bool,
         typer.Option("--no-pretty-print", help="Skip pretty printing the main_stuff"),
     ] = False,
-    graph: Annotated[
-        bool | None,
-        typer.Option("--graph/--no-graph", help="Generate execution graph outputs (JSON, Mermaid, HTML for both orchestration and data flow views)"),
-    ] = None,
+    no_graph: Annotated[
+        bool,
+        typer.Option("--no-graph", help="Disable execution graph outputs (JSON, Mermaid, HTML)"),
+    ] = False,
     graph_full_data: Annotated[
         bool | None,
         typer.Option(
             "--graph-full-data/--graph-no-data",
-            help="Override config: include or exclude full serialized data in graph (requires --graph)",
+            help="Override config: include or exclude full serialized data in graph",
         ),
     ] = None,
     output_dir: Annotated[
@@ -110,9 +110,9 @@ def run_cmd(
         pipelex run my_bundle.plx --inputs data.json
         pipelex run my_pipe --working-memory-path results.json --no-pretty-print
         pipelex run my_pipe --no-save-working-memory --no-save-main-stuff
-        pipelex run my_pipe --graph
-        pipelex run my_pipe --graph --graph-full-data   # Force include data
-        pipelex run my_pipe --graph --graph-no-data     # Force exclude data
+        pipelex run my_pipe --no-graph                  # Disable graph generation
+        pipelex run my_pipe --graph-full-data           # Force include full data in graph
+        pipelex run my_pipe --graph-no-data             # Force exclude full data from graph
         pipelex run my_pipe --dry-run
         pipelex run my_pipe --dry-run --mock-inputs
     """
@@ -224,7 +224,7 @@ def run_cmd(
 
         # Build effective execution config with CLI overrides
         execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
-            generate_graph=graph,
+            generate_graph=not no_graph,
             force_include_full_data=graph_full_data,
             mock_inputs=mock_inputs or None,
         )
@@ -252,7 +252,7 @@ def run_cmd(
         # Determine if we need an output directory
         output_path: Path | None = None
         graph_spec = pipe_output.graph_spec
-        needs_output_path = graph or save_main_stuff or save_working_memory
+        needs_output_path = (not no_graph) or save_main_stuff or save_working_memory
 
         if needs_output_path:
             output_path = Path(get_incremental_directory_path(base_path=output_dir, base_name=f"{pipe_code}_output"))
@@ -260,7 +260,7 @@ def run_cmd(
 
         # Save graph outputs if requested
         saved_graphs: list[str] = []
-        if graph:
+        if not no_graph:
             if not graph_spec:
                 typer.secho(f"Failed to save graphs: no graph specification found for pipe '{pipe_code}'", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1)

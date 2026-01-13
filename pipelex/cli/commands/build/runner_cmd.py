@@ -60,7 +60,7 @@ def prepare_runner_cmd(
     - All necessary imports
     - Example input values based on the pipe's input types
 
-    Native concept types (Text, Image, PDF, etc.) will be automatically handled.
+    Native concept types (Text, Image, Document, etc.) will be automatically handled.
     Custom concept types will have their structure recursively generated.
 
     Examples:

@@ -73,9 +73,12 @@ class TimingSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    started_at: datetime | None = None
-    ended_at: datetime | None = None
-    duration_ms: int | None = None
+    started_at: datetime
+    ended_at: datetime
+
+    @property
+    def duration(self) -> float:
+        return (self.ended_at - self.started_at).total_seconds()
 
 
 class IOSpec(BaseModel):
