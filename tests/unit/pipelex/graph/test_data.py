@@ -43,7 +43,6 @@ class ValidGraphData:
     TIMING_SPEC: ClassVar[dict[str, Any]] = {
         "started_at": datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
         "ended_at": datetime(2024, 1, 15, 10, 30, 5, tzinfo=timezone.utc),
-        "duration_ms": 5000,
     }
 
     IO_SPEC_INPUT: ClassVar[dict[str, Any]] = {
@@ -91,7 +90,6 @@ class ValidGraphData:
         "timing": {
             "started_at": datetime(2024, 1, 15, 10, 30, 1, tzinfo=timezone.utc),
             "ended_at": datetime(2024, 1, 15, 10, 30, 4, tzinfo=timezone.utc),
-            "duration_ms": 3000,
         },
         "node_io": {
             "inputs": [IO_SPEC_INPUT],

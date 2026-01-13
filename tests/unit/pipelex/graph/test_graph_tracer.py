@@ -82,7 +82,7 @@ class TestGraphTracer:
         assert node.timing is not None
         assert node.timing.started_at == started_at
         assert node.timing.ended_at == ended_at
-        assert node.timing.duration_ms == 100
+        assert node.timing.duration == 0.1
         assert node.metrics == {"tokens": 150.0}
 
     def test_nested_pipe_execution(self) -> None:

@@ -71,14 +71,14 @@ def run_cmd(
         typer.Option("--no-pretty-print", help="Skip pretty printing the main_stuff"),
     ] = False,
     graph: Annotated[
-        bool | None,
-        typer.Option("--graph/--no-graph", help="Generate execution graph outputs (JSON, Mermaid, HTML for both orchestration and data flow views)"),
-    ] = None,
+        bool,
+        typer.Option("--graph/--no-graph", help="Enable/disable execution graph outputs (JSON, Mermaid, HTML)"),
+    ] = True,
     graph_full_data: Annotated[
         bool | None,
         typer.Option(
             "--graph-full-data/--graph-no-data",
-            help="Override config: include or exclude full serialized data in graph (requires --graph)",
+            help="Override config: include or exclude full serialized data in graph",
         ),
     ] = None,
     output_dir: Annotated[
@@ -110,9 +110,9 @@ def run_cmd(
         pipelex run my_bundle.plx --inputs data.json
         pipelex run my_pipe --working-memory-path results.json --no-pretty-print
         pipelex run my_pipe --no-save-working-memory --no-save-main-stuff
-        pipelex run my_pipe --graph
-        pipelex run my_pipe --graph --graph-full-data   # Force include data
-        pipelex run my_pipe --graph --graph-no-data     # Force exclude data
+        pipelex run my_pipe --no-graph                  # Disable graph generation
+        pipelex run my_pipe --graph-full-data           # Force include full data in graph
+        pipelex run my_pipe --graph-no-data             # Force exclude full data from graph
         pipelex run my_pipe --dry-run
         pipelex run my_pipe --dry-run --mock-inputs
     """

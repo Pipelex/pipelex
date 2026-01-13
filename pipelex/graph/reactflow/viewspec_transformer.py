@@ -112,8 +112,8 @@ def _build_ui_badges(timing: Any | None, metrics: dict[str, float] | None) -> li
         List of badge strings.
     """
     badges: list[str] = []
-    if timing and timing.duration_ms is not None:
-        badges.append(f"{timing.duration_ms}ms")
+    if timing:
+        badges.append(f"{timing.duration:.2f}s")
     if metrics:
         for key, value in metrics.items():
             if key == "llm_tokens":
@@ -174,9 +174,8 @@ def _build_inspector_data(node_spec: Any) -> dict[str, Any]:
         inspector["pipe_type"] = node_spec.pipe_type
     if node_spec.timing:
         inspector["timing"] = {
-            "started_at": node_spec.timing.started_at.isoformat() if node_spec.timing.started_at else None,
-            "ended_at": node_spec.timing.ended_at.isoformat() if node_spec.timing.ended_at else None,
-            "duration_ms": node_spec.timing.duration_ms,
+            "started_at": node_spec.timing.started_at.isoformat(),
+            "ended_at": node_spec.timing.ended_at.isoformat(),
         }
     if node_spec.node_io:
         inspector["io_preview"] = _build_io_preview(node_spec.node_io)

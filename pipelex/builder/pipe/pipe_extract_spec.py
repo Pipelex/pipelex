@@ -28,7 +28,7 @@ class PipeExtractSpec(PipeSpec):
     caption generation, and page rendering.
 
     Validation Rules:
-        - inputs dict must have exactly one input entry, and the value must be either `Image` or `PDF`.
+        - inputs dict must have exactly one input entry, and the value must be either `Image` or `Document` (a PDF is a document).
         - output must be "Page"
     """
 
@@ -56,10 +56,10 @@ class PipeExtractSpec(PipeSpec):
     @classmethod
     def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
-            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `Document` (a PDF is a document)."
             raise ValueError(msg)
         if len(inputs_value) != 1:
-            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `Document` (a PDF is a document)."
             raise ValueError(msg)
         return inputs_value
 

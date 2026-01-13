@@ -53,7 +53,7 @@ prompt = """
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 @pipe_signature
 
@@ -77,7 +77,7 @@ Orchestrate a set of independent pipes that will run concurrently.
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 @pipe_signature
 
@@ -98,7 +98,7 @@ Design a PipeConditionSpec to route to the correct pipe based on a conditional e
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 @pipe_signature
 
@@ -119,7 +119,7 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 Based on the pipe signature, build the PipeComposeSpec.
 
@@ -144,7 +144,7 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 Based on the pipe signature, build the PipeLLMSpec.
 
@@ -171,7 +171,7 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 Based on the pipe signature, build the PipeExtractSpec.
 
@@ -192,7 +192,7 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 Based on the pipe signature, build the PipeImgGenSpec.
 
@@ -216,7 +216,7 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, PDF, Number, Page
++ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 Based on the pipe signature, build the PipeComposeSpec.
 

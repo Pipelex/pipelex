@@ -20,6 +20,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 
 @dataclass
@@ -33,7 +34,8 @@ class CustomClassInfo:
     @property
     def module_name(self) -> str:
         """Get the module name (filename without .py) for this class."""
-        return f"{self.domain_code}_{self.concept_code}"
+        concept_snake_case = pascal_case_to_snake_case(self.concept_code)
+        return f"{self.domain_code}__{concept_snake_case}"
 
     @property
     def import_statement(self) -> str:
@@ -151,7 +153,7 @@ def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict
     return native_classes, custom_classes
 
 
-def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) -> str:
+def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, library_dir: str | None = None) -> str:
     """Generate the complete Python runner code for a pipe.
 
     This generates a runnable Python script with:
@@ -163,6 +165,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
     Args:
         pipe: The pipe to generate runner code for
         output_multiplicity: Whether the output is a list (e.g., Text[])
+        library_dir: Directory containing the PLX bundles to load
     """
     # Get output information
     structure_class_name = pipe.output.concept.structure_class_name
@@ -268,7 +271,17 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
             "",
             'if __name__ == "__main__":',
             "    # Initialize Pipelex",
-            "    with Pipelex.make():",
+        ]
+    )
+
+    # Add Pipelex.make() with library_dirs if provided
+    if library_dir:
+        function_lines.append(f'    with Pipelex.make(library_dirs=["{library_dir}"]):')
+    else:
+        function_lines.append("    with Pipelex.make():")
+
+    function_lines.extend(
+        [
             "        # Run the pipeline",
             f"        result = asyncio.run(run_{pipe.code}())",
             "",

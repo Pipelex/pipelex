@@ -2,13 +2,12 @@ import asyncio
 import os
 import time
 from pathlib import Path
-from typing import TYPE_CHECKING, Annotated
+from typing import Annotated
 
 import typer
 from posthog import tag
 
-from pipelex import log, pretty_print
-from pipelex.builder.builder import PipelexBundleSpec
+from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
@@ -30,7 +29,6 @@ from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
-from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -40,16 +38,11 @@ from pipelex.tools.misc.file_utils import (
     get_incremental_file_path,
     save_text_to_path,
 )
-from pipelex.tools.misc.json_utils import load_json_dict_from_path, save_as_json_to_path
+from pipelex.tools.misc.json_utils import save_as_json_to_path
 from pipelex.tools.misc.pretty import PrettyPrinter
-
-if TYPE_CHECKING:
-    from pipelex.client.protocol import PipelineInputs
 
 COMMAND = "build"
 SUB_COMMAND_PIPE = "pipe"
-SUB_COMMAND_ONE_SHOT_PIPE = "one-shot-pipe"
-SUB_COMMAND_PARTIAL_PIPE = "partial-pipe"
 
 
 async def _save_graph_outputs_to_dir(
@@ -117,20 +110,20 @@ pipelex build pipe "Imagine a cute animal mascot for a startup based on its elev
         at the end we want the rendered image" -o mascot
 
 pipelex build pipe "Given an expense report, apply company rules"
-pipelex build pipe "Take a CV in a PDF file, a Job offer text, and analyze if they match"
-pipelex build pipe "Take a CV in a PDF file and a Job offer text, analyze if they match and generate 5 questions for the interview"
-pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview"
+pipelex build pipe "Take a CV, a Job offer text, and analyze if they match"
+pipelex build pipe "Take a CV and a Job offer text, analyze if they match and generate 5 questions for the interview"
+pipelex build pipe "Take a CV and a Job offer, analyze if they match and generate 5 questions for the interview"
 
 pipelex build pipe \
-    "Take a Job offer text and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
+    "Take a Job offer text and a bunch of CVs, analyze how each CV matches the Job offer and generate 5 questions for each interview"
 
 pipelex build pipe \
-    "Take a Job offer and a bunch of CVs (PDF), analyze how each CV matches the Job offer and generate 5 questions for each interview"
+    "Take a Job offer and a bunch of CVs, analyze how each CV matches the Job offer and generate 5 questions for each interview"
 
 # Other ideas:
 pipelex build pipe "Take a photo as input, and render the opposite of the photo, don't structure anything, use only text content, be super concise"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo"
-pipelex build pipe "Given an RDFP PDF, build a compliance matrix"
+pipelex build pipe "Given an RDFP, build a compliance matrix"
 pipelex build pipe "Given a theme, write a Haiku"
 """
 
@@ -207,9 +200,7 @@ def build_pipe_cmd(
         builder_loop = BuilderLoop()
         try:
             pipelex_bundle_spec, builder_graph_spec = await builder_loop.build_and_fix(
-                builder_pipe=builder_pipe,
-                inputs={"brief": prompt},
-                execution_config=execution_config,
+                builder_pipe=builder_pipe, inputs={"brief": prompt}, execution_config=execution_config, output_dir=output_dir
             )
         except PipeBuilderError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."
@@ -305,7 +296,7 @@ def build_pipe_cmd(
                         output_is_list = output_parse.multiplicity is not None
 
                     # Generate runner.py (after structures are generated)
-                    runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list)
+                    runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list, library_dir=extras_output_dir)
                     runner_path = os.path.join(extras_output_dir, f"run_{main_pipe_code}.py")
                     save_text_to_path(text=runner_code, path=runner_path)
                     typer.secho(f"✅ Python runner script saved to: {runner_path}", fg=typer.colors.GREEN)
@@ -366,7 +357,9 @@ def build_pipe_cmd(
                     console = get_console()
                     console.print("\n📋 [cyan]To run your pipeline:[/cyan]")
                     console.print(f"   [cyan]• Execute the runner:[/cyan] python {runner_path}")
-                    console.print(f"   [cyan]• Or use CLI:[/cyan] pipelex run {main_pipe_code} --inputs {inputs_json_path}\n")
+                    console.print(
+                        f"   [cyan]• Or use CLI:[/cyan] pipelex run {main_pipe_code} --inputs {inputs_json_path} --library-dir {extras_output_dir}\n"
+                    )
 
                 except Exception as exc:
                     typer.secho(f"⚠️  Warning: Could not generate extras: {exc}", fg=typer.colors.YELLOW)
@@ -378,203 +371,6 @@ def build_pipe_cmd(
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
             asyncio.run(run_pipeline())
-
-    except PipeOperatorModelChoiceError as exc:
-        handle_model_choice_error(exc, context=ErrorContext.BUILD)
-
-    except PipeOperatorModelAvailabilityError as exc:
-        handle_model_availability_error(exc, context=ErrorContext.BUILD)
-
-    finally:
-        Pipelex.teardown_if_needed()
-
-
-@build_app.command(SUB_COMMAND_ONE_SHOT_PIPE, help="Developer utility for contributors: deliver pipeline in one shot, without validation loop")
-def build_one_shot_cmd(
-    brief: Annotated[
-        str,
-        typer.Argument(help="Brief description of what the pipeline should do"),
-    ],
-    builder_pipe: Annotated[
-        str,
-        typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
-    ] = "pipe_builder",
-    output_path: Annotated[
-        str,
-        typer.Option("--output", "-o", help="Path to save the generated PLX file"),
-    ] = "./results/generated_pipeline.plx",
-    no_output: Annotated[
-        bool,
-        typer.Option("--no-output", help="Skip saving the pipeline to file"),
-    ] = False,
-    library_dir: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--library-dir",
-            "-L",
-            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
-        ),
-    ] = None,
-) -> None:
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_ONE_SHOT)
-
-    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
-
-    async def run_pipeline():
-        if no_output:
-            typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
-        elif not output_path:
-            typer.secho("\n🛑  Cannot save a pipeline to an empty file name", fg=typer.colors.RED)
-            raise typer.Exit(1)
-        else:
-            ensure_directory_for_file_path(file_path=output_path)
-
-        try:
-            pipe_output = await execute_pipeline(
-                pipe_code=builder_pipe,
-                inputs={"brief": brief},
-                library_dirs=library_dir,
-            )
-        except PipelineExecutionError as exc:
-            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from exc
-        pretty_print(pipe_output, title="Pipe Output")
-
-        # Save to file unless explicitly disabled with --no-output
-        if no_output:
-            typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
-            return
-
-        pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
-        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-        save_text_to_path(text=plx_content, path=output_path)
-        typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
-
-    try:
-        with get_telemetry_manager().telemetry_context():
-            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_ONE_SHOT_PIPE}")
-
-            start_time = time.time()
-            asyncio.run(run_pipeline())
-            end_time = time.time()
-            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
-
-            get_report_delegate().generate_report()
-
-    except PipeOperatorModelChoiceError as exc:
-        handle_model_choice_error(exc, context=ErrorContext.BUILD)
-
-    except PipeOperatorModelAvailabilityError as exc:
-        handle_model_availability_error(exc, context=ErrorContext.BUILD)
-
-    finally:
-        Pipelex.teardown_if_needed()
-
-
-@build_app.command(
-    SUB_COMMAND_PARTIAL_PIPE,
-    help="Developer utility for contributors: deliver a partial pipeline specification (not an actual bundle) and save it as JSON",
-)
-def build_partial_cmd(
-    inputs: Annotated[
-        str,
-        typer.Argument(help="Inline brief or path to JSON file with inputs"),
-    ],
-    builder_pipe: Annotated[
-        str,
-        typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
-    ] = "pipe_builder",
-    output_dir: Annotated[
-        str,
-        typer.Option("--output", "-o", help="Path to save the generated PLX file"),
-    ] = "./results",
-    output_base_name: Annotated[
-        str,
-        typer.Option("--output-file-name", "-b", help="Name of the generated JSON file"),
-    ] = "partial_pipe",
-    extension: Annotated[
-        str,
-        typer.Option("--extension", "-e", help="Extension of the generated file"),
-    ] = "json",
-    no_output: Annotated[
-        bool,
-        typer.Option("--no-output", help="Skip saving the pipeline to file"),
-    ] = False,
-    library_dir: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--library-dir",
-            "-L",
-            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
-        ),
-    ] = None,
-) -> None:
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_PARTIAL)
-
-    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
-
-    async def run_pipeline():
-        output_path: str | None = None
-        if no_output:
-            typer.secho("\n⚠️  Pipeline will not be saved to file (--no-output specified)", fg=typer.colors.YELLOW)
-        else:
-            output_path = get_incremental_file_path(
-                base_path=output_dir,
-                base_name=output_base_name,
-                extension=extension,
-            )
-            ensure_directory_for_file_path(file_path=output_path)
-
-        pipeline_inputs: PipelineInputs | None = None
-        if inputs.endswith(".json"):
-            pipeline_inputs = load_json_dict_from_path(inputs)
-        else:
-            pipeline_inputs = {"brief": inputs}
-        try:
-            pipe_output = await execute_pipeline(
-                pipe_code=builder_pipe,
-                inputs=pipeline_inputs,
-                library_dirs=library_dir,
-            )
-        except PipelineExecutionError as exc:
-            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
-            raise typer.Exit(1) from exc
-        # Save to file unless explicitly disabled with --no-output
-        if output_path:
-            match extension:
-                case "md":
-                    markdown_output = await pipe_output.main_stuff.content.rendered_markdown_async()
-                    save_text_to_path(text=markdown_output, path=output_path)
-                case "txt":
-                    text_output = await pipe_output.main_stuff.content.rendered_plain_async()
-                    save_text_to_path(text=text_output, path=output_path)
-                case "html":
-                    html_output = await pipe_output.main_stuff.content.rendered_html_async()
-                    save_text_to_path(text=html_output, path=output_path)
-                case "json":
-                    json_output = pipe_output.main_stuff.content.smart_dump()
-                    save_as_json_to_path(object_to_save=json_output, path=output_path)
-                case _:
-                    json_output = pipe_output.main_stuff.content.smart_dump()
-                    save_as_json_to_path(object_to_save=json_output, path=output_path)
-            typer.secho(f"\n✅ Pipeline saved to: {output_path}", fg=typer.colors.GREEN)
-        else:
-            typer.secho("\n⚠️  Pipeline not saved to file (--no-output specified)", fg=typer.colors.YELLOW)
-
-    try:
-        with get_telemetry_manager().telemetry_context():
-            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-            tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PARTIAL_PIPE}")
-
-            start_time = time.time()
-            asyncio.run(run_pipeline())
-            end_time = time.time()
-            typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds", fg=typer.colors.GREEN)
-
-            get_report_delegate().generate_report()
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.BUILD)

@@ -65,12 +65,10 @@ class TestGraphSpecRoundtrip:
         timing1 = TimingSpec(
             started_at=datetime(2024, 1, 15, 10, 30, 0, tzinfo=timezone.utc),
             ended_at=datetime(2024, 1, 15, 10, 30, 5, tzinfo=timezone.utc),
-            duration_ms=5000,
         )
         timing2 = TimingSpec(
             started_at=datetime(2024, 1, 15, 10, 30, 1, tzinfo=timezone.utc),
             ended_at=datetime(2024, 1, 15, 10, 30, 4, tzinfo=timezone.utc),
-            duration_ms=3000,
         )
 
         input_io = IOSpec(
@@ -147,7 +145,7 @@ class TestGraphSpecRoundtrip:
         assert restored.nodes[0].node_id == "run_abc123:span_001"
         assert restored.nodes[0].kind == NodeKind.CONTROLLER
         assert restored.nodes[0].timing is not None
-        assert restored.nodes[0].timing.duration_ms == 5000
+        assert restored.nodes[0].timing.duration == 5.0
         assert restored.nodes[0].tags == {"layer": "root"}
         assert restored.nodes[0].metrics == {"llm_tokens": 150.0}
 
