@@ -20,6 +20,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 
 @dataclass
@@ -33,7 +34,8 @@ class CustomClassInfo:
     @property
     def module_name(self) -> str:
         """Get the module name (filename without .py) for this class."""
-        return f"{self.domain_code}_{self.concept_code}"
+        concept_snake_case = pascal_case_to_snake_case(self.concept_code)
+        return f"{self.domain_code}__{concept_snake_case}"
 
     @property
     def import_statement(self) -> str:

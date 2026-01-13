@@ -12,6 +12,7 @@ from posthog import tag
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.build.app import build_app
+from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -68,9 +69,6 @@ def prepare_runner_cmd(
         pipelex build runner ./my_library/ --pipe my_pipe
         pipelex build runner my_bundle.plx --output runner.py
     """
-    # Import here to avoid circular imports
-    from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints  # noqa: PLC0415
-
     # Show help if no target provided
     if target is None:
         ctx: click.Context = click.get_current_context()
