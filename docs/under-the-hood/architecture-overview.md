@@ -4,7 +4,7 @@ title: "Architecture Overview"
 
 # Architecture Overview
 
-Pipelex is a Python framework for building **repeatable AI workflows** using a declarative language (`.plx` files). It solves a fundamental problem: AI agents excel at novel tasks but struggle with consistency. Pipelex captures "know-how" as reusable, shareable workflows.
+Pipelex is a Python framework for building and running **repeatable AI workflows** using a declarative language (`.plx` files).
 
 ---
 

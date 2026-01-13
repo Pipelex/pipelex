@@ -4,7 +4,7 @@ title: "Under the Hood"
 
 # Under the Hood
 
-Welcome to the technical deep-dives of Pipelex. This section is for contributors, curious developers, and anyone doing due diligence on how Pipelex works internally.
+Welcome to the technical deep-dives of Pipelex. This section is for contributors, curious developers, AI agents, and anyone doing due diligence on how Pipelex works internally.
 
 ## What You'll Find Here
 

@@ -137,6 +137,10 @@ Summarize the key points from this document: @document
 You can use any concept that refines `Document` as an input, and choose descriptive variable names that fit your use case:
 
 ```plx
+[concept.FinancialReport]
+description = "A financial report"
+refines = "Document"
+
 [pipe.analyze_report]
 type = "PipeLLM"
 description = "Analyze financial report"

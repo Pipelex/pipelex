@@ -58,9 +58,9 @@ class WorkingMemory(BaseModel, ContextProviderAbstract):
 
         return self
 
-    async def pretty_print_summary(self):
+    def pretty_print_summary(self):
         for stuff in self.root.values():
-            content = await stuff.content.rendered_plain_async()
+            content = stuff.content.rendered_plain()
             if len(content) > PRETTY_PRINT_MAX_LENGTH:
                 content = content[:PRETTY_PRINT_MAX_LENGTH] + "..."
             pretty_print(content, title=f"{stuff.stuff_name} ({stuff.concept.code})")

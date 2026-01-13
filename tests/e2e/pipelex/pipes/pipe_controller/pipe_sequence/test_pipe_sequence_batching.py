@@ -81,7 +81,7 @@ async def test_review_analysis_sequence_with_batching(
 
     # Log the working memory for debugging
     log.verbose("Final working memory after pipeline execution:")
-    await pipe_output.working_memory.pretty_print_summary()
+    pipe_output.working_memory.pretty_print_summary()
 
     # Verify final product rating
     stuff = pipe_output.working_memory.get_stuff("product_rating")

@@ -40,19 +40,19 @@ def _collect_stuff_field(
 
     for node in graph.nodes:
         # Collect from outputs first
-        for io_spec in node.node_io.outputs:
-            if io_spec.digest:
-                value = extractor(io_spec)
+        for output_io_spec in node.node_io.outputs:
+            if output_io_spec.digest:
+                value = extractor(output_io_spec)
                 if value is not None:
-                    result[make_stuff_id(io_spec.digest)] = value
+                    result[make_stuff_id(output_io_spec.digest)] = value
 
         # Collect from inputs (for pipeline inputs without a producer)
-        for io_spec in node.node_io.inputs:
-            if io_spec.digest:
-                stuff_id = make_stuff_id(io_spec.digest)
+        for input_io_spec in node.node_io.inputs:
+            if input_io_spec.digest:
+                stuff_id = make_stuff_id(input_io_spec.digest)
                 # Don't overwrite if already captured from output
                 if stuff_id not in result:
-                    value = extractor(io_spec)
+                    value = extractor(input_io_spec)
                     if value is not None:
                         result[stuff_id] = value
 

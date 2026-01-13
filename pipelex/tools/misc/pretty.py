@@ -76,7 +76,7 @@ class PrettyRenderable(ABC):
         pretty = self.rendered_pretty(title=title, depth=0)
         return PrettyPrinter.pretty_text(pretty, width=width)
 
-    async def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
+    def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
         """Render as HTML string.
 
         Args:
