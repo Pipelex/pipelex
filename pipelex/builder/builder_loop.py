@@ -32,6 +32,7 @@ class BuilderLoop:
         is_save_first_iteration_enabled: bool = True,
         is_save_second_iteration_enabled: bool = True,
         is_save_working_memory_enabled: bool = True,
+        output_dir: str | None = None,
     ) -> tuple[PipelexBundleSpec, GraphSpec | None]:
         # TODO: Doesn't make sense to be able to put a builder_pipe code but hardcoding the Path to the builder pipe.
         pipe_output = await execute_pipeline(
@@ -43,7 +44,7 @@ class BuilderLoop:
 
         if is_save_working_memory_enabled:
             working_memory_path = get_incremental_file_path(
-                base_path="results/pipe-builder",
+                base_path=output_dir or "results/pipe-builder",
                 base_name="working_memory",
                 extension="json",
             )
@@ -54,7 +55,7 @@ class BuilderLoop:
 
         if is_save_first_iteration_enabled:
             first_iteration_path = get_incremental_file_path(
-                base_path="results/pipe-builder",
+                base_path=output_dir or "results/pipe-builder",
                 base_name="generated_pipeline_1st_iteration",
                 extension="plx",
             )
@@ -96,7 +97,7 @@ class BuilderLoop:
     ) -> PipelexBundleSpec:
         fixed_pipes: list[PipeSpecUnion] = []
         added_concepts: list[str] = []
-
+        # TODO: Auto remove the creation of native concept by the pipe builder
         # Handle pipe factory errors (e.g., missing output concepts)
         for factory_error in bundle_error.pipe_factory_errors:
             match factory_error.error_type:

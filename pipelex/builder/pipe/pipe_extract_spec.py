@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -10,6 +10,9 @@ from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import StrEnum
+
+if TYPE_CHECKING:
+    from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 
 
 class ExtractSkill(StrEnum):
@@ -88,7 +91,7 @@ class PipeExtractSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
 
         # create extract choice as a str
-        extract_model_choice = self.extract_skill
+        extract_model_choice: ExtractModelChoice = self.extract_skill
 
         return PipeExtractBlueprint(
             source=None,

@@ -203,6 +203,7 @@ def build_pipe_cmd(
                 builder_pipe=builder_pipe,
                 inputs={"brief": prompt},
                 execution_config=execution_config,
+                output_dir=output_dir
             )
         except PipeBuilderError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."

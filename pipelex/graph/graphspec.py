@@ -7,7 +7,7 @@ GraphSpec is renderer-agnostic and designed for JSON serialization.
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.types import StrEnum
@@ -76,8 +76,10 @@ class TimingSpec(BaseModel):
     started_at: datetime
     ended_at: datetime
 
+    @computed_field  # type: ignore[prop-decorator]
     @property
     def duration(self) -> float:
+        """Duration in seconds, included in JSON serialization."""
         return (self.ended_at - self.started_at).total_seconds()
 
 
