@@ -200,10 +200,7 @@ def build_pipe_cmd(
         builder_loop = BuilderLoop()
         try:
             pipelex_bundle_spec, builder_graph_spec = await builder_loop.build_and_fix(
-                builder_pipe=builder_pipe,
-                inputs={"brief": prompt},
-                execution_config=execution_config,
-                output_dir=output_dir
+                builder_pipe=builder_pipe, inputs={"brief": prompt}, execution_config=execution_config, output_dir=output_dir
             )
         except PipeBuilderError as exc:
             msg = f"Builder loop: Failed to execute pipeline: {exc}."
