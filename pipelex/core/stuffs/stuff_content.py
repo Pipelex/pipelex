@@ -107,5 +107,5 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
         pretty_print(pretty, title=title, width=width)
 
     @override
-    async def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
-        return await self.rendered_html_async()
+    def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
+        return self.rendered_html()

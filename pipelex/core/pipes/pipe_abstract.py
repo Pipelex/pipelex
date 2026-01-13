@@ -374,7 +374,7 @@ class PipeAbstract(ABC, BaseModel):
                             digest=stuff.stuff_code,
                             data=stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
                             data_text=stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
-                            data_html=await stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
+                            data_html=stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
                         )
                         input_specs.append(input_spec)
 
@@ -439,7 +439,7 @@ class PipeAbstract(ABC, BaseModel):
                     digest=main_stuff.stuff_code,
                     data=main_stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
                     data_text=main_stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
-                    data_html=await main_stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
+                    data_html=main_stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
                 )
 
             tracer_manager.on_pipe_end_success(
