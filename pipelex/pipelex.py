@@ -39,8 +39,7 @@ from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.observer.local_observer import LocalObserver
-from pipelex.observer.multi_observer import MultiObserver
-from pipelex.observer.observer_protocol import ObserverProtocol
+from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.pipeline_manager import PipelineManager
@@ -332,12 +331,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             local_observer = LocalObserver()
             observer_telemetry = ObserverTelemetry(telemetry_manager=self.telemetry_manager)
             observers = {"local": local_observer, "telemetry": observer_telemetry}
-        multi_observer = MultiObserver(observers=observers)
-        self.pipelex_hub.set_observer(observer=multi_observer)
+        self.pipelex_hub.set_observer(observer=ObserverNoOp())
 
         # --- Pipe Router -----------------------------------------------------------------------
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
+        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=ObserverNoOp()))
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 

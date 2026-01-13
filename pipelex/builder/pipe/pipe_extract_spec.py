@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -10,9 +10,6 @@ from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import StrEnum
-
-if TYPE_CHECKING:
-    from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 
 
 class ExtractSkill(StrEnum):
@@ -28,7 +25,7 @@ class PipeExtractSpec(PipeSpec):
     caption generation, and page rendering.
 
     Validation Rules:
-        - inputs dict must have exactly one input entry, and the value must be either `Image` or `PDF`.
+        - inputs dict must have exactly one input entry, and the value must be either `Image` or `Document` (a PDF is a document).
         - output must be "Page"
     """
 
@@ -56,10 +53,10 @@ class PipeExtractSpec(PipeSpec):
     @classmethod
     def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
-            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `Document` (a PDF is a document)."
             raise ValueError(msg)
         if len(inputs_value) != 1:
-            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `Document` (a PDF is a document)."
             raise ValueError(msg)
         return inputs_value
 
@@ -91,7 +88,7 @@ class PipeExtractSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
 
         # create extract choice as a str
-        extract_model_choice: ExtractModelChoice = self.extract_skill
+        extract_model_choice = self.extract_skill
 
         return PipeExtractBlueprint(
             source=None,

@@ -224,9 +224,17 @@ def prepare_runner_cmd(
                 output_is_list = output_parse.multiplicity is not None
                 break
 
+        # Determine the library directory for Pipelex.make()
+        if library_dir:
+            pipelex_library_dir = str(Path(library_dir).resolve())
+        elif bundle_path:
+            pipelex_library_dir = str(Path(bundle_path).parent.resolve())
+        else:
+            pipelex_library_dir = None
+
         # Generate the runner code
         try:
-            runner_code = generate_runner_code(the_pipe, output_multiplicity=output_is_list)
+            runner_code = generate_runner_code(the_pipe, output_multiplicity=output_is_list, library_dir=pipelex_library_dir)
         except Exception as exc:
             typer.secho(f"❌ Error generating runner code: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc

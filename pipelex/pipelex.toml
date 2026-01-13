@@ -4,7 +4,7 @@
 
 [pipelex.storage_config]
 is_fetch_remote_content_enabled = true
-method = "in_memory"                   # local, in_memory, s3, gcp
+method = "s3"                          # local, in_memory, s3, gcp
 
 [pipelex.storage_config.local]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
@@ -15,8 +15,8 @@ uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 
 [pipelex.storage_config.s3]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
-bucket_name = ""
-region = ""
+bucket_name = "pipelex-storage-test"
+region = "eu-west-3"
 signed_urls_lifespan_seconds = 3600
 
 [pipelex.storage_config.gcp]

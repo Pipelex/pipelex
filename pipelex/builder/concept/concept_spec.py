@@ -138,7 +138,7 @@ class ConceptSpec(StructuredContent):
     refines: str | None = Field(
         default=None,
         description=(
-            "If applicable: the native concept this concept extends (Text, Image, PDF, TextAndImages, Number, Page) "
+            "If applicable: the native concept this concept extends (Text, Image, Document, TextAndImages, Number, Page) "
             "in PascalCase format. Cannot be used together with 'structure'."
         ),
     )

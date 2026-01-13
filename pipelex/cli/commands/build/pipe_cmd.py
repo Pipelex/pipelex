@@ -305,7 +305,7 @@ def build_pipe_cmd(
                         output_is_list = output_parse.multiplicity is not None
 
                     # Generate runner.py (after structures are generated)
-                    runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list)
+                    runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list, library_dir=extras_output_dir)
                     runner_path = os.path.join(extras_output_dir, f"run_{main_pipe_code}.py")
                     save_text_to_path(text=runner_code, path=runner_path)
                     typer.secho(f"✅ Python runner script saved to: {runner_path}", fg=typer.colors.GREEN)
