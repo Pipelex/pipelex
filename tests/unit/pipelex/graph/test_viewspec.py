@@ -44,7 +44,11 @@ class TestViewNode:
             position={"x": 100.0, "y": 200.0},
             size={"width": 150.0, "height": 50.0},
             ui={"badges": ["132ms"], "classes": ["ok"], "icon": "llm"},
-            inspector={"pipe_code": "extract_text", "pipe_type": "PipeLLM", "timing": {"started_at": "2024-01-15T10:30:00+00:00", "ended_at": "2024-01-15T10:30:00.132000+00:00"}},
+            inspector={
+                "pipe_code": "extract_text",
+                "pipe_type": "PipeLLM",
+                "timing": {"started_at": "2024-01-15T10:30:00+00:00", "ended_at": "2024-01-15T10:30:00.132000+00:00"},
+            },
             handles=[{"id": "out.text", "type": "source", "position": "Right"}],
         )
         assert node.id == "node_1"

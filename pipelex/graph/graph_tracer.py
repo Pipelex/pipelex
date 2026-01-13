@@ -51,7 +51,8 @@ class _MutableNodeData:
 
     def to_node_spec(self) -> NodeSpec:
         """Convert to immutable NodeSpec."""
-        assert self.started_at is not None and self.ended_at is not None
+        assert self.started_at is not None
+        assert self.ended_at is not None
         timing = TimingSpec(
             started_at=self.started_at,
             ended_at=self.ended_at,

@@ -714,9 +714,7 @@ function GraphViewer() {
         } else if (status === 'failed') {
             html += '<span class="inspector-badge error">✕ Failed</span>';
         }
-        if (timing?.duration) {
-            html += `<span class="inspector-badge neutral">⏱ ${timing.duration}s</span>`;
-        }
+        html += `<span class="inspector-badge neutral">⏱ ${((new Date(timing.ended_at) - new Date(timing.started_at)) / 1000).toFixed(2)}s</span>`;
         html += '</div>';
 
         // Pipe info

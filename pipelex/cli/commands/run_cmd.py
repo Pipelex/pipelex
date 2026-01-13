@@ -70,10 +70,10 @@ def run_cmd(
         bool,
         typer.Option("--no-pretty-print", help="Skip pretty printing the main_stuff"),
     ] = False,
-    no_graph: Annotated[
+    graph: Annotated[
         bool,
-        typer.Option("--no-graph", help="Disable execution graph outputs (JSON, Mermaid, HTML)"),
-    ] = False,
+        typer.Option("--graph/--no-graph", help="Enable/disable execution graph outputs (JSON, Mermaid, HTML)"),
+    ] = True,
     graph_full_data: Annotated[
         bool | None,
         typer.Option(
@@ -224,7 +224,7 @@ def run_cmd(
 
         # Build effective execution config with CLI overrides
         execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
-            generate_graph=not no_graph,
+            generate_graph=graph,
             force_include_full_data=graph_full_data,
             mock_inputs=mock_inputs or None,
         )
@@ -252,7 +252,7 @@ def run_cmd(
         # Determine if we need an output directory
         output_path: Path | None = None
         graph_spec = pipe_output.graph_spec
-        needs_output_path = (not no_graph) or save_main_stuff or save_working_memory
+        needs_output_path = graph or save_main_stuff or save_working_memory
 
         if needs_output_path:
             output_path = Path(get_incremental_directory_path(base_path=output_dir, base_name=f"{pipe_code}_output"))
@@ -260,7 +260,7 @@ def run_cmd(
 
         # Save graph outputs if requested
         saved_graphs: list[str] = []
-        if not no_graph:
+        if graph:
             if not graph_spec:
                 typer.secho(f"Failed to save graphs: no graph specification found for pipe '{pipe_code}'", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1)
