@@ -16,8 +16,8 @@ from pipelex.core.concepts.structure_generation.exceptions import ConceptStructu
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.libraries.content_class.class_library_utils import register_classes_in_folder
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 if TYPE_CHECKING:
@@ -51,7 +51,7 @@ def generate_structures_from_blueprints(
     if check_existing:
         class_registry.teardown()
         class_registry.setup()
-        ClassRegistryUtils.register_classes_in_folder(
+        register_classes_in_folder(
             folder_path=str(target_path),
             base_class=StructuredContent,
             force_exclude_dirs=[str(output_directory.resolve())],

@@ -7,7 +7,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_concept_library, get_native_concept, get_required_concept
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.libraries.content_class.class_library_utils import register_classes_in_file
 from tests.unit.pipelex.core.concepts import data
 from tests.unit.pipelex.core.concepts.data import TestData
 
@@ -31,7 +31,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
     concept_library = get_concept_library()
 
     # Register the test structure classes
-    ClassRegistryUtils.register_classes_in_file(
+    register_classes_in_file(
         file_path=data.__file__,
         base_class=StructuredContent,
         is_include_imported=False,

@@ -23,10 +23,10 @@ from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.hub import get_required_pipe, get_telemetry_manager
+from pipelex.libraries.content_class.class_library_utils import register_classes_in_folder
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle, validate_bundles_from_directory
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
@@ -202,13 +202,13 @@ def prepare_runner_cmd(
         # Register all structure classes from the output directory so generate_runner_code can find them
         # This includes both newly generated structures and any manually-created ones
         if structures_output_dir.exists():
-            ClassRegistryUtils.register_classes_in_folder(
+            register_classes_in_folder(
                 folder_path=str(structures_output_dir),
                 base_class=StuffContent,
                 is_recursive=True,
             )
         # Also register any manually-created classes in the target directory (outside structures/)
-        ClassRegistryUtils.register_classes_in_folder(
+        register_classes_in_folder(
             folder_path=str(output_dir),
             base_class=StuffContent,
             is_recursive=True,

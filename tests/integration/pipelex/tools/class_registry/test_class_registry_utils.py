@@ -4,18 +4,18 @@ import pytest
 
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.hub import get_class_registry
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.libraries.content_class.class_library_utils import register_classes_in_folder
 from tests.cases import ClassRegistryTestCases
 
 
-class TestClassRegistryUtilsIntegration:
-    """Integration tests for ClassRegistryUtils using real file operations."""
+class TestClassLibraryUtilsIntegration:
+    """Integration tests for class_library_utils using real file operations."""
 
     @pytest.mark.asyncio
     async def test_register_classes_in_folder_integration_stuffcontent_recursive(self) -> None:
         """Integration test for registering StuffContent classes recursively."""
         class_registry = get_class_registry()
-        ClassRegistryUtils.register_classes_in_folder(
+        register_classes_in_folder(
             folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH,
             base_class=StuffContent,
             is_recursive=True,
@@ -29,7 +29,7 @@ class TestClassRegistryUtilsIntegration:
     async def test_register_classes_in_folder_integration_stuffcontent_non_recursive(self) -> None:
         """Integration test for registering StuffContent classes non-recursively."""
         class_registry = get_class_registry()
-        ClassRegistryUtils.register_classes_in_folder(
+        register_classes_in_folder(
             folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH,
             base_class=StuffContent,
             is_recursive=False,
@@ -50,7 +50,7 @@ class TestClassRegistryUtilsIntegration:
             if class_registry.has_class(class_name):
                 classes_before.add(class_name)
 
-        ClassRegistryUtils.register_classes_in_folder(folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH, base_class=None, is_recursive=True)
+        register_classes_in_folder(folder_path=ClassRegistryTestCases.MODEL_FOLDER_PATH, base_class=None, is_recursive=True)
 
         # Should register all classes
         for class_name in ["Class1", "Class2", "Class3", "Class4", "ClassA", "ClassB"]:
@@ -64,7 +64,7 @@ class TestClassRegistryUtilsIntegration:
         empty_dir.mkdir()
 
         # This should not raise an error and should not register any classes
-        ClassRegistryUtils.register_classes_in_folder(folder_path=str(empty_dir), base_class=StuffContent, is_recursive=True)
+        register_classes_in_folder(folder_path=str(empty_dir), base_class=StuffContent, is_recursive=True)
 
         # Verify no new classes were registered (we can't easily check the exact count,
         # but the operation should complete without error)

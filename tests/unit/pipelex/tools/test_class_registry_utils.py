@@ -3,11 +3,11 @@ from pathlib import Path
 from pydantic import BaseModel
 from pytest_mock import MockerFixture
 
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.libraries.content_class.class_library_utils import register_classes_in_file, register_classes_in_folder
 
 
-class TestClassRegistryUtilsUnit:
-    """Unit tests for ClassRegistryUtils using mocks."""
+class TestClassLibraryUtilsUnit:
+    """Unit tests for class_library_utils using mocks."""
 
     def test_register_classes_in_file(self, mocker: MockerFixture):
         """Test registering classes from a Python file."""
@@ -15,24 +15,24 @@ class TestClassRegistryUtilsUnit:
         mock_module = mocker.MagicMock()
         mock_module.__name__ = "test_module"
 
-        # Mock the functions at the location where they're imported in ClassRegistryUtils
+        # Mock the functions at the location where they're imported
         mock_import = mocker.patch(
-            "pipelex.system.registries.class_registry_utils.import_module_from_file",
+            "pipelex.libraries.content_class.class_library_utils.import_module_from_file",
             return_value=mock_module,
         )
         mock_find = mocker.patch(
-            "pipelex.system.registries.class_registry_utils.find_classes_in_module",
+            "pipelex.libraries.content_class.class_library_utils.find_classes_in_module",
             return_value=[str, int],
         )
 
         # Mock the global class registry
         mock_registry = mocker.MagicMock()
         mocker.patch(
-            "pipelex.system.registries.class_registry_utils.KajsonManager.get_class_registry",
+            "pipelex.libraries.content_class.class_library_utils.KajsonManager.get_class_registry",
             return_value=mock_registry,
         )
 
-        ClassRegistryUtils.register_classes_in_file(file_path="/fake/path.py", base_class=None, is_include_imported=False)
+        register_classes_in_file(file_path="/fake/path.py", base_class=None, is_include_imported=False)
 
         # Verify the mocked functions were called correctly
         mock_import.assert_called_once_with("/fake/path.py")
@@ -46,17 +46,17 @@ class TestClassRegistryUtilsUnit:
         # Mock get_config to return excluded_dirs
         mock_config = mocker.MagicMock()
         mock_config.pipelex.scan_config.excluded_dirs = ["__pycache__", ".git"]
-        mocker.patch("pipelex.system.registries.class_registry_utils.get_config", return_value=mock_config)
+        mocker.patch("pipelex.libraries.content_class.class_library_utils.get_config", return_value=mock_config)
 
         # Mock the file finding and registration
         mock_files = [Path("/fake/file1.py"), Path("/fake/file2.py")]
         mock_find_files = mocker.patch(
-            "pipelex.system.registries.class_registry_utils.find_files_in_dir",
+            "pipelex.libraries.content_class.class_library_utils.find_files_in_dir",
             return_value=mock_files,
         )
-        mock_register_file = mocker.patch.object(ClassRegistryUtils, "register_classes_in_file")
+        mock_register_file = mocker.patch("pipelex.libraries.content_class.class_library_utils.register_classes_in_file")
 
-        ClassRegistryUtils.register_classes_in_folder(
+        register_classes_in_folder(
             folder_path="/fake/folder",
             base_class=BaseModel,
             is_recursive=True,

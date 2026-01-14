@@ -17,6 +17,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_current_library
+from pipelex.libraries.content_class.class_library_utils import auto_register_all_subclasses, import_modules_in_folder
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -28,7 +29,6 @@ from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
     get_pipelex_plx_files_from_dirs,
 )
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
@@ -167,7 +167,7 @@ class LibraryManager(LibraryManagerAbstract):
         # Import from user directories
         for library_dir in all_dirs:
             # Only import files that contain StructuredContent subclasses (uses AST pre-check)
-            ClassRegistryUtils.import_modules_in_folder(
+            import_modules_in_folder(
                 folder_path=str(library_dir),
                 base_class_names=[StructuredContent.__name__],
                 force_include_dirs=[str(Path(builder.__file__).parent)],
@@ -180,7 +180,7 @@ class LibraryManager(LibraryManagerAbstract):
             )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
-        num_registered = ClassRegistryUtils.auto_register_all_subclasses(
+        num_registered = auto_register_all_subclasses(
             base_class=StructuredContent,
         )
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")

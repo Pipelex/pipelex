@@ -204,3 +204,50 @@ class FuncLibrary(RootModel[FuncLibraryRoot], FuncLibraryAbstract):
             pass
 
         return False
+
+    @override
+    def unregister_function(self, func: Callable[..., Any]) -> None:
+        """Unregisters a function from the registry."""
+        key = func.__name__
+        if key not in self.root:
+            msg = f"Function '{key}' not found in registry"
+            raise FuncLibraryError(msg)
+        del self.root[key]
+        log.debug(f"Unregistered single function '{key}' from registry")
+
+    @override
+    def unregister_function_by_name(self, name: str) -> None:
+        """Unregisters a function from the registry by its name."""
+        if name not in self.root:
+            msg = f"Function '{name}' not found in registry"
+            raise FuncLibraryError(msg)
+        del self.root[name]
+
+    @override
+    def register_functions_dict(self, functions: dict[str, Callable[..., Any]]) -> None:
+        """Registers multiple functions in the registry with names if they meet eligibility criteria."""
+        for name, func in functions.items():
+            self.register_function(func=func, name=name)
+
+    @override
+    def register_functions(self, functions: list[Callable[..., Any]]) -> None:
+        """Registers multiple functions in the registry with names if they meet eligibility criteria."""
+        for func in functions:
+            self.register_function(func=func)
+
+    @override
+    def get_required_function_with_signature(self, name: str) -> Callable[..., object]:
+        """Retrieves a function from the registry by its name and verifies it matches the expected signature.
+        Raises an error if not found or if signature doesn't match.
+        """
+        if name not in self.root:
+            msg = f"Function '{name}' not found in registry"
+            raise FuncLibraryError(msg)
+
+        func = self.root[name]
+        # Note: This is a basic signature check. For more thorough type checking,
+        # you might want to use typing.get_type_hints() or a more sophisticated type checker
+        if not callable(func):
+            msg = f"'{name}' is not a callable function"
+            raise FuncLibraryError(msg)
+        return func

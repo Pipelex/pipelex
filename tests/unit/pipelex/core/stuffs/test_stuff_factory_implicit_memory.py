@@ -11,7 +11,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
+from pipelex.libraries.content_class.class_library_utils import register_classes_in_file
 from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_TEST_CASES, TEST_CASES
 
 
@@ -19,7 +19,7 @@ from tests.unit.pipelex.core.stuffs.data import ERROR_TEST_CASES, SEARCH_DOMAIN_
 def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     load_test_library([Path(__file__).parent])
     # Register the class in the class registry
-    ClassRegistryUtils.register_classes_in_file(
+    register_classes_in_file(
         file_path=os.path.join(os.path.dirname(__file__), "data.py"),
         base_class=StructuredContent,
         is_include_imported=False,
