@@ -2,8 +2,8 @@ from typing import ClassVar
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.libraries.func.func_library import pipe_func
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
-from pipelex.system.registries.func_registry import pipe_func
 
 
 # Register test functions for validation tests

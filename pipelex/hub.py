@@ -24,6 +24,7 @@ from pipelex.core.domains.domain import Domain
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
+from pipelex.libraries.func.func_library_abstract import FuncLibraryAbstract
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
@@ -72,6 +73,7 @@ class PipelexHub:
         self._domain_library: DomainLibraryAbstract | None = None
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
+        self._func_library: FuncLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
 
         # pipeline
@@ -175,6 +177,9 @@ class PipelexHub:
 
     def set_pipe_library(self, pipe_library: PipeLibraryAbstract):
         self._pipe_library = pipe_library
+
+    def set_func_library(self, func_library: FuncLibraryAbstract):
+        self._func_library = func_library
 
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
@@ -289,6 +294,12 @@ class PipelexHub:
             msg = "PipeLibrary is not initialized"
             raise RuntimeError(msg)
         return self._pipe_library
+
+    def get_required_func_library(self) -> FuncLibraryAbstract:
+        if self._func_library is None:
+            msg = "FuncLibrary is not initialized"
+            raise RuntimeError(msg)
+        return self._func_library
 
     def get_required_pipe_router(self) -> PipeRouterProtocol:
         if self._pipe_router is None:
@@ -480,6 +491,10 @@ def get_required_domain(domain_code: str) -> Domain:
 
 def get_optional_domain(domain_code: str) -> Domain | None:
     return get_pipelex_hub().get_required_domain_library().get_domain(domain_code=domain_code)
+
+
+def get_func_library() -> FuncLibraryAbstract:
+    return get_pipelex_hub().get_required_func_library()
 
 
 def get_pipe_library() -> PipeLibraryAbstract:

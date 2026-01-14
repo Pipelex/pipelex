@@ -5,18 +5,17 @@ from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
 from pipelex.libraries.exceptions import LibraryError
+from pipelex.libraries.func.func_library import FuncLibrary
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 from pipelex.pipe_controllers.pipe_controller import PipeController
 
 
 class Library(BaseModel):
-    """A Library bundles together domain, concept, and pipe libraries for a specific context.
+    """A Library bundles together domain, concept, pipe, and func libraries for a specific context.
 
-    This represents a complete set of Pipelex definitions (domains, concepts, pipes)
+    This represents a complete set of Pipelex definitions (domains, concepts, pipes, funcs)
     that can be loaded and used together, typically for a single pipeline run.
-
-    Limitations: It lacks the Func Registry library and Class Registry library
 
     Each Library (except BASE) inherits native concepts and base pipes from the BASE library.
     """
@@ -24,6 +23,7 @@ class Library(BaseModel):
     domain_library: DomainLibrary
     concept_library: ConceptLibrary
     pipe_library: PipeLibrary
+    func_library: FuncLibrary
     loaded_plx_paths: list[str] = Field(default_factory=list)
 
     def get_domain_library(self) -> DomainLibrary:
@@ -35,10 +35,14 @@ class Library(BaseModel):
     def get_pipe_library(self) -> PipeLibrary:
         return self.pipe_library
 
+    def get_func_library(self) -> FuncLibrary:
+        return self.func_library
+
     def teardown(self) -> None:
         self.pipe_library.teardown()
         self.concept_library.teardown()
         self.domain_library.teardown()
+        self.func_library.teardown()
         self.loaded_plx_paths = []
 
     def validate_library(self) -> None:

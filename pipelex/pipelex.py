@@ -58,7 +58,6 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
-from pipelex.system.registries.func_registry import func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
@@ -356,7 +355,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.kajson_manager.teardown()
         if self.class_registry:
             self.class_registry.teardown()
-        func_registry.teardown()
         TemplateLoader.reset()
         TemplateRegistry.clear()
 

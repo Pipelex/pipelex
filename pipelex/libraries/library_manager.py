@@ -21,6 +21,7 @@ from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
 )
+from pipelex.libraries.func.func_library_utils import register_funcs_in_folder
 from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -28,7 +29,6 @@ from pipelex.libraries.library_utils import (
     get_pipelex_plx_files_from_dirs,
 )
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
-from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
@@ -160,7 +160,10 @@ class LibraryManager(LibraryManagerAbstract):
                 valid_plx_paths.append(plx_path)
                 seen_absolute_paths.add(absolute_path)
 
-        # Import modules and register in global registries
+        # Get the library's func_library for registering functions
+        library = self.get_library(library_id=library_id)
+
+        # Import modules and register in libraries
         # Import from user directories
         for library_dir in all_dirs:
             # Only import files that contain StructuredContent subclasses (uses AST pre-check)
@@ -170,7 +173,8 @@ class LibraryManager(LibraryManagerAbstract):
                 force_include_dirs=[str(Path(builder.__file__).parent)],
             )
             # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
-            FuncRegistryUtils.register_funcs_in_folder(
+            register_funcs_in_folder(
+                func_library=library.func_library,
                 folder_path=str(library_dir),
                 force_include_dirs=[str(Path(builder.__file__).parent)],
             )

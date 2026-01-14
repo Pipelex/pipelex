@@ -14,11 +14,11 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_func_library
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.system.registries.func_registry import func_registry
 
 
 class PipeFuncOutput(PipeOutput):
@@ -40,7 +40,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     @field_validator("function_name", mode="before")
     @classmethod
     def validate_function_name(cls, function_name: str) -> str:
-        function = func_registry.get_function(function_name)
+        function = get_func_library().get_function(function_name)
         if not function:
             msg = f"Function '{function_name}' not found in registry"
             raise ValueError(msg)
@@ -69,7 +69,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
 
     @override
     def validate_output_with_library(self):
-        function = func_registry.get_required_function(self.function_name)
+        function = get_func_library().get_required_function(self.function_name)
         return_type = get_type_hints(function).get("return")
         if return_type is None:
             msg = (
@@ -102,7 +102,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         output_name: str | None = None,
     ) -> PipeFuncOutput:
         log.verbose(f"Running PipeFunc with function '{self.function_name}'")
-        function = func_registry.get_required_function(self.function_name)
+        function = get_func_library().get_required_function(self.function_name)
 
         if asyncio.iscoroutinefunction(function):
             func_output_object = await function(working_memory=working_memory)
@@ -145,7 +145,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeFuncOutput:
-        function = func_registry.get_required_function(self.function_name)
+        function = get_func_library().get_required_function(self.function_name)
         return_type = get_type_hints(function).get("return")
         if return_type is None:
             msg = f"Dry run of {self.type} '{self.code}' failed: The return type of the function is None. It should be a subclass of StuffContent."
@@ -185,7 +185,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     async def _validate_before_run(
         self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
-        function = func_registry.get_required_function(self.function_name)
+        function = get_func_library().get_required_function(self.function_name)
         return_type = get_type_hints(function).get("return")
         # TODO: this should not happend ever. The correct way to do this would be to have a unit test making sure
         # that the FuncRegistry DOES CALL the 'is_eligible_function' function, and this function should be unit tested.

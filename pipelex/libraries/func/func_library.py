@@ -1,29 +1,26 @@
 import inspect
-import logging
 from collections.abc import Callable
 from typing import Any, TypeVar, cast, get_type_hints
 
-from pydantic import Field, PrivateAttr, RootModel
+from pydantic import Field, RootModel
+from typing_extensions import override
 
-from pipelex.system.exceptions import ToolError
+from pipelex import log
+from pipelex.libraries.func.exceptions import FuncLibraryError
+from pipelex.libraries.func.func_library_abstract import FuncLibraryAbstract
+from pipelex.types import Self
 from pipelex.urls import URLs
-
-FUNC_REGISTRY_LOGGER_CHANNEL_NAME = "func_registry"
 
 # Type variable for generic function types
 T = TypeVar("T")
-FuncRegistryDict = dict[str, Callable[..., Any]]
+FuncLibraryRoot = dict[str, Callable[..., Any]]
 
 # Attribute name used by the decorator to mark functions for registration
 PIPE_FUNC_MARKER = "_is_pipe_func"
 
 
-class FuncRegistryError(ToolError):
-    pass
-
-
 def pipe_func(name: str | None = None) -> Callable[[T], T]:
-    """Decorator to mark a function for automatic registration in the func_registry.
+    """Decorator to mark a function for automatic registration in the FuncLibrary.
 
     This decorator marks functions to be discovered and registered for use in PipeFunc operators.
     Functions marked with this decorator must follow the PipeFunc signature:
@@ -59,98 +56,68 @@ def pipe_func(name: str | None = None) -> Callable[[T], T]:
     return decorator
 
 
-class FuncRegistry(RootModel[FuncRegistryDict]):
-    root: FuncRegistryDict = Field(default_factory=dict)
-    _logger: logging.Logger = PrivateAttr(logging.getLogger(FUNC_REGISTRY_LOGGER_CHANNEL_NAME))
+class FuncLibrary(RootModel[FuncLibraryRoot], FuncLibraryAbstract):
+    root: FuncLibraryRoot = Field(default_factory=dict)
 
-    def log(self, message: str) -> None:
-        self._logger.debug(message)
+    @override
+    def setup(self) -> None:
+        pass
 
-    def set_logger(self, logger: logging.Logger) -> None:
-        self._logger = logger
-
+    @override
     def teardown(self) -> None:
-        """Resets the registry to an empty state."""
+        """Resets the library to an empty state."""
         self.root.clear()
 
+    @override
+    def reset(self) -> None:
+        self.teardown()
+        self.setup()
+
+    @classmethod
+    def make_empty(cls) -> Self:
+        return cls(root={})
+
+    @override
     def register_function(
         self,
         func: Callable[..., Any],
         name: str | None = None,
     ) -> None:
-        """Registers a function in the registry with a name if it meets eligibility criteria."""
+        """Registers a function in the library with a name if it meets eligibility criteria."""
         if not self.is_eligible_function(func):
             return
 
         key = name or func.__name__
         if key in self.root:
-            self.log(f"Function '{key}' already exists in registry")
+            log.debug(f"Function '{key}' already exists in library")
         else:
-            self.log(f"Registered new single function '{key}' in registry")
+            log.debug(f"Registered new single function '{key}' in library")
         self.root[key] = func
 
-    def unregister_function(self, func: Callable[..., Any]) -> None:
-        """Unregisters a function from the registry."""
-        key = func.__name__
-        if key not in self.root:
-            msg = f"Function '{key}' not found in registry"
-            raise FuncRegistryError(msg)
-        del self.root[key]
-        self.log(f"Unregistered single function '{key}' from registry")
-
-    def unregister_function_by_name(self, name: str) -> None:
-        """Unregisters a function from the registry by its name."""
-        if name not in self.root:
-            msg = f"Function '{name}' not found in registry"
-            raise FuncRegistryError(msg)
-        del self.root[name]
-
-    def register_functions_dict(self, functions: dict[str, Callable[..., Any]]) -> None:
-        """Registers multiple functions in the registry with names if they meet eligibility criteria."""
-        for name, func in functions.items():
-            self.register_function(func=func, name=name)
-
-    def register_functions(self, functions: list[Callable[..., Any]]) -> None:
-        """Registers multiple functions in the registry with names if they meet eligibility criteria."""
-        for func in functions:
-            self.register_function(func=func)
-
+    @override
     def get_function(self, name: str) -> Callable[..., Any] | None:
-        """Retrieves a function from the registry by its name. Returns None if not found."""
+        """Retrieves a function from the library by its name. Returns None if not found."""
         return self.root.get(name)
 
+    @override
     def get_required_function(self, name: str) -> Callable[..., Any]:
-        """Retrieves a function from the registry by its name. Raises an error if not found."""
+        """Retrieves a function from the library by its name. Raises an error if not found."""
         if name not in self.root:
             msg = (
-                f"Function '{name}' not found in registry. "
+                f"Function '{name}' not found in library. "
                 f"Since v0.12.0, custom functions require the @pipe_func() decorator for auto-discovery. "
                 f"Add @pipe_func() above your function definition. "
                 f"See: {URLs.pipe_func_docs}"
             )
-            raise FuncRegistryError(msg)
+            raise FuncLibraryError(msg)
         return self.root[name]
 
-    def get_required_function_with_signature(self, name: str) -> Callable[..., object]:
-        """Retrieves a function from the registry by its name and verifies it matches the expected signature.
-        Raises an error if not found or if signature doesn't match.
-        """
-        if name not in self.root:
-            msg = f"Function '{name}' not found in registry"
-            raise FuncRegistryError(msg)
-
-        func = self.root[name]
-        # Note: This is a basic signature check. For more thorough type checking,
-        # you might want to use typing.get_type_hints() or a more sophisticated type checker
-        if not callable(func):
-            msg = f"'{name}' is not a callable function"
-            raise FuncRegistryError(msg)
-        return func
-
+    @override
     def has_function(self, name: str) -> bool:
-        """Checks if a function is in the registry by its name."""
+        """Checks if a function is in the library by its name."""
         return name in self.root
 
+    @override
     def is_marked_pipe_func(self, func: Any) -> bool:
         """Checks if a function is marked with the @pipe_func decorator.
 
@@ -163,7 +130,8 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
         """
         return hasattr(func, PIPE_FUNC_MARKER) and getattr(func, PIPE_FUNC_MARKER) is True
 
-    # TODO: refactor this into a subclass of FuncRegistry dedicated to pipe funcs, avoid the circular import issue, avoid the code-smell
+    # TODO: refactor this into a subclass of FuncLibrary dedicated to pipe funcs, avoid the circular import issue, avoid the code-smell
+    @override
     def is_eligible_function(self, func: Any, require_decorator: bool = False) -> bool:
         """Checks if a function matches the criteria for PipeFunc registration:
         - Must be callable
@@ -236,6 +204,3 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             pass
 
         return False
-
-
-func_registry = FuncRegistry()

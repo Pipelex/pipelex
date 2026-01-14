@@ -37,8 +37,6 @@ from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
 class CoreRegistryModels(RegistryModels):
-    FIELD_EXTRACTION: ClassVar[list[ModelType]] = []
-
     PIPE_OPERATORS: ClassVar[list[PipeAbstractType]] = [
         PipeFunc,
         PipeImgGen,

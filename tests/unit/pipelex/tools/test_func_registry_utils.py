@@ -8,8 +8,9 @@ from pydantic import Field
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.system.registries.func_registry import func_registry
-from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
+from pipelex.hub import get_func_library
+from pipelex.libraries.func.func_library import FuncLibrary
+from pipelex.libraries.func.func_library_utils import register_funcs_in_folder
 
 
 class FilePath(StructuredContent):
@@ -23,7 +24,7 @@ class CodebaseFileContent(StructuredContent):
 
 class TestCases:
     VALID_ASYNC_FUNCTION = """
-from pipelex.system.registries.func_registry import pipe_func
+from pipelex.libraries.func.func_library import pipe_func
 
 @pipe_func()
 async def read_file_content(working_memory: WorkingMemory) -> ListContent[CodebaseFileContent]:
@@ -46,7 +47,7 @@ async def read_file_content(working_memory: WorkingMemory) -> ListContent[Codeba
 """
 
     VALID_SYNC_FUNCTION = """
-from pipelex.system.registries.func_registry import pipe_func
+from pipelex.libraries.func.func_library import pipe_func
 
 # Sync function - should be accepted
 @pipe_func()
@@ -118,13 +119,22 @@ def invalid_function_no_type_hints(working_memory):
     ]
 
 
-class TestFuncRegistryUtils:
+@pytest.fixture
+def func_library():
+    """Create a new FuncLibrary for each test."""
+    library = get_func_library()
+    yield library
+    library.teardown()
+
+
+class TestFuncLibraryUtils:
     @pytest.mark.parametrize(
         ("test_name", "function_code", "expected_registered", "expected_not_registered"),
         TestCases.TEST_CASES,
     )
     def test_function_registration_eligibility(
         self,
+        func_library: FuncLibrary,
         test_name: str,  # noqa: ARG002
         function_code: str,
         expected_registered: list[str],
@@ -159,26 +169,23 @@ class CodebaseFileContent(StructuredContent):
 
             test_file.write_text(full_code)
 
-            # Clear the registry to start fresh
-            func_registry.teardown()
-
             # Test the registration
-            FuncRegistryUtils.register_funcs_in_folder(folder_path=temp_dir, is_recursive=False)
+            register_funcs_in_folder(func_library=func_library, folder_path=temp_dir, is_recursive=False)
 
             # Check that expected functions were registered
             for func_name in expected_registered:
-                assert func_registry.has_function(func_name), f"{func_name} should be registered"
+                assert func_library.has_function(func_name), f"{func_name} should be registered"
 
                 # Verify we can get the function
-                registered_func = func_registry.get_function(func_name)
+                registered_func = func_library.get_function(func_name)
                 assert registered_func is not None, f"Registered function {func_name} should be retrievable"
                 assert registered_func.__name__ == func_name, f"Function name should match {func_name}"
 
             # Check that expected functions were NOT registered
             for func_name in expected_not_registered:
-                assert not func_registry.has_function(func_name), f"{func_name} should NOT be registered"
+                assert not func_library.has_function(func_name), f"{func_name} should NOT be registered"
 
-    def test_recursive_folder_search(self):
+    def test_recursive_folder_search(self, func_library: FuncLibrary):
         """Test that recursive folder search works correctly."""
         with tempfile.TemporaryDirectory() as temp_dir:
             # Create nested directory structure
@@ -190,7 +197,7 @@ class CodebaseFileContent(StructuredContent):
             root_file.write_text("""
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.system.registries.func_registry import pipe_func
+from pipelex.libraries.func.func_library import pipe_func
 
 @pipe_func()
 async def root_function(working_memory: WorkingMemory) -> TextContent:
@@ -202,32 +209,29 @@ async def root_function(working_memory: WorkingMemory) -> TextContent:
             nested_file.write_text("""
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.system.registries.func_registry import pipe_func
+from pipelex.libraries.func.func_library import pipe_func
 
 @pipe_func()
 async def nested_function(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text="nested")
 """)
 
-            # Clear the registry
-            func_registry.teardown()
-
             # Test recursive search
-            FuncRegistryUtils.register_funcs_in_folder(folder_path=temp_dir, is_recursive=True)
+            register_funcs_in_folder(func_library=func_library, folder_path=temp_dir, is_recursive=True)
 
             # Both functions should be registered
-            assert func_registry.has_function("root_function"), "root_function should be registered"
-            assert func_registry.has_function("nested_function"), "nested_function should be registered"
+            assert func_library.has_function("root_function"), "root_function should be registered"
+            assert func_library.has_function("nested_function"), "nested_function should be registered"
 
             # Clear and test non-recursive search
-            func_registry.teardown()
-            FuncRegistryUtils.register_funcs_in_folder(folder_path=temp_dir, is_recursive=False)
+            func_library.teardown()
+            register_funcs_in_folder(func_library=func_library, folder_path=temp_dir, is_recursive=False)
 
             # Only root function should be registered
-            assert func_registry.has_function("root_function"), "root_function should be registered"
-            assert not func_registry.has_function("nested_function"), "nested_function should NOT be registered"
+            assert func_library.has_function("root_function"), "root_function should be registered"
+            assert not func_library.has_function("nested_function"), "nested_function should NOT be registered"
 
-    def test_eligibility_check_directly(self):
+    def test_eligibility_check_directly(self, func_library: FuncLibrary):
         # Valid async function
         async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
             return TextContent(text="test")
@@ -237,12 +241,10 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
             return TextContent(text="test")
 
         # Test eligibility
-        assert func_registry.is_eligible_function(valid_async_function), "Valid async function should be eligible"
-        assert func_registry.is_eligible_function(valid_sync_function), "Valid sync function should be eligible"
+        assert func_library.is_eligible_function(valid_async_function), "Valid async function should be eligible"
+        assert func_library.is_eligible_function(valid_sync_function), "Valid sync function should be eligible"
 
-    def test_register_function_checks_eligibility(self):
-        func_registry.teardown()
-
+    def test_register_function_checks_eligibility(self, func_library: FuncLibrary):
         # Valid async function
         async def valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
             return TextContent(text="valid")
@@ -252,15 +254,15 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
             return TextContent(text="valid")
 
         # Try to register both functions
-        func_registry.register_function(valid_async_function)
-        func_registry.register_function(valid_sync_function)
+        func_library.register_function(valid_async_function)
+        func_library.register_function(valid_sync_function)
 
         # Both functions should be registered
-        assert func_registry.has_function("valid_async_function"), "Valid async function should be registered"
-        assert func_registry.has_function("valid_sync_function"), "Valid sync function should be registered"
+        assert func_library.has_function("valid_async_function"), "Valid async function should be registered"
+        assert func_library.has_function("valid_sync_function"), "Valid sync function should be registered"
 
         # Test register_functions method as well
-        func_registry.teardown()
+        func_library.teardown()
 
         async def another_valid_async_function(working_memory: WorkingMemory) -> TextContent:  # noqa: ARG001,RUF029 # pyright: ignore[reportUnknownParameterType,reportMissingParameterType, reportUnusedParameter]
             return TextContent(text="another_valid_async")
@@ -273,12 +275,12 @@ async def nested_function(working_memory: WorkingMemory) -> TextContent:
             return TextContent(text="invalid")
 
         # Register multiple functions at once - invalid functions should be silently skipped
-        func_registry.register_functions([invalid_function, another_valid_async_function, another_valid_sync_function])
+        func_library.register_functions([invalid_function, another_valid_async_function, another_valid_sync_function])
 
         # Valid functions should be registered, invalid function silently skipped
-        assert func_registry.has_function("another_valid_async_function"), "Valid async function should be registered"
-        assert func_registry.has_function("another_valid_sync_function"), "Valid sync function should be registered"
-        assert not func_registry.has_function("invalid_function"), "Invalid function should NOT be registered"
+        assert func_library.has_function("another_valid_async_function"), "Valid async function should be registered"
+        assert func_library.has_function("another_valid_sync_function"), "Valid sync function should be registered"
+        assert not func_library.has_function("invalid_function"), "Invalid function should NOT be registered"
 
 
 if __name__ == "__main__":

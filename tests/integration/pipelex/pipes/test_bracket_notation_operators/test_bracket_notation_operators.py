@@ -6,6 +6,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.libraries.func.func_library import pipe_func
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
@@ -16,7 +17,6 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
-from pipelex.system.registries.func_registry import pipe_func
 
 
 # Test function for PipeFunc bracket notation test

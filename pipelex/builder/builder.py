@@ -25,7 +25,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.exceptions import StuffContentTypeError
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
-from pipelex.system.registries.func_registry import pipe_func
+from pipelex.libraries.func.func_library import pipe_func
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:

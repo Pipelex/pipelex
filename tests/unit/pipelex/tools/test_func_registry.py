@@ -1,13 +1,13 @@
-import logging
 from collections.abc import Callable
 from typing import Any
 
 import pytest
-from pytest import LogCaptureFixture
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.system.registries.func_registry import FuncRegistry, FuncRegistryError
+from pipelex.hub import get_func_library
+from pipelex.libraries.func.exceptions import FuncLibraryError
+from pipelex.libraries.func.func_library import FuncLibrary
 
 
 def sample_function():
@@ -76,15 +76,15 @@ TEST_CASES: list[EligibilityTestCase] = [
 @pytest.fixture
 def registry():
     # Create a new registry for each test
-    reg = FuncRegistry()
+    reg = get_func_library()
     yield reg
     # Teardown: clear the registry after each test
     reg.teardown()
 
 
-class TestFuncRegistry:
+class TestFuncLibrary:
     @pytest.mark.parametrize(("test_name", "func", "is_eligible"), TEST_CASES)
-    def test_function_eligibility_and_registration(self, registry: FuncRegistry, test_name: str, func: Callable[..., Any], is_eligible: bool):
+    def test_function_eligibility_and_registration(self, registry: FuncLibrary, test_name: str, func: Callable[..., Any], is_eligible: bool):
         # Test eligibility check directly
         actual_eligibility = registry.is_eligible_function(func)
         assert actual_eligibility == is_eligible, f"Eligibility check failed for {test_name}: expected {is_eligible}, got {actual_eligibility}"
@@ -100,36 +100,36 @@ class TestFuncRegistry:
             registry.register_function(func)
             assert not registry.has_function(func.__name__), f"Ineligible function {test_name} should not be registered"
 
-    def test_register_function_with_custom_name(self, registry: FuncRegistry):
+    def test_register_function_with_custom_name(self, registry: FuncLibrary):
         """Test registering a function with a custom name."""
         registry.register_function(valid_function, name="custom_name")
         assert registry.get_function("custom_name") is valid_function
         assert registry.get_function("valid_function") is None
 
-    def test_get_required_function_not_found(self, registry: FuncRegistry):
-        with pytest.raises(FuncRegistryError, match="not found in registry"):
+    def test_get_required_function_not_found(self, registry: FuncLibrary):
+        with pytest.raises(FuncLibraryError, match="not found in library"):
             registry.get_required_function("non_existent_function")
 
-    def test_unregister_function(self, registry: FuncRegistry):
+    def test_unregister_function(self, registry: FuncLibrary):
         registry.register_function(valid_function)
         assert registry.has_function("valid_function")
         registry.unregister_function(valid_function)
         assert not registry.has_function("valid_function")
 
-    def test_unregister_function_not_found(self, registry: FuncRegistry):
-        with pytest.raises(FuncRegistryError, match="not found in registry"):
+    def test_unregister_function_not_found(self, registry: FuncLibrary):
+        with pytest.raises(FuncLibraryError, match="not found in library"):
             registry.unregister_function(sample_function)
 
-    def test_unregister_function_by_name(self, registry: FuncRegistry):
+    def test_unregister_function_by_name(self, registry: FuncLibrary):
         registry.register_function(valid_function, name="custom")
         registry.unregister_function_by_name("custom")
         assert not registry.has_function("custom")
 
-    def test_unregister_function_by_name_not_found(self, registry: FuncRegistry):
-        with pytest.raises(FuncRegistryError, match="not found in registry"):
+    def test_unregister_function_by_name_not_found(self, registry: FuncLibrary):
+        with pytest.raises(FuncLibraryError, match="not found in library"):
             registry.unregister_function_by_name("non_existent")
 
-    def test_register_functions_dict_with_ineligible_functions(self, registry: FuncRegistry):
+    def test_register_functions_dict_with_ineligible_functions(self, registry: FuncLibrary):
         functions: dict[str, Callable[..., Any]] = {"func1": sample_function, "func2": another_function}
         registry.register_functions_dict(functions)
         # Ineligible functions should be silently skipped
@@ -137,7 +137,7 @@ class TestFuncRegistry:
         assert not registry.has_function("func2")
         assert len(registry.root) == 0
 
-    def test_register_functions_list_with_ineligible_functions(self, registry: FuncRegistry):
+    def test_register_functions_list_with_ineligible_functions(self, registry: FuncLibrary):
         functions: list[Callable[..., Any]] = [sample_function, another_function]
         registry.register_functions(functions)
         # Ineligible functions should be silently skipped
@@ -145,45 +145,34 @@ class TestFuncRegistry:
         assert not registry.has_function("another_function")
         assert len(registry.root) == 0
 
-    def test_register_functions_empty_list(self, registry: FuncRegistry):
+    def test_register_functions_empty_list(self, registry: FuncLibrary):
         registry.register_functions([])
         assert len(registry.root) == 0
 
-    def test_register_existing_function_with_warning(self, registry: FuncRegistry, caplog: LogCaptureFixture):
+    def test_register_existing_function_replaces(self, registry: FuncLibrary):
+        """Test that registering an existing function replaces it without error."""
         registry.register_function(valid_function)
-        with caplog.at_level("DEBUG"):
-            registry.register_function(valid_function)
-        assert "already exists in registry" in caplog.text
+        assert registry.has_function("valid_function")
+        # Register again - should not raise
+        registry.register_function(valid_function)
+        assert registry.has_function("valid_function")
 
-    def test_teardown(self, registry: FuncRegistry):
+    def test_teardown(self, registry: FuncLibrary):
         registry.register_function(valid_function)
         assert registry.has_function("valid_function")
         registry.teardown()
         assert not registry.has_function("valid_function")
 
-    def test_get_required_function_with_signature(self, registry: FuncRegistry):
+    def test_get_required_function_with_signature(self, registry: FuncLibrary):
         registry.register_function(valid_function)
         func = registry.get_required_function_with_signature("valid_function")
         assert func is valid_function
 
-    def test_get_required_function_with_signature_not_found(self, registry: FuncRegistry):
-        with pytest.raises(FuncRegistryError, match="not found in registry"):
+    def test_get_required_function_with_signature_not_found(self, registry: FuncLibrary):
+        with pytest.raises(FuncLibraryError, match="not found in library"):
             registry.get_required_function_with_signature("non_existent")
 
-    def test_get_required_function_with_signature_not_callable(self, registry: FuncRegistry):
+    def test_get_required_function_with_signature_not_callable(self, registry: FuncLibrary):
         registry.root["not_a_function"] = "a string"  # type: ignore[assignment]
-        with pytest.raises(FuncRegistryError, match="is not a callable function"):
+        with pytest.raises(FuncLibraryError, match="is not a callable function"):
             registry.get_required_function_with_signature("not_a_function")
-
-    def test_set_logger(self, registry: FuncRegistry, caplog: LogCaptureFixture):
-        """Test setting a custom logger"""
-        custom_logger = logging.getLogger("custom_test_logger")
-        registry.set_logger(custom_logger)
-
-        # Test that the custom logger is being used by triggering a log message
-        with caplog.at_level("DEBUG", logger="custom_test_logger"):
-            registry.register_function(valid_function)
-
-        # Verify the log message was captured by our custom logger
-        assert len(caplog.records) > 0
-        assert any("Registered new single function" in record.message for record in caplog.records)
