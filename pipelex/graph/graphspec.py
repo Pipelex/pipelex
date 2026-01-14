@@ -7,10 +7,10 @@ GraphSpec is renderer-agnostic and designed for JSON serialization.
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 # Redaction limits
 MAX_PREVIEW_LENGTH = 200
@@ -73,14 +73,23 @@ class TimingSpec(BaseModel):
 
     model_config = ConfigDict(extra="forbid", strict=True)
 
-    started_at: datetime
-    ended_at: datetime
+    started_at: datetime = Field(strict=False)
+    ended_at: datetime = Field(strict=False)
 
     @computed_field  # type: ignore[prop-decorator]
     @property
     def duration(self) -> float:
         """Duration in seconds, included in JSON serialization."""
         return (self.ended_at - self.started_at).total_seconds()
+
+    # filter out the duration field (computed, not stored)
+    @model_validator(mode="before")
+    @classmethod
+    def validate_duration(cls, data: dict[str, Any] | Self) -> dict[str, Any] | Self:
+        """Filter out the duration field from dict input without mutating the original."""
+        if isinstance(data, dict) and "duration" in data:
+            return {key: value for key, value in data.items() if key != "duration"}
+        return data
 
 
 class IOSpec(BaseModel):

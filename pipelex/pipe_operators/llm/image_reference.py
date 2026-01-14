@@ -17,7 +17,7 @@ class ImageReferenceKind(StrEnum):
     """Direct reference to an ImageContent variable, e.g., {{ portrait }}"""
 
     DIRECT_LIST = "direct_list"
-    """Direct reference to a list of ImageContent, e.g., {{ photos }}"""
+    """Direct reference to a ListContent of ImageContent, e.g., {{ photos }}"""
 
     NESTED = "nested"
     """Reference with | with_images filter for nested image extraction,

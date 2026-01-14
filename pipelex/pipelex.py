@@ -10,6 +10,7 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
@@ -154,6 +155,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def setup(
         self,
         integration_mode: IntegrationMode,
+        disable_inference: bool = False,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -186,22 +188,30 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         remote_config: RemoteConfig | None = None
         gateway_model_specs: BackendModelSpecs | None = None
         if is_pipelex_service_enabled:
-            # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
-            if integration_mode.requires_terms_acceptance:
-                # Check if terms are accepted
-                pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
-                if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
-                    raise GatewayTermsNotAcceptedError
-            # Fetch remote configuration
-            remote_config = RemoteConfigFetcher.fetch_remote_config()
-            log.verbose("Successfully fetched Pipelex Gateway remote configuration")
-            gateway_model_specs = remote_config.backend_model_specs
+            if disable_inference:
+                # Use dummy config when inference is disabled (for testing without network access)
+                remote_config = RemoteConfigFetcher.make_dummy_remote_config()
+                gateway_model_specs = remote_config.backend_model_specs
+                log.verbose("Using dummy remote config (inference disabled)")
+            else:
+                # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
+                if integration_mode.requires_terms_acceptance:
+                    # Check if terms are accepted
+                    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+                    if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
+                        raise GatewayTermsNotAcceptedError
+                # Fetch remote configuration
+                remote_config = RemoteConfigFetcher.fetch_remote_config()
+                log.verbose("Successfully fetched Pipelex Gateway remote configuration")
+                gateway_model_specs = remote_config.backend_model_specs
 
+        # Disable Pipelex telemetry when inference is disabled (no remote config available)
+        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and not disable_inference
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
             remote_config=remote_config,
-            is_pipelex_telemetry_enabled=is_pipelex_service_enabled,
+            is_pipelex_telemetry_enabled=is_pipelex_telemetry_enabled,
             telemetry_config=telemetry_config,
             injected_telemetry_manager=telemetry_manager,
         )
@@ -287,8 +297,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(error_msg) from credentials_exc
 
         if content_generator is None:
-            generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-            content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
+            if disable_inference:
+                content_generator = ContentGeneratorDry()
+            else:
+                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
+                content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
         self.pipelex_hub.set_content_generator(content_generator)
 
         self.inference_manager = inference_manager or InferenceManager()
@@ -376,6 +389,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def make(
         cls,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
+        disable_inference: bool = False,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -399,6 +413,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
+            disable_inference: When True, disables all inference functionality by using a mock
+                content generator. This skips gateway terms acceptance check and auto-skips
+                inference tests. Useful for CI/testing scenarios where inference is not needed.
             class_registry: Custom class registry for dynamic loading
             secrets_provider: Custom secrets/credentials provider
             storage_provider: Custom storage backend
@@ -431,6 +448,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         try:
             pipelex_instance.setup(
                 integration_mode=integration_mode,
+                disable_inference=disable_inference,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
                 storage_provider=storage_provider,

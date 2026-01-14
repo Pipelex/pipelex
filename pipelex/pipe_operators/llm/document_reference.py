@@ -17,7 +17,7 @@ class DocumentReferenceKind(StrEnum):
     """Direct reference to a DocumentContent variable, e.g., {{ report }}"""
 
     DIRECT_LIST = "direct_list"
-    """Direct reference to a list of DocumentContent, e.g., {{ documents }}"""
+    """Direct reference to a ListContent of DocumentContent, e.g., {{ documents }}"""
 
 
 class DocumentReference(BaseModel):
