@@ -82,13 +82,13 @@ class TimingSpec(BaseModel):
         """Duration in seconds, included in JSON serialization."""
         return (self.ended_at - self.started_at).total_seconds()
 
-    # pop the duration field
+    # filter out the duration field (computed, not stored)
     @model_validator(mode="before")
     @classmethod
     def validate_duration(cls, data: dict[str, Any] | Self) -> dict[str, Any] | Self:
-        """Pop the duration field from the data if it is a dict."""
-        if isinstance(data, dict):
-            data.pop("duration", None)
+        """Filter out the duration field from dict input without mutating the original."""
+        if isinstance(data, dict) and "duration" in data:
+            return {key: value for key, value in data.items() if key != "duration"}
         return data
 
 
