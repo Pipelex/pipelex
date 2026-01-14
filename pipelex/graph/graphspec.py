@@ -10,7 +10,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 # Redaction limits
 MAX_PREVIEW_LENGTH = 200
@@ -85,9 +85,10 @@ class TimingSpec(BaseModel):
     # pop the duration field
     @model_validator(mode="before")
     @classmethod
-    def validate_duration(cls, data: dict[str, Any]) -> dict[str, Any]:
-        """Pop the duration field from the data."""
-        data.pop("duration", None)
+    def validate_duration(cls, data: dict[str, Any] | Self) -> dict[str, Any] | Self:
+        """Pop the duration field from the data if it is a dict."""
+        if isinstance(data, dict):
+            data.pop("duration", None)
         return data
 
 
