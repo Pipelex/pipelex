@@ -227,7 +227,7 @@ default_page_views_dpi = 72
 # in order to test new model integrations or debug issues with the Gateway
 
 ####################################################################################################
-# Pipelex prompting config
+# Prompting config
 ####################################################################################################
 
 [pipelex.prompting_config]
@@ -243,20 +243,7 @@ gemini = { tag_style = "xml" }
 is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
 ####################################################################################################
-# Validation error config
-####################################################################################################
-
-[pipelex.validation_error_config]
-default_reaction = "raise"
-
-[pipelex.validation_error_config.reactions]
-# default_reaction is on raise
-# missing_input_variable = "log"
-# extraneous_input_variable = "log"
-# inadequate_input_concept = "log"
-
-####################################################################################################
-# Pipelex run config
+# Pipe run config
 ####################################################################################################
 
 [pipelex.pipe_run_config]

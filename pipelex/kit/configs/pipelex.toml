@@ -6,15 +6,15 @@
 #   `pipelex init config`
 #
 # Purpose:
-# - This file allows to override Pipelex's default settings for specific projects
-# - Feel free to modify any settings below to suit your needs
-# - You can add any configuration sections that exist in the main pipelex.toml
+# - This file allows you to override Pipelex's default settings for specific projects
+# - All values below are set to their defaults - modify them as needed
+# - The values here will override the defaults from the Pipelex package
 #
 # Finding Available Settings:
 # - See the full default configuration in: pipelex/pipelex.toml (in the Pipelex package)
 # - See the configuration structure classes in: pipelex/config.py and pipelex/cogt/config_cogt.py
 #
-# Common customizations are proposed below, such as:
+# Common customizations include:
 # - Logging levels and behavior
 # - Excluded directories for scanning
 # - LLM prompt dumping for debugging
@@ -26,136 +26,162 @@
 #
 ####################################################################################################
 
+####################################################################################################
+# Pipeline Execution Config
+####################################################################################################
+
 [pipelex.pipeline_execution_config]
-# Uncomment to disable conversion of data URLs to pipelex-storage:// URIs
-# is_normalize_data_urls_to_storage = false
+# Set to false to disable conversion of incoming data URLs to pipelex-storage:// URIs
+is_normalize_data_urls_to_storage = true
 
 [pipelex.pipeline_execution_config.graph_config.data_inclusion]
-# Uncomment to include stuff data in graph outputs:
+# Control what data is included in graph outputs
 stuff_json_content = true
 stuff_text_content = true
 stuff_html_content = true
 error_stack_traces = true
 
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
-# Uncomment to customize which graph outputs are generated (all enabled by default):
-# graphspec_json = false
-# mermaidflow_mmd = false
-# mermaidflow_html = false
-# reactflow_viewspec = false
-# reactflow_html = false
+# Control which graph outputs are generated
+graphspec_json = true
+mermaidflow_mmd = true
+mermaidflow_html = true
+reactflow_viewspec = true
+reactflow_html = true
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config]
-# Uncomment to customize ReactFlow graph rendering:
-# edge_type = "bezier"    # Options: "bezier", "smoothstep", "step", "straight"
-# nodesep = 50            # Horizontal spacing between nodes
-# ranksep = 80            # Vertical spacing between ranks/levels
-# initial_zoom = 1.0      # Initial zoom level (1.0 = 100%)
-# pan_to_top = true       # Pan to show top of graph on load
+# Customize ReactFlow graph rendering
+edge_type = "bezier" # Options: "bezier", "smoothstep", "step", "straight"
+nodesep = 50         # Horizontal spacing between nodes
+ranksep = 80         # Vertical spacing between ranks/levels
+initial_zoom = 1.0   # Initial zoom level (1.0 = 100%)
+pan_to_top = true    # Pan to show top of graph on load
+
+####################################################################################################
+# Storage Config
+####################################################################################################
 
 [pipelex.storage_config]
-# Storage method: "local" (default), "in_memory", "s3", or "gcp"
-# method = "local"
-
+# Storage method: "local", "in_memory" (default), "s3", or "gcp"
+method = "in_memory"
 # Whether to fetch remote HTTP URLs and store them locally
-# is_fetch_remote_content_enabled = true
+is_fetch_remote_content_enabled = true
 
-# --- Local Storage Configuration ---
-# Uncomment to customize local storage settings:
 [pipelex.storage_config.local]
-# uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
-# local_storage_path = ".pipelex/storage"
+# Local storage settings
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+local_storage_path = ".pipelex/storage"
 
-# --- AWS S3 Storage Configuration ---
-# Uncomment to use S3 storage (requires boto3: `pip install pipelex[s3]`):
+[pipelex.storage_config.in_memory]
+# In-memory storage settings
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+
 [pipelex.storage_config.s3]
-# uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
-# bucket_name = "your-bucket-name"
-# region = "us-east-1"
-# signed_urls_lifespan_seconds = 3600  # Set to "disabled" for public URLs
+# AWS S3 storage settings (requires boto3: `pip install pipelex[s3]`)
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+bucket_name = ""
+region = ""
+signed_urls_lifespan_seconds = 3600                           # Set to "disabled" for public URLs
 
-# --- Google Cloud Storage Configuration ---
-# Uncomment to use GCP storage (requires google-cloud-storage: `pip install pipelex[gcp-storage]`):
 [pipelex.storage_config.gcp]
-# uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
-# bucket_name = "your-bucket-name"
-# project_id = "your-project-id"
-# signed_urls_lifespan_seconds = 3600  # Set to "disabled" for public URLs
+# Google Cloud Storage settings (requires google-cloud-storage: `pip install pipelex[gcp-storage]`)
+uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
+bucket_name = ""
+project_id = ""
+signed_urls_lifespan_seconds = 3600                           # Set to "disabled" for public URLs
+
+####################################################################################################
+# Scan Config
+####################################################################################################
 
 [pipelex.scan_config]
-# Uncomment to customize the excluded directories for scanning
-# excluded_dirs = [
-#     ".venv",
-#     "venv",
-#     "env",
-#     ".env",
-#     "virtualenv",
-#     ".virtualenv",
-#     ".git",
-#     "__pycache__",
-#     ".pytest_cache",
-#     ".mypy_cache",
-#     ".ruff_cache",
-#     "node_modules",
-#     "results",
-# ]
+# Directories to exclude when scanning for pipeline files
+excluded_dirs = [
+    ".venv",
+    "venv",
+    "env",
+    ".env",
+    "virtualenv",
+    ".virtualenv",
+    ".git",
+    "__pycache__",
+    ".pytest_cache",
+    ".mypy_cache",
+    ".ruff_cache",
+    "node_modules",
+    "results",
+]
+
+####################################################################################################
+# Builder Config
+####################################################################################################
 
 [pipelex.builder_config]
-# Uncomment to change where the generated pipelines are saved:
-# default_output_dir = "."
-# default_bundle_file_name = "bundle"
-# default_directory_base_name = "pipeline"
+# Settings for generated pipelines
+default_output_dir = "."
+default_bundle_file_name = "bundle"
+default_directory_base_name = "pipeline"
+
+####################################################################################################
+# Log Config
+####################################################################################################
 
 [pipelex.log_config]
-# Uncomment to change the default log level:
-# default_log_level = "INFO"
-
-# Uncomment to log to stderr instead of stdout
-# console_log_target = "stderr"
-# console_print_target = "stderr"
+# Default logging level: "DEBUG", "INFO", "WARNING", "ERROR"
+default_log_level = "INFO"
+# Log output target: "stdout" or "stderr"
+console_log_target = "stdout"
+console_print_target = "stdout"
 
 [pipelex.log_config.package_log_levels]
-# Uncomment to change the log level for specific packages:
-# pipelex = "INFO"
+# Log levels for specific packages (use "-" instead of "." in package names)
+pipelex = "INFO"
 
-[pipelex.observer_config]
-# Uncomment to change the directory where the observer will save its results:
-# observer_dir = "results/observer"
+####################################################################################################
+# Feature Config
+####################################################################################################
 
 [pipelex.feature_config]
-# WIP/Experimental feature flags:
-# is_reporting_enabled = true
+# WIP/Experimental feature flags
+is_reporting_enabled = true
+
+####################################################################################################
+# Reporting Config
+####################################################################################################
 
 [pipelex.reporting_config]
-# Uncomment to customize the reporting configuration:
-# is_log_costs_to_console = false
-# is_generate_cost_report_file_enabled = false
-# cost_report_dir_path = "reports"
-# cost_report_base_name = "cost_report"
-# cost_report_extension = "csv"
-# cost_report_unit_scale = 1.0
+# Cost reporting settings
+is_log_costs_to_console = false
+is_generate_cost_report_file_enabled = false
+cost_report_dir_path = "reports"
+cost_report_base_name = "cost_report"
+cost_report_extension = "csv"
+cost_report_unit_scale = 1.0
 
-[cogt]
+####################################################################################################
+# Cogt (Cognitive Tools) Config
+####################################################################################################
+
 [cogt.model_deck_config]
-# Uncomment to disable model fallback: it will raise errors instead of using secondary model options:
-# is_model_fallback_enabled = false
-# Uncomment to change the reaction to missing presets: "raise" (default), "log" or "none"
-# missing_presets_reaction = "raise"
+# Model fallback behavior: if true, uses secondary model options when primary fails
+is_model_fallback_enabled = true
+# Reaction to missing presets: "raise", "log", or "none"
+missing_presets_reaction = "log"
 
 [cogt.tenacity_config]
-# Uncomment to change those values as needed:
-# max_retries = 50      # Maximum number of retry attempts before giving up
-# wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
-# wait_max = 20         # Maximum wait time between retries (in seconds)
-# wait_exp_base = 1.3   # Base for exponential backoff calculation
+# Retry behavior for API calls
+max_retries = 50      # Maximum number of retry attempts before giving up
+wait_multiplier = 0.2 # Multiplier applied to the wait time between retries (in seconds)
+wait_max = 20         # Maximum wait time between retries (in seconds)
+wait_exp_base = 1.3   # Base for exponential backoff calculation
 
 [cogt.llm_config]
-# Uncomment any of these to enable dumping the inputs or outputs of text-generation with an LLM:
-# is_dump_text_prompts_enabled = true
-# is_dump_response_text_enabled = true
+# Enable dumping of LLM inputs/outputs for debugging
+is_dump_text_prompts_enabled = false
+is_dump_response_text_enabled = false
 
 [cogt.llm_config.instructor_config]
-# Uncomment any of these to enable dumping the kwargs, response or errors when generating structured content:
-# is_dump_kwargs_enabled = true
-# is_dump_response_enabled = true
-# is_dump_error_enabled = true
+# Enable dumping of structured content generation details for debugging
+is_dump_kwargs_enabled = false
+is_dump_response_enabled = false
+is_dump_error_enabled = false

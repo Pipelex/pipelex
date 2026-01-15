@@ -1,5 +1,3 @@
-from typing import cast
-
 import shortuuid
 from pydantic import Field, field_validator
 
@@ -7,7 +5,6 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.plx_config import PlxConfig
 from pipelex.system.configuration.config_model import ConfigModel
@@ -40,23 +37,6 @@ class ValidationErrorReaction(StrEnum):
     RAISE = "raise"
     LOG = "log"
     IGNORE = "ignore"
-
-
-class ValidationErrorConfig(ConfigModel):
-    default_reaction: ValidationErrorReaction = Field(strict=False)
-    reactions: dict[PipeValidationErrorType, ValidationErrorReaction]
-
-    @field_validator("reactions", mode="before")
-    @classmethod
-    def validate_reactions(cls, value: dict[str, str]) -> dict[PipeValidationErrorType, ValidationErrorReaction]:
-        return cast(
-            "dict[PipeValidationErrorType, ValidationErrorReaction]",
-            ConfigModel.transform_dict_str_to_enum(
-                input_dict=value,
-                key_enum_cls=PipeValidationErrorType,
-                value_enum_cls=ValidationErrorReaction,
-            ),
-        )
 
 
 class PipeRunConfig(ConfigModel):
@@ -183,7 +163,6 @@ class Pipelex(ConfigModel):
     log_config: LogConfig
     aws_config: AwsConfig
 
-    validation_error_config: ValidationErrorConfig
     structure_config: StructureConfig
     prompting_config: PromptingConfig
     plx_config: PlxConfig
