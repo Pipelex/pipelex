@@ -367,8 +367,8 @@ pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 
 Pipelex supports two independent telemetry streams:
 
-- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage.
-- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP).
+- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#gateway-telemetry-pipelex-controlled)
+- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#custom-telemetry-user-controlled)
 
 **We only collect technical data** (model names, token counts, latency, error rates) - never your prompts, completions, or business data. Set `DO_NOT_TRACK=1` to disable all telemetry (note: Gateway requires telemetry to function).
 
