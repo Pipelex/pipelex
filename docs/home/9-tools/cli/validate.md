@@ -118,6 +118,5 @@ All validation commands check:
 
 ## Related Configuration
 
-- [Static Validation Configuration](../../7-configuration/config-pipeline-validation/static-validation-config.md)
 - [Dry Run Configuration](../../7-configuration/config-pipeline-validation/dry-run-config.md)
 

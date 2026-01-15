@@ -156,7 +156,6 @@ nav:
       - Overview: home/7-configuration/index.md
       - Pipeline Validation Configuration:
         - Dry Run: home/7-configuration/config-pipeline-validation/dry-run-config.md
-        - Static Validation: home/7-configuration/config-pipeline-validation/static-validation-config.md
       - Practical Configuration:
         - Logging: home/7-configuration/config-practical/logging-config.md
         - Pipe Run: home/7-configuration/config-practical/pipe-run-config.md
