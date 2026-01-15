@@ -114,7 +114,7 @@ warn_unused_configs = true
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
-module = ["filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
+module = ["backports.strenum", "filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
 
 [tool.pyright]
 pythonVersion = "3.11"

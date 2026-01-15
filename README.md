@@ -41,15 +41,27 @@ pip install pipelex
 pipelex init
 ```
 
-## 2. Get Your API Key (Free)
+## 2. Configure AI Access
 
-To use AI models, you need an API key:
+To run pipelines with AI models, choose one of these options:
 
-- **Free Pipelex API Key**: Join our [Discord community](https://go.pipelex.com/discord) and request your **free API key** (no credit card required) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
-- **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral
-- **Local AI**: Ollama, vLLM, LM Studio, llama.cpp... any endpoint based on the OpenAI API or not, as you can plug-in your own non-standard APIs.
+### Option A: Pipelex Gateway (Recommended)
 
-See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for details.
+Get **free credits** with a single API key for LLMs, document extraction, and image generation across all major providers (OpenAI, Anthropic, Google, Azure, and more). New models added constantly.
+
+1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
+2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+3. Run `pipelex init` and accept the Gateway terms of service
+
+> **Migrating from pipelex_inference?** The old `pipelex_inference` backend is deprecated. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
+
+### Option B: Bring Your Own Keys
+
+Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for setup.
+
+### Option C: Local AI
+
+Run models locally with Ollama, vLLM, LM Studio, or llama.cpp - no API keys required. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for details.
 
 ## 3. Generate Your First Workflow
 
@@ -353,13 +365,12 @@ pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 
 ## Privacy & Telemetry
 
-Pipelex collects optional, anonymous usage data to help improve the product. On first run, you'll be prompted to choose your telemetry preference:
+Pipelex supports two independent telemetry streams:
 
-- **Off**: No telemetry data collected
-- **Anonymous**: Anonymous usage data only (command usage, performance metrics, feature usage)
-- **Identified**: Usage data with user identification (helps us provide better support)
+- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#gateway-telemetry-pipelex-controlled)
+- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#custom-telemetry-user-controlled)
 
-Your prompts, LLM responses, file paths, and URLs are automatically redacted and never transmitted. You can change your preference at any time or disable telemetry completely by setting the `DO_NOT_TRACK` environment variable.
+**We only collect technical data** (model names, token counts, latency, error rates) - never your prompts, completions, or business data. Set `DO_NOT_TRACK=1` to disable all telemetry (note: Gateway requires telemetry to function).
 
 For more details, see the [Telemetry Documentation](https://docs.pipelex.com/home/5-setup/telemetry/) or read our [Privacy Policy](https://go.pipelex.com/privacy-policy).
 
