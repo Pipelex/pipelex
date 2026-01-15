@@ -1262,7 +1262,6 @@ These require manual intervention:
 
 - See AGENTS.md for complete documentation of the current syntax
 - Run `make validate` frequently to catch issues early
-- Check the test files in `tests/test_pipelines/` for examples of the new syntax
 
 ## Support
 
