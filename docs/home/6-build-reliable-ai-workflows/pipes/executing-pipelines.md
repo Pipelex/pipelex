@@ -36,7 +36,7 @@ When using `execute_pipeline` or `start_pipeline`, you can control library behav
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 
-- **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.plx` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex will load from the current working directory (the directory from which your Python script is executed).
+- **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.plx` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
 
 - **`plx_content`**: When provided, Pipelex will load only this PLX content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
 
@@ -53,6 +53,9 @@ The loading behavior depends on which parameters you provide:
 
 !!! info "Learn More About Libraries"
     For a comprehensive understanding of libraries, including their structure, uniqueness rules, lifecycle, and best practices, see [Libraries](../libraries.md).
+
+!!! tip "Library Directory Configuration"
+    For complete configuration options including the `PIPELEXPATH` environment variable, CLI options, and priority resolution, see [Configuring Library Directories](../../7-configuration/config-technical/library-config.md#configuring-library-directories).
 
 ### Option 2.1: Using the pipe code
 
