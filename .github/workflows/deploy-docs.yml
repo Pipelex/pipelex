@@ -1,4 +1,4 @@
-name: Deploy MkDocs with Versioning
+name: Deploy docs
 
 on:
   push:
@@ -40,15 +40,5 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Extract version from pyproject.toml
-        id: version
-        run: |
-          VERSION=$(grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Extracted version: $VERSION"
-
       - name: Deploy documentation
-        run: |
-          . "$VIRTUAL_ENV/bin/activate"
-          mike deploy --push --update-aliases ${{ steps.version.outputs.version }} latest
-          mike set-default --push latest
+        run: make docs-deploy-stable
