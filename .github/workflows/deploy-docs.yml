@@ -1,20 +1,23 @@
-name: Preview MkDocs on GitHub Pages
+name: Deploy docs
 
 on:
   push:
-    branches: main
+    branches:
+      - main
 
 permissions:
   contents: write
   pages: write
 
 jobs:
-  preview:
+  deploy:
     runs-on: ubuntu-latest
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for mike to access git history
 
       - uses: actions/setup-python@v5
         with:
@@ -32,5 +35,10 @@ jobs:
       - name: Install docs dependencies
         run: uv pip install -e ".[docs]"
 
+      - name: Configure git for mike
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Deploy documentation
-        run: make docs-deploy
+        run: make docs-deploy-stable

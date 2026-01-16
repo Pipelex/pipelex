@@ -15,6 +15,7 @@ VENV_PYRIGHT := "$(VIRTUAL_ENV)/bin/pyright"
 VENV_MYPY := "$(VIRTUAL_ENV)/bin/mypy"
 VENV_PIPELEX := "$(VIRTUAL_ENV)/bin/pipelex"
 VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
+VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 
@@ -105,7 +106,11 @@ make check-TODOs              - Check for TODOs
 
 make docs                     - Serve documentation locally with mkdocs
 make docs-check               - Check documentation build with mkdocs
-make docs-deploy              - Deploy documentation with mkdocs
+make docs-serve-versioned     - Serve versioned docs locally with mike
+make docs-list                - List deployed documentation versions
+make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
+make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
+make docs-deploy-beta         - Manually deploy pre-release docs with '-beta' suffix
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -128,8 +133,9 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc agent-check \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-TODOs docs docs-check docs-deploy \
-	test-count check-test-badge update-gateway-models ugm check-gateway-models cgm up
+	li check-unused-imports fix-unused-imports check-uv check-TODOs \
+	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-beta \
+	update-gateway-models ugm check-gateway-models cgm up
 
 all help:
 	@echo "$$HELP"
@@ -584,6 +590,9 @@ check-TODOs: env
 ### DOCUMENTATION
 ##########################################################################################
 
+# Extract version from pyproject.toml for docs deployment
+DOCS_VERSION := $(shell grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+
 docs: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
 	$(VENV_MKDOCS) serve -a 127.0.0.1:8000 -f "$(CURDIR)/mkdocs.yml" --watch "$(CURDIR)/docs" -s
@@ -592,9 +601,26 @@ docs-check: env
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
 	$(VENV_MKDOCS) build --strict
 
+docs-serve-versioned: env
+	$(call PRINT_TITLE,"Serving versioned documentation with mike")
+	$(VENV_MIKE) serve
+
+docs-list: env
+	$(call PRINT_TITLE,"Listing deployed documentation versions")
+	$(VENV_MIKE) list
+
 docs-deploy: env
-	$(call PRINT_TITLE,"Deploying documentation with mkdocs")
-	$(VENV_MKDOCS) gh-deploy --force --clean -s
+	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
+	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
+
+docs-deploy-stable: env
+	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
+	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
+	$(VENV_MIKE) set-default --push latest
+
+docs-deploy-beta: env
+	$(call PRINT_TITLE,"Deploying pre-release documentation $(DOCS_VERSION)-beta")
+	$(VENV_MIKE) deploy --push $(DOCS_VERSION)-beta
 
 ##########################################################################################
 ### SHORTHANDS

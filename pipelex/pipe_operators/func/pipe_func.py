@@ -104,7 +104,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         log.verbose(f"Running PipeFunc with function '{self.function_name}'")
         function = func_registry.get_required_function(self.function_name)
 
-        if asyncio.iscoroutinefunction(function):
+        if asyncio.iscoroutinefunction(function):  # pyright: ignore[reportDeprecated]
             func_output_object = await function(working_memory=working_memory)
         else:
             func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
