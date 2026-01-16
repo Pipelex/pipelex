@@ -11,13 +11,24 @@
         // Check if it's a version: either "latest" or starts with "0." (e.g., "0.17")
         const hasVersion = firstSegment === 'latest' || (firstSegment && firstSegment.startsWith('0.'));
 
+        // Check if we're already on a 404.html path (prevents infinite loop for invalid versions)
+        const isAlready404 = path.endsWith('/404.html');
+
         if (!hasVersion) {
             // No version in URL, redirect to /latest/...
             const newUrl = '/latest' + path + window.location.search + window.location.hash;
             window.location.replace(newUrl);
+        } else if (isAlready404 && firstSegment !== 'latest') {
+            // We tried a version's 404.html but it doesn't exist (invalid version)
+            // Fall back to /latest/404.html
+            window.location.replace('/latest/404.html');
+        } else if (!isAlready404) {
+            // Has version, redirect to that version's styled 404 page
+            const version404Url = '/' + firstSegment + '/404.html';
+            window.location.replace(version404Url);
         } else {
-            // Already has version, this is a real 404
-            document.write('<h1>Page not found</h1><p>The page you requested does not exist.</p>');
+            // We're on /latest/404.html and it still 404'd - show basic error
+            document.write('<h1>Page not found</h1><p>The page you requested does not exist. <a href="/latest/">Go to documentation</a>.</p>');
         }
     </script>
 </head>
