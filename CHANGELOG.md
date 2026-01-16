@@ -86,6 +86,7 @@
 - **Documentation**: Corrected typo "unised" → "unused" across internal documentation and rule files.
 - **Duplicate Pipeline Registration**: Fixed an issue where running a pipeline from a file that was also part of a pre-loaded library (via `PIPELEXPATH`) would cause a duplicate domain registration error. The system now tracks absolute paths of loaded library files and skips files already loaded.
 - Fixed a bug with the `pipelex build structures` command: The generated structures were not being imported correctly.
+- Fixed a bug with the `pipelex kit rules` command: The rule about configuring LLM for pipelex was duplicated.
 
 ### Changed
 
