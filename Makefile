@@ -570,15 +570,14 @@ docs-deploy-beta: env docs-deploy-404
 
 docs-deploy-404:
 	$(call PRINT_TITLE,"Deploying 404.html to gh-pages root for versionless URL redirects")
-	@TMPDIR=$$(mktemp -d) && \
+	@TMPDIR=$$(mktemp -d); \
+	trap "cd '$(CURDIR)'; git worktree remove '$$TMPDIR' 2>/dev/null || true; rm -rf '$$TMPDIR'" EXIT; \
 	git worktree add "$$TMPDIR" gh-pages && \
 	cp docs/404.html "$$TMPDIR/404.html" && \
 	cd "$$TMPDIR" && \
 	git add 404.html && \
-	git diff --cached --quiet || git commit -m "Update 404.html for versionless URL redirects" && \
-	git push origin gh-pages && \
-	cd - > /dev/null && \
-	git worktree remove "$$TMPDIR"
+	(git diff --cached --quiet || git commit -m "Update 404.html for versionless URL redirects") && \
+	git push origin gh-pages
 
 ##########################################################################################
 ### SHORTHANDS
