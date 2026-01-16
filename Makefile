@@ -111,6 +111,7 @@ make docs-list                - List deployed documentation versions
 make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
 make docs-deploy-beta         - Manually deploy pre-release docs with '-beta' suffix
+make docs-deploy-404          - Deploy 404.html for versionless URL redirects
 
 make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
 make stop-graph-server        - Stop the graph viewer HTTP server
@@ -141,7 +142,8 @@ export HELP
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-beta \
 	update-gateway-models ugm check-gateway-models cgm up
 	test-count check-test-badge \
-	serve-graph serve-graph-bg stop-graph-server view-graph sg vg
+	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
+	docs-deploy-404
 
 all help:
 	@echo "$$HELP"
@@ -619,14 +621,25 @@ docs-deploy: env
 	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
 	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
 
-docs-deploy-stable: env
+docs-deploy-stable: env docs-deploy-404
 	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
 
-docs-deploy-beta: env
+docs-deploy-beta: env docs-deploy-404
 	$(call PRINT_TITLE,"Deploying pre-release documentation $(DOCS_VERSION)-beta")
 	$(VENV_MIKE) deploy --push $(DOCS_VERSION)-beta
+
+docs-deploy-404:
+	$(call PRINT_TITLE,"Deploying 404.html to gh-pages root for versionless URL redirects")
+	@TMPDIR=$$(mktemp -d); \
+	trap "cd '$(CURDIR)'; git worktree remove '$$TMPDIR' 2>/dev/null || true; rm -rf '$$TMPDIR'" EXIT; \
+	git worktree add "$$TMPDIR" gh-pages && \
+	cp docs/404.html "$$TMPDIR/404.html" && \
+	cd "$$TMPDIR" && \
+	git add 404.html && \
+	(git diff --cached --quiet || git commit -m "Update 404.html for versionless URL redirects") && \
+	git push origin gh-pages
 
 ##########################################################################################
 ### GRAPH VIEWER
