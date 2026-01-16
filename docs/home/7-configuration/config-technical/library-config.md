@@ -1,6 +1,46 @@
 # Pipeline Discovery and Loading
 
-Pipelex automatically discovers and loads pipeline files (`.plx`) and structure classes from your project. This page explains how the discovery system works and how to organize your pipelines effectively.
+When running pipelines, Pipelex needs to find your `.plx` bundle files. There are two approaches:
+
+1. **Point to the bundle file directly** - The simplest option. Just pass the path to your `.plx` file. No configuration needed.
+
+2. **Configure library directories** - For larger projects. Pipelex scans directories to discover all bundles, letting you reference pipes by code.
+
+Most users should start with the first approach.
+
+## The Simplest Way: Use the Bundle Path Directly
+
+If you just want to run a pipe from a single `.plx` file, **you don't need any library configuration**. Simply point to your bundle file:
+
+```bash
+# CLI: run the bundle's main_pipe
+pipelex run path/to/my_bundle.plx
+
+# CLI: run a specific pipe from the bundle
+pipelex run path/to/my_bundle.plx --pipe my_pipe
+```
+
+```python
+# Python: run the bundle's main_pipe
+pipe_output = await execute_pipeline(
+    bundle_uri="path/to/my_bundle.plx",
+    inputs={...},
+)
+
+# Python: run a specific pipe from the bundle
+pipe_output = await execute_pipeline(
+    bundle_uri="path/to/my_bundle.plx",
+    pipe_code="my_pipe",
+    inputs={...},
+)
+```
+
+This is the recommended approach for newcomers and simple projects. Pipelex reads the file directly - no discovery needed.
+
+!!! tip "When to use library directories"
+    The library directory configuration below is useful when you have **multiple bundles across different directories** and want to reference pipes by code without specifying the bundle path each time. For most use cases, pointing to the `.plx` file directly is simpler.
+
+---
 
 ## How Pipeline Discovery Works
 
