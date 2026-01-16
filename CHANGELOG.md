@@ -75,6 +75,7 @@
 - **Dry Run Mode**: `pipelex run --dry-run` executes pipeline logic without API calls, useful for validating structure and generating orchestration graphs.
 - **`--library-dir` CLI Option**: Added `--library-dir` / `-L` option to `pipelex run`, `pipelex validate`, and `pipelex build` subcommands (`one-shot-pipe`, `partial-pipe`) to specify additional directories for searching pipe definitions. Can be specified multiple times. For `pipelex build pipe`, the option only affects the dry-run graph generation of the built pipeline.
 - **Automatic File Loading**: The core pipeline execution functions (`pipelex.execute_pipeline`, `pipelex.start_pipeline`) can now directly load a pipeline from a file path via a new `bundle_uri` parameter.
+- Add pre-release workflow to publish pre-release distributions to PyPI and Github Packages.
 
 ### Fixed
 
