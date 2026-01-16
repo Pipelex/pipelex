@@ -4,7 +4,7 @@ on:
   pull_request:
     branches:
       - main
-      - pre-releases
+      - 'pre-release/v*'
     types: [opened, synchronize, reopened]
 
 jobs:
@@ -15,49 +15,19 @@ jobs:
 
       - name: Check Changelog Version
         run: |
-          TARGET_BRANCH="${{ github.base_ref }}"
-          BRANCH_NAME="${GITHUB_HEAD_REF}"
+          # Get version from pyproject.toml
+          VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2)
+          echo "Version from pyproject.toml: $VERSION"
 
-          echo "Target branch: $TARGET_BRANCH"
-          echo "Source branch: $BRANCH_NAME"
-
-          # For PRs to main: only run on release branches
-          if [[ "$TARGET_BRANCH" == "main" ]]; then
-            if [[ ! $BRANCH_NAME =~ ^release/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-              echo "Skipping: Not a release branch PR to main"
-              exit 0
-            fi
-            VERSION="${BASH_REMATCH[1]}"
-            echo "Checking release branch v$VERSION against changelog..."
-
-            # Look for the version in the changelog (stable release format)
-            if ! grep -q "## \[v$VERSION\] -" CHANGELOG.md; then
-              echo "❌ Error: No changelog entry found for version v$VERSION"
-              echo "The following versions are in the changelog:"
-              grep -E "^## \[v[0-9]+\.[0-9]+\.[0-9]+\]" CHANGELOG.md
-              echo "Please add a changelog entry for v$VERSION before merging this release to main"
-              exit 1
-            else
-              echo "✅ Changelog entry found for version v$VERSION"
-            fi
-
-          # For PRs to pre-releases: only run on pre-release branches
-          elif [[ "$TARGET_BRANCH" == "pre-releases" ]]; then
-            if [[ ! $BRANCH_NAME =~ ^pre-release/v([0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+)$ ]]; then
-              echo "Skipping: Not a pre-release branch PR to pre-releases"
-              exit 0
-            fi
-            VERSION="${BASH_REMATCH[1]}"
-            echo "Checking pre-release branch v$VERSION against changelog..."
-
-            # Look for the version in the changelog (pre-release format)
-            if ! grep -q "## \[v$VERSION\] -" CHANGELOG.md; then
-              echo "❌ Error: No changelog entry found for version v$VERSION"
-              echo "The following versions are in the changelog:"
-              grep -E "^## \[v[0-9]+\.[0-9]+\.[0-9]+" CHANGELOG.md | head -10
-              echo "Please add a changelog entry for v$VERSION before merging to pre-releases"
-              exit 1
-            else
-              echo "✅ Changelog entry found for version v$VERSION"
-            fi
+          # Look for the version in the changelog
+          if ! grep -q "## \[v$VERSION\] -" CHANGELOG.md; then
+            echo "❌ Error: No changelog entry found for version v$VERSION"
+            echo ""
+            echo "The following versions are in the changelog:"
+            grep -E "^## \[v[0-9]+" CHANGELOG.md | head -10
+            echo ""
+            echo "Please add a changelog entry: ## [v$VERSION] - YYYY-MM-DD"
+            exit 1
+          else
+            echo "✅ Changelog entry found for version v$VERSION"
           fi

@@ -22,24 +22,7 @@ jobs:
           fi
 
   # ───────────────────────────────────────────────────────────────
-  # 2) Only pre-release/vX.Y.Z(a|b|rc)N → pre-releases
-  # ───────────────────────────────────────────────────────────────
-  gate-pre-releases:
-    if: github.event.pull_request.base.ref == 'pre-releases'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Verify source branch is a Pre-release
-        env:
-          HEAD: ${{ github.event.pull_request.head.ref }}
-        run: |
-          echo "PR → pre-releases from $HEAD"
-          if [[ ! "$HEAD" =~ ^pre-release\/v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
-            echo "::error::Only pre-release/vX.Y.Z(a|b|rc)N branches may merge into pre-releases."
-            exit 1
-          fi
-
-  # ───────────────────────────────────────────────────────────────
-  # 3) Only work-branches → release/vX.Y.Z, pre-release/vX.Y.Z..., or dev
+  # 2) Only work-branches → release/vX.Y.Z, pre-release/vX.Y.Z..., or dev
   # ───────────────────────────────────────────────────────────────
   gate-release:
     if: startsWith(github.event.pull_request.base.ref, 'release/v') || startsWith(github.event.pull_request.base.ref, 'pre-release/v') || github.event.pull_request.base.ref == 'dev'
@@ -59,7 +42,7 @@ jobs:
           fi
 
   # ───────────────────────────────────────────────────────────────
-  # 4) Prevent forks from editing your workflows
+  # 3) Prevent forks from editing your workflows
   # ───────────────────────────────────────────────────────────────
   protect-workflows:
     runs-on: ubuntu-latest
