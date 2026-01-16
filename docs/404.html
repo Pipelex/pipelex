@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Redirecting...</title>
+    <script>
+        const path = window.location.pathname;
+        // Get the first path segment (e.g., "/latest/foo/bar" → "latest")
+        const firstSegment = path.split('/').filter(seg => seg)[0];
+
+        // Check if it's a version: either "latest" or starts with "0." (e.g., "0.17")
+        const hasVersion = firstSegment === 'latest' || (firstSegment && firstSegment.startsWith('0.'));
+
+        if (!hasVersion) {
+            // No version in URL, redirect to /latest/...
+            const newUrl = '/latest' + path + window.location.search + window.location.hash;
+            window.location.replace(newUrl);
+        } else {
+            // Already has version, this is a real 404
+            document.write('<h1>Page not found</h1><p>The page you requested does not exist.</p>');
+        }
+    </script>
+</head>
+<body>
+    <noscript>
+        <h1>Page not found</h1>
+        <p>Enable JavaScript for automatic redirects, or go to <a href="/latest/">the documentation</a>.</p>
+    </noscript>
+</body>
+</html>
