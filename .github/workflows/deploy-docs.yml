@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - pre-release/v*
 
 permissions:
   contents: write
