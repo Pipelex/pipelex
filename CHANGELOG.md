@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.17.5] - 2026-01-16
+
+- Added target `make docs-deploy-404` to deploy the 404.html file to the gh-pages root for versionless URL redirects.
+
 ## [v0.17.4] - 2026-01-16
 
 ### Added
