@@ -51,7 +51,6 @@
     - **Scaleway** inference provider support for open-source models
     - **Mistral** Document AI (OCR) via Pipelex Gateway (disclaimer: it's flaky, needs many retries via tenacity)
     - **Portkey AI** backend integration for unified access to multiple models through a single API key
-    - Mistral Document AI (OCR) via Pipelex Gateway (disclaimer: it's flaky, needs many retries via tenacity)
 - **Unified URI Handling System**: New `pipelex.tools.uri` module providing type-safe parsing for HTTP/HTTPS URLs, local file paths, file URIs, `pipelex-storage://` URIs, and base64 data URLs.
 - **Automatic Data URL Normalization**: Pipeline pre-processing step that converts large `data:` URLs in `ImageContent` to `pipelex-storage://` URIs for improved performance. Configurable via `is_normalize_data_urls_to_storage` in `pipelex.toml`.
 - **`PreparedImage` Abstraction**: New models (`PreparedImageHttpUrl`, `PreparedImageBase64`) representing images ready for LLM provider APIs.
@@ -97,7 +96,7 @@
 - **Image Generation Architecture**: Refactored to taxonomy-based approach. Standardizes parameter translation (`aspect_ratio`, `quality`, `output_format`) to provider-specific APIs.
 - **Content Handling Overhaul**: `GeneratedImage` replaced by internal `GeneratedImageRawDetails`; `ImageContent` is now standard (without `base_64` field). `PipeExtract` outputs `PageContent` list directly. Content persistence now handled automatically by storage system.
 - **Document Extraction Improvements**: `pypdfium2` extractor now extracts embedded images from PDFs. Response parsing uses dedicated Pydantic schemas for validation.
-- **Default Model Change**: `extract_text_from_visuals` deck now defaults to `azure-document-intelligence` instead of `mistral-ocr`.
+- **Default Model Change**: `extract_text_from_visuals` deck now defaults to `azure-document-intelligence`
 - **`pipelex_inference` replaced by `pipelex_gateway`** with remote model configuration fetching for always-current model support
     - New environment variable `PIPELEX_GATEWAY_API_KEY`
     - Default routing profiles updated from `pipelex_first` to `pipelex_gateway_first` with automatic migration in `pipelex init`
