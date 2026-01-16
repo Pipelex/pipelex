@@ -42,4 +42,11 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Deploy documentation
-        run: make docs-deploy-stable
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "Deploying stable docs..."
+            make docs-deploy-stable
+          elif [[ "${{ github.ref }}" == refs/heads/pre-release/* ]]; then
+            echo "Deploying beta docs..."
+            make docs-deploy-beta
+          fi
