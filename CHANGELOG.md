@@ -158,6 +158,12 @@
 - Renamed `domain` into `domain_code` when relevant.
 - Refactored the dry run methods of the `PipeAbstract` class.
 
+## [v0.17.4] - 2026-01-16
+
+### Added
+
+- Added the `mike` dependency to support mutiple docs versions. `version` plugin added to the MkDocs configuration, make targets and CI scripts.
+
 ## [v0.17.3] - 2025-12-01
 
 ### Fixed
