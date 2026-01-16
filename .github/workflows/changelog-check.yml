@@ -4,25 +4,33 @@ on:
   pull_request:
     branches:
       - main
+      - pre-releases
     types: [opened, synchronize, reopened]
 
 jobs:
   check-changelog:
     runs-on: ubuntu-latest
-    if: startsWith(github.head_ref, 'release/v')  # Only run on release branches
     steps:
       - uses: actions/checkout@v4
 
       - name: Check Changelog Version
         run: |
-          # Get the current branch name and extract version
-          BRANCH_NAME=${GITHUB_HEAD_REF}
-          
-          if [[ $BRANCH_NAME =~ ^release/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+          TARGET_BRANCH="${{ github.base_ref }}"
+          BRANCH_NAME="${GITHUB_HEAD_REF}"
+
+          echo "Target branch: $TARGET_BRANCH"
+          echo "Source branch: $BRANCH_NAME"
+
+          # For PRs to main: only run on release branches
+          if [[ "$TARGET_BRANCH" == "main" ]]; then
+            if [[ ! $BRANCH_NAME =~ ^release/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+              echo "Skipping: Not a release branch PR to main"
+              exit 0
+            fi
             VERSION="${BASH_REMATCH[1]}"
             echo "Checking release branch v$VERSION against changelog..."
-            
-            # Look for the version in the changelog
+
+            # Look for the version in the changelog (stable release format)
             if ! grep -q "## \[v$VERSION\] -" CHANGELOG.md; then
               echo "❌ Error: No changelog entry found for version v$VERSION"
               echo "The following versions are in the changelog:"
@@ -32,7 +40,24 @@ jobs:
             else
               echo "✅ Changelog entry found for version v$VERSION"
             fi
-          else
-            echo "❌ Error: Branch name $BRANCH_NAME does not match expected format 'release/vX.Y.Z'"
-            exit 1
-          fi 
+
+          # For PRs to pre-releases: only run on pre-release branches
+          elif [[ "$TARGET_BRANCH" == "pre-releases" ]]; then
+            if [[ ! $BRANCH_NAME =~ ^pre-release/v([0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+)$ ]]; then
+              echo "Skipping: Not a pre-release branch PR to pre-releases"
+              exit 0
+            fi
+            VERSION="${BASH_REMATCH[1]}"
+            echo "Checking pre-release branch v$VERSION against changelog..."
+
+            # Look for the version in the changelog (pre-release format)
+            if ! grep -q "## \[v$VERSION\] -" CHANGELOG.md; then
+              echo "❌ Error: No changelog entry found for version v$VERSION"
+              echo "The following versions are in the changelog:"
+              grep -E "^## \[v[0-9]+\.[0-9]+\.[0-9]+" CHANGELOG.md | head -10
+              echo "Please add a changelog entry for v$VERSION before merging to pre-releases"
+              exit 1
+            else
+              echo "✅ Changelog entry found for version v$VERSION"
+            fi
+          fi

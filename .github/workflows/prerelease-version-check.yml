@@ -1,0 +1,75 @@
+name: Pre-release version check
+
+on:
+  pull_request:
+    branches:
+      - pre-releases
+
+jobs:
+  prerelease-version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get branch info
+        id: branch_info
+        run: |
+          echo "====== DEBUGGING BRANCH INFO ======"
+          echo "PR URL: ${{ github.event.pull_request.html_url }}"
+          echo "PR Number: ${{ github.event.pull_request.number }}"
+
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          SOURCE_BRANCH="${{ github.event.pull_request.head.ref }}"
+          echo "Source branch: $SOURCE_BRANCH"
+          echo "Target branch: $BASE_BRANCH"
+
+          echo "base_branch=$BASE_BRANCH" >> $GITHUB_OUTPUT
+          echo "source_branch=$SOURCE_BRANCH" >> $GITHUB_OUTPUT
+
+          # Check if source is a pre-release branch (pre-release/vX.Y.Z(a|b|rc)N)
+          if [[ "$SOURCE_BRANCH" =~ ^pre-release/v([0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+)$ ]]; then
+            echo "Source is a pre-release branch"
+            echo "is_prerelease_source=true" >> $GITHUB_OUTPUT
+            echo "source_prerelease_version=${BASH_REMATCH[1]}" >> $GITHUB_OUTPUT
+            echo "Extracted source pre-release version: ${BASH_REMATCH[1]}"
+          else
+            echo "Source is NOT a pre-release branch - skipping version check"
+            echo "is_prerelease_source=false" >> $GITHUB_OUTPUT
+            echo "This workflow only runs for PRs from pre-release/vX.Y.Z(a|b|rc)N branches"
+            exit 0
+          fi
+          echo "======================================="
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version from pyproject.toml
+        id: current_version
+        run: |
+          echo "====== DEBUGGING CURRENT VERSION ======"
+          VERSION=$(grep '^version' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          echo "Current pyproject.toml version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "======================================="
+
+      # Check that version in pyproject.toml matches the source pre-release branch name
+      - name: Check version matches pre-release branch
+        run: |
+          echo "====== CHECKING VERSION MATCH FOR PRE-RELEASE BRANCH ======"
+          # Extract version from branch name
+          PRERELEASE_VERSION="${{ steps.branch_info.outputs.source_prerelease_version }}"
+
+          # Get version from PR branch
+          PR_VERSION="${{ steps.current_version.outputs.version }}"
+
+          echo "Pre-release branch version: $PRERELEASE_VERSION"
+          echo "pyproject.toml version: $PR_VERSION"
+
+          # Check if versions match
+          if [[ "$PR_VERSION" != "$PRERELEASE_VERSION" ]]; then
+            echo "❌ ERROR: Version in pyproject.toml ($PR_VERSION) does not match pre-release branch version ($PRERELEASE_VERSION)"
+            exit 1
+          else
+            echo "✅ Version in pyproject.toml ($PR_VERSION) matches pre-release branch version ($PRERELEASE_VERSION)"
+          fi
+          echo "======================================="
