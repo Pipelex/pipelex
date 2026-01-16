@@ -45,6 +45,8 @@ extra:
       link: https://go.pipelex.com/discord
       name: Pipelex on Discord
   generator: false
+  version:
+    provider: mike
 
 plugins:
   - search
