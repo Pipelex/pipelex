@@ -15,7 +15,7 @@ coding_standards = [
     "docs.md",
     "tdd.md",
 ]
-pipelex_language = ["write_pipelex.md", "run_pipelex.md", "llms.md"]
+pipelex_language = ["write_pipelex.md", "run_pipelex.md"]
 all = [
     "commands.md",
     "python_standards.md",
@@ -23,7 +23,6 @@ all = [
     "write_pipelex.md",
     "run_pipelex.md",
     "docs.md",
-    "llms.md",
     "pytest_standards.md",
     "tdd.md",
 ]
@@ -62,10 +61,6 @@ globs = ["**/*.plx", "**/pipelines/**/*.py"]
 [agent_rules.cursor.files.run_pipelex.front_matter]
 description = "Guidelines for running Pipelex pipelines"
 globs = ["examples/**/*.py"]
-
-[agent_rules.cursor.files.llms.front_matter]
-description = "LLM configuration and usage guidelines"
-globs = ["*.plx", "*.toml"]
 
 [agent_rules.targets.agents]
 path = "AGENTS.md"

@@ -121,7 +121,6 @@ The agent rules installed by `pipelex kit rules` include:
 
 - **`write_pipelex.md`**: Guidelines for writing Pipelex pipelines, including syntax, best practices, and common patterns
 - **`run_pipelex.md`**: Guidelines for running and testing Pipelex pipelines
-- **`llms.md`**: LLM configuration and usage guidelines
 - **`python_standards.md`**: Python coding standards and best practices
 - **`docs.md`**: Guidelines for writing documentation
 - **`pytest_standards.md`**: Guidelines for writing unit tests
