@@ -1,0 +1,157 @@
+name: Pre-release version check
+
+on:
+  pull_request:
+    branches:
+      - 'pre-release/v*'
+
+jobs:
+  prerelease-version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get branch info
+        id: branch_info
+        run: |
+          echo "====== BRANCH INFO ======"
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          echo "Target branch: $BASE_BRANCH"
+
+          # Extract version from branch name (pre-release/vX.Y.Z(a|b|rc)N)
+          if [[ "$BASE_BRANCH" =~ ^pre-release/v([0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+)$ ]]; then
+            BRANCH_VERSION="${BASH_REMATCH[1]}"
+            echo "Branch version: $BRANCH_VERSION"
+            echo "branch_version=$BRANCH_VERSION" >> $GITHUB_OUTPUT
+          else
+            echo "::error::Branch name does not match pre-release format: pre-release/vX.Y.Z(a|b|rc)N"
+            exit 1
+          fi
+          echo "========================="
+
+      - name: Get version from pyproject.toml
+        id: pyproject_version
+        run: |
+          echo "====== PYPROJECT VERSION ======"
+          VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2)
+          echo "pyproject.toml version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "================================"
+
+      - name: Validate version is PEP 440 pre-release
+        run: |
+          echo "====== VALIDATING PEP 440 PRE-RELEASE FORMAT ======"
+          VERSION="${{ steps.pyproject_version.outputs.version }}"
+
+          # PEP 440 pre-release format: X.Y.Z(a|b|rc)N
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
+            echo "::error::Version '$VERSION' is not a valid PEP 440 pre-release format"
+            echo ""
+            echo "Valid formats:"
+            echo "  - X.Y.Za1  (alpha, e.g., 0.18.0a1)"
+            echo "  - X.Y.Zb1  (beta, e.g., 0.18.0b1)"
+            echo "  - X.Y.Zrc1 (release candidate, e.g., 0.18.0rc1)"
+            exit 1
+          fi
+          echo "✅ Version '$VERSION' is a valid PEP 440 pre-release format"
+          echo "=================================================="
+
+      - name: Validate version matches branch name
+        run: |
+          echo "====== VALIDATING VERSION MATCHES BRANCH ======"
+          BRANCH_VERSION="${{ steps.branch_info.outputs.branch_version }}"
+          PYPROJECT_VERSION="${{ steps.pyproject_version.outputs.version }}"
+
+          if [[ "$PYPROJECT_VERSION" != "$BRANCH_VERSION" ]]; then
+            echo "::error::Version mismatch! pyproject.toml: $PYPROJECT_VERSION, branch: $BRANCH_VERSION"
+            exit 1
+          fi
+          echo "✅ Version matches branch name: $PYPROJECT_VERSION"
+          echo "================================================"
+
+      - name: Check version is increasing
+        run: |
+          echo "====== CHECKING VERSION PROGRESSION ======"
+          NEW_VERSION="${{ steps.pyproject_version.outputs.version }}"
+
+          # Get the current version on the target branch
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1 || true
+
+          if git rev-parse "origin/${{ github.event.pull_request.base.ref }}" >/dev/null 2>&1; then
+            OLD_VERSION=$(git show "origin/${{ github.event.pull_request.base.ref }}:pyproject.toml" 2>/dev/null | grep -m 1 'version = ' | cut -d '"' -f 2) || OLD_VERSION=""
+          else
+            OLD_VERSION=""
+          fi
+
+          if [ -z "$OLD_VERSION" ]; then
+            echo "No previous version found (new branch) - skipping progression check"
+            echo "✅ First PR to this pre-release branch"
+            exit 0
+          fi
+
+          echo "Previous version: $OLD_VERSION"
+          echo "New version: $NEW_VERSION"
+
+          # Parse versions: extract base (X.Y.Z), type (a/b/rc), and number
+          parse_prerelease() {
+            local ver="$1"
+            if [[ "$ver" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(a|b|rc)([0-9]+)$ ]]; then
+              echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]}"
+            else
+              echo ""
+            fi
+          }
+
+          OLD_PARSED=$(parse_prerelease "$OLD_VERSION")
+          NEW_PARSED=$(parse_prerelease "$NEW_VERSION")
+
+          if [ -z "$OLD_PARSED" ] || [ -z "$NEW_PARSED" ]; then
+            echo "::error::Could not parse versions for comparison"
+            exit 1
+          fi
+
+          read OLD_BASE OLD_TYPE OLD_NUM <<< "$OLD_PARSED"
+          read NEW_BASE NEW_TYPE NEW_NUM <<< "$NEW_PARSED"
+
+          echo "Old: base=$OLD_BASE type=$OLD_TYPE num=$OLD_NUM"
+          echo "New: base=$NEW_BASE type=$NEW_TYPE num=$NEW_NUM"
+
+          # Check base version matches (should be same X.Y.Z for same pre-release branch)
+          if [[ "$OLD_BASE" != "$NEW_BASE" ]]; then
+            echo "::error::Base version changed from $OLD_BASE to $NEW_BASE. Create a new pre-release branch instead."
+            exit 1
+          fi
+
+          # Define type order: a < b < rc
+          type_order() {
+            case "$1" in
+              a) echo 1 ;;
+              b) echo 2 ;;
+              rc) echo 3 ;;
+              *) echo 0 ;;
+            esac
+          }
+
+          OLD_TYPE_ORDER=$(type_order "$OLD_TYPE")
+          NEW_TYPE_ORDER=$(type_order "$NEW_TYPE")
+
+          # Check progression
+          if [[ "$NEW_TYPE_ORDER" -gt "$OLD_TYPE_ORDER" ]]; then
+            echo "✅ Valid progression: $OLD_TYPE → $NEW_TYPE (stage upgrade)"
+          elif [[ "$NEW_TYPE_ORDER" -eq "$OLD_TYPE_ORDER" ]]; then
+            if [[ "$NEW_NUM" -gt "$OLD_NUM" ]]; then
+              echo "✅ Valid progression: $OLD_TYPE$OLD_NUM → $NEW_TYPE$NEW_NUM (number increment)"
+            else
+              echo "::error::Version not increasing! $OLD_VERSION → $NEW_VERSION"
+              echo "Expected $NEW_TYPE$((OLD_NUM + 1)) or higher, or progress to next stage (a→b→rc)"
+              exit 1
+            fi
+          else
+            echo "::error::Invalid progression! Cannot go backwards: $OLD_TYPE → $NEW_TYPE"
+            echo "Valid progressions: a → b → rc"
+            exit 1
+          fi
+          echo "==========================================="
