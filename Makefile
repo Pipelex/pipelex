@@ -112,6 +112,7 @@ make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
 make docs-deploy-beta         - Manually deploy pre-release docs with '-beta' suffix
 make docs-deploy-404          - Deploy 404.html for versionless URL redirects
+make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 
 make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
 make stop-graph-server        - Stop the graph viewer HTTP server
@@ -139,8 +140,8 @@ export HELP
 	validate v check c cc agent-check \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
-	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-beta \
-	update-gateway-models ugm check-gateway-models cgm up
+	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-beta docs-delete \
+	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
 	docs-deploy-404
@@ -640,6 +641,13 @@ docs-deploy-404:
 	git add 404.html && \
 	(git diff --cached --quiet || git commit -m "Update 404.html for versionless URL redirects") && \
 	git push origin gh-pages
+
+docs-delete: env
+ifndef VERSION
+	$(error VERSION is required. Usage: make docs-delete VERSION=x.y.z)
+endif
+	$(call PRINT_TITLE,"Deleting documentation version $(VERSION)")
+	$(VENV_MIKE) delete --push $(VERSION)
 
 ##########################################################################################
 ### GRAPH VIEWER
