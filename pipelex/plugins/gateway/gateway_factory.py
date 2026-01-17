@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import TYPE_CHECKING, Any
 
 from portkey_ai import (
@@ -11,6 +12,7 @@ from portkey_ai.api_resources import exceptions as portkey_exc
 from pipelex import log
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
+from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
@@ -83,6 +85,9 @@ class GatewayFactory:
                     request_params = GatewayExtractRequestParams(should_include_images=should_include_images)
                     messages: list[dict[str, str]] = [{"role": "user", "content": request_params.model_dump_json()}]
                     extra_body["messages"] = messages
+        elif isinstance(inference_job, LLMJob) and inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
+            # Mistral models really want non-null seed
+            extra_body["seed"] = random.randint(0, 1000000)
 
         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
         if get_telemetry_manager().is_pipelex_gateway_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):

@@ -1,7 +1,7 @@
 # Pipelex Gateway - Available Models
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-17T15:06:45Z
+> Last updated: 2026-01-17T15:36:26Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
 
@@ -54,9 +54,10 @@ For configuration details, see the [documentation](https://docs.pipelex.com/home
 
 ## Document Extraction Models
 
-| Model | Inputs | Outputs | SDK | Structure Method |
-|-------|--------|---------|-----|------------------|
-| azure-document-intelligence | pdf | pages | gateway_extract | instructor/openai_tools |
+| Model | Inputs | Outputs | SDK |
+|-------|--------|---------|-----|
+| azure-document-intelligence | pdf | pages | gateway_extract |
+| mistral-document-ai-2505 | pdf, image | pages | gateway_extract |
 
 ## Image Generation Models
 

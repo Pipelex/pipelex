@@ -30,6 +30,7 @@ EXTRACT_HANDLE_FROM_PDF = [
     "mistral-ocr-2503",
     "mistral-ocr-2505",
     "mistral-ocr-2512",
+    "mistral-document-ai-2505",
     "azure-document-intelligence",
 ]
 
