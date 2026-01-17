@@ -155,7 +155,7 @@ Native concepts can be used directly in your pipeline definitions without any ad
 
 ### In Pipe Inputs
 
-```plx
+```toml
 [pipe.analyze_document]
 type = "PipeLLM"
 description = "Analyze a document"
@@ -166,7 +166,7 @@ prompt = "Analyze this document and provide a summary"
 
 ### In Pipe Outputs
 
-```plx
+```toml
 [pipe.process_image]
 type = "PipeLLM"
 description = "Describe an image"
@@ -179,7 +179,7 @@ prompt = "Describe what you see in this image"
 
 The `Page` concept is particularly useful with `PipeExtract`:
 
-```plx
+```toml
 [pipe.extract_pages]
 type = "PipeExtract"
 description = "Extract content from a document"
@@ -191,7 +191,7 @@ This extracts each page with both its text/images and a visual representation.
 
 ### In Complex Workflows
 
-```plx
+```toml
 [pipe.create_report]
 type = "PipeSequence"
 description = "Generate a report with text and images"
@@ -230,7 +230,7 @@ Refine native concepts when:
 
 ### Text Processing
 
-```plx
+```toml
 [pipe.summarize]
 type = "PipeLLM"
 description = "Summarize any text"
@@ -241,7 +241,7 @@ prompt = "Summarize this content: @content"
 
 ### Document Extraction
 
-```plx
+```toml
 [pipe.extract_pages]
 type = "PipeExtract"
 description = "Extract content from a document"
@@ -270,7 +270,7 @@ steps = [
 
 ### Multi-Modal Processing
 
-```plx
+```toml
 [pipe.analyze_with_context]
 type = "PipeLLM"
 description = "Analyze image with text context"

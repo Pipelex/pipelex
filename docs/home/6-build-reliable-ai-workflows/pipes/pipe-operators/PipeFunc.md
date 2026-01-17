@@ -100,7 +100,7 @@ Once the function is registered, you can use it in your `.plx` file.
 
 This PLX snippet shows how to use the `concatenate_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
 
-```plx
+```toml
 [pipe.combine_them]
 type = "PipeFunc"
 description = "Combine two text inputs using a custom Python function"

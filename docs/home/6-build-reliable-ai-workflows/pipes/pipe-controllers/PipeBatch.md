@@ -40,7 +40,7 @@ This is the ideal controller for processing collections of documents, images, or
 
 Suppose you have a list of articles and you want to generate a summary for each one.
 
-```plx
+```toml
 # The pipe that knows how to summarize one article
 [pipe.summarize_one_article]
 type = "PipeLLM"

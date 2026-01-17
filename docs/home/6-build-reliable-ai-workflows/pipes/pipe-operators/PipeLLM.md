@@ -21,7 +21,7 @@ For structured data output, `PipeLLM` employs two main strategies:
 
 Images must be declared in the `inputs` section of your pipe definition. The image will be automatically passed to the VLM along with your text prompt.
 
-```plx
+```toml
 [pipe.describe_image]
 type = "PipeLLM"
 description = "Describe an image"
@@ -39,7 +39,7 @@ Describe the provided image in great detail: $image
 
 You can use any concept that refines `Image` as an input, and choose descriptive variable names that fit your use case:
 
-```plx
+```toml
 [pipe.analyze_wedding]
 type = "PipeLLM"
 description = "Analyze wedding photo"
@@ -54,7 +54,7 @@ Analyze this wedding photo and describe the key moments captured: $wedding_photo
 
 When working with structured content that contains image fields (like `PageContent` which has a `page_view` field), you need to specify the full path to the image attribute in the `inputs` section:
 
-```plx
+```toml
 [pipe.analyze_page_view]
 type = "PipeLLM"
 description = "Analyze the visual layout of a page"
@@ -76,7 +76,7 @@ In this example:
 
 You can include multiple images in a single prompt by listing them in the inputs:
 
-```plx
+```toml
 [pipe.compare_images]
 type = "PipeLLM"
 description = "Compare two images"
@@ -94,7 +94,7 @@ Compare these two images and describe their similarities and differences: $first
 
 You can mix any stuff and image inputs in the same pipe:
 
-```plx
+```toml
 [pipe.analyze_document_with_context]
 type = "PipeLLM"
 description = "Analyze a document page with additional context"
@@ -118,7 +118,7 @@ Analyze the document page shown in the image and explain how it relates to the p
 
 Documents must be declared in the `inputs` section of your pipe definition. The document will be automatically passed to the LLM along with your text prompt.
 
-```plx
+```toml
 [pipe.summarize_document]
 type = "PipeLLM"
 description = "Summarize a document"
@@ -136,7 +136,7 @@ Summarize the key points from this document: @document
 
 You can use any concept that refines `Document` as an input, and choose descriptive variable names that fit your use case:
 
-```plx
+```toml
 [concept.FinancialReport]
 description = "A financial report"
 refines = "Document"
@@ -155,7 +155,7 @@ Analyze this financial report and extract the key metrics: $financial_report
 
 You can include multiple documents in a single prompt by listing them in the inputs:
 
-```plx
+```toml
 [pipe.compare_documents]
 type = "PipeLLM"
 description = "Compare two documents"
@@ -168,7 +168,7 @@ Compare these two documents and describe their similarities and differences: $fi
 
 For a variable number of documents, use the list syntax:
 
-```plx
+```toml
 [pipe.merge_documents]
 type = "PipeLLM"
 description = "Merge multiple documents"
@@ -183,7 +183,7 @@ Combine the information from all these documents into a single coherent summary:
 
 You can mix text, image, and document inputs in the same pipe:
 
-```plx
+```toml
 [pipe.analyze_with_context]
 type = "PipeLLM"
 description = "Analyze a document with context"
@@ -230,7 +230,7 @@ Specify output multiplicity using bracket notation in the `output` field:
 
 Examples:
 
-```plx
+```toml
 # Single output (default)
 output = "Summary"
 
@@ -250,7 +250,7 @@ output = "Headline[3]"
 
 This pipe takes no input and writes a poem.
 
-```plx
+```toml
 [pipe.write_poem]
 type = "PipeLLM"
 description = "Write a short poem"
@@ -265,7 +265,7 @@ Write a four-line poem about pipes.
 
 This pipe summarizes an input text, using a `prompt` to inject the input.
 
-```plx
+```toml
 [pipe.summarize_text]
 type = "PipeLLM"
 description = "Summarize a text"
@@ -284,7 +284,7 @@ The summary should be no longer than 3 sentences.
 
 This pipe takes an image of a table and uses a VLM to extract the content as an HTML table.
 
-```plx
+```toml
 [pipe.extract_table_from_image]
 type = "PipeLLM"
 description = "Extract table data from an image"
@@ -299,7 +299,7 @@ Extract the table data from this image and format it as a structured table: $ima
 
 This pipe extracts a list of `Expense` items from a block of text.
 
-```plx
+```toml
 [concept.Expense]
 structure = "Expense" # Assumes a Pydantic model 'Expense' is defined
 

@@ -104,7 +104,7 @@ Follow this pragmatic approach:
 
 **Step 1: Start with inline structure**
 
-```plx
+```toml
 [concept.UserProfile]
 description = "A user profile"
 
@@ -144,7 +144,7 @@ class UserProfile(StructuredContent):
 
 **Step 4: Update your .plx file**
 
-```plx
+```toml
 [concept]
 UserProfile = "A user profile"  # Structure now defined in Python
 ```
@@ -159,7 +159,7 @@ Here's how to migrate when you need more advanced features:
 
 **1. You have this inline structure:**
 
-```plx
+```toml
 domain = "ecommerce"
 
 [concept.Product]
@@ -189,7 +189,7 @@ class Product(StructuredContent):
 
 **3. Update your `.plx` file:**
 
-```plx
+```toml
 domain = "ecommerce"
 
 [concept]

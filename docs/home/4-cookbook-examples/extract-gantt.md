@@ -4,7 +4,8 @@ This example showcases the ability of Pipelex to extract structured information 
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/extract_gantt.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/extract_gantt.py)
+<!-- PRERELEASE_LINK -->
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_gantt/extract_gantt.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_gantt/extract_gantt.py)
 
 ## The Pipeline Explained
 
@@ -54,7 +55,7 @@ class GanttChart(StructuredContent):
 
 The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex workflow from simple, reusable components.
 
-```plx
+```toml
 [pipe.extract_gantt_by_steps]
 type = "PipeSequence"
 description = "Extract all details from a gantt chart"

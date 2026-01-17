@@ -11,7 +11,7 @@ Let's build a **character generator** to understand the basics.
 Create a `.plx` file anywhere in your project (we recommend a `pipelines` directory):
 
 `character.plx`
-```plx
+```toml
 domain = "characters"                    # domain of existance of your pipe
 
 [pipe]
@@ -74,7 +74,7 @@ Let's create a rigorously structured `Character` object instead of plain text. W
 
 Define structures directly in your `.plx` file:
 
-```plx
+```toml
 [concept.Character]                                 # Declare the concept by giving it a name.
 description = "A character in a fiction story"      # Give it a description in natural language.
 
@@ -90,7 +90,7 @@ description = "A description of the character"      # Fourth attribute: "descrip
 Specify that the output of your Pipellm is a `Character` object:
 
 `characters.plx`
-```plx
+```toml
 domain = "characters"
 
 [concept.Character]
@@ -147,7 +147,7 @@ Learn more in [Inline Structures](../6-build-reliable-ai-workflows/concepts/inli
 Specify that the output of your Pipellm is a `Character` object:
 
 `characters.plx`
-```plx
+```toml
 domain = "characters"
 
 [concept]
@@ -183,7 +183,7 @@ Let's process existing characters and extract metadata from their descriptions. 
 For example, I would like to create and instance of `CharacterMetadata`, that contains the `name`, `age`, and height if it was provided in the description of the character. 
 
 
-```plx
+```toml
 domain = "characters" 
 
 [concept.Character]

@@ -8,7 +8,8 @@ It's the perfect starting point to verify your installation and get a first tast
 
 You can find the complete code for this example in the Pipelex Cookbook repository.
 
-[**➡️ View on GitHub: quick_start/hello_world.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/quick_start/hello_world.py)
+<!-- PRERELEASE_LINK -->
+[**➡️ View on GitHub: examples/a_quick_start/hello_world.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/a_quick_start/hello_world.py)
 
 ## The Pipeline Explained
 
@@ -47,7 +48,7 @@ This example shows the minimal setup needed to run a Pipelex pipeline: initializ
 
 The pipeline definition is extremely simple - it's a single LLM call that generates a haiku:
 
-```plx
+```toml
 domain = "quick_start"
 description = "Discovering Pipelex"
 
@@ -66,7 +67,8 @@ Write a haiku about Hello World.
 
 1.  Clone the cookbook repository:
     ```bash
-    git clone https://github.com/Pipelex/pipelex-cookbook.git
+    # PRERELEASE_LINK
+    git clone -b feature/Chicago https://github.com/Pipelex/pipelex-cookbook.git
     cd pipelex-cookbook
     ```
 2.  Install dependencies:
@@ -76,7 +78,8 @@ Write a haiku about Hello World.
 3.  Set up your environment variables by copying `.env.example` to `.env` and adding your API keys.
 4.  Run the example:
     ```bash
-    python quick_start/hello_world.py
+    # PRERELEASE_LINK
+    python examples/a_quick_start/hello_world.py
     ```
 
 Expected output: A haiku about "Hello World" displayed with pretty formatting.

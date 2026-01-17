@@ -21,7 +21,7 @@ Each pipe, whether it's an operator or a controller, is defined in its own `[pip
     Pipe codes **MUST** be in `snake_case` (lowercase with underscores). Use descriptive names that clearly indicate what the pipe does.
     
     **Valid pipe codes:**
-    ```plx
+    ```toml
     ✅ [pipe.generate_tagline]
     ✅ [pipe.extract_invoice]
     ✅ [pipe.validate_and_process]
@@ -29,7 +29,7 @@ Each pipe, whether it's an operator or a controller, is defined in its own `[pip
     ```
     
     **Invalid pipe codes:**
-    ```plx
+    ```toml
     ❌ [pipe.GenerateTagline]     # PascalCase not allowed
     ❌ [pipe.generateTagline]      # camelCase not allowed
     ❌ [pipe.generate-tagline]     # Hyphens not allowed
@@ -43,7 +43,7 @@ Let's look at a simple example. Imagine we want a workflow that:
 We can achieve this with a `PipeLLM` operator.
 
 `marketing_pipeline.plx`
-```plx
+```toml
 domain = "marketing"
 description = "Marketing content generation domain"
 
@@ -89,7 +89,7 @@ To create a multi-step workflow, you use a controller. The `PipeSequence` contro
 
 
 `marketing_pipeline.plx`
-```plx
+```toml
 domain = "marketing"
 description = "Marketing content generation domain"
 

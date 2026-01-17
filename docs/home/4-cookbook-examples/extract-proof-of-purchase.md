@@ -4,7 +4,8 @@ This example demonstrates a pipeline designed to extract structured data from a 
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/extract_proof_of_purchase.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/extract_proof_of_purchase.py)
+<!-- PRERELEASE_LINK -->
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py)
 
 ## The Pipeline Explained
 
@@ -51,7 +52,7 @@ This demonstrates how you can create nested data structures to accurately model 
 
 The pipeline uses a powerful `PipeLLM` to extract the structured data from the document. The prompt is carefully engineered to guide the LLM.
 
-```plx
+```toml
 [pipe.write_markdown_from_page_content_proof_of_purchase]
 type = "PipeLLM"
 description = "Write markdown from page content"

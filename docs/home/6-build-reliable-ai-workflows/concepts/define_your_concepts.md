@@ -10,7 +10,7 @@ Every concept starts with a natural language definition. This definition serves 
 
 The simplest way to define a concept is with a descriptive sentence:
 
-```plx
+```toml
 [concept]
 Invoice = "A commercial document issued by a seller to a buyer"
 Employee = "A person employed by an organization"
@@ -21,7 +21,7 @@ ProductReview = "A customer's evaluation of a product or service"
     Concept names **MUST** be in `PascalCase` (also known as UpperCamelCase). Each word starts with a capital letter, with no underscores or hyphens.
     
     **Valid concept names:**
-    ```plx
+    ```toml
     ✅ Invoice
     ✅ ProductReview
     ✅ CustomerFeedback
@@ -29,7 +29,7 @@ ProductReview = "A customer's evaluation of a product or service"
     ```
     
     **Invalid concept names:**
-    ```plx
+    ```toml
     ❌ invoice           # Not PascalCase
     ❌ product_review    # snake_case not allowed
     ❌ Product-Review    # Hyphens not allowed
@@ -41,7 +41,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
 **Key principles for concept definitions:**
 
 1. **Define what it is, not what it's for**
-   ```plx
+   ```toml
    # ❌ Wrong: includes usage context
    TextToSummarize = "Text that needs to be summarized"
    
@@ -50,7 +50,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
    ```
 
 2. **Use singular forms**
-   ```plx
+   ```toml
    # ❌ Wrong: plural form
    Invoices = "Commercial documents from sellers"
    
@@ -59,7 +59,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
    ```
 
 3. **Avoid unnecessary adjectives**
-   ```plx
+   ```toml
    # ❌ Wrong: includes subjective qualifier
    LongArticle = "A lengthy written composition"
    
@@ -71,7 +71,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
 
 Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [Understanding Domains](../domain.md).
 
-```plx
+```toml
 # finance.plx
 domain = "finance"
 description = "Financial document processing"
@@ -88,7 +88,7 @@ LineItem = "An individual item or service listed in a financial document"
 
 To add structure to your concepts, the simplest approach is using **inline structures** directly in your `.plx` files:
 
-```plx
+```toml
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
 
@@ -113,7 +113,7 @@ For advanced features like custom validation, computed properties, or reusable b
 
 You can create more specific versions of existing concepts through refinement. For example, an `Invoice` is a specific kind of `PDF`:
 
-```plx
+```toml
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
 refines = "PDF"

@@ -43,7 +43,7 @@ Each entry in the `parallels` array is a table with the following keys:
 
 Imagine you have a product description and you want to extract the product features and the product sentiment at the same time.
 
-```plx
+```toml
 [concept.ProductAnalysis]
 structure = "ProductAnalysis" # A Pydantic model with 'features' and 'sentiment' fields
 
