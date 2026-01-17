@@ -12,7 +12,7 @@ In Pipelex, concepts are always defined in the singular form. You define a `Keyw
 
 A concept represents a semantic entity—a meaningful piece of knowledge with clear boundaries. When you define a concept, you're describing what something *is*, not how many of them you might have:
 
-```plx
+```toml
 [concept]
 Keyword = "A significant word or term extracted from text"
 ProductIdea = "A concept for a new product or service"
@@ -41,7 +41,7 @@ Output multiplicity controls how many items a pipe produces. You can specify thi
 
 When no brackets are used in the output, the pipe produces a single item:
 
-```plx
+```toml
 [concept]
 Summary = "A concise overview of content"
 
@@ -63,7 +63,7 @@ This is the default behavior and represents the most common case.
 
 Use empty brackets in the output to let the LLM decide how many items to generate:
 
-```plx
+```toml
 [concept]
 LineItem = "A single line item from an invoice"
 
@@ -100,7 +100,7 @@ The pipe will extract however many line items appear in the invoice. A simple in
 
 Use a number in brackets to generate an exact number of items:
 
-```plx
+```toml
 [concept]
 Headline = "A catchy title for content"
 
@@ -136,7 +136,7 @@ Input multiplicity specifies whether a pipe expects a single item or multiple it
 
 Input multiplicity is specified using bracket notation in the `inputs` dictionary:
 
-```plx
+```toml
 # Standard syntax (single item, the default)
 inputs = { document = "Text" }
 
@@ -153,7 +153,7 @@ inputs = { comparison_items = "Text[2]" }
 
 When you use the standard syntax, the pipe expects exactly one item. This is the default behavior:
 
-```plx
+```toml
 [concept]
 Report = "A detailed analytical document"
 
@@ -176,7 +176,7 @@ Analyze this report in detail:
 
 Use empty brackets `[]` to specify that the pipe expects a list with an indeterminate number of items:
 
-```plx
+```toml
 [concept]
 Document = "A written or printed record"
 Summary = "A concise overview of multiple documents"
@@ -207,7 +207,7 @@ Create a single unified summary that captures the key points across all document
 
 Use a number in brackets `[N]` to specify that the pipe expects exactly that many items:
 
-```plx
+```toml
 [concept]
 Image = "A visual image file"
 Comparison = "A detailed comparison analysis"
@@ -232,7 +232,7 @@ Describe their similarities, differences, and relative strengths.
 
 Process an unknown number of invoices, extracting structured data from each:
 
-```plx
+```toml
 [concept]
 InvoiceImage = "An image of an invoice document"
 InvoiceData = "Structured invoice information"
@@ -262,7 +262,7 @@ steps = [
 
 Create exactly 3 subject line variations for A/B testing:
 
-```plx
+```toml
 [concept]
 EmailContent = "The body text of an email"
 SubjectLine = "An email subject line"
@@ -286,7 +286,7 @@ Each should use a different persuasion technique.
 
 Compare exactly two products side by side:
 
-```plx
+```toml
 [concept]
 ProductDescription = "A description of a product's features"
 Comparison = "A comparative analysis of products"
@@ -309,7 +309,7 @@ Provide a balanced comparison of features, benefits, and potential drawbacks.
 
 Extract all company names mentioned in a document:
 
-```plx
+```toml
 [concept]
 Article = "A news or information article"
 CompanyName = "The name of a company or organization"

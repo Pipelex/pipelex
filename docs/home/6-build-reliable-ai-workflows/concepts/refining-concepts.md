@@ -17,7 +17,7 @@ Think of it as creating a subtype: an `Invoice` is a specific kind of `Document`
 
 Refined concepts make your pipeline's intent explicit:
 
-```plx
+```toml
 # ❌ Less clear
 [pipe.process_invoice]
 inputs = { invoice = "PDF" }
@@ -29,7 +29,7 @@ inputs = { invoice = "Invoice" }
 
 ### 2. Self-Documenting Code
 
-```plx
+```toml
 [pipe.extract_contract_terms]
 type = "PipeLLM"
 description = "Extract key terms from a contract"
@@ -41,7 +41,7 @@ output = "ContractTerms"
 
 Build pipelines tailored to specific use cases:
 
-```plx
+```toml
 domain = "finance"
 
 [concept.Invoice]
@@ -69,7 +69,7 @@ output = "ReceiptData"
 
 Using specific concept names helps catch errors early:
 
-```plx
+```toml
 [pipe.analyze_invoice]
 inputs = { invoice = "Invoice" }  # Only accepts Invoice
 output = "Analysis"
@@ -84,7 +84,7 @@ output = "Analysis"
     When you refine a concept, you **cannot** add an inline structure or specify a `structure_class_name`. This limitation will be lifted in future releases.
     
     **Not allowed:**
-```plx
+```toml
 [concept.Invoice]
 description = "A commercial invoice"
 refines = "Document"
@@ -95,7 +95,7 @@ invoice_number = "Invoice ID"
 ```
 
 **Allowed:**
-```plx
+```toml
 [concept.Invoice]
 description = "A commercial invoice"
 refines = "Document"  # ✅ Inherits DocumentContent structure
@@ -105,7 +105,7 @@ refines = "Document"  # ✅ Inherits DocumentContent structure
 
 Define a refined concept using the `refines` field:
 
-```plx
+```toml
 [concept.ConceptName]
 description = "Description of the refined concept"
 refines = "NativeConceptName"
@@ -113,7 +113,7 @@ refines = "NativeConceptName"
 
 ### Refining Document
 
-```plx
+```toml
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
 refines = "Document"
@@ -127,7 +127,7 @@ Both concepts inherit the `DocumentContent` structure (with a `url` field) but r
 
 ### Refining Image
 
-```plx
+```toml
 [concept.ProductPhoto]
 description = "A photograph of a product for marketing purposes"
 refines = "Image"
@@ -141,7 +141,7 @@ Each inherits `ImageContent` structure (url, caption, base_64, etc.) with specif
 
 ### Refining Text
 
-```plx
+```toml
 [concept.Article]
 description = "A written composition on a specific topic"
 refines = "Text"
@@ -160,7 +160,7 @@ Understanding how refined concepts interact with pipe inputs is crucial.
 !!! important "Key Rule"
     A pipe that accepts a **native concept** will **NOT** accept concepts that refine it.
     
-```plx
+```toml
 [pipe.extract_text]
 inputs = { document = "Document" }  # Only accepts Document, not Invoice or Contract
 ```
@@ -169,7 +169,7 @@ inputs = { document = "Document" }  # Only accepts Document, not Invoice or Cont
 
 ### Practical Example
 
-```plx
+```toml
 [concept.Invoice]
 refines = "Document"
 
@@ -205,7 +205,7 @@ In this setup:
 
 ### 1. Choose Meaningful Names
 
-```plx
+```toml
 # ❌ Avoid generic or vague names
 [concept.Document1]
 refines = "Document"
@@ -217,7 +217,7 @@ refines = "Document"
 
 ### 2. Write Clear Descriptions
 
-```plx
+```toml
 # ❌ Too vague
 [concept.Invoice]
 description = "A document"
@@ -231,7 +231,7 @@ refines = "Document"
 
 ### 3. Don't Over-Refine
 
-```plx
+```toml
 # ❌ Too specific, creates unnecessary complexity
 [concept.SmallInvoice]
 description = "An invoice under $100"
@@ -257,7 +257,7 @@ refines = "Document"
 - ✅ You're building domain-specific workflows with clear document/content types
 
 **Example:**
-```plx
+```toml
 [concept.Invoice]  # Clearly a type of Document
 refines = "Document"
 ```

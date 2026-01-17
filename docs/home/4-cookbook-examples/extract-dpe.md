@@ -56,7 +56,7 @@ class Dpe(StructuredContent):
 
 The pipeline uses a `PipeLLM` with a very specific prompt to extract the information from the document. The combination of the image and the OCR text allows the LLM to accurately capture all the details.
 
-```plx
+```toml
 [pipe.write_markdown_from_page_content_dpe]
 type = "PipeLLM"
 description = "Write markdown from page content of a 'Diagnostic de Performance Energetique'"

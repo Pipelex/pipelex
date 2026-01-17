@@ -48,7 +48,7 @@ This example shows the minimal setup needed to run a Pipelex pipeline: initializ
 
 The pipeline definition is extremely simple - it's a single LLM call that generates a haiku:
 
-```plx
+```toml
 domain = "quick_start"
 description = "Discovering Pipelex"
 

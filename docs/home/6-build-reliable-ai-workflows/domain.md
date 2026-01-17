@@ -14,7 +14,7 @@ A domain is defined by three properties:
 
 Every `.plx` file must declare its domain at the beginning:
 
-```plx
+```toml
 domain = "invoice_processing"
 description = "Tools for extracting, validating, and processing invoice documents"
 system_prompt = "You are an expert in financial document analysis and invoice processing."
@@ -24,7 +24,7 @@ system_prompt = "You are an expert in financial document analysis and invoice pr
     Domain codes **MUST** be in `snake_case` (lowercase with underscores). Use descriptive names that clearly indicate the domain's purpose.
     
     **Valid domain codes:**
-    ```plx
+    ```toml
     ✅ domain = "finance"
     ✅ domain = "invoice_processing"
     ✅ domain = "medical_records"
@@ -32,7 +32,7 @@ system_prompt = "You are an expert in financial document analysis and invoice pr
     ```
     
     **Invalid domain codes:**
-    ```plx
+    ```toml
     ❌ domain = "Finance"           # No uppercase
     ❌ domain = "invoice-processing" # No hyphens
     ❌ domain = "INVOICE_PROCESSING" # No all caps
@@ -51,7 +51,7 @@ domain_code.ConceptName
 
 **Example:**
 
-```plx
+```toml
 domain = "finance"
 
 [concept]
@@ -67,14 +67,14 @@ This creates two concepts:
 
 The domain code prevents naming conflicts. Multiple bundles can define concepts with the same name if they're in different domains:
 
-```plx
+```toml
 # finance.plx
 domain = "finance"
 [concept]
 Report = "A financial report"
 ```
 
-```plx
+```toml
 # marketing.plx
 domain = "marketing"
 [concept]
@@ -87,14 +87,14 @@ Result: Two different concepts (`finance.Report` and `marketing.Report`) with no
 
 Multiple `.plx` files can declare the same domain. They all contribute to that domain's namespace:
 
-```plx
+```toml
 # finance_invoices.plx
 domain = "finance"
 [concept]
 Invoice = "..."
 ```
 
-```plx
+```toml
 # finance_payments.plx
 domain = "finance"
 [concept]
@@ -111,7 +111,7 @@ Both files contribute to the `finance` domain, creating:
 
 **Same-domain references** (no prefix needed):
 
-```plx
+```toml
 domain = "finance"
 
 [concept]
@@ -126,7 +126,7 @@ prompt = "Process this invoice: @invoice"
 
 **Cross-domain references** (prefix required):
 
-```plx
+```toml
 domain = "accounting"
 
 [pipe.reconcile]
@@ -154,7 +154,7 @@ invoice_stuff = StuffFactory.make_from_concept_ref(
 
 When you set a `system_prompt` at the domain level, it applies to all `PipeLLM` operators in bundles that declare that domain:
 
-```plx
+```toml
 domain = "medical_records"
 system_prompt = "You are a medical records specialist with expertise in HIPAA compliance."
 

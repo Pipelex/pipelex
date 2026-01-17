@@ -55,7 +55,7 @@ class GanttChart(StructuredContent):
 
 The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex workflow from simple, reusable components.
 
-```plx
+```toml
 [pipe.extract_gantt_by_steps]
 type = "PipeSequence"
 description = "Extract all details from a gantt chart"

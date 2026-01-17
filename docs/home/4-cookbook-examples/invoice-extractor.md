@@ -55,7 +55,7 @@ class Invoice(StructuredContent):
 
 The entire workflow is defined in a PLX file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.plx`:
 
-```plx
+```toml
 [pipe.process_invoice]
 type = "PipeSequence"
 description = "Process relevant information from an invoice"

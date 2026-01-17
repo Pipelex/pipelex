@@ -52,7 +52,7 @@ This demonstrates how you can create nested data structures to accurately model 
 
 The pipeline uses a powerful `PipeLLM` to extract the structured data from the document. The prompt is carefully engineered to guide the LLM.
 
-```plx
+```toml
 [pipe.write_markdown_from_page_content_proof_of_purchase]
 type = "PipeLLM"
 description = "Write markdown from page content"

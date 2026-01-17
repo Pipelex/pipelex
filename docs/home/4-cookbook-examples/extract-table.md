@@ -60,7 +60,7 @@ class HtmlTable(StructuredContent):
 
 The pipeline uses a two-step "extract and review" pattern. The first pipe does the initial extraction, and the second pipe reviews the generated HTML against the original image to correct any errors. This is a powerful pattern for increasing the reliability of LLM outputs.
 
-```plx
+```toml
 [pipe.extract_html_table_and_review]
 type = "PipeSequence"
 description = "Get an HTML table and review it"

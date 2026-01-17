@@ -55,7 +55,7 @@ OCR presets are defined in your model deck configuration and can include paramet
 
 This example defines a pipe that takes a PDF, extracts text and full-page images, and outputs them as a list of pages.
 
-```plx
+```toml
 [concept]
 ScannedDocument = "A document that has been scanned as a PDF"
 
