@@ -283,7 +283,6 @@ NEVER EVER put more than one TestClass into a test module.
     - `tests/unit/` - for unit tests that test individual functions/classes in isolation
     - `tests/integration/` - for integration tests that test component interactions
     - `tests/e2e/` - for end-to-end tests that test complete workflows
-    - `tests/test_pipelines/` - for test pipeline definitions (PLX files and their structuring python files)
 - Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
@@ -294,11 +293,12 @@ NEVER EVER put more than one TestClass into a test module.
 #### Markers
 
 Apply the appropriate markers:
+- "gha_disabled: will not be able to run properly on GitHub Actions"
 - "llm: uses an LLM to generate text or objects"
 - "img_gen: uses an image generation AI"
 - "extract: uses text/image extraction from documents"
 - "inference: uses either an LLM or an image generation AI"
-- "gha_disabled: will not be able to run properly on GitHub Actions"
+- never add "@pytest.mark.dry_runnable" if you haven't set the "inference" marker
 
 Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
 
