@@ -6,7 +6,8 @@ This is a fundamental building block for many document processing workflows.
 
 ## Get the code
 
-<!-- PRERELEASE_LINK -->[**➡️ View on GitHub: examples/a_quick_start/simple_ocr.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/a_quick_start/simple_ocr.py)
+<!-- PRERELEASE_LINK -->
+[**➡️ View on GitHub: examples/a_quick_start/simple_ocr.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/a_quick_start/simple_ocr.py)
 
 ## The Pipeline Explained
 

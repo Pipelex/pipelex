@@ -4,7 +4,8 @@ This example demonstrates a powerful and generic pipeline for extracting content
 
 ## Get the code
 
-<!-- PRERELEASE_LINK -->[**➡️ View on GitHub: examples/b_basics/document_extract/extract_generic/extract_generic.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_generic/extract_generic.py)
+<!-- PRERELEASE_LINK -->
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_generic/extract_generic.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_generic/extract_generic.py)
 
 ## The Pipeline Explained
 

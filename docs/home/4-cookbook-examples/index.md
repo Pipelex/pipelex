@@ -2,7 +2,8 @@
 
 Welcome to the Pipelex Cookbook!
 
-<!-- PRERELEASE_LINK -->[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
+<!-- PRERELEASE_LINK -->
+[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
 
 This is your go-to resource for practical examples and ready-to-use recipes to build powerful and reliable AI workflows with Pipelex. Whether you're a beginner looking to get started or an experienced user searching for advanced patterns, you'll find something useful here.
 
@@ -14,7 +15,8 @@ Our examples are designed to be:
 -   **Readable**: Easy to understand and adapt.
 -   **A Starting Point**: A foundation for your own custom pipelines.
 
-We strongly encourage you to clone our <!-- PRERELEASE_LINK -->[Pipelex Cookbook repository](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago), play with the examples, and tailor them to your specific needs.
+<!-- PRERELEASE_LINK -->
+We strongly encourage you to clone our [Pipelex Cookbook repository](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago), play with the examples, and tailor them to your specific needs.
 
 ## Contribute to the Community!
 

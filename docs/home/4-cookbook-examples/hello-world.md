@@ -8,7 +8,8 @@ It's the perfect starting point to verify your installation and get a first tast
 
 You can find the complete code for this example in the Pipelex Cookbook repository.
 
-<!-- PRERELEASE_LINK -->[**➡️ View on GitHub: examples/a_quick_start/hello_world.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/a_quick_start/hello_world.py)
+<!-- PRERELEASE_LINK -->
+[**➡️ View on GitHub: examples/a_quick_start/hello_world.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/a_quick_start/hello_world.py)
 
 ## The Pipeline Explained
 

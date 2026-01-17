@@ -342,7 +342,8 @@ We **highly** recommend installing our extension for `.plx` files into your IDE.
 
 Explore real-world examples in our **Cookbook** repository:
 
-<!-- PRERELEASE_LINK -->[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
+<!-- PRERELEASE_LINK -->
+[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
 
 Clone it, fork it, and experiment with production-ready pipelines for various use cases.
 
