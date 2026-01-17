@@ -111,7 +111,6 @@ nav:
         - Table Extraction from Image: home/4-cookbook-examples/extract-table.md
         - DPE Extraction: home/4-cookbook-examples/extract-dpe.md
       - Text Generation:
-        - Screenplay Generator (wip): home/4-cookbook-examples/write-screenplay.md
         - Tweet Optimizer (wip): home/4-cookbook-examples/write-tweet.md
     - Setup (first run):
       - Overview: home/5-setup/index.md

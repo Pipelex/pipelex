@@ -129,7 +129,7 @@ Our Pipelex workflow builder is itself a Pipelex workflow. The tooling builds it
 
 Pipelex is MIT-licensed and designed for portability. Workflows are files, based on TOML syntax (itself well standardized), and the outputs are validated JSON.
 
-Early adopters are contributing to the [cookbook repo](https://github.com/Pipelex/pipelex-cookbook), building integrations, and running workflows in production. The pieces for ecosystem growth are in place: declarative spec, reference implementation, composable architecture.
+Early adopters are contributing to the <!-- PRERELEASE_LINK -->[cookbook repo](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago), building integrations, and running workflows in production. The pieces for ecosystem growth are in place: declarative spec, reference implementation, composable architecture.
 
 Building a standard is hard. We're at v0.1.0, with versioning and backward compatibility coming next. The spec will evolve with your feedback.
 

@@ -4,7 +4,7 @@ This example provides a comprehensive pipeline for processing invoices. It takes
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/invoice_extractor.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/invoice_extractor.py)
+<!-- PRERELEASE_LINK -->[**➡️ View on GitHub: examples/b_basics/document_extract/extract_invoice/extract_invoice.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_invoice/extract_invoice.py)
 
 ## The Pipeline Explained
 

@@ -52,6 +52,6 @@ Now that you understand project organization:
 
 1. **Start building**: [Get Started](../../home/2-get-started/pipe-builder.md)
 2. **Learn the concepts**: [Writing Workflows Tutorial](../../home/2-get-started/pipe-builder.md)
-3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook)
+3. **Explore examples**: <!-- PRERELEASE_LINK -->[Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
 4. **Deep dive**: [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md)
 
