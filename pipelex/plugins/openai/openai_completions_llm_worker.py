@@ -4,9 +4,6 @@ import instructor
 import openai
 from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
-
-if TYPE_CHECKING:
-    from openai.types.chat import ChatCompletionMessage
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import LLMCompletionError, SdkTypeError
@@ -19,6 +16,9 @@ from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsF
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessage
 
 
 class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
@@ -96,6 +96,10 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
         except AuthenticationError as authentication_error:
             msg = f"LLM authentication error: {authentication_error}"
             raise LLMCompletionError(msg) from authentication_error
+
+        if not response.choices:
+            msg = f"OpenAI chat completion response choices are empty with model: {self.inference_model.desc}"
+            raise LLMCompletionError(msg)
 
         openai_message: ChatCompletionMessage = response.choices[0].message
         response_text = openai_message.content

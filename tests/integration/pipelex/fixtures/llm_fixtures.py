@@ -100,6 +100,12 @@ META_MODELS = [
     "meta-llama/llama-guard-4-12b",
 ]
 
+# --- Microsoft Models -----------------------------------------------------------------------------
+MICROSOFT_MODELS = [
+    "phi-4",
+    "phi-4-multimodal",
+]
+
 # --- Mistral Models -----------------------------------------------------------------------------
 MISTRALAI_MODELS = [
     "bedrock-mistral-large",
@@ -117,11 +123,13 @@ MISTRALAI_MODELS = [
     "pixtral-12b",
     "pixtral-large",
     "pixtral-large-2411",
+    "mistral-large-3",
 ]
 
 # --- Moonshot AI Models -------------------------------------------------------------------------
 MOONSHOTAI_MODELS = [
     "kimi-k2-instruct-0905",
+    "kimi-k2-thinking",
 ]
 
 # --- OpenAI Models ------------------------------------------------------------------------------
@@ -147,6 +155,7 @@ OPENAI_MODELS = [
     "gpt-5.1",
     "gpt-5.2",
     "gpt-5.2-chat",
+    "gpt-5.2-codex",
 ]
 
 # --- OpenAI OSS Models --------------------------------------------------------------------------
@@ -172,6 +181,7 @@ XAI_MODELS = [
     "grok-3-mini",
     "grok-3-fast",
     "grok-3-mini-fast",
+    "grok-4",
     "grok-4-fast-reasoning",
     "grok-4-fast-non-reasoning",
 ]
@@ -184,6 +194,7 @@ ALL_LLM_HANDLES = [
     *GOOGLE_MODELS,
     *GROQ_MODELS,
     *META_MODELS,
+    *MICROSOFT_MODELS,
     *MISTRALAI_MODELS,
     *MOONSHOTAI_MODELS,
     *OPENAI_MODELS,
