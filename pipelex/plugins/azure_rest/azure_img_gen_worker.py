@@ -126,7 +126,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     GeneratedImageRawDetails(
                         base64_str=base64_str,
                         size=ImageSize(width=width, height=height),
-                        output_format=response_output_format,
+                        image_format=response_output_format,
                     ),
                 )
         else:

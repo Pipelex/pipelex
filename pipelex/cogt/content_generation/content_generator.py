@@ -328,7 +328,7 @@ class ContentGenerator(ContentGeneratorProtocol):
                 job_metadata=job_metadata,
                 generated_image_raw_details=GeneratedImageRawDetails.make_from_pil_image(
                     pil_image=page_view_image,
-                    output_format=ImageFormat.PNG,
+                    image_format=ImageFormat.PNG,
                 ),
                 img_gen_prompt=None,
             )

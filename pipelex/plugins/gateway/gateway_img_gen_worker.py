@@ -91,9 +91,12 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
 
+        # Giv en that different backends and different models can be used with this worker, we must interpret the response,
+        # so we do it according to the shape we detext
         response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
         generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
+            # Azure-shaped responses, model is either OpenAI's GPT Image or Black Forest Labs' Flux 2 Pro
             azure_gpt_image: GatewayImgGenAzureGptImage | None = None
             flux_2_pro_image: GatewayImgGenAzureFlux2Pro | None = None
             parsing_errors: str = ""
@@ -112,10 +115,10 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
 
             width: int
             height: int
-            response_output_format: str | None
+            image_format: str | None
             if azure_gpt_image:
-                response_output_format = response_dict.get("output_format")
-                if not response_output_format:
+                image_format = response_dict.get("output_format")
+                if not image_format:
                     msg = "No output format received from Gateway"
                     raise ImgGenGenerationError(msg)
                 size = response_dict.get("size")
@@ -143,7 +146,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 # Decode base64 once and detect file type and dimensions
                 image_bytes = base64.b64decode(first_base64)
                 file_type = detect_file_type_from_bytes(image_bytes)
-                response_output_format = ImageFormat.from_mime_type(
+                image_format = ImageFormat.from_mime_type(
                     mime_type=file_type.mime,
                 ).value
                 with Image.open(io.BytesIO(image_bytes)) as pil_img:
@@ -161,7 +164,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     GeneratedImageRawDetails(
                         base64_str=base64_str,
                         size=ImageSize(width=width, height=height),
-                        output_format=response_output_format,
+                        image_format=image_format,
                     ),
                 )
 
