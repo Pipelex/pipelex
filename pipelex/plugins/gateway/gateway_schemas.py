@@ -26,11 +26,28 @@ class GatewayExtractPageAzure(BaseModel):
     images: list[GatewayExtractImageAzure] = Field(description="The images on the page")
 
 
+class ImageDimensions(BaseModel):
+    """Image dimensions and file size."""
+
+    width: int = Field(description="Image width in pixels")
+    height: int = Field(description="Image height in pixels")
+    bytes: int = Field(description="Image file size in bytes")
+
+
+class ImageInfo(BaseModel):
+    """Information about the processed image."""
+
+    original: ImageDimensions = Field(description="Original image dimensions before processing")
+    processed: ImageDimensions = Field(description="Processed image dimensions (after scaling if applied)")
+    scaled_down: bool = Field(description="Whether the image was scaled down to fit limits")
+
+
 class GatewayExtractPageDeepseek(BaseModel):
     """Result for a single page extracted by DeepSeek-OCR."""
 
     index: int = Field(description="The index of the page (0-based)")
     markdown: str = Field(description="The markdown content of the page")
+    source_image_info: ImageInfo | None = Field(default=None, description="Information about the source image for this page")
 
 
 class GatewayExtractImageMistral(BaseModel):

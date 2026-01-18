@@ -18,6 +18,7 @@ from portkey_ai import (
 from pydantic import ValidationError
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
@@ -231,6 +232,13 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
             for response_page_dict in response_page_dicts:
                 response_page = GatewayExtractPageDeepseek.model_validate(response_page_dict)
                 page_index = response_page.index
+                if response_page.source_image_info and response_page.source_image_info.scaled_down:
+                    original = response_page.source_image_info.original
+                    processed = response_page.source_image_info.processed
+                    log.warning(
+                        f"Extract page [{page_index}]: image was scaled down from {original.width}x{original.height} "
+                        f"({original.bytes / 1024:.1f} KB) to {processed.width}x{processed.height} ({processed.bytes / 1024:.1f} KB)"
+                    )
                 extracted_page_text = response_page.markdown
                 pages[page_index] = Page(
                     text=extracted_page_text,
