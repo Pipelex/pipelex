@@ -18,7 +18,6 @@ from portkey_ai import (
 from pydantic import ValidationError
 from typing_extensions import override
 
-from pipelex import pretty_print
 from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
@@ -239,7 +238,7 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
                 )
             return ExtractOutput(pages=pages)
         except (TypeError, ValidationError) as exc:
-            msg = f"Error parsing Gateway extract response from pages using Azure schema: {exc}"
+            msg = f"Error parsing Gateway extract response from pages using Deepseek schema: {exc}"
             raise GatewayExtractResponseError(msg) from exc
 
     @override
