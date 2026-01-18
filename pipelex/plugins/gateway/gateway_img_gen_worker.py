@@ -151,7 +151,7 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 with Image.open(io.BytesIO(image_bytes)) as pil_img:
                     width, height = pil_img.size
             else:
-                msg = "Could not parse image generation from Gateway response"
+                msg = f"Could not parse image generation from Gateway response:\n{parsing_errors}"
                 raise ImgGenGenerationError(msg)
 
             for image in images:
