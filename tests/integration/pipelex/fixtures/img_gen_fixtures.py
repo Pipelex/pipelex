@@ -102,7 +102,7 @@ def img_gen_handle(request: pytest.FixtureRequest) -> str:
             output_format=ImageFormat.JPEG,
         ),
         ImgGenJobParams(
-            aspect_ratio=AspectRatio.LANDSCAPE_3_2,
+            aspect_ratio=AspectRatio.LANDSCAPE_4_3,
             background=Background.OPAQUE,
             quality=Quality.HIGH,
             guidance_scale=2.5,

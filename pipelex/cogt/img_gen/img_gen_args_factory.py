@@ -225,7 +225,7 @@ class ImgGenArgsFactory:
                     case AspectRatio.PORTRAIT_9_21:
                         value = "portrait_21_9"
                     case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
-                        msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1 image generation model"
+                        msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux image generation model"
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.FLUX_11_ULTRA:
                 key = "aspect_ratio"

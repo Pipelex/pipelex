@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import base64
+import io
 from typing import TYPE_CHECKING, Any
 
+from PIL import Image
 from portkey_ai import AsyncPortkey
 from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
@@ -18,6 +21,8 @@ from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_schemas import GatewayImgGenAzureFlux2Pro, GatewayImgGenAzureGptImage
+from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
+from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
@@ -107,8 +112,9 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
 
             width: int
             height: int
+            response_output_format: str | None
             if azure_gpt_image:
-                response_output_format: str | None = response_dict.get("output_format")
+                response_output_format = response_dict.get("output_format")
                 if not response_output_format:
                     msg = "No output format received from Gateway"
                     raise ImgGenGenerationError(msg)
@@ -124,9 +130,24 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 width = int(width_str)
                 height = int(height_str)
             elif flux_2_pro_image:
-                width = 1024
-                height = 1024
-                response_output_format = "png"
+                # Detect size and format from the first image's data
+                first_image = images[0] if images else None
+                if not first_image:
+                    msg = "No images in Flux 2 Pro response"
+                    raise ImgGenGenerationError(msg)
+                first_base64 = first_image.get("b64_json")
+                if not isinstance(first_base64, str):
+                    msg = f"No base64 image data in first image from model '{self.inference_model.model_id}'"
+                    raise ImgGenGenerationError(msg)
+
+                # Decode base64 once and detect file type and dimensions
+                image_bytes = base64.b64decode(first_base64)
+                file_type = detect_file_type_from_bytes(image_bytes)
+                response_output_format = ImageFormat.from_mime_type(
+                    mime_type=file_type.mime,
+                ).value
+                with Image.open(io.BytesIO(image_bytes)) as pil_img:
+                    width, height = pil_img.size
             else:
                 msg = "Could not parse image generation from Gateway response"
                 raise ImgGenGenerationError(msg)
