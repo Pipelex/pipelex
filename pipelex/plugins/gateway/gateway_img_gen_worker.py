@@ -11,7 +11,6 @@ from portkey_ai.api_resources.utils import GenericResponse
 from pydantic import ValidationError
 from typing_extensions import override
 
-from pipelex import pretty_print
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
