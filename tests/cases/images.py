@@ -26,7 +26,7 @@ class ImageTestCases:
         f"{TEST_IMAGE_DIRECTORY}/animal_lympics.jpg",
     ]
     IMAGE_TEXT_FILE_PATHS: ClassVar[list[str]] = [
-        # IMAGE_FILE_PATH_JPG_1,
+        IMAGE_FILE_PATH_JPG_1,
         IMAGE_FILE_PATH_PNG_2,
     ]
 

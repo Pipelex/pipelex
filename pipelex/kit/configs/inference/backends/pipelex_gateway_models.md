@@ -1,12 +1,12 @@
 # Pipelex Gateway - Available Models
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-18T14:29:48Z
+> Last updated: 2026-01-18T15:31:10Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
 
 This file documents models available through Pipelex Gateway.
-For configuration details, see the [documentation](https://docs.pipelex.com/home/5-setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started).
+For configuration details, see the [documentation](https://docs.pipelex.com/latest/home/5-setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started).
 
 ## Language Models (LLM)
 
