@@ -6,7 +6,7 @@ from portkey_ai.api_resources.utils import GenericResponse
 from tenacity import AsyncRetrying, RetryCallState, retry_if_exception, stop_after_attempt, wait_random_exponential
 from typing_extensions import override
 
-from pipelex import log
+from pipelex import log, pretty_print
 from pipelex.cogt.exceptions import ExtractCapabilityError, ExtractJobFailureError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob

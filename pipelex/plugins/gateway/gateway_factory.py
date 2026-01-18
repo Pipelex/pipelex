@@ -83,8 +83,11 @@ class GatewayFactory:
                     extra_body["include_image_base64"] = should_include_images
                 case GatewayExtractProtocol.AZURE_DOC_INTEL:
                     request_params = GatewayExtractRequestParams(should_include_images=should_include_images)
-                    messages: list[dict[str, str]] = [{"role": "user", "content": request_params.model_dump_json()}]
-                    extra_body["messages"] = messages
+                    messages_azure: list[dict[str, str]] = [{"role": "user", "content": request_params.model_dump_json()}]
+                    extra_body["messages"] = messages_azure
+                case GatewayExtractProtocol.DEEPSEEK_OCR:
+                    messages_deepseek: list[dict[str, str]] = [{"role": "user", "content": "Convert the document to markdown."}]
+                    extra_body["messages"] = messages_deepseek
         elif isinstance(inference_job, LLMJob) and inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
             # Mistral models really want non-null seed
             extra_body["seed"] = random.randint(0, 1000000)

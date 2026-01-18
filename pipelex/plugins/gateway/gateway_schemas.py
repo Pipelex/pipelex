@@ -26,6 +26,13 @@ class GatewayExtractPageAzure(BaseModel):
     images: list[GatewayExtractImageAzure] = Field(description="The images on the page")
 
 
+class GatewayExtractPageDeepseek(BaseModel):
+    """Result for a single page extracted by DeepSeek-OCR."""
+
+    index: int = Field(description="The index of the page (0-based)")
+    markdown: str = Field(description="The markdown content of the page")
+
+
 class GatewayExtractImageMistral(BaseModel):
     """An extracted image with its base64 content and bounding box."""
 
