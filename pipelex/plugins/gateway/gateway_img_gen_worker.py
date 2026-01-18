@@ -5,8 +5,10 @@ from typing import TYPE_CHECKING, Any
 from portkey_ai import AsyncPortkey
 from portkey_ai.api_resources import exceptions as portkey_exceptions
 from portkey_ai.api_resources.utils import GenericResponse
+from pydantic import ValidationError
 from typing_extensions import override
 
+from pipelex import pretty_print
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
@@ -15,6 +17,8 @@ from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
+from pipelex.plugins.gateway.gateway_schemas import GatewayImgGenAzureFlux2Pro, GatewayImgGenAzureGptImage
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -58,13 +62,17 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
             nb_images=nb_images,
+            model_id=self.inference_model.model_id,
         )
 
-        endpoint_path = f"/{self.inference_model.model_id}"
+        endpoint_path = (self.inference_model.extra_headers or {}).get("endpoint_path") or f"/{self.inference_model.model_id}"
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         try:
             # TODO: add portkey tracing headers when enabled
-            response = await self.portkey_client.with_options(config=config_id).post(url=endpoint_path, **args_dict)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+            response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                url=endpoint_path,
+                **args_dict,
+            )
         except portkey_exceptions.APIError as exc:
             error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
             msg = f"Image generation service error for model '{self.inference_model.model_id}': {error_summary}"
@@ -78,24 +86,51 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
 
-        response_dict: dict[str, Any] = response.model_dump()
+        response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
         generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
-            response_output_format: str | None = response_dict.get("output_format")
-            if not response_output_format:
-                msg = "No output format received from Gateway"
+            azure_gpt_image: GatewayImgGenAzureGptImage | None = None
+            flux_2_pro_image: GatewayImgGenAzureFlux2Pro | None = None
+            parsing_errors: str = ""
+            try:
+                response_azure_gpt_image = GatewayImgGenAzureGptImage.model_validate(response_dict)
+                azure_gpt_image = response_azure_gpt_image
+            except ValidationError as azure_gpt_image_error:
+                validation_error_summary = format_pydantic_validation_error(azure_gpt_image_error)
+                parsing_errors += f"Azure GPT Image: {validation_error_summary}\n"
+                try:
+                    response_flux_2_pro_image = GatewayImgGenAzureFlux2Pro.model_validate(response_dict)
+                    flux_2_pro_image = response_flux_2_pro_image
+                except ValidationError as flux_2_pro_image_error:
+                    validation_error_summary = format_pydantic_validation_error(flux_2_pro_image_error)
+                    parsing_errors += f"\n\nFlux 2 Pro: {validation_error_summary}\n"
+
+            width: int
+            height: int
+            if azure_gpt_image:
+                response_output_format: str | None = response_dict.get("output_format")
+                if not response_output_format:
+                    msg = "No output format received from Gateway"
+                    raise ImgGenGenerationError(msg)
+                size = response_dict.get("size")
+                if not isinstance(size, str):
+                    msg = f"Size from img gen response is not a string: '{size}'"
+                    raise ImgGenGenerationError(msg)
+                size_split = size.split("x")
+                if len(size_split) != 2:
+                    msg = f"Size from img gen response is not a valid size: '{size}'"
+                    raise ImgGenGenerationError(msg)
+                width_str, height_str = size_split
+                width = int(width_str)
+                height = int(height_str)
+            elif flux_2_pro_image:
+                width = 1024
+                height = 1024
+                response_output_format = "png"
+            else:
+                msg = "Could not parse image generation from Gateway response"
                 raise ImgGenGenerationError(msg)
-            size = response_dict.get("size")
-            if not isinstance(size, str):
-                msg = f"Size from img gen response is not a string: '{size}'"
-                raise ImgGenGenerationError(msg)
-            size_split = size.split("x")
-            if len(size_split) != 2:
-                msg = f"Size from img gen response is not a valid size: '{size}'"
-                raise ImgGenGenerationError(msg)
-            width_str, height_str = size_split
-            width = int(width_str)
-            height = int(height_str)
+
             for image in images:
                 base64_str = image.get("b64_json")
                 if not isinstance(base64_str, str):
@@ -119,12 +154,12 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 if not isinstance(url, str):
                     msg = "Missing url field in image response"
                     raise ImgGenGenerationError(msg)
-                width = image.get("width")
-                if not isinstance(width, int):
+                fal_width = image.get("width")
+                if not isinstance(fal_width, int):
                     msg = "Missing width field in image response"
                     raise ImgGenGenerationError(msg)
-                height = image.get("height")
-                if not isinstance(height, int):
+                fal_height = image.get("height")
+                if not isinstance(fal_height, int):
                     msg = "Missing height field in image response"
                     raise ImgGenGenerationError(msg)
                 content_type = image.get("content_type")
@@ -133,11 +168,13 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                     raise ImgGenGenerationError(msg)
                 generated_image = GeneratedImageRawDetails(
                     actual_url_or_prefixed_base64=url,
-                    size=ImageSize(width=width, height=height),
+                    size=ImageSize(width=fal_width, height=fal_height),
                     mime_type=content_type,
                 )
                 generated_images.append(generated_image)
         else:
+            pretty_print(response, title="Response")
+            pretty_print(response_dict, title="Response dict")
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
             raise ImgGenGenerationError(msg)
 

@@ -19,6 +19,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     ImgGenArgTopic,
     ImgGenModelRules,
     InferenceTaxonomy,
+    ModelNameTaxonomy,
     NumImagesTaxonomy,
     OutputFormatTaxonomy,
     PromptTaxonomy,
@@ -43,6 +44,7 @@ class ImgGenArgsFactory:
         model_rules: ImgGenModelRules,
         img_gen_job: ImgGenJob,
         nb_images: int,
+        model_id: str,
     ) -> dict[str, Any]:
         """Build provider-specific API arguments from model rules and job parameters.
 
@@ -53,6 +55,7 @@ class ImgGenArgsFactory:
             model_rules: Mapping of argument topics to their taxonomy values for the target model
             img_gen_job: The image generation job containing prompt and parameters
             nb_images: Number of images to generate
+            model_id: The model identifier to pass to the provider API
 
         Returns:
             Dictionary of API arguments ready to be passed to the provider's API
@@ -132,6 +135,14 @@ class ImgGenArgsFactory:
                             specific_taxonomy=specific_taxonomy,
                         )
                     )
+                case ImgGenArgTopic.MODEL_NAME:
+                    model_name_taxonomy = ModelNameTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_model_name(
+                            model_name_taxonomy=model_name_taxonomy,
+                            model_id=model_id,
+                        )
+                    )
 
         return args_dict
 
@@ -167,6 +178,17 @@ class ImgGenArgsFactory:
         match specific_taxonomy:
             case SpecificTaxonomy.FAL:
                 return {"sync_mode": False}
+
+    @classmethod
+    def make_args_from_model_name(
+        cls,
+        model_name_taxonomy: ModelNameTaxonomy,
+        model_id: str,
+    ) -> dict[str, Any]:
+        """Map model identifier to provider-specific parameter."""
+        match model_name_taxonomy:
+            case ModelNameTaxonomy.STANDARD:
+                return {"model": model_id}
 
     @classmethod
     def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background) -> dict[str, Any]:
