@@ -197,8 +197,6 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
                 )
                 generated_images.append(generated_image)
         else:
-            pretty_print(response, title="Response")
-            pretty_print(response_dict, title="Response dict")
             msg = f"Unexpected response from model '{self.inference_model.model_id}' has no 'data' or 'images' key"
             raise ImgGenGenerationError(msg)
 
