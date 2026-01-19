@@ -91,27 +91,69 @@ def extract_reference_data(model_specs: BackendModelSpecs) -> dict[str, list[dic
 
 
 def generate_markdown_table(models: list[dict[str, Any]]) -> str:
-    """Generate a Markdown table for a list of models.
+    """Generate an HTML table for a list of models with grouped input/output headers.
 
     Args:
         models: List of model info dictionaries.
 
     Returns:
-        Markdown table string.
+        HTML table string.
     """
     if not models:
         return "_No models available in this category._\n"
 
-    header = "| Model | Inputs | Outputs |"
-    separator = "|-------|--------|---------|"
-
-    lines = [header, separator]
-
+    # Collect all unique input and output types across all models
+    all_inputs: set[str] = set()
+    all_outputs: set[str] = set()
     for model in models:
-        inputs = ", ".join(model.get("inputs", []))
-        outputs = ", ".join(model.get("outputs", []))
+        all_inputs.update(model.get("inputs", []))
+        all_outputs.update(model.get("outputs", []))
+
+    # Sort for consistent column order
+    input_cols = sorted(all_inputs)
+    output_cols = sorted(all_outputs)
+
+    # Build HTML table
+    lines = ["<table>", "<thead>"]
+
+    # First header row with grouped columns (Model + Inputs span + Outputs span)
+    lines.append("<tr>")
+    lines.append('<th rowspan="2">Model</th>')
+    if input_cols:
+        lines.append(f'<th colspan="{len(input_cols)}" style="text-align:center">Inputs</th>')
+    if output_cols:
+        lines.append(f'<th colspan="{len(output_cols)}" style="text-align:center">Outputs</th>')
+    lines.append("</tr>")
+
+    # Second header row with individual column names
+    lines.append("<tr>")
+    for inp in input_cols:
+        lines.append(f'<th style="text-align:center">{inp}</th>')
+    for out in output_cols:
+        lines.append(f'<th style="text-align:center">{out}</th>')
+    lines.append("</tr>")
+
+    lines.append("</thead>")
+    lines.append("<tbody>")
+
+    # Data rows
+    for model in models:
+        model_inputs = set(model.get("inputs", []))
+        model_outputs = set(model.get("outputs", []))
         name = model.get("name", "")
-        lines.append(f"| {name} | {inputs} | {outputs} |")
+
+        lines.append("<tr>")
+        lines.append(f"<td>{name}</td>")
+        for inp in input_cols:
+            check = "✅" if inp in model_inputs else "❌"
+            lines.append(f'<td style="text-align:center">{check}</td>')
+        for out in output_cols:
+            check = "✅" if out in model_outputs else "❌"
+            lines.append(f'<td style="text-align:center">{check}</td>')
+        lines.append("</tr>")
+
+    lines.append("</tbody>")
+    lines.append("</table>")
 
     return "\n".join(lines) + "\n"
 
@@ -129,14 +171,9 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
     timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     sections = [
-        "# Pipelex Gateway - Available Models",
-        "",
-        "> **AUTO-GENERATED FILE** - Do not edit manually.",
-        f"> Last updated: {timestamp}",
-        ">",
-        "> Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.",
-        "",
-        "This file documents models available through Pipelex Gateway.",
+        "# Pipelex Gateway — Available Models",
+        "<!-- PRERELEASE_LINK -->",
+        "This file lists the LLMs, document extraction models, and image generation models currently available through Pipelex Gateway.",
         f"For configuration details, see the [documentation]({URLs.gateway_docs}).",
         "",
     ]
@@ -155,5 +192,12 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
     sections.append("## Image Generation Models")
     sections.append("")
     sections.append(generate_markdown_table(models_by_type["img_gen"]))
+
+    # Add auto-generated notice at the bottom
+    sections.append("")
+    sections.append("> **AUTO-GENERATED FILE** - Do not edit manually.")
+    sections.append(f"> Last updated: {timestamp}")
+    sections.append(">")
+    sections.append("> Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.")
 
     return "\n".join(sections)

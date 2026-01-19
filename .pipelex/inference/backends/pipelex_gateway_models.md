@@ -1,79 +1,500 @@
-# Pipelex Gateway - Available Models
-
-> **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-19T10:29:00Z
->
-> Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
-
-This file documents models available through Pipelex Gateway.
+# Pipelex Gateway — Available Models
+<!-- PRERELEASE_LINK -->
+This file lists the LLMs, document extraction models, and image generation models currently available through Pipelex Gateway.
 For configuration details, see the [documentation](https://docs.pipelex.com/latest/home/5-setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started).
 
 ## Language Models (LLM)
 
-| Model | Inputs | Outputs | SDK | Structure Method |
-|-------|--------|---------|-----|------------------|
-| claude-3.7-sonnet | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4-opus | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4-sonnet | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4.1-opus | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4.5-haiku | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4.5-opus | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| claude-4.5-sonnet | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| deepseek-v3.1 | text | text, structured | gateway_completions | instructor/json |
-| gemini-2.0-flash | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-2.5-flash | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-2.5-flash-lite | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-2.5-pro | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-3.0-flash-preview | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| gemini-3.0-pro | text, images, pdf | text, structured | gateway_completions | instructor/openai_tools |
-| gpt-4.1 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-4.1-mini | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-4.1-nano | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-4o | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-4o-mini | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5-chat | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5-mini | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5-nano | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.1 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.1-chat | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.1-codex | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.2 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.2-chat | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-5.2-codex | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| gpt-oss-120b | text | text, structured | gateway_completions | instructor/openai_tools |
-| gpt-oss-20b | text | text, structured | gateway_completions | instructor/openai_tools |
-| grok-3 | text | text | gateway_completions | instructor/openai_tools |
-| grok-3-mini | text | text | gateway_completions | instructor/openai_tools |
-| grok-4 | text | text, structured | gateway_completions | instructor/openai_tools |
-| grok-4-fast-non-reasoning | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| grok-4-fast-reasoning | text, images | text, structured | gateway_completions | instructor/openai_tools |
-| kimi-k2-thinking | text | text, structured | gateway_completions | instructor/openai_tools |
-| mistral-large-3 | text, images, pdf | text, structured | gateway_completions | instructor/mistral_tools |
-| o1 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| o1-mini | text, images | text, structured | gateway_responses | instructor/openai_responses_tools |
-| o3 | text, images, pdf | text, structured | gateway_responses | instructor/openai_responses_tools |
-| o3-mini | text | text, structured | gateway_responses | instructor/openai_responses_tools |
-| o4-mini | text | text, structured | gateway_responses | instructor/openai_responses_tools |
-| phi-4 | text | text | gateway_completions | instructor/openai_tools |
-| phi-4-multimodal | text, images | text | gateway_completions | instructor/openai_tools |
-| qwen3-vl-235b-a22b | text, images | text, structured | gateway_completions | instructor/json |
+<table>
+<thead>
+<tr>
+<th rowspan="2">Model</th>
+<th colspan="3" style="text-align:center">Inputs</th>
+<th colspan="2" style="text-align:center">Outputs</th>
+</tr>
+<tr>
+<th style="text-align:center">images</th>
+<th style="text-align:center">pdf</th>
+<th style="text-align:center">text</th>
+<th style="text-align:center">structured</th>
+<th style="text-align:center">text</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>claude-3.7-sonnet</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>claude-4-opus</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>claude-4-sonnet</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>claude-4.1-opus</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>claude-4.5-haiku</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>claude-4.5-opus</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>claude-4.5-sonnet</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>deepseek-v3.1</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>deepseek-v3.2</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>deepseek-v3.2-speciale</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gemini-2.0-flash</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gemini-2.5-flash</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gemini-2.5-flash-lite</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gemini-2.5-pro</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gemini-3.0-flash-preview</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gemini-3.0-pro</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-4.1</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-4.1-mini</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-4.1-nano</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-4o</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-4o-mini</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5-chat</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5-mini</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5-nano</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5.1</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5.1-chat</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5.1-codex</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5.2</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5.2-chat</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-5.2-codex</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-oss-120b</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-oss-20b</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>grok-3</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>grok-3-mini</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>grok-4</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>grok-4-fast-non-reasoning</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>grok-4-fast-reasoning</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>kimi-k2-thinking</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>mistral-large-3</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>o1</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>o1-mini</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>o3</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>o3-mini</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>o4-mini</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>phi-4</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>phi-4-multimodal</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>qwen3-vl-235b-a22b</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+</tbody>
+</table>
 
 ## Document Extraction Models
 
-| Model | Inputs | Outputs | SDK |
-|-------|--------|---------|-----|
-| azure-document-intelligence | pdf | pages | gateway_extract |
-| deepseek-ocr | image | pages | gateway_extract |
-| mistral-document-ai-2505 | pdf, image | pages | gateway_extract |
+<table>
+<thead>
+<tr>
+<th rowspan="2">Model</th>
+<th colspan="2" style="text-align:center">Inputs</th>
+<th colspan="1" style="text-align:center">Outputs</th>
+</tr>
+<tr>
+<th style="text-align:center">image</th>
+<th style="text-align:center">pdf</th>
+<th style="text-align:center">pages</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>azure-document-intelligence</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>deepseek-ocr</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>mistral-document-ai-2505</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+</tbody>
+</table>
 
 ## Image Generation Models
 
-| Model | Inputs | Outputs | SDK |
-|-------|--------|---------|-----|
-| flux-2-pro | text | image | gateway_img_gen |
-| gpt-image-1 | text | image | gateway_img_gen |
-| gpt-image-1-mini | text | image | gateway_img_gen |
-| gpt-image-1.5 | text | image | gateway_img_gen |
-| nano-banana | text | image | gateway_completions |
-| nano-banana-pro | text | image | gateway_completions |
+<table>
+<thead>
+<tr>
+<th rowspan="2">Model</th>
+<th colspan="1" style="text-align:center">Inputs</th>
+<th colspan="1" style="text-align:center">Outputs</th>
+</tr>
+<tr>
+<th style="text-align:center">text</th>
+<th style="text-align:center">image</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>flux-2-pro</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-image-1</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-image-1-mini</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>gpt-image-1.5</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>nano-banana</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+<tr>
+<td>nano-banana-pro</td>
+<td style="text-align:center">✅</td>
+<td style="text-align:center">✅</td>
+</tr>
+</tbody>
+</table>
+
+
+> **AUTO-GENERATED FILE** - Do not edit manually.
+> Last updated: 2026-01-19T21:27:35Z
+>
+> Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
