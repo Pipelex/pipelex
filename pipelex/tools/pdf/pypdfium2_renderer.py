@@ -120,7 +120,7 @@ def _extract_image_from_pdf_object(
         return ExtractedImageFromPage(
             size=ImageSize(width=width, height=height),
             actual_bytes=actual_bytes,
-            output_format=ImageFormat.JPEG,
+            image_format=ImageFormat.JPEG,
             bounding_box=bounding_box,
         )
 
@@ -136,7 +136,7 @@ def _extract_image_from_pdf_object(
     return ExtractedImageFromPage(
         size=ImageSize(width=width, height=height),
         actual_bytes=actual_bytes,
-        output_format=effective_format,
+        image_format=effective_format,
         bounding_box=bounding_box,
     )
 

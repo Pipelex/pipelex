@@ -25,20 +25,20 @@ class GeneratedImageRawDetails(CustomBaseModel):
     actual_bytes: bytes | None = None
 
     mime_type: str | None = None
-    output_format: str | None = None
+    image_format: str | None = None
 
     caption: str | None = None
 
-    @field_validator("output_format", mode="before")
+    @field_validator("image_format", mode="before")
     @classmethod
-    def validate_output_format(cls, output_format_str: str | None) -> str | None:
-        if output_format_str:
-            return ImageFormat(output_format_str).value
+    def validate_image_format(cls, image_format_str: str | None) -> str | None:
+        if image_format_str:
+            return ImageFormat(image_format_str).value
         else:
             return None
 
     @model_validator(mode="after")
-    def validate_mime_type_or_output_format(self) -> Self:
+    def validate_mime_type_or_image_format(self) -> Self:
         if self.mime_type:
             ImageFormat.raise_if_unsupported_mime_type(self.mime_type)
         elif self.actual_url_or_prefixed_base64 and (
@@ -48,20 +48,20 @@ class GeneratedImageRawDetails(CustomBaseModel):
             ImageFormat.raise_if_unsupported_mime_type(base64_extracted_mime_type)
             self.mime_type = base64_extracted_mime_type
             self.base64_str = base64_str
-        elif self.output_format is None:
-            msg = "Either mime_type or output_format must be provided"
+        elif self.image_format is None:
+            msg = "Either mime_type or image_format must be provided"
             raise ValueError(msg)
         return self
 
     @classmethod
-    def make_from_pil_image(cls, pil_image: Image.Image, output_format: ImageFormat) -> GeneratedImageRawDetails:
+    def make_from_pil_image(cls, pil_image: Image.Image, image_format: ImageFormat) -> GeneratedImageRawDetails:
         try:
             width, height = pil_image.size
-            actual_bytes = pil_image_to_bytes(pil_image=pil_image, image_format=output_format)
+            actual_bytes = pil_image_to_bytes(pil_image=pil_image, image_format=image_format)
             return GeneratedImageRawDetails(
                 size=ImageSize(width=width, height=height),
                 actual_bytes=actual_bytes,
-                output_format=output_format,
+                image_format=image_format,
             )
         except (ValueError, OSError, AttributeError) as exc:
             msg = f"Failed to convert PIL image to GeneratedImageRawDetails: {exc}"

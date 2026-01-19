@@ -30,6 +30,7 @@ EXTRACT_HANDLE_FROM_PDF = [
     "mistral-ocr-2503",
     "mistral-ocr-2505",
     "mistral-ocr-2512",
+    "mistral-document-ai-2505",
     "azure-document-intelligence",
 ]
 
@@ -39,6 +40,7 @@ EXTRACT_HANDLE_FROM_IMAGE = [
     "mistral-ocr-2503",
     "mistral-ocr-2505",
     "mistral-ocr-2512",
+    "deepseek-ocr",
 ]
 
 ALL_EXTRACT_HANDLES: list[str] = list(set(EXTRACT_HANDLE_FROM_PDF + EXTRACT_HANDLE_FROM_IMAGE))
@@ -122,12 +124,20 @@ def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
             page_views_dpi=72,
             image_min_size=100,
         ),
-        # max_nb_images=0: No images
+        # max_nb_images=0: No images but page_views True
         ExtractJobParams(
             max_nb_images=0,
             should_caption_images=False,
             should_include_page_views=True,
             page_views_dpi=150,
+            image_min_size=None,
+        ),
+        # max_nb_images=0: No images and no page_views
+        ExtractJobParams(
+            max_nb_images=0,
+            should_caption_images=False,
+            should_include_page_views=False,
+            page_views_dpi=None,
             image_min_size=None,
         ),
     ],
