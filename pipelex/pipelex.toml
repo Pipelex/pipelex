@@ -295,6 +295,7 @@ default_title = "Pipelex Graph"
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
 theme = "dark"
+palette = "dracula"
 
 ####################################################################################################
 # Dry run config

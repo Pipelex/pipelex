@@ -70,6 +70,7 @@ def generate_reactflow_html(
             "initial_zoom": config.initial_zoom,
             "pan_to_top": config.pan_to_top,
             "initial_theme": config.style.theme,
+            "initial_palette": config.style.palette,
         },
         use_registry=True,
     )
@@ -129,6 +130,7 @@ async def generate_reactflow_html_async(
             "initial_zoom": config.initial_zoom,
             "pan_to_top": config.pan_to_top,
             "initial_theme": config.style.theme,
+            "initial_palette": config.style.palette,
         },
         use_registry=True,
     )
