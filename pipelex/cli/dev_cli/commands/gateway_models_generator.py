@@ -22,6 +22,10 @@ MODEL_TYPE_SECTIONS = {
     "img_gen": "Image Generation Models",
 }
 
+# Preferred column order for inputs and outputs (columns not listed will be appended alphabetically)
+PREFERRED_INPUT_ORDER = ["text", "images", "image", "pdf"]
+PREFERRED_OUTPUT_ORDER = ["text", "structured", "image", "pages"]
+
 
 def fetch_gateway_model_specs() -> BackendModelSpecs:
     """Fetch model specifications from Pipelex Gateway remote config.
@@ -109,9 +113,18 @@ def generate_markdown_table(models: list[dict[str, Any]]) -> str:
         all_inputs.update(model.get("inputs", []))
         all_outputs.update(model.get("outputs", []))
 
-    # Sort for consistent column order
-    input_cols = sorted(all_inputs)
-    output_cols = sorted(all_outputs)
+    # Sort columns using preferred order, with any unlisted columns appended alphabetically
+    def sort_by_preferred(items: set[str], preferred: list[str]) -> list[str]:
+        ordered = [col for col in preferred if col in items]
+        remaining = sorted(items - set(preferred))
+        return ordered + remaining
+
+    input_cols = sort_by_preferred(all_inputs, PREFERRED_INPUT_ORDER)
+    output_cols = sort_by_preferred(all_outputs, PREFERRED_OUTPUT_ORDER)
+
+    # Background colors for visual separation (semi-transparent for dark/light mode compatibility)
+    input_bg = "background-color:rgba(33,150,243,0.15)"  # Semi-transparent blue
+    output_bg = "background-color:rgba(76,175,80,0.15)"  # Semi-transparent green
 
     # Build HTML table
     lines = ["<table>", "<thead>"]
@@ -120,17 +133,17 @@ def generate_markdown_table(models: list[dict[str, Any]]) -> str:
     lines.append("<tr>")
     lines.append('<th rowspan="2">Model</th>')
     if input_cols:
-        lines.append(f'<th colspan="{len(input_cols)}" style="text-align:center">Inputs</th>')
+        lines.append(f'<th colspan="{len(input_cols)}" style="text-align:center;{input_bg}">Inputs</th>')
     if output_cols:
-        lines.append(f'<th colspan="{len(output_cols)}" style="text-align:center">Outputs</th>')
+        lines.append(f'<th colspan="{len(output_cols)}" style="text-align:center;{output_bg}">Outputs</th>')
     lines.append("</tr>")
 
     # Second header row with individual column names
     lines.append("<tr>")
     for inp in input_cols:
-        lines.append(f'<th style="text-align:center">{inp}</th>')
+        lines.append(f'<th style="text-align:center;{input_bg}">{inp}</th>')
     for out in output_cols:
-        lines.append(f'<th style="text-align:center">{out}</th>')
+        lines.append(f'<th style="text-align:center;{output_bg}">{out}</th>')
     lines.append("</tr>")
 
     lines.append("</thead>")
@@ -146,10 +159,10 @@ def generate_markdown_table(models: list[dict[str, Any]]) -> str:
         lines.append(f"<td>{name}</td>")
         for inp in input_cols:
             check = "✅" if inp in model_inputs else "❌"
-            lines.append(f'<td style="text-align:center">{check}</td>')
+            lines.append(f'<td style="text-align:center;{input_bg}">{check}</td>')
         for out in output_cols:
             check = "✅" if out in model_outputs else "❌"
-            lines.append(f'<td style="text-align:center">{check}</td>')
+            lines.append(f'<td style="text-align:center;{output_bg}">{check}</td>')
         lines.append("</tr>")
 
     lines.append("</tbody>")
@@ -187,6 +200,14 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
     sections.append("## Document Extraction Models")
     sections.append("")
     sections.append(generate_markdown_table(models_by_type["text_extractor"]))
+    sections.append("")
+    sections.append(
+        "!!! info About extracted pages\n"
+        "    Each page contains Markdown text (based on AI-interpreted layout) and optional extracted images. "
+        "A single image input is treated as one page. Pipelex also wraps the `pypdfium2` library for raw text "
+        "(without any AI interpretation) and images extraction and page views rendering. "
+        "All these elements can be used as inputs into downstream pipes, including LLM prompts."
+    )
 
     # Add image generation section
     sections.append("## Image Generation Models")

@@ -13,11 +13,11 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <th colspan="2" style="text-align:center">Outputs</th>
 </tr>
 <tr>
+<th style="text-align:center">text</th>
 <th style="text-align:center">images</th>
 <th style="text-align:center">pdf</th>
 <th style="text-align:center">text</th>
 <th style="text-align:center">structured</th>
-<th style="text-align:center">text</th>
 </tr>
 </thead>
 <tbody>
@@ -79,25 +79,25 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </tr>
 <tr>
 <td>deepseek-v3.1</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>deepseek-v3.2</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>deepseek-v3.2-speciale</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
@@ -271,65 +271,65 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </tr>
 <tr>
 <td>gpt-oss-120b</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>gpt-oss-20b</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>grok-3</td>
+<td style="text-align:center">✅</td>
 <td style="text-align:center">❌</td>
 <td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">❌</td>
-<td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>grok-3-mini</td>
+<td style="text-align:center">✅</td>
 <td style="text-align:center">❌</td>
 <td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">❌</td>
-<td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>grok-4</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>grok-4-fast-non-reasoning</td>
 <td style="text-align:center">✅</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>grok-4-fast-reasoning</td>
 <td style="text-align:center">✅</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>kimi-k2-thinking</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
@@ -352,8 +352,8 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <tr>
 <td>o1-mini</td>
 <td style="text-align:center">✅</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
@@ -367,41 +367,41 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </tr>
 <tr>
 <td>o3-mini</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>o4-mini</td>
-<td style="text-align:center">❌</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>phi-4</td>
+<td style="text-align:center">✅</td>
 <td style="text-align:center">❌</td>
 <td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">❌</td>
-<td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>phi-4-multimodal</td>
 <td style="text-align:center">✅</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
 </tr>
 <tr>
 <td>qwen3-vl-235b-a22b</td>
 <td style="text-align:center">✅</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
@@ -418,22 +418,22 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <th colspan="1" style="text-align:center">Outputs</th>
 </tr>
 <tr>
-<th style="text-align:center">image</th>
 <th style="text-align:center">pdf</th>
+<th style="text-align:center">image</th>
 <th style="text-align:center">pages</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>azure-document-intelligence</td>
-<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
+<td style="text-align:center">❌</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
 <td>deepseek-ocr</td>
-<td style="text-align:center">✅</td>
 <td style="text-align:center">❌</td>
+<td style="text-align:center">✅</td>
 <td style="text-align:center">✅</td>
 </tr>
 <tr>
@@ -495,6 +495,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-19T21:27:35Z
+> Last updated: 2026-01-19T22:53:28Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
