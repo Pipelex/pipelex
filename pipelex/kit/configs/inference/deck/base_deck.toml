@@ -202,4 +202,4 @@ img_gen_for_art = { model = "best-img-gen", quality = "high", guidance_scale = 9
 img_gen_for_diagram = { model = "base-img-gen", quality = "medium", guidance_scale = 7.0, is_moderated = true, safety_tolerance = 2 }
 img_gen_for_mockup = { model = "base-img-gen", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
 img_gen_for_product = { model = "best-img-gen", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
-img_gen_for_testing = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 4.0, is_moderated = true, safety_tolerance = 4 }
+img_gen_for_testing = { model = "gpt-image-1-mini", quality = "low" }
