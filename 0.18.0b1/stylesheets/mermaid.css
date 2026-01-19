@@ -1,0 +1,36 @@
+/* docs/stylesheets/mermaid.css
+   Tweak the colours Material exposes for Mermaid */
+
+.mermaid {
+    --md-mermaid-edge-color: #000000;
+    --md-mermaid-label-bg-color: #ffdbfa;
+    --md-mermaid-label-fg-color: #000000;
+
+    --md-mermaid-node-bg-color: #fff9db;
+    --md-mermaid-node-fg-color: #000000;
+}
+
+/* Give the diagram itself a code-block like backdrop so it stands out
+   on both light and dark themes. */
+.md-typeset .mermaid {
+    padding: 0.3rem;
+    border-radius: 0.3rem;
+    overflow: auto;
+}
+
+/* --- Light color scheme ---------------------------------------------- */
+
+[data-md-color-scheme="default"] .md-typeset .mermaid {
+    background-color: hsla(140, 27%, 98%, 0.983);
+}
+
+/* --- Dark color scheme ------------------------------------------------ */
+
+[data-md-color-scheme="slate"] .md-typeset .mermaid {
+    background-color: hsla(140, 27%, 98%, 0.983);
+}
+
+/* Ensure text inside nodes and labels is black */
+.mermaid text {
+    fill: #000 !important;
+}
