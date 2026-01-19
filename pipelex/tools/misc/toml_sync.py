@@ -6,7 +6,7 @@ from typing import Any, cast
 
 from pydantic import BaseModel, Field
 from tomlkit import TOMLDocument
-from tomlkit.items import Table
+from tomlkit.items import Item, Table
 
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -66,7 +66,8 @@ def get_nested_value(doc: TOMLDocument | Table | dict[str, Any], key_path: str) 
 def set_nested_value(doc: TOMLDocument | Table | dict[str, Any], key_path: str, value: Any) -> bool:
     """Set value in TOML document by key path (dot-separated).
 
-    Only sets the value if the key already exists.
+    Only sets the value if the key already exists. Preserves inline comments
+    (trivia) from the existing item when updating the value.
 
     Args:
         doc: TOML document or table to modify
@@ -93,7 +94,21 @@ def set_nested_value(doc: TOMLDocument | Table | dict[str, Any], key_path: str, 
     # Set the final key if it exists
     final_key = keys[-1]
     if isinstance(current, (dict, TOMLDocument, Table)) and final_key in current:
+        # Capture existing item's trivia (inline comments) before replacing
+        existing_item: Any = current[final_key]  # type: ignore[assignment]
+        existing_trivia = None
+        if isinstance(existing_item, Item):
+            existing_trivia = existing_item.trivia
+
+        # Set the new value
         current[final_key] = value
+
+        # Restore the trivia from the old item to preserve inline comments
+        if existing_trivia is not None:
+            new_item: Any = current[final_key]  # type: ignore[assignment]
+            if isinstance(new_item, Item):
+                new_item._trivia = existing_trivia  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
         return True
 
     return False
