@@ -6,7 +6,7 @@ To run pipelines with LLMs, you need to configure API access. **You have three o
 
 ### Option 1: Pipelex Gateway (Easiest for Getting Started)
 
-Get **free credits** for testing and development with a single API key that works with all major LLM providers. Unlock the **full power of Pipelex** with many models already available and new ones being added constantly.
+Get **free credits** for testing and development with a single API key for LLMs, document extraction, and image generation across all major providers (OpenAI, Anthropic, Google, Azure, and more). New models added constantly.
 
 **Benefits:**
 
@@ -18,10 +18,7 @@ Get **free credits** for testing and development with a single API key that work
 
 **Setup:**
 
-1. Join our Discord community to get your free API key:
-
-    - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord)
-    - Request your key in the appropriate channel
+1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
 
 2. Create a `.env` file in your project root:
 
@@ -40,13 +37,11 @@ That's it! Your pipelines can now access any supported LLM. See [Gateway Availab
 
 !!! note "Migration from pipelex_inference"
     If you were using the deprecated `pipelex_inference` backend, migrate to `pipelex_gateway`:
-    
-    1. **Get your new Gateway API key**:
-        - If you had a `pipelex_inference` key: get your new key at [app.pipelex.com](https://app.pipelex.com/)
-        - New users: join our [Discord](https://go.pipelex.com/discord) and request a free key with credits
+
+    1. Get your new Gateway API key at [app.pipelex.com](https://app.pipelex.com/)
     2. Update your `.env`: set `PIPELEX_GATEWAY_API_KEY` with your new key
     3. Run `pipelex init` and accept the Gateway terms
-    
+
     The `pipelex_inference` backend is deprecated and will be removed in a future release.
 
 ### Option 2: Bring Your Own API Keys
@@ -176,7 +171,8 @@ Now that you have your backend configured:
 
 1. **Organize your project**: [Project Organization](./project-organization.md)
 2. **Learn the concepts**: [Writing Workflows Tutorial](../../home/2-get-started/pipe-builder.md)
-3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook)
+<!-- PRERELEASE_LINK -->
+3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
 4. **Deep dive**: [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md)
 
 !!! tip "Advanced Configuration"

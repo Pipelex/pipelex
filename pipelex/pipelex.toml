@@ -144,6 +144,9 @@ is_dump_kwargs_enabled = false
 is_dump_response_enabled = false
 is_dump_error_enabled = false
 
+[cogt.llm_config.anthropic_config]
+structured_output_timeout_seconds = 1200
+
 [cogt.llm_config.llm_job_config]
 max_retries = 3
 
@@ -224,7 +227,7 @@ default_page_views_dpi = 72
 # in order to test new model integrations or debug issues with the Gateway
 
 ####################################################################################################
-# Pipelex prompting config
+# Prompting config
 ####################################################################################################
 
 [pipelex.prompting_config]
@@ -240,20 +243,7 @@ gemini = { tag_style = "xml" }
 is_default_text_then_structure = false # turn this to true to get better results: generates text before structuring
 
 ####################################################################################################
-# Validation error config
-####################################################################################################
-
-[pipelex.validation_error_config]
-default_reaction = "raise"
-
-[pipelex.validation_error_config.reactions]
-# default_reaction is on raise
-# missing_input_variable = "log"
-# extraneous_input_variable = "log"
-# inadequate_input_concept = "log"
-
-####################################################################################################
-# Pipelex run config
+# Pipe run config
 ####################################################################################################
 
 [pipelex.pipe_run_config]
@@ -265,6 +255,46 @@ pipe_stack_limit = 20
 
 [pipelex.pipeline_execution_config]
 is_normalize_data_urls_to_storage = true
+is_mock_inputs = false
+is_generate_graph = false
+
+[pipelex.pipeline_execution_config.graph_config]
+
+[pipelex.pipeline_execution_config.graph_config.data_inclusion]
+stuff_json_content = true
+stuff_text_content = true
+stuff_html_content = true
+error_stack_traces = true
+
+[pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
+graphspec_json = true
+mermaidflow_mmd = true
+mermaidflow_html = true
+reactflow_viewspec = true
+reactflow_html = true
+
+[pipelex.pipeline_execution_config.graph_config.mermaid_config]
+direction = "top_down"
+is_include_data_edges = true
+is_include_contains_edges = false
+is_include_selected_outcome_edges = true
+is_show_stuff_codes = false
+
+[pipelex.pipeline_execution_config.graph_config.mermaid_config.style]
+theme = "dark"
+
+[pipelex.pipeline_execution_config.graph_config.reactflow_config]
+is_use_cdn = true
+layout_direction = "TB"
+nodesep = 50
+ranksep = 80
+edge_type = "bezier"
+initial_zoom = 1.0
+pan_to_top = true
+default_title = "Pipelex Graph"
+
+[pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
+theme = "dark"
 
 ####################################################################################################
 # Dry run config

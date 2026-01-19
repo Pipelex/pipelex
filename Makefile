@@ -112,6 +112,11 @@ make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
 make docs-deploy-beta         - Manually deploy pre-release docs with '-beta' suffix
 make docs-deploy-404          - Deploy 404.html for versionless URL redirects
+make docs-delete VERSION=x.y.z - Delete a deployed documentation version
+
+make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
+make stop-graph-server        - Stop the graph viewer HTTP server
+make view-graph               - Start server and open ReactFlow graph in browser
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -134,10 +139,11 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc agent-check \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs \
-	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-beta \
+	li check-unused-imports fix-unused-imports check-TODOs check-uv \
+	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-beta docs-delete \
 	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
+	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
 	docs-deploy-404
 
 all help:
@@ -284,7 +290,7 @@ cleanderived:
 cleanenv:
 	$(call PRINT_TITLE,"Erasing virtual environment")
 	find . -name 'uv.lock' -delete && \
-	find . -type d -wholename './.venv' -exec rm -rf {} + && \
+	rm -rf "$(VIRTUAL_ENV)" && \
 	echo "Cleaned up virtual env and dependency lock files";
 
 cleanconfig:
@@ -635,6 +641,53 @@ docs-deploy-404:
 	git add 404.html && \
 	(git diff --cached --quiet || git commit -m "Update 404.html for versionless URL redirects") && \
 	git push origin gh-pages
+
+docs-delete: env
+ifndef VERSION
+	$(error VERSION is required. Usage: make docs-delete VERSION=x.y.z)
+endif
+	$(call PRINT_TITLE,"Deleting documentation version $(VERSION)")
+	$(VENV_MIKE) delete --push $(VERSION)
+
+##########################################################################################
+### GRAPH VIEWER
+##########################################################################################
+
+GRAPH_SERVER_PORT ?= 8765
+GRAPH_SERVER_DIR ?= temp/test_outputs
+
+serve-graph:
+	$(call PRINT_TITLE,"Starting HTTP server for ReactFlow graphs on port $(GRAPH_SERVER_PORT)")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@echo "Serving $(GRAPH_SERVER_DIR) at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Press Ctrl+C to stop the server"
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR)
+
+serve-graph-bg:
+	$(call PRINT_TITLE,"Starting HTTP server for ReactFlow graphs on port $(GRAPH_SERVER_PORT) (background)")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR) &
+	@echo "Server running at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Run 'make stop-graph-server' to stop"
+
+stop-graph-server:
+	$(call PRINT_TITLE,"Stopping graph viewer HTTP server")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null && echo "Server stopped" || echo "No server running on port $(GRAPH_SERVER_PORT)"
+
+view-graph:
+	$(call PRINT_TITLE,"Opening ReactFlow graph viewer")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR) &
+	@sleep 1
+	@open "http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Server running at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Run 'make stop-graph-server' to stop"
+
+sg: serve-graph
+	@echo "> done: sg = serve-graph"
+
+vg: view-graph
+	@echo "> done: vg = view-graph"
 
 ##########################################################################################
 ### SHORTHANDS

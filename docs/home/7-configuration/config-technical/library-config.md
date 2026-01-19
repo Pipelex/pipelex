@@ -1,6 +1,46 @@
 # Pipeline Discovery and Loading
 
-Pipelex automatically discovers and loads pipeline files (`.plx`) and structure classes from your project. This page explains how the discovery system works and how to organize your pipelines effectively.
+When running pipelines, Pipelex needs to find your `.plx` bundle files. There are two approaches:
+
+1. **Point to the bundle file directly** - The simplest option. Just pass the path to your `.plx` file. No configuration needed.
+
+2. **Configure library directories** - For larger projects. Pipelex scans directories to discover all bundles, letting you reference pipes by code.
+
+Most users should start with the first approach.
+
+## The Simplest Way: Use the Bundle Path Directly
+
+If you just want to run a pipe from a single `.plx` file, **you don't need any library configuration**. Simply point to your bundle file:
+
+```bash
+# CLI: run the bundle's main_pipe
+pipelex run path/to/my_bundle.plx
+
+# CLI: run a specific pipe from the bundle
+pipelex run path/to/my_bundle.plx --pipe my_pipe
+```
+
+```python
+# Python: run the bundle's main_pipe
+pipe_output = await execute_pipeline(
+    bundle_uri="path/to/my_bundle.plx",
+    inputs={...},
+)
+
+# Python: run a specific pipe from the bundle
+pipe_output = await execute_pipeline(
+    bundle_uri="path/to/my_bundle.plx",
+    pipe_code="my_pipe",
+    inputs={...},
+)
+```
+
+This is the recommended approach for newcomers and simple projects. Pipelex reads the file directly - no discovery needed.
+
+!!! tip "When to use library directories"
+    The library directory configuration below is useful when you have **multiple bundles across different directories** and want to reference pipes by code without specifying the bundle path each time. For most use cases, pointing to the `.plx` file directly is simpler.
+
+---
 
 ## How Pipeline Discovery Works
 
@@ -12,6 +52,194 @@ When you initialize Pipelex with `Pipelex.make()`, the system:
 4. **Registers custom functions** decorated with `@pipe_func()`
 
 All of this happens automatically - no configuration needed.
+
+## Configuring Library Directories
+
+When executing pipelines, Pipelex needs to know where to find your `.plx` files and Python structure classes. You can configure this using a **3-tier priority system** that gives you flexibility from global defaults to per-execution overrides.
+
+### The 3-Tier Priority System
+
+Pipelex resolves library directories using this priority order (highest to lowest):
+
+| Priority | Source | When to Use |
+|----------|--------|-------------|
+| **1 (Highest)** | Per-call `library_dirs` parameter | Override for specific pipeline executions |
+| **2** | Instance default via `Pipelex.make(library_dirs=...)` | Application-wide default |
+| **3 (Fallback)** | `PIPELEXPATH` environment variable | System-wide or shell session default |
+
+!!! info "Empty List is Valid"
+    Passing an empty list `[]` to `library_dirs` is a valid explicit value that **disables** directory-based library loading. This is useful when using `plx_content` directly without needing files from the filesystem.
+
+### Using the PIPELEXPATH Environment Variable
+
+The `PIPELEXPATH` environment variable provides a system-wide default for library directories. It uses PATH-style syntax:
+
+- **Unix/macOS**: Colon-separated paths (`:`)
+- **Windows**: Semicolon-separated paths (`;`)
+
+**Bash / Zsh (macOS/Linux):**
+
+```bash
+# Single directory
+export PIPELEXPATH="/path/to/my/pipelines"
+
+# Multiple directories (colon-separated)
+export PIPELEXPATH="/path/to/shared_pipes:/path/to/project_pipes"
+
+# Add to your ~/.bashrc or ~/.zshrc for persistence
+echo 'export PIPELEXPATH="/path/to/my/pipelines"' >> ~/.bashrc
+```
+
+**PowerShell (Windows):**
+
+```powershell
+# Single directory
+$env:PIPELEXPATH = "C:\path\to\my\pipelines"
+
+# Multiple directories (semicolon-separated)
+$env:PIPELEXPATH = "C:\shared_pipes;C:\project_pipes"
+```
+
+**In a `.env` file:**
+
+```bash
+# .env file in your project root
+PIPELEXPATH=/path/to/shared_pipes:/path/to/project_pipes
+```
+
+### Using the CLI `--library-dir` Option
+
+When running pipelines from the command line, use the `-L` or `--library-dir` option. This option can be specified multiple times to include multiple directories.
+
+```bash
+# Single directory
+pipelex run my_pipe -L /path/to/pipelines
+
+# Multiple directories
+pipelex run my_pipe -L /path/to/shared_pipes -L /path/to/project_pipes
+
+# Combined with other options
+pipelex run my_bundle.plx --inputs data.json -L /path/to/pipelines
+
+# Available on multiple commands
+pipelex validate all -L /path/to/pipelines
+pipelex show pipes -L /path/to/pipelines
+pipelex which my_pipe -L /path/to/pipelines
+```
+
+!!! tip "CLI Option Overrides PIPELEXPATH"
+    When you use `-L` on the command line, it takes precedence over any `PIPELEXPATH` environment variable that may be set.
+
+### Setting Instance Defaults with `Pipelex.make()`
+
+For Python applications, you can set a default library directory when initializing Pipelex. This default will be used for all subsequent `execute_pipeline` calls unless overridden.
+
+```python
+from pipelex.pipelex import Pipelex
+from pipelex.pipeline.execute import execute_pipeline
+
+# Set instance-level defaults at initialization
+Pipelex.make(
+    library_dirs=["/path/to/shared_pipes", "/path/to/project_pipes"]
+)
+
+# All execute_pipeline calls will use these directories by default
+pipe_output = await execute_pipeline(
+    pipe_code="my_pipe",
+    inputs={"input": "value"},
+)
+```
+
+### Per-Call Override with `execute_pipeline`
+
+For maximum flexibility, you can override library directories on each `execute_pipeline` call:
+
+```python
+from pipelex.pipelex import Pipelex
+from pipelex.pipeline.execute import execute_pipeline
+
+# Initialize with default directories
+Pipelex.make(
+    library_dirs=["/path/to/default_pipes"]
+)
+
+# Use the default directories
+output1 = await execute_pipeline(
+    pipe_code="default_pipe",
+    inputs={"input": "value"},
+)
+
+# Override for a specific execution
+output2 = await execute_pipeline(
+    pipe_code="special_pipe",
+    library_dirs=["/path/to/special_pipes"],  # Overrides instance default
+    inputs={"input": "value"},
+)
+
+# Disable directory loading (use only plx_content)
+output3 = await execute_pipeline(
+    plx_content=my_plx_string,
+    library_dirs=[],  # Empty list disables directory-based loading
+    inputs={"input": "value"},
+)
+```
+
+### Priority Resolution Examples
+
+**Example 1: Environment variable as fallback**
+
+```bash
+# Shell: Set PIPELEXPATH
+export PIPELEXPATH="/shared/pipes"
+```
+
+```python
+# Python: No library_dirs specified anywhere
+Pipelex.make()  # No library_dirs
+
+# Uses PIPELEXPATH: /shared/pipes
+output = await execute_pipeline(pipe_code="my_pipe", inputs={...})
+```
+
+**Example 2: Instance default overrides PIPELEXPATH**
+
+```bash
+# Shell: PIPELEXPATH is set
+export PIPELEXPATH="/shared/pipes"
+```
+
+```python
+# Python: Instance default set
+Pipelex.make(library_dirs=["/project/pipes"])
+
+# Uses instance default: /project/pipes (PIPELEXPATH ignored)
+output = await execute_pipeline(pipe_code="my_pipe", inputs={...})
+```
+
+**Example 3: Per-call override takes highest priority**
+
+```python
+Pipelex.make(library_dirs=["/default/pipes"])
+
+# Uses per-call value: /special/pipes
+output = await execute_pipeline(
+    pipe_code="my_pipe",
+    library_dirs=["/special/pipes"],  # Highest priority
+    inputs={...},
+)
+```
+
+### Best Practices
+
+1. **Use PIPELEXPATH for shared libraries**: Set it in your shell profile for directories that should always be available.
+
+2. **Use `Pipelex.make(library_dirs=...)` for application defaults**: When building an application, set sensible defaults at initialization.
+
+3. **Use per-call `library_dirs` for exceptions**: Override only when a specific execution needs different directories.
+
+4. **Use empty list `[]` for isolated execution**: When you want to execute only from `plx_content` without loading any file-based definitions.
+
+5. **Include structure class directories**: Remember that `library_dirs` must contain both `.plx` files AND Python files defining `StructuredContent` classes.
 
 ## Excluded Directories
 

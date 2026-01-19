@@ -53,7 +53,7 @@ smart_llm = [
     "claude-4.1-opus",
     "gemini-2.5-pro",
     "claude-4-sonnet",
-    "grok-4",
+    "grok-4-fast-non-reasoning",
 ]
 smart_llm_with_vision = [
     "claude-4.5-opus",
@@ -63,7 +63,7 @@ smart_llm_with_vision = [
     "claude-4.1-opus",
     "gemini-2.5-pro",
     "claude-4-sonnet",
-    "grok-4",
+    "grok-4-fast-non-reasoning",
 ]
 smart_llm_for_structured = [
     "claude-4.5-opus",
@@ -85,7 +85,7 @@ llm_for_large_codebase = [
     "gemini-3.0-pro",
     "gpt-5.1",
     "gemini-2.5-flash",
-    "grok-4",
+    "grok-4-fast-non-reasoning",
 ]
 cheap_llm = [
     "gpt-4o-mini",
@@ -199,4 +199,4 @@ img_gen_for_art = { model = "best-img-gen", quality = "high", guidance_scale = 9
 img_gen_for_diagram = { model = "base-img-gen", quality = "medium", guidance_scale = 7.0, is_moderated = true, safety_tolerance = 2 }
 img_gen_for_mockup = { model = "base-img-gen", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
 img_gen_for_product = { model = "best-img-gen", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
-img_gen_for_testing = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 4.0, is_moderated = true, safety_tolerance = 4 }
+img_gen_for_testing = { model = "gpt-image-1-mini", quality = "low" }

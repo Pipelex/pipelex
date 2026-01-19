@@ -16,11 +16,18 @@ Performs comprehensive validation:
 
 This is the recommended validation to run before committing changes or deploying pipelines.
 
+**Options:**
+
+- `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+
 **Examples:**
 
 ```bash
 # Validate everything
 pipelex validate all
+
+# Validate with custom library directories
+pipelex validate all -L ./pipelines -L ./shared_pipes
 ```
 
 ## Validate Single Pipe
@@ -39,6 +46,7 @@ Validates and dry-runs a specific pipe from your imported packages, useful for i
 **Options:**
 
 - `--pipe PIPE_CODE` - Explicitly specify the pipe code to validate (alternative to positional argument)
+- `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
 
 **Examples:**
 
@@ -49,6 +57,9 @@ pipelex validate write_weekly_report
 
 # Validate a specific pipe (explicit option)
 pipelex validate --pipe analyze_cv_matching
+
+# Validate with custom library directories
+pipelex validate my_pipe -L ./pipelines
 ```
 
 ## Validate Bundle
@@ -67,6 +78,7 @@ Validates all pipes defined in a bundle file. The command automatically detects 
 **Options:**
 
 - `--bundle BUNDLE_FILE.plx` - Explicitly specify the bundle file path
+- `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 
 **Examples:**
 
@@ -77,6 +89,9 @@ pipelex validate pipelines/invoice_processor.plx
 
 # Validate a bundle (explicit option)
 pipelex validate --bundle my_pipeline.plx
+
+# Validate a bundle with additional library directories
+pipelex validate my_bundle.plx -L ./shared_pipes
 ```
 
 !!! note
@@ -118,6 +133,5 @@ All validation commands check:
 
 ## Related Configuration
 
-- [Static Validation Configuration](../../7-configuration/config-pipeline-validation/static-validation-config.md)
 - [Dry Run Configuration](../../7-configuration/config-pipeline-validation/dry-run-config.md)
 

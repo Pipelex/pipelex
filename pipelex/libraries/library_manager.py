@@ -39,7 +39,7 @@ class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
-        self.loaded_plx_paths: list[str] = []
+        self._pipe_source_map: dict[str, Path] = {}  # pipe_code -> source .plx file
 
     ############################################################
     # Manager lifecycle
@@ -58,6 +58,9 @@ class LibraryManager(LibraryManagerAbstract):
                 msg = f"Trying to teardown a library that does not exist: '{library_id}'"
                 raise LibraryError(msg)
             library = self._libraries[library_id]
+            # Remove source map entries for pipes in this library
+            for pipe_code in library.pipe_library.root:
+                self._pipe_source_map.pop(pipe_code, None)
             library.teardown()
             del self._libraries[library_id]
             return
@@ -65,6 +68,7 @@ class LibraryManager(LibraryManagerAbstract):
         for library in self._libraries.values():
             library.teardown()
         self._libraries = {}
+        self._pipe_source_map = {}
 
     @override
     def reset(self) -> None:
@@ -102,6 +106,18 @@ class LibraryManager(LibraryManagerAbstract):
             msg = f"No current library set. Library '{library_id}' does not exist"
             raise LibraryError(msg)
         return self._libraries[library_id]
+
+    @override
+    def get_pipe_source(self, pipe_code: str) -> Path | None:
+        """Get the source file path for a pipe.
+
+        Args:
+            pipe_code: The pipe code to look up.
+
+        Returns:
+            Path to the .plx file the pipe was loaded from, or None if unknown.
+        """
+        return self._pipe_source_map.get(pipe_code)
 
     ############################################################
     # Private methods
@@ -216,14 +232,17 @@ class LibraryManager(LibraryManagerAbstract):
         for blueprint in blueprints:
             pipes: list[PipeAbstract] = []
             if blueprint.pipe is not None:
-                for pipe_name, pipe_blueprint in blueprint.pipe.items():
+                for pipe_code, pipe_blueprint in blueprint.pipe.items():
                     pipe = PipeFactory[PipeAbstract].make_from_blueprint(
                         domain_code=blueprint.domain,
-                        pipe_code=pipe_name,
+                        pipe_code=pipe_code,
                         blueprint=pipe_blueprint,
                         concept_codes_from_the_same_domain=[the_concept.code for the_concept in all_concepts],
                     )
                     pipes.append(pipe)
+                    # Track source file for this pipe
+                    if blueprint.source:
+                        self._pipe_source_map[pipe_code] = Path(blueprint.source)
             all_pipes.extend(pipes)
 
         library.pipe_library.add_pipes(pipes=all_pipes)
@@ -263,7 +282,15 @@ class LibraryManager(LibraryManagerAbstract):
                 ) from interpreter_error
             blueprints.append(blueprint)
 
-        self.loaded_plx_paths.extend([str(plx_file_path) for plx_file_path in valid_plx_paths])
+        # Store resolved absolute paths for duplicate detection in the library
+        library = self.get_library(library_id=library_id)
+        for plx_file_path in valid_plx_paths:
+            try:
+                resolved_path = str(plx_file_path.resolve())
+            except (OSError, RuntimeError):
+                resolved_path = str(plx_file_path)
+            library.loaded_plx_paths.append(resolved_path)
+
         return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:

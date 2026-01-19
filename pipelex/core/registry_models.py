@@ -2,6 +2,7 @@ from typing import Any, ClassVar
 
 from pipelex.core.pipes.pipe_abstract import PipeAbstractType
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
@@ -9,7 +10,6 @@ from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -78,7 +78,7 @@ class CoreRegistryModels(RegistryModels):
         HtmlContent,
         ListContent,
         StructuredContent,
-        PDFContent,
+        DocumentContent,
         TextAndImagesContent,
         PageContent,
         JSONContent,

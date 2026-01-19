@@ -27,8 +27,8 @@ async def test_review_analysis_sequence_with_batching(
     load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
     """Test customer review analysis sequence with batching."""
     # Create test input - a document with reviews
-    if pipe_run_mode == PipeRunMode.DRY:
-        working_memory = WorkingMemoryFactory.make_for_dry_run(
+    if pipe_run_mode.is_dry:
+        working_memory = WorkingMemoryFactory.make_mock_inputs(
             needed_inputs=[
                 TypedNamedStuffSpec(
                     variable_name="document",
@@ -45,7 +45,7 @@ async def test_review_analysis_sequence_with_batching(
         pipe = get_required_pipe(pipe_code="analyze_reviews_sequence")
         pipe_output = await pipe.run_pipe(
             job_metadata=job_metadata,
-            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+            pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             working_memory=working_memory,
         )
     else:

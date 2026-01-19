@@ -46,7 +46,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         img_gen_job: ImgGenJob,
     ) -> GeneratedImageRawDetails:
         log.debug(f"Generating image with model: {self.inference_model.tag}")
-        output_format: ImageFormat | None = None
+        image_format: ImageFormat | None = None
         if self.inference_model.backend_name == "pipelex_gateway":
             if img_gen_job.job_params.output_format and not img_gen_job.job_params.output_format.is_png:
                 msg = (
@@ -54,7 +54,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                     f"Requested output format: {img_gen_job.job_params.output_format}"
                 )
                 raise ImgGenParameterError(msg)
-            output_format = ImageFormat.PNG
+            image_format = ImageFormat.PNG
         if self.inference_model.backend_name == "blackboxai":
             if img_gen_job.job_params.output_format and not img_gen_job.job_params.output_format.is_jpeg:
                 msg = (
@@ -62,7 +62,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                     f"Requested output format: {img_gen_job.job_params.output_format}"
                 )
                 raise ImgGenParameterError(msg)
-            output_format = ImageFormat.JPEG
+            image_format = ImageFormat.JPEG
         if img_gen_job.job_params.aspect_ratio != AspectRatio.SQUARE:
             msg = f"OpenAI Completions ImgGen worker only supports square images. Aspect ratio: {img_gen_job.job_params.aspect_ratio}"
             raise ImgGenParameterError(msg)
@@ -95,7 +95,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         if (content := openai_message.content) and content.startswith("http"):
             # OpenAI response message is a URL, this happens with blackboxai and pipelex_gateway which have a fixed output format.
             # Otherwise we won't know what format the image is in.
-            if output_format is None:
+            if image_format is None:
                 msg = (
                     f"OpenAI response message is a URL but output_format is not set. This shouldn't be possible. "
                     f"This response should only happen when using backend 'blackboxai' or 'pipelex_gateway'. "
@@ -123,7 +123,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
             base64_str=base64_str,
             size=ImageSize(width=1024, height=1024),
             mime_type=base64_extracted_mime_type,
-            output_format=output_format,
+            image_format=image_format,
         )
 
     @override

@@ -144,6 +144,10 @@ class PromptImageFormatError(CogtError):
     pass
 
 
+class PromptDocumentFactoryError(CogtError):
+    pass
+
+
 class ImgGenModelNotFoundError(ModelNotFoundError):
     pass
 

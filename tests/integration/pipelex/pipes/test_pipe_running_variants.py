@@ -66,8 +66,8 @@ class TestPipeRunningVariants:
 
         stuff = pipe_output.main_stuff
         pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
-        pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
-        pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
+        pretty_print(await stuff.content.rendered_html_async(), title=f"{topic}: run pipe '{pipe_code}' in html")
+        pretty_print(await stuff.content.rendered_markdown_async(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
 
     @pytest.mark.parametrize(("topic", "pipe_code", "output_multiplicity"), PipeTestCases.NO_INPUT_PARALLEL1)
     async def test_pipe_batch_no_input(
@@ -95,8 +95,8 @@ class TestPipeRunningVariants:
 
         stuff = pipe_output.main_stuff
         pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
-        pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
-        pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
+        pretty_print(await stuff.content.rendered_html_async(), title=f"{topic}: run pipe '{pipe_code}' in html")
+        pretty_print(await stuff.content.rendered_markdown_async(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
 
     @pytest.mark.parametrize(("pipe_code", "exception", "expected_error_message"), PipeTestCases.FAILURE_PIPES)
     async def test_pipe_infinite_loop(

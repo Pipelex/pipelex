@@ -4,6 +4,8 @@ import base64
 from google import genai
 from google.genai import types as genai_types
 
+from pipelex.cogt.document.prompt_document import PromptDocument
+from pipelex.cogt.document.prompt_document_utils import prepare_prompt_document_as_base64
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_utils import prepare_prompt_image_as_base64
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -29,6 +31,17 @@ class GoogleFactory:
         return genai_types.Part.from_bytes(data=image_bytes, mime_type=prepared.mime_type)
 
     @classmethod
+    async def prepare_document_part(cls, prompt_document: PromptDocument) -> genai_types.Part:
+        """Convert a PromptDocument to Google genai Part format.
+
+        Uses the unified prepare_prompt_document_as_base64() which supports all URI types
+        including pipelex-storage://.
+        """
+        prepared = await prepare_prompt_document_as_base64(prompt_document)
+        document_bytes = base64.b64decode(prepared.base64_data)
+        return genai_types.Part.from_bytes(data=document_bytes, mime_type=prepared.mime_type)
+
+    @classmethod
     async def prepare_user_contents(cls, llm_prompt: LLMPrompt) -> genai_types.ContentListUnion:
         """Prepare contents for Google genai API."""
         # Build list of parts for multimodal content
@@ -44,6 +57,13 @@ class GoogleFactory:
             image_tasks = [cls.prepare_image_part(image) for image in llm_prompt.user_images]
             image_parts = await asyncio.gather(*image_tasks)
             parts.extend(image_parts)
+
+        # Add document parts if present
+        if llm_prompt.user_documents:
+            # Prepare all documents in parallel
+            document_tasks = [cls.prepare_document_part(document) for document in llm_prompt.user_documents]
+            document_parts = await asyncio.gather(*document_tasks)
+            parts.extend(document_parts)
 
         return genai_types.Content(parts=parts, role="user")
 

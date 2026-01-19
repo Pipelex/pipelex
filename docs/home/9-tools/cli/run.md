@@ -22,6 +22,7 @@ Executes a pipeline, either from a standalone bundle (.plx) file or from your pr
 - `--output`, `-o` - Path to save output JSON (defaults to `results/run_{pipe_code}.json`)
 - `--no-output` - Skip saving output to file
 - `--no-pretty-print` - Skip pretty printing the main output
+- `--library-dir`, `-L` - Directory to search for pipe definitions (.plx files). Can be specified multiple times.
 
 **Examples:**
 
@@ -43,6 +44,9 @@ pipelex run --pipe hello_world --output my_output.json
 
 # Run without saving or pretty printing
 pipelex run my_pipe --no-output --no-pretty-print
+
+# Run with custom library directories
+pipelex run my_pipe -L ./pipelines -L ./shared_pipes
 ```
 
 ## Input JSON Format

@@ -111,7 +111,6 @@ nav:
         - Table Extraction from Image: home/4-cookbook-examples/extract-table.md
         - DPE Extraction: home/4-cookbook-examples/extract-dpe.md
       - Text Generation:
-        - Screenplay Generator (wip): home/4-cookbook-examples/write-screenplay.md
         - Tweet Optimizer (wip): home/4-cookbook-examples/write-tweet.md
     - Setup (first run):
       - Overview: home/5-setup/index.md
@@ -158,7 +157,6 @@ nav:
       - Overview: home/7-configuration/index.md
       - Pipeline Validation Configuration:
         - Dry Run: home/7-configuration/config-pipeline-validation/dry-run-config.md
-        - Static Validation: home/7-configuration/config-pipeline-validation/static-validation-config.md
       - Practical Configuration:
         - Logging: home/7-configuration/config-practical/logging-config.md
         - Pipe Run: home/7-configuration/config-practical/pipe-run-config.md
@@ -197,6 +195,12 @@ nav:
       - Content Generator: home/10-advanced-customizations/content-generator-injection.md
       - Plugin Injection: home/10-advanced-customizations/plugin-injection.md
       - Pipe Router: home/10-advanced-customizations/pipe-router-injection.md
+  - Under the Hood:
+    - Overview: under-the-hood/index.md
+    - Architecture Overview: under-the-hood/architecture-overview.md
+    - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
+    - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
+    - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
   - API: https://pipelex.github.io/pipelex-api/
   - MCP: https://pipelex.github.io/pipelex-mcp/
   - n8n: https://pipelex.github.io/n8n-nodes-pipelex/

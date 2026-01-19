@@ -4,7 +4,8 @@ This example demonstrates how to extract information from a French "Diagnostic d
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/extract_dpe.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/extract_dpe.py)
+<!-- PRERELEASE_LINK -->
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_dpe/extract_dpe.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_dpe/extract_dpe.py)
 
 ## The Pipeline Explained
 
@@ -15,7 +16,7 @@ async def extract_dpe(pdf_url: str) -> Dpe:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_dpe",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
     working_memory = pipe_output.working_memory
@@ -55,7 +56,7 @@ class Dpe(StructuredContent):
 
 The pipeline uses a `PipeLLM` with a very specific prompt to extract the information from the document. The combination of the image and the OCR text allows the LLM to accurately capture all the details.
 
-```plx
+```toml
 [pipe.write_markdown_from_page_content_dpe]
 type = "PipeLLM"
 description = "Write markdown from page content of a 'Diagnostic de Performance Energetique'"

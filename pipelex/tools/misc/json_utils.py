@@ -61,6 +61,7 @@ def save_as_json_to_path(
     path: str,
     indent: int | None = 4,
     is_warning_enabled: bool = True,
+    create_directory: bool = False,
 ):
     """Saves a Python object as a JSON file at the specified path.
 
@@ -72,13 +73,14 @@ def save_as_json_to_path(
         path (str): The file path where the JSON file will be saved.
         indent (int | None, optional): Number of spaces for JSON formatting indentation. Defaults to 4.
         is_warning_enabled (bool, optional): Whether to show warnings during JSON purification. Defaults to True.
+        create_directory (bool, optional): Whether to create the directory if it doesn't exist. Defaults to False.
 
     Returns:
         None
 
     """
     _, json_string = purify_json(object_to_save, indent=indent, is_warning_enabled=is_warning_enabled)
-    save_text_to_path(json_string, path)
+    save_text_to_path(json_string, path, create_directory=create_directory)
 
 
 def load_json_from_path(path: str) -> JsonContent:
@@ -103,7 +105,7 @@ def load_json_from_path(path: str) -> JsonContent:
         return json_content
 
 
-def load_json_dict_from_path(path: str) -> dict[Any, Any]:
+def load_json_dict_from_path(path: str) -> dict[str, Any]:
     """Loads a JSON file and ensures it contains a dictionary.
 
     This function reads a JSON file and verifies that its content is a dictionary.
@@ -113,7 +115,7 @@ def load_json_dict_from_path(path: str) -> dict[Any, Any]:
         path (str): The file path to the JSON file to be loaded.
 
     Returns:
-        Dict[Any, Any]: The parsed JSON content as a Python dictionary.
+        Dict[str, Any]: The parsed JSON content as a Python dictionary.
 
     Raises:
         JsonTypeError: If the JSON content is not a dictionary.

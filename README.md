@@ -1,6 +1,16 @@
 <div align="center">
   <a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
+  <br/>
+  <br/>
+  <!-- PRERELEASE_LINK -->
+  <a href="https://github.com/Pipelex/pipelex/tree/pre-release/v0.18.0b1">
+    <img src="https://img.shields.io/badge/PRE--RELEASE-Chicago-ff6b35?style=for-the-badge&labelColor=1a1a2e" alt="Pre-release: Chicago">
+  </a>
+
+  <br/>
+  <br/>
+
   <h2 align="center">AI Workflows That Agents Build & Run</h2>
   <p align="center">Pipelex is developing the open standard for repeatable AI workflows.<br/>
 Write business logic, not API calls.</p>
@@ -22,7 +32,7 @@ Write business logic, not API calls.</p>
     <a href="https://go.pipelex.com/discord"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
     <a href="https://www.youtube.com/@PipelexAI"><img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white" alt="YouTube"></a>
     <a href="https://pipelex.com"><img src="https://img.shields.io/badge/Homepage-03bb95?logo=google-chrome&logoColor=white&style=flat" alt="Website"></a>
-    <a href="https://github.com/Pipelex/pipelex-cookbook"><img src="https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat" alt="Cookbook"></a>
+    <!-- PRERELEASE_LINK --><a href="https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago"><img src="https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat" alt="Cookbook"></a>
     <a href="https://docs.pipelex.com/"><img src="https://img.shields.io/badge/Docs-03bb95?logo=read-the-docs&logoColor=white&style=flat" alt="Documentation"></a>
     <a href="https://docs.pipelex.com/changelog/"><img src="https://img.shields.io/badge/Changelog-03bb95?logo=git&logoColor=white&style=flat" alt="Changelog"></a>
     <br/>
@@ -41,15 +51,27 @@ pip install pipelex
 pipelex init
 ```
 
-## 2. Get Your API Key (Free)
+## 2. Configure AI Access
 
-To use AI models, you need an API key:
+To run pipelines with AI models, choose one of these options:
 
-- **Free Pipelex API Key**: Join our [Discord community](https://go.pipelex.com/discord) and request your **free API key** (no credit card required) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
-- **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral
-- **Local AI**: Ollama, vLLM, LM Studio, llama.cpp... any endpoint based on the OpenAI API or not, as you can plug-in your own non-standard APIs.
+### Option A: Pipelex Gateway (Recommended)
 
-See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for details.
+Get **free credits** with a single API key for LLMs, document extraction, and image generation across all major providers (OpenAI, Anthropic, Google, Azure, and more). New models added constantly.
+
+1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
+2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+3. Run `pipelex init` and accept the Gateway terms of service
+
+> **Migrating from pipelex_inference?** The old `pipelex_inference` backend is deprecated. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
+
+### Option B: Bring Your Own Keys
+
+Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for setup.
+
+### Option C: Local AI
+
+Run models locally with Ollama, vLLM, LM Studio, or llama.cpp - no API keys required. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for details.
 
 ## 3. Generate Your First Workflow
 
@@ -330,7 +352,8 @@ We **highly** recommend installing our extension for `.plx` files into your IDE.
 
 Explore real-world examples in our **Cookbook** repository:
 
-[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
+<!-- PRERELEASE_LINK -->
+[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
 
 Clone it, fork it, and experiment with production-ready pipelines for various use cases.
 
@@ -353,13 +376,12 @@ pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 
 ## Privacy & Telemetry
 
-Pipelex collects optional, anonymous usage data to help improve the product. On first run, you'll be prompted to choose your telemetry preference:
+Pipelex supports two independent telemetry streams:
 
-- **Off**: No telemetry data collected
-- **Anonymous**: Anonymous usage data only (command usage, performance metrics, feature usage)
-- **Identified**: Usage data with user identification (helps us provide better support)
+- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#gateway-telemetry-pipelex-controlled)
+- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#custom-telemetry-user-controlled)
 
-Your prompts, LLM responses, file paths, and URLs are automatically redacted and never transmitted. You can change your preference at any time or disable telemetry completely by setting the `DO_NOT_TRACK` environment variable.
+**We only collect technical data** (model names, token counts, latency, error rates) - never your prompts, completions, or business data. Set `DO_NOT_TRACK=1` to disable all telemetry (note: Gateway requires telemetry to function).
 
 For more details, see the [Telemetry Documentation](https://docs.pipelex.com/home/5-setup/telemetry/) or read our [Privacy Policy](https://go.pipelex.com/privacy-policy).
 

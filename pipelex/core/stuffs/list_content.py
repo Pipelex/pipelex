@@ -5,8 +5,10 @@ from rich.pretty import Pretty
 from rich.table import Table
 from typing_extensions import override
 
-from pipelex.cogt.templating.templating_style import TextFormat
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
+from pipelex.tools.jinja2.image_registry import ImageRegistry
+from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.tools.misc.pretty import MAX_RENDER_DEPTH, PrettyPrintable, PrettyPrinter
 
 
@@ -55,10 +57,6 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         return obj_dict
 
     @override
-    def rendered_plain(self) -> str:
-        return self.rendered_markdown()
-
-    @override
     def rendered_html(self) -> str:
         list_dump = [item.smart_dump() for item in self.items]
 
@@ -69,6 +67,14 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         )
         return html
 
+    # -------------------------------------------------------------------------------------
+    # Sync implementations
+    # -------------------------------------------------------------------------------------
+
+    @override
+    def rendered_plain(self) -> str:
+        return self.rendered_markdown()
+
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         rendered = ""
@@ -78,9 +84,46 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         else:
             for item_index, item in enumerate(self.items):
                 rendered += f"\n • item #{item_index + 1}:\n\n"
-                rendered += item.rendered_str(text_format=TextFormat.MARKDOWN)
+                rendered += item.rendered_markdown(level=level, is_pretty=is_pretty)
                 rendered += "\n"
         return rendered
+
+    # -------------------------------------------------------------------------------------
+    # Async implementations - kept for recursive methods that may need to await nested content
+    # -------------------------------------------------------------------------------------
+
+    @override
+    async def rendered_plain_async(self) -> str:
+        return await self.rendered_markdown_async()
+
+    @override
+    async def rendered_markdown_async(self, level: int = 1, is_pretty: bool = False) -> str:
+        rendered = ""
+        if self._single_class_name == "TextContent":
+            for item in self.items:
+                rendered += f" • {item}\n"
+        else:
+            for item_index, item in enumerate(self.items):
+                rendered += f"\n • item #{item_index + 1}:\n\n"
+                rendered += await item.rendered_markdown_async(level=level, is_pretty=is_pretty)
+                rendered += "\n"
+        return rendered
+
+    def render_with_images(
+        self,
+        registry: ImageRegistry,
+        text_format: TextFormat,
+    ) -> str:
+        """Render each item with images."""
+        parts: list[str] = []
+        for item in self.items:
+            if isinstance(item, ImageRenderable):  # pyright: ignore[reportUnnecessaryIsInstance]
+                rendered = item.render_with_images(registry, text_format)
+            else:
+                rendered = str(item)
+            if rendered:
+                parts.append(rendered)
+        return "\n".join(parts)
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

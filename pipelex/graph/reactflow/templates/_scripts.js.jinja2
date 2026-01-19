@@ -1,0 +1,1278 @@
+const themes = ['dark', 'light', 'system'];
+const initialTheme = {{ initial_theme | tojson }};
+let currentThemeIndex = themes.indexOf(localStorage.getItem('pipelex-theme') || initialTheme);
+if (currentThemeIndex === -1) currentThemeIndex = 0;
+
+function applyTheme(theme) {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('pipelex-theme', theme);
+    // Update button icons
+    document.querySelectorAll('.theme-icon').forEach(icon => icon.classList.remove('active'));
+    const activeIcon = document.querySelector(`.${theme}-icon`);
+    if (activeIcon) activeIcon.classList.add('active');
+}
+
+// Set up theme toggle button
+document.getElementById('theme-toggle').addEventListener('click', () => {
+    currentThemeIndex = (currentThemeIndex + 1) % themes.length;
+    applyTheme(themes[currentThemeIndex]);
+});
+
+// Apply initial theme immediately
+applyTheme(themes[currentThemeIndex]);
+
+// Parse embedded ViewSpec
+const viewspecElement = document.getElementById('pipelex-viewspec');
+const viewspec = JSON.parse(viewspecElement.textContent);
+
+// Parse GraphSpec if present
+const graphspecElement = document.getElementById('pipelex-graphspec');
+const graphspec = graphspecElement ? JSON.parse(graphspecElement.textContent) : null;
+
+// Parse stuff data in alternate formats (for display toggle)
+const stuffDataTextElement = document.getElementById('pipelex-stuff-data-text');
+const stuffDataText = stuffDataTextElement ? JSON.parse(stuffDataTextElement.textContent || '{}') : {};
+const stuffDataHtmlElement = document.getElementById('pipelex-stuff-data-html');
+const stuffDataHtml = stuffDataHtmlElement ? JSON.parse(stuffDataHtmlElement.textContent || '{}') : {};
+
+// Track current format selection for stuff display
+let currentStuffFormat = 'html';
+
+// ====================================================================
+// DATAFLOW ANALYSIS: Extract stuff nodes and build producer/consumer maps
+// This mirrors the Python GraphAnalysis logic
+// ====================================================================
+function buildDataflowAnalysis(graphspec) {
+    if (!graphspec) return null;
+
+    const stuffRegistry = {};      // digest -> { name, concept, data, dataText, dataHtml }
+    const stuffProducers = {};     // digest -> producer_node_id
+    const stuffConsumers = {};     // digest -> [consumer_node_ids]
+    const containmentTree = {};    // parent_id -> [child_ids]
+    const childNodeIds = new Set();
+
+    // Build containment tree from edges
+    for (const edge of graphspec.edges) {
+        if (edge.kind === 'contains') {
+            if (!containmentTree[edge.source]) containmentTree[edge.source] = [];
+            containmentTree[edge.source].push(edge.target);
+            childNodeIds.add(edge.target);
+        }
+    }
+
+    // Controller IDs are nodes that have children
+    const controllerNodeIds = new Set(Object.keys(containmentTree));
+
+    // Process nodes for stuff extraction
+    for (const node of graphspec.nodes) {
+        // Skip controllers - they don't directly transform data
+        if (controllerNodeIds.has(node.node_id)) continue;
+
+        const nodeIo = node.node_io || {};
+
+        // Collect outputs (this node produces these stuffs)
+        for (const output of (nodeIo.outputs || [])) {
+            if (output.digest) {
+                stuffRegistry[output.digest] = {
+                    name: output.name,
+                    concept: output.concept,
+                    contentType: output.content_type,
+                    data: output.data,
+                    dataText: output.data_text,
+                    dataHtml: output.data_html,
+                };
+                stuffProducers[output.digest] = node.node_id;
+            }
+        }
+
+        // Collect inputs (this node consumes these stuffs)
+        for (const input of (nodeIo.inputs || [])) {
+            if (input.digest) {
+                // Register stuff even if we don't know the producer (pipeline input)
+                if (!stuffRegistry[input.digest]) {
+                    stuffRegistry[input.digest] = {
+                        name: input.name,
+                        concept: input.concept,
+                        contentType: input.content_type,
+                        data: input.data,
+                        dataText: input.data_text,
+                        dataHtml: input.data_html,
+                    };
+                }
+                if (!stuffConsumers[input.digest]) stuffConsumers[input.digest] = [];
+                stuffConsumers[input.digest].push(node.node_id);
+            }
+        }
+    }
+
+    return {
+        stuffRegistry,
+        stuffProducers,
+        stuffConsumers,
+        controllerNodeIds,
+        childNodeIds,
+    };
+}
+
+const dataflowAnalysis = buildDataflowAnalysis(graphspec);
+const hasDataflow = dataflowAnalysis && Object.keys(dataflowAnalysis.stuffRegistry).length > 0;
+
+// Update footer stats
+const statsEl = document.getElementById('footer-stats');
+const pipeCount = hasDataflow
+    ? graphspec.nodes.filter(n => !dataflowAnalysis.controllerNodeIds.has(n.node_id)).length
+    : viewspec.nodes.length;
+const stuffCount = hasDataflow ? Object.keys(dataflowAnalysis.stuffRegistry).length : 0;
+const succeededCount = viewspec.nodes.filter(n => n.status === 'succeeded').length;
+const failedCount = viewspec.nodes.filter(n => n.status === 'failed').length;
+
+statsEl.innerHTML = `
+    <div class="stat-item">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+        </svg>
+        <span class="stat-value">${pipeCount}</span> pipes
+    </div>
+    ${stuffCount > 0 ? `<div class="stat-item" style="color: var(--color-stuff)">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <ellipse cx="12" cy="12" rx="10" ry="6"/>
+        </svg>
+        <span class="stat-value">${stuffCount}</span> data
+    </div>` : ''}
+    ${succeededCount > 0 ? `<div class="stat-item" style="color: var(--color-success)">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span class="stat-value">${succeededCount}</span>
+    </div>` : ''}
+    ${failedCount > 0 ? `<div class="stat-item" style="color: var(--color-error)">
+        <svg class="stat-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+        </svg>
+        <span class="stat-value">${failedCount}</span>
+    </div>` : ''}
+`;
+
+// ReactFlow setup
+const { React, ReactDOM } = window;
+const ReactFlowLib = window.ReactFlowRenderer || window.ReactFlow || {};
+const { ReactFlow, useNodesState, useEdgesState, Background, Controls, MarkerType } = ReactFlowLib;
+
+// Dagre layout function
+function getLayoutedElements(nodes, edges, direction = 'TB') {
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({
+        rankdir: direction,
+        nodesep: {{ nodesep | tojson }},
+        ranksep: {{ ranksep | tojson }},
+        edgesep: 20,
+        marginx: 40,
+        marginy: 40,
+    });
+
+    nodes.forEach((node) => {
+        const nodeData = node.data || {};
+        const isStuff = nodeData.isStuff;
+        // Estimate width based on label length (rough: 8px per character + padding)
+        const labelText = nodeData.label?.props?.children?.[0]?.props?.children || '';
+        const estimatedWidth = Math.max(180, Math.min(400, labelText.length * 8 + 60));
+        const width = isStuff ? Math.max(180, estimatedWidth) : Math.max(200, estimatedWidth);
+        const height = isStuff ? 60 : 70;
+        g.setNode(node.id, { width, height });
+    });
+
+    edges.forEach((edge) => {
+        g.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(g);
+
+    const layoutedNodes = nodes.map((node) => {
+        const nodeWithPosition = g.node(node.id);
+        const nodeData = node.data || {};
+        const isStuff = nodeData.isStuff;
+        const width = isStuff ? 180 : 200;
+        return {
+            ...node,
+            position: {
+                x: nodeWithPosition.x - width / 2,
+                y: nodeWithPosition.y - 30,
+            },
+        };
+    });
+
+    return { nodes: layoutedNodes, edges };
+}
+
+// ====================================================================
+// BUILD DATAFLOW NODES AND EDGES
+// ====================================================================
+function buildDataflowGraph(graphspec, analysis) {
+    const nodes = [];
+    const edges = [];
+    const nodeIdMap = {};  // original node_id -> graphspec node
+
+    // Map node IDs to nodes
+    for (const node of graphspec.nodes) {
+        nodeIdMap[node.node_id] = node;
+    }
+
+    // Find participating pipes (those that produce or consume data)
+    const participatingPipes = new Set();
+    for (const producer of Object.values(analysis.stuffProducers)) {
+        participatingPipes.add(producer);
+    }
+    for (const consumers of Object.values(analysis.stuffConsumers)) {
+        for (const consumer of consumers) {
+            participatingPipes.add(consumer);
+        }
+    }
+
+    // Create pipe nodes (only those that participate in data flow)
+    for (const node of graphspec.nodes) {
+        if (!participatingPipes.has(node.node_id)) continue;
+
+        const isFailed = node.status === 'failed';
+        const label = node.pipe_code || node.node_id.split(':').pop();
+        // Calculate width: ~8px per char (monospace 13px) + padding (28px)
+        const nodeWidth = Math.max(160, label.length * 8 + 28);
+
+        nodes.push({
+            id: node.node_id,
+            type: 'default',
+            data: {
+                label: React.createElement('div', {
+                    style: {
+                        padding: '10px 14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '2px',
+                        textAlign: 'center',
+                    }
+                },
+                    React.createElement('span', {
+                        style: {
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: 'var(--color-pipe-text)',
+                        }
+                    }, label)
+                ),
+                nodeData: node,
+                isPipe: true,
+                isStuff: false,
+            },
+            position: { x: 0, y: 0 },
+            style: {
+                background: isFailed ? 'var(--color-pipe-failed-bg)' : 'var(--color-pipe-bg)',
+                border: isFailed ? '2px solid var(--color-pipe-failed)' : '2px solid var(--color-pipe)',
+                borderRadius: '8px',
+                padding: '0',
+                width: nodeWidth + 'px',
+                boxShadow: 'var(--shadow-md)',
+            },
+        });
+    }
+
+    // Create stuff nodes
+    for (const [digest, stuffInfo] of Object.entries(analysis.stuffRegistry)) {
+        const stuffId = `stuff_${digest}`;
+        const label = stuffInfo.name;
+        const concept = stuffInfo.concept || '';
+        // For pill shape, need extra padding. ~7px per char (12px font) + side padding (48px)
+        const textWidth = Math.max(label.length, concept.length) * 7 + 48;
+        const stuffWidth = Math.max(140, textWidth);
+
+        nodes.push({
+            id: stuffId,
+            type: 'default',
+            data: {
+                label: React.createElement('div', {
+                    style: {
+                        padding: '8px 24px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '2px',
+                        textAlign: 'center',
+                    }
+                },
+                    React.createElement('span', {
+                        style: {
+                            fontFamily: "'JetBrains Mono', monospace",
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            color: 'var(--color-stuff-text)',
+                        }
+                    }, label),
+                    concept && React.createElement('span', {
+                        style: {
+                            fontSize: '10px',
+                            color: 'var(--color-stuff-text-dim)',
+                        }
+                    }, concept)
+                ),
+                stuffData: stuffInfo,
+                stuffDigest: digest,
+                isStuff: true,
+                isPipe: false,
+            },
+            position: { x: 0, y: 0 },
+            style: {
+                background: 'var(--color-stuff-bg)',
+                border: '2px solid var(--color-stuff-border)',
+                borderRadius: '999px',  // Pill shape
+                padding: '0',
+                width: stuffWidth + 'px',
+                boxShadow: 'var(--shadow-md)',
+                cursor: 'pointer',
+            },
+        });
+    }
+
+    // Create edges: producer -> stuff
+    let edgeId = 0;
+    for (const [digest, producerNodeId] of Object.entries(analysis.stuffProducers)) {
+        const stuffId = `stuff_${digest}`;
+        edges.push({
+            id: `edge_${edgeId++}`,
+            source: producerNodeId,
+            target: stuffId,
+            type: {{ edge_type | tojson }},
+            animated: false,
+            style: {
+                stroke: 'var(--color-pipe)',
+                strokeWidth: 2,
+            },
+            markerEnd: {
+                type: MarkerType?.ArrowClosed || 'arrowclosed',
+                color: 'var(--color-pipe)',
+            },
+        });
+    }
+
+    // Create edges: stuff -> consumer
+    for (const [digest, consumers] of Object.entries(analysis.stuffConsumers)) {
+        const stuffId = `stuff_${digest}`;
+        for (const consumerNodeId of consumers) {
+            edges.push({
+                id: `edge_${edgeId++}`,
+                source: stuffId,
+                target: consumerNodeId,
+                type: {{ edge_type | tojson }},
+                animated: false,
+                style: {
+                    stroke: 'var(--color-pipe)',
+                    strokeWidth: 2,
+                },
+                markerEnd: {
+                    type: MarkerType?.ArrowClosed || 'arrowclosed',
+                    color: 'var(--color-pipe)',
+                },
+            });
+        }
+    }
+
+    return { nodes, edges };
+}
+
+// ====================================================================
+// FALLBACK: Build orchestration graph from ViewSpec (no dataflow)
+// ====================================================================
+function buildOrchestrationGraph(viewspec) {
+    const nodes = viewspec.nodes.map(node => {
+        const isController = node.kind === 'controller';
+        const isFailed = node.ui?.classes?.includes('failed');
+        const isSucceeded = node.ui?.classes?.includes('succeeded');
+        const badge = node.ui?.badges?.[0] || '';
+        // Calculate width: ~8px per char (monospace 13px) + padding + status dot
+        const nodeWidth = Math.max(160, (node.label?.length || 10) * 8 + 50);
+
+        return {
+            id: node.id,
+            type: 'default',
+            data: {
+                label: React.createElement('div', {
+                    style: {
+                        padding: '10px 14px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '4px',
+                    }
+                },
+                    React.createElement('div', {
+                        style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                        }
+                    },
+                        React.createElement('span', {
+                            style: {
+                                fontFamily: "'JetBrains Mono', monospace",
+                                fontSize: '13px',
+                                fontWeight: 600,
+                                color: 'var(--color-pipe-text)',
+                            }
+                        }, node.label),
+                        isSucceeded && React.createElement('span', {
+                            style: {
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: 'var(--color-success)',
+                                flexShrink: 0,
+                            }
+                        }),
+                        isFailed && React.createElement('span', {
+                            style: {
+                                width: '8px',
+                                height: '8px',
+                                borderRadius: '50%',
+                                background: 'var(--color-error)',
+                                flexShrink: 0,
+                            }
+                        })
+                    ),
+                    React.createElement('div', {
+                        style: {
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                        }
+                    },
+                        React.createElement('span', {
+                            style: {
+                                fontSize: '11px',
+                                color: 'var(--color-text-dim)',
+                            }
+                        }, isController ? 'Controller' : node.inspector?.pipe_type || 'Operator'),
+                        badge && React.createElement('span', {
+                            style: {
+                                fontSize: '10px',
+                                color: 'var(--color-text-muted)',
+                                background: 'var(--color-surface-hover)',
+                                padding: '2px 6px',
+                                borderRadius: '4px',
+                                fontFamily: "'JetBrains Mono', monospace",
+                            }
+                        }, badge)
+                    )
+                ),
+                nodeData: node,
+                isPipe: true,
+                isStuff: false,
+            },
+            position: node.position || { x: 0, y: 0 },
+            style: {
+                background: isFailed ? 'var(--color-pipe-failed-bg)' : 'var(--color-pipe-bg)',
+                border: isFailed ? '2px solid var(--color-pipe-failed)' : '2px solid var(--color-pipe)',
+                borderRadius: '8px',
+                padding: '0',
+                width: nodeWidth + 'px',
+                boxShadow: 'var(--shadow-md)',
+            },
+        };
+    });
+
+    const edges = viewspec.edges.map(edge => ({
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        type: {{ edge_type | tojson }},
+        animated: edge.animated || false,
+        label: edge.label,
+        labelStyle: {
+            fontSize: 11,
+            fontWeight: 500,
+            fill: 'var(--color-text-muted)',
+            fontFamily: "'JetBrains Mono', monospace",
+        },
+        labelBgStyle: {
+            fill: '#0f172a',
+            fillOpacity: 0.9,
+        },
+        labelBgPadding: [6, 4],
+        labelBgBorderRadius: 4,
+        style: {
+            stroke: edge.kind === 'data' ? 'var(--color-pipe)' : 'var(--color-text-dim)',
+            strokeWidth: edge.kind === 'data' ? 2 : 1,
+        },
+        markerEnd: {
+            type: MarkerType?.ArrowClosed || 'arrowclosed',
+            color: edge.kind === 'data' ? 'var(--color-pipe)' : 'var(--color-text-dim)',
+        },
+    }));
+
+    return { nodes, edges };
+}
+
+// ====================================================================
+// MAIN REACT COMPONENT
+// ====================================================================
+function GraphViewer() {
+    // Build graph based on available data
+    let initialData;
+    if (hasDataflow) {
+        initialData = buildDataflowGraph(graphspec, dataflowAnalysis);
+    } else {
+        initialData = buildOrchestrationGraph(viewspec);
+    }
+
+    // Apply layout
+    const needsLayout = initialData.nodes.some(n => !n.position || (n.position.x === 0 && n.position.y === 0));
+    const layouted = needsLayout
+        ? getLayoutedElements(initialData.nodes, initialData.edges, viewspec.layout?.direction || 'TB')
+        : initialData;
+
+    const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
+    const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
+    const [selectedNodeId, setSelectedNodeId] = React.useState(null);
+
+    // Expose function to clear node selection globally
+    React.useEffect(() => {
+        window.clearNodeSelection = () => {
+            setSelectedNodeId(null);
+            setNodes((nds) =>
+                nds.map((n) => ({
+                    ...n,
+                    selected: false,
+                }))
+            );
+        };
+    }, [setNodes]);
+
+    const onNodeClick = (event, node) => {
+        // Update selected node state and highlight it
+        setSelectedNodeId(node.id);
+        setNodes((nds) =>
+            nds.map((n) => ({
+                ...n,
+                selected: n.id === node.id,
+            }))
+        );
+        const inspector = document.getElementById('inspector');
+        const inspectorContent = document.getElementById('inspector-content');
+        const inspectorTitle = document.getElementById('inspector-title');
+        const inspectorSubtitle = document.getElementById('inspector-subtitle');
+        const inspectorHeader = document.getElementById('inspector-header');
+
+        // Reset scroll to top-left when switching nodes (keep tab selection)
+        inspectorContent.scrollTop = 0;
+        inspectorContent.scrollLeft = 0;
+
+        const nodeData = node.data || {};
+
+        // Handle stuff nodes
+        if (nodeData.isStuff) {
+            const stuffData = nodeData.stuffData || {};
+            const stuffDigest = nodeData.stuffDigest;
+            const stuffMermaidId = stuffDigest ? `s_${stuffDigest.substring(0, 10)}` : null;
+
+            inspectorTitle.textContent = stuffData.name || 'Data';
+            inspectorSubtitle.textContent = stuffData.concept || 'Data Item';
+            inspectorHeader.className = 'inspector-header stuff';
+
+            // Check which formats are available
+            // First check graphspec-extracted data, then fallback to separate dictionaries
+            const hasJson = !!stuffData.data;
+            const hasText = !!stuffData.dataText || (stuffMermaidId && !!stuffDataText[stuffMermaidId]);
+            // For PDF and image content types, HTML tab can render from JSON data via extractUrl()
+            const canRenderFromJson = (stuffData.contentType === 'application/pdf' || stuffData.contentType?.startsWith('image/')) && extractUrl(stuffData.data);
+            const hasHtml = !!stuffData.dataHtml || (stuffMermaidId && !!stuffDataHtml[stuffMermaidId]) || canRenderFromJson;
+            const hasMultipleFormats = [hasJson, hasText, hasHtml].filter(Boolean).length > 1;
+
+            let html = '';
+
+            // Add format tabs if multiple formats available
+            if (hasMultipleFormats) {
+                html += '<div class="inspector-section">';
+                html += '<div class="format-toolbar">';
+                html += '<div class="format-tabs" id="stuff-format-tabs">';
+                const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
+                const textActive = currentStuffFormat === 'text' ? 'active' : '';
+                const htmlActive = currentStuffFormat === 'html' ? 'active' : '';
+                const htmlTabLabel = getHtmlTabLabel(stuffData.contentType);
+                html += `<button class="format-tab ${htmlActive}" data-format="html" `;
+                html += `${!hasHtml ? 'disabled' : ''}>${htmlTabLabel}</button>`;
+                html += `<button class="format-tab ${jsonActive}" data-format="json" `;
+                html += `${!hasJson ? 'disabled' : ''}>JSON</button>`;
+                html += `<button class="format-tab ${textActive}" data-format="text" `;
+                html += `${!hasText ? 'disabled' : ''}>Pretty</button>`;
+                html += '</div>';
+                html += '<div class="format-actions">';
+                html += '<button class="action-btn" id="open-external-btn" ';
+                html += 'onclick="openExternal()" title="Open in new window" style="display: none;">';
+                html += '<svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+                html += '</button>';
+                html += '<button class="action-btn" id="fullscreen-open-btn" ';
+                html += 'onclick="openFullscreen()" title="Fullscreen">';
+                html += '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+                html += '</button>';
+                html += '<button class="action-btn" id="copy-btn" ';
+                html += 'onclick="copyStuffContent()" title="Copy">';
+                html += '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z';
+                html += 'm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z';
+                html += 'm0 16H8V7h11v14z"/></svg></button>';
+                html += '<button class="action-btn" id="download-btn" ';
+                html += 'onclick="downloadStuffContent()" title="Download">';
+                html += '<svg viewBox="0 0 24 24">';
+                html += '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>';
+                html += '</svg></button>';
+                html += '</div>';
+                html += '</div>';
+                html += '<div id="stuff-data-content"></div>';
+                html += '</div>';
+            } else if (hasJson || hasText || hasHtml) {
+                html += '<div class="inspector-section">';
+                html += '<div class="format-toolbar">';
+                html += '<div class="format-tabs"></div>';
+                html += '<div class="format-actions">';
+                html += '<button class="action-btn" id="open-external-btn" ';
+                html += 'onclick="openExternal()" title="Open in new window" style="display: none;">';
+                html += '<svg viewBox="0 0 24 24"><path d="M19 19H5V5h7V3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z"/></svg>';
+                html += '</button>';
+                html += '<button class="action-btn" id="fullscreen-open-btn" ';
+                html += 'onclick="openFullscreen()" title="Fullscreen">';
+                html += '<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>';
+                html += '</button>';
+                html += '<button class="action-btn" id="copy-btn" ';
+                html += 'onclick="copyStuffContent()" title="Copy">';
+                html += '<svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z';
+                html += 'm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z';
+                html += 'm0 16H8V7h11v14z"/></svg></button>';
+                html += '<button class="action-btn" id="download-btn" ';
+                html += 'onclick="downloadStuffContent()" title="Download">';
+                html += '<svg viewBox="0 0 24 24">';
+                html += '<path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>';
+                html += '</svg></button>';
+                html += '</div>';
+                html += '</div>';
+                html += '<div id="stuff-data-content"></div>';
+                html += '</div>';
+            }
+
+            inspectorContent.innerHTML = html;
+            // Add class to enable flex behavior for stuff inspector
+            inspectorContent.classList.add('stuff-inspector');
+
+            // Store current stuff data for format switching
+            window.currentStuffJsonData = stuffData.data;
+            window.currentStuffMermaidId = stuffMermaidId;
+            window.currentStuffContentType = stuffData.contentType;
+            // Store graphspec-extracted text/html data (preferred over dictionary lookups)
+            window.currentStuffDataText = stuffData.dataText;
+            window.currentStuffDataHtml = stuffData.dataHtml;
+
+            // Attach format tab handlers
+            const formatTabs = document.getElementById('stuff-format-tabs');
+            if (formatTabs) {
+                formatTabs.querySelectorAll('.format-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        if (tab.disabled) return;
+                        setStuffFormat(tab.dataset.format);
+                    });
+                });
+            }
+
+            // Render initial content
+            if (hasJson || hasText || hasHtml) {
+                // Determine best available format (HTML -> JSON -> Pretty)
+                let bestFormat = currentStuffFormat;
+                if (bestFormat === 'html' && !hasHtml) bestFormat = hasJson ? 'json' : 'text';
+                if (bestFormat === 'json' && !hasJson) bestFormat = hasHtml ? 'html' : 'text';
+                if (bestFormat === 'text' && !hasText) bestFormat = hasHtml ? 'html' : 'json';
+
+                renderStuffContent(bestFormat);
+            }
+
+            document.getElementById('top-hint').style.display = 'none';
+            inspector.classList.add('visible');
+            return;
+        }
+
+        // Handle pipe nodes
+        const pipeData = nodeData.nodeData || {};
+        inspectorTitle.textContent = pipeData.pipe_code || pipeData.label || node.id;
+        inspectorSubtitle.textContent = pipeData.pipe_type || nodeData.kind || 'Pipe';
+        inspectorHeader.className = 'inspector-header pipe';
+
+        const timing = pipeData.timing;
+        const nodeIo = pipeData.node_io;
+        const status = pipeData.status;
+
+        let html = '';
+
+        // Status badges
+        html += '<div class="inspector-badges">';
+        if (status === 'succeeded') {
+            html += '<span class="inspector-badge success">✓ Succeeded</span>';
+        } else if (status === 'failed') {
+            html += '<span class="inspector-badge error">✕ Failed</span>';
+        }
+        html += `<span class="inspector-badge neutral">⏱ ${timing.duration.toFixed(2)}s</span>`;
+        html += '</div>';
+
+        // Pipe info
+        if (pipeData.pipe_code) {
+            html += `<div class="inspector-section">
+                <div class="inspector-section-title">Pipe Code</div>
+                <div class="inspector-value pipe-code">${pipeData.pipe_code}</div>
+            </div>`;
+        }
+
+        if (pipeData.pipe_type) {
+            html += `<div class="inspector-section">
+                <div class="inspector-section-title">Pipe Type</div>
+                <div class="inspector-value">${pipeData.pipe_type}</div>
+            </div>`;
+        }
+
+        if (timing) {
+            html += `<div class="inspector-section">
+                <div class="inspector-section-title">Timing</div>
+                <div class="inspector-row">
+                    <span class="inspector-row-label">Started</span>
+                    <span class="inspector-row-value">${new Date(timing.started_at).toLocaleTimeString()}</span>
+                </div>
+                <div class="inspector-row">
+                    <span class="inspector-row-label">Ended</span>
+                    <span class="inspector-row-value">${new Date(timing.ended_at).toLocaleTimeString()}</span>
+                </div>
+                <div class="inspector-row">
+                    <span class="inspector-row-label">Duration</span>
+                    <span class="inspector-row-value">${timing.duration.toFixed(2)}s</span>
+                </div>
+            </div>`;
+        }
+
+        if (nodeIo?.inputs?.length > 0) {
+            html += `<div class="inspector-section">
+                <div class="inspector-section-title">Inputs (${nodeIo.inputs.length})</div>
+                <div class="inspector-pre">${nodeIo.inputs.map(i => `${i.name}: ${i.concept || 'unknown'}`).join('\\n')}</div>
+            </div>`;
+        }
+
+        if (nodeIo?.outputs?.length > 0) {
+            html += `<div class="inspector-section">
+                <div class="inspector-section-title">Outputs (${nodeIo.outputs.length})</div>
+                <div class="inspector-pre">${nodeIo.outputs.map(o => `${o.name}: ${o.concept || 'unknown'}`).join('\\n')}</div>
+            </div>`;
+        }
+
+        if (pipeData.error) {
+            html += `<div class="inspector-section">
+                <div class="inspector-section-title">Error</div>
+                <pre class="inspector-pre" style="color: var(--color-error);">${JSON.stringify(pipeData.error, null, 2)}</pre>
+            </div>`;
+        }
+
+        inspectorContent.innerHTML = html || '<div style="color: var(--color-text-dim)">No additional information</div>';
+        // Remove stuff-specific flex behavior for pipe inspector
+        inspectorContent.classList.remove('stuff-inspector');
+        document.getElementById('top-hint').style.display = 'none';
+        inspector.classList.add('visible');
+    };
+
+    if (!ReactFlow) {
+        return React.createElement('div', { style: { padding: '20px', color: 'var(--color-text)' } },
+            React.createElement('p', null, 'Loading ReactFlow...')
+        );
+    }
+
+    {% if pan_to_top %}
+    // Pan to show the top of the graph after initial fit
+    const onInit = (reactFlowInstance) => {
+        setTimeout(() => {
+            // Find the topmost node position
+            const currentNodes = reactFlowInstance.getNodes();
+            if (currentNodes.length === 0) return;
+            const minY = Math.min(...currentNodes.map(n => n.position.y));
+            const viewport = reactFlowInstance.getViewport();
+            // Adjust viewport to show the top with some padding
+            reactFlowInstance.setViewport({
+                x: viewport.x,
+                y: -minY * viewport.zoom + 80,
+                zoom: viewport.zoom
+            });
+        }, 100);
+    };
+    {% endif %}
+
+    return React.createElement('div', { className: 'react-flow-container' },
+        React.createElement(ReactFlow, {
+            nodes: nodes,
+            edges: edges,
+            onNodesChange: onNodesChange,
+            onEdgesChange: onEdgesChange,
+            onNodeClick: onNodeClick,
+            {% if pan_to_top %}onInit: onInit,{% endif %}
+            fitView: true,
+            fitViewOptions: { padding: 0.1, minZoom: {{ initial_zoom | tojson }} },
+            defaultEdgeOptions: { type: {{ edge_type | tojson }} },
+            proOptions: { hideAttribution: true },
+        },
+            Background ? React.createElement(Background, {
+                variant: 'dots',
+                gap: 20,
+                size: 1,
+                color: '#334155',
+            }) : null,
+            Controls ? React.createElement(Controls, { showInteractive: false }) : null
+        )
+    );
+}
+
+// Render the app
+const root = ReactDOM.createRoot(document.getElementById('root'));
+const graphViewerRef = { current: null };
+root.render(React.createElement(GraphViewer));
+
+// Close inspector function
+function closeInspector() {
+    document.getElementById('inspector').classList.remove('visible');
+    document.getElementById('top-hint').style.display = '';
+    // Clear node selection/highlighting when closing inspector
+    if (window.clearNodeSelection) {
+        window.clearNodeSelection();
+    }
+}
+
+// Close inspector on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeInspector();
+    }
+});
+
+// Inspector resize functionality
+(function() {
+    const inspector = document.getElementById('inspector');
+    const resizeHandle = document.getElementById('inspector-resize-handle');
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    resizeHandle.addEventListener('mousedown', (e) => {
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = inspector.offsetWidth;
+        resizeHandle.classList.add('dragging');
+        document.body.style.cursor = 'ew-resize';
+        document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isResizing) return;
+        const deltaX = startX - e.clientX;
+        const newWidth = Math.max(300, Math.min(startWidth + deltaX, window.innerWidth * 0.8));
+        inspector.style.width = newWidth + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isResizing) {
+            isResizing = false;
+            resizeHandle.classList.remove('dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+        }
+    });
+})();
+
+// Set stuff display format and re-render
+function setStuffFormat(format) {
+    currentStuffFormat = format;
+    // Update tab styling
+    document.querySelectorAll('.format-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.format === format);
+    });
+    renderStuffContent(format);
+}
+
+// Render stuff content in the specified format
+function renderStuffContent(format) {
+    const container = document.getElementById('stuff-data-content');
+    if (!container) return;
+
+    const stuffMermaidId = window.currentStuffMermaidId;
+    const jsonData = window.currentStuffJsonData;
+    const contentType = window.currentStuffContentType;
+    // Prefer graphspec-extracted data, fallback to dictionary lookups
+    const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
+    const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+
+    // Handle PDF content type with iframe viewer
+    if (format === 'html' && contentType === 'application/pdf') {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
+            container.className = 'inspector-pdf-content';
+            container.innerHTML = '';
+            const iframe = document.createElement('iframe');
+            iframe.src = pdfUrl;
+            iframe.style.cssText = 'width:100%; height:100%; border:none;';
+            container.appendChild(iframe);
+            updateOpenExternalButton();
+            return;
+        }
+    }
+
+    // Handle image content type
+    if (format === 'html' && contentType?.startsWith('image/')) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
+            container.className = 'inspector-image-content';
+            container.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
+            img.alt = 'Image content';
+            container.appendChild(img);
+            updateOpenExternalButton();
+            return;
+        }
+    }
+
+    if (format === 'json') {
+        container.className = '';
+        const jsonStr = JSON.stringify(jsonData, null, 2);
+        container.innerHTML = `<pre class="inspector-pre">${escapeHtml(jsonStr)}</pre>`;
+    } else if (format === 'text') {
+        // Use nowrap class for Rich-formatted ASCII tables
+        const textContent = textData || 'No text data available';
+        container.className = '';
+        container.innerHTML = `<pre class="inspector-pre nowrap">${escapeHtml(textContent)}</pre>`;
+    } else if (format === 'html') {
+        const htmlContent = htmlData || 'No HTML data available';
+        container.className = 'inspector-html-content';
+        container.innerHTML = DOMPurify.sanitize(htmlContent);
+        makeLinksOpenInNewWindow(container);
+    }
+
+    updateOpenExternalButton();
+}
+
+// Get current stuff content based on active format
+function getCurrentStuffContent() {
+    const stuffMermaidId = window.currentStuffMermaidId;
+    const jsonData = window.currentStuffJsonData;
+    const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
+    const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+
+    if (currentStuffFormat === 'json' && jsonData) {
+        return { content: JSON.stringify(jsonData, null, 2), ext: 'json', mime: 'application/json' };
+    } else if (currentStuffFormat === 'text' && textData) {
+        return { content: textData, ext: 'txt', mime: 'text/plain' };
+    } else if (currentStuffFormat === 'html' && htmlData) {
+        return { content: htmlData, ext: 'html', mime: 'text/html' };
+    }
+    return null;
+}
+
+// Copy stuff content to clipboard
+function copyStuffContent() {
+    const data = getCurrentStuffContent();
+    if (!data) return;
+
+    navigator.clipboard.writeText(data.content).then(() => {
+        // Update both inspector and fullscreen buttons if they exist
+        const btn = document.getElementById('copy-btn');
+        const fullscreenBtn = document.getElementById('fullscreen-copy-btn');
+        const checkIcon = '<svg viewBox="0 0 24 24">' +
+            '<path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>';
+        const copyIcon = '<svg viewBox="0 0 24 24">' +
+            '<path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1z' +
+            'm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2z' +
+            'm0 16H8V7h11v14z"/></svg>';
+        
+        if (btn) {
+            btn.innerHTML = checkIcon;
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.innerHTML = copyIcon;
+                btn.classList.remove('copied');
+            }, 1500);
+        }
+        
+        if (fullscreenBtn) {
+            fullscreenBtn.innerHTML = checkIcon;
+            fullscreenBtn.classList.add('copied');
+            setTimeout(() => {
+                fullscreenBtn.innerHTML = copyIcon;
+                fullscreenBtn.classList.remove('copied');
+            }, 1500);
+        }
+    });
+}
+
+// Download stuff content as file
+function downloadStuffContent() {
+    const stuffName = document.getElementById('inspector-title')?.textContent || 'data';
+    const baseName = stuffName.replace(/[^a-zA-Z0-9_-]/g, '_');
+    const contentType = window.currentStuffContentType;
+    const jsonData = window.currentStuffJsonData;
+
+    // For images, download the actual image file directly
+    if (contentType?.startsWith('image/')) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
+            const ext = contentType.split('/')[1] || 'png';
+            const filename = `${baseName}.${ext}`;
+            const link = document.createElement('a');
+            link.href = imageUrl;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        }
+    }
+
+    // For PDFs, download the actual PDF file directly
+    if (contentType === 'application/pdf') {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
+            const filename = `${baseName}.pdf`;
+            const link = document.createElement('a');
+            link.href = pdfUrl;
+            link.download = filename;
+            link.target = '_blank';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            return;
+        }
+    }
+
+    const data = getCurrentStuffContent();
+    if (!data) return;
+
+    const filename = `${baseName}.${data.ext}`;
+    const blob = new Blob([data.content], { type: data.mime });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+}
+
+// Include shared utility functions
+{% include 'stuff/_stuff_utils.js.jinja2' %}
+
+// Open external URL for PDF content
+function openExternal() {
+    const contentType = window.currentStuffContentType;
+    const jsonData = window.currentStuffJsonData;
+
+    if (contentType === 'application/pdf') {
+        const url = extractUrl(jsonData);
+        if (url) {
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
+    }
+}
+
+// Update visibility of the "open in new window" button (PDF only)
+function updateOpenExternalButton() {
+    const openExternalBtn = document.getElementById('open-external-btn');
+    const fullscreenOpenExternalBtn = document.getElementById('fullscreen-open-external-btn');
+
+    const contentType = window.currentStuffContentType;
+    const jsonData = window.currentStuffJsonData;
+    const url = extractUrl(jsonData);
+    // Only show for PDFs (images are handled by the download button)
+    const shouldShow = contentType === 'application/pdf' && !!url;
+
+    if (openExternalBtn) {
+        openExternalBtn.style.display = shouldShow ? '' : 'none';
+    }
+    if (fullscreenOpenExternalBtn) {
+        fullscreenOpenExternalBtn.style.display = shouldShow ? '' : 'none';
+    }
+}
+
+// Open fullscreen view
+function openFullscreen() {
+    const modal = document.getElementById('fullscreen-modal');
+    const fullscreenTitle = document.getElementById('fullscreen-title');
+    const fullscreenSubtitle = document.getElementById('fullscreen-subtitle');
+    const fullscreenContent = document.getElementById('fullscreen-content');
+    const fullscreenFormatTabs = document.getElementById('fullscreen-format-tabs');
+    
+    // Copy title and subtitle from inspector
+    const inspectorTitle = document.getElementById('inspector-title');
+    const inspectorSubtitle = document.getElementById('inspector-subtitle');
+    fullscreenTitle.textContent = inspectorTitle.textContent;
+    fullscreenSubtitle.textContent = inspectorSubtitle.textContent;
+    
+    // Build format tabs if multiple formats available
+    const stuffMermaidId = window.currentStuffMermaidId;
+    const jsonData = window.currentStuffJsonData;
+    const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
+    const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+    const hasJson = !!jsonData;
+    const hasText = !!textData;
+    // For PDF and image content types, HTML tab can render from JSON data via extractUrl()
+    const contentType = window.currentStuffContentType;
+    const canRenderFromJson = (contentType === 'application/pdf' || contentType?.startsWith('image/')) && extractUrl(jsonData);
+    const hasHtml = !!htmlData || canRenderFromJson;
+    const hasMultipleFormats = [hasJson, hasText, hasHtml].filter(Boolean).length > 1;
+    
+    if (hasMultipleFormats) {
+        const jsonActive = currentStuffFormat === 'json' ? 'active' : '';
+        const textActive = currentStuffFormat === 'text' ? 'active' : '';
+        const htmlActive = currentStuffFormat === 'html' ? 'active' : '';
+        const htmlTabLabel = getHtmlTabLabel(window.currentStuffContentType);
+        let tabsHtml = '';
+        tabsHtml += `<button class="format-tab ${htmlActive}" data-format="html" `;
+        tabsHtml += `${!hasHtml ? 'disabled' : ''}>${htmlTabLabel}</button>`;
+        tabsHtml += `<button class="format-tab ${jsonActive}" data-format="json" `;
+        tabsHtml += `${!hasJson ? 'disabled' : ''}>JSON</button>`;
+        tabsHtml += `<button class="format-tab ${textActive}" data-format="text" `;
+        tabsHtml += `${!hasText ? 'disabled' : ''}>Pretty</button>`;
+        fullscreenFormatTabs.innerHTML = tabsHtml;
+        
+        // Attach format tab handlers
+        fullscreenFormatTabs.querySelectorAll('.format-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                if (tab.disabled) return;
+                setStuffFormat(tab.dataset.format, true);
+            });
+        });
+    } else {
+        fullscreenFormatTabs.innerHTML = '';
+    }
+    
+    // Render initial content
+    renderStuffContentFullscreen(currentStuffFormat);
+    
+    // Show modal
+    modal.classList.add('visible');
+    
+    // Disable body scroll
+    document.body.style.overflow = 'hidden';
+}
+
+// Close fullscreen view (back to sidebar inspector)
+function closeFullscreen() {
+    const modal = document.getElementById('fullscreen-modal');
+    modal.classList.remove('visible');
+
+    // Re-enable body scroll
+    document.body.style.overflow = '';
+}
+
+// Minimize fullscreen (alias for closeFullscreen - returns to sidebar)
+function minimizeFullscreen() {
+    closeFullscreen();
+}
+
+// Close both fullscreen and inspector panel
+function closeFullscreenAndInspector() {
+    closeFullscreen();
+    closeInspector();
+}
+
+// Close fullscreen on Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('fullscreen-modal');
+        if (modal.classList.contains('visible')) {
+            closeFullscreen();
+        }
+    }
+});
+
+// Update setStuffFormat to handle both inspector and fullscreen
+const originalSetStuffFormat = setStuffFormat;
+function setStuffFormat(format, updateFullscreen = false) {
+    currentStuffFormat = format;
+    
+    // Update inspector tabs
+    const inspectorTabs = document.getElementById('stuff-format-tabs');
+    if (inspectorTabs) {
+        inspectorTabs.querySelectorAll('.format-tab').forEach(tab => {
+            tab.classList.toggle('active', tab.dataset.format === format);
+        });
+        renderStuffContent(format);
+    }
+    
+    // Update fullscreen tabs if it's open
+    const modal = document.getElementById('fullscreen-modal');
+    if (modal.classList.contains('visible') || updateFullscreen) {
+        const fullscreenTabs = document.getElementById('fullscreen-format-tabs');
+        if (fullscreenTabs) {
+            fullscreenTabs.querySelectorAll('.format-tab').forEach(tab => {
+                tab.classList.toggle('active', tab.dataset.format === format);
+            });
+        }
+        renderStuffContentFullscreen(format);
+    }
+}
+
+// Render stuff content in fullscreen view
+function renderStuffContentFullscreen(format) {
+    const container = document.getElementById('fullscreen-content');
+    if (!container) return;
+
+    const stuffMermaidId = window.currentStuffMermaidId;
+    const jsonData = window.currentStuffJsonData;
+    const contentType = window.currentStuffContentType;
+    const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
+    const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
+
+    // Handle PDF content type with iframe viewer
+    if (format === 'html' && contentType === 'application/pdf') {
+        const pdfUrl = extractUrl(jsonData);
+        if (pdfUrl) {
+            container.className = 'fullscreen-content inspector-pdf-content';
+            container.innerHTML = '';
+            const iframe = document.createElement('iframe');
+            iframe.src = pdfUrl;
+            iframe.style.cssText = 'width:100%; height:100%; border:none;';
+            container.appendChild(iframe);
+            updateOpenExternalButton();
+            return;
+        }
+    }
+
+    // Handle image content type
+    if (format === 'html' && contentType?.startsWith('image/')) {
+        const imageUrl = extractUrl(jsonData);
+        if (imageUrl) {
+            container.className = 'fullscreen-content inspector-image-content';
+            container.innerHTML = '';
+            const img = document.createElement('img');
+            img.src = imageUrl;
+            img.style.cssText = 'max-width:100%; max-height:100%; object-fit:contain;';
+            img.alt = 'Image content';
+            container.appendChild(img);
+            updateOpenExternalButton();
+            return;
+        }
+    }
+
+    if (format === 'json') {
+        container.className = 'fullscreen-content';
+        const jsonStr = JSON.stringify(jsonData, null, 2);
+        container.innerHTML = `<pre class="inspector-pre">${escapeHtml(jsonStr)}</pre>`;
+    } else if (format === 'text') {
+        const textContent = textData || 'No text data available';
+        container.className = 'fullscreen-content';
+        container.innerHTML = `<pre class="inspector-pre nowrap">${escapeHtml(textContent)}</pre>`;
+    } else if (format === 'html') {
+        const htmlContent = htmlData || 'No HTML data available';
+        container.className = 'fullscreen-content inspector-html-content';
+        container.innerHTML = DOMPurify.sanitize(htmlContent);
+        makeLinksOpenInNewWindow(container);
+    }
+
+    updateOpenExternalButton();
+}

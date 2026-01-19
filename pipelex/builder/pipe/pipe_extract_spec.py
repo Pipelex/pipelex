@@ -28,14 +28,16 @@ class PipeExtractSpec(PipeSpec):
     caption generation, and page rendering.
 
     Validation Rules:
-        - inputs dict must have exactly one input entry, and the value must be either `Image` or `PDF`.
+        - inputs dict must have exactly one input entry, and the value must be either `Image` or `Document` (a PDF is a document).
         - output must be "Page"
     """
 
     type: SkipJsonSchema[Literal["PipeExtract"]] = "PipeExtract"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
     extract_skill: ExtractSkill | str = Field(description="Select the most adequate extraction model skill according to the task to be performed.")
-    page_images: bool | None = Field(default=None, description="Whether to include detected images in the Extract output.")
+    max_page_images: int | None = Field(
+        default=None, description="Max number of images to extract from pages: None=unlimited, 0=no images, N=limit to N images."
+    )
     page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
 
@@ -54,10 +56,10 @@ class PipeExtractSpec(PipeSpec):
     @classmethod
     def validate_extract_inputs(cls, inputs_value: dict[str, str] | None) -> dict[str, str] | None:
         if inputs_value is None:
-            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `Document` (a PDF is a document)."
             raise ValueError(msg)
         if len(inputs_value) != 1:
-            msg = "PipeExtract must have exactly one input which must be either `Image` or `PDF`."
+            msg = "PipeExtract must have exactly one input which must be either `Image` or `Document` (a PDF is a document)."
             raise ValueError(msg)
         return inputs_value
 
@@ -75,8 +77,8 @@ class PipeExtractSpec(PipeSpec):
         extract_group.renderables.append(Text.from_markup(f"Extract Skill: [bold yellow]{self.extract_skill}[/bold yellow]"))
 
         # Add optional extraction settings if they are set
-        if self.page_images is not None:
-            extract_group.renderables.append(Text.from_markup(f"Include Page Images: [bold magenta]{self.page_images}[/bold magenta]"))
+        if self.max_page_images is not None:
+            extract_group.renderables.append(Text.from_markup(f"Max Page Images: [bold magenta]{self.max_page_images}[/bold magenta]"))
         if self.page_image_captions is not None:
             extract_group.renderables.append(Text.from_markup(f"Generate Image Captions: [bold magenta]{self.page_image_captions}[/bold magenta]"))
         if self.page_views is not None:
@@ -97,7 +99,7 @@ class PipeExtractSpec(PipeSpec):
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             model=extract_model_choice,
-            page_images=self.page_images,
+            max_page_images=self.max_page_images,
             page_image_captions=self.page_image_captions,
             page_views=self.page_views,
             page_views_dpi=None,

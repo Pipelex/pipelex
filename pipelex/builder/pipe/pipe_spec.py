@@ -30,7 +30,7 @@ class PipeSpec(StructuredContent):
         - [N]: exactly N items (e.g., "Image[3]" for 3 images)
 
     Examples:
-        inputs = {"document": "PDF", "queries": "Text[]"}  # single PDF, multiple texts
+        inputs = {"document": "Document", "queries": "Text[]"}  # single document, multiple texts
         output = "Article[]"  # produces a list of articles
         output = "Image[5]"  # produces exactly 5 images
     """

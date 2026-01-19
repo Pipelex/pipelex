@@ -72,7 +72,7 @@ class TestPipeConditionNeededInputs:
         # Create concepts
         document_concept = ConceptFactory.make_from_blueprint(
             domain_code=domain_code,
-            concept_code="Document",
+            concept_code="TestDocument",
             blueprint_or_string_description=ConceptBlueprint(description="A document"),
         )
         analysis_concept = ConceptFactory.make_from_blueprint(

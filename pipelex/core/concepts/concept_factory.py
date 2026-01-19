@@ -105,11 +105,11 @@ class ConceptFactory:
                     description="An image",
                     structure_class_name=structure_class_name,
                 )
-            case NativeConceptCode.PDF:
+            case NativeConceptCode.DOCUMENT:
                 return Concept(
                     code=native_concept_code,
                     domain_code=SpecialDomain.NATIVE,
-                    description="A PDF",
+                    description="A document",
                     structure_class_name=structure_class_name,
                 )
             case NativeConceptCode.TEXT_AND_IMAGES:

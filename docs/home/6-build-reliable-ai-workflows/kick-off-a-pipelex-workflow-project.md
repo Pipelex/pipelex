@@ -5,7 +5,7 @@
 A pipeline in Pipelex is a collection of related concepts and pipes. Start by creating a PLX file in your project:
 
 `tutorial.plx`
-```plx
+```toml
 domain = "tutorial"
 description = "My first Pipelex library"
 system_prompt = "You are a helpful assistant."

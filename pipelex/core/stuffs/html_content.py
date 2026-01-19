@@ -30,7 +30,7 @@ class HtmlContent(StuffContent):
         return render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
-            temlating_context={
+            templating_context={
                 "inner_html": self.inner_html,
                 "css_class": self.css_class,
             },

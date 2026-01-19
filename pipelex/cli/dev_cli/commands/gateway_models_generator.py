@@ -82,8 +82,8 @@ def extract_reference_data(model_specs: BackendModelSpecs) -> dict[str, list[dic
             "sdk": spec_dict.get("sdk", default_sdk),
         }
 
-        # Only include structure_method for LLMs (not relevant for img_gen)
-        if model_type in {"llm", "text_extractor"}:
+        # Only include structure_method for LLMs (not relevant for img_gen or text_extractor)
+        if model_type == "llm":
             model_info["structure_method"] = spec_dict.get("structure_method", default_structure_method)
 
         # Add to appropriate group
@@ -145,7 +145,7 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
         Complete Markdown content for the reference file.
     """
     models_by_type = extract_reference_data(model_specs)
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")  # noqa: UP017
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
     sections = [
         "# Pipelex Gateway - Available Models",
@@ -168,7 +168,7 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
     # Add document extractor section
     sections.append("## Document Extraction Models")
     sections.append("")
-    sections.append(generate_markdown_table(models_by_type["text_extractor"], include_structure_method=True))
+    sections.append(generate_markdown_table(models_by_type["text_extractor"], include_structure_method=False))
 
     # Add image generation section
     sections.append("## Image Generation Models")

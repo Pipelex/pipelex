@@ -1,0 +1,154 @@
+name: Pre-release version check
+
+on:
+  pull_request:
+    branches:
+      - 'pre-release/v*'
+
+jobs:
+  prerelease-version-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate pre-release version
+        run: |
+          # Get target branch and extract expected version
+          BASE_BRANCH="${{ github.event.pull_request.base.ref }}"
+          echo "Target branch: $BASE_BRANCH"
+
+          # Extract version from branch name (pre-release/vX.Y.Z(a|b|rc)N)
+          if [[ ! "$BASE_BRANCH" =~ ^pre-release/v([0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+)$ ]]; then
+            echo "::error::Branch name does not match pre-release format: pre-release/vX.Y.Z(a|b|rc)N"
+            exit 1
+          fi
+          BRANCH_VERSION="${BASH_REMATCH[1]}"
+          echo "Expected version from branch: $BRANCH_VERSION"
+
+          # Get version from pyproject.toml
+          PYPROJECT_VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2)
+          echo "Version in pyproject.toml: $PYPROJECT_VERSION"
+
+          # Validate it's a PEP 440 pre-release format
+          if [[ ! "$PYPROJECT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(a|b|rc)[0-9]+$ ]]; then
+            echo "::error::Version '$PYPROJECT_VERSION' is not a valid PEP 440 pre-release (expected X.Y.Za1, X.Y.Zb1, or X.Y.Zrc1)"
+            exit 1
+          fi
+
+          # Check versions match
+          if [[ "$PYPROJECT_VERSION" != "$BRANCH_VERSION" ]]; then
+            echo "::error::Version mismatch! pyproject.toml: $PYPROJECT_VERSION, branch: $BRANCH_VERSION"
+            exit 1
+          fi
+
+          echo "✅ Version '$PYPROJECT_VERSION' is valid and matches branch name"
+
+      - name: Check version doesn't exist on PyPI
+        run: |
+          VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2)
+          PACKAGE_NAME="pipelex"
+
+          echo "Checking if $PACKAGE_NAME version $VERSION already exists on PyPI..."
+
+          # Fetch all versions from PyPI
+          PYPI_RESPONSE=$(curl -s "https://pypi.org/pypi/$PACKAGE_NAME/json" || echo "")
+
+          if [ -z "$PYPI_RESPONSE" ]; then
+            echo "Could not fetch PyPI data (package may not exist yet). Skipping check."
+            exit 0
+          fi
+
+          # Check if this exact version exists
+          if echo "$PYPI_RESPONSE" | grep -q "\"$VERSION\""; then
+            echo "::error::Version $VERSION already exists on PyPI! Cannot publish duplicate version."
+            exit 1
+          fi
+
+          echo "✅ Version $VERSION does not exist on PyPI"
+
+      - name: Check version is valid increment from PyPI
+        run: |
+          VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2)
+          PACKAGE_NAME="pipelex"
+
+          # Parse new version
+          if [[ "$VERSION" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(a|b|rc)([0-9]+)$ ]]; then
+            NEW_BASE="${BASH_REMATCH[1]}"
+            NEW_TYPE="${BASH_REMATCH[2]}"
+            NEW_NUM="${BASH_REMATCH[3]}"
+          else
+            echo "::error::Could not parse version $VERSION"
+            exit 1
+          fi
+
+          echo "New version: base=$NEW_BASE type=$NEW_TYPE num=$NEW_NUM"
+
+          # Fetch all versions from PyPI
+          PYPI_RESPONSE=$(curl -s "https://pypi.org/pypi/$PACKAGE_NAME/json" || echo "")
+
+          if [ -z "$PYPI_RESPONSE" ]; then
+            echo "Could not fetch PyPI data. Skipping increment check."
+            exit 0
+          fi
+
+          # Extract all pre-release versions with the same base (X.Y.Z)
+          # PyPI JSON has "releases" object with version keys
+          EXISTING_PRERELEASES=$(echo "$PYPI_RESPONSE" | grep -oE "\"${NEW_BASE}(a|b|rc)[0-9]+\"" | tr -d '"' | sort -V)
+
+          if [ -z "$EXISTING_PRERELEASES" ]; then
+            echo "No existing pre-releases for $NEW_BASE on PyPI."
+            echo "✅ First pre-release for this version - valid"
+            exit 0
+          fi
+
+          echo "Existing pre-releases for $NEW_BASE on PyPI:"
+          echo "$EXISTING_PRERELEASES"
+
+          # Get the latest pre-release
+          LATEST=$(echo "$EXISTING_PRERELEASES" | tail -1)
+          echo "Latest pre-release: $LATEST"
+
+          # Parse latest version
+          if [[ "$LATEST" =~ ^([0-9]+\.[0-9]+\.[0-9]+)(a|b|rc)([0-9]+)$ ]]; then
+            OLD_BASE="${BASH_REMATCH[1]}"
+            OLD_TYPE="${BASH_REMATCH[2]}"
+            OLD_NUM="${BASH_REMATCH[3]}"
+          else
+            echo "::error::Could not parse latest version $LATEST"
+            exit 1
+          fi
+
+          echo "Latest on PyPI: base=$OLD_BASE type=$OLD_TYPE num=$OLD_NUM"
+
+          # Define type order: a=1, b=2, rc=3
+          type_order() {
+            case "$1" in
+              a) echo 1 ;;
+              b) echo 2 ;;
+              rc) echo 3 ;;
+              *) echo 0 ;;
+            esac
+          }
+
+          OLD_TYPE_ORDER=$(type_order "$OLD_TYPE")
+          NEW_TYPE_ORDER=$(type_order "$NEW_TYPE")
+
+          # Check valid progression
+          if [[ "$NEW_TYPE_ORDER" -gt "$OLD_TYPE_ORDER" ]]; then
+            # Letter progression (a→b, a→rc, b→rc) - valid
+            echo "✅ Valid progression: $OLD_TYPE → $NEW_TYPE (stage upgrade)"
+          elif [[ "$NEW_TYPE_ORDER" -eq "$OLD_TYPE_ORDER" ]]; then
+            # Same type - must increment by exactly 1
+            EXPECTED_NUM=$((OLD_NUM + 1))
+            if [[ "$NEW_NUM" -eq "$EXPECTED_NUM" ]]; then
+              echo "✅ Valid progression: $OLD_TYPE$OLD_NUM → $NEW_TYPE$NEW_NUM (increment by 1)"
+            else
+              echo "::error::Invalid increment! Expected $NEW_TYPE$EXPECTED_NUM but got $NEW_TYPE$NEW_NUM"
+              echo "Number must increment by exactly 1 (from $OLD_NUM to $EXPECTED_NUM)"
+              exit 1
+            fi
+          else
+            echo "::error::Invalid progression! Cannot go backwards: $OLD_TYPE → $NEW_TYPE"
+            echo "Valid progressions: a → b → rc"
+            exit 1
+          fi

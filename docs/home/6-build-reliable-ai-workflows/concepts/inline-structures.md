@@ -6,7 +6,7 @@ For an introduction to concepts themselves, see [Define Your Concepts](define_yo
 
 ## Quick Example
 
-```plx
+```toml
 domain = "finance"
 
 [concept.Invoice]
@@ -37,7 +37,7 @@ Behind the scenes, Pipelex automatically generates a fully-typed Pydantic model 
     Inline structures **cannot reference other custom concepts** as field types. You can only use basic types (text, integer, boolean, etc.) and native concepts.
     
     **Not allowed:**
-    ```plx
+    ```toml
     [concept.Address.structure]
     street = "Street address"
     
@@ -66,7 +66,7 @@ Inline structures support these field types:
 
 String values. Use for any text content.
 
-```plx
+```toml
 [concept.Person.structure]
 email = { type = "text", description = "Email address" }
 ```
@@ -84,7 +84,7 @@ email = { type = "text", description = "Email address" }
 
 Whole numbers (no decimals). Use for counts, IDs, ages, etc.
 
-```plx
+```toml
 [concept.Product.structure]
 product_id = { type = "integer", description = "Unique product ID" }
 quantity = { type = "integer", description = "Stock quantity", default_value = 0 }
@@ -94,7 +94,7 @@ quantity = { type = "integer", description = "Stock quantity", default_value = 0
 
 True/false values. Use for flags, states, toggles.
 
-```plx
+```toml
 [concept.Account.structure]
 is_active = { type = "boolean", description = "Account status" }
 is_verified = { type = "boolean", description = "Email verified", default_value = false }
@@ -104,7 +104,7 @@ is_verified = { type = "boolean", description = "Email verified", default_value 
 
 Numeric values (integers or floats). Use for prices, measurements, scores.
 
-```plx
+```toml
 [concept.Invoice.structure]
 total_amount = { type = "number", description = "Total amount" }
 tax_rate = { type = "number", description = "Tax rate as decimal", default_value = 0.0 }
@@ -114,7 +114,7 @@ tax_rate = { type = "number", description = "Tax rate as decimal", default_value
 
 Date and datetime values. Pipelex handles date parsing automatically.
 
-```plx
+```toml
 [concept.Event.structure]
 event_date = { type = "date", description = "Event date and time" }
 created_at = { type = "date", description = "Creation timestamp" }
@@ -124,7 +124,7 @@ created_at = { type = "date", description = "Creation timestamp" }
 
 Arrays/lists of items. **Must specify `item_type`** to indicate what the list contains.
 
-```plx
+```toml
 [concept.Project.structure]
 tags = { type = "list", item_type = "text", description = "Project tags" }
 milestones = { type = "list", item_type = "text", description = "Milestone names" }
@@ -135,7 +135,7 @@ scores = { type = "list", item_type = "number", description = "Test scores" }
 
 Dictionaries/maps with key-value pairs. **Must specify `key_type` and `value_type`**.
 
-```plx
+```toml
 [concept.Configuration.structure]
 settings = { type = "dict", key_type = "text", value_type = "text", description = "Config settings" }
 metadata = { type = "dict", key_type = "text", value_type = "number", description = "Numeric metadata" }
@@ -145,7 +145,7 @@ metadata = { type = "dict", key_type = "text", value_type = "number", descriptio
 
 For fields that should only accept specific values, use the `choices` property. When using `choices`, you don't need to specify a `type`.
 
-```plx
+```toml
 [concept.Task.structure]
 title = "Task title"
 priority = { choices = ["low", "medium", "high"], description = "Task priority level" }
@@ -156,7 +156,7 @@ status = { choices = ["todo", "in_progress", "done"], description = "Current sta
 
 By default, **all fields are optional** (`required = false`). To make a field mandatory, explicitly set `required = true`:
 
-```plx
+```toml
 [concept.User.structure]
 username = { type = "text", description = "Username", required = true }
 email = { type = "text", description = "Email address", required = true }

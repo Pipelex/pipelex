@@ -51,7 +51,7 @@ Image generation presets are defined in your model deck configuration and can in
 
 This pipe generates one image of a futuristic car without requiring any input.
 
-```plx
+```toml
 [pipe.generate_car_image]
 type = "PipeImgGen"
 description = "Generate a futuristic car image"
@@ -66,7 +66,7 @@ quality = "hd"
 
 This pipe takes a text prompt as input and generates three variations of the image using bracket notation.
 
-```plx
+```toml
 [concept]
 ImagePrompt = "A text prompt for generating an image"
 

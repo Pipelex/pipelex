@@ -93,13 +93,13 @@ So here are a few concrete examples of calls to execute_pipeline with various wa
         },
     )
 
-# Here we have a single input and it's a PDF.
-# Because PDFContent is a native concept, we can use it directly as a value,
+# Here we have a single input and it's a document.
+# Because DocumentContent is a native concept, we can use it directly as a value,
 # the system knows what content it corresponds to:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_dpe",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
 

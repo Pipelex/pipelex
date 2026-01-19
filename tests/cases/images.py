@@ -14,6 +14,7 @@ class ImageTestCases:
     IMAGE_FILE_PATH_JPG_1 = f"{TEST_IMAGE_DIRECTORY}/animal_lympics.jpg"
     IMAGE_FILE_PATH_JPG_2 = f"{TEST_IMAGE_DIRECTORY}/solar_system.jpg"
     IMAGE_FILE_PATH_PNG_2 = f"{TEST_IMAGE_DIRECTORY}/solar_system.png"
+    IMAGE_FILE_PATH_PNG_3 = f"{TEST_IMAGE_DIRECTORY}/solar_system_max.png"
     IMAGE_FILE_PATH_JPG_3 = f"{TEST_IMAGE_DIRECTORY}/eiffel_tower.jpg"
     IMAGE_FILE_PATH_LOGO_TINY = f"{TEST_IMAGE_DIRECTORY}/logo-tiny.png"
 
@@ -28,6 +29,7 @@ class ImageTestCases:
     IMAGE_TEXT_FILE_PATHS: ClassVar[list[str]] = [
         IMAGE_FILE_PATH_JPG_1,
         IMAGE_FILE_PATH_PNG_2,
+        IMAGE_FILE_PATH_PNG_3,
     ]
 
     # URL collections

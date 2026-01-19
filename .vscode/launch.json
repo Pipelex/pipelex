@@ -93,15 +93,29 @@
             "justMyCode": false
         },
         {
-            "name": "Debug run pipe bundle",
+            "name": "Debug run pipe bundle no inputs",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
-                "results/pipeline_01/bundle.plx",
+                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.plx",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug run pipe bundle with inputs",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "run",
+                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.plx",
+                "--pipe",
+                "describe_image",
                 "--inputs",
-                "results/pipeline_01/inputs.json",
+                "tests/data/pipeline_inputs/input_image.json",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

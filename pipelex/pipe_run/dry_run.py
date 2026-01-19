@@ -47,8 +47,8 @@ class DryRunOutput(BaseModel):
 
 async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> DryRunOutput:
     try:
-        needed_inputs_for_factory = _convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
-        working_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs_for_factory)
+        needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec=pipe.needed_inputs())
+        working_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs_for_factory)
         pipe.validate_with_libraries()
         await pipe.run_pipe(
             job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED),
@@ -66,7 +66,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
         else:
             error_message = f"Dry run failed for pipe '{pipe.code}': {formatted_error}"
             return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.FAILURE, error_message=error_message)
-    log.dev(f"✅ Pipe '{pipe.code}' dry run completed successfully")
+    log.verbose(f"✅ Pipe '{pipe.code}' dry run completed successfully")
     return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SUCCESS)
 
 
@@ -107,7 +107,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
 
     unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
 
-    log.dev(
+    log.verbose(
         f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, "
         f"{len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
     )
@@ -122,7 +122,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
     return results
 
 
-def _convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
+def convert_to_working_memory_format(needed_inputs_spec: InputStuffSpecs) -> list[TypedNamedStuffSpec]:
     """Convert PipeInput to the format needed by WorkingMemoryFactory.make_for_dry_run.
 
     Args:

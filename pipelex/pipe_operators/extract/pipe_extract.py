@@ -38,12 +38,12 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     type: Literal["PipeExtract"] = "PipeExtract"
     extract_choice: ExtractModelChoice | None
     should_caption_images: bool
-    should_include_images: bool
+    max_page_images: int | None
     should_include_page_views: bool
     page_views_dpi: int
 
     image_stuff_name: str | None = None
-    pdf_stuff_name: str | None = None
+    document_stuff_name: str | None = None
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -55,8 +55,8 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
     @model_validator(mode="after")
     def validate_fields(self) -> Self:
-        if self.image_stuff_name is None and self.pdf_stuff_name is None:
-            msg = "For PipeExtract you must provide either a pdf or an image or a concept that refines one of them"
+        if self.image_stuff_name is None and self.document_stuff_name is None:
+            msg = "For PipeExtract you must provide either a document or an image or a concept that refines one of them"
             raise ValueError(msg)
         return self
 
@@ -106,24 +106,26 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         if self.image_stuff_name:
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
             image_uri = image_stuff.url
-        elif self.pdf_stuff_name:
-            pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
-            pdf_uri = pdf_stuff.url
+        elif self.document_stuff_name:
+            document_stuff = working_memory.get_stuff_as_document(name=self.document_stuff_name)
+            pdf_uri = document_stuff.url
 
         extract_choice: ExtractModelChoice = self.extract_choice or get_model_deck().extract_choice_default
         extract_setting: ExtractSetting = get_model_deck().get_extract_setting(extract_choice=extract_choice)
 
+        # PLX-level max_page_images takes precedence if set, otherwise use ExtractSetting
+        max_nb_images = self.max_page_images if self.max_page_images is not None else extract_setting.max_nb_images
+
         extract_job_params = ExtractJobParams(
-            should_include_images=self.should_include_images,
             should_caption_images=self.should_caption_images,
             should_include_page_views=self.should_include_page_views,
             page_views_dpi=self.page_views_dpi,
-            max_nb_images=extract_setting.max_nb_images,
+            max_nb_images=max_nb_images,
             image_min_size=extract_setting.image_min_size,
         )
         extract_input = ExtractInput(
             image_uri=image_uri,
-            pdf_uri=pdf_uri,
+            document_uri=pdf_uri,
         )
         page_contents = await content_generator.make_extract_pages(
             extract_input=extract_input,

@@ -4,7 +4,8 @@ This example demonstrates how to create a pipeline that takes a draft of a tweet
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/wip/write_tweet.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/wip/write_tweet.py)
+<!-- PRERELEASE_LINK -->
+[**➡️ View on GitHub: examples/wip/write_tweet/write_tweet.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/wip/write_tweet/write_tweet.py)
 
 ## The Pipeline Explained
 
@@ -47,7 +48,7 @@ class OptimizedTweet(TextContent):
 
 This pipeline uses a two-step "analyze and optimize" sequence. The first pipe analyzes the draft tweet for common pitfalls, and the second pipe rewrites the tweet based on the analysis and a provided writing style. This is a powerful pattern for refining generated content.
 
-```plx
+```toml
 [pipe.optimize_tweet_sequence]
 type = "PipeSequence"
 description = "Analyze and optimize a tech tweet in sequence"

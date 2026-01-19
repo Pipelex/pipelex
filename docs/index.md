@@ -61,4 +61,5 @@ Ready to get started?
 
 **Explore Examples:**
 
-[![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
+<!-- PRERELEASE_LINK -->
+[![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)

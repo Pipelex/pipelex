@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.17.5"
+version = "0.18.0b1"
 description = "The open standard for repeatable AI workflows. Write business logic, not API calls."
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -115,7 +115,13 @@ warn_unused_configs = true
 
 [[tool.mypy.overrides]]
 ignore_missing_imports = true
-module = ["filetype", "json2html", "pypdfium2", "pypdfium2.raw"]
+module = [
+    "backports.strenum",
+    "filetype",
+    "json2html",
+    "pypdfium2",
+    "pypdfium2.raw",
+]
 
 [tool.pyright]
 pythonVersion = "3.11"
@@ -361,7 +367,6 @@ ignore = [
     "RUF001", # String contains ambiguous `′` (PRIME). Did you mean ``` (GRAVE ACCENT)?
     "RUF003", # Comment contains ambiguous `’` (RIGHT SINGLE QUOTATION MARK). Did you mean ``` (GRAVE ACCENT)?
     "RUF022", # Checks for __all__ definitions that are not ordered according to an "isort-style" sort.
-    "RUF067", # `__init__` module should only contain docstrings and re-exports
 
     "SIM105", # Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`
     "SIM108", # Use ternary operator `description = func.__doc__.strip().split("\n")[0] if func.__doc__ else func.__name__` instead of `if`-`else`-block
@@ -391,6 +396,7 @@ ignore = [
     "TRY300",  # Consider moving this statement to an `else` block
     "UP035",   # `typing.List` is deprecated, use `list` instead
     "RET503",  # Missing explicit `return` at the end of function able to return non-`None` value
+    "UP017",   # Use `datetime.UTC` alias - but UTC only available in Python 3.11+
 ]
 
 [tool.ruff.lint.pydocstyle]

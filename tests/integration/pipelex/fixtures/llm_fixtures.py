@@ -60,7 +60,6 @@ ANTHROPIC_MODELS = [
     "claude-4.1-opus",
     "claude-4.5-haiku",
     "claude-4.5-sonnet",
-    "claude-opus-4",
     "claude-4.5-opus",
 ]
 
@@ -74,7 +73,6 @@ DEEPSEEK_MODELS = [
 
 # --- Google Models (Gemini) ---------------------------------------------------------------------
 GOOGLE_MODELS = [
-    "gemini-flash-1.5-8b",
     "gemini-2.0-flash",
     "gemini-2.5-flash",
     "gemini-2.5-flash-lite",
@@ -102,6 +100,12 @@ META_MODELS = [
     "meta-llama/llama-guard-4-12b",
 ]
 
+# --- Microsoft Models -----------------------------------------------------------------------------
+MICROSOFT_MODELS = [
+    "phi-4",
+    "phi-4-multimodal",
+]
+
 # --- Mistral Models -----------------------------------------------------------------------------
 MISTRALAI_MODELS = [
     "bedrock-mistral-large",
@@ -119,11 +123,13 @@ MISTRALAI_MODELS = [
     "pixtral-12b",
     "pixtral-large",
     "pixtral-large-2411",
+    "mistral-large-3",
 ]
 
 # --- Moonshot AI Models -------------------------------------------------------------------------
 MOONSHOTAI_MODELS = [
     "kimi-k2-instruct-0905",
+    "kimi-k2-thinking",
 ]
 
 # --- OpenAI Models ------------------------------------------------------------------------------
@@ -149,6 +155,7 @@ OPENAI_MODELS = [
     "gpt-5.1",
     "gpt-5.2",
     "gpt-5.2-chat",
+    "gpt-5.2-codex",
 ]
 
 # --- OpenAI OSS Models --------------------------------------------------------------------------
@@ -172,9 +179,9 @@ QWEN_MODELS = [
 XAI_MODELS = [
     "grok-3",
     "grok-3-mini",
-    "grok-4",
     "grok-3-fast",
     "grok-3-mini-fast",
+    "grok-4",
     "grok-4-fast-reasoning",
     "grok-4-fast-non-reasoning",
 ]
@@ -187,6 +194,7 @@ ALL_LLM_HANDLES = [
     *GOOGLE_MODELS,
     *GROQ_MODELS,
     *META_MODELS,
+    *MICROSOFT_MODELS,
     *MISTRALAI_MODELS,
     *MOONSHOTAI_MODELS,
     *OPENAI_MODELS,
@@ -241,20 +249,33 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        # "gpt-4o",
-        # "gpt-4o-mini",
-        # "gpt-5-mini",
-        # "gpt-5-nano",
-        # "gpt-5-chat",
+        # Anthropic Claude models with native document support
+        # "claude-3.7-sonnet",
+        # "claude-4-sonnet",
+        # "claude-4-opus",
+        # "claude-4.1-opus",
+        "claude-4.5-haiku",
         # "claude-4.5-sonnet",
-        # "mistral-medium-2508",
+        # "claude-4.5-opus",
+        # Google Gemini models with native document support
         "gemini-2.5-flash-lite",
         # "gemini-2.5-flash",
         # "gemini-2.5-pro",
-        # "qwen3:8b",
+        # OpenAI models using Responses API (supports PDF input)
+        # "gpt-5.2",
+        # "gpt-5",
+        # "gpt-5-chat",
+        "gpt-4o-mini",
+        # Mistral models with native document support
+        "mistral-medium",
     ],
 )
-def llm_handle_for_vision(request: pytest.FixtureRequest) -> str:
+def llm_handle_for_documents(request: pytest.FixtureRequest) -> str:
+    """Fixture for LLM handles that support document input (PDF, DOCX).
+
+    Note: OpenAI models starting with gpt-5 and later use the Responses API
+    which supports PDF input via input_file type.
+    """
     assert isinstance(request.param, str)
     llm_handle_param = request.param
     if not is_llm_handle_supported(llm_handle_param):

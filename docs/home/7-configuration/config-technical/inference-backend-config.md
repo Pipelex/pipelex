@@ -160,7 +160,7 @@ Your API key is hashed for security. Gateway telemetry operates independently fr
 
 Once configured, all models are available through the unified backend. Use standard model names in your pipelines:
 
-```plx
+```toml
 [pipe.example]
 type = "PipeLLM"
 model = { model = "claude-4.5-sonnet", temperature = 0.7 }

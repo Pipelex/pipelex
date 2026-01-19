@@ -45,7 +45,7 @@ OCR presets are defined in your model deck configuration and can include paramet
 | `description`               | string  | A description of the OCR operation.                                                                   | Yes      |
 | `inputs`                    | Fixed  | The value is either of concept `Image` or `Pdf`.                                                     | Yes       |
 | `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
-| `page_images`               | boolean | If `true`, any images found within the document pages will be extracted and included in the output. Defaults to `false`.                 | No       |
+| `max_page_images`           | integer or null | Maximum number of images to extract from pages: `null` (or omit) for unlimited, `0` for no images, or a positive integer to limit. Defaults to the value in your Extract model preset. | No       |
 | `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
 | `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
 | `page_image_captions`       | boolean | If `true`, the OCR service may attempt to generate captions for the images found. *Note: This feature depends on the OCR provider.*        | No       |
@@ -55,7 +55,7 @@ OCR presets are defined in your model deck configuration and can include paramet
 
 This example defines a pipe that takes a PDF, extracts text and full-page images, and outputs them as a list of pages.
 
-```plx
+```toml
 [concept]
 ScannedDocument = "A document that has been scanned as a PDF"
 

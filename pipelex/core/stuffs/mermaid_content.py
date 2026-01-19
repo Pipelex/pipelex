@@ -30,7 +30,7 @@ class MermaidContent(StuffContent):
         return render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
-            temlating_context={
+            templating_context={
                 "mermaid_code": self.mermaid_code,
             },
         )

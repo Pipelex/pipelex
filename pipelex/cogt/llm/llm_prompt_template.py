@@ -9,7 +9,8 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.config import get_config
 from pipelex.hub import get_content_generator
 from pipelex.tools.misc.string_utils import is_none_or_has_text

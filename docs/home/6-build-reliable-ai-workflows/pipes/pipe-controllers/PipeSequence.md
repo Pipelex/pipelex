@@ -40,7 +40,7 @@ Each entry in the `steps` array is a table with the following keys:
 
 Let's imagine a pipeline that first extracts text from an image, then summarizes that text, and finally translates the summary into French.
 
-```plx
+```toml
 [pipe.extract_text_from_image]
 type = "PipeExtract"
 description = "Extract text from an image"

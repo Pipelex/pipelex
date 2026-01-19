@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from typing import Literal, cast, get_type_hints
 
 from pydantic import field_validator
@@ -104,7 +105,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         log.verbose(f"Running PipeFunc with function '{self.function_name}'")
         function = func_registry.get_required_function(self.function_name)
 
-        if asyncio.iscoroutinefunction(function):  # pyright: ignore[reportDeprecated]
+        if inspect.iscoroutinefunction(function):
             func_output_object = await function(working_memory=working_memory)
         else:
             func_output_object = await asyncio.to_thread(function, working_memory=working_memory)

@@ -41,6 +41,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
             nb_images=1,
+            model_id=self.inference_model.model_id,
         )
         prompt = args_dict.pop("prompt")
         model_id = self.inference_model.model_id
@@ -57,7 +58,7 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImageRawDetails:
         pil_image = await self._generate_single_image(img_gen_job=img_gen_job)
         output_format = img_gen_job.job_params.output_format or ImageFormat.PNG
-        generated_image = GeneratedImageRawDetails.make_from_pil_image(pil_image=pil_image, output_format=output_format)
+        generated_image = GeneratedImageRawDetails.make_from_pil_image(pil_image=pil_image, image_format=output_format)
         log.verbose(generated_image, title="generated_image")
         return generated_image
 

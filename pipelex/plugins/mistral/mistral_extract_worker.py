@@ -6,19 +6,12 @@ from typing_extensions import override
 from pipelex.cogt.exceptions import ExtractCapabilityError, SdkTypeError
 from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.base64_utils import make_base64_url_from_path
-from pipelex.tools.uri.resolved_uri import (
-    ResolvedBase64DataUrl,
-    ResolvedHttpUrl,
-    ResolvedLocalPath,
-    ResolvedPipelexStorage,
-)
-from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 class MistralExtractWorker(ExtractWorkerAbstract):
@@ -50,108 +43,59 @@ class MistralExtractWorker(ExtractWorkerAbstract):
         if image_uri := extract_job.extract_input.image_uri:
             extract_output = await self._extract_page_from_image(
                 image_uri=image_uri,
-                should_caption_image=extract_job.job_params.should_caption_images,
             )
 
-        elif pdf_uri := extract_job.extract_input.pdf_uri:
-            extract_output = await self._extract_pages_from_pdf(
-                pdf_uri=pdf_uri,
-                should_include_images=extract_job.job_params.should_include_images,
-                should_caption_images=extract_job.job_params.should_caption_images,
+        elif document_uri := extract_job.extract_input.document_uri:
+            extract_output = await self._extract_pages_from_document(
+                document_uri=document_uri,
+                extract_job_params=extract_job.job_params,
             )
         else:
-            msg = "No image nor PDF URI provided in ExtractJob"
+            msg = "No image nor document URI provided in ExtractJob"
             raise ExtractInputError(msg)
         return extract_output
 
     async def _extract_page_from_image(
         self,
         image_uri: str,
-        should_caption_image: bool = False,
     ) -> ExtractOutput:
-        if should_caption_image:
-            msg = "Captioning is not implemented for Mistral OCR."
-            raise NotImplementedError(msg)
-        resolved_uri = resolve_uri(image_uri)
-        image_url: str
-        match resolved_uri:
-            case ResolvedHttpUrl():
-                image_url = resolved_uri.url
-            case ResolvedLocalPath():
-                image_url = await make_base64_url_from_path(path=resolved_uri.path)
-            case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for Mistral image extraction: {resolved_uri.kind}"
-                raise ExtractInputError(msg)
-        return await self._extract_from_image_url(image_url=image_url)
+        document = await MistralFactory.make_mistral_image_url_chunk_from_uri(uri=image_uri)
+        extract_response = await self.mistral_client.ocr.process_async(
+            model=self.inference_model.model_id,
+            document=document,
+        )
+        return await MistralFactory.make_extract_output_from_mistral_response(
+            mistral_extract_response=extract_response,
+        )
 
-    async def _extract_pages_from_pdf(
+    async def _extract_pages_from_document(
         self,
-        pdf_uri: str,
-        should_include_images: bool,
-        should_caption_images: bool,
+        document_uri: str,
+        extract_job_params: ExtractJobParams,
     ) -> ExtractOutput:
-        if should_caption_images:
+        if extract_job_params.should_caption_images:
             msg = "Captioning is not implemented for Mistral OCR."
             raise ExtractCapabilityError(msg)
-        resolved_uri = resolve_uri(pdf_uri)
-        pdf_url: str
-        match resolved_uri:
-            case ResolvedHttpUrl():
-                pdf_url = resolved_uri.url
-            case ResolvedLocalPath():
-                pdf_url = await self._get_signed_url_from_pdf_file(pdf_path=resolved_uri.path)
-            case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for Mistral PDF extraction: {resolved_uri.kind}"
-                raise ExtractInputError(msg)
-        return await self._extract_from_pdf_url(
-            pdf_url=pdf_url,
-            should_include_images=should_include_images,
-        )
 
-    async def _extract_from_image_url(
-        self,
-        image_url: str,
-    ) -> ExtractOutput:
-        extract_response = await self.mistral_client.ocr.process_async(
-            model=self.inference_model.model_id,
-            document={
-                "type": "image_url",
-                "image_url": image_url,
-            },
-        )
-        return await MistralFactory.make_extract_output_from_mistral_response(
-            mistral_extract_response=extract_response,
-        )
-
-    async def _extract_from_pdf_url(
-        self,
-        pdf_url: str,
-        should_include_images: bool = False,
-    ) -> ExtractOutput:
-        extract_response = await self.mistral_client.ocr.process_async(
-            model=self.inference_model.model_id,
-            document={
-                "type": "document_url",
-                "document_url": pdf_url,
-            },
-            include_image_base64=should_include_images,
-        )
-
-        return await MistralFactory.make_extract_output_from_mistral_response(
-            mistral_extract_response=extract_response,
-            should_include_images=should_include_images,
-        )
-
-    async def _get_signed_url_from_pdf_file(
-        self,
-        pdf_path: str,
-    ) -> str:
-        """Upload a PDF file to Mistral and return a signed URL for it."""
-        uploaded_file_id = await MistralFactory.upload_file_to_mistral_for_ocr(
+        document = await MistralFactory.make_mistral_document_url_chunk_from_uri(
             mistral_client=self.mistral_client,
-            file_path=pdf_path,
+            uri=document_uri,
         )
-        signed_url = await self.mistral_client.files.get_signed_url_async(
-            file_id=uploaded_file_id,
+
+        # max_nb_images: None=unlimited, 0=no images, N=limit to N images
+        image_limit: int | None = extract_job_params.max_nb_images
+        image_min_size: int | None = extract_job_params.image_min_size if image_limit != 0 else None
+
+        # include_image_base64 specifies return format; image_limit=0 means no images extracted
+        include_image_base64 = True
+        extract_response = await self.mistral_client.ocr.process_async(
+            model=self.inference_model.model_id,
+            document=document,
+            include_image_base64=include_image_base64,
+            image_limit=image_limit,
+            image_min_size=image_min_size,
         )
-        return signed_url.url
+
+        return await MistralFactory.make_extract_output_from_mistral_response(
+            mistral_extract_response=extract_response,
+        )

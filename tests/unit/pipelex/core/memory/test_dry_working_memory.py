@@ -13,7 +13,7 @@ from tests.unit.pipelex.core.memory.tricky_questions import ThoughtfulAnswer
 @pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestDryWorkingMemory:
-    async def test_make_for_dry_run_with_page_content(self):
+    async def test_make_mock_inputs_with_page_content(self):
         log.info("Testing dry run with PageContent")
 
         # Test the specific inputs requested by the user
@@ -27,7 +27,7 @@ class TestDryWorkingMemory:
             ),
         ]
 
-        dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        dry_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
         # Verify working memory contains exactly this
         assert len(dry_memory.root) == 1
         assert dry_memory.get_optional_stuff("page") is not None
@@ -51,7 +51,7 @@ class TestDryWorkingMemory:
         # Verify page_view field exists (it's Optional so could be None)
         assert hasattr(page_content, "page_view")
 
-    async def test_make_for_dry_run_with_structured_content(self):
+    async def test_make_mock_inputs_with_structured_content(self):
         log.info("Testing dry run with structured content (ThoughtfulAnswer)")
 
         # Use ThoughtfulAnswer from tricky questions domain
@@ -73,7 +73,7 @@ class TestDryWorkingMemory:
             ),
         ]
 
-        dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        dry_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
         expected_number_of_elements_in_memory = 2
 
         assert len(dry_memory.root) == expected_number_of_elements_in_memory
@@ -106,7 +106,7 @@ class TestDryWorkingMemory:
         log.info("Created mock working memory with structured content:")
         dry_memory.pretty_print_summary()
 
-    async def test_make_for_dry_run_with_text_content_fallback(self):
+    async def test_make_mock_inputs_with_text_content_fallback(self):
         log.info("Testing dry run with TextContent fallback")
 
         needed_inputs = [
@@ -132,7 +132,7 @@ class TestDryWorkingMemory:
             ),
         ]
 
-        dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        dry_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
 
         assert len(dry_memory.root) == 2
         assert dry_memory.get_optional_stuff("question_analysis") is not None
@@ -151,7 +151,7 @@ class TestDryWorkingMemory:
         log.info("Created mock working memory with TextContent fallback:")
         dry_memory.pretty_print_summary()
 
-    async def test_make_for_dry_run_mixed_content_types(self):
+    async def test_make_mock_inputs_mixed_content_types(self):
         log.info("Testing dry run with mixed content types")
 
         needed_inputs = [
@@ -182,7 +182,7 @@ class TestDryWorkingMemory:
             ),
         ]
 
-        dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        dry_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
 
         assert len(dry_memory.root) == 3
 
@@ -206,12 +206,12 @@ class TestDryWorkingMemory:
         log.info("Created mock working memory with mixed content types:")
         dry_memory.pretty_print_summary()
 
-    async def test_make_for_dry_run_empty_inputs(self):
+    async def test_make_mock_inputs_empty_inputs(self):
         log.info("Testing dry run with empty inputs")
 
         needed_inputs: list[TypedNamedStuffSpec] = []
 
-        dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        dry_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
 
         # Verify empty memory was created
         assert len(dry_memory.root) == 0
@@ -219,7 +219,7 @@ class TestDryWorkingMemory:
 
         log.info("Created empty mock working memory")
 
-    async def test_make_for_dry_run_realistic_pipeline_scenario(self):
+    async def test_make_mock_inputs_realistic_pipeline_scenario(self):
         log.info("Testing dry run with realistic tricky questions pipeline scenario")
 
         # Simulate the conclude_tricky_question_by_steps pipeline needs
@@ -251,7 +251,7 @@ class TestDryWorkingMemory:
             ),
         ]
 
-        dry_memory = WorkingMemoryFactory.make_for_dry_run(needed_inputs=needed_inputs)
+        dry_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=needed_inputs)
 
         # Verify the complete pipeline inputs are mocked
         assert len(dry_memory.root) == 3

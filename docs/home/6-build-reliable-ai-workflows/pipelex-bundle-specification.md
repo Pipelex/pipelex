@@ -20,7 +20,7 @@ Think of a bundle as a self-contained module that solves a specific problem doma
 
 Every Pipelex bundle follows this structure:
 
-```plx
+```toml
 # 1. Domain Declaration (MANDATORY)
 domain = "domain_code"
 description = "Description of what this domain handles"
@@ -47,7 +47,7 @@ type = "PipeLLM"
 
 Every bundle **must** declare a domain. Only the `domain` field is mandatory; all other fields are optional:
 
-```plx
+```toml
 domain = "invoice_processing"
 description = "Tools for extracting and validating invoice data"
 source = "path/to/invoice_processing.plx"
@@ -75,7 +75,7 @@ Learn more about domains in [Understanding Domains](./domain.md).
 
 When you define a `system_prompt` at the bundle level, it automatically applies to every `PipeLLM` operator in the bundle. This is useful for setting domain-specific context:
 
-```plx
+```toml
 domain = "medical_records"
 system_prompt = "You are a medical records specialist with expertise in HIPAA compliance and clinical documentation."
 
@@ -93,7 +93,7 @@ Individual pipes can override the bundle's system prompt by defining their own `
 
 You can specify a default pipe to execute when no specific pipe is requested:
 
-```plx
+```toml
 domain = "invoice_processing"
 main_pipe = "extract_and_validate_invoice"
 ```
@@ -110,7 +110,7 @@ See more about executing pipes in [Executing Pipelines](./pipes/executing-pipeli
 
 Concepts define the knowledge structures in your domain. While optional, most bundles define at least a few concepts (See more about concepts in [Define Your Concepts](./concepts/define_your_concepts.md)):
 
-```plx
+```toml
 [concept]
 Invoice = "A commercial document issued by a seller to a buyer"
 Vendor = "A company or individual that provides goods or services"
@@ -137,7 +137,7 @@ This full identifier is how other bundles reference your concepts.
 
 Pipes are the processing units that transform data. Like concepts, they're optional:
 
-```plx
+```toml
 [pipe.extract_invoice]
 type = "PipeExtract"
 description = "Extract text and images from an invoice PDF"
@@ -154,7 +154,7 @@ Understanding when to use domain code prefixes is crucial for writing clean, mai
 
 When a pipe in a bundle references a concept **defined in the same bundle**, you don't need the domain code prefix:
 
-```plx
+```toml
 domain = "invoice_processing"
 
 [concept]
@@ -175,7 +175,7 @@ This is the most common case and keeps your code clean.
 
 When a pipe references a concept **from another bundle/domain**, you must use the full domain code prefix:
 
-```plx
+```toml
 domain = "accounting"
 
 [concept]
@@ -183,7 +183,7 @@ Payment = "A financial transaction recording money transfer"
 ReconciliationReport = "Report of payment reconciliation"
 ```
 
-```plx
+```toml
 [pipe.reconcile_payment]
 type = "PipeLLM"
 description = "Reconcile a payment with an invoice"
@@ -207,7 +207,7 @@ When you execute pipelines, multiple bundles are loaded together into a **Librar
 
 A pipe in one bundle can call a pipe from another bundle using the full pipe identifier:
 
-```plx
+```toml
 domain = "accounts_payable"
 
 [pipe.process_vendor_invoice]

@@ -9,8 +9,7 @@
 # =========================================================================================
 
 # Which profile to use (change this to switch routing)
-# TODO: TBD
-active = "pipelex_gateway_first" # Change to "pipelex_gateway_first" after enabling gateway
+active = "pipelex_gateway_first"
 
 # We recommend using the "pipelex_gateway_first" profile to get a head start with all models.
 # To use the Pipelex Gateway backend:

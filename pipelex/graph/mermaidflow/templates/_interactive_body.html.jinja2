@@ -1,0 +1,46 @@
+{% from 'stuff/_stuff_icons.html.jinja2' import icon_copy, icon_download, icon_external %}
+<div class="header">
+    <h1>{{ title | e }}</h1>
+    <div class="theme-selector">
+        <label for="theme-select">Theme:</label>
+        <select id="theme-select">
+            <option value="default">Default</option>
+            <option value="dark">Dark</option>
+            <option value="forest">Forest</option>
+            <option value="neutral">Neutral</option>
+            <option value="base">Base</option>
+        </select>
+    </div>
+</div>
+<div class="mermaid-container">
+    <div class="mermaid" id="mermaid-diagram"></div>
+</div>
+{% if has_data %}
+<p class="hint">Click on data nodes (rounded pills) to view their full content</p>
+{% endif %}
+<div class="data-modal-overlay" id="modal-overlay"></div>
+<div class="data-modal" id="data-modal">
+    <div class="data-modal-header">
+        <span class="data-modal-title" id="modal-title">Data Content</span>
+        <span class="data-modal-close" onclick="hideModal()">&times;</span>
+    </div>
+    <div class="format-toolbar">
+        <div class="format-tabs" id="format-tabs">
+            <button class="format-tab active" data-format="html" id="tab-html">HTML</button>
+            <button class="format-tab" data-format="json" id="tab-json">JSON</button>
+            <button class="format-tab" data-format="text" id="tab-text">Pretty</button>
+        </div>
+        <div class="format-actions">
+            <button class="action-btn" id="open-external-btn" onclick="openExternal()" title="Open in new window" style="display: none;">
+                {{ icon_external() }}
+            </button>
+            <button class="action-btn" id="copy-btn" onclick="copyContent()" title="Copy">
+                {{ icon_copy() }}
+            </button>
+            <button class="action-btn" id="download-btn" onclick="downloadContent()" title="Download">
+                {{ icon_download() }}
+            </button>
+        </div>
+    </div>
+    <div class="data-modal-content" id="modal-content"></div>
+</div>

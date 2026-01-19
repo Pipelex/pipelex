@@ -60,7 +60,7 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
 max_tokens = 8192
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -69,7 +69,7 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
 max_tokens = 64000
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -78,7 +78,7 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-opus-4-20250514-v1:0"
 max_tokens = 32000
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -87,7 +87,7 @@ costs = { input = 3.0, output = 15.0 }
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-opus-4-1-20250805-v1:0"
 max_tokens = 32000
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -95,8 +95,8 @@ costs = { input = 3.0, output = 15.0 }
 ["claude-4.5-sonnet"]
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
-max_tokens = 8192
-inputs = ["text", "images"]
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -104,8 +104,8 @@ costs = { input = 3.0, output = 15.0 }
 ["claude-4.5-haiku"]
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-haiku-4-5-20251001-v1:0"
-max_tokens = 8192
-inputs = ["text", "images"]
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
@@ -113,8 +113,8 @@ costs = { input = 1.0, output = 5.0 }
 ["claude-4.5-opus"]
 sdk = "bedrock_anthropic"
 model_id = "global.anthropic.claude-opus-4-5-20251101-v1:0"
-max_tokens = 8192
-inputs = ["text", "images"]
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }

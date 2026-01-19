@@ -1,5 +1,3 @@
-from typing import cast
-
 import shortuuid
 from pydantic import Field, field_validator
 
@@ -7,14 +5,14 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.plx_config import PlxConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.storage.storage_config import StorageConfig
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 
 class ConfigPaths:
@@ -39,23 +37,6 @@ class ValidationErrorReaction(StrEnum):
     RAISE = "raise"
     LOG = "log"
     IGNORE = "ignore"
-
-
-class ValidationErrorConfig(ConfigModel):
-    default_reaction: ValidationErrorReaction = Field(strict=False)
-    reactions: dict[PipeValidationErrorType, ValidationErrorReaction]
-
-    @field_validator("reactions", mode="before")
-    @classmethod
-    def validate_reactions(cls, value: dict[str, str]) -> dict[PipeValidationErrorType, ValidationErrorReaction]:
-        return cast(
-            "dict[PipeValidationErrorType, ValidationErrorReaction]",
-            ConfigModel.transform_dict_str_to_enum(
-                input_dict=value,
-                key_enum_cls=PipeValidationErrorType,
-                value_enum_cls=ValidationErrorReaction,
-            ),
-        )
 
 
 class PipeRunConfig(ConfigModel):
@@ -130,6 +111,50 @@ class BuilderConfig(ConfigModel):
 
 class PipelineExecutionConfig(ConfigModel):
     is_normalize_data_urls_to_storage: bool
+    is_mock_inputs: bool
+    is_generate_graph: bool
+    graph_config: GraphConfig
+
+    def with_graph_config_overrides(
+        self,
+        generate_graph: bool | None = None,
+        force_include_full_data: bool | None = None,
+        mock_inputs: bool | None = None,
+    ) -> Self:
+        """Create a copy of this config with optional overrides.
+
+        Args:
+            generate_graph: If not None, overrides is_generate_graph.
+            force_include_full_data: If not None, overrides all graph_config.data_inclusion flags
+                (stuff_json_content, stuff_text_content, stuff_html_content, error_stack_traces).
+            mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock
+                data for missing required inputs (for dry-run validation).
+
+        Returns:
+            A new PipelineExecutionConfig with the specified overrides applied.
+        """
+        updates: dict[str, bool | GraphConfig] = {}
+
+        if generate_graph is not None:
+            updates["is_generate_graph"] = generate_graph
+
+        if mock_inputs is not None:
+            updates["is_mock_inputs"] = mock_inputs
+
+        if force_include_full_data is not None:
+            new_data_inclusion = self.graph_config.data_inclusion.model_copy(
+                update={
+                    "stuff_json_content": force_include_full_data,
+                    "stuff_text_content": force_include_full_data,
+                    "stuff_html_content": force_include_full_data,
+                    "error_stack_traces": force_include_full_data,
+                }
+            )
+            updates["graph_config"] = self.graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
+
+        if updates:
+            return self.model_copy(update=updates)
+        return self
 
 
 class Pipelex(ConfigModel):
@@ -138,7 +163,6 @@ class Pipelex(ConfigModel):
     log_config: LogConfig
     aws_config: AwsConfig
 
-    validation_error_config: ValidationErrorConfig
     structure_config: StructureConfig
     prompting_config: PromptingConfig
     plx_config: PlxConfig

@@ -5,18 +5,18 @@
 
 ### Linting
 
-   After making code changes, you must always lint using `make check`.
+   After making code changes, you must always lint using `make agent-check`.
 
    ```bash
-   make format lint pyright mypy check-unused-imports check-config-sync check-rules pylint
-   # If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
+   make agent-check
+   # If the current system doesn't have the `make` command,
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
    ```
 
    This runs multiple code quality tools:
    - Pyright: Static type checking
-   - Ruff: Fast Python linter  
+   - Ruff: Fix unused imports, lint, format  
    - Mypy: Static type checker
-   - Other checks
 
    Always fix any issues reported by these tools before proceeding.
 
@@ -71,6 +71,19 @@
    ```
 
    If the installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
+
+### Pipelex CLI Commands
+
+   To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.
+
+   ```bash
+   pipelex --help
+   pipelex build --help --no-logo
+   pipelex run --help --no-logo
+   pipelex validate --help --no-logo
+   pipelex doctor --help --no-logo
+   pipelex init --help --no-logo
+   ```
 
 ## Coding Standards & Best Practices for Python Code
 
@@ -228,7 +241,6 @@ NEVER EVER put more than one TestClass into a test module.
     - `tests/unit/` - for unit tests that test individual functions/classes in isolation
     - `tests/integration/` - for integration tests that test component interactions
     - `tests/e2e/` - for end-to-end tests that test complete workflows
-    - `tests/test_pipelines/` - for test pipeline definitions (PLX files and their structuring python files)
 - Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
@@ -239,11 +251,12 @@ NEVER EVER put more than one TestClass into a test module.
 #### Markers
 
 Apply the appropriate markers:
+- "gha_disabled: will not be able to run properly on GitHub Actions"
 - "llm: uses an LLM to generate text or objects"
 - "img_gen: uses an image generation AI"
 - "extract: uses text/image extraction from documents"
 - "inference: uses either an LLM or an image generation AI"
-- "gha_disabled: will not be able to run properly on GitHub Actions"
+- never add "@pytest.mark.dry_runnable" if you haven't set the "inference" marker
 
 Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
 

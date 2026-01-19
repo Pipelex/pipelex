@@ -61,7 +61,7 @@ When describing the task of a pipe controller, be concise, don't detail all the 
 ## Available pipe operators:
 - LLM: uses a Vision/LLM to generate text or structured objects. It can generate single items or lists of items.
 - IMG_GEN: uses an AI model to generate images from a prompt that is either the result of a previous step or part of the pipeline's original inputs. As the image generation prompt MUST be a text, you can plan to use an LLM step to write it.
-- EXTRACT: extracts content from an image or a pdf, always outputs a list of pages (possibly a list of one page). Use it only when you need to use OCR or PDF extraction.
+- EXTRACT: extracts content from an image or a document, always outputs a list of pages (possibly a list of one page). Use it only when you need to use OCR or document extraction.
 
 ---
 
@@ -109,8 +109,8 @@ For instance:
   If we need multiple items, we'll indicate it elsewhere so you don't bother with it here.
 - Provide a concise description for each concept
 
-If the concept can be expressed as a text, image, pdf, number, or page:
-- Name the concept, define it and just write "refines: Text", "refines: PDF", or "refines: Image" etc.
+If the concept can be expressed as a text, image, document, number, or page:
+- Name the concept, define it and just write "refines: Text", "refines: Document" (and note that PDF is a document), or "refines: Image" etc.
 - No need to define its structure
 Else, if you need structure for your concept, draft its structure:
 - field name in snake_case
@@ -122,7 +122,7 @@ Else, if you need structure for your concept, draft its structure:
 
 @plan_draft
 
-DO NOT redefine native concepts such as: Text, Image, PDF, Number, Page. if you need one of these, they already exist so you should NOT REDEFINE THEM.
+DO NOT redefine native concepts such as: Text, Image, Document, Number, Page. if you need one of these, they already exist so you should NOT REDEFINE THEM.
 
 Do not write any intro or outro, do not mention the brief or the plan draft, just write the concept drafts.
 List the concept drafts in Markdown format with a heading 3 for each, e.g. `### Concept FooBar`.
@@ -161,9 +161,9 @@ prompt = """
 {% if concept_specs %}
 We have already defined the concepts you must use for the inputs and outputs of the pipes:
 @concept_specs
-And of course you still have the native concepts if required: Text, Image, PDF, Number, Page.
+And of course you still have the native concepts if required: Text, Image, Document, Number, Page.
 {% else %}
-You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Image, PDF, Number, Page.
+You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Image, Document, Number, Page.
 {% endif %}
 
 ## For PipeOperators:

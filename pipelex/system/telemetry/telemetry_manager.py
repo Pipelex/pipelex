@@ -277,7 +277,7 @@ class TelemetryManager(TelemetryManagerAbstract):
     def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
         if not is_debug and self.telemetry_config.custom_portkey.force_debug_enabled:
-            log.info("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
+            log.verbose("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
             is_debug = True
         if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
             log.warning(
@@ -324,7 +324,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             and self.telemetry_config.pipelex_gateway.portkey.force_tracing_enabled
             and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
         ):
-            log.dev(
+            log.verbose(
                 "Force-enabling Pipelex Gateway Portkey tracing "
                 "because pipelex_gateway.portkey.force_tracing_enabled is set in telemetry configuration"
             )

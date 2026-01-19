@@ -22,6 +22,7 @@ class ImgGenArgTopic(StrEnum):
     depending on the model backend being used.
     """
 
+    MODEL_NAME = "model_name"
     PROMPT = "prompt"
     NUM_IMAGES = "num_images"
     ASPECT_RATIO = "aspect_ratio"
@@ -135,6 +136,15 @@ class OutputFormatTaxonomy(StrEnum):
     FLUX_1 = "flux_1"
     FLUX_2 = "flux_2"
     GPT = "gpt"
+
+
+class ModelNameTaxonomy(StrEnum):
+    """Taxonomy for how model name/id is passed to the API.
+
+    - STANDARD: passes model as {"model": model_id}
+    """
+
+    STANDARD = "standard"
 
 
 ImgGenModelRules = dict[ImgGenArgTopic, str]

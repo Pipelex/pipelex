@@ -17,6 +17,6 @@ async def render_template(
     return await render_jinja2_async(
         template_source=template_source,
         template_category=category,
-        temlating_context=context,
+        templating_context=context,
         templating_style=templating_style,
     )

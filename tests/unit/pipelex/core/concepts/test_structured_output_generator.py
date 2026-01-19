@@ -623,11 +623,11 @@ class WrongClassName(StructuredContent):
         instance = generated_class(text="Sample text")  # pyright: ignore[reportCallIssue]
         assert instance is not None
 
-    def test_inheritance_from_pdf_content(self):
-        """Test generating a class that inherits from PDFContent."""
+    def test_inheritance_from_document_content(self):
+        """Test generating a class that inherits from DocumentContent."""
         structure_blueprint = {
             "document_type": ConceptStructureBlueprint(
-                description="Type of PDF document",
+                description="Type of document",
                 type=ConceptStructureBlueprintFieldType.TEXT,
                 required=False,
             ),
@@ -637,19 +637,19 @@ class WrongClassName(StructuredContent):
         generated_code, generated_class = generator.generate_from_structure_blueprint(
             "Invoice",
             structure_blueprint,
-            base_class_name="PDFContent",
+            base_class_name="DocumentContent",
         )
 
         # Verify correct import is present
-        assert "from pipelex.core.stuffs.pdf_content import PDFContent" in generated_code
+        assert "from pipelex.core.stuffs.document_content import DocumentContent" in generated_code
 
-        # Verify class inherits from PDFContent
-        assert "class Invoice(PDFContent):" in generated_code
+        # Verify class inherits from DocumentContent
+        assert "class Invoice(DocumentContent):" in generated_code
 
         # Verify the generated class is valid
-        from pipelex.core.stuffs.pdf_content import PDFContent  # noqa: PLC0415
+        from pipelex.core.stuffs.document_content import DocumentContent  # noqa: PLC0415
 
-        assert issubclass(generated_class, PDFContent)
+        assert issubclass(generated_class, DocumentContent)
         from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
 
         assert issubclass(generated_class, StuffContent)

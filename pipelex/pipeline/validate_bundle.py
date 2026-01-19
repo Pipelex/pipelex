@@ -80,7 +80,9 @@ class ValidateBundleResult(BaseModel):
 
 
 async def validate_bundle(
-    plx_content: str | None = None, blueprints: list[PipelexBundleBlueprint] | None = None, plx_file_path: str | None = None
+    plx_file_path: str | None = None,
+    plx_content: str | None = None,
+    blueprints: list[PipelexBundleBlueprint] | None = None,
 ) -> ValidateBundleResult:
     provided_params = sum([blueprints is not None, plx_content is not None, plx_file_path is not None])
     if provided_params == 0:
