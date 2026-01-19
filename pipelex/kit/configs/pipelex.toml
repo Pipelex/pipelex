@@ -53,7 +53,7 @@ reactflow_html = true
 # Customize ReactFlow graph rendering
 edge_type = "bezier" # Options: "bezier", "smoothstep", "step", "straight"
 nodesep = 50         # Horizontal spacing between nodes
-ranksep = 80         # Vertical spacing between ranks/levels
+ranksep = 30         # Vertical spacing between ranks/levels
 initial_zoom = 1.0   # Initial zoom level (1.0 = 100%)
 pan_to_top = true    # Pan to show top of graph on load
 

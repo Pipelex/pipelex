@@ -269,6 +269,17 @@ check-gateway-models: env
 cgm: check-gateway-models
 	@echo "> done: cgm = check-gateway-models"
 
+sync-main-config: env
+	$(call PRINT_TITLE,"Syncing main config to kit and project configs")
+	$(VENV_PIPELEX_DEV) sync-main-config --quiet
+
+smc: sync-main-config
+	@echo "> done: smc = sync-main-config"
+
+smc-dry: env
+	$(call PRINT_TITLE,Previewing main config sync - dry run)
+	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
+
 ##############################################################################################
 ############################      Cleaning                        ############################
 ##############################################################################################
