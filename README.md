@@ -1,6 +1,16 @@
 <div align="center">
   <a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
+  <br/>
+  <br/>
+
+  <a href="https://github.com/Pipelex/pipelex/tree/pre-release/v0.18.0b1">
+    <img src="https://img.shields.io/badge/PRE--RELEASE-Chicago-ff6b35?style=for-the-badge&labelColor=1a1a2e" alt="Pre-release: Chicago">
+  </a>
+
+  <br/>
+  <br/>
+
   <h2 align="center">AI Workflows That Agents Build & Run</h2>
   <p align="center">Pipelex is developing the open standard for repeatable AI workflows.<br/>
 Write business logic, not API calls.</p>
