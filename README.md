@@ -48,7 +48,7 @@ Write business logic, not API calls.</p>
 
 <!-- PRERELEASE_LINK -->
 ```bash
-pip install pipelex==0.18.0b1
+pip install pipelex --pre
 pipelex init
 ```
 
