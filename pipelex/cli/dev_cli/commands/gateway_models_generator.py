@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 
 # Fields to include in the reference (excluding sensitive/internal details)
-REFERENCE_FIELDS = frozenset({"model_type", "inputs", "outputs", "sdk", "structure_method"})
+REFERENCE_FIELDS = frozenset({"model_type", "inputs", "outputs"})
 
 # Model type display names and order
 MODEL_TYPE_SECTIONS = {
@@ -49,8 +49,6 @@ def extract_reference_data(model_specs: BackendModelSpecs) -> dict[str, list[dic
     # Get defaults for fallback values
     defaults = model_specs.get("defaults", {})
     default_model_type = defaults.get("model_type", "llm")
-    default_sdk = defaults.get("sdk", "")
-    default_structure_method = defaults.get("structure_method", "")
 
     # Group models by type
     models_by_type: dict[str, list[dict[str, Any]]] = {
@@ -79,12 +77,7 @@ def extract_reference_data(model_specs: BackendModelSpecs) -> dict[str, list[dic
             "name": model_name,
             "inputs": spec_dict.get("inputs", []),
             "outputs": spec_dict.get("outputs", []),
-            "sdk": spec_dict.get("sdk", default_sdk),
         }
-
-        # Only include structure_method for LLMs (not relevant for img_gen or text_extractor)
-        if model_type == "llm":
-            model_info["structure_method"] = spec_dict.get("structure_method", default_structure_method)
 
         # Add to appropriate group
         if model_type in models_by_type:
@@ -97,12 +90,11 @@ def extract_reference_data(model_specs: BackendModelSpecs) -> dict[str, list[dic
     return models_by_type
 
 
-def generate_markdown_table(models: list[dict[str, Any]], include_structure_method: bool = True) -> str:
+def generate_markdown_table(models: list[dict[str, Any]]) -> str:
     """Generate a Markdown table for a list of models.
 
     Args:
         models: List of model info dictionaries.
-        include_structure_method: Whether to include the structure_method column.
 
     Returns:
         Markdown table string.
@@ -110,27 +102,16 @@ def generate_markdown_table(models: list[dict[str, Any]], include_structure_meth
     if not models:
         return "_No models available in this category._\n"
 
-    # Build header
-    if include_structure_method:
-        header = "| Model | Inputs | Outputs | SDK | Structure Method |"
-        separator = "|-------|--------|---------|-----|------------------|"
-    else:
-        header = "| Model | Inputs | Outputs | SDK |"
-        separator = "|-------|--------|---------|-----|"
+    header = "| Model | Inputs | Outputs |"
+    separator = "|-------|--------|---------|"
 
     lines = [header, separator]
 
     for model in models:
         inputs = ", ".join(model.get("inputs", []))
         outputs = ", ".join(model.get("outputs", []))
-        sdk = model.get("sdk", "")
         name = model.get("name", "")
-
-        if include_structure_method:
-            structure_method = model.get("structure_method", "")
-            lines.append(f"| {name} | {inputs} | {outputs} | {sdk} | {structure_method} |")
-        else:
-            lines.append(f"| {name} | {inputs} | {outputs} | {sdk} |")
+        lines.append(f"| {name} | {inputs} | {outputs} |")
 
     return "\n".join(lines) + "\n"
 
@@ -163,16 +144,16 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
     # Add LLM section
     sections.append("## Language Models (LLM)")
     sections.append("")
-    sections.append(generate_markdown_table(models_by_type["llm"], include_structure_method=True))
+    sections.append(generate_markdown_table(models_by_type["llm"]))
 
     # Add document extractor section
     sections.append("## Document Extraction Models")
     sections.append("")
-    sections.append(generate_markdown_table(models_by_type["text_extractor"], include_structure_method=False))
+    sections.append(generate_markdown_table(models_by_type["text_extractor"]))
 
     # Add image generation section
     sections.append("## Image Generation Models")
     sections.append("")
-    sections.append(generate_markdown_table(models_by_type["img_gen"], include_structure_method=False))
+    sections.append(generate_markdown_table(models_by_type["img_gen"]))
 
     return "\n".join(sections)
