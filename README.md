@@ -3,7 +3,7 @@
 
   <br/>
   <br/>
-
+  <!-- PRERELEASE_LINK -->
   <a href="https://github.com/Pipelex/pipelex/tree/pre-release/v0.18.0b1">
     <img src="https://img.shields.io/badge/PRE--RELEASE-Chicago-ff6b35?style=for-the-badge&labelColor=1a1a2e" alt="Pre-release: Chicago">
   </a>
