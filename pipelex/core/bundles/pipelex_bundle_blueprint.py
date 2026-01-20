@@ -75,16 +75,11 @@ class PipelexBundleBlueprint(BaseModel):
                 raise ValueError(msg)
         return concept
 
-    @model_validator(mode="after")
-    def validate_main_pipe(self) -> "PipelexBundleBlueprint":
-        if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
-            msg = f"Main pipe '{self.main_pipe}' could not be found in pipelex bundle at source '{self.source}' and domain '{self.domain}'"
-            raise ValueError(msg)
-        return self
-
     @field_validator("main_pipe", mode="before")
     @classmethod
-    def validate_main_pipe_syntax(cls, main_pipe: str) -> str:
+    def validate_main_pipe_syntax(cls, main_pipe: str | None) -> str | None:
+        if main_pipe is None:
+            return None
         if not is_pipe_code_valid(main_pipe):
             msg = f"Invalid main pipe syntax '{main_pipe}'. Must be in snake_case."
             raise ValueError(msg)
@@ -100,3 +95,10 @@ class PipelexBundleBlueprint(BaseModel):
                 msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
                 raise ValueError(msg)
         return pipe
+
+    @model_validator(mode="after")
+    def validate_main_pipe(self) -> "PipelexBundleBlueprint":
+        if self.main_pipe and (not self.pipe or (self.main_pipe not in self.pipe)):
+            msg = f"Main pipe '{self.main_pipe}' could not be found in pipelex bundle at source '{self.source}' and domain '{self.domain}'"
+            raise ValueError(msg)
+        return self
