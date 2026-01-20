@@ -392,8 +392,10 @@ class PipeAbstract(ABC, BaseModel):
                         otel_context=job_metadata.otel_context,
                         graph_context=child_graph_context,
                     )
-
         try:
+            await self.validate_before_run(
+                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
             match pipe_run_params.run_mode:
                 case PipeRunMode.LIVE:
                     pipe_output = await self.live_run_pipe(
@@ -409,6 +411,9 @@ class PipeAbstract(ABC, BaseModel):
                         pipe_run_params=pipe_run_params,
                         output_name=output_name,
                     )
+            await self.validate_after_run(
+                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
         except Exception as exc:
             # Record graph tracing error
             if tracer_manager is not None and parent_graph_context is not None:
@@ -527,16 +532,9 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         log.verbose(f"Dry run of {self.type}: '{self.code}'")
         assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
-        await self.validate_before_run(
+        return await self._dry_run_pipe(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
-        pipe_output = await self._dry_run_pipe(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-        )
-        await self.validate_after_run(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-        )
-        return pipe_output
 
     @abstractmethod
     async def _live_run_pipe(
