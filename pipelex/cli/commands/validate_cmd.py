@@ -18,7 +18,7 @@ from pipelex.cli.error_handlers import (
     handle_validate_bundle_error,
 )
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
+from pipelex.hub import get_console, get_default_library_dirs, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
@@ -30,7 +30,7 @@ from pipelex.tools.misc.package_utils import get_package_version
 COMMAND = "validate"
 
 
-def do_validate_all_libraries_and_dry_run(library_dirs: list[Path] | None = None) -> None:
+def do_validate_all_libraries_and_dry_run() -> None:
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -40,9 +40,9 @@ def do_validate_all_libraries_and_dry_run(library_dirs: list[Path] | None = None
             library_manager = get_library_manager()
             library_id, library = library_manager.open_library()
             set_current_library(library_id=library_id)
-            library_manager.load_libraries(library_id=library_id, library_dirs=library_dirs or [Path.cwd()])
+            library_manager.load_libraries(library_id=library_id, library_dirs=get_default_library_dirs())
 
-            pipes = library.get_pipe_library().get_pipes()
+            pipes = library.pipe_library.get_pipes()
             for pipe in pipes:
                 pipe.validate_with_libraries()
 
@@ -87,12 +87,10 @@ def validate_cmd(
         pipelex validate --bundle my_bundle.plx --pipe my_pipe
         pipelex validate all
     """
-    # Check for "all" keyword
     if target == "all" and not pipe and not bundle:
         try:
-            make_pipelex_for_cli(context=ErrorContext.VALIDATION)
-            library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-            do_validate_all_libraries_and_dry_run(library_dirs=library_dirs_paths)
+            make_pipelex_for_cli(context=ErrorContext.VALIDATION, library_dirs=[Path(lib_dir) for lib_dir in library_dir] if library_dir else None)
+            do_validate_all_libraries_and_dry_run()
         finally:
             Pipelex.teardown_if_needed()
         return

@@ -78,6 +78,44 @@ def _categorize_input_validation_error(
     return None
 
 
+def _categorize_syntax_validation_error(
+    message: str,
+    domain: str | None,
+    source: str | None,
+) -> PipelexBundleBlueprintValidationErrorData | None:
+    """Categorize syntax validation errors (invalid pipe code, invalid main_pipe).
+
+    Args:
+        message: The error message from the validation
+        domain: Domain code
+        source: Source file path
+
+    Returns:
+        Categorized error data, or None if not a syntax validation error
+    """
+    message_lower = message.lower()
+
+    # Detect invalid main_pipe syntax
+    if "invalid main pipe syntax" in message_lower:
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+            domain_code=domain,
+            source=source,
+            message=message,
+        )
+
+    # Detect invalid pipe code syntax
+    if "is not a valid pipe code" in message_lower:
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+            domain_code=domain,
+            source=source,
+            message=message,
+        )
+
+    return None
+
+
 def categorize_blueprint_validation_error(
     blueprint_dict: dict[str, Any],
     error: ErrorDetails,
@@ -111,6 +149,15 @@ def categorize_blueprint_validation_error(
     )
     if input_error:
         return input_error
+
+    # Try to categorize syntax validation errors (invalid pipe code, main_pipe)
+    syntax_error = _categorize_syntax_validation_error(
+        message=message,
+        domain=domain,
+        source=source,
+    )
+    if syntax_error:
+        return syntax_error
 
     # If we couldn't categorize the error, log a warning
     error_scope = get_error_scope(loc)

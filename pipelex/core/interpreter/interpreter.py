@@ -19,38 +19,15 @@ class PipelexInterpreter(BaseModel):
     # TODO: rethink this method
     @staticmethod
     def is_pipelex_file(file_path: Path) -> bool:
-        """Check if a file is a valid Pipelex PLX file.
+        """Check if a file is a Pipelex PLX file based on its extension.
 
         Args:
             file_path: Path to the file to check
 
         Returns:
-            True if the file is a Pipelex file, False otherwise
-
-        Criteria:
-            - Has .plx extension
-            - Starts with "domain =" (ignoring leading whitespace)
-
+            True if the file has .plx extension, False otherwise
         """
-        # Check if it has .toml extension
-        if file_path.suffix != ".plx":
-            return False
-
-        # Check if file exists
-        if not file_path.exists() or not file_path.is_file():
-            return False
-
-        try:
-            # Read the first few lines to check for "domain ="
-            with open(file_path, encoding="utf-8") as file:
-                # Read first 100 characters (should be enough to find domain)
-                content = file.read(100)
-                # Remove leading whitespace and check if it starts with "domain ="
-                stripped_content = content.lstrip()
-                return stripped_content.startswith("domain =")
-        except Exception:
-            # If we can't read the file, it's not a valid Pipelex file
-            return False
+        return file_path.suffix == ".plx"
 
     @classmethod
     def make_pipelex_bundle_blueprint(cls, bundle_path: str | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:

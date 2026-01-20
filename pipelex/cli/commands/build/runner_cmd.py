@@ -11,7 +11,6 @@ from posthog import tag
 
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -39,7 +38,6 @@ COMMAND = "build"
 SUB_COMMAND_RUNNER = "runner"
 
 
-@build_app.command(SUB_COMMAND_RUNNER, help="Build the Python code to run a pipe with the necessary inputs")
 def prepare_runner_cmd(
     target: Annotated[
         str | None,

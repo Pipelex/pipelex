@@ -12,7 +12,6 @@ from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -128,7 +127,6 @@ pipelex build pipe "Given a theme, write a Haiku"
 """
 
 
-@build_app.command(SUB_COMMAND_PIPE, help="Build a Pipelex bundle with one validation/fix loop correcting deterministic issues")
 def build_pipe_cmd(
     prompt: Annotated[
         str,

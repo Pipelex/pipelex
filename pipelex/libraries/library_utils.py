@@ -87,5 +87,4 @@ def get_pipelex_plx_files_from_dirs(dirs: set[Path]) -> list[Path]:
                 all_plx_paths.append(plx_file)
             else:
                 log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")
-
     return all_plx_paths

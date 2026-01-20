@@ -8,7 +8,6 @@ from kajson.kajson_manager import KajsonManager
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import normalize_structure_blueprint
@@ -186,7 +185,6 @@ def generate_structures_from_blueprints(
     return generated_files
 
 
-@build_app.command(SUB_COMMAND_STRUCTURES, help="Generate Python structure files from concept definitions in PLX files")
 def build_structures_command(
     target: Annotated[
         str,
