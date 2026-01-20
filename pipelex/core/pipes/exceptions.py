@@ -112,6 +112,7 @@ class PipeValidationErrorType(StrEnum):
     # Errors that are raised but NOT auto-fixed (will fail validation)
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE = "img_gen_input_not_text_compatible"
+    INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
 
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"

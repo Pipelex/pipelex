@@ -436,6 +436,10 @@ def get_current_library() -> str:
     return library_id
 
 
+def get_default_library_dirs() -> list[Path] | None:
+    return get_pipelex_hub().get_default_library_dirs()
+
+
 def teardown_current_library() -> None:
     """Teardown the library_id for the current async context."""
     _library_id.set(None)

@@ -12,7 +12,6 @@ from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -128,7 +127,6 @@ pipelex build pipe "Given a theme, write a Haiku"
 """
 
 
-@build_app.command(SUB_COMMAND_PIPE, help="Build a Pipelex bundle with one validation/fix loop correcting deterministic issues")
 def build_pipe_cmd(
     prompt: Annotated[
         str,
@@ -155,9 +153,9 @@ def build_pipe_cmd(
         typer.Option("--no-extras", help="Skip generating inputs.json and runner.py, only generate the PLX file"),
     ] = False,
     graph: Annotated[
-        bool | None,
+        bool,
         typer.Option("--graph/--no-graph", help="Generate execution graphs for both build process and built pipeline"),
-    ] = None,
+    ] = True,
     graph_full_data: Annotated[
         bool | None,
         typer.Option(
@@ -310,8 +308,9 @@ def build_pipe_cmd(
                     if graph and builder_graph_spec:
                         typer.secho("\n📊 Generating graphs...", fg=typer.colors.CYAN)
 
-                        # Save builder pipeline graph
-                        builder_graph_dir = Path(extras_output_dir) / "builder_graph"
+                        # Save builder pipeline graph in graphs/ subfolder
+                        graphs_dir = Path(extras_output_dir) / "graphs"
+                        builder_graph_dir = graphs_dir / "builder_graph"
                         builder_graph_count = await _save_graph_outputs_to_dir(
                             graph_spec=builder_graph_spec,
                             graph_config=execution_config.graph_config,
@@ -332,7 +331,7 @@ def build_pipe_cmd(
                                 library_dirs=library_dir,
                             )
                             if built_pipe_output.graph_spec:
-                                pipeline_graph_dir = Path(extras_output_dir) / "pipeline_graph"
+                                pipeline_graph_dir = graphs_dir / "pipeline_graph"
                                 log.dev(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
                                 pipeline_graph_count = await _save_graph_outputs_to_dir(
                                     graph_spec=built_pipe_output.graph_spec,

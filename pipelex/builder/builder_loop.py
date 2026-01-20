@@ -227,6 +227,7 @@ class BuilderLoop:
                 case (
                     PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                     | PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE
+                    | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                     | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
                     | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                 ):
