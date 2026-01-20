@@ -4,7 +4,7 @@
   <br/>
   <br/>
   <!-- PRERELEASE_LINK -->
-  <a href="https://github.com/Pipelex/pipelex/tree/pre-release/v0.18.0b1">
+  <a href="https://go.pipelex.com/pre-release">
     <img src="https://img.shields.io/badge/PRE--RELEASE-Chicago-ff6b35?style=for-the-badge&labelColor=1a1a2e" alt="Pre-release: Chicago">
   </a>
 
@@ -17,7 +17,7 @@ Write business logic, not API calls.</p>
 
   <div>
     <a href="https://go.pipelex.com/demo"><strong>Demo</strong></a> -
-    <!-- PRERELEASE_LINK --><a href="https://docs.pipelex.com/0.18.0b1/"><strong>Documentation</strong></a> -
+    <!-- PRERELEASE_LINK --><a href="https://docs.pipelex.com/pre-release/"><strong>Documentation</strong></a> -
     <a href="https://github.com/Pipelex/pipelex/issues"><strong>Report Bug</strong></a> -
     <a href="https://github.com/Pipelex/pipelex/discussions"><strong>Feature Request</strong></a>
   </div>
@@ -33,8 +33,8 @@ Write business logic, not API calls.</p>
     <a href="https://www.youtube.com/@PipelexAI"><img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white" alt="YouTube"></a>
     <a href="https://pipelex.com"><img src="https://img.shields.io/badge/Homepage-03bb95?logo=google-chrome&logoColor=white&style=flat" alt="Website"></a>
     <!-- PRERELEASE_LINK --><a href="https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago"><img src="https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat" alt="Cookbook"></a>
-    <!-- PRERELEASE_LINK --><a href="https://docs.pipelex.com/0.18.0b1/"><img src="https://img.shields.io/badge/Docs-03bb95?logo=read-the-docs&logoColor=white&style=flat" alt="Documentation"></a>
-    <!-- PRERELEASE_LINK --><a href="https://docs.pipelex.com/0.18.0b1/changelog/"><img src="https://img.shields.io/badge/Changelog-03bb95?logo=git&logoColor=white&style=flat" alt="Changelog"></a>
+    <!-- PRERELEASE_LINK --><a href="https://docs.pipelex.com/pre-release/"><img src="https://img.shields.io/badge/Docs-03bb95?logo=read-the-docs&logoColor=white&style=flat" alt="Documentation"></a>
+    <!-- PRERELEASE_LINK --><a href="https://docs.pipelex.com/pre-release/changelog/"><img src="https://img.shields.io/badge/Changelog-03bb95?logo=git&logoColor=white&style=flat" alt="Changelog"></a>
     <br/>
     <br/>
 </div>
@@ -69,12 +69,12 @@ Get **free credits** with a single API key for LLMs, document extraction, and im
 ### Option B: Bring Your Own Keys
 
 <!-- PRERELEASE_LINK -->
-Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/0.18.0b1/home/5-setup/configure-ai-providers/) for setup.
+Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/pre-release/home/5-setup/configure-ai-providers/) for setup.
 
 ### Option C: Local AI
 
 <!-- PRERELEASE_LINK -->
-Run models locally with Ollama, vLLM, LM Studio, or llama.cpp - no API keys required. See [Configure AI Providers](https://docs.pipelex.com/0.18.0b1/home/5-setup/configure-ai-providers/) for details.
+Run models locally with Ollama, vLLM, LM Studio, or llama.cpp - no API keys required. See [Configure AI Providers](https://docs.pipelex.com/pre-release/home/5-setup/configure-ai-providers/) for details.
 
 ## 3. Generate Your First Workflow
 
@@ -344,9 +344,9 @@ Each pipe processes information using **Concepts** (typing with meaning) to ensu
 
 <!-- PRERELEASE_LINK -->
 **Learn More:**
-- [Design and Run Pipelines](https://docs.pipelex.com/0.18.0b1/home/6-build-reliable-ai-workflows/pipes/) - Complete guide with examples
-- [Kick off a Pipeline Project](https://docs.pipelex.com/0.18.0b1/home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project/) - Deep dive into Pipelex
-- [Configure AI Providers](https://docs.pipelex.com/0.18.0b1/home/5-setup/configure-ai-providers/) - Set up AI providers and models
+- [Design and Run Pipelines](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/pipes/) - Complete guide with examples
+- [Kick off a Pipeline Project](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project/) - Deep dive into Pipelex
+- [Configure AI Providers](https://docs.pipelex.com/pre-release/home/5-setup/configure-ai-providers/) - Set up AI providers and models
 
 ## 🔧 IDE Extension
 
@@ -383,13 +383,13 @@ pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 Pipelex supports two independent telemetry streams:
 
 <!-- PRERELEASE_LINK -->
-- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/0.18.0b1/home/5-setup/telemetry/#gateway-telemetry-pipelex-controlled)
-- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/0.18.0b1/home/5-setup/telemetry/#custom-telemetry-user-controlled)
+- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/pre-release/home/5-setup/telemetry/#gateway-telemetry-pipelex-controlled)
+- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/pre-release/home/5-setup/telemetry/#custom-telemetry-user-controlled)
 
 **We only collect technical data** (model names, token counts, latency, error rates) - never your prompts, completions, or business data. Set `DO_NOT_TRACK=1` to disable all telemetry (note: Gateway requires telemetry to function).
 
 <!-- PRERELEASE_LINK -->
-For more details, see the [Telemetry Documentation](https://docs.pipelex.com/0.18.0b1/home/5-setup/telemetry/) or read our [Privacy Policy](https://go.pipelex.com/privacy-policy).
+For more details, see the [Telemetry Documentation](https://docs.pipelex.com/pre-release/home/5-setup/telemetry/) or read our [Privacy Policy](https://go.pipelex.com/privacy-policy).
 
 ## 🤝 Contributing
 
@@ -406,7 +406,7 @@ Join our vibrant Discord community to connect with other developers, share your 
 - **GitHub Issues**: For bug reports and feature requests
 - **Discussions**: For questions and community discussions
 <!-- PRERELEASE_LINK -->
-- [**Documentation**](https://docs.pipelex.com/0.18.0b1/)
+- [**Documentation**](https://docs.pipelex.com/pre-release/)
 
 ## ⭐ Star Us!
 
