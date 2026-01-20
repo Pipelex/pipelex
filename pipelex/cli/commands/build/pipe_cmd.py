@@ -12,6 +12,7 @@ from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
+from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -153,9 +154,9 @@ def build_pipe_cmd(
         typer.Option("--no-extras", help="Skip generating inputs.json and runner.py, only generate the PLX file"),
     ] = False,
     graph: Annotated[
-        bool,
+        bool | None,
         typer.Option("--graph/--no-graph", help="Generate execution graphs for both build process and built pipeline"),
-    ] = True,
+    ] = None,
     graph_full_data: Annotated[
         bool | None,
         typer.Option(
@@ -172,9 +173,6 @@ def build_pipe_cmd(
         ),
     ] = None,
 ) -> None:
-    # Import here to avoid circular imports
-    from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints  # noqa: PLC0415
-
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
 
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
@@ -304,8 +302,8 @@ def build_pipe_cmd(
                     save_text_to_path(text="", path=init_path)
                     typer.secho(f"✅ Package init file saved to: {init_path}", fg=typer.colors.GREEN)
 
-                    # Generate graphs if --graph is enabled
-                    if graph and builder_graph_spec:
+                    # Generate graphs if it was tracked during the build process
+                    if builder_graph_spec:
                         typer.secho("\n📊 Generating graphs...", fg=typer.colors.CYAN)
 
                         # Save builder pipeline graph in graphs/ subfolder
