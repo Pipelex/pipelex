@@ -1,17 +1,6 @@
 # Changelog
 
-## [Unreleased]
-
-### Added
-
-- **`pipelex build inputs` Command**: New CLI command to generate example input JSON files for pipes. Supports `--library-dir` (`-L`) to specify library directories.
-- **Pipe Code Syntax Validation**: Bundle validation now checks that pipe codes and `main_pipe` values use valid snake_case syntax, with proper error categorization (`INVALID_PIPE_CODE_SYNTAX`).
-
-### Changed
-
-- Simplified `.plx` file detection to check file extension only.
-
-## [v0.18.0b1] - 2026-01-16
+## [v0.18.0b2] - 2026-01-20
 
 **Highlights:**
 
@@ -90,6 +79,8 @@
 - **Rendering Protocols**: Three new `@runtime_checkable` protocols (`ImageRenderable`, `TagRenderable`, `TextFormatRenderable`) to formalize the interaction between data types and Jinja2 filters.
 - **Unified URI Handling System**: New `pipelex.tools.uri` module providing type-safe parsing for HTTP/HTTPS URLs, local file paths, file URIs, `pipelex-storage://` URIs, and base64 data URLs.
 - **Automatic Input Data Storage**: Pipeline pre-processing step that converts large `data:` URLs in an `ImageContent` or `DocumentContent` into `pipelex-storage://` URIs for improved performance, by storing the data with the configured storage provider. Configurable via `is_normalize_data_urls_to_storage` in `pipelex.toml`.
+- **`pipelex build inputs` Command**: New CLI command to generate example input JSON files for pipes. Supports `--library-dir` (`-L`) to specify library directories.
+- **Pipe Code Syntax Validation**: Bundle validation now checks that pipe codes and `main_pipe` values use valid snake_case syntax, with proper error categorization (`INVALID_PIPE_CODE_SYNTAX`).
 
 ### Fixed
 
