@@ -33,6 +33,8 @@
 [pipelex.pipeline_execution_config]
 # Set to false to disable conversion of incoming data URLs to pipelex-storage:// URIs
 is_normalize_data_urls_to_storage = true
+# Set to false to disable generation of execution graphs
+is_generate_graph = true
 
 [pipelex.pipeline_execution_config.graph_config.data_inclusion]
 # Control what data is included in graph outputs
