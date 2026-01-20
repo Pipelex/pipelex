@@ -392,10 +392,10 @@ class PipeAbstract(ABC, BaseModel):
                         otel_context=job_metadata.otel_context,
                         graph_context=child_graph_context,
                     )
-        await self.validate_before_run(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-        )
         try:
+            await self.validate_before_run(
+                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
             match pipe_run_params.run_mode:
                 case PipeRunMode.LIVE:
                     pipe_output = await self.live_run_pipe(
