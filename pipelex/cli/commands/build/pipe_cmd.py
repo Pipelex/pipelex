@@ -153,7 +153,7 @@ def build_pipe_cmd(
         typer.Option("--no-extras", help="Skip generating inputs.json and runner.py, only generate the PLX file"),
     ] = False,
     graph: Annotated[
-        bool | None,
+        bool,
         typer.Option("--graph/--no-graph", help="Generate execution graphs for both build process and built pipeline"),
     ] = True,
     graph_full_data: Annotated[
