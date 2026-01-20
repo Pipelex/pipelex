@@ -6,7 +6,7 @@ from click import Command, Context
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex.cli.commands.build import build_app
+from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
