@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pipelex build inputs` Command**: New CLI command to generate example input JSON files for pipes. Supports `--library-dir` (`-L`) to specify library directories.
+- **Pipe Code Syntax Validation**: Bundle validation now checks that pipe codes and `main_pipe` values use valid snake_case syntax, with proper error categorization (`INVALID_PIPE_CODE_SYNTAX`).
+
+### Changed
+
+- Simplified `.plx` file detection to check file extension only.
+
 ## [v0.18.0b1] - 2026-01-16
 
 **Highlights:**
