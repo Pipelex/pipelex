@@ -110,7 +110,7 @@ make docs-serve-versioned     - Serve versioned docs locally with mike
 make docs-list                - List deployed documentation versions
 make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
-make docs-deploy-specific-version         - Deploy docs for the current version (no 'latest' alias)
+make docs-deploy-specific-version         - Deploy docs for the current version with 'pre-release' alias (CI only)
 make docs-deploy-404          - Deploy 404.html for versionless URL redirects
 make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 
@@ -639,8 +639,8 @@ docs-deploy-stable: env docs-deploy-404
 	$(VENV_MIKE) set-default --push latest
 
 docs-deploy-specific-version: env docs-deploy-404
-	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION)")
-	$(VENV_MIKE) deploy --push $(DOCS_VERSION)
+	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
+	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
 
 docs-deploy-404:
 	$(call PRINT_TITLE,"Deploying 404.html to gh-pages root for versionless URL redirects")
