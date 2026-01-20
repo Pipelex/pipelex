@@ -8,9 +8,19 @@
 
     **Getting your API key:**
 
-    1. Join our Discord community at [go.pipelex.com/discord](https://go.pipelex.com/discord)
-    2. Request your free API key (includes credits for testing and development)
-    3. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+    1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
+    2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+
+    **Gateway Supported models — included with the Free API Key**
+
+    - **Language Models (LLM):**
+        - OpenAI: all models up to GPT-5.2 and Codex
+        - Anthropic: Claude 3.7 Sonnet through Claude 4.5 Haiku/Sonnet/Opus
+        - Google: Gemini 2.0/2.5 Flash, Gemini 2.5 Pro, Gemini 3.0 Flash/Pro
+        - xAI: Grok 3/mini, Grok 4 (+ fast reasoning variants)
+        - Open-source: Mistral Large 3, DeepSeek v3.1/3.2/Speciale, GPT-OSS 20B/120B1, Kimi K2, Phi-4, Qwen3-VL 235B
+    - **Document Extraction:** Mistral Document AI, Azure Document Intelligence, DeepSeek OCR
+    - **Image Generation:** GPT-Image 1/1.5, Flux 2 Pro, Nano Banana/Pro
 
     **Accepting the Terms of Service:**
 
