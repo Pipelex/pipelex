@@ -139,7 +139,7 @@ Your API key is hashed for security. Gateway telemetry operates independently fr
     
     1. **Get your new Gateway API key**:
         - If you had a `pipelex_inference` key: get your new key at [app.pipelex.com](https://app.pipelex.com/)
-        - New users: join our [Discord](https://go.pipelex.com/discord)
+        - New users: join the [waitlist](https://app.pipelex.com/waitlist) and the community on [Discord](https://go.pipelex.com/discord)
     2. Update your `.env`: set `PIPELEX_GATEWAY_API_KEY` with your new key
     3. Run `pipelex init` and accept the Gateway terms
     4. Update any routing profiles that reference `pipelex_inference` to use `pipelex_gateway`
