@@ -50,6 +50,7 @@ def _do_graph_render(
     open_browser: bool,
 ) -> None:
     """Execute the graph render logic."""
+    get_telemetry_manager().track_event(EventName.GRAPH_RENDER)
     # Load the graph
     typer.echo(f"Loading graph from: {input_file}", err=True)
     json_str = load_text_from_path(str(input_file))
@@ -163,8 +164,6 @@ def _do_graph_render(
             # Open the output directory so user can see all files
             webbrowser.open(f"file://{output_dir.absolute()}")
             typer.secho("🌐 Opened output directory in browser", fg=typer.colors.BLUE, err=True)
-
-    get_telemetry_manager().track_event(EventName.GRAPH_RENDER)
 
 
 @graph_app.command("render", help="Render an existing graph.json file to mermaidflow.html and/or reactflow.html")

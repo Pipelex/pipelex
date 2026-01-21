@@ -35,6 +35,7 @@ def _sync_agent_rules(
     agent_set: str | None,
     kit_index: KitIndex | None = None,
 ) -> None:
+    get_telemetry_manager().track_event(EventName.KIT_RULES_SYNC)
     resolved_repo_root = repo_root if repo_root is not None else Path()
     loaded_kit_index = load_index() if kit_index is None else kit_index
     agent_set = agent_set or loaded_kit_index.agent_rules.default_set
@@ -60,8 +61,6 @@ def _sync_agent_rules(
     else:
         typer.echo("✅ Kit sync completed successfully")
 
-    get_telemetry_manager().track_event(EventName.KIT_RULES_SYNC)
-
 
 def _do_remove_rules(
     repo_root: Path | None,
@@ -73,6 +72,7 @@ def _do_remove_rules(
     backup: str | None,
 ) -> None:
     """Execute the remove-rules logic."""
+    get_telemetry_manager().track_event(EventName.KIT_RULES_REMOVE)
     resolved_repo_root = repo_root if repo_root is not None else Path()
     idx = load_index()
 
@@ -99,14 +99,13 @@ def _do_remove_rules(
     else:
         typer.echo("✅ Agent rules removal completed successfully")
 
-    get_telemetry_manager().track_event(EventName.KIT_RULES_REMOVE)
-
 
 def _do_migration_instructions(
     repo_root: Path | None,
     dry_run: bool,
 ) -> None:
     """Execute the migrations logic."""
+    get_telemetry_manager().track_event(EventName.KIT_MIGRATIONS_SYNC)
     resolved_repo_root = repo_root if repo_root is not None else Path()
 
     typer.echo("📄 Syncing migration instructions...")
@@ -116,8 +115,6 @@ def _do_migration_instructions(
         typer.echo("✅ Dry run completed - no changes made")
     else:
         typer.echo(f"✅ Migration instructions synced to {resolved_repo_root / '.pipelex' / 'migrations'}")
-
-    get_telemetry_manager().track_event(EventName.KIT_MIGRATIONS_SYNC)
 
 
 @kit_app.command("rules", help="Export Pipelex Cursor rules and merge Pipelex marked sections into other agent rules files")
