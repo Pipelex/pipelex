@@ -387,7 +387,6 @@ def find_files_in_dir(
         files = list(path.rglob(pattern))
     else:
         files = list(path.glob(pattern))
-
     for file in files:
         # Check if file is under any excluded directory
         is_excluded = False
@@ -432,4 +431,5 @@ def find_files_in_dir(
         # Include if not excluded, or if force included
         if not is_excluded or should_force_include:
             filtered_files.append(file)
+
     return filtered_files

@@ -1,6 +1,6 @@
 /* Dark theme (default) */
 :root, [data-theme="dark"] {
-    --color-bg: #0f172a;
+    --color-bg: #1e1e1e;
     --color-surface: #1e293b;
     --color-surface-hover: #334155;
     --color-border: #334155;
@@ -24,6 +24,7 @@
     --color-pipe-text: #dbeafe;
     --color-pipe-failed: #ef4444;
     --color-pipe-failed-bg: rgba(239, 68, 68, 0.15);
+    --color-edge: #3b82f6;
     --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     --font-mono: 'JetBrains Mono', 'Monaco', 'Menlo', monospace;
     --radius-sm: 4px;
@@ -60,6 +61,7 @@
     --color-pipe-text: #1e3a8a;
     --color-pipe-failed: #ef4444;
     --color-pipe-failed-bg: rgba(239, 68, 68, 0.1);
+    --color-edge: #3b82f6;
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
     --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
     --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
@@ -91,11 +93,64 @@
         --color-pipe-text: #1e3a8a;
         --color-pipe-failed: #ef4444;
         --color-pipe-failed-bg: rgba(239, 68, 68, 0.1);
+        --color-edge: #3b82f6;
         --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
         --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
         --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.15);
     }
 }
+
+/* === PALETTES === */
+/* Yellow-Blue palette is the default (uses theme colors) */
+
+/* Dracula palette - vibrant dark theme with high contrast */
+[data-palette="dracula"] {
+    /* Pipes / Execution Units - Salmon red (matches plx syntax highlighting) */
+    --color-pipe: #ff6b6b;
+    --color-pipe-bg: rgba(224, 108, 117, 0.18);
+    --color-pipe-text: #ffffff;
+
+    /* Stuff / Concepts - Teal border with Pale Green variable names */
+    --color-stuff: #4ECDC4;
+    --color-stuff-bg: rgba(78, 205, 196, 0.12);
+    --color-stuff-border: #9ddcfd;
+    --color-stuff-text: #98FB98;          /* Pale Green - flashy for variable names */
+    --color-stuff-text-dim: #9ddcfd;      /* Light Cyan - for concept names */
+
+    /* Edges / Data Flow - Super light yellow, almost white */
+    --color-edge: #FFFACD;
+
+    /* Status colors */
+    --color-success: #50FA7B;             /* Bright Green */
+    --color-success-bg: rgba(80, 250, 123, 0.15);
+    --color-error: #FF5555;               /* Dracula Red */
+    --color-error-bg: rgba(255, 85, 85, 0.15);
+
+    /* Supporting colors */
+    --color-accent: #8BE9FD;              /* Light Cyan - control flow */
+    --color-warning: #FFB86C;             /* Orange - structural elements */
+    --color-template: #FF79C6;            /* Magenta/Pink - template markers */
+    --color-metadata: #F1FA8C;            /* Pale Yellow - attributes */
+    --color-comment: #6272A4;             /* Slate Blue/Gray - comments */
+}
+
+/* Light theme adjustments for Dracula palette */
+[data-theme="light"][data-palette="dracula"] {
+    --color-pipe-text: #8B0000;
+    --color-stuff-text: #006400;          /* Dark green for light mode */
+    --color-stuff-text-dim: #006666;
+    --color-edge: #B8860B;                /* Darker yellow for light mode */
+}
+
+@media (prefers-color-scheme: light) {
+    [data-theme="system"][data-palette="dracula"] {
+        --color-pipe-text: #8B0000;
+        --color-stuff-text: #006400;
+        --color-stuff-text-dim: #006666;
+        --color-edge: #B8860B;
+    }
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body {
     font-family: var(--font-sans);

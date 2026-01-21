@@ -1,6 +1,6 @@
 # Changelog
 
-## [v0.18.0b1] - 2026-01-16
+## [v0.18.0b2] - 2026-01-20
 
 **Highlights:**
 
@@ -8,9 +8,19 @@
 
     **Getting your API key:**
 
-    1. Join our Discord community at [go.pipelex.com/discord](https://go.pipelex.com/discord)
-    2. Request your free API key (includes credits for testing and development)
-    3. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+    1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
+    2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+
+    **Gateway Supported models — included with the Free API Key**
+
+    - **Language Models (LLM):**
+        - OpenAI: all models up to GPT-5.2 and Codex
+        - Anthropic: Claude 3.7 Sonnet through Claude 4.5 Haiku/Sonnet/Opus
+        - Google: Gemini 2.0/2.5 Flash, Gemini 2.5 Pro, Gemini 3.0 Flash/Pro
+        - xAI: Grok 3/mini, Grok 4 (+ fast reasoning variants)
+        - Open-source: Mistral Large 3, DeepSeek v3.1/3.2/Speciale, GPT-OSS 20B/120B1, Kimi K2, Phi-4, Qwen3-VL 235B
+    - **Document Extraction:** Mistral Document AI, Azure Document Intelligence, DeepSeek OCR
+    - **Image Generation:** GPT-Image 1/1.5, Flux 2 Pro, Nano Banana/Pro
 
     **Accepting the Terms of Service:**
 
@@ -69,6 +79,8 @@
 - **Rendering Protocols**: Three new `@runtime_checkable` protocols (`ImageRenderable`, `TagRenderable`, `TextFormatRenderable`) to formalize the interaction between data types and Jinja2 filters.
 - **Unified URI Handling System**: New `pipelex.tools.uri` module providing type-safe parsing for HTTP/HTTPS URLs, local file paths, file URIs, `pipelex-storage://` URIs, and base64 data URLs.
 - **Automatic Input Data Storage**: Pipeline pre-processing step that converts large `data:` URLs in an `ImageContent` or `DocumentContent` into `pipelex-storage://` URIs for improved performance, by storing the data with the configured storage provider. Configurable via `is_normalize_data_urls_to_storage` in `pipelex.toml`.
+- **`pipelex build inputs` Command**: New CLI command to generate example input JSON files for pipes. Supports `--library-dir` (`-L`) to specify library directories.
+- **Pipe Code Syntax Validation**: Bundle validation now checks that pipe codes and `main_pipe` values use valid snake_case syntax, with proper error categorization (`INVALID_PIPE_CODE_SYNTAX`).
 
 ### Fixed
 

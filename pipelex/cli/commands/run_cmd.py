@@ -179,7 +179,11 @@ def run_cmd(
                 if not pipe_code:
                     main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
                     if not main_pipe_code:
-                        typer.secho(f"Bundle '{bundle_path}' does not declare a main_pipe", fg=typer.colors.RED, err=True)
+                        msg = (
+                            f"Bundle '{bundle_path}' does not declare a main_pipe. In order to run a bundle, "
+                            "you must specify a main pipe in the bundle itself or specify a pipe code in the command line using the --pipe option."
+                        )
+                        typer.secho(msg, fg=typer.colors.RED, err=True)
                         raise typer.Exit(1)
                     pipe_code = main_pipe_code
                     source_description = f"bundle '{bundle_path}' • main pipe: '{pipe_code}'"

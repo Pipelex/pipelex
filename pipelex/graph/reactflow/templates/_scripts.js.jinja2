@@ -3,6 +3,12 @@ const initialTheme = {{ initial_theme | tojson }};
 let currentThemeIndex = themes.indexOf(localStorage.getItem('pipelex-theme') || initialTheme);
 if (currentThemeIndex === -1) currentThemeIndex = 0;
 
+const palette = {{ initial_palette | tojson }};
+
+function applyPalette(palette) {
+    document.documentElement.setAttribute('data-palette', palette);
+}
+
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('pipelex-theme', theme);
@@ -18,8 +24,9 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
     applyTheme(themes[currentThemeIndex]);
 });
 
-// Apply initial theme immediately
+// Apply initial theme and palette immediately
 applyTheme(themes[currentThemeIndex]);
+applyPalette(palette);
 
 // Parse embedded ViewSpec
 const viewspecElement = document.getElementById('pipelex-viewspec');
@@ -309,7 +316,7 @@ function buildDataflowGraph(graphspec, analysis) {
                     }, label),
                     concept && React.createElement('span', {
                         style: {
-                            fontSize: '10px',
+                            fontSize: '14px',
                             color: 'var(--color-stuff-text-dim)',
                         }
                     }, concept)
@@ -343,12 +350,12 @@ function buildDataflowGraph(graphspec, analysis) {
             type: {{ edge_type | tojson }},
             animated: false,
             style: {
-                stroke: 'var(--color-pipe)',
+                stroke: 'var(--color-edge)',
                 strokeWidth: 2,
             },
             markerEnd: {
                 type: MarkerType?.ArrowClosed || 'arrowclosed',
-                color: 'var(--color-pipe)',
+                color: 'var(--color-edge)',
             },
         });
     }
@@ -364,12 +371,12 @@ function buildDataflowGraph(graphspec, analysis) {
                 type: {{ edge_type | tojson }},
                 animated: false,
                 style: {
-                    stroke: 'var(--color-pipe)',
+                    stroke: 'var(--color-edge)',
                     strokeWidth: 2,
                 },
                 markerEnd: {
                     type: MarkerType?.ArrowClosed || 'arrowclosed',
-                    color: 'var(--color-pipe)',
+                    color: 'var(--color-edge)',
                 },
             });
         }
@@ -499,12 +506,12 @@ function buildOrchestrationGraph(viewspec) {
         labelBgPadding: [6, 4],
         labelBgBorderRadius: 4,
         style: {
-            stroke: edge.kind === 'data' ? 'var(--color-pipe)' : 'var(--color-text-dim)',
+            stroke: edge.kind === 'data' ? 'var(--color-edge)' : 'var(--color-text-dim)',
             strokeWidth: edge.kind === 'data' ? 2 : 1,
         },
         markerEnd: {
             type: MarkerType?.ArrowClosed || 'arrowclosed',
-            color: edge.kind === 'data' ? 'var(--color-pipe)' : 'var(--color-text-dim)',
+            color: edge.kind === 'data' ? 'var(--color-edge)' : 'var(--color-text-dim)',
         },
     }));
 

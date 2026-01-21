@@ -33,6 +33,8 @@
 [pipelex.pipeline_execution_config]
 # Set to false to disable conversion of incoming data URLs to pipelex-storage:// URIs
 is_normalize_data_urls_to_storage = true
+# Set to false to disable generation of execution graphs
+is_generate_graph = true
 
 [pipelex.pipeline_execution_config.graph_config.data_inclusion]
 # Control what data is included in graph outputs
@@ -53,7 +55,7 @@ reactflow_html = true
 # Customize ReactFlow graph rendering
 edge_type = "bezier" # Options: "bezier", "smoothstep", "step", "straight"
 nodesep = 50         # Horizontal spacing between nodes
-ranksep = 80         # Vertical spacing between ranks/levels
+ranksep = 30         # Vertical spacing between ranks/levels
 initial_zoom = 1.0   # Initial zoom level (1.0 = 100%)
 pan_to_top = true    # Pan to show top of graph on load
 

@@ -7,6 +7,7 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_code_valid
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.pipes.validation import is_pipe_code_valid
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -73,6 +74,27 @@ class PipelexBundleBlueprint(BaseModel):
                 )
                 raise ValueError(msg)
         return concept
+
+    @field_validator("main_pipe", mode="before")
+    @classmethod
+    def validate_main_pipe_syntax(cls, main_pipe: str | None) -> str | None:
+        if main_pipe is None:
+            return None
+        if not is_pipe_code_valid(main_pipe):
+            msg = f"Invalid main pipe syntax '{main_pipe}'. Must be in snake_case."
+            raise ValueError(msg)
+        return main_pipe
+
+    @field_validator("pipe", mode="before")
+    @classmethod
+    def validate_pipe_keys(cls, pipe: dict[str, PipeBlueprintUnion] | None) -> dict[str, PipeBlueprintUnion] | None:
+        if pipe is None:
+            return None
+        for pipe_code in pipe:
+            if not is_pipe_code_valid(pipe_code=pipe_code):
+                msg = f"Pipe code '{pipe_code}' is not a valid pipe code. Must be in snake_case."
+                raise ValueError(msg)
+        return pipe
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleBlueprint":

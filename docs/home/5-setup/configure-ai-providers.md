@@ -4,9 +4,9 @@
 
 To run pipelines with LLMs, you need to configure API access. **You have three options** - choose what works best for you:
 
-### Option 1: Pipelex Gateway (Easiest for Getting Started)
+### Option 1: Pipelex Gateway — Easiest and most Powerful for Getting Started
 
-Get **free credits** for testing and development with a single API key for LLMs, document extraction, and image generation across all major providers (OpenAI, Anthropic, Google, Azure, and more). New models added constantly.
+Get **free credits** for testing and development with a single API key for LLMs, document extraction, and image generation across all major providers (OpenAI, Anthropic, Google, Azure, open-source, and more). New models added constantly.
 
 **Benefits:**
 

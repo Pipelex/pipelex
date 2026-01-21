@@ -110,7 +110,7 @@ make docs-serve-versioned     - Serve versioned docs locally with mike
 make docs-list                - List deployed documentation versions
 make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
-make docs-deploy-beta         - Manually deploy pre-release docs with '-beta' suffix
+make docs-deploy-specific-version         - Deploy docs for the current version with 'pre-release' alias (CI only)
 make docs-deploy-404          - Deploy 404.html for versionless URL redirects
 make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 
@@ -140,7 +140,7 @@ export HELP
 	validate v check c cc agent-check \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
-	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-beta docs-delete \
+	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
 	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
@@ -268,6 +268,17 @@ check-gateway-models: env
 
 cgm: check-gateway-models
 	@echo "> done: cgm = check-gateway-models"
+
+sync-main-config: env
+	$(call PRINT_TITLE,"Syncing main config to kit and project configs")
+	$(VENV_PIPELEX_DEV) sync-main-config --quiet
+
+smc: sync-main-config
+	@echo "> done: smc = sync-main-config"
+
+smc-dry: env
+	$(call PRINT_TITLE,Previewing main config sync - dry run)
+	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
 
 ##############################################################################################
 ############################      Cleaning                        ############################
@@ -627,9 +638,9 @@ docs-deploy-stable: env docs-deploy-404
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
 
-docs-deploy-beta: env docs-deploy-404
-	$(call PRINT_TITLE,"Deploying pre-release documentation $(DOCS_VERSION)-beta")
-	$(VENV_MIKE) deploy --push $(DOCS_VERSION)-beta
+docs-deploy-specific-version: env docs-deploy-404
+	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
+	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
 
 docs-deploy-404:
 	$(call PRINT_TITLE,"Deploying 404.html to gh-pages root for versionless URL redirects")

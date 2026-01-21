@@ -69,6 +69,8 @@ DEEPSEEK_MODELS = [
     "deepseek-r1",
     "deepseek-v3.1",
     "deepseek-r1-distill-llama-70b",
+    "deepseek-v3.2",
+    "deepseek-v3.2-speciale",
 ]
 
 # --- Google Models (Gemini) ---------------------------------------------------------------------

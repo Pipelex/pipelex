@@ -12,7 +12,7 @@ from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.commands.build.app import build_app
+from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -128,7 +128,6 @@ pipelex build pipe "Given a theme, write a Haiku"
 """
 
 
-@build_app.command(SUB_COMMAND_PIPE, help="Build a Pipelex bundle with one validation/fix loop correcting deterministic issues")
 def build_pipe_cmd(
     prompt: Annotated[
         str,
@@ -165,18 +164,7 @@ def build_pipe_cmd(
             help="Override config: include or exclude full serialized data in graphs (requires --graph)",
         ),
     ] = None,
-    library_dir: Annotated[
-        list[str] | None,
-        typer.Option(
-            "--library-dir",
-            "-L",
-            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
-        ),
-    ] = None,
 ) -> None:
-    # Import here to avoid circular imports
-    from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints  # noqa: PLC0415
-
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
 
     typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
@@ -306,12 +294,15 @@ def build_pipe_cmd(
                     save_text_to_path(text="", path=init_path)
                     typer.secho(f"✅ Package init file saved to: {init_path}", fg=typer.colors.GREEN)
 
-                    # Generate graphs if --graph is enabled
-                    if graph and builder_graph_spec:
+                    get_report_delegate().generate_report()
+
+                    # Generate graphs if it was tracked during the build process
+                    if builder_graph_spec:
                         typer.secho("\n📊 Generating graphs...", fg=typer.colors.CYAN)
 
-                        # Save builder pipeline graph
-                        builder_graph_dir = Path(extras_output_dir) / "builder_graph"
+                        # Save builder pipeline graph in graphs/ subfolder
+                        graphs_dir = Path(extras_output_dir) / "graphs"
+                        builder_graph_dir = graphs_dir / "builder_graph"
                         builder_graph_count = await _save_graph_outputs_to_dir(
                             graph_spec=builder_graph_spec,
                             graph_config=execution_config.graph_config,
@@ -325,14 +316,16 @@ def build_pipe_cmd(
                         try:
                             built_pipe_execution_config = execution_config.with_graph_config_overrides(mock_inputs=True)
 
+                            # pass empty library_dirs to avoid loading any libraries set at env var or instance level:
+                            # we don't want any other pipeline to interfere with the pipeline we just built
                             built_pipe_output = await execute_pipeline(
                                 plx_content=plx_content,
                                 pipe_run_mode=PipeRunMode.DRY,
                                 execution_config=built_pipe_execution_config,
-                                library_dirs=library_dir,
+                                library_dirs=[],
                             )
                             if built_pipe_output.graph_spec:
-                                pipeline_graph_dir = Path(extras_output_dir) / "pipeline_graph"
+                                pipeline_graph_dir = graphs_dir / "pipeline_graph"
                                 log.dev(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
                                 pipeline_graph_count = await _save_graph_outputs_to_dir(
                                     graph_spec=built_pipe_output.graph_spec,
@@ -342,7 +335,7 @@ def build_pipe_cmd(
                                 )
                                 if pipeline_graph_count > 0:
                                     typer.secho(
-                                        f"📊 {pipeline_graph_count} pipeline graph outputs saved to: {pipeline_graph_dir}",
+                                        f"📊 {pipeline_graph_count} built pipeline graph outputs saved to: {pipeline_graph_dir}",
                                         fg=typer.colors.CYAN,
                                     )
                         except Exception as graph_exc:
@@ -350,8 +343,6 @@ def build_pipe_cmd(
 
                     end_time = time.time()
                     typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds\n", fg=typer.colors.WHITE)
-
-                    get_report_delegate().generate_report()
 
                     # Show how to run the pipe
                     console = get_console()

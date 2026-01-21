@@ -10,6 +10,11 @@ class ReactFlowTheme(StrEnum):
     SYSTEM = "system"
 
 
+class ReactFlowPalette(StrEnum):
+    YELLOW_BLUE = "yellow_blue"
+    DRACULA = "dracula"
+
+
 class ReactFlowEdgeType(StrEnum):
     BEZIER = "bezier"
     SMOOTHSTEP = "smoothstep"
@@ -21,6 +26,7 @@ class ReactFlowStyle(ConfigModel):
     """ReactFlow theming preset."""
 
     theme: ReactFlowTheme = Field(strict=False)
+    palette: ReactFlowPalette = Field(strict=False)
 
 
 class ReactFlowRenderingConfig(ConfigModel):
