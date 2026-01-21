@@ -4134,16 +4134,12 @@
 
 <p><a class="glightbox" href="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_banner_docs_v2.png" data-type="image" data-width="100%" data-height="auto" data-desc-position="bottom"><img alt="Pipelex Banner" src="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_banner_docs_v2.png" /></a></p>
 <h2 id="install">Install</h2>
-<p><div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pipelex
+<div class="highlight"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pipelex<span class="w"> </span>--pre
 </code></pre></div>
 <div class="highlight"><pre><span></span><code>pipelex<span class="w"> </span>init
-</code></pre></div></p>
-<p>To use AI models, you need API key(s):</p>
-<ul>
-<li>The <code>PIPELEX_GATEWAY_API_KEY</code> key provides access to all the AI models. To get your key, join our <a href="https://go.pipelex.com/discord">Discord community</a>, then request your <strong>free API key</strong> (no credit card required, limited time offer) in the <a href="https://discord.com/channels/1369447918955921449/1418228010431025233">🔑・free-api-key</a> channel.</li>
-<li>You can also use other AI routing services like <a href="https://docs.blackbox.ai/">BlackBox AI</a> or <a href="https://portkey.ai/">Portkey</a>, or you can bring your own API keys (OpenAI, Anthropic, Google, Mistral, etc.), or run local AI (no key needed).
-See <a href="../../5-setup/configure-ai-providers/">Configure AI Providers</a> for details. If you are using non-standard APIs, that's OK too, don't hesitate to join our <a href="https://go.pipelex.com/discord">Discord</a> for guidance, Pipelex provides dependency injections for the API portals, <a href="../../10-advanced-customizations/plugin-injection/">See here for more information</a></li>
-</ul>
+</code></pre></div>
+<p>During the second step of the initialization, we recommand, for a quick start, to use the Pipelex Gateway. Get your API key at <a href="https://app.pipelex.com/">app.pipelex.com</a> with free credits (no credit card required, limited time offer). If you have questions, join our <a href="https://go.pipelex.com/discord">Discord</a>.</p>
+<p>If you want to bring your own API keys, see <a href="../../5-setup/configure-ai-providers/">Configure AI Providers</a> for details.</p>
 <h1 id="generate-workflows-with-pipe-builder">Generate workflows with Pipe Builder</h1>
 <p>The fastest way to create production-ready AI workflows is with the Pipe Builder. Just describe what you want, and Pipelex generates complete, validated pipelines.</p>
 <div class="highlight"><pre><span></span><code>pipelex<span class="w"> </span>build<span class="w"> </span>pipe<span class="w"> </span><span class="s2">&quot;Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview&quot;</span>
