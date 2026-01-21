@@ -43,6 +43,7 @@ jobs:
 
       - name: Deploy documentation
         run: |
+          source .venv/bin/activate
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             echo "Deploying stable docs..."
             make docs-deploy-stable
