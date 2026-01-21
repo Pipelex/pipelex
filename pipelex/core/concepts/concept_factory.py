@@ -250,11 +250,19 @@ class ConceptFactory:
         blueprint: ConceptBlueprint,
         concept_code: str,
         domain_code: str,
+        concept_ref_to_class_name: dict[str, str] | None = None,
     ) -> str:
         """Handle BLUEPRINT_WITH_STRUCTURE declaration type.
 
         Structure is defined as a ConceptStructureBlueprint dict - run the structure generator
         and register it in the class registry.
+
+        Args:
+            blueprint: The concept blueprint
+            concept_code: The concept code
+            domain_code: The domain code
+            concept_ref_to_class_name: Optional mapping from concept refs to structure class names
+                for resolving concept-to-concept references
 
         Returns:
             The structure class name (which is the concept_code)
@@ -267,7 +275,7 @@ class ConceptFactory:
         normalized_structure = normalize_structure_blueprint(blueprint.structure)
 
         try:
-            _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+            _, the_generated_class = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name).generate_from_structure_blueprint(
                 class_name=concept_code,
                 structure_blueprint=normalized_structure,
             )
@@ -368,6 +376,7 @@ class ConceptFactory:
         domain_code: str,
         concept_code: str,
         blueprint_or_string_description: ConceptBlueprint | str,
+        concept_ref_to_class_name: dict[str, str] | None = None,
     ) -> Concept:
         # Determine declaration type
         declaration_type: ConceptDeclarationType
@@ -438,6 +447,7 @@ class ConceptFactory:
                         blueprint=blueprint,
                         concept_code=concept_code,
                         domain_code=domain_code,
+                        concept_ref_to_class_name=concept_ref_to_class_name,
                     ),
                     refines=None,
                 )
