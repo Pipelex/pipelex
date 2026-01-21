@@ -12,7 +12,7 @@ from pipelex.cli.error_handlers import ErrorContext
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
-from pipelex.core.concepts.structure_generation.generator import StructureGenerator
+from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
@@ -23,6 +23,68 @@ if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 SUB_COMMAND_STRUCTURES = "structures"
+
+
+def _compute_module_path_from_output_dir(output_directory: Path) -> str | None:
+    """Compute the Python module path from the output directory.
+
+    Args:
+        output_directory: The directory where structure files will be generated
+
+    Returns:
+        Module path string (e.g., "pipeline_01.structures") or None if cannot be determined
+    """
+    try:
+        # Get relative path from current working directory
+        cwd = Path.cwd()
+        rel_path = output_directory.resolve().relative_to(cwd)
+        # Convert path to module path (replace / with .)
+        return str(rel_path).replace("/", ".").replace("\\", ".")
+    except ValueError:
+        # output_directory is not relative to cwd
+        return None
+
+
+def _build_concept_ref_to_class_info(
+    blueprints: list["PipelexBundleBlueprint"],
+    output_directory: Path,
+) -> dict[str, ConceptClassInfo]:
+    """Build a mapping from concept refs to their class info including module paths.
+
+    Args:
+        blueprints: List of PipelexBundleBlueprint containing concept definitions
+        output_directory: Directory where structure files will be generated
+
+    Returns:
+        Mapping from concept_ref to ConceptClassInfo with module paths
+    """
+    concept_ref_to_class_info: dict[str, ConceptClassInfo] = {}
+    base_module_path = _compute_module_path_from_output_dir(output_directory)
+
+    for blueprint in blueprints:
+        if blueprint.domain == "native":
+            continue
+
+        if not blueprint.concept:
+            continue
+
+        for concept_code in blueprint.concept:
+            # Build the concept ref (domain.ConceptCode)
+            concept_ref = f"{blueprint.domain}.{concept_code}"
+
+            # Build the module path for this concept's structure file
+            concept_snake_case = pascal_case_to_snake_case(concept_code)
+            if base_module_path:
+                module_path = f"{base_module_path}.{blueprint.domain}__{concept_snake_case}"
+            else:
+                module_path = None
+
+            concept_ref_to_class_info[concept_ref] = ConceptClassInfo(
+                class_name=concept_code,
+                module_path=module_path,
+            )
+
+    return concept_ref_to_class_info
 
 
 def generate_structures_from_blueprints(
@@ -43,6 +105,9 @@ def generate_structures_from_blueprints(
         List of (domain, concept_code) tuples for generated files
     """
     output_directory.mkdir(parents=True, exist_ok=True)
+
+    # Build concept_ref_to_class_info mapping for all concepts
+    concept_ref_to_class_info = _build_concept_ref_to_class_info(blueprints, output_directory)
 
     # Only check for existing classes if we're not skipping and have a target path
     check_existing = not skip_existing_check and target_path is not None
@@ -90,7 +155,7 @@ def generate_structures_from_blueprints(
             # Handle simple string concept definitions (description only, refines Text by default)
             if isinstance(concept_blueprint, str):
                 try:
-                    generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
@@ -113,7 +178,7 @@ def generate_structures_from_blueprints(
                 normalized_structure = normalize_structure_blueprint(concept_blueprint.structure)
 
                 try:
-                    generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint=normalized_structure,
                     )
@@ -140,7 +205,7 @@ def generate_structures_from_blueprints(
                 refined_structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
 
                 try:
-                    generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=refined_structure_class_name,
@@ -161,7 +226,7 @@ def generate_structures_from_blueprints(
             # Handle concepts with neither structure nor refines - defaults to TextContent
             else:
                 try:
-                    generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,

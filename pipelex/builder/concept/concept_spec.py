@@ -24,6 +24,8 @@ class ConceptStructureSpecFieldType(StrEnum):
     BOOLEAN = "boolean"
     NUMBER = "number"
     DATE = "date"
+    LIST = "list"
+    CONCEPT = "concept"
 
 
 class ConceptSpecError(PipelexError):
@@ -32,22 +34,22 @@ class ConceptSpecError(PipelexError):
 
 class ConceptStructureSpec(StructuredContent):
     """ConceptStructureSpec represents the schema for a single field in a concept's structure. It supports
-    various field types including text, integer, boolean, number, and date.
+    various field types including text, integer, boolean, number, date, list, and concept.
 
     Attributes:
         the_field_name: Field name. Must be snake_case.
         description: Natural language description of the field's purpose and usage.
         type: The field's data type.
         required: Whether the field is mandatory. Defaults to False unless explicitly set to True.
-        default_value: Default value for the field. Must match the specified type, and for choice
-                      fields must be one of the valid choices. When provided, type must be specified
-                      (unless choices are provided).
+        default_value: Default value for the field. Must match the specified type.
+        concept_ref: For type="concept", the reference to the concept (e.g., "myapp.Customer").
+        item_type: For type="list", the type of list items (e.g., "text", "integer", "concept").
+        item_concept_ref: For type="list" with item_type="concept", the reference to the item concept.
 
     Validation Rules:
-        3. Default values: When default_value is provided:
-           - For typed fields: type must be specified and default_value must match that type
-           - Type validation includes: text (str), integer (int), boolean (bool),
-             number (int/float), dict (dict)
+        1. CONCEPT type: concept_ref must be set; default_value cannot be set.
+        2. LIST type: item_type must be set; if item_type="concept", item_concept_ref must be set.
+        3. Default values: When default_value is provided, it must match the specified type.
 
     """
 
@@ -56,6 +58,9 @@ class ConceptStructureSpec(StructuredContent):
     type: ConceptStructureSpecFieldType = Field(description="The type of the field.")
     required: bool | None = False
     default_value: Any | None = None
+    concept_ref: str | None = Field(default=None, description="For type='concept', the concept reference (e.g., 'myapp.Customer').")
+    item_type: str | None = Field(default=None, description="For type='list', the type of list items (e.g., 'text', 'integer', 'concept').")
+    item_concept_ref: str | None = Field(default=None, description="For type='list' with item_type='concept', the concept reference.")
 
     @field_validator("type", mode="before")
     @classmethod
@@ -65,9 +70,44 @@ class ConceptStructureSpec(StructuredContent):
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
         """Validate the structure blueprint according to type rules."""
+        match self.type:
+            case ConceptStructureSpecFieldType.CONCEPT:
+                if not self.concept_ref:
+                    msg = "When type is 'concept', concept_ref must be set."
+                    raise ValueError(msg)
+                if self.default_value is not None:
+                    msg = "default_value cannot be set for concept type (complex objects cannot have defaults)."
+                    raise ValueError(msg)
+
+            case ConceptStructureSpecFieldType.LIST:
+                if not self.item_type:
+                    msg = "When type is 'list', item_type must be set."
+                    raise ValueError(msg)
+                if self.item_type == "concept" and not self.item_concept_ref:
+                    msg = "When item_type is 'concept', item_concept_ref must be set."
+                    raise ValueError(msg)
+                if self.item_concept_ref and self.item_type != "concept":
+                    msg = f"item_concept_ref can only be set when item_type is 'concept'. Actual item_type: {self.item_type}"
+                    raise ValueError(msg)
+
+            case (
+                ConceptStructureSpecFieldType.TEXT
+                | ConceptStructureSpecFieldType.INTEGER
+                | ConceptStructureSpecFieldType.BOOLEAN
+                | ConceptStructureSpecFieldType.NUMBER
+                | ConceptStructureSpecFieldType.DATE
+            ):
+                pass
+
+        # Validate concept_ref can only be set when type is 'concept'
+        if self.concept_ref and self.type != ConceptStructureSpecFieldType.CONCEPT:
+            msg = f"'concept_ref' can only be set when type is 'concept'. Actual type: {self.type}"
+            raise ValueError(msg)
+
         # Check default_value type is the same as type
         if self.default_value is not None:
             self._validate_default_value_type()
+
         return self
 
     def _validate_default_value_type(self) -> None:
@@ -91,6 +131,12 @@ class ConceptStructureSpec(StructuredContent):
             case ConceptStructureSpecFieldType.DATE:
                 if not isinstance(self.default_value, datetime):
                     self._raise_type_mismatch_error("date", type(self.default_value).__name__)
+            case ConceptStructureSpecFieldType.LIST:
+                if not isinstance(self.default_value, list):
+                    self._raise_type_mismatch_error("list", type(self.default_value).__name__)
+            case ConceptStructureSpecFieldType.CONCEPT:
+                # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
+                pass
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
@@ -107,6 +153,9 @@ class ConceptStructureSpec(StructuredContent):
             type=core_type,
             required=self.required,
             default_value=self.default_value,
+            concept_ref=self.concept_ref,
+            item_type=self.item_type,
+            item_concept_ref=self.item_concept_ref,
         )
 
 
@@ -207,6 +256,24 @@ class ConceptSpec(StructuredContent):
 
         return ConceptBlueprint(description=self.description, structure=converted_structure, refines=self.refines)
 
+    def _format_type_display(self, field_spec: ConceptStructureSpec) -> str:
+        """Format the type display string for a field, including extra info for complex types."""
+        match field_spec.type:
+            case ConceptStructureSpecFieldType.CONCEPT:
+                return f"concept[{field_spec.concept_ref}]"
+            case ConceptStructureSpecFieldType.LIST:
+                if field_spec.item_type == "concept":
+                    return f"list[concept[{field_spec.item_concept_ref}]]"
+                return f"list[{field_spec.item_type}]"
+            case (
+                ConceptStructureSpecFieldType.TEXT
+                | ConceptStructureSpecFieldType.INTEGER
+                | ConceptStructureSpecFieldType.BOOLEAN
+                | ConceptStructureSpecFieldType.NUMBER
+                | ConceptStructureSpecFieldType.DATE
+            ):
+                return field_spec.type.value
+
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         concept_group = Group()
@@ -239,7 +306,8 @@ class ConceptSpec(StructuredContent):
 
             for field_name, field_spec in self.structure.items():
                 required_text = "Yes" if field_spec.required else "No"
-                row_data = [field_name, field_spec.description, field_spec.type.value, required_text]
+                type_display = self._format_type_display(field_spec)
+                row_data = [field_name, field_spec.description, type_display, required_text]
                 if has_default_values:
                     row_data.append(str(field_spec.default_value) if field_spec.default_value is not None else "")
                 structure_table.add_row(*row_data)

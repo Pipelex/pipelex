@@ -8,19 +8,43 @@ from pydantic import Field
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+
+
+class ConceptClassInfo:
+    """Information about a concept's structure class for import generation."""
+
+    def __init__(self, class_name: str, module_path: str | None = None):
+        """Initialize ConceptClassInfo.
+
+        Args:
+            class_name: The name of the structure class (e.g., "Skill")
+            module_path: Optional module path where the class is defined (e.g., "myapp.structures.skill").
+                         If None, a forward reference (string) will be used.
+        """
+        self.class_name = class_name
+        self.module_path = module_path
 
 
 class StructureGenerator:
     """Generate Pydantic BaseModel classes from concept structure blueprints."""
 
     # TODO: use StrEnum instead of Enum
-    def __init__(self, concept_ref_to_class_name: dict[str, str] | None = None):
+    def __init__(
+        self,
+        concept_ref_to_class_name: dict[str, str] | None = None,
+        concept_ref_to_class_info: dict[str, ConceptClassInfo] | None = None,
+    ):
         """Initialize the StructureGenerator.
 
         Args:
             concept_ref_to_class_name: Optional mapping from concept refs (e.g., "myapp.Customer")
                 to their structure class names (e.g., "Customer"). Used for resolving concept references.
+                When module_path is not known, forward references (strings) will be used.
+            concept_ref_to_class_info: Optional mapping from concept refs to ConceptClassInfo.
+                This takes precedence over concept_ref_to_class_name when both are provided.
+                When module_path is provided, proper import statements will be generated.
         """
         self.imports = {
             "from typing import Optional, List, Dict, Any, Literal",
@@ -30,6 +54,9 @@ class StructureGenerator:
         }
         self.enum_definitions: dict[str, dict[str, Any]] = {}  # Store enum definitions
         self.concept_ref_to_class_name = concept_ref_to_class_name or {}
+        self.concept_ref_to_class_info = concept_ref_to_class_info or {}
+        # Track concept classes that need to be mocked during validation
+        self._concept_classes_to_mock: set[str] = set()
 
     def generate_from_structure_blueprint(
         self,
@@ -322,16 +349,29 @@ class StructureGenerator:
             concept_ref: The concept reference (e.g., "myapp.Customer")
 
         Returns:
-            The Python type annotation (structure class name)
+            The Python type annotation (structure class name).
+            If module_path is available in concept_ref_to_class_info, generates an import
+            and returns the class name directly. Otherwise, returns a forward reference (string).
         """
         if not concept_ref:
             return "Any"
 
-        # Check if we have a mapping for this concept_ref
+        # First, check concept_ref_to_class_info (takes precedence)
+        if concept_ref in self.concept_ref_to_class_info:
+            class_info = self.concept_ref_to_class_info[concept_ref]
+            if class_info.module_path:
+                # Generate proper import and return class name directly
+                self.imports.add(f"from {class_info.module_path} import {class_info.class_name}")
+                # Track this class for mocking during validation
+                self._concept_classes_to_mock.add(class_info.class_name)
+                return class_info.class_name
+            # No module path, use forward reference
+            return f'"{class_info.class_name}"'
+
+        # Fall back to concept_ref_to_class_name (legacy behavior with forward references)
         if concept_ref in self.concept_ref_to_class_name:
             class_name = self.concept_ref_to_class_name[concept_ref]
-            # We'll need to add an import for this class - the class will be in the registry
-            # For now, we use a forward reference (string) to avoid import issues
+            # No module path known, use a forward reference (string)
             return f'"{class_name}"'
 
         # Default: extract the concept code from the ref and use as type
@@ -503,6 +543,21 @@ class StructureGenerator:
             "Field": Field,
         }
 
+        # Create mock classes for concept references that would fail import during validation
+        # These classes don't exist yet or their modules aren't in the path
+        validation_code = python_code
+        for mock_class_name in self._concept_classes_to_mock:
+            # Create a mock class that inherits from StructuredContent
+            mock_class = type(mock_class_name, (StructuredContent,), {})
+            exec_globals[mock_class_name] = mock_class
+            # Remove the import line for this class from the validation code
+            # (the actual generated code will still have it)
+            lines = validation_code.split("\n")
+            filtered_lines = [
+                line for line in lines if not (line.strip().startswith("from ") and f"import {mock_class_name}" in line and "pipelex" not in line)
+            ]
+            validation_code = "\n".join(filtered_lines)
+
         # If a custom base class is specified that's not a native class, get it from the registry
         if base_class_name:
             if not NativeConceptCode.is_native_structure_class(base_class_name):
@@ -514,7 +569,7 @@ class StructureGenerator:
                 exec_globals[base_class_name] = custom_base_class  # type: ignore[assignment]
 
         exec_locals: dict[str, Any] = {}
-        exec(python_code, exec_globals, exec_locals)
+        exec(validation_code, exec_globals, exec_locals)
 
         # Verify the expected class was created
         if expected_class_name not in exec_locals:

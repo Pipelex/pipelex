@@ -5,7 +5,7 @@ referencing other concepts (type = "concept" with concept_ref).
 """
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.structure_generation.generator import StructureGenerator
+from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
 
 
@@ -441,3 +441,175 @@ class Wrapper(StructuredContent):
 
         assert generated_code == expected_code
         assert issubclass(generated_class, StructuredContent)
+
+    def test_concept_ref_with_module_path_generates_import(self):
+        """Test that concept_ref with module_path generates proper import statements.
+
+        Note: This test only checks the generated code string because the external modules
+        don't exist in the test environment, so full validation would fail on import.
+        """
+        structure_blueprint = {
+            "skill": ConceptStructureBlueprint(
+                description="The skill being evaluated",
+                type=ConceptStructureBlueprintFieldType.CONCEPT,
+                concept_ref="cv_tech_screening.Skill",
+                required=True,
+            ),
+            "matches_requirement": ConceptStructureBlueprint(
+                description="Whether this skill matches a job requirement",
+                type=ConceptStructureBlueprintFieldType.BOOLEAN,
+                required=True,
+            ),
+        }
+
+        concept_ref_to_class_info = {
+            "cv_tech_screening.Skill": ConceptClassInfo(
+                class_name="Skill",
+                module_path="pipeline_01.structures.cv_tech_screening__skill",
+            ),
+        }
+
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
+
+        # Generate the class code without full validation (imports would fail)
+
+        class_code = generator._generate_class_source_code_from_blueprint("SkillMatchResult", structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        imports_section = "\n".join(sorted(generator.imports))
+
+        # Check the import was generated correctly
+        assert "from pipeline_01.structures.cv_tech_screening__skill import Skill" in imports_section
+
+        # Check the field uses the class name directly (not as a forward reference string)
+        assert "skill: Skill = Field(..., description=" in class_code
+        assert '"Skill"' not in class_code  # Should NOT be a forward reference
+
+    def test_list_of_concepts_with_module_path_generates_import(self):
+        """Test that list of concepts with module_path generates proper import statements.
+
+        Note: This test only checks the generated code string because the external modules
+        don't exist in the test environment, so full validation would fail on import.
+        """
+        structure_blueprint = {
+            "skill_matches": ConceptStructureBlueprint(
+                description="List of skill match results",
+                type=ConceptStructureBlueprintFieldType.LIST,
+                item_type="concept",
+                item_concept_ref="cv_tech_screening.SkillMatchResult",
+                required=True,
+            ),
+            "overall_score": ConceptStructureBlueprint(
+                description="Overall match score",
+                type=ConceptStructureBlueprintFieldType.INTEGER,
+                required=True,
+            ),
+        }
+
+        concept_ref_to_class_info = {
+            "cv_tech_screening.SkillMatchResult": ConceptClassInfo(
+                class_name="SkillMatchResult",
+                module_path="pipeline_01.structures.cv_tech_screening__skill_match_result",
+            ),
+        }
+
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
+
+        # Generate the class code without full validation (imports would fail)
+        class_code = generator._generate_class_source_code_from_blueprint("TechAnalysis", structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        imports_section = "\n".join(sorted(generator.imports))
+
+        # Check the import was generated correctly
+        assert "from pipeline_01.structures.cv_tech_screening__skill_match_result import SkillMatchResult" in imports_section
+
+        # Check the field uses the class name directly in List type (not as a forward reference string)
+        assert "skill_matches: List[SkillMatchResult] = Field(..., description=" in class_code
+        assert 'List["SkillMatchResult"]' not in class_code  # Should NOT be a forward reference
+
+    def test_class_info_without_module_path_uses_forward_reference(self):
+        """Test that ConceptClassInfo without module_path falls back to forward reference."""
+        structure_blueprint = {
+            "item": ConceptStructureBlueprint(
+                description="An item reference",
+                type=ConceptStructureBlueprintFieldType.CONCEPT,
+                concept_ref="myapp.SomeItem",
+                required=True,
+            ),
+        }
+
+        concept_ref_to_class_info = {
+            "myapp.SomeItem": ConceptClassInfo(
+                class_name="SomeItem",
+                module_path=None,  # No module path
+            ),
+        }
+
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
+        generated_code, generated_class = generator.generate_from_structure_blueprint("Container", structure_blueprint)
+
+        expected_code = '''\
+"""
+AUTOGENERATED CODE - DO NOT EDIT
+
+If you want to customize this structure:
+  1. Copy this file to your own module
+  2. Remove the 'structure' or 'refines' declaration from the concept in the PLX file
+     and declare it in inline mode (see https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/define_your_concepts/#basic-concept-definition)
+  3. Make sure your custom class is importable and registered
+
+To regenerate: pipelex build structures <target_directory>
+"""
+
+from enum import Enum
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pydantic import Field
+from typing import Optional, List, Dict, Any, Literal
+
+
+class Container(StructuredContent):
+    """Generated Container class"""
+
+    item: "SomeItem" = Field(..., description="An item reference")
+'''
+
+        assert generated_code == expected_code
+        assert issubclass(generated_class, StructuredContent)
+
+    def test_class_info_takes_precedence_over_class_name(self):
+        """Test that concept_ref_to_class_info takes precedence over concept_ref_to_class_name.
+
+        Note: This test only checks the generated code string because the external modules
+        don't exist in the test environment, so full validation would fail on import.
+        """
+        structure_blueprint = {
+            "customer": ConceptStructureBlueprint(
+                description="The customer",
+                type=ConceptStructureBlueprintFieldType.CONCEPT,
+                concept_ref="myapp.Customer",
+                required=True,
+            ),
+        }
+
+        # Both mappings provided - class_info should take precedence
+        concept_ref_to_class_name = {
+            "myapp.Customer": "OldCustomerName",
+        }
+        concept_ref_to_class_info = {
+            "myapp.Customer": ConceptClassInfo(
+                class_name="Customer",
+                module_path="myapp.structures.customer",
+            ),
+        }
+
+        generator = StructureGenerator(
+            concept_ref_to_class_name=concept_ref_to_class_name,
+            concept_ref_to_class_info=concept_ref_to_class_info,
+        )
+
+        # Generate the class code without full validation (imports would fail)
+        class_code = generator._generate_class_source_code_from_blueprint("Order", structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        imports_section = "\n".join(sorted(generator.imports))
+
+        # Should use "Customer" from class_info, not "OldCustomerName" from class_name
+        assert "customer: Customer = Field" in class_code
+        assert "from myapp.structures.customer import Customer" in imports_section
+        assert "OldCustomerName" not in class_code
+        assert "OldCustomerName" not in imports_section

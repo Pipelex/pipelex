@@ -147,12 +147,143 @@ class ConceptBlueprintTestCases:
         ),
     )
 
+    CONCEPT_WITH_CONCEPT_REF = (
+        "concept_with_concept_ref",
+        ConceptSpec(
+            the_concept_code="Invoice",
+            description="An invoice with a customer reference",
+            structure={
+                "invoice_number": ConceptStructureSpec(
+                    the_field_name="invoice_number",
+                    description="The invoice number",
+                    type=ConceptStructureSpecFieldType.TEXT,
+                    required=True,
+                ),
+                "customer": ConceptStructureSpec(
+                    the_field_name="customer",
+                    description="The customer for this invoice",
+                    type=ConceptStructureSpecFieldType.CONCEPT,
+                    concept_ref="myapp.Customer",
+                    required=True,
+                ),
+            },
+        ),
+        ConceptBlueprint(
+            description="An invoice with a customer reference",
+            refines=None,
+            structure={
+                "invoice_number": ConceptStructureBlueprint(
+                    description="The invoice number",
+                    type=ConceptStructureBlueprintFieldType.TEXT,
+                    required=True,
+                    default_value=None,
+                ),
+                "customer": ConceptStructureBlueprint(
+                    description="The customer for this invoice",
+                    type=ConceptStructureBlueprintFieldType.CONCEPT,
+                    concept_ref="myapp.Customer",
+                    required=True,
+                    default_value=None,
+                ),
+            },
+        ),
+    )
+
+    CONCEPT_WITH_LIST_OF_TEXT = (
+        "concept_with_list_of_text",
+        ConceptSpec(
+            the_concept_code="TaggedEntity",
+            description="An entity with a list of tags",
+            structure={
+                "name": ConceptStructureSpec(
+                    the_field_name="name",
+                    description="The entity name",
+                    type=ConceptStructureSpecFieldType.TEXT,
+                    required=True,
+                ),
+                "tags": ConceptStructureSpec(
+                    the_field_name="tags",
+                    description="List of tags",
+                    type=ConceptStructureSpecFieldType.LIST,
+                    item_type="text",
+                    required=False,
+                ),
+            },
+        ),
+        ConceptBlueprint(
+            description="An entity with a list of tags",
+            refines=None,
+            structure={
+                "name": ConceptStructureBlueprint(
+                    description="The entity name",
+                    type=ConceptStructureBlueprintFieldType.TEXT,
+                    required=True,
+                    default_value=None,
+                ),
+                "tags": ConceptStructureBlueprint(
+                    description="List of tags",
+                    type=ConceptStructureBlueprintFieldType.LIST,
+                    item_type="text",
+                    required=False,
+                    default_value=None,
+                ),
+            },
+        ),
+    )
+
+    CONCEPT_WITH_LIST_OF_CONCEPTS = (
+        "concept_with_list_of_concepts",
+        ConceptSpec(
+            the_concept_code="Order",
+            description="An order with line items",
+            structure={
+                "order_id": ConceptStructureSpec(
+                    the_field_name="order_id",
+                    description="The order ID",
+                    type=ConceptStructureSpecFieldType.TEXT,
+                    required=True,
+                ),
+                "line_items": ConceptStructureSpec(
+                    the_field_name="line_items",
+                    description="List of line items",
+                    type=ConceptStructureSpecFieldType.LIST,
+                    item_type="concept",
+                    item_concept_ref="myapp.LineItem",
+                    required=True,
+                ),
+            },
+        ),
+        ConceptBlueprint(
+            description="An order with line items",
+            refines=None,
+            structure={
+                "order_id": ConceptStructureBlueprint(
+                    description="The order ID",
+                    type=ConceptStructureBlueprintFieldType.TEXT,
+                    required=True,
+                    default_value=None,
+                ),
+                "line_items": ConceptStructureBlueprint(
+                    description="List of line items",
+                    type=ConceptStructureBlueprintFieldType.LIST,
+                    item_type="concept",
+                    item_concept_ref="myapp.LineItem",
+                    required=True,
+                    default_value=None,
+                ),
+            },
+        ),
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, ConceptSpec, ConceptBlueprint]]] = [
         SIMPLE_CONCEPT,
         CONCEPT_WITH_REFINES,
         CONCEPT_WITH_TEXT_FIELD,
         CONCEPT_WITH_INTEGER_FIELD,
         CONCEPT_WITH_MULTIPLE_FIELDS,
+        CONCEPT_WITH_CONCEPT_REF,
+        CONCEPT_WITH_LIST_OF_TEXT,
+        CONCEPT_WITH_LIST_OF_CONCEPTS,
     ]
 
 
