@@ -3,14 +3,24 @@
 from pathlib import Path
 
 import typer
+from posthog import tag
 from typing_extensions import Annotated
 
 from pipelex.cli.exceptions import PipelexCLIError
+from pipelex.hub import get_telemetry_manager
 from pipelex.kit.cursor_rules import remove_cursor_rules, update_cursor_rules
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.migrations_export import export_migration_instructions
 from pipelex.kit.single_file_agent_rules import remove_from_targets, update_single_file_agent_rules
+from pipelex.system.runtime import IntegrationMode
+from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.tools.misc.package_utils import get_package_version
+
+COMMAND = "kit"
+SUB_COMMAND_RULES = "rules"
+SUB_COMMAND_REMOVE_RULES = "remove-rules"
+SUB_COMMAND_MIGRATIONS = "migrations"
 
 kit_app = typer.Typer(no_args_is_help=True)
 
@@ -50,6 +60,65 @@ def _sync_agent_rules(
     else:
         typer.echo("✅ Kit sync completed successfully")
 
+    get_telemetry_manager().track_event(EventName.KIT_RULES_SYNC)
+
+
+def _do_remove_rules(
+    repo_root: Path | None,
+    cursor: bool,
+    single_files: bool,
+    delete_files: bool,
+    dry_run: bool,
+    diff: bool,
+    backup: str | None,
+) -> None:
+    """Execute the remove-rules logic."""
+    resolved_repo_root = repo_root if repo_root is not None else Path()
+    idx = load_index()
+
+    if cursor:
+        typer.echo("🗑️  Removing Cursor rules...")
+        remove_cursor_rules(resolved_repo_root, dry_run=dry_run)
+
+    if single_files:
+        if delete_files:
+            typer.echo("🗑️  Deleting target files...")
+        else:
+            typer.echo("🗑️  Removing marked sections from target files...")
+        remove_from_targets(
+            resolved_repo_root,
+            idx.agent_rules.targets,
+            delete_files=delete_files,
+            dry_run=dry_run,
+            diff=diff,
+            backup=backup,
+        )
+
+    if dry_run:
+        typer.echo("✅ Dry run completed - no changes made")
+    else:
+        typer.echo("✅ Agent rules removal completed successfully")
+
+    get_telemetry_manager().track_event(EventName.KIT_RULES_REMOVE)
+
+
+def _do_migration_instructions(
+    repo_root: Path | None,
+    dry_run: bool,
+) -> None:
+    """Execute the migrations logic."""
+    resolved_repo_root = repo_root if repo_root is not None else Path()
+
+    typer.echo("📄 Syncing migration instructions...")
+    export_migration_instructions(resolved_repo_root, dry_run=dry_run)
+
+    if dry_run:
+        typer.echo("✅ Dry run completed - no changes made")
+    else:
+        typer.echo(f"✅ Migration instructions synced to {resolved_repo_root / '.pipelex' / 'migrations'}")
+
+    get_telemetry_manager().track_event(EventName.KIT_MIGRATIONS_SYNC)
+
 
 @kit_app.command("rules", help="Export Pipelex Cursor rules and merge Pipelex marked sections into other agent rules files")
 def agent_rules(
@@ -62,15 +131,19 @@ def agent_rules(
     agent_set: Annotated[str | None, typer.Option("--set", help="Agent rule set to sync (use 'pipelex' for Pipelex repo)")] = None,
 ) -> None:
     try:
-        _sync_agent_rules(
-            repo_root=repo_root,
-            cursor=cursor,
-            single_files=single_files,
-            dry_run=dry_run,
-            diff=diff,
-            backup=backup,
-            agent_set=agent_set,
-        )
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RULES}")
+            _sync_agent_rules(
+                repo_root=repo_root,
+                cursor=cursor,
+                single_files=single_files,
+                dry_run=dry_run,
+                diff=diff,
+                backup=backup,
+                agent_set=agent_set,
+            )
 
     except Exception as exc:
         msg = f"Failed to sync kit assets for agent rules: {exc}"
@@ -90,33 +163,19 @@ def remove_rules(
     backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
 ) -> None:
     try:
-        if repo_root is None:
-            repo_root = Path()
-
-        idx = load_index()
-
-        if cursor:
-            typer.echo("🗑️  Removing Cursor rules...")
-            remove_cursor_rules(repo_root, dry_run=dry_run)
-
-        if single_files:
-            if delete_files:
-                typer.echo("🗑️  Deleting target files...")
-            else:
-                typer.echo("🗑️  Removing marked sections from target files...")
-            remove_from_targets(
-                repo_root,
-                idx.agent_rules.targets,
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_REMOVE_RULES}")
+            _do_remove_rules(
+                repo_root=repo_root,
+                cursor=cursor,
+                single_files=single_files,
                 delete_files=delete_files,
                 dry_run=dry_run,
                 diff=diff,
                 backup=backup,
             )
-
-        if dry_run:
-            typer.echo("✅ Dry run completed - no changes made")
-        else:
-            typer.echo("✅ Agent rules removal completed successfully")
 
     except Exception as exc:
         msg = f"Failed to remove agent rules: {exc}"
@@ -129,16 +188,11 @@ def migration_instructions(
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would be done without making changes")] = False,
 ) -> None:
     try:
-        if repo_root is None:
-            repo_root = Path()
-
-        typer.echo("📄 Syncing migration instructions...")
-        export_migration_instructions(repo_root, dry_run=dry_run)
-
-        if dry_run:
-            typer.echo("✅ Dry run completed - no changes made")
-        else:
-            typer.echo(f"✅ Migration instructions synced to {repo_root / '.pipelex' / 'migrations'}")
+        with get_telemetry_manager().telemetry_context():
+            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
+            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_MIGRATIONS}")
+            _do_migration_instructions(repo_root=repo_root, dry_run=dry_run)
 
     except Exception as exc:
         msg = f"Failed to sync migration instructions: {exc}"
