@@ -7,17 +7,16 @@ title: "Generate Workflows with Pipe Builder"
 ## Install
 
 ```bash
-pip install pipelex
+pip install pipelex --pre
 ```
+
 ```bash
 pipelex init
 ```
 
-To use AI models, you need API key(s):
+During the second step of the initialization, we recommand, for a quick start, to use the Pipelex Gateway. Get your API key at [app.pipelex.com](https://app.pipelex.com/) with free credits (no credit card required, limited time offer). If you have questions, join our [Discord](https://go.pipelex.com/discord).
 
-- The `PIPELEX_GATEWAY_API_KEY` key provides access to all the AI models. To get your key, join our [Discord community](https://go.pipelex.com/discord), then request your **free API key** (no credit card required, limited time offer) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
-- You can also use other AI routing services like [BlackBox AI](https://docs.blackbox.ai/) or [Portkey](https://portkey.ai/), or you can bring your own API keys (OpenAI, Anthropic, Google, Mistral, etc.), or run local AI (no key needed).
-See [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) for details. If you are using non-standard APIs, that's OK too, don't hesitate to join our [Discord](https://go.pipelex.com/discord) for guidance, Pipelex provides dependency injections for the API portals, [See here for more information](../10-advanced-customizations/plugin-injection.md)
+If you want to bring your own API keys, see [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) for details.
 
 # Generate workflows with Pipe Builder
 
