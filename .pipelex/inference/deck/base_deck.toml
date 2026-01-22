@@ -121,9 +121,9 @@ fast-groq = "llama-3.1-8b-instant"
 vision-groq = "llama-4-scout-17b-16e-instruct"
 
 # Image generation aliases
-base-img-gen = "flux-pro/v1.1"
-best-img-gen = "flux-2"
-fast-img-gen = "fast-lightning-sdxl"
+base-img-gen = "flux-2-pro"
+best-img-gen = "nano-banana-pro"
+fast-img-gen = "gpt-image-1-mini"
 
 ####################################################################################################
 # LLM Presets
