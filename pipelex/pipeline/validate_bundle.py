@@ -1,7 +1,9 @@
 from pathlib import Path
+from typing import Sequence
 
 from pydantic import BaseModel, ValidationError
 
+from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErrorData
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
@@ -16,7 +18,7 @@ from pipelex.core.pipes.handle_pipe_errors import (
 )
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_library_manager, set_current_library
+from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library
 from pipelex.libraries.library_utils import get_pipelex_plx_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 
@@ -83,6 +85,7 @@ async def validate_bundle(
     plx_file_path: str | None = None,
     plx_content: str | None = None,
     blueprints: list[PipelexBundleBlueprint] | None = None,
+    library_dirs: Sequence[str | Path] | None = None,
 ) -> ValidateBundleResult:
     provided_params = sum([blueprints is not None, plx_content is not None, plx_file_path is not None])
     if provided_params == 0:
@@ -95,6 +98,15 @@ async def validate_bundle(
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
+
+    # Load libraries from resolved directories before loading the bundle
+    effective_dirs, source_label = resolve_library_dirs(library_dirs)
+    if effective_dirs:
+        log.debug(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
+        library_manager.load_libraries(
+            library_id=library_id,
+            library_dirs=effective_dirs,
+        )
 
     loaded_pipes: list[PipeAbstract] | None = None
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None
