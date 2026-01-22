@@ -4,6 +4,8 @@ from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from instructor import Mode as InstructorMode
+
+
 class StructureMethod(StrEnum):
     # generic
     INSTRUCTOR_JSON = "instructor/json"
@@ -46,8 +48,9 @@ class StructureMethod(StrEnum):
     INSTRUCTOR_PERPLEXITY_JSON = "instructor/perplexity_json"
     INSTRUCTOR_OPENROUTER_STRUCTURED_OUTPUTS = "instructor/openrouter_structured_outputs"
 
-    def as_instructor_mode(self) -> InstructorMode:
+    def as_instructor_mode(self) -> "InstructorMode":
         from instructor import Mode as InstructorMode  # noqa: PLC0415
+
         match self:
             # generic
             case StructureMethod.INSTRUCTOR_JSON:

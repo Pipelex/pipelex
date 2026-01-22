@@ -1,6 +1,6 @@
 import inspect
 from collections.abc import Callable
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from openai.types.chat import ChatCompletionMessage
 from pydantic import BaseModel, create_model
