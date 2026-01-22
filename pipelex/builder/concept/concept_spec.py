@@ -33,7 +33,7 @@ class ConceptSpecError(PipelexError):
 
 class ConceptStructureSpec(StructuredContent):
     """ConceptStructureSpec represents the schema for a single field in a concept's structure. It supports
-    various field types including text, integer, boolean, number, date, list, and concept.
+    various field types including text, integer, boolean, number, date, and concept.
 
     Attributes:
         the_field_name: Field name. Must be snake_case.
@@ -42,12 +42,9 @@ class ConceptStructureSpec(StructuredContent):
         required: Whether the field is mandatory. Defaults to False unless explicitly set to True.
         default_value: Default value for the field. Must match the specified type.
         concept_ref: For type="concept", the reference to the concept (e.g., "myapp.Customer").
-        item_type: For type="list", the type of list items (e.g., "text", "integer", "concept").
-        item_concept_ref: For type="list" with item_type="concept", the reference to the item concept.
 
     Validation Rules:
         1. CONCEPT type: concept_ref must be set; default_value cannot be set.
-        2. LIST type: item_type must be set; if item_type="concept", item_concept_ref must be set.
         3. Default values: When default_value is provided, it must match the specified type.
 
     """
@@ -58,8 +55,6 @@ class ConceptStructureSpec(StructuredContent):
     required: bool | None = False
     default_value: Any | None = None
     concept_ref: str | None = Field(default=None, description="For type='concept', the concept reference (e.g., 'myapp.Customer').")
-    item_type: str | None = Field(default=None, description="For type='list', the type of list items (e.g., 'text', 'integer', 'concept').")
-    item_concept_ref: str | None = Field(default=None, description="For type='list' with item_type='concept', the concept reference.")
 
     @field_validator("type", mode="before")
     @classmethod
@@ -139,8 +134,6 @@ class ConceptStructureSpec(StructuredContent):
             required=self.required,
             default_value=self.default_value,
             concept_ref=self.concept_ref,
-            item_type=self.item_type,
-            item_concept_ref=self.item_concept_ref,
         )
 
 
