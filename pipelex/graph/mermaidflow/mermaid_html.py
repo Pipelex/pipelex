@@ -5,6 +5,7 @@ with theme support and interactive features for viewing stuff (data) content.
 """
 
 import json
+from datetime import date, datetime
 from typing import Any
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -14,6 +15,16 @@ from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 # Template registry keys
 _BASIC_TEMPLATE_KEY = "mermaid/basic.html.jinja2"
 _INTERACTIVE_TEMPLATE_KEY = "mermaid/interactive.html.jinja2"
+
+
+def _json_serial(obj: object) -> str:
+    """JSON serializer for objects not serializable by default."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, date):
+        return obj.isoformat()
+    msg = f"Type {type(obj)} not serializable"
+    raise TypeError(msg)
 
 
 def render_mermaid_html(
@@ -116,11 +127,11 @@ async def render_mermaid_html_with_data_async(
     context: dict[str, Any] = {
         "title": title,
         "mermaid_code": mermaid_code,
-        "stuff_data_json": json.dumps(stuff_data or {}),
-        "stuff_data_text_json": json.dumps(stuff_data_text or {}),
-        "stuff_data_html_json": json.dumps(stuff_data_html or {}),
-        "stuff_metadata_json": json.dumps(stuff_metadata or {}),
-        "stuff_content_type_json": json.dumps(stuff_content_type or {}),
+        "stuff_data_json": json.dumps(stuff_data or {}, default=_json_serial),
+        "stuff_data_text_json": json.dumps(stuff_data_text or {}, default=_json_serial),
+        "stuff_data_html_json": json.dumps(stuff_data_html or {}, default=_json_serial),
+        "stuff_metadata_json": json.dumps(stuff_metadata or {}, default=_json_serial),
+        "stuff_content_type_json": json.dumps(stuff_content_type or {}, default=_json_serial),
         "has_data": has_data,
         "theme": theme,
     }

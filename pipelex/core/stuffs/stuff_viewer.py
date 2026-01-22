@@ -5,6 +5,7 @@ with format tabs (HTML/JSON/Pretty) and action buttons (copy, download, open ext
 """
 
 import json
+from datetime import date, datetime
 from typing import Any
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -15,6 +16,16 @@ from pipelex.tools.misc.pretty import PRETTY_WIDTH_FOR_EXPORT
 
 # Template registry key
 _STUFF_VIEWER_TEMPLATE_KEY = "stuff/stuff_viewer.html.jinja2"
+
+
+def _json_serial(obj: object) -> str:
+    """JSON serializer for objects not serializable by default."""
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    if isinstance(obj, date):
+        return obj.isoformat()
+    msg = f"Type {type(obj)} not serializable"
+    raise TypeError(msg)
 
 
 async def render_stuff_viewer(
@@ -59,10 +70,10 @@ async def render_stuff_viewer(
             "title": display_title,
             "subtitle": display_subtitle,
             "html_tab_label": html_tab_label,
-            "stuff_data_json": json.dumps(stuff_data),
-            "stuff_data_text_json": json.dumps(stuff_data_text),
-            "stuff_data_html_json": json.dumps(stuff_data_html),
-            "content_type_json": json.dumps(content_type),
+            "stuff_data_json": json.dumps(stuff_data, default=_json_serial),
+            "stuff_data_text_json": json.dumps(stuff_data_text, default=_json_serial),
+            "stuff_data_html_json": json.dumps(stuff_data_html, default=_json_serial),
+            "content_type_json": json.dumps(content_type, default=_json_serial),
         },
         use_registry=True,
     )
@@ -105,10 +116,10 @@ async def render_stuff_content_viewer(
             "title": title,
             "subtitle": subtitle,
             "html_tab_label": html_tab_label,
-            "stuff_data_json": json.dumps(stuff_data),
-            "stuff_data_text_json": json.dumps(stuff_data_text),
-            "stuff_data_html_json": json.dumps(stuff_data_html),
-            "content_type_json": json.dumps(content_type),
+            "stuff_data_json": json.dumps(stuff_data, default=_json_serial),
+            "stuff_data_text_json": json.dumps(stuff_data_text, default=_json_serial),
+            "stuff_data_html_json": json.dumps(stuff_data_html, default=_json_serial),
+            "content_type_json": json.dumps(content_type, default=_json_serial),
         },
         use_registry=True,
     )
