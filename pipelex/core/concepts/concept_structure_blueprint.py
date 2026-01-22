@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.pipe_run.pipe_run_params import PipeRunParamKey
 from pipelex.types import Self, StrEnum
 
@@ -47,17 +48,38 @@ class ConceptStructureBlueprintFieldType(StrEnum):
 class ConceptStructureBlueprint(BaseModel):
     description: str
     type: ConceptStructureBlueprintFieldType | None = None
-    item_type: str | None = None
+    # type=dict
     key_type: str | None = None
     value_type: str | None = None
-    choices: list[str] | None = Field(default=None)
-    required: bool | None = Field(default=True)
-    default_value: Any | None = None
-    # Concept reference fields for concept-to-concept references
+    # type=list
+    item_type: str | None = None
+    # type=concept
     concept_ref: str | None = None
     item_concept_ref: str | None = None
 
+    choices: list[str] | None = Field(default=None)
+    default_value: Any | None = None
+    required: bool | None = Field(default=True)
+
     # TODO: date translator for default_value
+
+    @field_validator("concept_ref", mode="before")
+    @classmethod
+    def validate_concept_ref(cls, concept_ref: str | None) -> str | None:
+        if concept_ref is not None:
+            if not is_concept_ref_or_code_valid(concept_ref_or_code=concept_ref):
+                msg = f"Concept ref '{concept_ref}' must be a valid concept ref (domain.ConceptCode) or simply a concept code (PascalCase)"
+                raise ValueError(msg)
+        return concept_ref
+
+    @field_validator("item_concept_ref", mode="before")
+    @classmethod
+    def validate_item_concept_ref(cls, item_concept_ref: str | None) -> str | None:
+        if item_concept_ref is not None:
+            if not is_concept_ref_or_code_valid(concept_ref_or_code=item_concept_ref):
+                msg = f"Item concept ref '{item_concept_ref}' must be a valid concept ref (domain.ConceptCode) or simply a concept code (PascalCase)"
+                raise ValueError(msg)
+        return item_concept_ref
 
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:

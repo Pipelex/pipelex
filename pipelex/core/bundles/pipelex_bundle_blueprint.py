@@ -102,3 +102,5 @@ class PipelexBundleBlueprint(BaseModel):
             msg = f"Main pipe '{self.main_pipe}' could not be found in pipelex bundle at source '{self.source}' and domain '{self.domain}'"
             raise ValueError(msg)
         return self
+
+    # TODO: Add here the validation of the concept references without domain. Are they declared in this bundle?
