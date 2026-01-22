@@ -24,7 +24,6 @@ class ConceptStructureSpecFieldType(StrEnum):
     BOOLEAN = "boolean"
     NUMBER = "number"
     DATE = "date"
-    LIST = "list"
     CONCEPT = "concept"
 
 
@@ -79,17 +78,6 @@ class ConceptStructureSpec(StructuredContent):
                     msg = "default_value cannot be set for concept type (complex objects cannot have defaults)."
                     raise ValueError(msg)
 
-            case ConceptStructureSpecFieldType.LIST:
-                if not self.item_type:
-                    msg = "When type is 'list', item_type must be set."
-                    raise ValueError(msg)
-                if self.item_type == "concept" and not self.item_concept_ref:
-                    msg = "When item_type is 'concept', item_concept_ref must be set."
-                    raise ValueError(msg)
-                if self.item_concept_ref and self.item_type != "concept":
-                    msg = f"item_concept_ref can only be set when item_type is 'concept'. Actual item_type: {self.item_type}"
-                    raise ValueError(msg)
-
             case (
                 ConceptStructureSpecFieldType.TEXT
                 | ConceptStructureSpecFieldType.INTEGER
@@ -131,9 +119,6 @@ class ConceptStructureSpec(StructuredContent):
             case ConceptStructureSpecFieldType.DATE:
                 if not isinstance(self.default_value, datetime):
                     self._raise_type_mismatch_error("date", type(self.default_value).__name__)
-            case ConceptStructureSpecFieldType.LIST:
-                if not isinstance(self.default_value, list):
-                    self._raise_type_mismatch_error("list", type(self.default_value).__name__)
             case ConceptStructureSpecFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
@@ -261,10 +246,6 @@ class ConceptSpec(StructuredContent):
         match field_spec.type:
             case ConceptStructureSpecFieldType.CONCEPT:
                 return f"concept[{field_spec.concept_ref}]"
-            case ConceptStructureSpecFieldType.LIST:
-                if field_spec.item_type == "concept":
-                    return f"list[concept[{field_spec.item_concept_ref}]]"
-                return f"list[{field_spec.item_type}]"
             case (
                 ConceptStructureSpecFieldType.TEXT
                 | ConceptStructureSpecFieldType.INTEGER
