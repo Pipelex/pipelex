@@ -53,7 +53,8 @@ class DualClientExceptionCapture:
     def _thread_exception_handler(self, args: threading.ExceptHookArgs) -> None:
         """Handle uncaught exceptions from threads."""
         self._capture_exception((args.exc_type, args.exc_value, args.exc_traceback))
-        # Note: threading.excepthook has no default behavior to preserve
+        # Always call original handler to preserve default behavior (prints to stderr)
+        self._original_threading_excepthook(args)
 
     def _capture_exception(
         self,
