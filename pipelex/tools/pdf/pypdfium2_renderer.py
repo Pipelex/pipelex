@@ -87,7 +87,7 @@ def _extract_image_from_pdf_object(
         ExtractedImageFromPage with the extracted image data and page coordinates
     """
     # Get image dimensions directly from the PDF object
-    width, height = cast(tuple[int, int], image_obj.get_size())  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+    width, height = cast("tuple[int, int]", image_obj.get_size())  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 
     # Get the position on the page (left, bottom, right, top) in PDF coordinates
     # PDF uses bottom-left as origin, so we map:
@@ -95,7 +95,7 @@ def _extract_image_from_pdf_object(
     # - top → top_left_y
     # - right → bottom_right_x
     # - bottom → bottom_right_y
-    left, bottom, right, top = cast(tuple[float, float, float, float], image_obj.get_pos())  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+    left, bottom, right, top = cast("tuple[float, float, float, float]", image_obj.get_pos())  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
     bounding_box = BoundingBox.make_from_two_corners(
         top_left_x=left,
         top_left_y=top,

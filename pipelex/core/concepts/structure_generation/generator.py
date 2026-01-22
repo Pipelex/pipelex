@@ -51,7 +51,7 @@ class StructureGenerator:
         }
         self.enum_definitions: dict[str, dict[str, Any]] = {}  # Store enum definitions
         self.concept_ref_to_class_info = concept_ref_to_class_info or {}
-        # Track concept classes that need to be mocked during validation
+        # Track concept classes that need to be mocked during validation (for file generation)
         self._concept_classes_to_mock: set[str] = set()
 
     def generate_from_structure_blueprint(
@@ -346,8 +346,9 @@ class StructureGenerator:
 
         Returns:
             The Python type annotation (structure class name).
-            If module_path is available in concept_ref_to_class_info, generates an import
-            and returns the class name directly. Otherwise, returns a forward reference (string).
+            - If module_path is available in concept_ref_to_class_info: generates an import,
+              tracks for mocking, returns class name directly (for file generation)
+            - Otherwise: returns a forward reference string (for runtime - resolved via model_rebuild)
         """
         if not concept_ref:
             return "Any"
@@ -356,16 +357,15 @@ class StructureGenerator:
         if concept_ref in self.concept_ref_to_class_info:
             class_info = self.concept_ref_to_class_info[concept_ref]
             if class_info.module_path:
-                # Generate proper import and return class name directly
+                # File generation: generate import and mock during validation
                 self.imports.add(f"from {class_info.module_path} import {class_info.class_name}")
-                # Track this class for mocking during validation
                 self._concept_classes_to_mock.add(class_info.class_name)
                 return class_info.class_name
-            # No module path, use forward reference
+            # No module path: use forward reference (resolved via model_rebuild at runtime)
             return f'"{class_info.class_name}"'
 
-        # Default: extract the concept code from the ref and use as type
-        # e.g., "myapp.Customer" -> "Customer"
+        # Default: extract concept code and use as forward reference
+        # e.g., "myapp.Customer" -> '"Customer"'
         concept_code = concept_ref.split(".")[-1]
         return f'"{concept_code}"'
 
@@ -528,9 +528,10 @@ class StructureGenerator:
             "Field": Field,
         }
 
-        # Create mock classes for concept references that would fail import during validation
-        # These classes don't exist yet or their modules aren't in the path
         validation_code = python_code
+
+        # For file generation: create mock classes for concept references that would fail import
+        # These classes don't exist yet or their modules aren't in the path
         for mock_class_name in self._concept_classes_to_mock:
             # Create a mock class that inherits from StructuredContent
             mock_class = type(mock_class_name, (StructuredContent,), {})

@@ -11,8 +11,6 @@ from pipelex.builder import builder
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprint
-from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
@@ -219,10 +217,12 @@ class LibraryManager(LibraryManagerAbstract):
             all_domains.append(domain)
         library.domain_library.add_domains(domains=all_domains)
 
-        # Load concepts with dependency ordering and forward reference resolution
-        all_concepts, concept_ref_to_class_info = self._load_concepts_from_blueprints(blueprints)
+        # Load concepts with dependency ordering (topological sort ensures referenced classes exist)
+        all_concepts = self._load_concepts_from_blueprints(blueprints)
         library.concept_library.add_concepts(concepts=all_concepts)
-        self._rebuild_models_with_forward_refs(all_concepts, concept_ref_to_class_info)
+
+        # Resolve forward references in dynamically generated structure classes
+        self._rebuild_models_with_forward_refs(all_concepts)
 
         # Load all pipes
         for blueprint in blueprints:
@@ -249,18 +249,19 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_concepts_from_blueprints(
         self,
         blueprints: list[PipelexBundleBlueprint],
-    ) -> tuple[list["Concept"], dict[str, ConceptClassInfo]]:
+    ) -> list["Concept"]:
         """Load concepts from blueprints with topological sorting for dependencies.
 
-        This method implements two-phase loading:
-        1. Parse & Analyze: Collect all concept blueprints, build dependency graph, topological sort
-        2. Load in Order: Load concepts in dependency order
+        This method implements three-phase loading:
+        1. Parse & Analyze: Collect all concept blueprints
+        2. Topological Sort: Build dependency graph, determine load order
+        3. Load in Order: Load concepts in dependency order (so referenced classes exist)
 
         Args:
             blueprints: List of parsed PLX blueprints to load
 
         Returns:
-            Tuple of (loaded concepts list, concept_ref to class info mapping)
+            List of loaded concepts
         """
         # Phase 1: Collect all concept blueprints
         concept_blueprints: dict[str, tuple[str, ConceptBlueprint | str]] = {}
@@ -269,13 +270,6 @@ class LibraryManager(LibraryManagerAbstract):
                 for concept_code, concept_blueprint in blueprint.concept.items():
                     concept_ref = f"{blueprint.domain}.{concept_code}"
                     concept_blueprints[concept_ref] = (blueprint.domain, concept_blueprint)
-
-        # Build concept_ref to class info mapping for forward reference resolution
-        concept_ref_to_class_info: dict[str, ConceptClassInfo] = {}
-        for concept_ref, (_, concept_blueprint) in concept_blueprints.items():
-            concept_code = concept_ref.split(".")[-1]
-            class_name = get_structure_class_name_from_blueprint(concept_blueprint, concept_code)
-            concept_ref_to_class_info[concept_ref] = ConceptClassInfo(class_name=class_name, module_path=None)
 
         # Phase 2: Topological sort to determine load order
         sorted_concept_refs: list[str]
@@ -294,6 +288,7 @@ class LibraryManager(LibraryManagerAbstract):
             sorted_concept_refs = []
 
         # Phase 3: Load concepts in dependency order
+        # Because we load in topological order, referenced classes already exist in the registry
         all_concepts: list[Concept] = []
         for concept_ref in sorted_concept_refs:
             domain_code, concept_blueprint = concept_blueprints[concept_ref]
@@ -305,7 +300,7 @@ class LibraryManager(LibraryManagerAbstract):
             )
             all_concepts.append(concept)
 
-        return all_concepts, concept_ref_to_class_info
+        return all_concepts
 
     ############################################################
     # Private helper methods
@@ -374,11 +369,7 @@ class LibraryManager(LibraryManagerAbstract):
         for blueprint in blueprints:
             self._remove_from_blueprint(library_id=library_id, blueprint=blueprint)
 
-    def _rebuild_models_with_forward_refs(
-        self,
-        concepts: list["Concept"],
-        concept_ref_to_class_info: dict[str, ConceptClassInfo],
-    ) -> None:
+    def _rebuild_models_with_forward_refs(self, concepts: list["Concept"]) -> None:
         """Rebuild Pydantic models to resolve forward references.
 
         When dynamically generated classes have forward references (e.g., `customer: "Customer"`),
@@ -388,23 +379,16 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             concepts: List of concepts that were just loaded
-            concept_ref_to_class_info: Mapping from concept refs to ConceptClassInfo
         """
         # Build namespace with all structure class names
         namespace: dict[str, type] = {}
         class_registry = KajsonManager.get_class_registry()
 
-        for class_info in concept_ref_to_class_info.values():
-            structure_class = class_registry.get_class(name=class_info.class_name)
-            if structure_class is not None:
-                namespace[class_info.class_name] = structure_class
-
-        # Also add classes by their concept code (for cases where concept_ref wasn't used)
         for concept in concepts:
             structure_class = class_registry.get_class(name=concept.structure_class_name)
             if structure_class is not None:
                 namespace[concept.structure_class_name] = structure_class
-                # Also add by concept code in case the class name differs
+                # Also add by concept code in case the forward ref uses the code
                 namespace[concept.code] = structure_class
 
         # Rebuild each model with the shared namespace
