@@ -6,6 +6,8 @@ import typer
 from posthog import tag
 from typing_extensions import Annotated
 
+from pipelex.cli.cli_factory import make_pipelex_for_cli
+from pipelex.cli.error_handlers import ErrorContext
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.hub import get_telemetry_manager
 from pipelex.kit.cursor_rules import remove_cursor_rules, update_cursor_rules
@@ -13,6 +15,7 @@ from pipelex.kit.index_loader import load_index
 from pipelex.kit.index_models import KitIndex
 from pipelex.kit.migrations_export import export_migration_instructions
 from pipelex.kit.single_file_agent_rules import remove_from_targets, update_single_file_agent_rules
+from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
@@ -128,6 +131,7 @@ def agent_rules(
     agent_set: Annotated[str | None, typer.Option("--set", help="Agent rule set to sync (use 'pipelex' for Pipelex repo)")] = None,
 ) -> None:
     try:
+        make_pipelex_for_cli(context=ErrorContext.KIT)
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
@@ -145,6 +149,8 @@ def agent_rules(
     except Exception as exc:
         msg = f"Failed to sync kit assets for agent rules: {exc}"
         raise PipelexCLIError(msg) from exc
+    finally:
+        Pipelex.teardown_if_needed()
 
 
 @kit_app.command(
@@ -160,6 +166,7 @@ def remove_rules(
     backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
 ) -> None:
     try:
+        make_pipelex_for_cli(context=ErrorContext.KIT)
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
@@ -177,6 +184,8 @@ def remove_rules(
     except Exception as exc:
         msg = f"Failed to remove agent rules: {exc}"
         raise PipelexCLIError(msg) from exc
+    finally:
+        Pipelex.teardown_if_needed()
 
 
 @kit_app.command("migrations", help="Sync Pipelex migration instructions to the `.pipelex/migrations` directory")
@@ -185,6 +194,7 @@ def migration_instructions(
     dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would be done without making changes")] = False,
 ) -> None:
     try:
+        make_pipelex_for_cli(context=ErrorContext.KIT)
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
@@ -194,3 +204,5 @@ def migration_instructions(
     except Exception as exc:
         msg = f"Failed to sync migration instructions: {exc}"
         raise PipelexCLIError(msg) from exc
+    finally:
+        Pipelex.teardown_if_needed()

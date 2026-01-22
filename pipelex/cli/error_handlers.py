@@ -35,6 +35,7 @@ class ErrorContext(StrEnum):
     VALIDATION_BEFORE_BUILD_PIPE = "Pre-validation (build pipe)"
     VALIDATION_BEFORE_BUILD_RUNNER = "Pre-validation (build runner)"
     VALIDATION_BEFORE_BUILD_INPUTS = "Pre-validation (build inputs)"
+    KIT = "Kit operation"
 
 
 def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorContext) -> NoReturn:
