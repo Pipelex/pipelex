@@ -116,27 +116,60 @@ class PipeCondition(PipeController):
     @override
     def validate_output_with_library(self):
         """Validate the output for the pipe condition.
-        The output of the pipe condition should match the output of all the conditional pipes, and the default pipe.
+
+        Rules:
+        1. If all mapped pipes have the same output concept, PipeCondition's output MUST be that same concept.
+        2. If mapped pipes have different output concepts, PipeCondition's output MUST be Dynamic.
+
+        Special outcomes (CONTINUE/FAIL) do not influence the output validation - only actual pipes matter.
+        When there are no mapped pipes (all special outcomes), any output is allowed.
         """
-        for pipe_code in self.mapped_pipe_codes:
+        mapped_pipe_codes = self.mapped_pipe_codes
+        if not mapped_pipe_codes:
+            # No actual pipes to validate against (all special outcomes)
+            return
+
+        # Collect all unique output concept refs from mapped pipes
+        mapped_output_refs: set[str] = set()
+        for pipe_code in mapped_pipe_codes:
             pipe = get_required_pipe(pipe_code=pipe_code)
-            if self.output.concept.concept_ref not in {
-                pipe.output.concept.concept_ref,
-                NativeConceptCode.DYNAMIC.concept_ref,
-                NativeConceptCode.ANYTHING.concept_ref,
-            }:
+            mapped_output_refs.add(pipe.output.concept.concept_ref)
+
+        all_outputs_same = len(mapped_output_refs) == 1
+
+        if all_outputs_same:
+            # All mapped pipes have the same output - PipeCondition MUST use that same output
+            expected_output_ref = next(iter(mapped_output_refs))
+            if self.output.concept.concept_ref != expected_output_ref:
                 msg = (
-                    f"The output concept code '{self.output.concept.concept_ref}' of the pipe '{self.code}' is not "
-                    f"matching the output concept code '{pipe.output.concept.concept_ref}' of the pipe '{pipe_code}'"
+                    f"All mapped pipes of PipeCondition '{self.code}' have the same output concept "
+                    f"'{expected_output_ref}', but PipeCondition declares output '{self.output.concept.concept_ref}'. "
+                    f"When all mapped pipes share the same output, the PipeCondition must use that exact output."
                 )
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
                     domain_code=self.domain_code,
                     pipe_code=self.code,
-                    provided_concept_code=pipe.output.concept.concept_ref,
-                    required_concept_codes=[self.output.concept.concept_ref],
+                    provided_concept_code=self.output.concept.concept_ref,
+                    required_concept_codes=[expected_output_ref],
                 )
+        # Mapped pipes have different outputs - PipeCondition MUST use Dynamic
+        elif self.output.concept.concept_ref != NativeConceptCode.DYNAMIC.concept_ref:
+            msg = (
+                f"Mapped pipes of PipeCondition '{self.code}' have different output concepts: "
+                f"{sorted(mapped_output_refs)}. When mapped pipes have different outputs, "
+                f"the PipeCondition must declare its output as '{NativeConceptCode.DYNAMIC.concept_ref}', "
+                f"but it declares '{self.output.concept.concept_ref}'."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                provided_concept_code=self.output.concept.concept_ref,
+                required_concept_codes=[NativeConceptCode.DYNAMIC.concept_ref],
+            )
 
     # TODO: Restore this validation. The problem lies with needed_inputs that construct Anything concepts.
     # @override
