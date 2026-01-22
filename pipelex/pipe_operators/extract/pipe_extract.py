@@ -74,6 +74,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     def validate_inputs_with_library(self):
         the_single_input = self.inputs.get_single_stuff_spec()
         image_concept = get_native_concept(native_concept=NativeConceptCode.IMAGE)
+        document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
         concept_library = get_concept_library()
         if concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=image_concept, strict=True):
             # it's an image, we can't accept documnt-related fields
@@ -89,6 +90,12 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             if self.max_page_images is not None:
                 msg = "PipeExtract with image input cannot have max_page_images set"
                 raise ValueError(msg)
+        elif not concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=document_concept, strict=True):
+            msg = (
+                "The input to PipeExtract must be an image or a document (or a concept that refines one of them), "
+                f"but is {the_single_input.concept.concept_ref}"
+            )
+            raise TypeError(msg)
 
     @override
     def validate_output_static(self):
