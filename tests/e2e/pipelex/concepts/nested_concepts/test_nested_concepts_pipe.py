@@ -1,7 +1,3 @@
-# pyright: reportUnknownMemberType=false
-# pyright: reportUnknownVariableType=false
-# pyright: reportUnknownArgumentType=false
-# pyright: reportAttributeAccessIssue=false
 """E2E test for pipes with nested concept-to-concept references.
 
 This test verifies that:
@@ -10,19 +6,18 @@ This test verifies that:
 3. Pipes can generate structured output with nested concepts
 4. The generated output contains properly typed nested objects
 
-Note: pyright checks are disabled for this file because it tests dynamically
-generated classes with runtime-determined attributes that can't be statically typed.
+Note: Dry-run mode generates random values, so we only test types and structure, not exact values.
 """
-
-from typing import Any
 
 import pytest
 
 from pipelex import pretty_print
-from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
+from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__customer import Customer
+from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__invoice import Invoice
+from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__line_item import LineItem
 
 
 @pytest.mark.llm
@@ -39,7 +34,7 @@ class TestNestedConceptsPipe:
         1. PLX file with concept-to-concept references is loaded
         2. Concepts are loaded in topological order (LineItem, Customer before Invoice)
         3. The LLM generates structured output with proper nested types
-        4. The output can be accessed and validated
+        4. The output can be accessed via working_memory.get_stuff_as() with typed models
         """
         pipe_output = await execute_pipeline(
             pipe_code="generate_invoice",
@@ -52,76 +47,50 @@ class TestNestedConceptsPipe:
             pipe_run_mode=pipe_run_mode,
         )
 
-        # Basic assertions
-        assert pipe_output is not None
-        assert pipe_output.working_memory is not None
-        assert pipe_output.main_stuff is not None
-
-        # Verify the concept
+        # Verify the concept metadata
         assert pipe_output.main_stuff.concept.code == "Invoice"
         assert pipe_output.main_stuff.concept.domain_code == "nested_concepts_test"
 
-        # Get the content - attributes are dynamically generated at runtime
-        invoice_content = pipe_output.main_stuff.content
-        assert isinstance(invoice_content, StructuredContent)
+        # Get the typed invoice using working_memory.get_stuff_as()
+        invoice = pipe_output.working_memory.get_stuff_as("main_stuff", Invoice)
+        assert isinstance(invoice, Invoice)
 
         # Log output for debugging
-        pretty_print(invoice_content, title="Generated Invoice")
+        pretty_print(invoice, title="Generated Invoice")
 
-        # Verify the invoice has the expected fields
-        assert hasattr(invoice_content, "invoice_number")
-        assert hasattr(invoice_content, "customer")
-        assert hasattr(invoice_content, "line_items")
-        assert hasattr(invoice_content, "total_amount")
+        # Verify invoice_number is a non-empty string (don't check exact value - dry run randomizes)
+        assert isinstance(invoice.invoice_number, str)
+        assert len(invoice.invoice_number) > 0
 
-        # Verify invoice_number is a string
-        invoice_number: Any = invoice_content.invoice_number
-        assert isinstance(invoice_number, str)
-        assert len(invoice_number) > 0
+        # Verify customer is a properly typed nested Customer object
+        assert isinstance(invoice.customer, Customer)
+        assert isinstance(invoice.customer.name, str)
+        assert isinstance(invoice.customer.email, str)
 
-        # Verify customer is a nested concept (StructuredContent with name and email)
-        customer: Any = invoice_content.customer
-        assert customer is not None
-        assert isinstance(customer, StructuredContent)
-        assert hasattr(customer, "name")
-        assert hasattr(customer, "email")
-        customer_name: Any = customer.name
-        customer_email: Any = customer.email
-        assert isinstance(customer_name, str)
-        assert isinstance(customer_email, str)
+        # Verify line_items is a list of properly typed LineItem objects
+        assert isinstance(invoice.line_items, list)
+        assert len(invoice.line_items) >= 1  # Dry run creates at least 1 item
 
-        # Verify line_items is a list of nested concepts
-        line_items: Any = invoice_content.line_items
-        assert line_items is not None
-        assert isinstance(line_items, list)
-        assert len(line_items) >= 1  # At least 1 item (dry mode creates 1, live mode may create more)
+        for line_item in invoice.line_items:
+            assert isinstance(line_item, LineItem)
+            assert isinstance(line_item.product_name, str)
+            assert isinstance(line_item.quantity, int)
+            assert isinstance(line_item.unit_price, float)
 
-        # Verify each line item has the expected structure
-        for line_item in line_items:
-            assert isinstance(line_item, StructuredContent)
-            assert hasattr(line_item, "product_name")
-            assert hasattr(line_item, "quantity")
-            assert hasattr(line_item, "unit_price")
-            product_name: Any = line_item.product_name
-            quantity: Any = line_item.quantity
-            unit_price: Any = line_item.unit_price
-            assert isinstance(product_name, str)
-            assert isinstance(quantity, int)
-            assert isinstance(unit_price, (int, float))
+        # Verify total_amount is a number (don't check exact value - dry run randomizes)
+        assert isinstance(invoice.total_amount, float)
 
-        # Verify total_amount is a number
-        total_amount: Any = invoice_content.total_amount
-        assert isinstance(total_amount, (int, float))
-        assert total_amount > 0
+        # Verify optional notes field (can be None or string)
+        assert invoice.notes is None or isinstance(invoice.notes, str)
 
         # Log detailed structure for debugging
         pretty_print(
             {
-                "invoice_number": invoice_number,
-                "customer_name": customer_name,
-                "customer_email": customer_email,
-                "num_line_items": len(line_items),
-                "total_amount": total_amount,
+                "invoice_number": invoice.invoice_number,
+                "customer_name": invoice.customer.name,
+                "customer_email": invoice.customer.email,
+                "num_line_items": len(invoice.line_items),
+                "total_amount": invoice.total_amount,
             },
             title="Invoice Summary",
         )
