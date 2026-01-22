@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING, Any
 
 import instructor
 import openai
-from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
 from typing_extensions import override
 
@@ -119,6 +118,8 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
+        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+
         try:
             try:
                 extra_headers, extra_body = self.openai_completions_factory.make_extras(

@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Any, cast
 
 import instructor
 import openai
-from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
 from typing_extensions import override
 
@@ -114,6 +113,8 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
+        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+
         try:
             if not hasattr(self.instructor_for_objects, "responses"):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."
