@@ -17,19 +17,20 @@ class TestConceptFactory:
     """Test ConceptFactory methods with various configurations."""
 
     @pytest.mark.parametrize(
-        ("test_name", "blueprint", "expected_result"),
+        ("test_name", "domain_code", "blueprint", "expected_result"),
         TestCases.MAKE_REFINES_TEST_CASES,
     )
     def test_make_refine(
         self,
         test_name: str,
+        domain_code: str,
         blueprint: ConceptBlueprint,
         expected_result: str,
     ):
         """Test make_refines method with different blueprint configurations."""
         if not blueprint.refines:
             pytest.skip("Test case has no refines")
-        result = ConceptFactory.make_refine(refine=blueprint.refines)
+        result = ConceptFactory.make_refine(refine=blueprint.refines, domain_code=domain_code)
         assert result == expected_result, f"Failed for test case: {test_name}"
 
     def test_normalize_structure_blueprint(self):

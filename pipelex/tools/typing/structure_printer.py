@@ -2,6 +2,7 @@ import types
 from enum import Enum
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
+from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
 from pipelex.types import StrEnum
@@ -20,8 +21,6 @@ def _build_type_hints_namespace() -> dict[str, Any]:
     Returns:
         A namespace dict with all registered classes
     """
-    from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
-
     # Get all registered classes from the class registry
     # The root attribute is a dict[str, type] but the type checker doesn't know this
     class_registry = KajsonManager.get_class_registry()

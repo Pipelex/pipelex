@@ -28,11 +28,11 @@ class TestStructureGeneratorConceptRefs:
             ),
         }
 
-        concept_ref_to_class_name = {
-            "myapp.Customer": "Customer",
+        concept_ref_to_class_info = {
+            "myapp.Customer": ConceptClassInfo(class_name="Customer", module_path=None),
         }
 
-        generator = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name)
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
         generated_code, generated_class = generator.generate_from_structure_blueprint("Invoice", structure_blueprint)
 
         expected_code = '''\
@@ -81,11 +81,11 @@ class Invoice(StructuredContent):
             ),
         }
 
-        concept_ref_to_class_name = {
-            "myapp.LineItem": "LineItem",
+        concept_ref_to_class_info = {
+            "myapp.LineItem": ConceptClassInfo(class_name="LineItem", module_path=None),
         }
 
-        generator = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name)
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
         generated_code, generated_class = generator.generate_from_structure_blueprint("Invoice", structure_blueprint)
 
         expected_code = '''\
@@ -133,11 +133,11 @@ class Invoice(StructuredContent):
             ),
         }
 
-        concept_ref_to_class_name = {
-            "myapp.Category": "Category",
+        concept_ref_to_class_info = {
+            "myapp.Category": ConceptClassInfo(class_name="Category", module_path=None),
         }
 
-        generator = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name)
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
         generated_code, generated_class = generator.generate_from_structure_blueprint("Category", structure_blueprint)
 
         expected_code = '''\
@@ -181,11 +181,11 @@ class Category(StructuredContent):
             ),
         }
 
-        concept_ref_to_class_name = {
-            "myapp.Category": "Category",
+        concept_ref_to_class_info = {
+            "myapp.Category": ConceptClassInfo(class_name="Category", module_path=None),
         }
 
-        generator = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name)
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
         generated_code, generated_class = generator.generate_from_structure_blueprint("Parent", structure_blueprint)
 
         expected_code = '''\
@@ -234,12 +234,12 @@ class Parent(StructuredContent):
             ),
         }
 
-        concept_ref_to_class_name = {
-            "crm.Customer": "Customer",
-            "inventory.Product": "Product",
+        concept_ref_to_class_info = {
+            "crm.Customer": ConceptClassInfo(class_name="Customer", module_path=None),
+            "inventory.Product": ConceptClassInfo(class_name="Product", module_path=None),
         }
 
-        generator = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name)
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
         generated_code, generated_class = generator.generate_from_structure_blueprint("Order", structure_blueprint)
 
         expected_code = '''\
@@ -355,12 +355,12 @@ class Container(StructuredContent):
             ),
         }
 
-        concept_ref_to_class_name = {
-            "myapp.User": "User",
-            "myapp.Item": "Item",
+        concept_ref_to_class_info = {
+            "myapp.User": ConceptClassInfo(class_name="User", module_path=None),
+            "myapp.Item": ConceptClassInfo(class_name="Item", module_path=None),
         }
 
-        generator = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name)
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
         generated_code, generated_class = generator.generate_from_structure_blueprint("ComplexEntity", structure_blueprint)
 
         expected_code = '''\
@@ -407,11 +407,11 @@ class ComplexEntity(StructuredContent):
             ),
         }
 
-        concept_ref_to_class_name = {
-            "native.Text": "TextContent",
+        concept_ref_to_class_info = {
+            "native.Text": ConceptClassInfo(class_name="TextContent", module_path=None),
         }
 
-        generator = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name)
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
         generated_code, generated_class = generator.generate_from_structure_blueprint("Wrapper", structure_blueprint)
 
         expected_code = '''\
@@ -573,43 +573,46 @@ class Container(StructuredContent):
         assert generated_code == expected_code
         assert issubclass(generated_class, StructuredContent)
 
-    def test_class_info_takes_precedence_over_class_name(self):
-        """Test that concept_ref_to_class_info takes precedence over concept_ref_to_class_name.
+    def test_multiple_concept_refs_with_same_class_name(self):
+        """Test generation with multiple concept refs that have the same structure class name.
 
         Note: This test only checks the generated code string because the external modules
         don't exist in the test environment, so full validation would fail on import.
         """
         structure_blueprint = {
-            "customer": ConceptStructureBlueprint(
-                description="The customer",
+            "billing_customer": ConceptStructureBlueprint(
+                description="The billing customer",
                 type=ConceptStructureBlueprintFieldType.CONCEPT,
-                concept_ref="myapp.Customer",
+                concept_ref="billing.Customer",
                 required=True,
             ),
-        }
-
-        # Both mappings provided - class_info should take precedence
-        concept_ref_to_class_name = {
-            "myapp.Customer": "OldCustomerName",
-        }
-        concept_ref_to_class_info = {
-            "myapp.Customer": ConceptClassInfo(
-                class_name="Customer",
-                module_path="myapp.structures.customer",
+            "shipping_customer": ConceptStructureBlueprint(
+                description="The shipping customer",
+                type=ConceptStructureBlueprintFieldType.CONCEPT,
+                concept_ref="shipping.Customer",
+                required=False,
             ),
         }
 
-        generator = StructureGenerator(
-            concept_ref_to_class_name=concept_ref_to_class_name,
-            concept_ref_to_class_info=concept_ref_to_class_info,
-        )
+        concept_ref_to_class_info = {
+            "billing.Customer": ConceptClassInfo(
+                class_name="BillingCustomer",
+                module_path="billing.structures.customer",
+            ),
+            "shipping.Customer": ConceptClassInfo(
+                class_name="ShippingCustomer",
+                module_path="shipping.structures.customer",
+            ),
+        }
+
+        generator = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info)
 
         # Generate the class code without full validation (imports would fail)
         class_code = generator._generate_class_source_code_from_blueprint("Order", structure_blueprint)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         imports_section = "\n".join(sorted(generator.imports))
 
-        # Should use "Customer" from class_info, not "OldCustomerName" from class_name
-        assert "customer: Customer = Field" in class_code
-        assert "from myapp.structures.customer import Customer" in imports_section
-        assert "OldCustomerName" not in class_code
-        assert "OldCustomerName" not in imports_section
+        # Should use different class names for different domains
+        assert "billing_customer: BillingCustomer = Field" in class_code
+        assert "shipping_customer: Optional[ShippingCustomer]" in class_code
+        assert "from billing.structures.customer import BillingCustomer" in imports_section
+        assert "from shipping.structures.customer import ShippingCustomer" in imports_section

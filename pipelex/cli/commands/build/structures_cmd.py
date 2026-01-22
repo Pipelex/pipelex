@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -10,7 +11,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.helpers import normalize_structure_blueprint
+from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprint, normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -68,19 +69,22 @@ def _build_concept_ref_to_class_info(
         if not blueprint.concept:
             continue
 
-        for concept_code in blueprint.concept:
+        for concept_code, concept_blueprint in blueprint.concept.items():
             # Build the concept ref (domain.ConceptCode)
             concept_ref = f"{blueprint.domain}.{concept_code}"
 
+            # Get the class name from the blueprint
+            class_name = get_structure_class_name_from_blueprint(concept_blueprint, concept_code)
+
             # Build the module path for this concept's structure file
-            concept_snake_case = pascal_case_to_snake_case(concept_code)
+            class_name_snake_case = pascal_case_to_snake_case(class_name)
             if base_module_path:
-                module_path = f"{base_module_path}.{blueprint.domain}__{concept_snake_case}"
+                module_path = f"{base_module_path}.{blueprint.domain}__{class_name_snake_case}"
             else:
                 module_path = None
 
             concept_ref_to_class_info[concept_ref] = ConceptClassInfo(
-                class_name=concept_code,
+                class_name=class_name,
                 module_path=module_path,
             )
 
@@ -137,8 +141,6 @@ def generate_structures_from_blueprints(
             if check_existing and class_registry.has_class(name=concept_code):
                 existing_class = class_registry.get_class(name=concept_code)
                 if existing_class:
-                    import inspect  # noqa: PLC0415
-
                     try:
                         source_file = inspect.getfile(existing_class)
                         log.warning(
@@ -195,7 +197,7 @@ def generate_structures_from_blueprints(
             # Handle concepts with refines
             elif concept_blueprint.refines:
                 try:
-                    current_refine = ConceptFactory.make_refine(refine=concept_blueprint.refines)
+                    current_refine = ConceptFactory.make_refine(refine=concept_blueprint.refines, domain_code=blueprint.domain)
                 except Exception as exc:
                     msg = (
                         f"Could not validate refine '{concept_blueprint.refines}' for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"

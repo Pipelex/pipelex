@@ -118,13 +118,22 @@ class TestConceptStructureBlueprintConceptType:
         )
         assert single_domain.concept_ref == "domain.Concept"
 
-        # Nested domain
-        nested_domain = ConceptStructureBlueprint(
-            description="Nested domain concept",
+        # Domain with underscore
+        underscore_domain = ConceptStructureBlueprint(
+            description="Domain with underscore",
             type=ConceptStructureBlueprintFieldType.CONCEPT,
-            concept_ref="my_domain.SubDomain.Concept",
+            concept_ref="my_domain.Concept",
         )
-        assert nested_domain.concept_ref == "my_domain.SubDomain.Concept"
+        assert underscore_domain.concept_ref == "my_domain.Concept"
+
+    def test_nested_domain_concept_ref_rejected(self):
+        """Test that nested domain formats (more than one dot) are rejected."""
+        with pytest.raises(ValidationError, match="must be a valid concept ref"):
+            ConceptStructureBlueprint(
+                description="Nested domain concept",
+                type=ConceptStructureBlueprintFieldType.CONCEPT,
+                concept_ref="my_domain.SubDomain.Concept",
+            )
 
     def test_list_of_concepts_can_be_optional(self):
         """Test that list of concepts can be optional."""

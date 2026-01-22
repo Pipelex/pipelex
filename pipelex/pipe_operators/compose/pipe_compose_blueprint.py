@@ -136,7 +136,7 @@ class PipeComposeBlueprint(PipeBlueprint):
 
     @override
     def validate_output(self):
-        parsed_output = parse_concept_with_multiplicity(concept_ref=self.output)
+        parsed_output = parse_concept_with_multiplicity(concept_ref_or_code=self.output)
         if parsed_output.multiplicity:
             msg = (
                 "PipeCompose does not support multiple output generation. The output of PipeCompose must be a single stuff, "

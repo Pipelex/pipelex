@@ -199,9 +199,9 @@ class PipeBlueprint(ABC, BaseModel):
             msg = f"Invalid concept specification syntax: '{self.output}'. {exc}"
             raise ValueError(msg) from exc
         try:
-            validate_concept_ref_or_code(concept_ref_or_code=output_parse_result.concept)
+            validate_concept_ref_or_code(concept_ref_or_code=output_parse_result.concept_ref_or_code)
         except ConceptStringError as exc:
-            msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
+            msg = f"Invalid concept string '{output_parse_result.concept_ref_or_code}' when trying to validate the output of a pipe blueprint: {exc}"
             raise ValueError(msg) from exc
 
         self.validate_output()

@@ -3,11 +3,13 @@ from typing import Annotated
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_code_valid
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
 from pipelex.core.pipes.validation import is_pipe_code_valid
+from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
@@ -17,6 +19,7 @@ from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlu
 from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.types import Self
 from pipelex.urls import URLs
 
 PipeBlueprintUnion = Annotated[
@@ -103,4 +106,97 @@ class PipelexBundleBlueprint(BaseModel):
             raise ValueError(msg)
         return self
 
-    # TODO: Add here the validation of the concept references without domain. Are they declared in this bundle?
+    @model_validator(mode="after")
+    def validate_local_concept_references(self) -> Self:
+        """Validate that local concept references are declared in this bundle or are native concepts.
+
+        This validates two cases:
+        1. Concept codes without domain prefix (e.g., 'MyConceptName')
+        2. Concept refs with the same domain as this bundle (e.g., 'this_domain.MyConceptName')
+
+        External references (concepts from other domains) are not validated here - they're
+        assumed to be declared in their respective bundles and loaded via dependencies.
+        """
+        declared_concepts = set(self.concept.keys()) if self.concept else set[str]()
+        native_codes = {native.value for native in NativeConceptCode.values_list()}
+        all_refs = self._collect_local_concept_references()
+
+        undeclared_refs: list[str] = []
+        for concept_ref_or_code, context in all_refs:
+            # Determine if this is a local reference or an external one
+            if "." in concept_ref_or_code:
+                # It's a concept ref (domain.ConceptCode)
+                domain, concept_code = concept_ref_or_code.split(".", 1)
+                if domain != self.domain:
+                    # External reference - skip validation (will be validated when loading dependencies)
+                    continue
+            else:
+                # It's a bare concept code - always local
+                concept_code = concept_ref_or_code
+
+            # Validate local reference
+            if concept_code not in declared_concepts and concept_code not in native_codes:
+                undeclared_refs.append(f"'{concept_ref_or_code}' in {context}")
+
+        if undeclared_refs:
+            msg = (
+                f"The following local concept references are not declared in bundle '{self.domain}' "
+                f"and are not native concepts: {', '.join(undeclared_refs)}. "
+                f"Declared concepts: {sorted(declared_concepts) if declared_concepts else '(none)'}. "
+                f"Native concepts: {sorted(native_codes)}"
+            )
+            raise ValueError(msg)
+        return self
+
+    def _collect_local_concept_references(self) -> list[tuple[str, str]]:
+        local_refs: list[tuple[str, str]] = []
+
+        # Collect from concepts
+        if self.concept:
+            for concept_code, concept_blueprint in self.concept.items():
+                local_refs.extend(self._collect_local_refs_from_concept(concept_code, concept_blueprint))
+
+        # Collect from pipes
+        if self.pipe:
+            for pipe_code, pipe_blueprint in self.pipe.items():
+                local_refs.extend(self._collect_local_refs_from_pipe(pipe_code, pipe_blueprint))
+
+        return local_refs
+
+    def _collect_local_refs_from_concept(self, concept_code: str, concept_blueprint: ConceptBlueprint | str) -> list[tuple[str, str]]:
+        local_refs: list[tuple[str, str]] = []
+
+        if isinstance(concept_blueprint, str):
+            return local_refs
+
+        # Check refines field
+        if concept_blueprint.refines:
+            local_refs.append((concept_blueprint.refines, f"concept.{concept_code}.refines"))
+
+        # Check structure fields
+        if isinstance(concept_blueprint.structure, dict):
+            for field_name, field_blueprint in concept_blueprint.structure.items():
+                if isinstance(field_blueprint, ConceptStructureBlueprint):
+                    # Check concept_ref
+                    if field_blueprint.concept_ref:
+                        local_refs.append((field_blueprint.concept_ref, f"concept.{concept_code}.structure.{field_name}.concept_ref"))
+                    # Check item_concept_ref
+                    if field_blueprint.item_concept_ref:
+                        local_refs.append((field_blueprint.item_concept_ref, f"concept.{concept_code}.structure.{field_name}.item_concept_ref"))
+
+        return local_refs
+
+    def _collect_local_refs_from_pipe(self, pipe_code: str, pipe_blueprint: PipeBlueprintUnion) -> list[tuple[str, str]]:
+        local_refs: list[tuple[str, str]] = []
+
+        # Check inputs
+        if pipe_blueprint.inputs:
+            for input_name, input_concept_spec in pipe_blueprint.inputs.items():
+                local_ref = parse_concept_with_multiplicity(input_concept_spec).concept_ref_or_code
+                local_refs.append((local_ref, f"pipe.{pipe_code}.inputs.{input_name}"))
+
+        # Check output
+        local_ref = parse_concept_with_multiplicity(pipe_blueprint.output).concept_ref_or_code
+        local_refs.append((local_ref, f"pipe.{pipe_code}.output"))
+
+        return local_refs

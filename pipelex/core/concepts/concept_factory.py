@@ -200,14 +200,17 @@ class ConceptFactory:
         )
 
     @classmethod
-    def make_refine(cls, refine: str) -> str:
+    def make_refine(cls, refine: str, domain_code: str) -> str:
         """Validate and normalize a refine string.
 
         If the refine is a native concept code without domain (e.g., 'Text'),
         it will be normalized to include the native domain prefix (e.g., 'native.Text').
+        If the refine is a local concept code without domain (e.g., 'MyCustomConcept'),
+        it will be prefixed with the given domain_code.
 
         Args:
             refine: The refine string to validate and normalize
+            domain_code: The domain code to use for prefixing local concept references
 
         Returns:
             The normalized refine string with domain prefix
@@ -216,7 +219,12 @@ class ConceptFactory:
             ConceptFactoryError: If the refine is invalid
 
         """
-        return NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refine)
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=refine):
+            return NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refine)
+        elif "." in refine:
+            return refine
+        else:
+            return f"{domain_code}.{refine}"
 
     @classmethod
     def _handle_structure_with_classname(
@@ -250,7 +258,6 @@ class ConceptFactory:
         blueprint: ConceptBlueprint,
         concept_code: str,
         domain_code: str,
-        concept_ref_to_class_name: dict[str, str] | None = None,
     ) -> str:
         """Handle BLUEPRINT_WITH_STRUCTURE declaration type.
 
@@ -261,8 +268,6 @@ class ConceptFactory:
             blueprint: The concept blueprint
             concept_code: The concept code
             domain_code: The domain code
-            concept_ref_to_class_name: Optional mapping from concept refs to structure class names
-                for resolving concept-to-concept references
 
         Returns:
             The structure class name (which is the concept_code)
@@ -275,7 +280,7 @@ class ConceptFactory:
         normalized_structure = normalize_structure_blueprint(blueprint.structure)
 
         try:
-            _, the_generated_class = StructureGenerator(concept_ref_to_class_name=concept_ref_to_class_name).generate_from_structure_blueprint(
+            _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
                 class_name=concept_code,
                 structure_blueprint=normalized_structure,
             )
@@ -342,7 +347,7 @@ class ConceptFactory:
             raise ConceptFactoryError(msg)
 
         try:
-            current_refine = cls.make_refine(refine=blueprint.refines)
+            current_refine = cls.make_refine(refine=blueprint.refines, domain_code=domain_code)
         except ConceptRefineError as exc:
             msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
@@ -376,7 +381,6 @@ class ConceptFactory:
         domain_code: str,
         concept_code: str,
         blueprint_or_string_description: ConceptBlueprint | str,
-        concept_ref_to_class_name: dict[str, str] | None = None,
     ) -> Concept:
         # Determine declaration type
         declaration_type: ConceptDeclarationType
@@ -447,7 +451,6 @@ class ConceptFactory:
                         blueprint=blueprint,
                         concept_code=concept_code,
                         domain_code=domain_code,
-                        concept_ref_to_class_name=concept_ref_to_class_name,
                     ),
                     refines=None,
                 )

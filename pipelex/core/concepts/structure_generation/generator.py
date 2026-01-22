@@ -34,18 +34,14 @@ class StructureGenerator:
     # TODO: use StrEnum instead of Enum
     def __init__(
         self,
-        concept_ref_to_class_name: dict[str, str] | None = None,
         concept_ref_to_class_info: dict[str, ConceptClassInfo] | None = None,
     ):
         """Initialize the StructureGenerator.
 
         Args:
-            concept_ref_to_class_name: Optional mapping from concept refs (e.g., "myapp.Customer")
-                to their structure class names (e.g., "Customer"). Used for resolving concept references.
-                When module_path is not known, forward references (strings) will be used.
             concept_ref_to_class_info: Optional mapping from concept refs to ConceptClassInfo.
-                This takes precedence over concept_ref_to_class_name when both are provided.
                 When module_path is provided, proper import statements will be generated.
+                When module_path is None, forward references (strings) will be used.
         """
         self.imports = {
             "from typing import Optional, List, Dict, Any, Literal",
@@ -54,7 +50,6 @@ class StructureGenerator:
             "from pydantic import Field",
         }
         self.enum_definitions: dict[str, dict[str, Any]] = {}  # Store enum definitions
-        self.concept_ref_to_class_name = concept_ref_to_class_name or {}
         self.concept_ref_to_class_info = concept_ref_to_class_info or {}
         # Track concept classes that need to be mocked during validation
         self._concept_classes_to_mock: set[str] = set()
@@ -357,7 +352,7 @@ class StructureGenerator:
         if not concept_ref:
             return "Any"
 
-        # First, check concept_ref_to_class_info (takes precedence)
+        # Check concept_ref_to_class_info for the concept reference
         if concept_ref in self.concept_ref_to_class_info:
             class_info = self.concept_ref_to_class_info[concept_ref]
             if class_info.module_path:
@@ -368,12 +363,6 @@ class StructureGenerator:
                 return class_info.class_name
             # No module path, use forward reference
             return f'"{class_info.class_name}"'
-
-        # Fall back to concept_ref_to_class_name (legacy behavior with forward references)
-        if concept_ref in self.concept_ref_to_class_name:
-            class_name = self.concept_ref_to_class_name[concept_ref]
-            # No module path known, use a forward reference (string)
-            return f'"{class_name}"'
 
         # Default: extract the concept code from the ref and use as type
         # e.g., "myapp.Customer" -> "Customer"
