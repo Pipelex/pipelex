@@ -1,7 +1,7 @@
 import ast
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import Field
 
@@ -536,7 +536,7 @@ class StructureGenerator:
             "datetime": datetime,
             "Enum": Enum,
             "Optional": Optional,
-            "List": List,
+            "List": list,
             "Dict": dict,
             "Any": Any,
             "Literal": Literal,
