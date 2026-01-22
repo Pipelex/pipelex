@@ -1,8 +1,9 @@
 import ast
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, List, Literal, Optional
 
+from kajson.kajson_manager import KajsonManager
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
@@ -523,11 +524,6 @@ class StructureGenerator:
         base_class_name: str | None = None,
     ) -> type:
         """Validate that the code executes and creates the expected class."""
-        # Import necessary modules for the execution context
-        from typing import Any  # noqa: PLC0415
-
-        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
-
         # exec_globals with basic types but let native class imports execute naturally
         # This ensures we use the same class objects for inheritance checks
         exec_globals: dict[str, Any] = {
@@ -536,7 +532,7 @@ class StructureGenerator:
             "datetime": datetime,
             "Enum": Enum,
             "Optional": Optional,
-            "List": list,
+            "List": List,  # noqa: UP006
             "Dict": dict,
             "Any": Any,
             "Literal": Literal,
