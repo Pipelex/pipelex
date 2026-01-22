@@ -22,6 +22,14 @@ class EventName(StrEnum):
     BUNDLE_DRY_RUN = "bundle_dry_run"
     PIPE_DRY_RUN = "pipe_dry_run"
 
+    # Graph
+    GRAPH_RENDER = "graph_render"
+
+    # Kit
+    KIT_RULES_SYNC = "kit_rules_sync"
+    KIT_RULES_REMOVE = "kit_rules_remove"
+    KIT_MIGRATIONS_SYNC = "kit_migrations_sync"
+
 
 class Setting(StrEnum):
     TELEMETRY_MODE = "telemetry_mode"

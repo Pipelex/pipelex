@@ -18,6 +18,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import (
+    get_concept_library,
     get_content_generator,
     get_model_deck,
     get_native_concept,
@@ -40,7 +41,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     should_caption_images: bool
     max_page_images: int | None
     should_include_page_views: bool
-    page_views_dpi: int
+    page_views_dpi: int | None
 
     image_stuff_name: str | None = None
     document_stuff_name: str | None = None
@@ -71,7 +72,30 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
     @override
     def validate_inputs_with_library(self):
-        pass
+        the_single_input = self.inputs.get_single_stuff_spec()
+        image_concept = get_native_concept(native_concept=NativeConceptCode.IMAGE)
+        document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
+        concept_library = get_concept_library()
+        if concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=image_concept, strict=True):
+            # it's an image, we can't accept documnt-related fields
+            if self.should_caption_images:
+                msg = "PipeExtract with image input cannot have should_caption_images set to True"
+                raise ValueError(msg)
+            if self.should_include_page_views:
+                msg = "PipeExtract with image input cannot have should_include_page_views set to True"
+                raise ValueError(msg)
+            if self.page_views_dpi is not None:
+                msg = "PipeExtract with image input cannot have page_views_dpi set"
+                raise ValueError(msg)
+            if self.max_page_images is not None:
+                msg = "PipeExtract with image input cannot have max_page_images set"
+                raise ValueError(msg)
+        elif not concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=document_concept, strict=True):
+            msg = (
+                "The input to PipeExtract must be an image or a document (or a concept that refines one of them), "
+                f"but is {the_single_input.concept.concept_ref}"
+            )
+            raise TypeError(msg)
 
     @override
     def validate_output_static(self):

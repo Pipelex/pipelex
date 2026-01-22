@@ -415,19 +415,21 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <tr>
 <th rowspan="2">Model</th>
 <th colspan="2" style="text-align:center;background-color:rgba(33,150,243,0.15)">Inputs</th>
-<th colspan="1" style="text-align:center;background-color:rgba(76,175,80,0.15)">Outputs</th>
+<th colspan="2" style="text-align:center;background-color:rgba(76,175,80,0.15)">Outputs</th>
 </tr>
 <tr>
 <th style="text-align:center;background-color:rgba(33,150,243,0.15)">image</th>
 <th style="text-align:center;background-color:rgba(33,150,243,0.15)">pdf</th>
 <th style="text-align:center;background-color:rgba(76,175,80,0.15)">pages</th>
+<th style="text-align:center;background-color:rgba(76,175,80,0.15)">captions</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>azure-document-intelligence</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
@@ -435,12 +437,14 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">❌</td>
 </tr>
 <tr>
 <td>mistral-document-ai-2505</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">❌</td>
 </tr>
 </tbody>
 </table>
@@ -498,6 +502,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-19T23:18:39Z
+> Last updated: 2026-01-22T13:14:42Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

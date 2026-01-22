@@ -41,6 +41,7 @@ EXTRACT_HANDLE_FROM_IMAGE = [
     "mistral-ocr-2505",
     "mistral-ocr-2512",
     "deepseek-ocr",
+    "azure-document-intelligence",
 ]
 
 ALL_EXTRACT_HANDLES: list[str] = list(set(EXTRACT_HANDLE_FROM_PDF + EXTRACT_HANDLE_FROM_IMAGE))
