@@ -218,6 +218,200 @@ a_ref = { type = "concept", concept_ref = "testapp.A", description = "Reference 
                     library_dirs=[Path(tmp_dir)],
                 )
 
+    def test_cycle_detection_self_reference(self, load_empty_library: Callable[[], str]):
+        """Test that a concept referencing itself is detected as a cycle."""
+        plx_content = """
+domain = "testapp"
+description = "Test domain with self-referencing concept"
+
+[concept.Node]
+description = "A node that references itself"
+
+[concept.Node.structure]
+name = { type = "text", description = "Node name" }
+parent = { type = "concept", concept_ref = "testapp.Node", description = "Parent node" }
+"""
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plx_path = Path(tmp_dir) / "test_concepts.plx"
+            plx_path.write_text(plx_content, encoding="utf-8")
+
+            library_id = load_empty_library()
+            library_manager = get_library_manager()
+
+            with pytest.raises(Exception, match=r"[Cc]ycle"):
+                library_manager.load_libraries(
+                    library_id=library_id,
+                    library_dirs=[Path(tmp_dir)],
+                )
+
+    def test_cycle_detection_three_concepts(self, load_empty_library: Callable[[], str]):
+        """Test that a cycle through three concepts (A -> B -> C -> A) is detected."""
+        plx_content = """
+domain = "testapp"
+description = "Test domain with three-concept cycle"
+
+[concept.A]
+description = "Concept A references B"
+
+[concept.A.structure]
+b_ref = { type = "concept", concept_ref = "testapp.B", description = "Reference to B" }
+
+[concept.B]
+description = "Concept B references C"
+
+[concept.B.structure]
+c_ref = { type = "concept", concept_ref = "testapp.C", description = "Reference to C" }
+
+[concept.C]
+description = "Concept C references A - completing the cycle"
+
+[concept.C.structure]
+a_ref = { type = "concept", concept_ref = "testapp.A", description = "Reference to A" }
+"""
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plx_path = Path(tmp_dir) / "test_concepts.plx"
+            plx_path.write_text(plx_content, encoding="utf-8")
+
+            library_id = load_empty_library()
+            library_manager = get_library_manager()
+
+            with pytest.raises(Exception, match=r"[Cc]ycle"):
+                library_manager.load_libraries(
+                    library_id=library_id,
+                    library_dirs=[Path(tmp_dir)],
+                )
+
+    def test_cycle_detection_long_chain(self, load_empty_library: Callable[[], str]):
+        """Test that a cycle through many concepts (A -> B -> C -> D -> E -> A) is detected."""
+        plx_content = """
+domain = "testapp"
+description = "Test domain with long chain cycle"
+
+[concept.A]
+description = "Concept A"
+[concept.A.structure]
+next = { type = "concept", concept_ref = "testapp.B", description = "Next" }
+
+[concept.B]
+description = "Concept B"
+[concept.B.structure]
+next = { type = "concept", concept_ref = "testapp.C", description = "Next" }
+
+[concept.C]
+description = "Concept C"
+[concept.C.structure]
+next = { type = "concept", concept_ref = "testapp.D", description = "Next" }
+
+[concept.D]
+description = "Concept D"
+[concept.D.structure]
+next = { type = "concept", concept_ref = "testapp.E", description = "Next" }
+
+[concept.E]
+description = "Concept E - cycles back to A"
+[concept.E.structure]
+next = { type = "concept", concept_ref = "testapp.A", description = "Back to A" }
+"""
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plx_path = Path(tmp_dir) / "test_concepts.plx"
+            plx_path.write_text(plx_content, encoding="utf-8")
+
+            library_id = load_empty_library()
+            library_manager = get_library_manager()
+
+            with pytest.raises(Exception, match=r"[Cc]ycle"):
+                library_manager.load_libraries(
+                    library_id=library_id,
+                    library_dirs=[Path(tmp_dir)],
+                )
+
+    def test_cycle_detection_through_list_field(self, load_empty_library: Callable[[], str]):
+        """Test that cycles through list fields are detected."""
+        plx_content = """
+domain = "testapp"
+description = "Test domain with cycle through list field"
+
+[concept.Parent]
+description = "A parent with children"
+
+[concept.Parent.structure]
+name = { type = "text", description = "Parent name" }
+children = { type = "list", item_type = "concept", item_concept_ref = "testapp.Child", description = "Children" }
+
+[concept.Child]
+description = "A child that references back to parent"
+
+[concept.Child.structure]
+name = { type = "text", description = "Child name" }
+parent = { type = "concept", concept_ref = "testapp.Parent", description = "Reference back to parent" }
+"""
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plx_path = Path(tmp_dir) / "test_concepts.plx"
+            plx_path.write_text(plx_content, encoding="utf-8")
+
+            library_id = load_empty_library()
+            library_manager = get_library_manager()
+
+            with pytest.raises(Exception, match=r"[Cc]ycle"):
+                library_manager.load_libraries(
+                    library_id=library_id,
+                    library_dirs=[Path(tmp_dir)],
+                )
+
+    def test_cycle_detection_partial_cycle_in_graph(self, load_empty_library: Callable[[], str]):
+        """Test cycle detection when cycle is not at the start (D -> E -> F -> D, with A -> B -> C -> D)."""
+        plx_content = """
+domain = "testapp"
+description = "Test domain with cycle deeper in the graph"
+
+[concept.A]
+description = "Entry point"
+[concept.A.structure]
+next = { type = "concept", concept_ref = "testapp.B", description = "To B" }
+
+[concept.B]
+description = "Intermediate"
+[concept.B.structure]
+next = { type = "concept", concept_ref = "testapp.C", description = "To C" }
+
+[concept.C]
+description = "Leads to cycle"
+[concept.C.structure]
+next = { type = "concept", concept_ref = "testapp.D", description = "To D" }
+
+[concept.D]
+description = "Start of cycle"
+[concept.D.structure]
+next = { type = "concept", concept_ref = "testapp.E", description = "To E" }
+
+[concept.E]
+description = "Middle of cycle"
+[concept.E.structure]
+next = { type = "concept", concept_ref = "testapp.F", description = "To F" }
+
+[concept.F]
+description = "Completes cycle back to D"
+[concept.F.structure]
+next = { type = "concept", concept_ref = "testapp.D", description = "Back to D" }
+"""
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            plx_path = Path(tmp_dir) / "test_concepts.plx"
+            plx_path.write_text(plx_content, encoding="utf-8")
+
+            library_id = load_empty_library()
+            library_manager = get_library_manager()
+
+            with pytest.raises(Exception, match=r"[Cc]ycle"):
+                library_manager.load_libraries(
+                    library_id=library_id,
+                    library_dirs=[Path(tmp_dir)],
+                )
+
     def test_cross_domain_concept_reference(self, load_test_library: Callable[[list[Path]], None]):
         """Test loading concepts with cross-domain references."""
         crm_plx = """

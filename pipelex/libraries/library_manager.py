@@ -9,7 +9,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.builder import builder
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
@@ -20,7 +19,6 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_current_library
-from pipelex.libraries.concept_dependency_graph import ConceptDependencyGraph
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -217,12 +215,15 @@ class LibraryManager(LibraryManagerAbstract):
             all_domains.append(domain)
         library.domain_library.add_domains(domains=all_domains)
 
-        # Load concepts with dependency ordering (topological sort ensures referenced classes exist)
+        # Load concepts (forward references resolved after all are loaded)
         all_concepts = self._load_concepts_from_blueprints(blueprints)
         library.concept_library.add_concepts(concepts=all_concepts)
 
         # Resolve forward references in dynamically generated structure classes
         self._rebuild_models_with_forward_refs(all_concepts)
+
+        # Detect cycles in concept references (A -> B -> A is forbidden)
+        self._detect_concept_cycles(all_concepts)
 
         # Load all pipes
         for blueprint in blueprints:
@@ -250,12 +251,10 @@ class LibraryManager(LibraryManagerAbstract):
         self,
         blueprints: list[PipelexBundleBlueprint],
     ) -> list["Concept"]:
-        """Load concepts from blueprints with topological sorting for dependencies.
+        """Load concepts from blueprints.
 
-        This method implements three-phase loading:
-        1. Parse & Analyze: Collect all concept blueprints
-        2. Topological Sort: Build dependency graph, determine load order
-        3. Load in Order: Load concepts in dependency order (so referenced classes exist)
+        Concepts are loaded in iteration order. Forward references between concepts
+        are resolved later by _rebuild_models_with_forward_refs().
 
         Args:
             blueprints: List of parsed PLX blueprints to load
@@ -263,42 +262,16 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of loaded concepts
         """
-        # Phase 1: Collect all concept blueprints
-        concept_blueprints: dict[str, tuple[str, ConceptBlueprint | str]] = {}
+        all_concepts: list[Concept] = []
         for blueprint in blueprints:
             if blueprint.concept is not None:
                 for concept_code, concept_blueprint in blueprint.concept.items():
-                    concept_ref = f"{blueprint.domain}.{concept_code}"
-                    concept_blueprints[concept_ref] = (blueprint.domain, concept_blueprint)
-
-        # Phase 2: Topological sort to determine load order
-        sorted_concept_refs: list[str]
-        if concept_blueprints:
-            blueprint_dict: dict[str, ConceptBlueprint] = {}
-            for concept_ref, (_, concept_bp) in concept_blueprints.items():
-                if isinstance(concept_bp, ConceptBlueprint):
-                    blueprint_dict[concept_ref] = concept_bp
-                else:
-                    # String descriptions have no dependencies
-                    blueprint_dict[concept_ref] = ConceptBlueprint(description=concept_bp)
-
-            dep_graph = ConceptDependencyGraph()
-            sorted_concept_refs = dep_graph.topological_sort(blueprint_dict)
-        else:
-            sorted_concept_refs = []
-
-        # Phase 3: Load concepts in dependency order
-        # Because we load in topological order, referenced classes already exist in the registry
-        all_concepts: list[Concept] = []
-        for concept_ref in sorted_concept_refs:
-            domain_code, concept_blueprint = concept_blueprints[concept_ref]
-            concept_code = concept_ref.split(".")[-1]
-            concept = ConceptFactory.make_from_blueprint(
-                domain_code=domain_code,
-                concept_code=concept_code,
-                blueprint_or_string_description=concept_blueprint,
-            )
-            all_concepts.append(concept)
+                    concept = ConceptFactory.make_from_blueprint(
+                        domain_code=blueprint.domain,
+                        concept_code=concept_code,
+                        blueprint_or_string_description=concept_blueprint,
+                    )
+                    all_concepts.append(concept)
 
         return all_concepts
 
@@ -399,3 +372,78 @@ class LibraryManager(LibraryManagerAbstract):
                     structure_class.model_rebuild(_types_namespace=namespace)
                 except Exception as exc:
                     log.debug(f"Could not rebuild model for {concept.concept_ref}: {exc}")
+
+    def _detect_concept_cycles(self, concepts: list["Concept"]) -> None:
+        """Detect cycles in concept references and raise an error if found.
+
+        Cycles like A -> B -> A are forbidden because they create infinite recursion
+        in the data structure. This method traverses each concept's structure fields
+        and detects if any chain of references leads back to an already-visited concept.
+
+        Args:
+            concepts: List of concepts to check for cycles
+        """
+        class_registry = KajsonManager.get_class_registry()
+
+        # Build mappings from class names to concept refs
+        class_to_concept: dict[str, str] = {}
+        for concept in concepts:
+            class_to_concept[concept.structure_class_name] = concept.concept_ref
+            class_to_concept[concept.code] = concept.concept_ref
+
+        def get_referenced_concepts(concept: "Concept") -> list[str]:
+            """Get concept refs that this concept references in its structure fields."""
+            refs: list[str] = []
+            structure_class = class_registry.get_class(name=concept.structure_class_name)
+            if structure_class is None or not issubclass(structure_class, BaseModel):
+                return refs
+
+            for field_info in structure_class.model_fields.values():
+                annotation = field_info.annotation
+                if annotation is None:
+                    continue
+
+                # Handle Optional types, List types, etc.
+                origin = getattr(annotation, "__origin__", None)
+                args = getattr(annotation, "__args__", ())
+
+                # Check direct type or args for concept references
+                types_to_check = [annotation] if origin is None else list(args)
+
+                for type_to_check in types_to_check:
+                    if type_to_check is type(None):
+                        continue
+                    # Get the class name
+                    type_name = getattr(type_to_check, "__name__", None)
+                    if type_name and type_name in class_to_concept:
+                        refs.append(class_to_concept[type_name])
+
+            return refs
+
+        def check_for_cycle(concept_ref: str, visiting: set[str], path: list[str]) -> None:
+            """Recursively check for cycles starting from concept_ref."""
+            if concept_ref in visiting:
+                # Found a cycle - build error message
+                cycle_start = path.index(concept_ref)
+                cycle = [*path[cycle_start:], concept_ref]
+                cycle_str = " -> ".join(cycle)
+                msg = f"Cycle detected in concept references: {cycle_str}"
+                raise LibraryLoadingError(msg)
+
+            # Find the concept by ref
+            concept = next((c for c in concepts if c.concept_ref == concept_ref), None)
+            if concept is None:
+                return  # External concept, skip
+
+            visiting.add(concept_ref)
+            path.append(concept_ref)
+
+            for ref in get_referenced_concepts(concept):
+                check_for_cycle(ref, visiting, path)
+
+            path.pop()
+            visiting.remove(concept_ref)
+
+        # Check each concept as a starting point
+        for concept in concepts:
+            check_for_cycle(concept.concept_ref, set(), [])
