@@ -34,7 +34,7 @@ class ImageTestCases:
 
     # URL collections
     IMAGE_URLS: ClassVar[list[str]] = [
-        "https://www.w3.org/People/mimasa/test/imgformat/img/w3c_home.png",
+        "https://pipelex-web.s3.amazonaws.com/tests/logo-50.png",
         "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
     ]
 

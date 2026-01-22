@@ -87,6 +87,12 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def items(self) -> list[tuple[str, StuffSpec]]:
         return list(self.root.items())
 
+    def get_single_stuff_spec(self) -> StuffSpec:
+        if len(self.root) != 1:
+            msg = f"Expected 1 input, but got {len(self.root)}"
+            raise ValueError(msg)
+        return next(iter(self.root.values()))
+
     @property
     def concepts(self) -> list[Concept]:
         all_concepts: list[Concept] = []

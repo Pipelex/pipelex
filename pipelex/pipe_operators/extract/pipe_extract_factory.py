@@ -2,7 +2,6 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -55,8 +54,6 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             )
             raise PipeExtractFactoryError(msg)
 
-        page_views_dpi = blueprint.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
-
         return PipeExtract(
             domain_code=domain_code,
             code=pipe_code,
@@ -69,5 +66,5 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             max_page_images=blueprint.max_page_images,
             should_caption_images=blueprint.page_image_captions or False,
             should_include_page_views=blueprint.page_views or False,
-            page_views_dpi=page_views_dpi,
+            page_views_dpi=blueprint.page_views_dpi,
         )
