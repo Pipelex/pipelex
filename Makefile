@@ -213,7 +213,7 @@ update: env
 
 validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
-	$(VENV_PIPELEX) validate all
+	$(VENV_PIPELEX) validate --all
 
 build: env
 	$(call PRINT_TITLE,"Building the wheels")

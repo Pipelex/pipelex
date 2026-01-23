@@ -3,7 +3,7 @@
 - Always first write your "plan" in natural language, then transcribe it in pipelex.
 - You should ALWAYS RUN validation when you are writing or editing a `.plx` file. It will ensure the pipe is runnable. If not, iterate.
   - For a specific file: `pipelex validate path_to_file.plx`
-  - For all pipelines: `pipelex validate all`
+  - For all pipelines: `pipelex validate --all`
   - **IMPORTANT**: Ensure the Python virtual environment is activated before running `pipelex` commands. For standard installations, the venv is named `.venv` - always check that first. The commands will not work without proper venv activation.
 - Please use POSIX standard for files. (empty lines, no trailing whitespaces, etc.)
 
@@ -1030,7 +1030,7 @@ You can override the predefined llm presets by setting them in `.pipelex/inferen
 
 ALWAYS RUN validation when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
 - For a specific bundle/file: `pipelex validate path_to_file.plx`
-- For all pipelines: `pipelex validate all`
+- For all pipelines: `pipelex validate --all`
 - Remember: Ensure your Python virtual environment is activated (typically `.venv` for standard installations) before running `pipelex` commands.
 
 Then, create an example file to run the pipeline in the `examples` folder.

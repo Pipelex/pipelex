@@ -5,7 +5,7 @@ Validate your pipeline definitions and configuration for correctness.
 ## Validate All Pipes
 
 ```bash
-pipelex validate all
+pipelex validate --all
 ```
 
 Performs comprehensive validation:
@@ -24,10 +24,10 @@ This is the recommended validation to run before committing changes or deploying
 
 ```bash
 # Validate everything
-pipelex validate all
+pipelex validate --all
 
 # Validate with custom library directories
-pipelex validate all -L ./pipelines -L ./shared_pipes
+pipelex validate --all -L ./pipelines -L ./shared_pipes
 ```
 
 ## Validate Single Pipe
