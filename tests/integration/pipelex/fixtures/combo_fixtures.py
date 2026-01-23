@@ -25,7 +25,9 @@ import pytest
 from pytest import MonkeyPatch
 
 from pipelex.hub import get_console
+from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.integration.pipelex.fixtures.model_selection import (
     ModelCombo,
@@ -38,12 +40,21 @@ from tests.integration.pipelex.fixtures.model_selection import (
 def _setup_routing_for_backend(backend_name: str) -> tuple[MonkeyPatch, Path]:
     """Set up routing profile override for a specific backend.
 
+    This function:
+    1. Tears down any existing Pipelex instance
+    2. Sets up the routing monkeypatch BEFORE Pipelex initialization
+    3. Reinitializes Pipelex with the correct routing
+
     Args:
         backend_name: Name of the backend to route to.
 
     Returns:
         Tuple of (monkeypatch instance, temp directory path) for cleanup.
     """
+    # Teardown existing Pipelex (from reset_pipelex_config_fixture)
+    Pipelex.teardown_if_needed()
+
+    # Set up routing BEFORE Pipelex.make()
     routing_profile_name = f"all_{backend_name}"
     routing_monkeypatch = MonkeyPatch()
     routing_profiles_path = Path(ConfigPaths.ROUTING_PROFILES_FILE_PATH)
@@ -58,16 +69,34 @@ def _setup_routing_for_backend(backend_name: str) -> tuple[MonkeyPatch, Path]:
         str(routing_override_path),
     )
     get_console().print(f"[cyan]Routing to backend:[/cyan] {backend_name}")
+
+    # Reinitialize Pipelex with correct routing
+    # Use try/except to ensure cleanup on failure
+    try:
+        integration_mode = IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST
+        Pipelex.make(integration_mode=integration_mode)
+    except Exception:
+        # Clean up on failure to prevent resource leak
+        routing_monkeypatch.undo()
+        shutil.rmtree(routing_override_dir, ignore_errors=True)
+        raise
+
     return routing_monkeypatch, routing_override_dir
 
 
 def _cleanup_routing(monkeypatch: MonkeyPatch, temp_dir: Path) -> None:
     """Clean up routing profile override.
 
+    This function:
+    1. Tears down Pipelex (which used the monkeypatched routing)
+    2. Undoes the monkeypatch
+    3. Removes the temp directory
+
     Args:
         monkeypatch: Monkeypatch instance to undo.
         temp_dir: Temporary directory to remove.
     """
+    Pipelex.teardown_if_needed()
     monkeypatch.undo()
     shutil.rmtree(temp_dir, ignore_errors=True)
 
