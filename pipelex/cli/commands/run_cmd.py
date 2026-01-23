@@ -17,8 +17,9 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
 )
 from pipelex.config import get_config
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.hub import get_console, get_telemetry_manager
@@ -27,7 +28,6 @@ from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
@@ -178,9 +178,11 @@ def run_cmd(
         if bundle_path:
             try:
                 plx_content = Path(bundle_path).read_text(encoding="utf-8")
-                validate_bundle_result = await validate_bundle(plx_content=plx_content)
+                # Use lightweight parsing to extract main_pipe without full validation
+                # Full validation happens later during execute_pipeline
                 if not pipe_code:
-                    main_pipe_code = validate_bundle_result.blueprints[0].main_pipe
+                    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
+                    main_pipe_code = bundle_blueprint.main_pipe
                     if not main_pipe_code:
                         msg = (
                             f"Bundle '{bundle_path}' does not declare a main_pipe. In order to run a bundle, "
@@ -195,11 +197,8 @@ def run_cmd(
             except FileNotFoundError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
-            except ValidateBundleError as exc:
-                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from exc
-            except PipeInputError as exc:
-                typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
+            except PipelexInterpreterError as exc:
+                typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
         elif pipe_code:
             source_description = f"pipe '{pipe_code}'"
