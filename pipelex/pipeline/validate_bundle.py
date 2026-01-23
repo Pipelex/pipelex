@@ -101,16 +101,16 @@ async def validate_bundle(
 
     # Load libraries from resolved directories before loading the bundle
     effective_dirs, source_label = resolve_library_dirs(library_dirs)
-    if effective_dirs:
-        log.debug(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
-        library_manager.load_libraries(
-            library_id=library_id,
-            library_dirs=effective_dirs,
-        )
 
     loaded_pipes: list[PipeAbstract] | None = None
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None
     try:
+        if effective_dirs:
+            log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for validation")
+            library_manager.load_libraries(
+                library_id=library_id,
+                library_dirs=effective_dirs,
+            )
         if blueprints is not None:
             loaded_blueprints = blueprints
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
