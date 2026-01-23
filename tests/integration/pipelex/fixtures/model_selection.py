@@ -14,6 +14,7 @@ from typing import cast
 
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.toml_utils import load_toml_from_path
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo  # noqa: TC001
 
 # Environment variable for selecting test profile
 PIPELEX_TEST_PROFILE_ENV = "PIPELEX_TEST_PROFILE"
@@ -71,22 +72,22 @@ def is_generated_fixtures_available() -> bool:
 
 
 @cache
-def get_llm_model_backend_pairs() -> list[tuple[str, str]]:
-    """Get the list of valid (llm_model, backend) pairs.
+def get_llm_combos() -> list[ModelCombo]:
+    """Get the list of valid (llm_model, backend) combinations.
 
     First tries to load from the generated fixtures file, then falls back
     to an empty list if not available.
 
     Returns:
-        List of (model_handle, backend_name) tuples.
+        List of ModelCombo(handle, backend).
     """
     if is_generated_fixtures_available():
         try:
             from tests.integration.pipelex.fixtures._generated_model_sets import (  # noqa: PLC0415
-                LLM_MODEL_BACKEND_PAIRS,  # noqa: PLC2701
+                LLM_COMBOS,  # noqa: PLC2701
             )
 
-            return list(LLM_MODEL_BACKEND_PAIRS)
+            return list(LLM_COMBOS)
         except ImportError:
             pass
 
@@ -94,22 +95,22 @@ def get_llm_model_backend_pairs() -> list[tuple[str, str]]:
 
 
 @cache
-def get_img_gen_model_backend_pairs() -> list[tuple[str, str]]:
-    """Get the list of valid (img_gen_model, backend) pairs.
+def get_img_gen_combos() -> list[ModelCombo]:
+    """Get the list of valid (img_gen_model, backend) combinations.
 
     First tries to load from the generated fixtures file, then falls back
     to an empty list if not available.
 
     Returns:
-        List of (model_handle, backend_name) tuples.
+        List of ModelCombo(handle, backend).
     """
     if is_generated_fixtures_available():
         try:
             from tests.integration.pipelex.fixtures._generated_model_sets import (  # noqa: PLC0415
-                IMG_GEN_MODEL_BACKEND_PAIRS,  # noqa: PLC2701
+                IMG_GEN_COMBOS,  # noqa: PLC2701
             )
 
-            return list(IMG_GEN_MODEL_BACKEND_PAIRS)
+            return list(IMG_GEN_COMBOS)
         except ImportError:
             pass
 
@@ -117,22 +118,22 @@ def get_img_gen_model_backend_pairs() -> list[tuple[str, str]]:
 
 
 @cache
-def get_extract_model_backend_pairs() -> list[tuple[str, str]]:
-    """Get the list of valid (extract_model, backend) pairs.
+def get_extract_combos() -> list[ModelCombo]:
+    """Get the list of valid (extract_model, backend) combinations.
 
     First tries to load from the generated fixtures file, then falls back
     to an empty list if not available.
 
     Returns:
-        List of (model_handle, backend_name) tuples.
+        List of ModelCombo(handle, backend).
     """
     if is_generated_fixtures_available():
         try:
             from tests.integration.pipelex.fixtures._generated_model_sets import (  # noqa: PLC0415
-                EXTRACT_MODEL_BACKEND_PAIRS,  # noqa: PLC2701
+                EXTRACT_COMBOS,  # noqa: PLC2701
             )
 
-            return list(EXTRACT_MODEL_BACKEND_PAIRS)
+            return list(EXTRACT_COMBOS)
         except ImportError:
             pass
 
@@ -145,14 +146,14 @@ def get_llm_handles() -> list[str]:
     Returns:
         List of LLM model handles.
     """
-    pairs = get_llm_model_backend_pairs()
+    combos = get_llm_combos()
     # Return unique handles, preserving order
     seen: set[str] = set()
     handles: list[str] = []
-    for model, _ in pairs:
-        if model not in seen:
-            seen.add(model)
-            handles.append(model)
+    for combo in combos:
+        if combo.handle not in seen:
+            seen.add(combo.handle)
+            handles.append(combo.handle)
     return handles
 
 
@@ -162,14 +163,14 @@ def get_img_gen_handles() -> list[str]:
     Returns:
         List of image generation model handles.
     """
-    pairs = get_img_gen_model_backend_pairs()
+    combos = get_img_gen_combos()
     # Return unique handles, preserving order
     seen: set[str] = set()
     handles: list[str] = []
-    for model, _ in pairs:
-        if model not in seen:
-            seen.add(model)
-            handles.append(model)
+    for combo in combos:
+        if combo.handle not in seen:
+            seen.add(combo.handle)
+            handles.append(combo.handle)
     return handles
 
 
@@ -179,12 +180,12 @@ def get_extract_handles() -> list[str]:
     Returns:
         List of extract model handles.
     """
-    pairs = get_extract_model_backend_pairs()
+    combos = get_extract_combos()
     # Return unique handles, preserving order
     seen: set[str] = set()
     handles: list[str] = []
-    for model, _ in pairs:
-        if model not in seen:
-            seen.add(model)
-            handles.append(model)
+    for combo in combos:
+        if combo.handle not in seen:
+            seen.add(combo.handle)
+            handles.append(combo.handle)
     return handles

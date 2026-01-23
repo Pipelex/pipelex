@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMDocumentTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 @pytest.mark.llm
@@ -24,14 +25,13 @@ class TestLLMDocument:
         self,
         job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
-        llm_model_backend: tuple[str, str],
+        llm_combo: ModelCombo,
         topic: str,
         document_path: str,
     ):
         """Test LLM text generation from a local document file."""
-        llm_handle, _backend = llm_model_backend
         prompt_document = PromptDocumentUri(uri=document_path)
-        llm_worker = get_llm_worker(llm_handle=llm_handle)
+        llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
@@ -47,21 +47,20 @@ class TestLLMDocument:
             assert generated_text
             pretty_print(generated_text, title=f"Document summary of {topic}")
         except LLMCapabilityError as exc:
-            pytest.skip(f"Document capability not supported for this LLM: {llm_handle} because {exc}")
+            pytest.skip(f"Document capability not supported for this LLM: {llm_combo.handle} because {exc}")
 
     @pytest.mark.parametrize(("topic", "document_url"), LLMDocumentTestCases.DOCUMENT_URLS)
     async def test_gen_text_from_document_by_url(
         self,
         job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
-        llm_model_backend: tuple[str, str],
+        llm_combo: ModelCombo,
         topic: str,
         document_url: str,
     ):
         """Test LLM text generation from a remote document URL."""
-        llm_handle, _backend = llm_model_backend
         prompt_document = PromptDocumentUri(uri=document_url)
-        llm_worker = get_llm_worker(llm_handle=llm_handle)
+        llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
@@ -77,4 +76,4 @@ class TestLLMDocument:
             assert generated_text
             pretty_print(generated_text, title=f"Document summary of {topic} (URL)")
         except LLMCapabilityError as exc:
-            pytest.skip(f"Document capability not supported for this LLM: {llm_handle} because {exc}")
+            pytest.skip(f"Document capability not supported for this LLM: {llm_combo.handle} because {exc}")
