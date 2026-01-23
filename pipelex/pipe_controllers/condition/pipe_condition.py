@@ -155,11 +155,11 @@ class PipeCondition(PipeController):
                     required_concept_codes=[expected_output_ref],
                 )
         # Mapped pipes have different outputs - PipeCondition MUST use Dynamic
-        elif self.output.concept.concept_ref != NativeConceptCode.DYNAMIC.concept_ref:
+        elif self.output.concept.concept_ref != NativeConceptCode.ANYTHING.concept_ref:
             msg = (
                 f"Mapped pipes of PipeCondition '{self.code}' have different output concepts: "
                 f"{sorted(mapped_output_refs)}. When mapped pipes have different outputs, "
-                f"the PipeCondition must declare its output as '{NativeConceptCode.DYNAMIC.concept_ref}', "
+                f"the PipeCondition must declare its output as '{NativeConceptCode.ANYTHING.concept_ref}', "
                 f"but it declares '{self.output.concept.concept_ref}'."
             )
             raise PipeValidationError(
@@ -168,7 +168,7 @@ class PipeCondition(PipeController):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-                required_concept_codes=[NativeConceptCode.DYNAMIC.concept_ref],
+                required_concept_codes=[NativeConceptCode.ANYTHING.concept_ref],
             )
 
     # TODO: Restore this validation. The problem lies with needed_inputs that construct Anything concepts.
