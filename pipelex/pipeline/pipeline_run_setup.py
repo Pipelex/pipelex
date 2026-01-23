@@ -151,7 +151,7 @@ async def pipeline_run_setup(
     # Then handle plx_content or pipe_code
     if plx_content:
         blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
-        validate_bundle_result_blueprints = [blueprint]
+        blueprints_to_load = [blueprint]
 
         # Check if this bundle was already loaded from library directories
         bundle_already_loaded = False
@@ -168,7 +168,7 @@ async def pipeline_run_setup(
                 log.verbose(f"Bundle '{bundle_uri}' already loaded from library directories, skipping duplicate load")
 
         if not bundle_already_loaded:
-            library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result_blueprints)
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
 
         # For now, we only support one blueprint when given a plx_content. So blueprints is of length 1.
         # blueprint is already set from make_pipelex_bundle_blueprint above
