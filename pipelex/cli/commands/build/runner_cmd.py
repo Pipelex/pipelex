@@ -23,7 +23,7 @@ from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.hub import get_class_registry, get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_class_registry, get_func_registry, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
@@ -103,6 +103,9 @@ async def prepare_runner(
     # Generate structures folder FIRST (before runner, since runner imports from structures)
     structures_output_dir = output_dir / "structures"
     if all_blueprints:
+        get_class_registry().teardown()
+        get_func_registry().teardown()
+        get_class_registry().register_classes(CoreRegistryModels.get_all_models())
         generated_structures = generate_structures_from_blueprints(
             blueprints=all_blueprints,
             output_directory=structures_output_dir,

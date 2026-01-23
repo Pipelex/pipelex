@@ -14,8 +14,9 @@ from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprin
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
 from pipelex.core.interpreter.helpers import is_pipelex_file
+from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry
+from pipelex.hub import get_class_registry, get_func_registry
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
@@ -274,6 +275,11 @@ def build_structures_command(
 
                 # Validate single bundle
                 validate_result = await validate_bundle(plx_file_path=target_path)
+                # THIS IS A HACK, while waiting class/func registries to be in libraries.
+                get_class_registry().teardown()
+                get_func_registry().teardown()
+                get_class_registry().register_classes(CoreRegistryModels.get_all_models())
+
                 all_blueprints: list[PipelexBundleBlueprint] = validate_result.blueprints
 
                 typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
@@ -296,6 +302,11 @@ def build_structures_command(
 
                 # Validate bundles from directory
                 validate_result = await validate_bundles_from_directory(directory=target_path)
+                # THIS IS A HACK, while waiting class/func registries to be in libraries.
+                get_class_registry().teardown()
+                get_func_registry().teardown()
+                get_class_registry().register_classes(CoreRegistryModels.get_all_models())
+
                 typer.echo(f"✅ Validated {len(validate_result.blueprints)} blueprint(s)")
 
                 # Generate structures using the helper function
