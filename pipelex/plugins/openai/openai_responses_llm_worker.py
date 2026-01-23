@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-import instructor
 import openai
 from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
 from typing_extensions import override
@@ -39,11 +38,12 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
 
         self.openai_client_for_responses: openai.AsyncOpenAI = sdk_instance
         self.openai_responses_factory = openai_responses_factory
+        from instructor import from_openai  # noqa: PLC0415
 
         if instructor_mode := self.inference_model.get_instructor_mode():
-            self.instructor_for_objects = instructor.from_openai(client=sdk_instance, mode=instructor_mode)
+            self.instructor_for_objects = from_openai(client=sdk_instance, mode=instructor_mode)
         else:
-            self.instructor_for_objects = instructor.from_openai(client=sdk_instance)
+            self.instructor_for_objects = from_openai(client=sdk_instance)
 
         instructor_config = get_config().cogt.llm_config.instructor_config
         if instructor_config.is_dump_kwargs_enabled:

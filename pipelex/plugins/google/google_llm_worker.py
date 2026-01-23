@@ -1,7 +1,6 @@
 import asyncio
 from typing import TYPE_CHECKING, cast
 
-import instructor
 from google import genai
 from google.genai import types as genai_types
 from typing_extensions import override
@@ -40,11 +39,12 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         )
         genai_client: genai.Client = sdk_instance
         self.genai_async_client = genai_client.aio
+        from instructor import from_genai  # noqa: PLC0415
 
         if instructor_mode := self.inference_model.get_instructor_mode():
-            self.instructor_for_objects = instructor.from_genai(client=sdk_instance, mode=instructor_mode, use_async=True)
+            self.instructor_for_objects = from_genai(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
-            self.instructor_for_objects = instructor.from_genai(client=sdk_instance, use_async=True)
+            self.instructor_for_objects = from_genai(client=sdk_instance, use_async=True)
 
         instructor_config = get_config().cogt.llm_config.instructor_config
         if instructor_config.is_dump_kwargs_enabled:
