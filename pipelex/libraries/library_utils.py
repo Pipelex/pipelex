@@ -4,7 +4,7 @@ from pathlib import Path
 from pipelex import log
 from pipelex.builder import builder
 from pipelex.config import get_config
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.types import Traversable
 
@@ -29,12 +29,10 @@ def get_pipelex_plx_files_from_package() -> list[Path]:
                 return
 
             for child in traversable.iterdir():
-                if child.is_file() and child.name.endswith(".plx"):
-                    # Convert to path string for validation
+                if child.is_file() and is_pipelex_file(Path(child.name)):
                     plx_path_str = str(child)
-                    if PipelexInterpreter.is_pipelex_file(Path(plx_path_str)):
-                        collected.append(Path(plx_path_str))
-                        log.verbose(f"Found pipelex package PLX file: {plx_path_str}")
+                    collected.append(Path(plx_path_str))
+                    log.verbose(f"Found pipelex package PLX file: {plx_path_str}")
                 elif child.is_dir():
                     # Skip excluded directories
                     if child.name not in excluded_dirs:
@@ -83,7 +81,7 @@ def get_pipelex_plx_files_from_dirs(dirs: set[Path]) -> list[Path]:
 
         # Filter to only include valid Pipelex files
         for plx_file in plx_files:
-            if PipelexInterpreter.is_pipelex_file(plx_file):
+            if is_pipelex_file(plx_file):
                 all_plx_paths.append(plx_file)
             else:
                 log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")

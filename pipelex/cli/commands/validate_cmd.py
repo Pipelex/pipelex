@@ -17,6 +17,7 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
     handle_validate_bundle_error,
 )
+from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import get_console, get_default_library_dirs, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -108,7 +109,7 @@ def validate_cmd(
 
     # Determine source:
     if target:
-        if target.endswith(".plx"):
+        if is_pipelex_file(Path(target)):
             bundle_path = target
             if bundle:
                 typer.secho(

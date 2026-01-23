@@ -14,6 +14,7 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprint, normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
+from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
@@ -260,7 +261,7 @@ def build_structures_command(
             raise typer.Exit(1)
 
         # Determine if target is a file or directory
-        is_plx_file = target_path.is_file() and target_path.suffix == ".plx"
+        is_plx_file = target_path.is_file() and is_pipelex_file(target_path)
         pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD)
 
         try:

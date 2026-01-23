@@ -85,7 +85,7 @@ async def validate_bundle(
     plx_file_path: str | None = None,
     plx_content: str | None = None,
     blueprints: list[PipelexBundleBlueprint] | None = None,
-    library_dirs: Sequence[str | Path] | None = None,
+    library_dirs: Sequence[Path] | None = None,
 ) -> ValidateBundleResult:
     provided_params = sum([blueprints is not None, plx_content is not None, plx_file_path is not None])
     if provided_params == 0:

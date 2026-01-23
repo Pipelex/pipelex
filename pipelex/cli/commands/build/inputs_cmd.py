@@ -12,6 +12,7 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
 )
+from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.hub import get_required_pipe, get_telemetry_manager
@@ -171,7 +172,7 @@ def generate_inputs_cmd(
             )
             raise typer.Exit(1)
 
-        if target.endswith(".plx"):
+        if is_pipelex_file(target_path):
             bundle_path = target
         else:
             pipe_code = target
