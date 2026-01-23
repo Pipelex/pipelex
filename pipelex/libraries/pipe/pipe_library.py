@@ -110,6 +110,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             )
 
             table.add_column("Code", style="green")
+            table.add_column("Type", style="cyan")
             table.add_column("Definition", style="white")
             table.add_column("Input", style="yellow")
             table.add_column("Output", style="yellow")
@@ -124,6 +125,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
                 table.add_row(
                     pipe.code,
+                    pipe.type,
                     pipe.description or "",
                     formatted_inputs_str,
                     output_code,
