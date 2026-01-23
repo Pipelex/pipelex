@@ -1,0 +1,56 @@
+################################################################################
+# Test Profiles Configuration
+################################################################################
+#
+# This file defines test profiles for controlling which models are included
+# in parametrized tests. Select a profile using the PIPELEX_TEST_PROFILE
+# environment variable.
+#
+# Usage:
+#   PIPELEX_TEST_PROFILE=ci make test-xdist      # Use CI profile
+#   PIPELEX_TEST_PROFILE=dev make test-xdist     # Use dev profile (default)
+#   PIPELEX_TEST_PROFILE=full make test-xdist    # Use all models
+#
+# After changing profiles, regenerate fixtures:
+#   make regenerate-test-models
+#   # or
+#   pipelex-dev preprocess-test-models --generate-fixtures --profile <name>
+#
+################################################################################
+
+################################################################################
+# CI Profile - Minimal set for CI (no actual inference)
+################################################################################
+[profiles.ci]
+description = "Minimal set for CI - no actual inference"
+backends = ["anthropic"]
+llm_models = ["claude-4-sonnet"]
+img_gen_models = []
+extract_models = []
+
+################################################################################
+# Dev Profile - Quick dev testing with key models
+################################################################################
+[profiles.dev]
+description = "Quick dev testing with key models"
+backends = ["anthropic", "openai", "internal"]
+llm_models = ["claude-4-sonnet", "gpt-4o-mini"]
+img_gen_models = ["gpt-image-1"]
+extract_models = ["pypdfium2-extract-pdf"]
+
+################################################################################
+# Coverage Profile - One model per backend for coverage testing
+################################################################################
+[profiles.coverage]
+description = "One model per backend for coverage"
+backends = ["anthropic", "openai", "google", "mistral", "internal"]
+llm_models = ["claude-4-sonnet", "gpt-4o-mini", "gemini-2.5-flash", "mistral-large"]
+img_gen_models = ["gpt-image-1"]
+extract_models = ["pypdfium2-extract-pdf"]
+
+################################################################################
+# Full Profile - All available models (use with caution)
+################################################################################
+[profiles.full]
+description = "All available models"
+include_all = true

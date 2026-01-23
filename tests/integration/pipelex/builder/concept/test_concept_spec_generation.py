@@ -25,10 +25,11 @@ class TestConceptSpecGeneration:
         self,
         job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
-        llm_handle: str,
+        llm_model_backend: tuple[str, str],
         topic: str,
         user_prompt: str,
     ):
+        llm_handle, _backend = llm_model_backend
         log.info(f"Testing {topic} with llm_handle '{llm_handle}'")
 
         # Get the LLM worker

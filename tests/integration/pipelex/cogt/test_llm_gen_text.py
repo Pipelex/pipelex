@@ -37,12 +37,12 @@ def get_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMeta
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 class TestLLMGenText:
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_using_handle(
-        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_model_backend: tuple[str, str], topic: str, prompt_text: str
     ):
+        llm_handle, _backend = llm_model_backend
         pretty_print(prompt_text, title=f"Generating text about '{topic}' using '{llm_handle}'")
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         llm_job = LLMJobFactory.make_llm_job(

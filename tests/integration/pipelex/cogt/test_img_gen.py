@@ -16,19 +16,19 @@ SECONDARY_ID = "id_2"
 @pytest.mark.img_gen
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 class TestImageGeneration:
     @pytest.mark.parametrize(("topic", "positive_text", "negative_text"), ImageGenTestCases.IMAGE_GEN_PROMPT_CONTENTS)
     async def test_img_gen_single_opaque(
         self,
         job_metadata: JobMetadata,
-        img_gen_handle: str,
+        img_gen_model_backend: tuple[str, str],
         img_gen_job_params: ImgGenJobParams,
         topic: str,
         positive_text: str,
         negative_text: str | None,
         generated_content_factory: GeneratedContentFactory,
     ):
+        img_gen_handle, _backend = img_gen_model_backend
         pretty_print(f"Testing image generation with handle '{img_gen_handle}', output format '{img_gen_job_params.output_format}'")
         pretty_print(f"Positive text: {positive_text}\nNegative text: {negative_text}", title="Prompts")
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
@@ -55,12 +55,13 @@ class TestImageGeneration:
     async def test_img_gen_single_transparent(
         self,
         job_metadata: JobMetadata,
-        img_gen_handle: str,
+        img_gen_model_backend: tuple[str, str],
         topic: str,
         positive_text: str,
         negative_text: str | None,
         generated_content_factory: GeneratedContentFactory,
     ):
+        img_gen_handle, _backend = img_gen_model_backend
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
@@ -91,13 +92,14 @@ class TestImageGeneration:
     async def test_img_gen_multiple(
         self,
         job_metadata: JobMetadata,
-        img_gen_handle: str,
+        img_gen_model_backend: tuple[str, str],
         img_gen_job_params: ImgGenJobParams,
         topic: str,
         positive_text: str,
         negative_text: str | None,
         generated_content_factory: GeneratedContentFactory,
     ):
+        img_gen_handle, _backend = img_gen_model_backend
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_handle)
         img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt_contents(
             positive_text=positive_text,

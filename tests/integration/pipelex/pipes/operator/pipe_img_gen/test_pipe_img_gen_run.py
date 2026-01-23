@@ -26,12 +26,13 @@ class TestPipeImgGenRun:
         self,
         job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
-        img_gen_handle: str,
+        img_gen_model_backend: tuple[str, str],
         topic: str,  # noqa: ARG002
         prompt: str,
         negative_prompt: str | None,
         load_empty_library: Callable[[], None],
     ):
+        img_gen_handle, _backend = img_gen_model_backend
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
             description="Image generation test",
@@ -59,12 +60,13 @@ class TestPipeImgGenRun:
         self,
         job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
-        img_gen_handle: str,
+        img_gen_model_backend: tuple[str, str],
         topic: str,  # noqa: ARG002
         image_desc: str,
         negative_prompt: str | None,
         load_empty_library: Callable[[], None],
     ):
+        img_gen_handle, _backend = img_gen_model_backend
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
             description="Image generation test",

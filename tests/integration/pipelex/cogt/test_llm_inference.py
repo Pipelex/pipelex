@@ -14,10 +14,12 @@ from tests.integration.pipelex.cogt.test_data import ImageDescription, LLMTestCo
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 class TestLLMInference:
     @pytest.mark.parametrize("user_text", [LLMTestConstants.USER_TEXT_SUPER_SHORT])
-    async def test_simple_gen_text_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, user_text: str):
+    async def test_simple_gen_text_from_text(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_model_backend: tuple[str, str], user_text: str
+    ):
+        llm_handle, _backend = llm_model_backend
         log.info(f"test_simple_gen_text_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
@@ -34,7 +36,8 @@ class TestLLMInference:
         pretty_print(generated_text)
         # get_report_delegate().generate_report()
 
-    async def test_simple_gen_object_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str):
+    async def test_simple_gen_object_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_model_backend: tuple[str, str]):
+        llm_handle, _backend = llm_model_backend
         log.info(f"test_simple_gen_object_from_text: Testing llm_handle '{llm_handle}'")
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
         if not llm_worker.is_gen_object_supported:
@@ -55,7 +58,10 @@ class TestLLMInference:
         # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
-    async def test_gen_text_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
+    async def test_gen_text_from_image(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_model_backend: tuple[str, str], image_path: str
+    ):
+        llm_handle, _backend = llm_model_backend
         log.info(f"test_gen_text_from_image: Testing llm_handle '{llm_handle}'")
         prompt_image = PromptImageUri(uri=image_path)
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
@@ -81,7 +87,10 @@ class TestLLMInference:
         # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
-    async def test_gen_object_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
+    async def test_gen_object_from_image(
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_model_backend: tuple[str, str], image_path: str
+    ):
+        llm_handle, _backend = llm_model_backend
         log.info(f"test_gen_object_from_image: Testing llm_handle '{llm_handle}'")
         prompt_image = PromptImageUri(uri=image_path)
         llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)

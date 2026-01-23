@@ -34,12 +34,17 @@ def get_async_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: J
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 class TestLLMGenObject:
     @pytest.mark.parametrize(("user_text", "expected_instance"), LLMTestCases.SINGLE_OBJECT)
     async def test_gen_object_async_using_handle(
-        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, user_text: str, expected_instance: BaseModel
+        self,
+        job_metadata: JobMetadata,
+        llm_job_params: LLMJobParams,
+        llm_model_backend: tuple[str, str],
+        user_text: str,
+        expected_instance: BaseModel,
     ):
+        llm_handle, _backend = llm_model_backend
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         if not llm_worker.is_gen_object_supported:
             pytest.skip(f"LLM worker '{llm_worker.desc}' does not support object generation")
@@ -77,9 +82,10 @@ class TestLLMGenObject:
         self,
         job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
-        llm_handle: str,
+        llm_model_backend: tuple[str, str],
         case_tuples: list[tuple[str, BaseModel]],
     ):
+        llm_handle, _backend = llm_model_backend
         llm_worker = get_llm_worker(llm_handle=llm_handle)
         if not llm_worker.is_gen_object_supported:
             pytest.skip(f"'{llm_worker.desc}' does not support object generation")

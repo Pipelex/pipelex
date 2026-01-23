@@ -12,6 +12,7 @@ from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, ch
 from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
 from pipelex.hub import get_console
@@ -24,7 +25,15 @@ class PipelexDevCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["check-config-sync", "check-gateway-models", "check-rules", "check-urls", "sync-main-config", "update-gateway-models"]
+        return [
+            "check-config-sync",
+            "check-gateway-models",
+            "check-rules",
+            "check-urls",
+            "preprocess-test-models",
+            "sync-main-config",
+            "update-gateway-models",
+        ]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -120,6 +129,17 @@ def sync_main_config_command(
 ) -> None:
     """Sync values from main config (pipelex/pipelex.toml) to kit and project configs."""
     sync_main_config_cmd(target=target, dry_run=dry_run, quiet=quiet, show_diff=show_diff)
+
+
+@app.command(name="preprocess-test-models", help="Preprocess test models and generate fixture files")
+def preprocess_test_models_command(
+    profile: Annotated[str, typer.Option("--profile", "-p", help="Test profile to use (ci, dev, coverage, full)")] = "dev",
+    generate_fixtures: Annotated[bool, typer.Option("--generate-fixtures", "-g", help="Generate Python fixtures file")] = False,
+    output_json: Annotated[bool, typer.Option("--output-json", "-j", help="Output model availability JSON")] = False,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only minimal status lines")] = False,
+) -> None:
+    """Preprocess test models and generate fixture files for parametrized tests."""
+    preprocess_test_models_cmd(profile=profile, generate_fixtures=generate_fixtures, output_json=output_json, quiet=quiet)
 
 
 @app.command(name="update-gateway-models", help="Update the gateway models reference file")

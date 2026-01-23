@@ -222,66 +222,18 @@ def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
 
 
 @pytest.fixture(
-    params=ALL_LLM_HANDLES,
-)
-def llm_handle(request: pytest.FixtureRequest) -> str:
-    assert isinstance(request.param, str)
-    llm_handle_param = request.param
-    if not is_llm_handle_supported(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not available in model deck")
-    if not is_llm_handle_supported_by_enabled_backends(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not supported by any enabled backend")
-    return llm_handle_param
-
-
-@pytest.fixture(
     params=[
-        # "llm_for_testing_gen_text",
-        # "llm_for_testing_gen_object",
         "llm_for_creative_writing",
     ],
 )
 def llm_preset_id(request: pytest.FixtureRequest) -> str:
+    """Fixture for testing LLM presets (not model handles).
+
+    This tests the preset functionality where an LLM setting is looked up
+    by preset ID and used to configure the LLM worker.
+    """
     assert isinstance(request.param, str)
     llm_preset_id_param = request.param
     if not is_llm_preset_supported(llm_preset_id=llm_preset_id_param):
-        pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported by any enabled backend")
+        pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported")
     return llm_preset_id_param
-
-
-@pytest.fixture(
-    params=[
-        # Anthropic Claude models with native document support
-        # "claude-3.7-sonnet",
-        # "claude-4-sonnet",
-        # "claude-4-opus",
-        # "claude-4.1-opus",
-        "claude-4.5-haiku",
-        # "claude-4.5-sonnet",
-        # "claude-4.5-opus",
-        # Google Gemini models with native document support
-        "gemini-2.5-flash-lite",
-        # "gemini-2.5-flash",
-        # "gemini-2.5-pro",
-        # OpenAI models using Responses API (supports PDF input)
-        # "gpt-5.2",
-        # "gpt-5",
-        # "gpt-5-chat",
-        "gpt-4o-mini",
-        # Mistral models with native document support
-        "mistral-medium",
-    ],
-)
-def llm_handle_for_documents(request: pytest.FixtureRequest) -> str:
-    """Fixture for LLM handles that support document input (PDF, DOCX).
-
-    Note: OpenAI models starting with gpt-5 and later use the Responses API
-    which supports PDF input via input_file type.
-    """
-    assert isinstance(request.param, str)
-    llm_handle_param = request.param
-    if not is_llm_handle_supported(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not available in model deck")
-    if not is_llm_handle_supported_by_enabled_backends(llm_handle_param):
-        pytest.skip(f"LLM handle '{llm_handle_param}' not supported by any enabled backend")
-    return llm_handle_param

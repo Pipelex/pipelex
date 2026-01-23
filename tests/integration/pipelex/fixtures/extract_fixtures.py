@@ -48,19 +48,6 @@ ALL_EXTRACT_HANDLES: list[str] = list(set(EXTRACT_HANDLE_FROM_PDF + EXTRACT_HAND
 
 
 @pytest.fixture(
-    params=ALL_EXTRACT_HANDLES,
-)
-def extract_handle(request: pytest.FixtureRequest) -> str:
-    assert isinstance(request.param, str)
-    extract_handle_param = request.param
-    if not is_extract_handle_supported(extract_handle_param):
-        pytest.skip(f"Extract handle '{extract_handle_param}' not available in model deck")
-    if not is_extract_handle_supported_by_enabled_backends(extract_handle_param):
-        pytest.skip(f"Extract handle '{extract_handle_param}' not supported by any enabled backend")
-    return extract_handle_param
-
-
-@pytest.fixture(
     params=EXTRACT_HANDLE_FROM_PDF,
 )
 def extract_handle_from_pdf(request: pytest.FixtureRequest) -> str:

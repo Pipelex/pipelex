@@ -67,19 +67,6 @@ ALL_IMG_GEN_HANDLES = [
 
 
 @pytest.fixture(
-    params=ALL_IMG_GEN_HANDLES,
-)
-def img_gen_handle(request: pytest.FixtureRequest) -> str:
-    assert isinstance(request.param, str)
-    img_gen_handle_param = request.param
-    if not is_img_gen_handle_supported(img_gen_handle_param):
-        pytest.skip(f"Image generation handle '{img_gen_handle_param}' not available in model deck")
-    if not is_img_gen_handle_supported_by_enabled_backends(img_gen_handle_param):
-        pytest.skip(f"Image generation handle '{img_gen_handle_param}' not supported by any enabled backend")
-    return img_gen_handle_param
-
-
-@pytest.fixture(
     params=[
         ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,

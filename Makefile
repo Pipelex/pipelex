@@ -67,6 +67,8 @@ make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
 make cgm                      - Shorthand -> check-gateway-models
+make regenerate-test-models   - Regenerate test model fixtures from backend configs
+make rtm                      - Shorthand -> regenerate-test-models
 
 make up                       - Shorthand -> update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env and lock files
@@ -279,6 +281,13 @@ smc: sync-main-config
 smc-dry: env
 	$(call PRINT_TITLE,Previewing main config sync - dry run)
 	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
+
+regenerate-test-models: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures")
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(or $(PIPELEX_TEST_PROFILE),dev)
+
+rtm: regenerate-test-models
+	@echo "> done: rtm = regenerate-test-models"
 
 ##############################################################################################
 ############################      Cleaning                        ############################
