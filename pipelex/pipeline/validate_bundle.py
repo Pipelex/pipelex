@@ -216,7 +216,4 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
-    # finally:
-    #     get_class_registry().teardown()
-    #     get_func_registry().teardown()
     return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
