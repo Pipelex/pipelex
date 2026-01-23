@@ -105,12 +105,13 @@ def validate_cmd(
 
     # Let's analyze the options and determine what pipe code to use and if we need to load a bundle
     pipe_code: str | None = None
-    bundle_path: str | None = None
+    bundle_path: Path | None = None
 
     # Determine source:
     if target:
-        if is_pipelex_file(Path(target)):
-            bundle_path = target
+        target_path = Path(target)
+        if is_pipelex_file(target_path):
+            bundle_path = target_path
             if bundle:
                 typer.secho(
                     "Failed to validate: cannot use option --bundle if you're already passing a bundle file (.plx) as positional argument",
@@ -130,7 +131,7 @@ def validate_cmd(
 
     if bundle:
         assert not bundle_path, "bundle_path should be None at this stage if --bundle is provided"
-        bundle_path = bundle
+        bundle_path = Path(bundle)
 
     if pipe:
         assert not pipe_code, "pipe_code should be None at this stage if --pipe is provided"
@@ -140,7 +141,7 @@ def validate_cmd(
         typer.secho("Failed to validate: no pipe code or bundle file specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
-    async def validate_pipe(pipe_code: str | None = None, bundle_path: str | None = None):
+    async def validate_pipe(pipe_code: str | None = None, bundle_path: Path | None = None):
         if bundle_path:
             try:
                 await validate_bundle(plx_file_path=bundle_path)

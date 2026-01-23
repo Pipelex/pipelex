@@ -48,7 +48,7 @@ class BuilderLoop:
                 base_name="working_memory",
                 extension="json",
             )
-            save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=working_memory_path, create_directory=True)
+            save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=str(working_memory_path), create_directory=True)
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
@@ -59,7 +59,7 @@ class BuilderLoop:
                 base_name="generated_pipeline_1st_iteration",
                 extension="plx",
             )
-            save_text_to_path(text=plx_content, path=first_iteration_path, create_directory=True)
+            save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
 
         bundle_blueprint = pipelex_bundle_spec.to_blueprint()
         max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts
@@ -245,6 +245,6 @@ class BuilderLoop:
                 base_name="generated_pipeline_2nd_iteration",
                 extension="plx",
             )
-            save_text_to_path(text=plx_content, path=second_iteration_path)
+            save_text_to_path(text=plx_content, path=str(second_iteration_path))
 
         return pipelex_bundle_spec

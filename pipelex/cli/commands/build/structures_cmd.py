@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
-from kajson.kajson_manager import KajsonManager
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
@@ -16,6 +15,7 @@ from pipelex.core.concepts.structure_generation.exceptions import ConceptStructu
 from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
@@ -111,7 +111,7 @@ def generate_structures_from_blueprints(
 
     # Build concept_ref_to_class_info mapping for all concepts
     concept_ref_to_class_info = _build_concept_ref_to_class_info(blueprints, output_directory)
-    class_registry = KajsonManager.get_class_registry()
+    class_registry = get_class_registry()
 
     # Only check for existing classes if we're not skipping and have a target path
     check_existing = not skip_existing_check and target_path is not None
@@ -273,7 +273,7 @@ def build_structures_command(
                 typer.echo(f"🔍 Validating bundle: {target_path}")
 
                 # Validate single bundle
-                validate_result = await validate_bundle(plx_file_path=str(target_path))
+                validate_result = await validate_bundle(plx_file_path=target_path)
                 all_blueprints: list[PipelexBundleBlueprint] = validate_result.blueprints
 
                 typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")

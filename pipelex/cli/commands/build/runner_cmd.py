@@ -26,7 +26,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.hub import get_class_registry, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle, validate_bundles_from_directory
+from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -42,44 +42,20 @@ SUB_COMMAND_RUNNER = "runner"
 
 async def prepare_runner(
     pipe_code: str | None = None,
-    bundle_path: str | None = None,
+    bundle_path: Path | None = None,
+    output_path: Path | None = None,
     library_dirs: list[Path] | None = None,
-    output_path: str | None = None,
 ):
     all_blueprints: list[PipelexBundleBlueprint] = []
 
-    if library_dirs:
-        # Load all bundles from library directory
-        for library_dir in library_dirs:
-            try:
-                typer.echo(f"🔍 Loading bundles from: {library_dir}")
-                validate_result = await validate_bundles_from_directory(directory=library_dir)
-                all_blueprints.extend(validate_result.blueprints)
-                typer.echo(f"✅ Loaded {len(validate_result.blueprints)} blueprint(s) from {library_dir}")
-
-                # pipe_code is mandatory for library directory (already validated above)
-                assert pipe_code is not None
-                typer.echo(f"Using pipe '{pipe_code}' from library '{library_dirs}'")
-
-            except FileNotFoundError as exc:
-                typer.secho(f"Failed to load library '{library_dir}': {exc}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from exc
-            except ValidateBundleError as exc:
-                typer.secho(f"Failed to load library '{library_dir}': {exc}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from exc
-            except PipeInputError as exc:
-                typer.secho(f"Failed to load library '{library_dir}': {exc}", fg=typer.colors.RED, err=True)
-                raise typer.Exit(1) from exc
-
-    elif bundle_path:
+    if bundle_path:
         try:
-            validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
-            all_blueprints = validate_bundle_result.blueprints
-            first_blueprint = all_blueprints[0]
+            validate_bundle_result = await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+            all_blueprints.extend(validate_bundle_result.blueprints)
+            first_blueprint = validate_bundle_result.blueprints[0]
             if not pipe_code:
                 main_pipe_code = first_blueprint.main_pipe
                 if not main_pipe_code:
-                    # No main_pipe declared - require --pipe option
                     typer.secho(
                         f"Bundle '{bundle_path}' has no main_pipe declared. Use --pipe to specify which pipe to use.",
                         fg=typer.colors.RED,
@@ -103,8 +79,6 @@ async def prepare_runner(
         typer.secho("Failed to run: no bundle file or library directory specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
-    # Get the pipe
-    assert pipe_code is not None, "pipe_code should be set by this point"
     try:
         the_pipe = get_required_pipe(pipe_code=pipe_code)
     except Exception as exc:
@@ -114,13 +88,10 @@ async def prepare_runner(
     # Determine output path - use target's directory
     if output_path:
         final_output_path = output_path
-    elif library_dirs:
-        # Place runner in the first library directory
-        final_output_path = str(library_dirs[0] / f"run_{pipe_code}.py")
     elif bundle_path:
         # Place runner in the same directory as the PLX file
         bundle_dir = Path(bundle_path).parent
-        final_output_path = str(bundle_dir / f"run_{pipe_code}.py")
+        final_output_path = bundle_dir / f"run_{pipe_code}.py"
     else:
         final_output_path = get_incremental_file_path(
             base_path="results",
@@ -176,15 +147,15 @@ async def prepare_runner(
 
     # Generate the runner code
     try:
-        runner_code = generate_runner_code(the_pipe, output_multiplicity=output_is_list, library_dir=pipelex_library_dir)
+        runner_code = generate_runner_code(pipe=the_pipe, output_multiplicity=output_is_list, library_dir=pipelex_library_dir)
     except Exception as exc:
         typer.secho(f"❌ Error generating runner code: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
     # Save the runner file
     try:
-        ensure_directory_for_file_path(file_path=final_output_path)
-        save_text_to_path(text=runner_code, path=final_output_path)
+        ensure_directory_for_file_path(file_path=str(final_output_path))
+        save_text_to_path(text=runner_code, path=str(final_output_path))
         typer.secho(f"✅ Generated runner file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
         typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
@@ -232,10 +203,11 @@ def prepare_runner_cmd(
 
     # Analyze target type
     target_path = Path(target)
+    output_path_path = Path(output_path) if output_path else None
     is_directory = target_path.is_dir()
     is_plx_file = is_pipelex_file(target_path)
     library_dirs_paths = [Path(lib_dir) for lib_dir in library_dirs] if library_dirs else None
-    bundle_path = target if is_plx_file else None
+    bundle_path = target_path if is_plx_file else None
 
     # Validate: directory requires --pipe
     if is_directory and not pipe:
@@ -263,7 +235,7 @@ def prepare_runner_cmd(
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
 
-            asyncio.run(prepare_runner(pipe_code=pipe, bundle_path=bundle_path, library_dirs=library_dirs_paths, output_path=output_path))
+            asyncio.run(prepare_runner(pipe_code=pipe, bundle_path=bundle_path, library_dirs=library_dirs_paths, output_path=output_path_path))
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.BUILD)

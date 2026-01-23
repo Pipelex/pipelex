@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
@@ -16,12 +17,11 @@ class PipelexInterpreter(BaseModel):
     """plx -> PipelexBundleBlueprint"""
 
     @classmethod
-    def make_pipelex_bundle_blueprint(cls, bundle_path: str | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:
+    def make_pipelex_bundle_blueprint(cls, bundle_path: Path | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:
         blueprint_dict: dict[str, Any]
         try:
             if bundle_path is not None:
-                blueprint_dict = load_toml_from_path(path=bundle_path)
-                blueprint_dict.update(source=bundle_path)
+                blueprint_dict = load_toml_from_path(path=str(bundle_path))
             elif plx_content is not None:
                 blueprint_dict = load_toml_from_content(content=plx_content)
             else:
@@ -35,7 +35,9 @@ class PipelexInterpreter(BaseModel):
             raise PipelexInterpreterError(msg)
 
         try:
-            return PipelexBundleBlueprint.model_validate(blueprint_dict)
+            pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
+            pipelex_bundle_blueprint.source = str(bundle_path)
+            return pipelex_bundle_blueprint
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []

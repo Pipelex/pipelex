@@ -293,7 +293,7 @@ class LibraryManager(LibraryManagerAbstract):
         blueprints: list[PipelexBundleBlueprint] = []
         for plx_file_path in valid_plx_paths:
             try:
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=str(plx_file_path))
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file_path)
                 blueprint.source = str(plx_file_path)
             except FileNotFoundError as file_not_found_error:
                 msg = f"Could not find PLX bundle at '{plx_file_path}'"
@@ -311,9 +311,9 @@ class LibraryManager(LibraryManagerAbstract):
         library = self.get_library(library_id=library_id)
         for plx_file_path in valid_plx_paths:
             try:
-                resolved_path = str(plx_file_path.resolve())
+                resolved_path = plx_file_path.resolve()
             except (OSError, RuntimeError):
-                resolved_path = str(plx_file_path)
+                resolved_path = plx_file_path
             library.loaded_plx_paths.append(resolved_path)
 
         return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
