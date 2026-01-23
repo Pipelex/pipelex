@@ -5,7 +5,6 @@ import pytest
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, Quality
 from pipelex.hub import get_model_deck
 from pipelex.tools.misc.image_utils import ImageFormat
-from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
 
 
 def is_img_gen_handle_supported(img_gen_handle: str) -> bool:
@@ -14,56 +13,10 @@ def is_img_gen_handle_supported(img_gen_handle: str) -> bool:
     return model_deck.is_handle_defined(img_gen_handle)
 
 
-def is_img_gen_handle_supported_by_enabled_backends(img_gen_handle: str) -> bool:
-    """Check if an img_gen handle is supported by at least one enabled backend."""
-    return any(check_backend_supports_model(backend, img_gen_handle) for backend in ALL_BACKENDS)
-
-
 # ================================================================================================
-# Image Generation Handles by Backend
-# Comment out handles you don't want to test
+# Image generation model collections are now defined in .pipelex/test_profiles.toml
+# See [collections.img_gen] section for the full list organized by backend
 # ================================================================================================
-
-# --- Stable Diffusion Models ---------------------------------------------------------------------------------
-STABLE_DIFFUSION_IMG_GEN_MODELS = [
-    "fast-lightning-sdxl",
-]
-
-# --- FAL Models ---------------------------------------------------------------------------------
-FAL_IMG_GEN_MODELS = [
-    "flux-pro",
-    "flux-pro/v1.1",
-    "flux-pro/v1.1-ultra",
-    "flux-2",
-    "flux-2-pro",
-]
-
-# --- OpenAI Models ------------------------------------------------------------------------------
-OPENAI_IMG_GEN_MODELS = [
-    "gpt-image-1",
-    "gpt-image-1-mini",
-    "gpt-image-1.5",
-]
-
-# --- Google Models --------------------------------------------------------------------------
-GOOGLE_IMG_GEN_MODELS = [
-    "nano-banana",
-    "nano-banana-pro",
-]
-
-# --- Qwen Models --------------------------------------------------------------------------
-QWEN_IMG_GEN_MODELS = [
-    "qwen-image",
-]
-
-# --- All Image Generation Handles ---------------------------------------------------------------
-ALL_IMG_GEN_HANDLES = [
-    *FAL_IMG_GEN_MODELS,
-    *GOOGLE_IMG_GEN_MODELS,
-    *OPENAI_IMG_GEN_MODELS,
-    *QWEN_IMG_GEN_MODELS,
-    *STABLE_DIFFUSION_IMG_GEN_MODELS,
-]
 
 
 @pytest.fixture(

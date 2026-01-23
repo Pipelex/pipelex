@@ -282,12 +282,17 @@ smc-dry: env
 	$(call PRINT_TITLE,Previewing main config sync - dry run)
 	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
 
+TEST_PROFILE ?= dev
 regenerate-test-models: env
 	$(call PRINT_TITLE,"Regenerating test model fixtures")
-	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(or $(PIPELEX_TEST_PROFILE),dev)
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
 
 rtm: regenerate-test-models
 	@echo "> done: rtm = regenerate-test-models"
+
+rtm-full: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures with full profile")
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile full
 
 ##############################################################################################
 ############################      Cleaning                        ############################
@@ -327,11 +332,15 @@ cleanall: cleanderived cleanenv cleanconfig
 
 codex-tests: env
 	$(call PRINT_TITLE,"Unit testing for Codex")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
