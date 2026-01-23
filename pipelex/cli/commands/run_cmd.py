@@ -17,7 +17,7 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
 )
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -197,7 +197,7 @@ def run_cmd(
             except FileNotFoundError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
-            except PipelexInterpreterError as exc:
+            except (PipelexInterpreterError, PLXDecodeError) as exc:
                 typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
         elif pipe_code:
