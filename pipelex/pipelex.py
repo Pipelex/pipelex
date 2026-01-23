@@ -59,7 +59,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import FuncRegistry, func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
@@ -114,7 +114,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
-
+        self.func_registry: FuncRegistry | None = None
         # cogt
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
@@ -223,6 +223,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.class_registry = class_registry or ClassRegistry()
         self.pipelex_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
+
+        self.func_registry = func_registry or FuncRegistry()
+        self.pipelex_hub.set_func_registry(func_registry=self.func_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         if storage_provider is None:
             storage_config = get_config().pipelex.storage_config

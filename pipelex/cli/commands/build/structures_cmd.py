@@ -14,10 +14,8 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprint, normalize_structure_blueprint
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
-from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 if TYPE_CHECKING:
@@ -112,18 +110,10 @@ def generate_structures_from_blueprints(
 
     # Build concept_ref_to_class_info mapping for all concepts
     concept_ref_to_class_info = _build_concept_ref_to_class_info(blueprints, output_directory)
+    class_registry = KajsonManager.get_class_registry()
 
     # Only check for existing classes if we're not skipping and have a target path
     check_existing = not skip_existing_check and target_path is not None
-    class_registry = KajsonManager.get_class_registry()
-    if check_existing:
-        class_registry.teardown()
-        class_registry.setup()
-        ClassRegistryUtils.register_classes_in_folder(
-            folder_path=str(target_path),
-            base_class=StructuredContent,
-            force_exclude_dirs=[str(output_directory.resolve())],
-        )
 
     generated_files: list[tuple[str, str]] = []
 
@@ -255,15 +245,13 @@ def generate_structures_from_blueprints(
 def build_structures_command(
     target: Annotated[
         str,
-        typer.Argument(help="Target directory to scan for PLX files, or a specific .plx file"),
+        typer.Argument(help="Target directory to scan for .plx files, or a specific .plx file"),
     ],
     output_dir: Annotated[
         str | None,
         typer.Option("--output-dir", "-o", help="Output directory for generated structures (default: structures/ in target's directory)"),
     ] = None,
 ) -> None:
-    """Generate Python structure files from concept definitions in PLX files."""
-
     async def _build_structures_cmd():
         target_path = Path(target).resolve()
 
@@ -273,7 +261,6 @@ def build_structures_command(
 
         # Determine if target is a file or directory
         is_plx_file = target_path.is_file() and target_path.suffix == ".plx"
-
         pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD)
 
         try:
@@ -308,13 +295,11 @@ def build_structures_command(
 
                 # Validate bundles from directory
                 validate_result = await validate_bundles_from_directory(directory=target_path)
-                all_blueprints = validate_result.blueprints
-
-                typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
+                typer.echo(f"✅ Validated {len(validate_result.blueprints)} blueprint(s)")
 
                 # Generate structures using the helper function
                 generated_files = generate_structures_from_blueprints(
-                    blueprints=all_blueprints,
+                    blueprints=validate_result.blueprints,
                     output_directory=output_directory,
                     target_path=target_path,
                 )

@@ -16,7 +16,7 @@ from pipelex.core.pipes.handle_pipe_errors import (
 )
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_library_manager, set_current_library
+from pipelex.hub import get_class_registry, get_func_registry, get_library_manager, set_current_library
 from pipelex.libraries.library_utils import get_pipelex_plx_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 
@@ -144,6 +144,9 @@ async def validate_bundle(
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
+    finally:
+        get_class_registry().teardown()
+        get_func_registry().teardown()
 
     return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
@@ -192,5 +195,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
-
+    finally:
+        get_class_registry().teardown()
+        get_func_registry().teardown()
     return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)

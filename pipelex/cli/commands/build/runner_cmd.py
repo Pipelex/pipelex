@@ -20,8 +20,9 @@ from pipelex.cli.error_handlers import (
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.hub import get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_class_registry, get_required_pipe, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle, validate_bundles_from_directory
@@ -50,6 +51,10 @@ def prepare_runner_cmd(
     output_path: Annotated[
         str | None,
         typer.Option("--output", "-o", help="Path to save the generated Python file (defaults to target's directory)"),
+    ] = None,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files). Can be specified multiple times."),
     ] = None,
 ) -> None:
     """Prepare a Python runner file for a pipe.
@@ -98,8 +103,8 @@ def prepare_runner_cmd(
 
     pipe_code = pipe
     bundle_path = target if is_plx_file else None
-    library_dir = target if is_directory else None
-
+    library_dirs = library_dir if library_dir else [target] if is_directory else None
+    
     async def prepare_runner(
         pipe_code: str | None = None,
         bundle_path: str | None = None,
@@ -212,6 +217,7 @@ def prepare_runner_cmd(
             is_recursive=True,
             force_exclude_dirs=[str(structures_output_dir.resolve())] if structures_output_dir.exists() else None,
         )
+        get_class_registry().register_classes(CoreRegistryModels.get_all_models())
 
         # Determine if output is a list from any of the blueprints
         output_is_list = False
