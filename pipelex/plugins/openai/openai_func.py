@@ -1,10 +1,12 @@
 import inspect
 from collections.abc import Callable
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from instructor import OpenAISchema, openai_schema
 from openai.types.chat import ChatCompletionMessage
 from pydantic import BaseModel, create_model
+
+if TYPE_CHECKING:
+    from instructor import OpenAISchema
 
 
 def create_pydantic_model_from_function(func: Callable[..., Any]) -> type[BaseModel]:
@@ -44,6 +46,8 @@ def create_openai_schema_from_function(func: Callable[..., Any]) -> dict[str, An
 
     """
     model: type[BaseModel] = create_pydantic_model_from_function(func)
+    from instructor import openai_schema  # noqa: PLC0415
+
     the_openai_schema: OpenAISchema = openai_schema(model)
     as_openai_schema: dict[str, Any] = the_openai_schema.openai_schema
 

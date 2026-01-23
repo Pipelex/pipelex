@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, Any
 
-import instructor
 from anthropic import APIConnectionError, AsyncAnthropic, AsyncAnthropicBedrock, AuthenticationError, BadRequestError, omit
 from typing_extensions import override
 
@@ -66,10 +65,12 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             raise SdkTypeError(msg)
 
         self.anthropic_async_client = sdk_instance
+        from instructor import from_anthropic  # noqa: PLC0415
+
         if instructor_mode := self.inference_model.get_instructor_mode():
-            self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance, mode=instructor_mode)
+            self.instructor_for_objects = from_anthropic(client=sdk_instance, mode=instructor_mode)
         else:
-            self.instructor_for_objects = instructor.from_anthropic(client=sdk_instance)
+            self.instructor_for_objects = from_anthropic(client=sdk_instance)
 
         instructor_config = get_config().cogt.llm_config.instructor_config
         if instructor_config.is_dump_kwargs_enabled:

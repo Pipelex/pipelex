@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING, Any
 
-import instructor
 from mistralai import Mistral
 
 if TYPE_CHECKING:
@@ -42,11 +41,12 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             raise MistralWorkerConfigurationError(msg)
         self.mistral_client_for_text: Mistral = sdk_instance
         self.mistral_factory = mistral_factory
+        from instructor import from_mistral  # noqa: PLC0415
 
         if instructor_mode := self.inference_model.get_instructor_mode():
-            self.instructor_for_objects = instructor.from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
+            self.instructor_for_objects = from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
-            self.instructor_for_objects = instructor.from_mistral(client=sdk_instance, use_async=True)
+            self.instructor_for_objects = from_mistral(client=sdk_instance, use_async=True)
 
     @override
     async def _gen_text(
