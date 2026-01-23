@@ -381,16 +381,19 @@ def _filter_models_by_profile(
         return result
 
     # Get profile filters - resolve @collection references for backends
-    raw_backends = profile.get("backends", [])
-    allowed_backends: set[str] = set()
-    backends_collections = collections.get("backends", {})
-    for item in raw_backends:
-        if item.startswith("@"):
-            collection_name = item[1:]
-            if collection_name in backends_collections:
-                allowed_backends.update(backends_collections[collection_name])
-        else:
-            allowed_backends.add(item)
+    # None means "include all backends", empty set means "include no backends"
+    allowed_backends: set[str] | None = None
+    if "backends" in profile:
+        raw_backends = profile.get("backends", [])
+        allowed_backends = set()
+        backends_collections = collections.get("backends", {})
+        for item in raw_backends:
+            if item.startswith("@"):
+                collection_name = item[1:]
+                if collection_name in backends_collections:
+                    allowed_backends.update(backends_collections[collection_name])
+            else:
+                allowed_backends.add(item)
 
     # Build backend -> models mappings and all_known_models for each model type
     model_type_data: dict[str, dict[str, list[str]]] = {}
@@ -454,7 +457,8 @@ def _filter_models_by_profile(
         allowed_models = resolved_models[model_type]
         for backend_name, models in availability.get(model_type, {}).items():
             # Skip backends not in the profile (if backends filter is set)
-            if allowed_backends and backend_name not in allowed_backends:
+            # None means "include all", empty set means "include none"
+            if allowed_backends is not None and backend_name not in allowed_backends:
                 continue
 
             for model in models:
