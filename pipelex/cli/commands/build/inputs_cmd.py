@@ -2,6 +2,7 @@ import asyncio
 from pathlib import Path
 from typing import Annotated
 
+import click
 import typer
 from posthog import tag
 
@@ -116,16 +117,12 @@ async def _generate_inputs_core(
 
 def generate_inputs_cmd(
     target: Annotated[
-        str,
-        typer.Argument(help="Pipe code or bundle file path (.plx). If a bundle path is provided, it must declare a main_pipe."),
-    ],
-    bundle: Annotated[
         str | None,
-        typer.Option(
-            "--bundle",
-            "-b",
-            help="Bundle file path (.plx) containing the pipe. Use with a pipe code as target.",
-        ),
+        typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
+    ] = None,
+    pipe: Annotated[
+        str | None,
+        typer.Option("--pipe", help="Pipe code, can be omitted if you specify a bundle (.plx) that declares a main pipe"),
     ] = None,
     library_dir: Annotated[
         list[str] | None,
@@ -148,36 +145,51 @@ def generate_inputs_cmd(
     based on their concept types.
 
     Examples:
-        pipelex build inputs my_pipe_code
-        pipelex build inputs my_pipe_code -L ./my_pipes
-        pipelex build inputs my_pipe_code -b path/to/related/bundle.plx
+        pipelex build inputs my_pipe
         pipelex build inputs my_bundle.plx
-        pipelex build inputs my_pipe_code --output custom_inputs.json
+        pipelex build inputs my_bundle.plx --pipe my_pipe
+        pipelex build inputs my_pipe --output custom_inputs.json
+        pipelex build inputs my_pipe -L ./my_pipes
     """
+    # Show help if nothing provided
+    if target is None and pipe is None:
+        ctx: click.Context = click.get_current_context()
+        typer.echo(ctx.get_help())
+        raise typer.Exit(0)
+
+    # Determine pipe_code and bundle_path from target
     pipe_code: str | None = None
     bundle_path: str | None = None
 
-    target_path = Path(target)
-    if target_path.is_dir():
-        typer.secho(
-            f"Failed to run: '{target}' is a directory. The inputs command requires a .plx file or a pipe code.",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    if target.endswith(".plx"):
-        if bundle:
+    if target:
+        target_path = Path(target)
+        if target_path.is_dir():
             typer.secho(
-                "Failed to run: cannot use --bundle option when target is already a .plx file.",
+                f"Failed to run: '{target}' is a directory. The inputs command requires a .plx file or a pipe code.",
                 fg=typer.colors.RED,
                 err=True,
             )
             raise typer.Exit(1)
-        bundle_path = target
-    else:
-        pipe_code = target
-        bundle_path = bundle
+
+        if target.endswith(".plx"):
+            bundle_path = target
+        else:
+            pipe_code = target
+            if pipe:
+                typer.secho(
+                    "Failed to run: cannot use option --pipe if you're already passing a pipe code as positional argument",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+
+    if pipe:
+        assert not pipe_code, "pipe_code should be None at this stage if --pipe is provided"
+        pipe_code = pipe
+
+    if not pipe_code and not bundle_path:
+        typer.secho("Failed to run: no pipe code or bundle file specified", fg=typer.colors.RED, err=True)
+        raise typer.Exit(1)
 
     pipelex_instance = make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS, library_dirs=library_dir)
 
