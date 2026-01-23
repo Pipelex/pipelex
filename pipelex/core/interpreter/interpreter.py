@@ -36,7 +36,7 @@ class PipelexInterpreter(BaseModel):
 
         try:
             pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
-            pipelex_bundle_blueprint.source = str(bundle_path)
+            pipelex_bundle_blueprint.source = str(bundle_path) if bundle_path else None
             return pipelex_bundle_blueprint
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
