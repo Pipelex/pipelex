@@ -507,7 +507,7 @@ def _generate_fixtures_python(
     llm_pairs = combo_pairs.get("llm", [])
     lines.append("LLM_COMBOS: list[ModelCombo] = [")
     for model, backend in sorted(llm_pairs):
-        lines.append(f'    ModelCombo("{model}", "{backend}"),')
+        lines.append(f"    ModelCombo({model!r}, {backend!r}),")
     lines.append("]")
     lines.append("")
 
@@ -515,7 +515,7 @@ def _generate_fixtures_python(
     img_gen_pairs = combo_pairs.get("img_gen", [])
     lines.append("IMG_GEN_COMBOS: list[ModelCombo] = [")
     for model, backend in sorted(img_gen_pairs):
-        lines.append(f'    ModelCombo("{model}", "{backend}"),')
+        lines.append(f"    ModelCombo({model!r}, {backend!r}),")
     lines.append("]")
     lines.append("")
 
@@ -523,7 +523,7 @@ def _generate_fixtures_python(
     extract_pairs = combo_pairs.get("text_extractor", [])
     lines.append("EXTRACT_COMBOS: list[ModelCombo] = [")
     for model, backend in sorted(extract_pairs):
-        lines.append(f'    ModelCombo("{model}", "{backend}"),')
+        lines.append(f"    ModelCombo({model!r}, {backend!r}),")
     lines.append("]")
     lines.append("")
 
