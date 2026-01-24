@@ -34,6 +34,9 @@ jobs:
       - name: Install dependencies
         run: PYTHON_VERSION=${{ matrix.python-version }} make install
 
+      - name: Generate test model fixtures
+        run: make regenerate-test-models TEST_PROFILE=ci
+
       - name: Run ruff format merge check
         run: make merge-check-ruff-format
 
