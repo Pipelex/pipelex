@@ -346,11 +346,15 @@ gha-tests: env
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
+	@echo "• Regenerating test model fixtures"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
 	@echo "• Running all unit tests"
 	$(VENV_PYTEST) -n auto --exitfirst --quiet
 
 run-manual-trigger-gha-tests: env
 	$(call PRINT_TITLE,"Running GHA tests")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running GHA unit tests for inference, llm, and not gha_disabled"
 	$(VENV_PYTEST) --exitfirst --quiet -m "not (gha_disabled or pipelex_api) and (inference or llm)" || [ $$? = 5 ]
 
