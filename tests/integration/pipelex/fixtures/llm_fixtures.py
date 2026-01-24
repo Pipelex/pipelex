@@ -7,25 +7,6 @@ from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.hub import get_model_deck
 
-
-def is_llm_handle_supported(llm_handle: str) -> bool:
-    """Check if an LLM handle is available in the current model deck."""
-    model_deck = get_model_deck()
-    return model_deck.is_handle_defined(llm_handle)
-
-
-def is_llm_preset_supported(llm_preset_id: str) -> bool:
-    """Check if an LLM preset is supported by at least one enabled backend."""
-    llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
-    model_handle = llm_setting.model
-    model_deck = get_model_deck()
-    inference_model = model_deck.get_optional_inference_model(model_handle=model_handle)
-    if inference_model is None:
-        return False
-    log.debug(f"Inference model found!! {inference_model}")
-    return True
-
-
 # ================================================================================================
 # LLM model collections are now defined in .pipelex/test_profiles.toml
 # See [collections.llm] section for the full list organized by manufacturer
@@ -60,6 +41,18 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
     """
     assert isinstance(request.param, str)
     llm_preset_id_param = request.param
-    if not is_llm_preset_supported(llm_preset_id=llm_preset_id_param):
+    if not _is_llm_preset_supported(llm_preset_id=llm_preset_id_param):
         pytest.skip(f"LLM preset '{llm_preset_id_param}' not supported")
     return llm_preset_id_param
+
+
+def _is_llm_preset_supported(llm_preset_id: str) -> bool:
+    """Check if an LLM preset is supported by at least one enabled backend."""
+    llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
+    model_handle = llm_setting.model
+    model_deck = get_model_deck()
+    inference_model = model_deck.get_optional_inference_model(model_handle=model_handle)
+    if inference_model is None:
+        return False
+    log.debug(f"Inference model found!! {inference_model}")
+    return True

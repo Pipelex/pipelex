@@ -3,15 +3,7 @@
 import pytest
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, Quality
-from pipelex.hub import get_model_deck
 from pipelex.tools.misc.image_utils import ImageFormat
-
-
-def is_img_gen_handle_supported(img_gen_handle: str) -> bool:
-    """Check if an img_gen handle is available in the current model deck."""
-    model_deck = get_model_deck()
-    return model_deck.is_handle_defined(img_gen_handle)
-
 
 # ================================================================================================
 # Image generation model collections are now defined in .pipelex/test_profiles.toml
