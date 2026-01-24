@@ -214,6 +214,9 @@ def _load_test_profile(profile_name: str) -> dict[str, Any]:
 
     Returns:
         Profile configuration dictionary.
+
+    Raises:
+        ValueError: If the profile is not found in the configuration.
     """
     profiles_config = _load_merged_profiles_config()
     if not profiles_config:
@@ -222,8 +225,10 @@ def _load_test_profile(profile_name: str) -> dict[str, Any]:
     profiles = profiles_config.get("profiles", {})
     if profile_name in profiles:
         return dict(profiles[profile_name])
-    # Default to full if profile not found
-    return {"include_all": True}
+    else:
+        available_profiles = sorted(profiles.keys())
+        msg = f"Profile '{profile_name}' not found. Available profiles: {', '.join(available_profiles)}"
+        raise ValueError(msg)
 
 
 def _process_collections_from_toml(
