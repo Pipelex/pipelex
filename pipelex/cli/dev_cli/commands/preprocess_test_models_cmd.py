@@ -17,7 +17,7 @@ from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.tools.misc.json_utils import deep_update
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 
 if TYPE_CHECKING:
     from rich.console import Console
@@ -47,7 +47,7 @@ def _extract_models_from_backend_toml(backend_path: Path) -> dict[str, list[str]
     """
     try:
         config = load_toml_from_path(str(backend_path))
-    except Exception:
+    except (TomlError, OSError):
         return {}
 
     # Get defaults
@@ -189,21 +189,21 @@ def _load_merged_profiles_config() -> dict[str, Any]:
 
     Returns:
         Merged configuration dictionary.
+
+    Raises:
+        TOMLDecodeError: If either config file has invalid TOML syntax.
     """
     if not TEST_PROFILES_PATH.exists():
         return {}
 
-    try:
-        config = load_toml_from_path(str(TEST_PROFILES_PATH))
+    config = load_toml_from_path(str(TEST_PROFILES_PATH))
 
-        # Merge override file if it exists
-        if TEST_PROFILES_OVERRIDE_PATH.exists():
-            override_config = load_toml_from_path(str(TEST_PROFILES_OVERRIDE_PATH))
-            deep_update(config, override_config)
+    # Merge override file if it exists
+    if TEST_PROFILES_OVERRIDE_PATH.exists():
+        override_config = load_toml_from_path(str(TEST_PROFILES_OVERRIDE_PATH))
+        deep_update(config, override_config)
 
-        return dict(config)
-    except Exception:
-        return {}
+    return dict(config)
 
 
 def _load_test_profile(profile_name: str) -> dict[str, Any]:
@@ -603,19 +603,65 @@ def preprocess_test_models_cmd(
         console.print()
 
     # Collect model availability
-    try:
-        availability = _collect_all_model_availability()
-    except Exception as exc:
+    backends_dir = Path(ConfigPaths.BACKENDS_DIR_PATH)
+    if not backends_dir.exists():
         if quiet:
-            console.print(f"[red]✗ Preprocess failed:[/red] {exc}")
+            console.print(f"[red]✗ Preprocessing failed:[/red] Backends directory not found: {backends_dir}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] Failed to collect model availability\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] Backends directory not found\n\n"
+                f"[dim]Expected directory: {backends_dir}[/dim]\n\n"
+                f"The backends directory contains TOML configuration files\n"
+                f"for each inference backend (OpenAI, Anthropic, etc.).",
+                title="[bold red]Configuration Missing[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            console.print()
+            console.print("[bold yellow]Recommended Actions:[/bold yellow]")
+            console.print("  • Run: [cyan]pipelex init config[/cyan] to create the configuration")
+            console.print("  • Or copy the default configs from [cyan]pipelex/kit/configs[/cyan]")
+            console.print()
+        sys.exit(1)
+
+    try:
+        availability = _collect_all_model_availability()
+    except OSError as exc:
+        # File system errors (permissions, disk issues, etc.)
+        if quiet:
+            console.print(f"[red]✗ Preprocessing failed:[/red] File system error - {exc}")
+        else:
+            error_panel = Panel(
+                f"[red]✗[/red] File system error while reading backend configurations\n\n[dim]{exc}[/dim]",
+                title="[bold red]File System Error[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            console.print()
+            console.print("[bold yellow]Recommended Actions:[/bold yellow]")
+            console.print(f"  • Check file permissions in: [cyan]{backends_dir}[/cyan]")
+            console.print("  • Verify disk space and filesystem health")
+            console.print()
+        sys.exit(1)
+    except Exception as exc:
+        # Catch-all for unexpected errors
+        if quiet:
+            console.print(f"[red]✗ Preprocessing failed:[/red] {exc}")
+        else:
+            error_panel = Panel(
+                f"[red]✗[/red] Unexpected error while collecting model availability\n\n[dim]{type(exc).__name__}: {exc}[/dim]",
                 title="[bold red]Preprocessing Failed[/bold red]",
                 border_style="red",
                 padding=(1, 2),
             )
             console.print(error_panel)
+            console.print()
+            console.print("[bold yellow]Recommended Actions:[/bold yellow]")
+            console.print("  • Check the error message above for details")
+            console.print("  • Report this issue if it persists: [cyan]https://github.com/pipelex/pipelex/issues[/cyan]")
+            console.print()
         sys.exit(1)
 
     # Output JSON if requested
@@ -628,7 +674,69 @@ def preprocess_test_models_cmd(
             console.print(f"[green]✓[/green] Wrote model availability to {MODEL_AVAILABILITY_JSON_PATH}")
 
     # Load test profile, collections, and filter
-    test_profile = _load_test_profile(profile)
+    try:
+        test_profile = _load_test_profile(profile)
+    except TomlError as exc:
+        # TOML parsing error in config file
+        if quiet:
+            console.print(f"[red]✗ Preprocessing failed:[/red] TOML syntax error - {exc.message}")
+        else:
+            error_panel = Panel(
+                f"[red]✗[/red] TOML syntax error in configuration file\n\n"
+                f"[dim]{exc.message}[/dim]\n\n"
+                f"Check these files for syntax errors:\n"
+                f"  • [cyan]{TEST_PROFILES_PATH}[/cyan]\n"
+                f"  • [cyan]{TEST_PROFILES_OVERRIDE_PATH}[/cyan] (if it exists)",
+                title="[bold red]Configuration Error[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            console.print()
+            console.print("[bold yellow]Recommended Actions:[/bold yellow]")
+            console.print("  • Validate your TOML syntax at: [cyan]https://www.toml-lint.com/[/cyan]")
+            console.print("  • Check for unclosed brackets, missing quotes, or invalid characters")
+            console.print()
+        sys.exit(1)
+    except ValueError as exc:
+        # Profile not found error
+        error_message = str(exc)
+        if quiet:
+            console.print(f"[red]✗ Preprocessing failed:[/red] {error_message}")
+        else:
+            error_panel = Panel(
+                f"[red]✗[/red] {error_message}\n\n[dim]The specified profile does not exist in the configuration.[/dim]",
+                title="[bold red]Profile Not Found[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            console.print()
+            console.print("[bold yellow]Recommended Actions:[/bold yellow]")
+            console.print("  • Use one of the available profiles listed above")
+            console.print("  • Check for typos (profiles are case-sensitive)")
+            console.print(f"  • Review profiles in: [cyan]{TEST_PROFILES_PATH}[/cyan]")
+            console.print()
+        sys.exit(1)
+    except OSError as exc:
+        # File system errors (file deleted, permissions, etc.)
+        if quiet:
+            console.print(f"[red]✗ Preprocessing failed:[/red] File system error - {exc}")
+        else:
+            error_panel = Panel(
+                f"[red]✗[/red] File system error while reading test profiles\n\n[dim]{exc}[/dim]",
+                title="[bold red]File System Error[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            console.print()
+            console.print("[bold yellow]Recommended Actions:[/bold yellow]")
+            console.print(f"  • Check file permissions for: [cyan]{TEST_PROFILES_PATH}[/cyan]")
+            console.print(f"  • Verify file exists: [cyan]{TEST_PROFILES_OVERRIDE_PATH}[/cyan] (if used)")
+            console.print()
+        sys.exit(1)
+
     collections = _load_collections()
     combo_pairs = _filter_models_by_profile(availability, test_profile, collections)
 

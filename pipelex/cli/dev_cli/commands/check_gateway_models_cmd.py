@@ -88,7 +88,23 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
     expected_content = generate_reference_markdown(model_specs)
 
     # Read existing content
-    existing_content = GATEWAY_MODELS_REFERENCE_PATH.read_text(encoding="utf-8")
+    try:
+        existing_content = GATEWAY_MODELS_REFERENCE_PATH.read_text(encoding="utf-8")
+    except OSError as exc:
+        # Handle race condition where file is deleted after exists() check
+        # or other filesystem errors (permissions, etc.)
+        if quiet:
+            console.print(f"[red]✗ Gateway models check: FAILED[/red] - File system error: {exc}")
+        else:
+            error_panel = Panel(
+                f"[red]✗[/red] File system error while reading reference file\n\n[dim]{exc}[/dim]",
+                title="[bold red]Gateway Models Check: FAILED[/bold red]",
+                border_style="red",
+                padding=(1, 2),
+            )
+            console.print(error_panel)
+            console.print()
+        sys.exit(1)
 
     # Compare content (ignoring timestamp line for comparison)
     def normalize_for_comparison(content: str) -> str:
