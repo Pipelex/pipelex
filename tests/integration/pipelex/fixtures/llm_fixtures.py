@@ -236,9 +236,9 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        # "llm_for_testing_gen_text",
-        # "llm_for_testing_gen_object",
-        "llm_for_creative_writing",
+        # "$llm_for_testing_gen_text",
+        # "$llm_for_testing_gen_object",
+        "$llm_for_creative_writing",
     ],
 )
 def llm_preset_id(request: pytest.FixtureRequest) -> str:

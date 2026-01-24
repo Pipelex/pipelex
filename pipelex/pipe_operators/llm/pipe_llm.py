@@ -74,8 +74,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     @override
     def validate_inputs_static(self):
         if self.llm_choices:
-            for llm_choice in self.llm_choices.list_choice_strings():
-                check_llm_choice_with_deck(llm_choice=llm_choice)
+            for llm_choice_ref in self.llm_choices.list_choice_references():
+                check_llm_choice_with_deck(llm_choice=llm_choice_ref)
 
         needed_inputs = self.needed_inputs()
         required_variable_paths = self.required_variables()

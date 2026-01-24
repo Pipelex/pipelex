@@ -22,7 +22,7 @@ Describe the using rap lyrics, including puns and references to the image.
 type = "PipeLLM"
 description = "No Input"
 output = "Text"
-model = "llm_for_testing_gen_text"
+model = "$llm_for_testing_gen_text"
 prompt = """
 Explain that this is a test prompt which took no input from the user.
 """

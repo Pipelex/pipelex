@@ -1,3 +1,5 @@
+from typing import Never
+
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
 from pipelex import log
@@ -25,6 +27,7 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ensure_model_reference
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
@@ -93,6 +96,77 @@ class ModelDeck(ConfigModel):
             all_handles.update(self.waterfalls.keys())
         return model_handle in all_handles
 
+    def _warn_if_ambiguous_llm(self, name: str) -> None:
+        """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
+        matches: list[str] = []
+        if name in self.llm_presets:
+            matches.append(f"LLM preset (use ${name} or preset:{name})")
+        if name in self.aliases:
+            matches.append(f"alias (use @{name} or alias:{name})")
+        if name in self.waterfalls:
+            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
+        if matches:
+            log.warning(
+                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
+            )
+
+    def _warn_if_ambiguous_extract(self, name: str) -> None:
+        """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
+        matches: list[str] = []
+        if name in self.extract_presets:
+            matches.append(f"extract preset (use ${name} or preset:{name})")
+        if name in self.aliases:
+            matches.append(f"alias (use @{name} or alias:{name})")
+        if name in self.waterfalls:
+            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
+        if matches:
+            log.warning(
+                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
+            )
+
+    def _warn_if_ambiguous_img_gen(self, name: str) -> None:
+        """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
+        matches: list[str] = []
+        if name in self.img_gen_presets:
+            matches.append(f"image generation preset (use ${name} or preset:{name})")
+        if name in self.aliases:
+            matches.append(f"alias (use @{name} or alias:{name})")
+        if name in self.waterfalls:
+            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
+        if matches:
+            log.warning(
+                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
+            )
+
+    def _raise_handle_not_found_error(
+        self,
+        ref: ModelReference,
+        model_type: ModelType,
+        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting],
+    ) -> Never:
+        """Raise ModelChoiceNotFoundError with migration hints if applicable."""
+        msg = f"Model handle '{ref.name}' was not found in the model deck"
+
+        # Add migration hints if the name matches a preset, alias, or waterfall
+        hints: list[str] = []
+        if ref.name in presets:
+            hints.append(f"Did you mean preset '${ref.name}' or 'preset:{ref.name}'?")
+        if ref.name in self.aliases:
+            hints.append(f"Did you mean alias '@{ref.name}' or 'alias:{ref.name}'?")
+        if ref.name in self.waterfalls:
+            hints.append(f"Did you mean waterfall '~{ref.name}' or 'waterfall:{ref.name}'?")
+
+        if hints:
+            msg += "\n\nMigration hints:\n" + "\n".join(f"  - {hint}" for hint in hints)
+
+        raise ModelChoiceNotFoundError(
+            message=msg,
+            model_type=model_type,
+            model_choice=ref.raw,
+            reference_kind=ModelReferenceKind.HANDLE,
+            available_options=list(self.inference_models.keys()),
+        )
+
     def check_llm_choice(
         self,
         llm_choice: LLMModelChoice,
@@ -100,46 +174,207 @@ class ModelDeck(ConfigModel):
     ):
         if isinstance(llm_choice, LLMSetting):
             return
-        preset_id: str = llm_choice
-        if preset_id in self.llm_presets:
-            return
-        if preset_id == LLM_PRESET_DISABLED and is_disabled_allowed:
-            return
-        msg = f"LLM preset '{preset_id}' was not found in the model deck"
-        raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.LLM, model_choice=llm_choice)
+
+        ref = ensure_model_reference(llm_choice)
+        match ref.kind:
+            case ModelReferenceKind.PRESET:
+                if ref.name in self.llm_presets:
+                    return
+                if ref.name == LLM_PRESET_DISABLED and is_disabled_allowed:
+                    return
+                msg = f"LLM preset '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.LLM,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.PRESET,
+                    available_options=list(self.llm_presets.keys()),
+                )
+            case ModelReferenceKind.ALIAS:
+                if ref.name in self.aliases:
+                    return
+                msg = f"Alias '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.LLM,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.ALIAS,
+                    available_options=list(self.aliases.keys()),
+                )
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in self.waterfalls:
+                    return
+                msg = f"Waterfall '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.LLM,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.WATERFALL,
+                    available_options=list(self.waterfalls.keys()),
+                )
+            case ModelReferenceKind.HANDLE:
+                self._warn_if_ambiguous_llm(ref.name)
+                if self.is_model_handle_defined(model_handle=ref.name):
+                    return
+                msg = f"Model handle '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.LLM,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.HANDLE,
+                    available_options=list(self.inference_models.keys()),
+                )
 
     def get_llm_setting(self, llm_choice: LLMModelChoice) -> LLMSetting:
         if isinstance(llm_choice, LLMSetting):
             return llm_choice
-        # it's a string, so either an llm preset id or an llm handle
-        if llm_preset := self.llm_presets.get(llm_choice):
-            return llm_preset
-        if self.is_handle_defined(model_handle=llm_choice):
-            return LLMSetting(model=llm_choice, temperature=0.7, max_tokens=None)
-        msg = f"LLM choice '{llm_choice}' was not found in the model deck"
-        raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.LLM, model_choice=llm_choice)
+
+        ref = ensure_model_reference(llm_choice)
+        match ref.kind:
+            case ModelReferenceKind.PRESET:
+                if preset := self.llm_presets.get(ref.name):
+                    return preset
+                msg = f"LLM preset '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.LLM,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.PRESET,
+                    available_options=list(self.llm_presets.keys()),
+                )
+            case ModelReferenceKind.ALIAS:
+                if alias_target := self.aliases.get(ref.name):
+                    # Resolve the alias to an LLM setting by using the target as a handle
+                    return LLMSetting(model=alias_target, temperature=0.7, max_tokens=None)
+                msg = f"Alias '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.LLM,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.ALIAS,
+                    available_options=list(self.aliases.keys()),
+                )
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in self.waterfalls:
+                    # Use the waterfall name as the model handle (it will resolve via get_optional_inference_model)
+                    return LLMSetting(model=ref.name, temperature=0.7, max_tokens=None)
+                msg = f"Waterfall '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.LLM,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.WATERFALL,
+                    available_options=list(self.waterfalls.keys()),
+                )
+            case ModelReferenceKind.HANDLE:
+                # Strict: treat as direct model handle only
+                self._warn_if_ambiguous_llm(ref.name)
+                if self.is_model_handle_defined(model_handle=ref.name):
+                    return LLMSetting(model=ref.name, temperature=0.7, max_tokens=None)
+                # Error includes migration hint if name matches preset/waterfall
+                self._raise_handle_not_found_error(
+                    ref=ref,
+                    model_type=ModelType.LLM,
+                    presets=self.llm_presets,
+                )
 
     def get_extract_setting(self, extract_choice: ExtractModelChoice) -> ExtractSetting:
         if isinstance(extract_choice, ExtractSetting):
             return extract_choice
-        # it's a string, so either an extract preset id or an extract handle
-        if extract_preset := self.extract_presets.get(extract_choice):
-            return extract_preset
-        if self.is_handle_defined(model_handle=extract_choice):
-            return ExtractSetting(model=extract_choice)
-        msg = f"Extract choice '{extract_choice}' was not found in the model deck"
-        raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.TEXT_EXTRACTOR, model_choice=extract_choice)
+
+        ref = ensure_model_reference(extract_choice)
+        match ref.kind:
+            case ModelReferenceKind.PRESET:
+                if preset := self.extract_presets.get(ref.name):
+                    return preset
+                msg = f"Extract preset '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.TEXT_EXTRACTOR,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.PRESET,
+                    available_options=list(self.extract_presets.keys()),
+                )
+            case ModelReferenceKind.ALIAS:
+                if alias_target := self.aliases.get(ref.name):
+                    return ExtractSetting(model=alias_target)
+                msg = f"Alias '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.TEXT_EXTRACTOR,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.ALIAS,
+                    available_options=list(self.aliases.keys()),
+                )
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in self.waterfalls:
+                    return ExtractSetting(model=ref.name)
+                msg = f"Waterfall '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.TEXT_EXTRACTOR,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.WATERFALL,
+                    available_options=list(self.waterfalls.keys()),
+                )
+            case ModelReferenceKind.HANDLE:
+                self._warn_if_ambiguous_extract(ref.name)
+                if self.is_model_handle_defined(model_handle=ref.name):
+                    return ExtractSetting(model=ref.name)
+                self._raise_handle_not_found_error(
+                    ref=ref,
+                    model_type=ModelType.TEXT_EXTRACTOR,
+                    presets=self.extract_presets,
+                )
 
     def get_img_gen_setting(self, img_gen_choice: ImgGenModelChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
             return img_gen_choice
-        # it's a string, so either an img gen preset id or an img gen handle
-        if img_gen_preset := self.img_gen_presets.get(img_gen_choice):
-            return img_gen_preset
-        if self.is_handle_defined(model_handle=img_gen_choice):
-            return ImgGenSetting(model=img_gen_choice)
-        msg = f"Image generation choice '{img_gen_choice}' was not found in the model deck"
-        raise ModelChoiceNotFoundError(message=msg, model_type=ModelType.IMG_GEN, model_choice=img_gen_choice)
+
+        ref = ensure_model_reference(img_gen_choice)
+        match ref.kind:
+            case ModelReferenceKind.PRESET:
+                if preset := self.img_gen_presets.get(ref.name):
+                    return preset
+                msg = f"Image generation preset '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.IMG_GEN,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.PRESET,
+                    available_options=list(self.img_gen_presets.keys()),
+                )
+            case ModelReferenceKind.ALIAS:
+                if alias_target := self.aliases.get(ref.name):
+                    return ImgGenSetting(model=alias_target)
+                msg = f"Alias '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.IMG_GEN,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.ALIAS,
+                    available_options=list(self.aliases.keys()),
+                )
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in self.waterfalls:
+                    return ImgGenSetting(model=ref.name)
+                msg = f"Waterfall '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.IMG_GEN,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.WATERFALL,
+                    available_options=list(self.waterfalls.keys()),
+                )
+            case ModelReferenceKind.HANDLE:
+                self._warn_if_ambiguous_img_gen(ref.name)
+                if self.is_model_handle_defined(model_handle=ref.name):
+                    return ImgGenSetting(model=ref.name)
+                self._raise_handle_not_found_error(
+                    ref=ref,
+                    model_type=ModelType.IMG_GEN,
+                    presets=self.img_gen_presets,
+                )
 
     @classmethod
     def final_validate(cls, deck: Self):
@@ -186,16 +421,17 @@ class ModelDeck(ConfigModel):
     @field_validator("llm_choice_overrides", mode="after")
     @classmethod
     def validate_llm_choice_disabled_overrides(cls, value: LLMSettingChoices) -> LLMSettingChoices:
-        if value.for_text == LLM_PRESET_DISABLED:
-            value.for_text = None
-        if value.for_object == LLM_PRESET_DISABLED:
-            value.for_object = None
+        # Check if ModelReference has name "disabled" - this allows disabling the choice via explicit reference
+        if isinstance(value.for_text, ModelReference) and value.for_text.name == LLM_PRESET_DISABLED:
+            value = value.model_copy(update={"for_text": None})
+        if isinstance(value.for_object, ModelReference) and value.for_object.name == LLM_PRESET_DISABLED:
+            value = value.model_copy(update={"for_object": None})
         return value
 
     @model_validator(mode="after")
     def validate_llm_choice_overrides(self) -> Self:
-        for llm_preset_id in self.llm_choice_overrides.list_choice_strings():
-            self.check_llm_choice(llm_choice=llm_preset_id)
+        for llm_choice_ref in self.llm_choice_overrides.list_choice_references():
+            self.check_llm_choice(llm_choice=llm_choice_ref)
         return self
 
     def validate_llm_presets(self) -> Self:

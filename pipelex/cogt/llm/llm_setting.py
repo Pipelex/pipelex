@@ -1,10 +1,11 @@
-from typing import Literal, Union
+from typing import Annotated, Literal, Union
 
-from pydantic import Field, field_validator
+from pydantic import BeforeValidator, Field, field_validator
 
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
+from pipelex.cogt.models.model_reference import ModelReference, parse_model_reference
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import Self
 
@@ -39,7 +40,13 @@ class LLMSetting(ConfigModel):
         )
 
 
-LLMModelChoice = Union[LLMSetting, str]
+# LLMModelChoice accepts LLMSetting, ModelReference, or a string (which gets parsed to ModelReference)
+# The BeforeValidator ensures that strings are automatically converted to ModelReference during validation
+# ModelReference.model_serializer handles serialization back to the raw string value
+LLMModelChoice = Union[
+    LLMSetting,
+    Annotated[str | ModelReference, BeforeValidator(parse_model_reference)],
+]
 
 
 class LLMSettingChoicesDefaults(ConfigModel):
@@ -51,8 +58,8 @@ class LLMSettingChoices(ConfigModel):
     for_text: LLMModelChoice | None
     for_object: LLMModelChoice | None
 
-    def list_choice_strings(self) -> set[str]:
-        return {c for c in (self.for_text, self.for_object) if isinstance(c, str)}
+    def list_choice_references(self) -> set[ModelReference]:
+        return {c for c in (self.for_text, self.for_object) if isinstance(c, ModelReference)}
 
     @classmethod
     def make_completed_with_defaults(

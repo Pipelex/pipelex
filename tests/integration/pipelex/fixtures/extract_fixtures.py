@@ -88,8 +88,8 @@ def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "extract_ocr_from_document",
-        "extract_basic_from_pdf",
+        "$extract_ocr_from_document",
+        "$extract_basic_from_pdf",
     ],
 )
 def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
@@ -99,7 +99,7 @@ def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "extract_ocr_from_document",
+        "$extract_ocr_from_document",
     ],
 )
 def extract_choice_for_image(request: pytest.FixtureRequest) -> str:

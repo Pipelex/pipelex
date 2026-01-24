@@ -17,17 +17,17 @@ if TYPE_CHECKING:
 
 
 class LLMSkill(StrEnum):
-    LLM_TO_RETRIEVE = "llm_to_retrieve"
+    LLM_TO_RETRIEVE = "$llm_to_retrieve"
 
-    LLM_TO_ANSWER_QUESTIONS_CHEAP = "llm_to_answer_questions_cheap"
-    LLM_TO_ANSWER_QUESTIONS = "llm_to_answer_questions"
+    LLM_TO_ANSWER_QUESTIONS_CHEAP = "$llm_to_answer_questions_cheap"
+    LLM_TO_ANSWER_QUESTIONS = "$llm_to_answer_questions"
 
-    LLM_FOR_WRITING_CHEAP = "llm_for_writing_cheap"
-    LLM_FOR_IMG_TO_TEXT_CHEAP = "llm_for_img_to_text_cheap"
-    LLM_FOR_VISUAL_DESIGN = "cheap_llm_for_creativity"
-    LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
-    LLM_TO_CODE = "llm_to_code"
-    LLM_TO_ANALYZE_LARGE_CODEBASE = "llm_to_analyze_large_codebase"
+    LLM_FOR_WRITING_CHEAP = "$llm_for_writing_cheap"
+    LLM_FOR_IMG_TO_TEXT_CHEAP = "$llm_for_img_to_text_cheap"
+    LLM_FOR_VISUAL_DESIGN = "~cheap_llm_for_creativity"
+    LLM_FOR_CREATIVE_WRITING = "$llm_for_creative_writing"
+    LLM_TO_CODE = "$llm_to_code"
+    LLM_TO_ANALYZE_LARGE_CODEBASE = "$llm_to_analyze_large_codebase"
 
 
 class PipeLLMSpec(PipeSpec):
