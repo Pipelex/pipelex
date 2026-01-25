@@ -145,14 +145,14 @@ Your API key is hashed for security. Gateway telemetry operates independently fr
     4. Update any routing profiles that reference `pipelex_inference` to use `pipelex_gateway`
 
 4. **Verify routing configuration:**
-   
-   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `pipelex_gateway_first`:
-   
+
+   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `all_pipelex_gateway`:
+
    ```toml
-   active = "pipelex_gateway_first"
-   
-   [profiles.pipelex_gateway_first]
-   description = "Use Pipelex Gateway backend for all its supported models"
+   active = "all_pipelex_gateway"
+
+   [profiles.all_pipelex_gateway]
+   description = "Use Pipelex Gateway for all its supported models"
    default = "pipelex_gateway"
    ```
 
@@ -322,10 +322,10 @@ PIPELEX_GATEWAY_API_KEY="your-pipelex-key"
 In `.pipelex/inference/routing_profiles.toml`:
 ```toml
 # Which profile to use
-active = "pipelex_gateway_first"
+active = "all_pipelex_gateway"
 
-[profiles.pipelex_gateway_first]
-description = "Use Pipelex Gateway backend for all its supported models"
+[profiles.all_pipelex_gateway]
+description = "Use Pipelex Gateway for all its supported models"
 default = "pipelex_gateway"
 ```
 
