@@ -1,0 +1,72 @@
+####################################################################################################
+# Pipelex Model Deck - LLM Configuration
+####################################################################################################
+#
+# This file defines model defaults, aliases, and presets for LLMs
+#
+# Model Reference Syntax:
+# - Preset:    $preset_name or preset:preset_name
+# - Alias:     @alias_name or alias:alias_name
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# LLM Default Choices
+####################################################################################################
+
+[llm.choice_defaults]
+for_text = "~cheap_llm"
+for_object = "~cheap_llm_for_structured"
+
+####################################################################################################
+# LLM Aliases
+####################################################################################################
+
+[aliases]
+best-gpt = "gpt-5.2"
+best-claude = "claude-4.5-opus"
+best-gemini = "gemini-3.0-pro"
+best-mistral = "mistral-large-3"
+
+####################################################################################################
+# LLM Presets
+####################################################################################################
+
+[llm.presets]
+
+# Writing
+llm_for_factual_writing = { model = "@smart_llm", temperature = 0.1 }
+llm_for_creative_writing = { model = "@smart_llm", temperature = 0.9 }
+
+# Retrieval
+llm_to_retrieve = { model = "~llm_for_large_text", temperature = 0.1 }
+
+# Engineering
+llm_to_engineer = { model = "~smart_llm_for_structured", temperature = 0.2 }
+llm_to_code = { model = "@base-claude", temperature = 0.1 }
+llm_to_analyze_large_codebase = { model = "@base-claude", temperature = 0.1 }
+
+# Vision
+llm_for_img_to_text_cheap = { model = "gpt-4o-mini", temperature = 0.1 }
+llm_for_img_to_text = { model = "@base-claude", temperature = 0.1 }
+llm_for_diagram_to_text = { model = "@best-claude", temperature = 0.3 }
+llm_for_table_to_text = { model = "@base-claude", temperature = 0.3 }
+
+# Image generation prompting skills
+llm_to_prompt_img_gen = { model = "@base-claude", temperature = 0.2 }
+llm_to_prompt_img_gen_cheap = { model = "gpt-4o-mini", temperature = 0.5 }
+
+# Groq-specific presets (fast inference, low cost)
+llm_groq_fast_text = { model = "@fast-groq", temperature = 0.7 }
+llm_groq_balanced = { model = "@base-groq", temperature = 0.5 }
+llm_groq_vision = { model = "@vision-groq", temperature = 0.3 }
+
+# LLM Presets — For Testing ---------------------------------------------------------------------
+
+llm_for_testing_gen_text = { model = "~cheap_llm", temperature = 0.5 }
+llm_for_testing_gen_object = { model = "~cheap_llm_for_structured", temperature = 0.1 }
+llm_for_testing_vision = { model = "~cheap_llm_for_vision", temperature = 0.5 }
+llm_for_testing_vision_structured = { model = "~cheap_llm_for_vision", temperature = 0.5 }

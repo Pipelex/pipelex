@@ -1,0 +1,68 @@
+####################################################################################################
+# Pipelex Model Deck - Custom Configurations for LLMs
+####################################################################################################
+#
+# This file allows you to override or complete the base model decks.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# LLM Deck overrides
+####################################################################################################
+
+[llm.choice_overrides]
+for_text = "disabled"
+for_object = "disabled"
+
+
+####################################################################################################
+# Waterfalls — lists of models that will be tried in order until one of them is available
+####################################################################################################
+
+[waterfalls]
+
+# --- Waterfalls for smart LLMs ---------------------------------------------------------------------
+smart_llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2", "grok-4"]
+smart_llm_with_vision = [
+    "claude-4.5-opus",
+    "gemini-3.0-pro",
+    "gpt-5.2",
+    "grok-4-fast-reasoning",
+]
+smart_llm_for_structured = [
+    "claude-4.5-opus",
+    "gemini-3.0-pro",
+    "gpt-5.2",
+    "grok-4",
+]
+
+# --- Waterfalls for large contexts ---------------------------------------------------------------------
+llm_for_large_codebase = [
+    "gemini-3.0-pro",
+    "claude-4.5-opus",
+    "gpt-5.2",
+    "grok-4-fast-reasoning",
+]
+llm_for_large_text = ["gemini-2.5-flash", "claude-4.5-sonnet"]
+
+# --- Waterfalls for cheap LLMs ---------------------------------------------------------------------
+cheap_llm = [
+    "gemini-2.5-flash-lite",
+    "gpt-4o-mini",
+    "claude-3-haiku",
+    "phi-4",
+    "grok-3-mini",
+]
+cheap_llm_for_structured = [
+    "gemini-2.5-flash-lite",
+    "gpt-4o-mini",
+    "claude-3-haiku",
+]
+cheap_llm_for_vision = [
+    "gemini-2.5-flash-lite",
+    "gpt-4o-mini",
+    "claude-3-haiku",
+]

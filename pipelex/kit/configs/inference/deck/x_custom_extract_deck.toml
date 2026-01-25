@@ -1,19 +1,28 @@
 ####################################################################################################
-# Pipelex Model Deck - Overrides
+# Pipelex Model Deck - Custom Configurations for Document Extraction Models
 ####################################################################################################
 #
-# This file allows you to override the default model choices defined in base_deck.toml.
-# You can customize presets for LLMs, image generation, and document extraction models.
+# This file allows you to override or complete the base model decks.
 #
 # Documentation: https://docs.pipelex.com
 # Support: https://go.pipelex.com/discord
 #
 ####################################################################################################
 
+
 ####################################################################################################
-# LLM Deck overrides
+# Waterfalls — lists of models that will be tried in order until one of them is available
 ####################################################################################################
 
-[llm.choice_overrides]
-for_text = "disabled"
-for_object = "disabled"
+[waterfalls]
+
+document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
+pdf_text_extractor = [
+    "azure-document-intelligence",
+    "mistral-document-ai-2505",
+    "pypdfium2-extract-pdf",
+]
+image_text_extractor = [
+    "azure-document-intelligence",
+    "mistral-document-ai-2505",
+]
