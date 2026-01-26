@@ -186,20 +186,15 @@ class TestModelDeckGetOptionalInferenceModel:
         assert result is None
 
     def test_circular_alias_prevention(self):
-        # Note: The current implementation doesn't have explicit circular reference detection,
-        # but Python's recursion limit should prevent infinite loops.
-        # This test ensures the method handles it gracefully.
-
+        """Test that circular alias references are detected and handled gracefully."""
         # Arrange
         model_deck = self._create_test_model_deck(llm_aliases={"alias-a": "alias-b", "alias-b": "alias-a"})
 
-        # Act & Assert
-        # This should either return None or raise RecursionError (which would be caught by pytest)
-        # The important thing is it doesn't hang indefinitely
-        with pytest.raises((RecursionError, Exception)) or True:
-            result = model_deck.get_optional_inference_model("alias-a", model_type=ModelType.LLM)
-            # If no exception, result should be None
-            assert result is None
+        # Act
+        result = model_deck.get_optional_inference_model("alias-a", model_type=ModelType.LLM)
+
+        # Assert - cycle detection returns None instead of causing RecursionError
+        assert result is None
 
     def test_complex_waterfall_scenario(self):
         # Arrange

@@ -670,6 +670,19 @@ class ModelDeck(ConfigModel):
         Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
         them and looking up the appropriate dictionary.
         """
+        return self._get_optional_inference_model_impl(
+            model_handle=model_handle,
+            model_type=model_type,
+            _visited=frozenset(),
+        )
+
+    def _get_optional_inference_model_impl(
+        self,
+        model_handle: str,
+        model_type: ModelType,
+        _visited: frozenset[str],
+    ) -> InferenceModelSpec | None:
+        """Internal implementation with cycle detection for alias resolution."""
         # Parse the model_handle to handle prefixed references
         try:
             ref = ModelReference.parse(model_handle)
@@ -683,7 +696,14 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.ALIAS:
                 if alias_target := aliases.get(ref.name):
                     log.verbose(f"Prefixed alias '{model_handle}' -> '{alias_target}'")
-                    return self.get_optional_inference_model(model_handle=alias_target, model_type=model_type)
+                    if alias_target in _visited:
+                        log.error(f"Circular alias detected: '{model_handle}' -> '{alias_target}'")
+                        return None
+                    return self._get_optional_inference_model_impl(
+                        model_handle=alias_target,
+                        model_type=model_type,
+                        _visited=_visited | {model_handle},
+                    )
                 log.verbose(f"Prefixed alias '{model_handle}' not found in aliases")
                 return None
             case ModelReferenceKind.WATERFALL:
@@ -710,7 +730,14 @@ class ModelDeck(ConfigModel):
         # Then try aliases (without prefix)
         if alias := aliases.get(ref.name):
             log.verbose(f"Alias for '{model_handle}': {alias}")
-            return self.get_optional_inference_model(model_handle=alias, model_type=model_type)
+            if alias in _visited:
+                log.warning(f"Circular alias detected: '{model_handle}' -> '{alias}'")
+                return None
+            return self._get_optional_inference_model_impl(
+                model_handle=alias,
+                model_type=model_type,
+                _visited=_visited | {model_handle},
+            )
         # Finally try waterfalls (without prefix)
         if fallback_list := waterfalls.get(ref.name):
             return self._resolve_waterfall(

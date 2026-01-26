@@ -76,18 +76,8 @@ def _get_test_integration_mode() -> IntegrationMode:
         return IntegrationMode.PYTEST
 
 
-@pytest.fixture(scope="module")
-def routing_profile_setup(request: pytest.FixtureRequest):  # noqa: ARG001  # pyright: ignore[reportUnusedFunction]
-    """Hook for downstream conftest to inject routing profile setup before Pipelex init.
-
-    This fixture can be overridden in integration/conftest.py to setup routing overrides.
-    Note: Used by reset_pipelex_config_fixture via fixture dependency.
-    """
-    return
-
-
 @pytest.fixture(scope="module", autouse=True)
-def reset_pipelex_config_fixture(routing_profile_setup: str | None):  # noqa: ARG001
+def reset_pipelex_config_fixture():
     Pipelex.make(integration_mode=_get_test_integration_mode())
     yield
     Pipelex.teardown_if_needed()
