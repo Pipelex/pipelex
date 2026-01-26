@@ -232,7 +232,7 @@ def build_pipe_cmd(
                 base_path=base_dir,
                 base_name=dir_name,
             )
-            plx_file_path = extras_output_dir / bundle_file_name
+            plx_file_path = Path(extras_output_dir) / bundle_file_name
 
         # Save the PLX file
         ensure_directory_for_file_path(file_path=str(plx_file_path))
