@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
+from kajson.kajson_manager import KajsonManager
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
@@ -154,6 +155,7 @@ def generate_structures_from_blueprints(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
+                        description=concept_blueprint,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
@@ -173,13 +175,19 @@ def generate_structures_from_blueprints(
                 normalized_structure = normalize_structure_blueprint(concept_blueprint.structure)
 
                 try:
-                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
+                    generated_code, the_generated_class = StructureGenerator(
+                        concept_ref_to_class_info=concept_ref_to_class_info
+                    ).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint=normalized_structure,
+                        description=concept_blueprint.description,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
                     raise PipelexError(msg) from exc
+
+                # Register the generated class so it can be used as a base class for refined concepts
+                KajsonManager.get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
@@ -209,10 +217,13 @@ def generate_structures_from_blueprints(
                     refined_structure_class_name = TextContent.__name__
 
                 try:
-                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
+                    generated_code, the_generated_class = StructureGenerator(
+                        concept_ref_to_class_info=concept_ref_to_class_info
+                    ).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=refined_structure_class_name,
+                        description=concept_blueprint.description,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = (
@@ -220,6 +231,9 @@ def generate_structures_from_blueprints(
                         f"refining '{refined_structure_class_name}' in domain '{blueprint.domain}': {exc}"
                     )
                     raise PipelexError(msg) from exc
+
+                # Register the generated class so it can be used as a base class for other refined concepts
+                KajsonManager.get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
@@ -230,14 +244,20 @@ def generate_structures_from_blueprints(
             # Handle concepts with neither structure nor refines - defaults to TextContent
             else:
                 try:
-                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
+                    generated_code, the_generated_class = StructureGenerator(
+                        concept_ref_to_class_info=concept_ref_to_class_info
+                    ).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
+                        description=concept_blueprint.description,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
                     raise PipelexError(msg) from exc
+
+                # Register the generated class so it can be used as a base class for refined concepts
+                KajsonManager.get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"

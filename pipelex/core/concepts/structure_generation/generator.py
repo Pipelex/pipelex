@@ -59,6 +59,7 @@ class StructureGenerator:
         class_name: str,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
+        description: str = "",
     ) -> tuple[str, type]:
         """Generate Python module content from structure blueprint.
 
@@ -66,6 +67,7 @@ class StructureGenerator:
             class_name: Name of the class to generate
             structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
             base_class_name: Optional base class name to inherit from (defaults to StructuredContent)
+            description: Description for the class docstring (uses class_name if empty)
 
         Returns:
             Generated Python module content, the generated class
@@ -75,7 +77,7 @@ class StructureGenerator:
 
         """
         # Generate the class
-        class_code = self._generate_class_source_code_from_blueprint(class_name, structure_blueprint, base_class_name)
+        class_code = self._generate_class_source_code_from_blueprint(class_name, structure_blueprint, base_class_name, description)
 
         # Generate the complete module with a header comment
         imports_section = "\n".join(sorted(self.imports))
@@ -186,6 +188,7 @@ class StructureGenerator:
         class_name: str,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
+        description: str = "",
     ) -> str:
         """Generate a class definition from ConceptStructureBlueprint.
 
@@ -193,6 +196,7 @@ class StructureGenerator:
             class_name: Name of the class
             structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
             base_class_name: Optional base class name to inherit from (defaults to StructuredContent)
+            description: Description for the class docstring (uses class_name if empty)
 
         Returns:
             Generated class code with markers for regeneration
@@ -208,9 +212,16 @@ class StructureGenerator:
                 msg = f"Native structure class '{base_class}' not found"
                 raise ConceptStructureGeneratorError(msg)
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
+        elif base_class != "StructuredContent":
+            # Check if we have module info for this custom base class in concept_ref_to_class_info
+            for class_info in self.concept_ref_to_class_info.values():
+                if class_info.class_name == base_class and class_info.module_path:
+                    self.imports.add(f"from {class_info.module_path} import {class_info.class_name}")
+                    break
 
-        # Generate class header with docstring
-        class_header = f'class {class_name}({base_class}):\n    """Generated {class_name} class"""\n'
+        # Generate class header with docstring (use class name if no description provided)
+        docstring = description or f"Generated {class_name} class"
+        class_header = f'class {class_name}({base_class}):\n    """{docstring}"""\n'
 
         # Generate fields
         field_definitions: list[str] = []

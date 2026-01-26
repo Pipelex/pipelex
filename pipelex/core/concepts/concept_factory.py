@@ -283,6 +283,7 @@ class ConceptFactory:
             _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
                 class_name=concept_code,
                 structure_blueprint=normalized_structure,
+                description=blueprint.description,
             )
         except ConceptStructureGeneratorError as exc:
             msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{domain_code}': {exc}"
@@ -298,6 +299,7 @@ class ConceptFactory:
         cls,
         concept_code: str,
         domain_code: str,
+        description: str,
     ) -> tuple[str, str | None]:
         """Handle BASIC_BLUEPRINT declaration type.
 
@@ -318,6 +320,7 @@ class ConceptFactory:
                 class_name=concept_code,
                 structure_blueprint={},
                 base_class_name=TextContent.__name__,
+                description=description,
             )
         except ConceptStructureGeneratorError as exc:
             msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain_code}': {exc}"
@@ -368,6 +371,7 @@ class ConceptFactory:
                 class_name=concept_code,
                 structure_blueprint={},  # Empty structure - just inherits from refined class
                 base_class_name=refined_structure_class_name,
+                description=blueprint.description,
             )
         except ConceptStructureGeneratorError as exc:
             msg = (
@@ -409,26 +413,30 @@ class ConceptFactory:
 
         match declaration_type:
             case ConceptDeclarationType.STRING:
+                assert isinstance(blueprint_or_string_description, str)
                 structure_class_name, _ = cls._handle_basic_blueprint(
                     concept_code=concept_code,
                     domain_code=domain_code,
+                    description=blueprint_or_string_description,
                 )
                 return Concept(
                     domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
-                    description=cast("str", blueprint_or_string_description),
+                    description=blueprint_or_string_description,
                     structure_class_name=structure_class_name,
                 )
 
             case ConceptDeclarationType.BASIC_BLUEPRINT:
+                assert isinstance(blueprint_or_string_description, ConceptBlueprint)
                 structure_class_name, refines = cls._handle_basic_blueprint(
                     concept_code=concept_code,
                     domain_code=domain_code,
+                    description=blueprint_or_string_description.description,
                 )
                 return Concept(
                     domain_code=domain_and_concept_code.domain_code,
                     code=domain_and_concept_code.concept_code,
-                    description=cast("ConceptBlueprint", blueprint_or_string_description).description,
+                    description=blueprint_or_string_description.description,
                     structure_class_name=structure_class_name,
                     refines=refines,
                 )
