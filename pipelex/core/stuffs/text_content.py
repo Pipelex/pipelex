@@ -1,12 +1,16 @@
 import json
+import re
 from typing import Any
 
 import markdown
 from rich.markdown import Markdown
+from rich.syntax import Syntax
 from typing_extensions import override
 
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.pretty import PrettyPrintable
+
+HTML_PATTERN = re.compile(r"^\s*<(!DOCTYPE|!--|[a-zA-Z])", re.IGNORECASE)
 
 
 class TextContent(StuffContent):
@@ -42,6 +46,13 @@ class TextContent(StuffContent):
     def rendered_json(self) -> str:
         return json.dumps({"text": self.text})
 
+    # TODO: This should not exist: In PipeCompose, if the category is HTML, the user should be recommended to use HtmlContent instead.
+    def _looks_like_html(self) -> bool:
+        """Check if the text content appears to be HTML."""
+        return bool(HTML_PATTERN.match(self.text))
+
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        if self._looks_like_html():
+            return Syntax(self.text, "html", word_wrap=True)
         return Markdown(self.text)
