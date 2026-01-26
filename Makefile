@@ -282,7 +282,12 @@ smc-dry: env
 	$(call PRINT_TITLE,Previewing main config sync - dry run)
 	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
 
+# Support PROF as shorthand for TEST_PROFILE
+ifdef PROF
+TEST_PROFILE := $(PROF)
+endif
 TEST_PROFILE ?= dev
+
 regenerate-test-models: env
 	$(call PRINT_TITLE,"Regenerating test model fixtures")
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
@@ -431,6 +436,10 @@ tb: env
 
 test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -443,6 +452,10 @@ test-inference-with-prints: env
 
 test-inference-fast: env
 	$(call PRINT_TITLE,"Unit testing")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -473,6 +486,10 @@ ti-dry: env
 
 test-llm: env
 	$(call PRINT_TITLE,"Unit testing LLM")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "llm" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -488,6 +505,10 @@ tl: test-llm
 
 test-extract: env
 	$(call PRINT_TITLE,"Unit testing Extract")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "extract" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -503,6 +524,10 @@ te: test-extract
 
 test-img-gen: env
 	$(call PRINT_TITLE,"Unit testing Image Generation")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
