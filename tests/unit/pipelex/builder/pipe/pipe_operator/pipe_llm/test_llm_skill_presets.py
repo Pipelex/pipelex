@@ -15,17 +15,15 @@ class TestLLMSkill:
         configured in the model deck (as presets, waterfalls, aliases, or direct model names)
         and available at runtime.
         """
-        # Get all LLM skill values
-        all_llm_skills = [skill.value for skill in LLMSkill]
-
         # Act & Assert
         invalid_choices: list[str] = []
-        for skill_value in all_llm_skills:
+        for skill in LLMSkill:
             try:
                 # Use check_llm_choice_with_deck to validate - this checks both presets and handles (including waterfalls)
-                check_llm_choice_with_deck(skill_value)
+                llm_choice = LLMSkill.model_choice_for_skill(skill.value)
+                check_llm_choice_with_deck(llm_choice)
             except ModelChoiceNotFoundError:
-                invalid_choices.append(skill_value)
+                invalid_choices.append(skill.value)
 
         # Provide clear error message if any choices are invalid
         assert not invalid_choices, (
@@ -40,6 +38,7 @@ class TestLLMSkill:
         for skill in LLMSkill:
             try:
                 # Use check_llm_choice_with_deck to validate - this checks both presets and handles (including waterfalls)
-                check_llm_choice_with_deck(skill.value)
+                llm_choice = LLMSkill.model_choice_for_skill(skill.value)
+                check_llm_choice_with_deck(llm_choice)
             except ModelChoiceNotFoundError as e:
                 pytest.fail(f"LLMSkill.{skill.name} ('{skill.value}') is not a valid LLM choice in the model deck. Error: {e}")

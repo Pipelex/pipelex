@@ -6,7 +6,7 @@ model references using explicit prefixes:
 | Type     | Sigil | Namespace (Canonical) | Example                                    |
 |----------|-------|----------------------|--------------------------------------------|
 | Preset   | $     | preset:              | $llm_for_creativity or preset:llm_for_creativity |
-| Alias    | @     | alias:               | @base-claude or alias:base-claude          |
+| Alias    | @     | alias:               | @best-claude or alias:best-claude          |
 | Waterfall| ~     | waterfall:           | ~small-llm or waterfall:small-llm            |
 | Handle   | (none)| handle: (optional)   | gpt-4o-mini or handle:gpt-4o-mini          |
 

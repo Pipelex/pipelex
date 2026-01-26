@@ -360,7 +360,7 @@ Side effets: Unit tests now run in 30s.
 
 ### Changed
  - BREAKING: for inline concept structures, the fields are now optional by default: the `required` property defaults to `false`. Explicitly set `required = true` to make fields mandatory, which we discourage as it increases risks of hallucinations.
- - LLM Presets Overhaul: Rationalized and renamed default presets in `base_deck.toml`. Single-model aliases replaced with waterfall aliases. Key renames: `llm_for_complex_reasoning` → `llm_to_engineer`, `llm_to_answer_hard_questions` → `llm_to_answer_questions`, `llm_to_write_questions` → `llm_for_writing_cheap`. Removed redundant older presets.
+ - LLM Presets Overhaul: Rationalized and renamed default presets in `base_deck.toml`. Single-model aliases replaced with waterfall aliases. Key renames: `llm_for_complex_reasoning` → `engineering-structured`, `llm_to_answer_hard_questions` → `llm_to_answer_questions`, `llm_to_write_questions` → `llm_for_writing_cheap`. Removed redundant older presets.
  - Stricter Configuration Validation: Pipelex validates model deck on startup and raises errors if presets reference unavailable models.
 
 ### Fixed
@@ -588,7 +588,7 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
  - Replaced package `toml` by `tomli` which is more modern and faster
  - Updated Gemini 2.0 model from `gemini-2.0-flash-exp` to `gemini-2.0-flash` with new pricing (input: $0.10, output: $0.40 per million tokens)
  - Updated Gemini 2.5 Series comment from '(when available)' to stable release
- - Updated `base-claude` from `claude-4-sonnet` to `claude-4.5-sonnet` across all presets
+ - Updated `best-claude` from `claude-4-sonnet` to `claude-4.5-sonnet` across all presets
  - Updated kajson dependency from version `0.3.0` to `0.3.1`
  - Updated httpx dependency to `>=0.23.0,<1.0.0` for broader compatibility
  - Cleanup env example and better explain how to set up keys in README and docs

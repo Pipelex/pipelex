@@ -37,7 +37,7 @@ type = "PipeLLM"
 description = "Turn the brief into a pseudo-code plan describing controllers, pipes, their inputs/outputs."
 inputs = { brief = "UserBrief" }
 output = "PlanDraft"
-model = "$llm_to_engineer"
+model = "$engineering-structured"
 prompt = """
 # Return a draft of a plan that narrates the pipeline as pseudo-steps (no code):
 - For each pipe: state the pipe's description, inputs (by name using snake_case), and the output (by name using snake_case),
@@ -87,7 +87,7 @@ type = "PipeLLM"
 description = "Interpret the draft of a plan to create an AI pipeline, and define the needed concepts."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief" }
 output = "ConceptDrafts"
-model = "$llm_to_engineer"
+model = "$engineering-structured"
 prompt = """
 We are working on writing an AI pipeline to fulfill this brief:
 @brief
@@ -133,7 +133,7 @@ type = "PipeLLM"
 description = "Structure the concept definitions."
 inputs = { concept_drafts = "ConceptDrafts" }
 output = "ConceptSpec[]"
-model = "$llm_to_engineer"
+model = "$engineering-structured"
 system_prompt = """
 You are an expert at data extraction and json formatting.
 """
@@ -147,7 +147,7 @@ type = "PipeLLM"
 description = "Draft the flow of the pipeline."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "ConceptSpec" }
 output = "FlowDraft"
-model = "$llm_to_engineer"
+model = "$engineering-structured"
 system_prompt = """
 You are a Senior engineer.
 """
@@ -246,7 +246,7 @@ type = "PipeLLM"
 description = "Review a draft flow and make it consistent."
 inputs = { flow_draft = "FlowDraft", brief = "UserBrief" }
 output = "FlowDraft"
-model = "$llm_to_engineer"
+model = "$engineering-structured"
 system_prompt = """
 You are a Senior engineer.
 """
@@ -275,7 +275,7 @@ type = "PipeLLM"
 description = "Write the pipe signatures for the plan."
 inputs = { prepared_flow = "FlowDraft", brief = "UserBrief" }
 output = "pipe_design.PipeSignature[]"
-model = "$llm_to_engineer"
+model = "$engineering-structured"
 system_prompt = """
 You are a Senior engineer.
 """
@@ -312,7 +312,7 @@ type = "PipeLLM"
 description = "Write the bundle header."
 inputs = { brief = "UserBrief", pipe_signatures = "pipe_design.PipeSignature" }
 output = "BundleHeaderSpec"
-model = "$llm_to_engineer"
+model = "$engineering-structured"
 prompt = """
 Name and define the domain of this process:
 @brief

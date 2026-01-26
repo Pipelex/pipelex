@@ -57,7 +57,7 @@ retrieval = { model = "@default-large-context-text", temperature = 0.1 }
 
 # Engineering
 engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
-engineering-code = { model = "@best-claude", temperature = 0.1 }
+engineering-code = { model = "@default-premium", temperature = 0.1 }
 engineering-codebase-analysis = { model = "@best-gemini", temperature = 0.1 }
 
 # Vision
@@ -69,3 +69,9 @@ vision-table = { model = "@default-premium-vision", temperature = 0.3 }
 # Image generation prompting
 img-gen-prompting = { model = "@default-premium", temperature = 0.5 }
 img-gen-prompting-cheap = { model = "@default-small", temperature = 0.5 }
+
+# Testing
+testing-text = { model = "@default-small", temperature = 0.5 }
+testing-object = { model = "@default-small-structured", temperature = 0.1 }
+testing-vision = { model = "@default-small-vision", temperature = 0.5 }
+testing-vision-structured = { model = "@default-small-vision", temperature = 0.5 }

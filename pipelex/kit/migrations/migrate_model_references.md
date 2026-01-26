@@ -9,7 +9,7 @@ This is a **BREAKING CHANGE** that introduces explicit prefix syntax to disambig
 | Type      | Sigil  | Namespace (Canonical) | Example                                              |
 |-----------|--------|----------------------|------------------------------------------------------|
 | Preset    | `$`    | `preset:`            | `$llm_for_creativity` or `preset:llm_for_creativity` |
-| Alias     | `@`    | `alias:`             | `@base-claude` or `alias:base-claude`                |
+| Alias     | `@`    | `alias:`             | `@best-claude` or `alias:best-claude`                |
 | Waterfall | `~`    | `waterfall:`         | `~cheap_llm` or `waterfall:cheap_llm`                |
 | Handle    | (none) | `handle:` (optional) | `gpt-4o-mini` or `handle:gpt-4o-mini`                |
 
@@ -21,7 +21,7 @@ Both sigil prefixes (`$`, `@`, `~`) and namespace prefixes (`preset:`, `alias:`,
 ```toml
 # In .plx files or deck overrides
 model = "cheap_llm"           # Was ambiguous - could be preset, waterfall, or handle
-model = "base-claude"         # Was ambiguous - could be alias or handle
+model = "best-claude"         # Was ambiguous - could be alias or handle
 model = "llm_for_creativity"  # Was ambiguous - could be preset or handle
 ```
 
@@ -29,7 +29,7 @@ model = "llm_for_creativity"  # Was ambiguous - could be preset or handle
 ```toml
 # In .plx files or deck overrides
 model = "~cheap_llm"           # Explicit: this is a waterfall
-model = "@base-claude"         # Explicit: this is an alias
+model = "@best-claude"         # Explicit: this is an alias
 model = "$llm_for_creativity"  # Explicit: this is a preset
 model = "gpt-4o-mini"          # Bare string: direct model handle
 ```
@@ -43,10 +43,10 @@ Search for `model = "` in your `.plx` files and update each reference:
 **For presets** (defined in `[llm.presets]`, `[extract.presets]`, `[img_gen.presets]`):
 ```toml
 # Before
-model = "llm_for_creative_writing"
+model = "writing-creative"
 
 # After
-model = "$llm_for_creative_writing"
+model = "$writing-creative"
 ```
 
 **For waterfalls** (defined in `[waterfalls]`):
@@ -63,11 +63,11 @@ model = "~smart_llm_for_structured"
 **For aliases** (defined in `[aliases]`):
 ```toml
 # Before
-model = "base-claude"
+model = "best-claude"
 model = "base-gpt"
 
 # After
-model = "@base-claude"
+model = "@best-claude"
 model = "@base-gpt"
 ```
 
@@ -98,7 +98,7 @@ llm_choice = "cheap_llm"
 # After
 llm_choice = "~cheap_llm"  # waterfall
 llm_choice = "$llm_for_creativity"  # preset
-llm_choice = "@base-claude"  # alias
+llm_choice = "@best-claude"  # alias
 ```
 
 ## Common Patterns to Search and Replace
@@ -116,7 +116,7 @@ llm_choice = "@base-claude"  # alias
 | `llm_for_large_codebase`           | `~llm_for_large_codebase`          | Waterfall |
 | `pdf_text_extractor`               | `~pdf_text_extractor`              | Waterfall |
 | `image_text_extractor`             | `~image_text_extractor`            | Waterfall |
-| `base-claude`                      | `@base-claude`                     | Alias     |
+| `best-claude`                      | `@best-claude`                     | Alias     |
 | `base-gpt`                         | `@base-gpt`                        | Alias     |
 | `base-gemini`                      | `@base-gemini`                     | Alias     |
 | `base-mistral`                     | `@base-mistral`                    | Alias     |
@@ -126,18 +126,18 @@ llm_choice = "@base-claude"  # alias
 | `base-img-gen`                     | `@base-img-gen`                    | Alias     |
 | `best-img-gen`                     | `@best-img-gen`                    | Alias     |
 | `fast-img-gen`                     | `@fast-img-gen`                    | Alias     |
-| `llm_for_creative_writing`         | `$llm_for_creative_writing`        | Preset    |
+| `writing-creative`         | `$writing-creative`        | Preset    |
 | `llm_for_factual_writing`          | `$llm_for_factual_writing`         | Preset    |
 | `llm_for_writing_cheap`            | `$llm_for_writing_cheap`           | Preset    |
 | `llm_to_answer_questions`          | `$llm_to_answer_questions`         | Preset    |
-| `llm_to_answer_questions_cheap`    | `$llm_to_answer_questions_cheap`   | Preset    |
+| `default-small`    | `$default-small`   | Preset    |
 | `llm_to_retrieve`                  | `$llm_to_retrieve`                 | Preset    |
-| `llm_to_engineer`                  | `$llm_to_engineer`                 | Preset    |
+| `engineering-structured`                  | `$engineering-structured`                 | Preset    |
 | `llm_to_code`                      | `$llm_to_code`                     | Preset    |
 | `llm_to_analyze_large_codebase`    | `$llm_to_analyze_large_codebase`   | Preset    |
 | `llm_for_img_to_text`              | `$llm_for_img_to_text`             | Preset    |
 | `llm_for_img_to_text_cheap`        | `$llm_for_img_to_text_cheap`       | Preset    |
-| `llm_for_diagram_to_text`          | `$llm_for_diagram_to_text`         | Preset    |
+| `vision-diagram`          | `$vision-diagram`         | Preset    |
 | `llm_for_testing_gen_text`         | `$llm_for_testing_gen_text`        | Preset    |
 | `llm_for_testing_gen_object`       | `$llm_for_testing_gen_object`      | Preset    |
 | `vision-cheap`           | `$vision-cheap`          | Preset    |

@@ -414,7 +414,7 @@ Define user-friendly names that map to model names in `.pipelex/inference/deck/b
 ```toml
 [aliases]
 # LLM aliases
-base-claude = "claude-4.5-sonnet"
+best-claude = "claude-4.5-sonnet"
 base-gpt = "gpt-5"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
@@ -427,7 +427,7 @@ smart_llm = [
 ]
 
 # Aliases can also define fallback chains
-llm_to_engineer = { model = "smart_llm", temperature = 0.2 }
+engineering-structured = { model = "smart_llm", temperature = 0.2 }
 ```
 
 ### LLM Presets
@@ -441,9 +441,9 @@ cheap_llm_for_text = { model = "cheap_llm_for_text", temperature = 0.5 }
 cheap_llm_for_object = { model = "cheap_llm_for_object", temperature = 0.5 }
 
 # Task-specific presets
-llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
+writing-creative = { model = "claude-4.5-sonnet", temperature = 0.9 }
 llm_to_extract_invoice = { model = "claude-4.5-sonnet", temperature = 0.1 }
-llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
+llm_for_complex_reasoning = { model = "best-claude", temperature = 1 }
 
 ### OCR Presets
 

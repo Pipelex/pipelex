@@ -921,7 +921,7 @@ An llm_handle can be either:
 
 ```toml
 [aliases]
-base-claude = "claude-4.5-sonnet"
+best-claude = "claude-4.5-sonnet"
 base-gpt = "gpt-5"
 base-gemini = "gemini-2.5-flash"
 base-mistral = "mistral-medium"
@@ -952,7 +952,7 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_to_engineer = { model = "base-claude", temperature = 1 }
+engineering-structured = { model = "best-claude", temperature = 1 }
 llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
 ```
 

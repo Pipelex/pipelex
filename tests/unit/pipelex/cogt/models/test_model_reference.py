@@ -29,10 +29,10 @@ class TestModelReferenceParse:
 
     def test_parse_alias_with_sigil(self):
         """Test parsing alias reference with @ sigil."""
-        ref = ModelReference.parse("@base-claude")
+        ref = ModelReference.parse("@best-claude")
         assert ref.kind == ModelReferenceKind.ALIAS
-        assert ref.name == "base-claude"
-        assert ref.raw == "@base-claude"
+        assert ref.name == "best-claude"
+        assert ref.raw == "@best-claude"
 
     def test_parse_waterfall_with_sigil(self):
         """Test parsing waterfall reference with ~ sigil."""
@@ -52,10 +52,10 @@ class TestModelReferenceParse:
 
     def test_parse_alias_with_namespace(self):
         """Test parsing alias reference with alias: namespace."""
-        ref = ModelReference.parse("alias:base-claude")
+        ref = ModelReference.parse("alias:best-claude")
         assert ref.kind == ModelReferenceKind.ALIAS
-        assert ref.name == "base-claude"
-        assert ref.raw == "alias:base-claude"
+        assert ref.name == "best-claude"
+        assert ref.raw == "alias:best-claude"
 
     def test_parse_waterfall_with_namespace(self):
         """Test parsing waterfall reference with waterfall: namespace."""
