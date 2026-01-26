@@ -18,6 +18,7 @@ VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
+SKELETON_DIR := "$(HOME)/.pipelex/skeleton"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -69,6 +70,7 @@ make check-gateway-models     - Check gateway models reference is up-to-date
 make cgm                      - Shorthand -> check-gateway-models
 make regenerate-test-models   - Regenerate test model fixtures from backend configs
 make rtm                      - Shorthand -> regenerate-test-models
+make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
 make up                       - Shorthand -> update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env and lock files
@@ -300,9 +302,17 @@ rtm-full: env
 	$(call PRINT_TITLE,"Regenerating test model fixtures with full profile")
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile full
 
-##############################################################################################
-############################      Cleaning                        ############################
-##############################################################################################
+insert-skeleton:
+	@if [ ! -d "$(SKELETON_DIR)" ]; then \
+			echo "Error: Skeleton directory $(SKELETON_DIR) not found"; \
+			exit 1; \
+	fi
+	@cp -rn $(SKELETON_DIR)/. .
+	@echo "Skeleton inserted from $(SKELETON_DIR)"
+
+##########################################################################################
+### CLEANING
+##########################################################################################
 
 cleanderived:
 	$(call PRINT_TITLE,"Erasing derived files and directories")
@@ -588,9 +598,9 @@ cov-missing: env
 cm: cov-missing
 	@echo "> done: cm = cov-missing"
 
-############################################################################################
-############################               Linting              ############################
-############################################################################################
+##########################################################################################
+### LINTING
+##########################################################################################
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
