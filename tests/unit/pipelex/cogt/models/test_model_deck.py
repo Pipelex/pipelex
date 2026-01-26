@@ -1,7 +1,7 @@
 import pytest
 
 from pipelex.cogt.config_cogt import ModelDeckConfig
-from pipelex.cogt.exceptions import ModelWaterfallError
+from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelWaterfallError
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -411,3 +411,96 @@ class TestModelDeckPrefixedAliasReferences:
 
         # Act & Assert - should not raise an exception
         model_deck.validate_llm_presets()
+
+
+class TestModelDeckGetLLMSettingWithPresets:
+    """Tests for get_llm_setting() with preset references.
+
+    These tests verify that preset names are correctly resolved whether
+    passed as bare strings or with the $ prefix.
+    """
+
+    def _create_test_model_spec(self, name: str) -> InferenceModelSpec:
+        return InferenceModelSpec(
+            backend_name="test_backend",
+            name=name,
+            sdk="test_sdk",
+            model_type=ModelType.LLM,
+            model_id=f"test_model_{name}",
+            costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+            max_tokens=1000,
+            max_prompt_images=None,
+        )
+
+    def _create_test_model_deck(
+        self,
+        inference_models: dict[str, InferenceModelSpec] | None = None,
+        llm_aliases: dict[str, str] | None = None,
+        llm_presets: dict[str, LLMSetting] | None = None,
+    ) -> ModelDeck:
+        return ModelDeck(
+            inference_models=inference_models or {},
+            # LLM-specific
+            llm_default_temperature=0.7,
+            llm_aliases=llm_aliases or {},
+            llm_waterfalls={},
+            llm_presets=llm_presets or {},
+            llm_choice_defaults=LLMSettingChoicesDefaults(
+                default_temperature=0.7,
+                for_text=LLMSetting(model="default_text", temperature=0.7, max_tokens=1000),
+                for_object=LLMSetting(model="default_object", temperature=0.1, max_tokens=1000),
+            ),
+            # Extract-specific
+            extract_aliases={},
+            extract_waterfalls={},
+            extract_presets={},
+            extract_choice_default="extract-all-from-document",
+            # ImgGen-specific
+            img_gen_default_quality=Quality.MEDIUM,
+            img_gen_aliases={},
+            img_gen_waterfalls={},
+            img_gen_presets={},
+            img_gen_choice_default="gen_image_basic",
+            model_deck_config=ModelDeckConfig(is_model_fallback_enabled=False, missing_presets_reaction=ProblemReaction.NONE),
+        )
+
+    def test_get_llm_setting_with_prefixed_preset(self):
+        """Test that get_llm_setting resolves prefixed preset references like '$testing-text'."""
+        # Arrange
+        model_spec = self._create_test_model_spec("gpt-4")
+        preset = LLMSetting(model="gpt-4", temperature=0.5, max_tokens=500)
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4": model_spec},
+            llm_presets={"testing-text": preset},
+        )
+
+        # Act - using prefixed preset reference
+        result = model_deck.get_llm_setting(llm_choice="$testing-text")
+
+        # Assert - should return the preset
+        assert result.model == "gpt-4"
+        assert result.temperature == 0.5
+        assert result.max_tokens == 500
+
+    def test_get_llm_setting_with_bare_preset_name_fails(self):
+        """Test that get_llm_setting with bare preset name (no $ prefix) fails.
+
+        This test documents the expected behavior: bare strings are treated as
+        direct model handles, not presets. Test code using bare preset names like
+        "testing-text" instead of "$testing-text" will fail.
+        """
+        # Arrange
+        model_spec = self._create_test_model_spec("gpt-4")
+        preset = LLMSetting(model="gpt-4", temperature=0.5, max_tokens=500)
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4": model_spec},
+            llm_presets={"testing-text": preset},
+        )
+
+        # Act & Assert - bare preset name should raise an error
+        # because it's treated as a direct model handle, not a preset
+        with pytest.raises(ModelChoiceNotFoundError) as excinfo:
+            model_deck.get_llm_setting(llm_choice="testing-text")
+
+        # Verify the error message indicates the name was not found as a handle
+        assert "testing-text" in str(excinfo.value)
