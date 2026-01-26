@@ -31,6 +31,8 @@ class ConfigPaths:
     BASE_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{BASE_DECK_FILE_NAME}"
     OVERRIDES_DECK_FILE_NAME = "overrides.toml"
     OVERRIDES_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{OVERRIDES_DECK_FILE_NAME}"
+    # Dev-only config (not synced with kit)
+    DEV_CONFIG_DIR_PATH = "./.pipelex-dev"
 
 
 class ValidationErrorReaction(StrEnum):
