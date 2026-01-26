@@ -160,7 +160,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
     - Import statements for all required structure classes
     - An async function to run the pipeline with proper return type
     - Example input values based on the pipe's input concepts
-    - Output handling with main_stuff_as
+    - Output handling with main_stuff_as (or main_stuff for Anything)
 
     Args:
         pipe: The pipe to generate runner code for
@@ -172,14 +172,21 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
     is_native = NativeConceptCode.is_native_structure_class(structure_class_name)
     custom_info = None if is_native else _collect_concept_info(pipe.output.concept)
 
+    # Check if output is the special "Anything" concept (no specific content type)
+    is_anything_output = pipe.output.concept.code == NativeConceptCode.ANYTHING
+
     # Collect all imports needed for inputs
     native_classes, custom_classes = _collect_imports_for_inputs(pipe.inputs)
 
-    # Add output class to appropriate set
-    if is_native:
-        native_classes.add(structure_class_name)
-    elif custom_info:
-        custom_classes[structure_class_name] = custom_info
+    # Track if we need to import Any from typing (for Anything output)
+    needs_any_import = is_anything_output
+
+    # Add output class to appropriate set (unless it's Anything)
+    if not is_anything_output:
+        if is_native:
+            native_classes.add(structure_class_name)
+        elif custom_info:
+            custom_classes[structure_class_name] = custom_info
 
     # Build import section
     import_lines: list[str] = []
@@ -198,6 +205,11 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         )
 
     import_lines.extend(["import asyncio", ""])
+
+    # Add typing import if needed (for Anything output)
+    if needs_any_import:
+        import_lines.append("from typing import Any")
+        import_lines.append("")
 
     # Add native content class imports
     native_imports: list[str] = []
@@ -237,8 +249,12 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
     else:
         input_memory_block = "            # No inputs required"
 
-    # Determine return type annotation
-    if output_multiplicity:
+    # Determine return type annotation and result call
+    # Special case: Anything output uses Any type and main_stuff (no content type casting)
+    if is_anything_output:
+        return_type = "Any"
+        result_call = "pipe_output.main_stuff"
+    elif output_multiplicity:
         return_type = f"list[{structure_class_name}]"
         result_call = f"pipe_output.main_stuff_as_items(item_type={structure_class_name})"
     else:
