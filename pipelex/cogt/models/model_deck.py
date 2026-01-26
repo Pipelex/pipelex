@@ -1,4 +1,4 @@
-from typing import Never
+from typing import NoReturn
 
 from pydantic import Field, PrivateAttr, field_validator, model_validator
 
@@ -187,7 +187,7 @@ class ModelDeck(ConfigModel):
         ref: ModelReference,
         model_type: ModelType,
         presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting],
-    ) -> Never:
+    ) -> NoReturn:
         """Raise ModelChoiceNotFoundError with migration hints if applicable."""
         msg = f"Model handle '{ref.name}' was not found in the model deck"
 
