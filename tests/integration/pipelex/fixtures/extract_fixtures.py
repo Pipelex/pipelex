@@ -3,6 +3,7 @@
 import pytest
 
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.hub import get_model_deck
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
 
@@ -10,7 +11,7 @@ from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, ch
 def is_extract_handle_supported(extract_handle: str) -> bool:
     """Check if an extract handle is available in the current model deck."""
     model_deck = get_model_deck()
-    return model_deck.is_handle_defined(extract_handle)
+    return model_deck.is_handle_defined(extract_handle, model_type=ModelType.TEXT_EXTRACTOR)
 
 
 def is_extract_handle_supported_by_enabled_backends(extract_handle: str) -> bool:

@@ -12,7 +12,7 @@ class PipeLLMTestCases:
             description="Generate text",
             inputs={"topic": "Text"},
             output="Text",
-            llm_skill=LLMSkill.LLM_FOR_CREATIVE_WRITING,
+            llm_skill=LLMSkill.CREATIVE_WRITER,
             prompt="Write about $topic",
         ),
         PipeLLMBlueprint(
@@ -22,7 +22,7 @@ class PipeLLMTestCases:
             inputs={"topic": "Text"},
             output="Text",
             prompt="Write about $topic",
-            model=LLMSkill.LLM_FOR_CREATIVE_WRITING,
+            model="$writing-creative",
         ),
     )
 
@@ -33,7 +33,7 @@ class PipeLLMTestCases:
             description="Generate without inputs",
             inputs={},
             output="Text",
-            llm_skill=LLMSkill.LLM_FOR_CREATIVE_WRITING,
+            llm_skill=LLMSkill.CREATIVE_WRITER,
             prompt="Generate something interesting",
         ),
         PipeLLMBlueprint(
@@ -42,7 +42,7 @@ class PipeLLMTestCases:
             description="Generate without inputs",
             output="Text",
             prompt="Generate something interesting",
-            model=LLMSkill.LLM_FOR_CREATIVE_WRITING,
+            model="$writing-creative",
         ),
     )
 
@@ -54,7 +54,7 @@ class PipeLLMTestCases:
             inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
-            llm_skill=LLMSkill.LLM_FOR_IMG_TO_TEXT_CHEAP,
+            llm_skill=LLMSkill.VISION_LANGUAGE_MODEL,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -63,7 +63,7 @@ class PipeLLMTestCases:
             inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
-            model=LLMSkill.LLM_FOR_IMG_TO_TEXT_CHEAP,
+            model="$vision",
         ),
     )
 
@@ -75,13 +75,13 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm_skill=LLMSkill.LLM_FOR_WRITING_CHEAP,
+            llm_skill=LLMSkill.CREATIVE_WRITER,
         ),
         PipeLLMBlueprint(
             source=None,
             type="PipeLLM",
             description="Generate with preset",
-            model=LLMSkill.LLM_FOR_WRITING_CHEAP,
+            model="$writing-creative",
             output="Text",
             prompt="Generate text",
         ),
@@ -95,13 +95,13 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm_skill=LLMSkill.LLM_TO_ANSWER_QUESTIONS_CHEAP,
+            llm_skill=LLMSkill.DATA_RETRIEVAL,
         ),
         PipeLLMBlueprint(
             source=None,
             type="PipeLLM",
             description="Generate with settings",
-            model=LLMSkill.LLM_TO_ANSWER_QUESTIONS_CHEAP,
+            model="$retrieval",
             output="Text",
             prompt="Generate text",
         ),
@@ -116,7 +116,7 @@ class PipeLLMTestCases:
             output="Analysis",
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
-            llm_skill=LLMSkill.LLM_TO_ANSWER_QUESTIONS,
+            llm_skill=LLMSkill.DATA_RETRIEVAL,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -126,7 +126,7 @@ class PipeLLMTestCases:
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
             output="Analysis",
-            model=LLMSkill.LLM_TO_ANSWER_QUESTIONS,
+            model="$retrieval",
         ),
     )
 
@@ -138,7 +138,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[]",
             prompt="Generate items",
-            llm_skill=LLMSkill.LLM_FOR_WRITING_CHEAP,
+            llm_skill=LLMSkill.CREATIVE_WRITER,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -146,7 +146,7 @@ class PipeLLMTestCases:
             description="Generate multiple items",
             output="Item[]",
             prompt="Generate items",
-            model=LLMSkill.LLM_FOR_WRITING_CHEAP,
+            model="$writing-creative",
         ),
     )
 
@@ -158,7 +158,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[5]",
             prompt="Generate items",
-            llm_skill=LLMSkill.LLM_FOR_WRITING_CHEAP,
+            llm_skill=LLMSkill.CREATIVE_WRITER,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -166,7 +166,7 @@ class PipeLLMTestCases:
             description="Generate exactly 5 items",
             output="Item[5]",
             prompt="Generate items",
-            model=LLMSkill.LLM_FOR_WRITING_CHEAP,
+            model="$writing-creative",
         ),
     )
 

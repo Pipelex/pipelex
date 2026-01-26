@@ -24,7 +24,7 @@ choice_default = "$gen_image_basic"
 # Image Generation Aliases
 ####################################################################################################
 
-[aliases]
+[img_gen.aliases]
 base-img-gen = "flux-2-pro"
 best-img-gen = "nano-banana-pro"
 fast-img-gen = "gpt-image-1-mini"

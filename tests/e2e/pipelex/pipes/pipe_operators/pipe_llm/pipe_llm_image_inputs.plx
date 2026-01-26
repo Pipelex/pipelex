@@ -12,7 +12,7 @@ type = "PipeLLM"
 description = "Describe a single image"
 inputs = { image = "Image" }
 output = "ImageDescriptionE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Describe what you see in this image in 1-2 sentences: $image
 Be concise.
@@ -24,7 +24,7 @@ type = "PipeLLM"
 description = "Analyze a list of images"
 inputs = { images = "Image[]" }
 output = "ImageListAnalysisE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Count how many images there are and describe each briefly:
 $images
@@ -37,7 +37,7 @@ type = "PipeLLM"
 description = "Compare two image collections"
 inputs = { collection_a = "Image[]", collection_b = "Image[]" }
 output = "ImageListAnalysisE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Compare these two collections.
 
@@ -57,7 +57,7 @@ type = "PipeLLM"
 description = "Describe a page including its images"
 inputs = { page = "Page" }
 output = "PageDescriptionE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Describe this page content including any images.
 {{ page | with_images }}
@@ -71,7 +71,7 @@ type = "PipeLLM"
 description = "Describe a page based on text only"
 inputs = { page = "Page" }
 output = "PageDescriptionE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Describe this page based on the text content.
 @page
@@ -85,7 +85,7 @@ type = "PipeLLM"
 description = "Analyze direct image and page together"
 inputs = { direct_image = "Image", page = "Page" }
 output = "PageDescriptionE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Provide a combined description of all content below.
 

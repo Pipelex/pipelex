@@ -3,6 +3,7 @@
 import pytest
 
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, Quality
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.hub import get_model_deck
 from pipelex.tools.misc.image_utils import ImageFormat
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
@@ -11,7 +12,7 @@ from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, ch
 def is_img_gen_handle_supported(img_gen_handle: str) -> bool:
     """Check if an img_gen handle is available in the current model deck."""
     model_deck = get_model_deck()
-    return model_deck.is_handle_defined(img_gen_handle)
+    return model_deck.is_handle_defined(img_gen_handle, model_type=ModelType.IMG_GEN)
 
 
 def is_img_gen_handle_supported_by_enabled_backends(img_gen_handle: str) -> bool:

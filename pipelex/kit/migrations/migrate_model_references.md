@@ -140,7 +140,7 @@ llm_choice = "@base-claude"  # alias
 | `llm_for_diagram_to_text`          | `$llm_for_diagram_to_text`         | Preset    |
 | `llm_for_testing_gen_text`         | `$llm_for_testing_gen_text`        | Preset    |
 | `llm_for_testing_gen_object`       | `$llm_for_testing_gen_object`      | Preset    |
-| `llm_for_testing_vision`           | `$llm_for_testing_vision`          | Preset    |
+| `vision-cheap`           | `$vision-cheap`          | Preset    |
 | `extract_ocr_from_document`        | `$extract_ocr_from_document`       | Preset    |
 | `extract_basic_from_pdf`           | `$extract_basic_from_pdf`          | Preset    |
 | `gen_image_basic`                  | `$gen_image_basic`                 | Preset    |

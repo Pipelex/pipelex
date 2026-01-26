@@ -26,21 +26,28 @@ class TestModelDeckGetOptionalInferenceModel:
     def _create_test_model_deck(
         self,
         inference_models: dict[str, InferenceModelSpec] | None = None,
-        aliases: dict[str, str] | None = None,
-        fallbacks: dict[str, list[str]] | None = None,
+        llm_aliases: dict[str, str] | None = None,
+        llm_waterfalls: dict[str, list[str]] | None = None,
         is_model_fallback_enabled: bool = False,
     ) -> ModelDeck:
         return ModelDeck(
             inference_models=inference_models or {},
-            aliases=aliases or {},
-            waterfalls=fallbacks or {},
+            # LLM-specific
+            llm_aliases=llm_aliases or {},
+            llm_waterfalls=llm_waterfalls or {},
             llm_presets={},
             llm_choice_defaults=LLMSettingChoicesDefaults(
                 for_text=LLMSetting(model="default_text", temperature=0.7, max_tokens=1000),
                 for_object=LLMSetting(model="default_object", temperature=0.1, max_tokens=1000),
             ),
+            # Extract-specific
+            extract_aliases={},
+            extract_waterfalls={},
             extract_presets={},
             extract_choice_default="extract_ocr_from_document",
+            # ImgGen-specific
+            img_gen_aliases={},
+            img_gen_waterfalls={},
             img_gen_presets={},
             img_gen_choice_default="gen_image_basic",
             model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
@@ -52,7 +59,7 @@ class TestModelDeckGetOptionalInferenceModel:
         model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec})
 
         # Act
-        result = model_deck.get_optional_inference_model("gpt-4")
+        result = model_deck.get_optional_inference_model("gpt-4", model_type=ModelType.LLM)
 
         # Assert
         assert result == model_spec
@@ -62,7 +69,7 @@ class TestModelDeckGetOptionalInferenceModel:
         model_deck = self._create_test_model_deck()
 
         # Act
-        result = model_deck.get_optional_inference_model("nonexistent-model")
+        result = model_deck.get_optional_inference_model("nonexistent-model", model_type=ModelType.LLM)
 
         # Assert
         assert result is None
@@ -70,20 +77,20 @@ class TestModelDeckGetOptionalInferenceModel:
     def test_simple_string_alias_resolution_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
-        model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, aliases={"best-gpt": "gpt-4"})
+        model_deck = self._create_test_model_deck(inference_models={"gpt-4": model_spec}, llm_aliases={"best-gpt": "gpt-4"})
 
         # Act
-        result = model_deck.get_optional_inference_model("best-gpt")
+        result = model_deck.get_optional_inference_model("best-gpt", model_type=ModelType.LLM)
 
         # Assert
         assert result == model_spec
 
     def test_simple_string_alias_resolution_not_found(self):
         # Arrange
-        model_deck = self._create_test_model_deck(aliases={"best-gpt": "nonexistent-model"})
+        model_deck = self._create_test_model_deck(llm_aliases={"best-gpt": "nonexistent-model"})
 
         # Act
-        result = model_deck.get_optional_inference_model("best-gpt")
+        result = model_deck.get_optional_inference_model("best-gpt", model_type=ModelType.LLM)
 
         # Assert
         assert result is None
@@ -93,12 +100,12 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
             inference_models={"gpt-4": model_spec},
-            fallbacks={"dummy-model-handle": ["gpt-4", "claude-3"]},
+            llm_waterfalls={"dummy-model-handle": ["gpt-4", "claude-3"]},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("dummy-model-handle")
+        result = model_deck.get_optional_inference_model("dummy-model-handle", model_type=ModelType.LLM)
 
         # Assert
         assert result == model_spec
@@ -108,12 +115,12 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
             inference_models={"claude-3": model_spec},
-            fallbacks={"dummy-model-handle": ["nonexistent-model", "claude-3"]},
+            llm_waterfalls={"dummy-model-handle": ["nonexistent-model", "claude-3"]},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("dummy-model-handle")
+        result = model_deck.get_optional_inference_model("dummy-model-handle", model_type=ModelType.LLM)
 
         # Assert
         assert result == model_spec
@@ -121,7 +128,7 @@ class TestModelDeckGetOptionalInferenceModel:
     def test_list_alias_resolution_none_found(self):
         # Arrange
         model_deck = self._create_test_model_deck(
-            fallbacks={"dummy-model-handle": ["nonexistent-1", "nonexistent-2"]},
+            llm_waterfalls={"dummy-model-handle": ["nonexistent-1", "nonexistent-2"]},
             is_model_fallback_enabled=True,
         )
 
@@ -130,17 +137,17 @@ class TestModelDeckGetOptionalInferenceModel:
             ModelWaterfallError,
             match=r"is a waterfall.*but none of the fallback models were found",
         ):
-            model_deck.get_optional_inference_model("dummy-model-handle")
+            model_deck.get_optional_inference_model("dummy-model-handle", model_type=ModelType.LLM)
 
     def test_recursive_alias_resolution_success(self):
         # Arrange
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
-            inference_models={"gpt-4": model_spec}, aliases={"dummy-model-handle": "best-gpt", "best-gpt": "gpt-4"}
+            inference_models={"gpt-4": model_spec}, llm_aliases={"dummy-model-handle": "best-gpt", "best-gpt": "gpt-4"}
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("dummy-model-handle")
+        result = model_deck.get_optional_inference_model("dummy-model-handle", model_type=ModelType.LLM)
 
         # Assert
         assert result == model_spec
@@ -150,13 +157,13 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("gpt-4")
         model_deck = self._create_test_model_deck(
             inference_models={"gpt-4": model_spec},
-            aliases={"best-gpt": "gpt-4"},
-            fallbacks={"dummy-model-handle": ["nonexistent", "best-gpt"]},
+            llm_aliases={"best-gpt": "gpt-4"},
+            llm_waterfalls={"dummy-model-handle": ["nonexistent", "best-gpt"]},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("dummy-model-handle")
+        result = model_deck.get_optional_inference_model("dummy-model-handle", model_type=ModelType.LLM)
 
         # Assert
         assert result == model_spec
@@ -164,12 +171,12 @@ class TestModelDeckGetOptionalInferenceModel:
     def test_empty_alias_list(self):
         # Arrange
         model_deck = self._create_test_model_deck(
-            fallbacks={"empty-alias": []},
+            llm_waterfalls={"empty-alias": []},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("empty-alias")
+        result = model_deck.get_optional_inference_model("empty-alias", model_type=ModelType.LLM)
 
         # Assert
         assert result is None
@@ -180,13 +187,13 @@ class TestModelDeckGetOptionalInferenceModel:
         # This test ensures the method handles it gracefully.
 
         # Arrange
-        model_deck = self._create_test_model_deck(aliases={"alias-a": "alias-b", "alias-b": "alias-a"})
+        model_deck = self._create_test_model_deck(llm_aliases={"alias-a": "alias-b", "alias-b": "alias-a"})
 
         # Act & Assert
         # This should either return None or raise RecursionError (which would be caught by pytest)
         # The important thing is it doesn't hang indefinitely
         with pytest.raises((RecursionError, Exception)) or True:
-            result = model_deck.get_optional_inference_model("alias-a")
+            result = model_deck.get_optional_inference_model("alias-a", model_type=ModelType.LLM)
             # If no exception, result should be None
             assert result is None
 
@@ -195,13 +202,13 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
             inference_models={"claude-3": model_spec},
-            aliases={"premium-claude": "claude-3"},
-            fallbacks={"dummy-model-handle": ["premium-gpt", "premium-claude"]},
+            llm_aliases={"premium-claude": "claude-3"},
+            llm_waterfalls={"dummy-model-handle": ["premium-gpt", "premium-claude"]},
             is_model_fallback_enabled=True,
         )
 
         # Act
-        result = model_deck.get_optional_inference_model("dummy-model-handle")
+        result = model_deck.get_optional_inference_model("dummy-model-handle", model_type=ModelType.LLM)
 
         # Assert
         assert result == model_spec
@@ -212,10 +219,10 @@ class TestModelDeckGetOptionalInferenceModel:
         model_spec2 = self._create_test_model_spec("claude-3")
         model_deck = self._create_test_model_deck(
             inference_models={"gpt-4": model_spec1, "claude-3": model_spec2},
-            aliases={
+            llm_aliases={
                 "ai-model": "best-gpt",  # string alias
             },
-            fallbacks={
+            llm_waterfalls={
                 "best-gpt": ["gpt-4-turbo", "gpt-4"],  # list fallback
                 "backup-model": ["claude-4", "claude-3"],  # list fallback
             },
@@ -223,8 +230,8 @@ class TestModelDeckGetOptionalInferenceModel:
         )
 
         # Act
-        result1 = model_deck.get_optional_inference_model("ai-model")
-        result2 = model_deck.get_optional_inference_model("backup-model")
+        result1 = model_deck.get_optional_inference_model("ai-model", model_type=ModelType.LLM)
+        result2 = model_deck.get_optional_inference_model("backup-model", model_type=ModelType.LLM)
 
         # Assert
         assert result1 == model_spec1  # Should resolve to gpt-4
@@ -244,7 +251,7 @@ class TestModelDeckGetOptionalInferenceModel:
         model_deck = self._create_test_model_deck()
 
         # Act
-        result = model_deck.get_optional_inference_model(llm_handle)
+        result = model_deck.get_optional_inference_model(llm_handle, model_type=ModelType.LLM)
 
         # Assert
         assert result is None

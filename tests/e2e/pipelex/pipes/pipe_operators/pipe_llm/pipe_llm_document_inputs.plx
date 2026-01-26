@@ -12,7 +12,7 @@ type = "PipeLLM"
 description = "Summarize a single document"
 inputs = { document = "Document" }
 output = "DocumentSummaryE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Summarize this document in 2-3 sentences: $document
 Be concise.
@@ -24,7 +24,7 @@ type = "PipeLLM"
 description = "Analyze a list of documents"
 inputs = { documents = "Document[]" }
 output = "DocumentListAnalysisE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Analyze these documents. Count how many there are and summarize each briefly:
 $documents
@@ -37,7 +37,7 @@ type = "PipeLLM"
 description = "Compare two document collections"
 inputs = { collection_a = "Document[]", collection_b = "Document[]" }
 output = "DocumentListAnalysisE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Compare these two document collections.
 
@@ -57,7 +57,7 @@ type = "PipeLLM"
 description = "Analyze document and image together"
 inputs = { document = "Document", image = "Image" }
 output = "MixedMediaAnalysisE2E"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Analyze both the document and the image.
 

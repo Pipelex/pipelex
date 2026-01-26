@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -8,26 +8,46 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
+from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import StrEnum
 
-if TYPE_CHECKING:
-    from pipelex.cogt.llm.llm_setting import LLMModelChoice
-
 
 class LLMSkill(StrEnum):
-    LLM_TO_RETRIEVE = "$llm_to_retrieve"
+    DATA_RETRIEVAL = "data_retrieval"
 
-    LLM_TO_ANSWER_QUESTIONS_CHEAP = "$llm_to_answer_questions_cheap"
-    LLM_TO_ANSWER_QUESTIONS = "$llm_to_answer_questions"
+    HR_EXPERT = "hr_expert"
+    ACCOUNTING_EXPERT = "accounting_expert"
+    CREATIVE_WRITER = "creative_writer"
 
-    LLM_FOR_WRITING_CHEAP = "$llm_for_writing_cheap"
-    LLM_FOR_IMG_TO_TEXT_CHEAP = "$llm_for_img_to_text_cheap"
-    LLM_FOR_VISUAL_DESIGN = "~cheap_llm_for_creativity"
-    LLM_FOR_CREATIVE_WRITING = "$llm_for_creative_writing"
-    LLM_TO_CODE = "$llm_to_code"
-    LLM_TO_ANALYZE_LARGE_CODEBASE = "$llm_to_analyze_large_codebase"
+    ENGINEER = "engineer"
+    CODER = "coder"
+    CODE_ANALYZER = "code_analyzer"
+
+    VISION_LANGUAGE_MODEL = "vision_language_model"
+    VISUAL_DESIGNER = "visual_designer"
+
+    @classmethod
+    def model_choice_for_skill(cls, skill_value: str) -> LLMModelChoice:
+        skill = cls(skill_value)
+        match skill:
+            case LLMSkill.DATA_RETRIEVAL:
+                return "$retrieval"
+            case LLMSkill.HR_EXPERT | LLMSkill.ACCOUNTING_EXPERT:
+                return "$writing-factual"
+            case LLMSkill.CREATIVE_WRITER:
+                return "$writing-creative"
+            case LLMSkill.ENGINEER:
+                return "$engineering-structured"
+            case LLMSkill.CODER:
+                return "$engineering-code"
+            case LLMSkill.CODE_ANALYZER:
+                return "$engineering-codebase-analysis"
+            case LLMSkill.VISION_LANGUAGE_MODEL:
+                return "$vision"
+            case LLMSkill.VISUAL_DESIGNER:
+                return "$img-gen-prompting"
 
 
 class PipeLLMSpec(PipeSpec):
@@ -116,7 +136,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
         base_blueprint = super().to_blueprint()
 
         # create llm choice as a str
-        llm_choice: LLMModelChoice = self.llm_skill
+        llm_choice: LLMModelChoice = LLMSkill.model_choice_for_skill(self.llm_skill)
 
         return PipeLLMBlueprint(
             description=base_blueprint.description,

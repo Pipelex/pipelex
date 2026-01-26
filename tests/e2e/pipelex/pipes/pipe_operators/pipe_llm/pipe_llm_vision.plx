@@ -14,7 +14,7 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image = "Image" }
 output = "Text"
-model = "$llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Describe what you see in this image in 1-2 sentences, be concise.
 $image

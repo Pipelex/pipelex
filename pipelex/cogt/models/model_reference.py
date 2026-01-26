@@ -7,7 +7,7 @@ model references using explicit prefixes:
 |----------|-------|----------------------|--------------------------------------------|
 | Preset   | $     | preset:              | $llm_for_creativity or preset:llm_for_creativity |
 | Alias    | @     | alias:               | @base-claude or alias:base-claude          |
-| Waterfall| ~     | waterfall:           | ~cheap_llm or waterfall:cheap_llm          |
+| Waterfall| ~     | waterfall:           | ~small-llm or waterfall:small-llm            |
 | Handle   | (none)| handle: (optional)   | gpt-4o-mini or handle:gpt-4o-mini          |
 
 BREAKING CHANGE: Bare strings (without prefix) are now treated strictly as

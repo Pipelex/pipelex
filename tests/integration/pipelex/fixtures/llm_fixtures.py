@@ -5,6 +5,7 @@ import pytest
 from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.hub import get_model_deck
 from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
 
@@ -12,7 +13,7 @@ from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, ch
 def is_llm_handle_supported(llm_handle: str) -> bool:
     """Check if an LLM handle is available in the current model deck."""
     model_deck = get_model_deck()
-    return model_deck.is_handle_defined(llm_handle)
+    return model_deck.is_handle_defined(llm_handle, model_type=ModelType.LLM)
 
 
 def is_llm_handle_supported_by_enabled_backends(llm_handle: str) -> bool:
@@ -25,7 +26,7 @@ def is_llm_preset_supported(llm_preset_id: str) -> bool:
     llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
     model_handle = llm_setting.model
     model_deck = get_model_deck()
-    inference_model = model_deck.get_optional_inference_model(model_handle=model_handle)
+    inference_model = model_deck.get_optional_inference_model(model_handle=model_handle, model_type=ModelType.LLM)
     if inference_model is None:
         return False
     log.debug(f"Inference model found!! {inference_model}")
@@ -236,9 +237,7 @@ def llm_handle(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        # "$llm_for_testing_gen_text",
-        # "$llm_for_testing_gen_object",
-        "$llm_for_creative_writing",
+        "$writing-creative",
     ],
 )
 def llm_preset_id(request: pytest.FixtureRequest) -> str:
@@ -269,7 +268,7 @@ def llm_preset_id(request: pytest.FixtureRequest) -> str:
         # "gpt-5-chat",
         "gpt-4o-mini",
         # Mistral models with native document support
-        "mistral-medium",
+        "mistral-large-3",
     ],
 )
 def llm_handle_for_documents(request: pytest.FixtureRequest) -> str:

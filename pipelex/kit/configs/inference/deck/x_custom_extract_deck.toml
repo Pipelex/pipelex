@@ -14,7 +14,7 @@
 # Waterfalls — lists of models that will be tried in order until one of them is available
 ####################################################################################################
 
-[waterfalls]
+[extract.waterfalls]
 
 document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
 pdf_text_extractor = [

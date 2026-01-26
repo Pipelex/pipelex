@@ -18,18 +18,29 @@
 ####################################################################################################
 
 [llm.choice_defaults]
-for_text = "~cheap_llm"
-for_object = "~cheap_llm_for_structured"
+for_text = "@default-small"
+for_object = "@default-small-structured"
 
 ####################################################################################################
 # LLM Aliases
 ####################################################################################################
 
-[aliases]
+[llm.aliases]
 best-gpt = "gpt-5.2"
 best-claude = "claude-4.5-opus"
 best-gemini = "gemini-3.0-pro"
 best-mistral = "mistral-large-3"
+
+# Default aliases (first choice from waterfalls)
+default-premium = "claude-4.5-opus"
+default-premium-vision = "claude-4.5-opus"
+default-premium-structured = "claude-4.5-opus"
+default-large-context-code = "gemini-3.0-pro"
+default-large-context-text = "gemini-2.5-flash"
+default-small = "gemini-2.5-flash-lite"
+default-small-structured = "gemini-2.5-flash-lite"
+default-small-vision = "gemini-2.5-flash-lite"
+default-small-creative = "gemini-2.5-flash-lite"
 
 ####################################################################################################
 # LLM Presets
@@ -38,35 +49,34 @@ best-mistral = "mistral-large-3"
 [llm.presets]
 
 # Writing
-llm_for_factual_writing = { model = "@smart_llm", temperature = 0.1 }
-llm_for_creative_writing = { model = "@smart_llm", temperature = 0.9 }
+writing-factual = { model = "@default-premium", temperature = 0.1 }
+writing-creative = { model = "@default-premium", temperature = 0.9 }
 
 # Retrieval
-llm_to_retrieve = { model = "~llm_for_large_text", temperature = 0.1 }
+retrieval = { model = "@default-large-context-text", temperature = 0.1 }
 
 # Engineering
-llm_to_engineer = { model = "~smart_llm_for_structured", temperature = 0.2 }
-llm_to_code = { model = "@base-claude", temperature = 0.1 }
-llm_to_analyze_large_codebase = { model = "@base-claude", temperature = 0.1 }
+engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
+engineering-code = { model = "@base-claude", temperature = 0.1 }
+engineering-codebase-analysis = { model = "@base-claude", temperature = 0.1 }
 
 # Vision
-llm_for_img_to_text_cheap = { model = "gpt-4o-mini", temperature = 0.1 }
-llm_for_img_to_text = { model = "@base-claude", temperature = 0.1 }
-llm_for_diagram_to_text = { model = "@best-claude", temperature = 0.3 }
-llm_for_table_to_text = { model = "@base-claude", temperature = 0.3 }
+vision-cheap = { model = "gpt-4o-mini", temperature = 0.1 }
+vision = { model = "@base-claude", temperature = 0.1 }
+vision-diagram = { model = "@best-claude", temperature = 0.3 }
+vision-table = { model = "@base-claude", temperature = 0.3 }
 
-# Image generation prompting skills
-llm_to_prompt_img_gen = { model = "@base-claude", temperature = 0.2 }
-llm_to_prompt_img_gen_cheap = { model = "gpt-4o-mini", temperature = 0.5 }
+# Image generation prompting
+img-gen-prompting = { model = "@base-claude", temperature = 0.2 }
+img-gen-prompting-cheap = { model = "gpt-4o-mini", temperature = 0.5 }
 
 # Groq-specific presets (fast inference, low cost)
-llm_groq_fast_text = { model = "@fast-groq", temperature = 0.7 }
-llm_groq_balanced = { model = "@base-groq", temperature = 0.5 }
-llm_groq_vision = { model = "@vision-groq", temperature = 0.3 }
+groq-fast = { model = "@fast-groq", temperature = 0.7 }
+groq-balanced = { model = "@base-groq", temperature = 0.5 }
+groq-vision = { model = "@vision-groq", temperature = 0.3 }
 
-# LLM Presets — For Testing ---------------------------------------------------------------------
-
-llm_for_testing_gen_text = { model = "~cheap_llm", temperature = 0.5 }
-llm_for_testing_gen_object = { model = "~cheap_llm_for_structured", temperature = 0.1 }
-llm_for_testing_vision = { model = "~cheap_llm_for_vision", temperature = 0.5 }
-llm_for_testing_vision_structured = { model = "~cheap_llm_for_vision", temperature = 0.5 }
+# Testing
+testing-text = { model = "@default-small", temperature = 0.5 }
+testing-object = { model = "@default-small-structured", temperature = 0.1 }
+testing-vision = { model = "@default-small-vision", temperature = 0.5 }
+testing-vision-structured = { model = "@default-small-vision", temperature = 0.5 }

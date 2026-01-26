@@ -36,10 +36,10 @@ class TestModelReferenceParse:
 
     def test_parse_waterfall_with_sigil(self):
         """Test parsing waterfall reference with ~ sigil."""
-        ref = ModelReference.parse("~cheap_llm")
+        ref = ModelReference.parse("~small-llm")
         assert ref.kind == ModelReferenceKind.WATERFALL
-        assert ref.name == "cheap_llm"
-        assert ref.raw == "~cheap_llm"
+        assert ref.name == "small-llm"
+        assert ref.raw == "~small-llm"
 
     # --- Namespace prefix parsing ---
 
@@ -59,10 +59,10 @@ class TestModelReferenceParse:
 
     def test_parse_waterfall_with_namespace(self):
         """Test parsing waterfall reference with waterfall: namespace."""
-        ref = ModelReference.parse("waterfall:cheap_llm")
+        ref = ModelReference.parse("waterfall:small-llm")
         assert ref.kind == ModelReferenceKind.WATERFALL
-        assert ref.name == "cheap_llm"
-        assert ref.raw == "waterfall:cheap_llm"
+        assert ref.name == "small-llm"
+        assert ref.raw == "waterfall:small-llm"
 
     def test_parse_handle_with_namespace(self):
         """Test parsing handle reference with handle: namespace."""
