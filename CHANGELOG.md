@@ -17,6 +17,7 @@
  - **Remote Configuration**: Updated service URL to version 3.
  - **GatewayExtractWorker**: Now checks model capabilities before attempting image captioning.
  - Change the output validation of `PipeCondition`: If all mapped pipes have the same output concept, `PipeCondition`'s output MUST be that same concept. If mapped pipes have different output concepts, `PipeCondition`'s output MUST be the native concept `Anything`.
+ - **CLI**: Changed `pipelex validate all` to `pipelex validate --all` (or `-a`).
 
 ### Fixed
  - Corrected output directory creation logic in `pipelex run` to properly respect the `--no-graph` flag and configuration settings.
