@@ -28,7 +28,7 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ensure_model_reference
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError, ensure_model_reference
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
@@ -113,13 +113,32 @@ class ModelDeck(ConfigModel):
                 return self.img_gen_aliases, self.img_gen_waterfalls
 
     def is_model_handle_defined(self, model_handle: str, model_type: ModelType) -> bool:
-        all_handles: set[str] = set()
-        all_handles.update(self.inference_models.keys())
+        """Check if a model handle is defined in the model deck.
+
+        Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
+        them and looking up the appropriate dictionary.
+        """
+        ref = ModelReference.parse(model_handle)
         aliases, waterfalls = self._get_aliases_and_waterfalls_for_type(model_type)
-        all_handles.update(aliases.keys())
-        if self.model_deck_config.is_model_fallback_enabled:
-            all_handles.update(waterfalls.keys())
-        return model_handle in all_handles
+
+        match ref.kind:
+            case ModelReferenceKind.ALIAS:
+                return ref.name in aliases
+            case ModelReferenceKind.WATERFALL:
+                if self.model_deck_config.is_model_fallback_enabled:
+                    return ref.name in waterfalls
+                return False
+            case ModelReferenceKind.PRESET:
+                # Presets are handled separately, not as direct handles
+                return False
+            case ModelReferenceKind.HANDLE:
+                # Direct handle lookup - check inference_models, aliases, and waterfalls
+                all_handles: set[str] = set()
+                all_handles.update(self.inference_models.keys())
+                all_handles.update(aliases.keys())
+                if self.model_deck_config.is_model_fallback_enabled:
+                    all_handles.update(waterfalls.keys())
+                return ref.name in all_handles
 
     def _warn_if_ambiguous_llm(self, name: str) -> None:
         """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
@@ -582,69 +601,123 @@ class ModelDeck(ConfigModel):
             # Best-effort: if anything goes wrong, just return None
             return None
 
+    def _resolve_waterfall(
+        self,
+        waterfall_name: str,
+        fallback_list: list[str],
+        model_type: ModelType,
+    ) -> InferenceModelSpec | None:
+        """Resolve a waterfall to an inference model spec by trying each fallback in order."""
+        ideal_model_handle = fallback_list[0]
+        log.verbose(f"Fallback list for '{waterfall_name}': {fallback_list}")
+        for fallback_index, fallback in enumerate(fallback_list):
+            if fallback_index > 0 and not self.model_deck_config.is_model_fallback_enabled:
+                # Waterfall disabled, so we raise an error
+                fallback_list_str = " → ".join(fallback_list)
+                msg = (
+                    f"Model handle '{waterfall_name}' is a waterfall (i.e. a list of models to try in order), which resolves to "
+                    f"•[ {fallback_list_str} ]•, but model fallbacks are disabled "
+                    f"so only the first item in the list, '{ideal_model_handle}', is acceptable but it was not found in the deck. "
+                    f"You must enable model fallback in your .pipelex/pipelex.toml file to permit the following fallbacks, "
+                    f"or enable a backend that supports '{ideal_model_handle}'. "
+                )
+                raise ModelNotFoundError(message=msg, model_handle=waterfall_name)
+            if inference_model := self.get_optional_inference_model(model_handle=fallback, model_type=model_type):
+                if fallback_index > 0:
+                    # Only log if we haven't logged for this waterfall_name before
+                    if waterfall_name not in self._logged_fallback_warnings:
+                        # Waterfall success: we explain what happened in the logs
+                        msg = (
+                            f"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, "
+                            f"so it was replaced by '{fallback}'. "
+                            f"As a consequence, the results of the workflow may not have the expected quality, "
+                            f"and the workflow might fail due to feature limitations such as context window size, etc. "
+                            f"Consider getting access to '{ideal_model_handle}'."
+                        )
+                        enabled_backends = self._get_enabled_backends()
+                        if PipelexBackend.GATEWAY not in enabled_backends and self._is_model_available_in_backend(
+                            model_handle=ideal_model_handle, backend_name=PipelexBackend.GATEWAY
+                        ):
+                            msg += (
+                                f" Note that many high quality models such as '{ideal_model_handle}' are available "
+                                f"from the {PipelexBackend.GATEWAY.display_name} "
+                                f"and you can get free credits to try them out."
+                            )
+                            if PipelexBackend.LEGACY_INFERENCE in enabled_backends:
+                                msg += (
+                                    f"\nAlso note that {PipelexBackend.LEGACY_INFERENCE.display_name} is deprecated "
+                                    "and will be removed in the near future."
+                                )
+                            msg += (
+                                f"\nPlease see our docs for more details about setting up "
+                                f"{PipelexBackend.GATEWAY.display_name} or other inference backends:\n{URLs.backend_provider_docs}"
+                            )
+                        else:
+                            msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
+                        log.info(msg)
+                        # Mark this warning as logged for this waterfall_name
+                        self._logged_fallback_warnings.add(waterfall_name)
+                return inference_model
+        msg = (
+            f"Model handle '{waterfall_name}' is a waterfall (i.e. a list of models to try in order) "
+            "but none of the fallback models were found in the model deck"
+        )
+        raise ModelWaterfallError(message=msg, model_handle=waterfall_name, fallback_list=fallback_list)
+
     def get_optional_inference_model(self, model_handle: str, model_type: ModelType) -> InferenceModelSpec | None:
-        if inference_model := self.inference_models.get(model_handle):
-            return inference_model
+        """Get an inference model spec, resolving aliases and waterfalls as needed.
+
+        Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
+        them and looking up the appropriate dictionary.
+        """
+        # Parse the model_handle to handle prefixed references
+        try:
+            ref = ModelReference.parse(model_handle)
+        except ModelReferenceParseError:
+            # Invalid model handle (empty string, etc.)
+            return None
         aliases, waterfalls = self._get_aliases_and_waterfalls_for_type(model_type)
-        if alias := aliases.get(model_handle):
+
+        # Handle prefixed alias reference (e.g., @best-gpt)
+        match ref.kind:
+            case ModelReferenceKind.ALIAS:
+                if alias_target := aliases.get(ref.name):
+                    log.verbose(f"Prefixed alias '{model_handle}' -> '{alias_target}'")
+                    return self.get_optional_inference_model(model_handle=alias_target, model_type=model_type)
+                log.verbose(f"Prefixed alias '{model_handle}' not found in aliases")
+                return None
+            case ModelReferenceKind.WATERFALL:
+                if fallback_list := waterfalls.get(ref.name):
+                    log.verbose(f"Prefixed waterfall '{model_handle}' -> {fallback_list}")
+                    return self._resolve_waterfall(
+                        waterfall_name=ref.name,
+                        fallback_list=fallback_list,
+                        model_type=model_type,
+                    )
+                log.verbose(f"Prefixed waterfall '{model_handle}' not found in waterfalls")
+                return None
+            case ModelReferenceKind.PRESET:
+                # Presets should not be resolved here - they should be looked up in presets directly
+                log.verbose(f"Preset reference '{model_handle}' cannot be resolved as an inference model")
+                return None
+            case ModelReferenceKind.HANDLE:
+                # Direct handle - proceed with normal lookup
+                pass
+
+        # For direct handles (HANDLE kind), try inference_models first
+        if inference_model := self.inference_models.get(ref.name):
+            return inference_model
+        # Then try aliases (without prefix)
+        if alias := aliases.get(ref.name):
             log.verbose(f"Alias for '{model_handle}': {alias}")
             return self.get_optional_inference_model(model_handle=alias, model_type=model_type)
-        if fallback_list := waterfalls.get(model_handle):
-            ideal_model_handle = fallback_list[0]
-            log.verbose(f"Fallback list for '{model_handle}': {fallback_list}")
-            for fallback_index, fallback in enumerate(fallback_list):
-                if fallback_index > 0 and not self.model_deck_config.is_model_fallback_enabled:
-                    # Waterfall disabled, so we raise an error
-                    fallback_list_str = " → ".join(fallback_list)
-                    msg = (
-                        f"Model handle '{model_handle}' is a waterfall (i.e. a list of models to try in order), which resolves to "
-                        f"•[ {fallback_list_str} ]•, but model fallbacks are disabled "
-                        f"so only the first item in the list, '{ideal_model_handle}', is acceptable but it was not found in the deck. "
-                        f"You must enable model fallback in your .pipelex/pipelex.toml file to permit the following fallbacks, "
-                        f"or enable a backend that supports '{ideal_model_handle}'. "
-                    )
-                    raise ModelNotFoundError(message=msg, model_handle=model_handle)
-                if inference_model := self.get_optional_inference_model(model_handle=fallback, model_type=model_type):
-                    if fallback_index > 0:
-                        # Only log if we haven't logged for this model_handle before
-                        if model_handle not in self._logged_fallback_warnings:
-                            # Waterfall success: we explain what happened in the logs
-                            msg = (
-                                f"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, "
-                                f"so it was replaced by '{fallback}'. "
-                                f"As a consequence, the results of the workflow may not have the expected quality, "
-                                f"and the workflow might fail due to feature limitations such as context window size, etc. "
-                                f"Consider getting access to '{ideal_model_handle}'."
-                            )
-                            enabled_backends = self._get_enabled_backends()
-                            if PipelexBackend.GATEWAY not in enabled_backends and self._is_model_available_in_backend(
-                                model_handle=ideal_model_handle, backend_name=PipelexBackend.GATEWAY
-                            ):
-                                msg += (
-                                    f" Note that many high quality models such as '{ideal_model_handle}' are available "
-                                    f"from the {PipelexBackend.GATEWAY.display_name} "
-                                    f"and you can get free credits to try them out."
-                                )
-                                if PipelexBackend.LEGACY_INFERENCE in enabled_backends:
-                                    msg += (
-                                        f"\nAlso note that {PipelexBackend.LEGACY_INFERENCE.display_name} is deprecated "
-                                        "and will be removed in the near future."
-                                    )
-                                msg += (
-                                    f"\nPlease see our docs for more details about setting up "
-                                    f"{PipelexBackend.GATEWAY.display_name} or other inference backends:\n{URLs.backend_provider_docs}"
-                                )
-                            else:
-                                msg += f" Please see our docs for more details about setting up inference backends:\n{URLs.backend_provider_docs}"
-                            log.info(msg)
-                            # Mark this warning as logged for this model_handle
-                            self._logged_fallback_warnings.add(model_handle)
-                    return inference_model
-            msg = (
-                f"Model handle '{model_handle}' is a waterfall (i.e. a list of models to try in order) "
-                "but none of the fallback models were found in the model deck"
+        # Finally try waterfalls (without prefix)
+        if fallback_list := waterfalls.get(ref.name):
+            return self._resolve_waterfall(
+                waterfall_name=ref.name,
+                fallback_list=fallback_list,
+                model_type=model_type,
             )
-            raise ModelWaterfallError(message=msg, model_handle=model_handle, fallback_list=fallback_list)
         log.verbose(f"Skipping model handle '{model_handle}' because it's was not found in the model deck, it could be an external plugin.")
         return None
 

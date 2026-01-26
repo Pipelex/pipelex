@@ -259,3 +259,155 @@ class TestModelDeckGetOptionalInferenceModel:
 
         # Assert
         assert result is None
+
+
+class TestModelDeckPrefixedAliasReferences:
+    """Tests for prefixed alias references (e.g., @alias_name) in model lookups.
+
+    These tests verify that model references with explicit prefixes like '@best-gpt'
+    are correctly resolved to their target models.
+    """
+
+    def _create_test_model_spec(self, name: str) -> InferenceModelSpec:
+        return InferenceModelSpec(
+            backend_name="test_backend",
+            name=name,
+            sdk="test_sdk",
+            model_type=ModelType.LLM,
+            model_id=f"test_model_{name}",
+            costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+            max_tokens=1000,
+            max_prompt_images=None,
+        )
+
+    def _create_test_model_deck(
+        self,
+        inference_models: dict[str, InferenceModelSpec] | None = None,
+        llm_aliases: dict[str, str] | None = None,
+        llm_waterfalls: dict[str, list[str]] | None = None,
+        llm_presets: dict[str, LLMSetting] | None = None,
+        is_model_fallback_enabled: bool = False,
+    ) -> ModelDeck:
+        return ModelDeck(
+            inference_models=inference_models or {},
+            # LLM-specific
+            llm_default_temperature=0.7,
+            llm_aliases=llm_aliases or {},
+            llm_waterfalls=llm_waterfalls or {},
+            llm_presets=llm_presets or {},
+            llm_choice_defaults=LLMSettingChoicesDefaults(
+                default_temperature=0.7,
+                for_text=LLMSetting(model="default_text", temperature=0.7, max_tokens=1000),
+                for_object=LLMSetting(model="default_object", temperature=0.1, max_tokens=1000),
+            ),
+            # Extract-specific
+            extract_aliases={},
+            extract_waterfalls={},
+            extract_presets={},
+            extract_choice_default="extract-all-from-document",
+            # ImgGen-specific
+            img_gen_default_quality=Quality.MEDIUM,
+            img_gen_aliases={},
+            img_gen_waterfalls={},
+            img_gen_presets={},
+            img_gen_choice_default="gen_image_basic",
+            model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
+        )
+
+    def test_is_model_handle_defined_with_prefixed_alias(self):
+        """Test that is_model_handle_defined recognizes prefixed alias references like '@best-gpt'."""
+        # Arrange
+        model_spec = self._create_test_model_spec("gpt-4")
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4": model_spec},
+            llm_aliases={"best-gpt": "gpt-4"},
+        )
+
+        # Act - using prefixed alias reference
+        is_defined = model_deck.is_model_handle_defined(model_handle="@best-gpt", model_type=ModelType.LLM)
+
+        # Assert - this should be True because @best-gpt refers to the alias 'best-gpt'
+        assert is_defined is True
+
+    def test_get_optional_inference_model_with_prefixed_alias(self):
+        """Test that get_optional_inference_model resolves prefixed alias references like '@best-gpt'."""
+        # Arrange
+        model_spec = self._create_test_model_spec("gpt-4")
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4": model_spec},
+            llm_aliases={"best-gpt": "gpt-4"},
+        )
+
+        # Act - using prefixed alias reference
+        result = model_deck.get_optional_inference_model("@best-gpt", model_type=ModelType.LLM)
+
+        # Assert - should resolve to the gpt-4 model spec
+        assert result is not None
+        assert result.name == "gpt-4"
+
+    def test_is_model_handle_defined_with_prefixed_waterfall(self):
+        """Test that is_model_handle_defined recognizes prefixed waterfall references like '~small-llm'."""
+        # Arrange
+        model_spec = self._create_test_model_spec("gpt-4-mini")
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4-mini": model_spec},
+            llm_waterfalls={"small-llm": ["gpt-4-mini", "claude-instant"]},
+            is_model_fallback_enabled=True,
+        )
+
+        # Act - using prefixed waterfall reference
+        is_defined = model_deck.is_model_handle_defined(model_handle="~small-llm", model_type=ModelType.LLM)
+
+        # Assert - this should be True because ~small-llm refers to the waterfall 'small-llm'
+        assert is_defined is True
+
+    def test_get_optional_inference_model_with_prefixed_waterfall(self):
+        """Test that get_optional_inference_model resolves prefixed waterfall references like '~small-llm'."""
+        # Arrange
+        model_spec = self._create_test_model_spec("gpt-4-mini")
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4-mini": model_spec},
+            llm_waterfalls={"small-llm": ["gpt-4-mini", "claude-instant"]},
+            is_model_fallback_enabled=True,
+        )
+
+        # Act - using prefixed waterfall reference
+        result = model_deck.get_optional_inference_model("~small-llm", model_type=ModelType.LLM)
+
+        # Assert - should resolve to the first available model in the waterfall
+        assert result is not None
+        assert result.name == "gpt-4-mini"
+
+    def test_validate_llm_presets_with_prefixed_alias_in_model_field(self):
+        """Test that validate_llm_presets accepts presets with prefixed alias references in the model field.
+
+        This mimics the real-world scenario where TOML presets use:
+        writing-factual = { model = "@default-premium", temperature = 0.1 }
+        """
+        # Arrange
+        model_spec = self._create_test_model_spec("gpt-4")
+        preset_with_alias = LLMSetting(model="@best-gpt", temperature=0.5)
+        model_deck = self._create_test_model_deck(
+            inference_models={"gpt-4": model_spec},
+            llm_aliases={"best-gpt": "gpt-4"},
+            llm_presets={"my-preset": preset_with_alias},
+        )
+
+        # Act & Assert - should not raise an exception
+        model_deck.validate_llm_presets()
+
+    def test_validate_llm_presets_with_chained_prefixed_alias(self):
+        """Test validation with presets using prefixed alias that points to another alias."""
+        # Arrange
+        model_spec = self._create_test_model_spec("claude-4.5-opus")
+        preset_with_alias = LLMSetting(model="@default-premium", temperature=0.1)
+        model_deck = self._create_test_model_deck(
+            inference_models={"claude-4.5-opus": model_spec},
+            llm_aliases={
+                "default-premium": "claude-4.5-opus",  # this is what @default-premium should resolve to
+            },
+            llm_presets={"writing-factual": preset_with_alias},
+        )
+
+        # Act & Assert - should not raise an exception
+        model_deck.validate_llm_presets()
