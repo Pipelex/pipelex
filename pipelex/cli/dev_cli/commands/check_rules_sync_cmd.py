@@ -43,7 +43,13 @@ def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
             missing_targets.append(target_path)
             continue
 
-        current_content = target_path.read_text(encoding="utf-8")
+        try:
+            current_content = target_path.read_text(encoding="utf-8")
+        except OSError:
+            # Handle race condition where file is deleted after exists() check
+            # or other filesystem errors (permissions, etc.)
+            missing_targets.append(target_path)
+            continue
         span = find_span(current_content, target.marker_begin, target.marker_end)
 
         if span:

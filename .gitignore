@@ -60,3 +60,11 @@ settings.local.json
 structures/
 .pipelex/storage
 pipeline_*
+
+# Generated test fixtures (regenerate with `make regenerate-test-models`)
+tests/integration/pipelex/fixtures/_generated_model_sets.py
+
+.pipelex-dev/model_availability.json
+
+# Local test profile overrides (not tracked - for personal customization)
+.pipelex-dev/test_profiles_override.toml
