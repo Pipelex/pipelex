@@ -2,6 +2,7 @@ import pytest
 
 from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.exceptions import ModelWaterfallError
+from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -33,10 +34,12 @@ class TestModelDeckGetOptionalInferenceModel:
         return ModelDeck(
             inference_models=inference_models or {},
             # LLM-specific
+            llm_default_temperature=0.7,
             llm_aliases=llm_aliases or {},
             llm_waterfalls=llm_waterfalls or {},
             llm_presets={},
             llm_choice_defaults=LLMSettingChoicesDefaults(
+                default_temperature=0.7,
                 for_text=LLMSetting(model="default_text", temperature=0.7, max_tokens=1000),
                 for_object=LLMSetting(model="default_object", temperature=0.1, max_tokens=1000),
             ),
@@ -46,6 +49,7 @@ class TestModelDeckGetOptionalInferenceModel:
             extract_presets={},
             extract_choice_default="extract-all-from-document",
             # ImgGen-specific
+            img_gen_default_quality=Quality.MEDIUM,
             img_gen_aliases={},
             img_gen_waterfalls={},
             img_gen_presets={},

@@ -16,6 +16,7 @@ from pipelex.cogt.exceptions import (
     ModelWaterfallError,
 )
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
+from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
 from pipelex.cogt.llm.llm_setting import (
     LLMModelChoice,
@@ -57,6 +58,7 @@ class ExtractDeckBlueprint(ConfigModel):
 
 
 class ImgGenDeckBlueprint(ConfigModel):
+    default_quality: Quality = Field(strict=False)
     aliases: dict[str, str] = Field(default_factory=dict)
     waterfalls: dict[str, list[str]] = Field(default_factory=dict)
     presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
@@ -77,6 +79,7 @@ class ModelDeck(ConfigModel):
     _logged_fallback_warnings: set[str] = PrivateAttr(default_factory=set[str])
 
     # LLM-specific
+    llm_default_temperature: float = Field(..., ge=0, le=1)
     llm_aliases: dict[str, str] = Field(default_factory=dict)
     llm_waterfalls: dict[str, list[str]] = Field(default_factory=dict)
     llm_presets: dict[str, LLMSetting] = Field(default_factory=dict)
@@ -93,6 +96,7 @@ class ModelDeck(ConfigModel):
     extract_choice_default: ExtractModelChoice
 
     # ImgGen-specific
+    img_gen_default_quality: Quality = Field(strict=False)
     img_gen_aliases: dict[str, str] = Field(default_factory=dict)
     img_gen_waterfalls: dict[str, list[str]] = Field(default_factory=dict)
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
@@ -267,7 +271,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.ALIAS:
                 if alias_target := self.llm_aliases.get(ref.name):
                     # Resolve the alias to an LLM setting by using the target as a handle
-                    return LLMSetting(model=alias_target, temperature=0.7, max_tokens=None)
+                    return LLMSetting(model=alias_target, temperature=self.llm_default_temperature)
                 msg = f"Alias '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -279,7 +283,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.llm_waterfalls:
                     # Use the waterfall name as the model handle (it will resolve via get_optional_inference_model)
-                    return LLMSetting(model=ref.name, temperature=0.7, max_tokens=None)
+                    return LLMSetting(model=ref.name, temperature=self.llm_default_temperature)
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -292,7 +296,7 @@ class ModelDeck(ConfigModel):
                 # Strict: treat as direct model handle only
                 self._warn_if_ambiguous_llm(ref.name)
                 if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.LLM):
-                    return LLMSetting(model=ref.name, temperature=0.7, max_tokens=None)
+                    return LLMSetting(model=ref.name, temperature=self.llm_default_temperature)
                 # Error includes migration hint if name matches preset/waterfall
                 self._raise_handle_not_found_error(
                     ref=ref,
@@ -368,7 +372,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.ALIAS:
                 if alias_target := self.img_gen_aliases.get(ref.name):
-                    return ImgGenSetting(model=alias_target)
+                    return ImgGenSetting(model=alias_target, quality=self.img_gen_default_quality)
                 msg = f"Alias '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -379,7 +383,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.img_gen_waterfalls:
-                    return ImgGenSetting(model=ref.name)
+                    return ImgGenSetting(model=ref.name, quality=self.img_gen_default_quality)
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -391,7 +395,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_img_gen(ref.name)
                 if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.IMG_GEN):
-                    return ImgGenSetting(model=ref.name)
+                    return ImgGenSetting(model=ref.name, quality=self.img_gen_default_quality)
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.IMG_GEN,

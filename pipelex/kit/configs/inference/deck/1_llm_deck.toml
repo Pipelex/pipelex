@@ -18,8 +18,9 @@
 ####################################################################################################
 
 [llm.choice_defaults]
-for_text = "@default-small"
-for_object = "@default-small-structured"
+default_temperature = 0.5
+for_text = "@default-general"
+for_object = "@default-general"
 
 ####################################################################################################
 # LLM Aliases
@@ -32,6 +33,7 @@ best-gemini = "gemini-3.0-pro"
 best-mistral = "mistral-large-3"
 
 # Default aliases (first choice from waterfalls)
+default-general = "claude-4.5-sonnet"
 default-premium = "claude-4.5-opus"
 default-premium-vision = "claude-4.5-opus"
 default-premium-structured = "claude-4.5-opus"
@@ -57,7 +59,7 @@ retrieval = { model = "@default-large-context-text", temperature = 0.1 }
 
 # Engineering
 engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
-engineering-code = { model = "@best-claude", temperature = 0.1 }
+engineering-code = { model = "@default-premium", temperature = 0.1 }
 engineering-codebase-analysis = { model = "@best-gemini", temperature = 0.1 }
 
 # Vision

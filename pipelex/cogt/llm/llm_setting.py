@@ -50,6 +50,7 @@ LLMModelChoice = Union[
 
 
 class LLMSettingChoicesDefaults(ConfigModel):
+    default_temperature: float = Field(..., ge=0, le=1)
     for_text: LLMModelChoice
     for_object: LLMModelChoice
 

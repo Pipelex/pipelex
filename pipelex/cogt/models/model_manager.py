@@ -145,6 +145,7 @@ class ModelManager(ModelManagerAbstract):
         return ModelDeck(
             inference_models=inference_models,
             # LLM
+            llm_default_temperature=model_deck_blueprint.llm.choice_defaults.default_temperature,
             llm_aliases=model_deck_blueprint.llm.aliases,
             llm_waterfalls=model_deck_blueprint.llm.waterfalls,
             llm_presets=model_deck_blueprint.llm.presets,
@@ -156,6 +157,7 @@ class ModelManager(ModelManagerAbstract):
             extract_presets=model_deck_blueprint.extract.presets,
             extract_choice_default=model_deck_blueprint.extract.choice_default,
             # ImgGen
+            img_gen_default_quality=model_deck_blueprint.img_gen.default_quality,
             img_gen_aliases=model_deck_blueprint.img_gen.aliases,
             img_gen_waterfalls=model_deck_blueprint.img_gen.waterfalls,
             img_gen_presets=model_deck_blueprint.img_gen.presets,

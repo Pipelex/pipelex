@@ -18,6 +18,7 @@
 ####################################################################################################
 
 [llm.choice_defaults]
+default_temperature = 0.5
 for_text = "@default-general"
 for_object = "@default-general"
 
