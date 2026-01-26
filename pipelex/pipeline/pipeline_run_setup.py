@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING
 
 from pipelex import log
 from pipelex.client.protocol import PipelineInputs
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -29,7 +30,6 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
-from pipelex.pipeline.validate_bundle import validate_bundle
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
@@ -150,7 +150,8 @@ async def pipeline_run_setup(
 
     # Then handle plx_content or pipe_code
     if plx_content:
-        validate_bundle_result = await validate_bundle(plx_content=plx_content)
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
+        blueprints_to_load = [blueprint]
 
         # Check if this bundle was already loaded from library directories
         bundle_already_loaded = False
@@ -167,10 +168,10 @@ async def pipeline_run_setup(
                 log.verbose(f"Bundle '{bundle_uri}' already loaded from library directories, skipping duplicate load")
 
         if not bundle_already_loaded:
-            library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result.blueprints)
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
 
         # For now, we only support one blueprint when given a plx_content. So blueprints is of length 1.
-        blueprint = validate_bundle_result.blueprints[0]
+        # blueprint is already set from make_pipelex_bundle_blueprint above
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
         elif blueprint.main_pipe:

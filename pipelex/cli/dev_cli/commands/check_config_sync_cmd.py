@@ -73,7 +73,17 @@ def check_config_sync_cmd(
             right_label = ".pipelex"
 
     # Check for differences (excluding files and directories that intentionally differ)
-    has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=GIT_IGNORED_CONFIG_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
+    try:
+        has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=GIT_IGNORED_CONFIG_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
+    except OSError as exc:
+        # Handle race condition where directories are deleted/modified after existence checks
+        if quiet:
+            console.print(f"[red]✗ Config sync check: FAILED[/red] - File system error: {exc}")
+        else:
+            console.print()
+            console.print(f"[red]✗[/red] File system error while comparing directories: {exc}")
+            console.print()
+        sys.exit(1)
 
     if not has_diff:
         # No differences found

@@ -1,7 +1,9 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from instructor import Mode as InstructorMode
 from pydantic import Field
+
+if TYPE_CHECKING:
+    from instructor import Mode as InstructorMode
 
 from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenModelRules
 from pipelex.cogt.llm.structured_output import StructureMethod
@@ -71,7 +73,7 @@ class InferenceModelSpec(ConfigModel):
         """Check if any document type is supported for LLM input."""
         return bool(self.supported_document_types)
 
-    def get_instructor_mode(self) -> InstructorMode | None:
+    def get_instructor_mode(self) -> "InstructorMode | None":
         if self.structure_method:
             return self.structure_method.as_instructor_mode()
         else:

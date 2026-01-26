@@ -47,4 +47,39 @@ At a high level, the load order is:
 - If you change **templates**, keep them user-focused and stable; avoid adding internal-only details.
 - If you change **merge order or override semantics**, treat it as a potentially breaking change and document it (changelog + migration notes if needed).
 
+---
+
+## Test Profile Configuration
+
+The test profile system controls which AI models are included in parametrized tests. This is separate from the main Pipelex configuration.
+
+### Files
+
+| File | Purpose | Tracked |
+|------|---------|---------|
+| `.pipelex-dev/test_profiles.toml` | Base profiles and model collections | Yes |
+| `.pipelex-dev/test_profiles_override.toml` | Local customizations | No (gitignored) |
+
+### How it works
+
+1. Collections define reusable lists of models organized by provider
+2. Profiles reference collections or specify models directly
+3. The preprocessing command resolves references and generates fixture files
+
+### Key code locations
+
+- **Profile loading & merging**: `pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py`
+- **Generated fixtures**: `tests/integration/pipelex/fixtures/_generated_model_sets.py`
+
+### Common tasks
+
+```bash
+# Regenerate fixtures with default (dev) profile
+make regenerate-test-models
+
+# Use a specific profile
+make regenerate-test-models TEST_PROFILE=full
+```
+
+For full documentation, see [Test Profile Configuration](../under-the-hood/test-profile-configuration.md).
 
