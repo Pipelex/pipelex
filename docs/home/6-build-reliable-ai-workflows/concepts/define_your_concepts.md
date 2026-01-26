@@ -36,7 +36,7 @@ ProductReview = "A customer's evaluation of a product or service"
     ❌ productReview     # camelCase not allowed (must start with capital)
     ```
 
-Those concepts will be Text-based by default. If you want to use sutrctured output, you need to create a Python class for the concept, or declare the structure directly in the concept definition. 
+Those concepts will be Text-based by default. If you want to use structured output, declare the structure directly in the concept definition (recommended) or create a Python class for advanced use cases.
 
 **Key principles for concept definitions:**
 
@@ -86,24 +86,39 @@ LineItem = "An individual item or service listed in a financial document"
 
 ## Get Started with Inline Structures
 
-To add structure to your concepts, the simplest approach is using **inline structures** directly in your `.plx` files:
+To add structure to your concepts, the **recommended approach** is using **inline structures** directly in your `.plx` files. Inline structures support all field types including nested concepts:
 
 ```toml
+[concept.Customer]
+description = "A customer for an invoice"
+
+[concept.Customer.structure]
+name = { type = "text", description = "Customer's full name", required = true }
+email = { type = "text", description = "Customer's email address", required = true }
+
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
 
 [concept.Invoice.structure]
 invoice_number = "The unique invoice identifier"
 issue_date = { type = "date", description = "The date the invoice was issued" }
+customer = { type = "concept", concept_ref = "finance.Customer", description = "The customer" }
 total_amount = { type = "number", description = "The total invoice amount" }
-vendor_name = "The name of the vendor"
 ```
 
-This automatically generates a fully-typed Pydantic model with validation—no Python code needed!
+This automatically generates fully-typed Pydantic models with validation—no Python code needed!
 
-**For complete details on inline structures, field types, and all features, see [Inline Structures](inline-structures.md).**
+**For complete details on inline structures, nested concepts, and all features, see [Inline Structures](inline-structures.md).**
 
-### Alternative: Python Classes
+### Generating Python Classes
+
+If you need type hints and IDE autocomplete, use the `pipelex build structures` command to generate Python classes from your inline definitions:
+
+```bash
+pipelex build structures ./my_pipelines/
+```
+
+### Alternative: Hand-Written Python Classes
 
 For advanced features like custom validation, computed properties, or reusable business logic, you can create explicit Python classes.
 
