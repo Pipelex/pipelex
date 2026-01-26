@@ -201,6 +201,7 @@ install: env-verbose
 	@. "$(VIRTUAL_ENV)/bin/activate" && \
 	uv sync --all-extras && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
+	@$(MAKE) regenerate-test-models
 
 lock: env
 	$(call PRINT_TITLE,"Resolving dependencies without update")
@@ -315,6 +316,7 @@ cleanderived:
 	find . -type d -wholename '**/.pytest_cache' -exec rm -rf {} + && \
 	find . -type d -wholename './logs/*.log' -exec rm -rf {} + && \
 	find . -type d -wholename './.reports/*' -exec rm -rf {} + && \
+	rm -f tests/integration/pipelex/fixtures/_generated_model_sets.py && \
 	echo "Cleaned up derived files and directories";
 
 cleanenv:
