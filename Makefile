@@ -201,7 +201,7 @@ install: env-verbose
 	@. "$(VIRTUAL_ENV)/bin/activate" && \
 	uv sync --all-extras && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
-	@$(MAKE) --silent regenerate-test-models > /dev/null 2>&1
+	@$(MAKE) --silent regenerate-test-models-quiet
 
 lock: env
 	$(call PRINT_TITLE,"Resolving dependencies without update")
@@ -295,6 +295,10 @@ regenerate-test-models: env
 
 rtm: regenerate-test-models
 	@echo "> done: rtm = regenerate-test-models"
+
+regenerate-test-models-quiet: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures")
+	@$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE) > /dev/null 2>&1
 
 rtm-full: env
 	$(call PRINT_TITLE,"Regenerating test model fixtures with full profile")
@@ -757,8 +761,8 @@ vg: view-graph
 c: format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived c
-	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
+cc: cleanderived regenerate-test-models-quiet c
+	@echo "> done: cc = cleanderived regenerate-test-models format lint pyright pylint mypy"
 
 up: update-gateway-models up-kit-configs rules
 	@echo "> done: up = update-gateway-models up-kit-configs rules"
