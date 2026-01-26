@@ -8,7 +8,7 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.hub import get_model_deck
 
 # ================================================================================================
-# LLM model collections are now defined in .pipelex/test_profiles.toml
+# LLM model collections are now defined in .pipelex-dev/test_profiles.toml
 # See [collections.llm] section for the full list organized by manufacturer
 # ================================================================================================
 

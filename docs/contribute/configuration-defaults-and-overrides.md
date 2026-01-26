@@ -57,8 +57,8 @@ The test profile system controls which AI models are included in parametrized te
 
 | File | Purpose | Tracked |
 |------|---------|---------|
-| `.pipelex/test_profiles.toml` | Base profiles and model collections | Yes |
-| `.pipelex/test_profiles_override.toml` | Local customizations | No (gitignored) |
+| `.pipelex-dev/test_profiles.toml` | Base profiles and model collections | Yes |
+| `.pipelex-dev/test_profiles_override.toml` | Local customizations | No (gitignored) |
 
 ### How it works
 

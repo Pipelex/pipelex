@@ -12,7 +12,7 @@ Pipelex uses a flexible test profile system to control which AI models are inclu
 
 The test profile system consists of:
 
-1. **Profile definitions** in `.pipelex/test_profiles.toml`
+1. **Profile definitions** in `.pipelex-dev/test_profiles.toml`
 2. **Model collections** organized by provider/type
 3. **A preprocessing command** that generates fixture files
 4. **Make targets** for easy regeneration
@@ -35,7 +35,7 @@ make regenerate-test-models TEST_PROFILE=ci
 
 ## Profile Configuration File
 
-The configuration lives in `.pipelex/test_profiles.toml`:
+The configuration lives in `.pipelex-dev/test_profiles.toml`:
 
 ```toml
 ################################################################################
@@ -241,7 +241,7 @@ pipelex-dev preprocess-test-models --generate-fixtures --profile dev --quiet
 
 ## Adding a New Profile
 
-1. Add your profile to `.pipelex/test_profiles.toml`:
+1. Add your profile to `.pipelex-dev/test_profiles.toml`:
 
     ```toml
     [profiles.my_profile]
@@ -280,7 +280,7 @@ Collections serve as documentation of available models and can be referenced in 
 
 ## Local Overrides
 
-For personal customizations that shouldn't be committed to the repository, create a `.pipelex/test_profiles_override.toml` file. This file is gitignored and will be deep-merged on top of the base configuration.
+For personal customizations that shouldn't be committed to the repository, create a `.pipelex-dev/test_profiles_override.toml` file. This file is gitignored and will be deep-merged on top of the base configuration.
 
 This is useful for:
 
@@ -291,7 +291,7 @@ This is useful for:
 ### Example Override File
 
 ```toml
-# .pipelex/test_profiles_override.toml
+# .pipelex-dev/test_profiles_override.toml
 
 # Add a personal profile
 [profiles.my_local]
@@ -317,7 +317,7 @@ make regenerate-test-models TEST_PROFILE=my_local
 ```
 
 !!! tip "Team Collaboration"
-    Since the override file is gitignored, each developer can maintain their own testing preferences without conflicts. The base `test_profiles.toml` remains the shared source of truth for CI and team workflows.
+    Since the override file is gitignored, each developer can maintain their own testing preferences without conflicts. The base `.pipelex-dev/test_profiles.toml` remains the shared source of truth for CI and team workflows.
 
 ---
 

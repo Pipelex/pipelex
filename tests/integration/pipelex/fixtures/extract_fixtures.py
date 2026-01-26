@@ -6,6 +6,7 @@ import pytest
 
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.hub import get_model_deck
+from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
@@ -16,7 +17,7 @@ def is_extract_handle_supported(extract_handle: str) -> bool:
 
 
 # ================================================================================================
-# Extract model collections are now defined in .pipelex/test_profiles.toml
+# Extract model collections are now defined in .pipelex-dev/test_profiles.toml
 # See [collections.extract] section for from_pdf and from_image lists
 # ================================================================================================
 
@@ -30,7 +31,7 @@ def _load_extract_collection(collection_name: str) -> list[str]:
     Returns:
         List of model handles in the collection.
     """
-    test_profiles_path = Path(".pipelex/test_profiles.toml")
+    test_profiles_path = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_profiles.toml"
     if not test_profiles_path.exists():
         return []
 

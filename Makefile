@@ -317,6 +317,7 @@ cleanderived:
 	find . -type d -wholename './logs/*.log' -exec rm -rf {} + && \
 	find . -type d -wholename './.reports/*' -exec rm -rf {} + && \
 	rm -f tests/integration/pipelex/fixtures/_generated_model_sets.py && \
+	rm -f .pipelex-dev/model_availability.json && \
 	echo "Cleaned up derived files and directories";
 
 cleanenv:

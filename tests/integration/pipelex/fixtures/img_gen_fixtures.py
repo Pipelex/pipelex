@@ -6,7 +6,7 @@ from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background,
 from pipelex.tools.misc.image_utils import ImageFormat
 
 # ================================================================================================
-# Image generation model collections are now defined in .pipelex/test_profiles.toml
+# Image generation model collections are now defined in .pipelex-dev/test_profiles.toml
 # See [collections.img_gen] section for the full list organized by backend
 # ================================================================================================
 

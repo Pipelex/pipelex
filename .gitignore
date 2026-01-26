@@ -63,7 +63,8 @@ pipeline_*
 
 # Generated test fixtures (regenerate with `make regenerate-test-models`)
 tests/integration/pipelex/fixtures/_generated_model_sets.py
-.pipelex/inference/_model_availability.json
+
+.pipelex-dev/model_availability.json
 
 # Local test profile overrides (not tracked - for personal customization)
-.pipelex/test_profiles_override.toml
+.pipelex-dev/test_profiles_override.toml

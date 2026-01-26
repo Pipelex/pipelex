@@ -24,10 +24,10 @@ if TYPE_CHECKING:
 
 
 # Default paths for generated files
-MODEL_AVAILABILITY_JSON_PATH = Path(ConfigPaths.DEFAULT_CONFIG_DIR_PATH) / "inference" / "_model_availability.json"
+MODEL_AVAILABILITY_JSON_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "model_availability.json"
 GENERATED_FIXTURES_PATH = Path("tests/integration/pipelex/fixtures/_generated_model_sets.py")
-TEST_PROFILES_PATH = Path(ConfigPaths.DEFAULT_CONFIG_DIR_PATH) / "test_profiles.toml"
-TEST_PROFILES_OVERRIDE_PATH = Path(ConfigPaths.DEFAULT_CONFIG_DIR_PATH) / "test_profiles_override.toml"
+TEST_PROFILES_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_profiles.toml"
+TEST_PROFILES_OVERRIDE_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_profiles_override.toml"
 
 # Model types we care about
 MODEL_TYPES = ["llm", "img_gen", "text_extractor"]
