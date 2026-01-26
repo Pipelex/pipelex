@@ -469,7 +469,7 @@ class TestPipeConditionOutputValidation:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with Dynamic output",
             inputs={"selector": "native.Text"},
-            output=NativeConceptCode.DYNAMIC.concept_ref,
+            output=NativeConceptCode.ANYTHING.concept_ref,
             expression="selector",
             outcomes={"a": "pipe_a", "b": "pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -619,7 +619,7 @@ class TestPipeConditionOutputValidation:
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Condition with Anything output when Dynamic is required",
             inputs={"selector": "native.Text"},
-            output=NativeConceptCode.ANYTHING.concept_ref,
+            output=NativeConceptCode.TEXT.concept_ref,
             expression="selector",
             outcomes={"a": "pipe_a", "b": "pipe_b"},
             default_outcome=SpecialOutcome.CONTINUE,
@@ -631,7 +631,7 @@ class TestPipeConditionOutputValidation:
             blueprint=pipe_condition_blueprint,
         )
 
-        # Should raise - pipes have different outputs, so Dynamic is required (not Anything)
+        # Should raise - pipes have different outputs, so Anything is required
         with pytest.raises(PipeValidationError) as exc_info:
             pipe_condition.validate_output_with_library()
 
