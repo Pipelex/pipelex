@@ -11,7 +11,7 @@ from pipelex.core.concepts.concept_representation_generator import (
 )
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.validation import is_concept_ref_valid, validate_concept_code
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid, validate_concept_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
@@ -67,7 +67,7 @@ class Concept(BaseModel):
             return None
 
         # Check if it's a valid concept ref or code (domain.ConceptCode or ConceptCode in PascalCase)
-        if is_concept_ref_valid(concept_ref=refines):
+        if is_concept_ref_or_code_valid(concept_ref_or_code=refines):
             return refines
 
         # Invalid refines value

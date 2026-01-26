@@ -90,7 +90,7 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
         )
         raise PipeVariableMultiplicityError(msg)
 
-    concept_ref_or_code = match.group(1)
+    extracted_concept = match.group(1)
     bracket_content = match.group(2)
 
     multiplicity: int | bool | None
@@ -107,7 +107,7 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
             msg = f"Invalid multiplicity value in '{concept_ref_or_code}': multiplicity must be at least 1. A pipe must produce at least one output."
             raise PipeVariableMultiplicityError(msg)
 
-    return MultiplicityParseResult(concept_ref_or_code=concept_ref_or_code, multiplicity=multiplicity)
+    return MultiplicityParseResult(concept_ref_or_code=extracted_concept, multiplicity=multiplicity)
 
 
 def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None, target_multiplicity: VariableMultiplicity | None) -> bool:

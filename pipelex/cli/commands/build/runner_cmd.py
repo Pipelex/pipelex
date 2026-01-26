@@ -32,7 +32,6 @@ from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
     ensure_directory_for_file_path,
-    get_incremental_file_path,
     save_text_to_path,
 )
 
@@ -76,7 +75,7 @@ async def prepare_runner(
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
     else:
-        typer.secho("Failed to run: no bundle file or library directory specified", fg=typer.colors.RED, err=True)
+        typer.secho("Failed to run: no bundle file specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
     try:
@@ -88,16 +87,10 @@ async def prepare_runner(
     # Determine output path - use target's directory
     if output_path:
         final_output_path = output_path
-    elif bundle_path:
+    else:
         # Place runner in the same directory as the PLX file
         bundle_dir = Path(bundle_path).parent
         final_output_path = bundle_dir / f"run_{pipe_code}.py"
-    else:
-        final_output_path = get_incremental_file_path(
-            base_path="results",
-            base_name=f"run_{pipe_code}",
-            extension="py",
-        )
     output_dir = Path(final_output_path).parent
 
     # Generate structures folder FIRST (before runner, since runner imports from structures)
@@ -168,11 +161,11 @@ async def prepare_runner(
 def prepare_runner_cmd(
     target: Annotated[
         str | None,
-        typer.Argument(help="Bundle file path (.plx) or library directory"),
+        typer.Argument(help="Bundle file path (.plx)"),
     ] = None,
     pipe: Annotated[
         str | None,
-        typer.Option("--pipe", help="Pipe code to use (mandatory for library directory, optional for .plx if it declares a main_pipe)"),
+        typer.Option("--pipe", help="Pipe code to use (optional if the .plx declares a main_pipe)"),
     ] = None,
     output_path: Annotated[
         str | None,
@@ -195,7 +188,6 @@ def prepare_runner_cmd(
     Examples:
         pipelex build runner my_bundle.plx
         pipelex build runner my_bundle.plx --pipe my_pipe
-        pipelex build runner ./my_library/ --pipe my_pipe
         pipelex build runner my_bundle.plx --output runner.py
     """
     # Show help if no target provided
@@ -207,24 +199,12 @@ def prepare_runner_cmd(
     # Analyze target type
     target_path = Path(target)
     output_path_path = Path(output_path) if output_path else None
-    is_directory = target_path.is_dir()
-    is_plx_file = is_pipelex_file(target_path)
     library_dirs_paths = [Path(lib_dir) for lib_dir in library_dirs] if library_dirs else None
-    bundle_path = target_path if is_plx_file else None
 
-    # Validate: directory requires --pipe
-    if is_directory and not pipe:
+    # Validate: target must be a .plx file
+    if not is_pipelex_file(target_path):
         typer.secho(
-            f"Failed to run: '{target}' is a directory. The --pipe option is required when using a library directory.",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
-    # Validate: target must be a .plx file or directory
-    if not is_directory and not is_plx_file:
-        typer.secho(
-            f"Failed to run: '{target}' is not a .plx file or directory.",
+            f"Failed to run: '{target}' is not a .plx file.",
             fg=typer.colors.RED,
             err=True,
         )
@@ -238,7 +218,7 @@ def prepare_runner_cmd(
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RUNNER}")
 
-            asyncio.run(prepare_runner(pipe_code=pipe, bundle_path=bundle_path, library_dirs=library_dirs_paths, output_path=output_path_path))
+            asyncio.run(prepare_runner(pipe_code=pipe, bundle_path=target_path, library_dirs=library_dirs_paths, output_path=output_path_path))
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.BUILD)
