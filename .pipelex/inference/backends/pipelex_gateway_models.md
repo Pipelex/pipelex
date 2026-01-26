@@ -22,6 +22,14 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </thead>
 <tbody>
 <tr>
+<td>claude-3-haiku</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
 <td>claude-3.7-sonnet</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -502,6 +510,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-22T13:14:42Z
+> Last updated: 2026-01-26T15:02:42Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
