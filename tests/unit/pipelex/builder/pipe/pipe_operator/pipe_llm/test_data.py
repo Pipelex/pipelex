@@ -1,6 +1,7 @@
 from typing import ClassVar
 
-from pipelex.builder.pipe.pipe_llm_spec import LLMSkill, PipeLLMSpec
+from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
+from pipelex.builder.talents.llm_talent import LLMTalent
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 
@@ -12,7 +13,7 @@ class PipeLLMTestCases:
             description="Generate text",
             inputs={"topic": "Text"},
             output="Text",
-            llm_skill=LLMSkill.CREATIVE_WRITER,
+            llm_talent=LLMTalent.CREATIVE_WRITER,
             prompt="Write about $topic",
         ),
         PipeLLMBlueprint(
@@ -33,7 +34,7 @@ class PipeLLMTestCases:
             description="Generate without inputs",
             inputs={},
             output="Text",
-            llm_skill=LLMSkill.CREATIVE_WRITER,
+            llm_talent=LLMTalent.CREATIVE_WRITER,
             prompt="Generate something interesting",
         ),
         PipeLLMBlueprint(
@@ -54,7 +55,7 @@ class PipeLLMTestCases:
             inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
-            llm_skill=LLMSkill.VISION_LANGUAGE_MODEL,
+            llm_talent=LLMTalent.VISION_LANGUAGE_MODEL,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -75,7 +76,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm_skill=LLMSkill.CREATIVE_WRITER,
+            llm_talent=LLMTalent.CREATIVE_WRITER,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -95,7 +96,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm_skill=LLMSkill.DATA_RETRIEVAL,
+            llm_talent=LLMTalent.DATA_RETRIEVAL,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -116,7 +117,7 @@ class PipeLLMTestCases:
             output="Analysis",
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
-            llm_skill=LLMSkill.DATA_RETRIEVAL,
+            llm_talent=LLMTalent.DATA_RETRIEVAL,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -138,7 +139,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[]",
             prompt="Generate items",
-            llm_skill=LLMSkill.CREATIVE_WRITER,
+            llm_talent=LLMTalent.CREATIVE_WRITER,
         ),
         PipeLLMBlueprint(
             source=None,
@@ -158,7 +159,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[5]",
             prompt="Generate items",
-            llm_skill=LLMSkill.CREATIVE_WRITER,
+            llm_talent=LLMTalent.CREATIVE_WRITER,
         ),
         PipeLLMBlueprint(
             source=None,

@@ -51,6 +51,26 @@ default_output_dir = "."
 default_bundle_file_name = "bundle"
 default_directory_base_name = "pipeline"
 
+[pipelex.builder_config.talent_preset_mappings.llm]
+data-retrieval = "$retrieval"
+hr-expert = "$writing-factual"
+accounting-expert = "$writing-factual"
+creative-writer = "$writing-creative"
+engineer = "$engineering-structured"
+coder = "$engineering-code"
+code-analyzer = "$engineering-codebase-analysis"
+vision-language-model = "$vision"
+visual-designer = "$img-gen-prompting"
+
+[pipelex.builder_config.talent_preset_mappings.img_gen]
+gen-image = "$gen-image"
+gen-image-fast = "$gen-image-fast"
+gen-image-high-quality = "$gen-image-high-quality"
+
+[pipelex.builder_config.talent_preset_mappings.extract]
+pdf-text-extractor = "$extract-text-from-pdf"
+image-text-extractor = "$extract-all-from-document"
+
 [pipelex.feature_config]
 # WIP/Experimental feature flags
 is_reporting_enabled = true
@@ -354,6 +374,9 @@ ocr = "model"
 llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
+llm_skill = "llm_talent"
+img_gen_skill = "img_gen_talent"
+extract_skill = "extract_talent"
 
 
 [migration.migration_maps.telemetry]

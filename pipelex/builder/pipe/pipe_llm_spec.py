@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -8,46 +8,13 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.cogt.llm.llm_setting import LLMModelChoice
+from pipelex.builder.talents.llm_talent import LLMTalent
+from pipelex.config import get_config
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.types import StrEnum
 
-
-class LLMSkill(StrEnum):
-    DATA_RETRIEVAL = "data_retrieval"
-
-    HR_EXPERT = "hr_expert"
-    ACCOUNTING_EXPERT = "accounting_expert"
-    CREATIVE_WRITER = "creative_writer"
-
-    ENGINEER = "engineer"
-    CODER = "coder"
-    CODE_ANALYZER = "code_analyzer"
-
-    VISION_LANGUAGE_MODEL = "vision_language_model"
-    VISUAL_DESIGNER = "visual_designer"
-
-    @classmethod
-    def model_choice_for_skill(cls, skill_value: str) -> LLMModelChoice:
-        skill = cls(skill_value)
-        match skill:
-            case LLMSkill.DATA_RETRIEVAL:
-                return "$retrieval"
-            case LLMSkill.HR_EXPERT | LLMSkill.ACCOUNTING_EXPERT:
-                return "$writing-factual"
-            case LLMSkill.CREATIVE_WRITER:
-                return "$writing-creative"
-            case LLMSkill.ENGINEER:
-                return "$engineering-structured"
-            case LLMSkill.CODER:
-                return "$engineering-code"
-            case LLMSkill.CODE_ANALYZER:
-                return "$engineering-codebase-analysis"
-            case LLMSkill.VISION_LANGUAGE_MODEL:
-                return "$vision"
-            case LLMSkill.VISUAL_DESIGNER:
-                return "$img-gen-prompting"
+if TYPE_CHECKING:
+    from pipelex.cogt.llm.llm_setting import LLMModelChoice
 
 
 class PipeLLMSpec(PipeSpec):
@@ -66,7 +33,7 @@ class PipeLLMSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeLLM"]] = "PipeLLM"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    llm_skill: LLMSkill | str = Field(description="Select the simplest LLM skill corresponding to the task to be performed.")
+    llm_talent: LLMTalent | str = Field(description="Select the simplest LLM talent corresponding to the task to be performed.")
     system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
     prompt: str | None = Field(
         description="""A template for the user prompt:
@@ -87,10 +54,10 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 """
     )
 
-    @field_validator("llm_skill", mode="before")
+    @field_validator("llm_talent", mode="before")
     @classmethod
-    def validate_llm(cls, llm_value: str) -> LLMSkill:
-        return LLMSkill(llm_value)
+    def validate_llm_talent(cls, llm_value: str) -> LLMTalent:
+        return LLMTalent(llm_value)
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
@@ -103,7 +70,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 
         # Add LLM-specific information
         llm_group.renderables.append(Text())  # Blank line
-        llm_group.renderables.append(Text.from_markup(f"LLM Skill: [bold yellow]{self.llm_skill}[/bold yellow]"))
+        llm_group.renderables.append(Text.from_markup(f"LLM Talent: [bold yellow]{self.llm_talent}[/bold yellow]"))
 
         # Add system prompt if present
         if self.system_prompt:
@@ -135,8 +102,9 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
     def to_blueprint(self) -> PipeLLMBlueprint:
         base_blueprint = super().to_blueprint()
 
-        # create llm choice as a str
-        llm_choice: LLMModelChoice = LLMSkill.model_choice_for_skill(self.llm_skill)
+        # Get llm choice from config-based mapping
+        mappings = get_config().pipelex.builder_config.talent_preset_mappings.llm
+        llm_choice: LLMModelChoice = mappings[self.llm_talent]
 
         return PipeLLMBlueprint(
             description=base_blueprint.description,
