@@ -11,6 +11,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprint, normalize_structure_blueprint
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
 from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
 from pipelex.core.interpreter.helpers import is_pipelex_file
@@ -196,7 +197,16 @@ def generate_structures_from_blueprints(
                     )
                     raise PipelexError(msg) from exc
 
-                refined_structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
+                # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
+                # For custom concepts, the structure class name is just the concept code (e.g., Customer)
+                if current_refine:
+                    refined_concept_code = current_refine.split(".")[1]
+                    if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
+                        refined_structure_class_name = refined_concept_code + "Content"
+                    else:
+                        refined_structure_class_name = refined_concept_code
+                else:
+                    refined_structure_class_name = TextContent.__name__
 
                 try:
                     generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(

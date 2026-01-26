@@ -353,7 +353,13 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Get the refined concept's structure class name
-        refined_structure_class_name = current_refine.split(".")[1] + "Content"
+        # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
+        # For custom concepts, the structure class name is just the concept code (e.g., Customer)
+        refined_concept_code = current_refine.split(".")[1]
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
+            refined_structure_class_name = refined_concept_code + "Content"
+        else:
+            refined_structure_class_name = refined_concept_code
 
         # Generate a new class that inherits from the refined structure class
         # This creates an empty class that can be extended with additional fields in the future
