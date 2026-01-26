@@ -44,6 +44,7 @@ from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.pipeline_manager import PipelineManager
+from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
@@ -162,7 +163,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
-        pipeline_manager: PipelineManager | None = None,
+        pipeline_manager: PipelineManagerAbstract | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
         telemetry_config: TelemetryConfig | None = None,
