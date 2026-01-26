@@ -19,7 +19,7 @@
 ####################################################################################################
 
 [extract]
-choice_default = "$extract_ocr_from_document"
+choice_default = "$extract-all-from-document"
 
 ####################################################################################################
 # Aliases
@@ -32,5 +32,5 @@ choice_default = "$extract_ocr_from_document"
 ####################################################################################################
 
 [extract.presets]
-extract_ocr_from_document = { model = "azure-document-intelligence", max_nb_images = 100, image_min_size = 50 }
-extract_basic_from_pdf = { model = "pypdfium2-extract-pdf", max_nb_images = 100, image_min_size = 50 }
+extract-all-from-document = { model = "azure-document-intelligence", max_nb_images = 100, image_min_size = 50 }
+extract-text-from-pdf = { model = "pypdfium2-extract-pdf", max_nb_images = 100, image_min_size = 50 }

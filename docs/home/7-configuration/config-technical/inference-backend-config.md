@@ -452,8 +452,8 @@ OCR presets combine OCR model selection with optimized parameters:
 ```toml
 [extract.presets]
 # General purpose OCR
-extract_ocr_from_document = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-extract_basic_from_pdf = { model = "pypdfium2-extract-pdf", max_nb_images = 100, image_min_size = 50 }
+extract-all-from-document = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
+extract-text-from-pdf = { model = "pypdfium2-extract-pdf", max_nb_images = 100, image_min_size = 50 }
 ```
 
 ### Image Generation Presets
@@ -478,7 +478,7 @@ for_text = "cheap_llm_for_text"
 for_object = "cheap_llm_for_object"
 
 [extract]
-choice_default = "extract_ocr_from_document"
+choice_default = "extract-all-from-document"
 
 [img_gen]
 choice_default = "gen_image_basic"

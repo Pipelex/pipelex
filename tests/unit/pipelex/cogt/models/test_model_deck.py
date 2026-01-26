@@ -44,7 +44,7 @@ class TestModelDeckGetOptionalInferenceModel:
             extract_aliases={},
             extract_waterfalls={},
             extract_presets={},
-            extract_choice_default="extract_ocr_from_document",
+            extract_choice_default="extract-all-from-document",
             # ImgGen-specific
             img_gen_aliases={},
             img_gen_waterfalls={},

@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 
 
 class ImgGenSkill(StrEnum):
-    GEN_IMAGE_BASIC = "$gen_image_basic"
-    GEN_IMAGE_FAST = "$gen_image_fast"
-    GEN_IMAGE_HIGH_QUALITY = "$gen_image_high_quality"
+    GEN_IMAGE_BASIC = "$gen-image"
+    GEN_IMAGE_FAST = "$gen-image-fast"
+    GEN_IMAGE_HIGH_QUALITY = "$gen-image-high-quality"
 
 
 class PipeImgGenSpec(PipeSpec):

@@ -18,8 +18,8 @@
 ####################################################################################################
 
 [llm.choice_defaults]
-for_text = "@default-small"
-for_object = "@default-small-structured"
+for_text = "@default-general"
+for_object = "@default-general"
 
 ####################################################################################################
 # LLM Aliases
@@ -32,6 +32,7 @@ best-gemini = "gemini-3.0-pro"
 best-mistral = "mistral-large-3"
 
 # Default aliases (first choice from waterfalls)
+default-general = "claude-4.5-sonnet"
 default-premium = "claude-4.5-opus"
 default-premium-vision = "claude-4.5-opus"
 default-premium-structured = "claude-4.5-opus"

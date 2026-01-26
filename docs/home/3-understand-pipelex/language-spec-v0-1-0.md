@@ -98,7 +98,7 @@ type = "PipeExtract"
 description = "Extracts text content from the job offer PDF document into pages."
 inputs = { job_offer_pdf = "PDF" }
 output = "Page[]"
-model = "extract_basic_from_pdf"
+model = "extract-text-from-pdf"
 
 [pipe.structure_job_requirements]
 type = "PipeLLM"
@@ -143,7 +143,7 @@ type = "PipeExtract"
 description = "Extracts text content from a single CV PDF into pages."
 inputs = { cv_pdf = "PDF" }
 output = "Page[]"
-model = "extract_basic_from_pdf"
+model = "extract-text-from-pdf"
 
 [pipe.analyze_cv_match]
 type = "PipeLLM"

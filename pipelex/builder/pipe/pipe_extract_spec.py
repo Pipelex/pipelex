@@ -16,8 +16,8 @@ if TYPE_CHECKING:
 
 
 class ExtractSkill(StrEnum):
-    PDF_TEXT_EXTRACTOR = "$extract_basic_from_pdf"
-    IMAGE_TEXT_EXTRACTOR = "$extract_ocr_from_document"
+    PDF_TEXT_EXTRACTOR = "$extract-text-from-pdf"
+    IMAGE_TEXT_EXTRACTOR = "$extract-all-from-document"
 
 
 class PipeExtractSpec(PipeSpec):

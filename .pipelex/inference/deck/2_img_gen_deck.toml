@@ -18,16 +18,20 @@
 ####################################################################################################
 
 [img_gen]
-choice_default = "$gen_image_basic"
+choice_default = "$gen_image"
 
 ####################################################################################################
 # Image Generation Aliases
 ####################################################################################################
 
 [img_gen.aliases]
-base-img-gen = "flux-2-pro"
-best-img-gen = "nano-banana-pro"
-fast-img-gen = "gpt-image-1-mini"
+best-gpt = "gpt-image-1.5"
+best-gemini = "nano-banana-pro"
+best-blackforestlabs = "flux-2-pro"
+
+default-general = "flux-2-pro"
+default-premium = "nano-banana-pro"
+default-small = "gpt-image-1-mini"
 
 ####################################################################################################
 # Image Generation Presets
@@ -36,14 +40,9 @@ fast-img-gen = "gpt-image-1-mini"
 [img_gen.presets]
 
 # General purpose
-gen_image_basic = { model = "@base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
-gen_image_fast = { model = "@fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
-gen_image_high_quality = { model = "@best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
-gen_image_openai_low_quality = { model = "gpt-image-1", quality = "low" }
+gen-image = { model = "@default-general", quality = "medium" }
+gen-image-fast = { model = "@default-small", quality = "low" }
+gen-image-high-quality = { model = "@default-premium", quality = "high" }
 
-# Specific skills
-img_gen_for_art = { model = "@best-img-gen", quality = "high", guidance_scale = 9.0, is_moderated = false, safety_tolerance = 5 }
-img_gen_for_diagram = { model = "@base-img-gen", quality = "medium", guidance_scale = 7.0, is_moderated = true, safety_tolerance = 2 }
-img_gen_for_mockup = { model = "@base-img-gen", quality = "medium", guidance_scale = 6.5, is_moderated = true, safety_tolerance = 3 }
-img_gen_for_product = { model = "@best-img-gen", quality = "high", guidance_scale = 8.5, is_moderated = true, safety_tolerance = 2 }
-img_gen_for_testing = { model = "gpt-image-1-mini", quality = "low" }
+# Testing
+gen-image-testing = { model = "@default-small", quality = "low" }

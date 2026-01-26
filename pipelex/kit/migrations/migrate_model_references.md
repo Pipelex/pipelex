@@ -141,12 +141,12 @@ llm_choice = "@best-claude"  # alias
 | `llm_for_testing_gen_text`         | `$llm_for_testing_gen_text`        | Preset    |
 | `llm_for_testing_gen_object`       | `$llm_for_testing_gen_object`      | Preset    |
 | `vision-cheap`           | `$vision-cheap`          | Preset    |
-| `extract_ocr_from_document`        | `$extract_ocr_from_document`       | Preset    |
-| `extract_basic_from_pdf`           | `$extract_basic_from_pdf`          | Preset    |
+| `extract-all-from-document`        | `$extract-all-from-document`       | Preset    |
+| `extract-text-from-pdf`           | `$extract-text-from-pdf`          | Preset    |
 | `gen_image_basic`                  | `$gen_image_basic`                 | Preset    |
 | `gen_image_fast`                   | `$gen_image_fast`                  | Preset    |
 | `gen_image_high_quality`           | `$gen_image_high_quality`          | Preset    |
-| `img_gen_for_testing`              | `$img_gen_for_testing`             | Preset    |
+| `gen-image-testing`              | `$gen-image-testing`             | Preset    |
 
 ## Error Messages
 
