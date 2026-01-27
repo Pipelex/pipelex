@@ -113,7 +113,6 @@ class PipelineResponse(ApiResponse):
         finished_at (str | None): Timestamp when the pipeline finished, if completed
         pipe_output (DictPipeOutput | None): Output data from the pipeline execution (working_memory dict + pipeline_run_id)
         main_stuff_name (str | None): Name of the main stuff in the pipeline output
-        pipe_structures (dict[str, Any] | None): Structure of the pipeline to execute
 
     """
 
@@ -123,7 +122,6 @@ class PipelineResponse(ApiResponse):
     finished_at: str | None = None
     pipe_output: DictPipeOutput | None = None
     main_stuff_name: str | None = None
-    pipe_structures: dict[str, Any] | None = None
 
 
 @runtime_checkable

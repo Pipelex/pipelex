@@ -86,10 +86,11 @@ async def _generate_output_core(
         typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
-    # Generate the output JSON
+    # Generate the output JSON (content only, no concept wrapper)
     try:
         output_dict = the_pipe.output.render_stuff_spec(ConceptRepresentationFormat.JSON)
-        output_json_str = json.dumps(output_dict, indent=2, ensure_ascii=False)
+        content = output_dict.get("content", output_dict)
+        output_json_str = json.dumps(content, indent=2, ensure_ascii=False)
     except Exception as exc:
         typer.secho(f"❌ Error generating output JSON: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc

@@ -43,7 +43,6 @@ class PipelineResponseFactory:
         finished_at: str | None = None,
         message: str | None = None,
         error: str | None = None,
-        pipe_structures: dict[str, Any] | None = None,
     ) -> PipelineResponse:
         """Create a PipelineResponse from a PipeOutput object.
 
@@ -56,7 +55,6 @@ class PipelineResponseFactory:
             status: Status of the API call
             message: Optional message providing additional information
             error: Optional error message
-            pipe_structures: Structure of the pipeline to execute
         Returns:
             PipelineResponse with the pipe output serialized to reduced format
 
@@ -70,7 +68,6 @@ class PipelineResponseFactory:
                 working_memory=PipelineResponseFactory._serialize_working_memory_with_dict_stuffs(pipe_output.working_memory),
                 pipeline_run_id=pipe_output.pipeline_run_id,
             ),
-            pipe_structures=pipe_structures,
             main_stuff_name=pipe_output.working_memory.aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME),
             status=status,
             message=message,
