@@ -327,8 +327,15 @@ The main pipe is the one that will carry out the main task of the pipeline, it s
 """
 
 [pipe.assemble_pipelex_bundle_spec]
-type = "PipeFunc"
+type = "PipeCompose"
 description = "Compile the pipelex bundle spec."
-inputs = { pipe_specs = "pipe_design.PipeSpec", concept_specs = "ConceptSpec", bundle_header_spec = "BundleHeaderSpec" }
+inputs = { pipe_specs = "pipe_design.PipeSpec[]", concept_specs = "ConceptSpec[]", bundle_header_spec = "BundleHeaderSpec" }
 output = "PipelexBundleSpec"
-function_name = "assemble_pipelex_bundle_spec"
+
+[pipe.assemble_pipelex_bundle_spec.construct]
+domain = { from = "bundle_header_spec.domain_code" }
+description = { from = "bundle_header_spec.description" }
+system_prompt = { from = "bundle_header_spec.system_prompt" }
+main_pipe = { from = "bundle_header_spec.main_pipe" }
+concept = { from = "concept_specs", list_to_dict_keyed_by = "the_concept_code" }
+pipe = { from = "pipe_specs", list_to_dict_keyed_by = "pipe_code" }

@@ -45,6 +45,8 @@ class ConstructFieldBlueprint(BaseModel):
         from_path: Variable path in working memory (for FROM_VAR method)
         template: Jinja2 template string (for TEMPLATE method)
         nested: Nested ConstructBlueprint (for NESTED method)
+        list_to_dict_keyed_by: Optional modifier for FROM_VAR method that converts
+            a ListContent/list to dict keyed by the specified attribute name
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -54,6 +56,7 @@ class ConstructFieldBlueprint(BaseModel):
     from_path: str | None = None
     template: str | None = None
     nested: ConstructBlueprint | None = None
+    list_to_dict_keyed_by: str | None = None
 
     @model_validator(mode="after")
     def validate_method_data_consistency(self) -> Self:
@@ -118,17 +121,24 @@ class ConstructFieldBlueprint(BaseModel):
                 raise ConstructFieldBlueprintValueError(msg)
 
             if has_from:
-                # Variable reference
-                if len(raw_dict) != 1:
-                    msg = "'from' field should only have the 'from' key"
+                # Variable reference, possibly with list_to_dict_keyed_by modifier
+                allowed_keys = {"from", "list_to_dict_keyed_by"}
+                if not set(raw_dict.keys()).issubset(allowed_keys):
+                    extra_keys = set(raw_dict.keys()) - allowed_keys
+                    msg = f"'from' field has unexpected keys: {extra_keys}"
                     raise ConstructFieldBlueprintValueError(msg)
                 from_value = raw_dict["from"]
                 if not isinstance(from_value, str):
                     msg = "'from' value must be a string path"
                     raise ConstructFieldBlueprintTypeError(msg)
+                list_to_dict_keyed_by = raw_dict.get("list_to_dict_keyed_by")
+                if list_to_dict_keyed_by is not None and not isinstance(list_to_dict_keyed_by, str):
+                    msg = "'list_to_dict_keyed_by' value must be a string attribute name"
+                    raise ConstructFieldBlueprintTypeError(msg)
                 return cls(
                     method=ConstructFieldMethod.FROM_VAR,
                     from_path=from_value,
+                    list_to_dict_keyed_by=list_to_dict_keyed_by,
                 )
             elif has_template:
                 # Template

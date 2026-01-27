@@ -118,6 +118,9 @@ class StructuredContentComposer:
         - ListContent -> list[X]: extract items as dicts
         - ListContent -> ListContent: keep object
 
+        If list_to_dict_keyed_by is set, converts the list to a dict using the specified
+        attribute as the key.
+
         Args:
             field_blueprint: The field blueprint with from_path
             field_name: The name of the target field (for type lookup)
@@ -134,9 +137,64 @@ class StructuredContentComposer:
         log.verbose(f"_resolve_from_var: resolving path '{path}' for field '{field_name}' (expected: {expected_type})")
 
         if "." in path:
-            return self._resolve_dotted_path(path=path, expected_type=expected_type)
+            resolved_value = self._resolve_dotted_path(path=path, expected_type=expected_type)
         else:
-            return self._resolve_from_stuff_name(name=path, expected_type=expected_type)
+            resolved_value = self._resolve_from_stuff_name(name=path, expected_type=expected_type)
+
+        # If list_to_dict_keyed_by is set, convert list to dict
+        if field_blueprint.list_to_dict_keyed_by:
+            return self._convert_list_to_dict_keyed_by(
+                value=resolved_value,
+                key_attr=field_blueprint.list_to_dict_keyed_by,
+            )
+
+        return resolved_value
+
+    def _convert_list_to_dict_keyed_by(self, value: Any, key_attr: str) -> dict[str, Any]:
+        """Convert a ListContent or list to a dict keyed by a specified attribute.
+
+        Args:
+            value: The value to convert (must be ListContent or list)
+            key_attr: The attribute name to use as the dict key
+
+        Returns:
+            A dict mapping the key_attr values to the items
+
+        Raises:
+            StructuredContentComposerTypeError: If value is not a ListContent or list
+            StructuredContentComposerValueError: If an item doesn't have the key_attr
+        """
+        # Extract items from ListContent if needed
+        items: list[Any]
+        if isinstance(value, ListContent):
+            items = value.items
+        elif isinstance(value, list):
+            items = value
+        else:
+            msg = f"list_to_dict_keyed_by requires ListContent or list, got {type(value).__name__}"
+            raise StructuredContentComposerTypeError(msg)
+
+        log.verbose(f"  Converting list of {len(items)} items to dict keyed by '{key_attr}'")
+
+        result: dict[str, Any] = {}
+        for idx, item in enumerate(items):
+            # Try to get the key attribute
+            if hasattr(item, key_attr):
+                key = getattr(item, key_attr)
+            elif isinstance(item, dict) and key_attr in item:
+                key = item[key_attr]
+            else:
+                msg = f"Item at index {idx} does not have attribute '{key_attr}'"
+                raise StructuredContentComposerValueError(msg)
+
+            if not isinstance(key, str):
+                msg = f"Key attribute '{key_attr}' at index {idx} must be a string, got {type(key).__name__}"
+                raise StructuredContentComposerTypeError(msg)
+
+            result[key] = item
+
+        log.verbose(f"  Converted to dict with keys: {list(result.keys())}")
+        return result
 
     def _resolve_dotted_path(self, path: str, expected_type: type[Any] | None) -> Any:
         """Resolve a dotted path by navigating through object attributes.
