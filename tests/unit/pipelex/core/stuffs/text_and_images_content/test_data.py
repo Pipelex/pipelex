@@ -47,7 +47,8 @@ class TestData:
     EXPECTED_RENDERED_PLAIN = "Hello World"
     EXPECTED_RENDERED_MARKDOWN = "Hello World"
     EXPECTED_RENDERED_FOR_PROMPT = "Hello World"
-    EXPECTED_RENDERED_HTML = "<p>Hello World</p>"
+    # TextContent.rendered_html escapes HTML chars, no longer wraps in <p> tags
+    EXPECTED_RENDERED_HTML = "Hello World"
 
     # Empty content test cases
     EXPECTED_SMART_DUMP_EMPTY: ClassVar[dict[str, Any]] = {"text": None, "images": None}

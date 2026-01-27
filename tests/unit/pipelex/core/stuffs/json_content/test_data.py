@@ -23,6 +23,12 @@ class TestData:
 }"""
     # convert_to_markdown produces headers for each key
     EXPECTED_RENDERED_MARKDOWN = "# name: John\n\n# age: 30\n\n# active: True"
+    # rendered_for_prompt returns JSON format for JSONContent
+    EXPECTED_RENDERED_FOR_PROMPT = """{
+    "name": "John",
+    "age": 30,
+    "active": true
+}"""
 
     # Empty object test cases
     EMPTY_JSON_OBJ: ClassVar[dict[str, Any]] = {}

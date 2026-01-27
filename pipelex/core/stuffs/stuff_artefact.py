@@ -55,8 +55,8 @@ _PASSTHROUGH_ATTRS = frozenset(
         "default_tag_name",
         # Methods that must remain accessible (ImageRenderable protocol)
         "render_with_images",
-        # Other methods
-        "rendered_str_async",
+        # Methods that must remain accessible (TextFormatRenderable protocol)
+        "rendered_for_prompt_async",
         "stuff",
         # Dict-like methods for template iteration
         "iter_keys",
@@ -94,7 +94,7 @@ class StuffArtefact:
 
     Implements:
         - TagRenderable protocol (render_for_tag, default_tag_name)
-        - TextFormatRenderable protocol (rendered_str_async)
+        - TextFormatRenderable protocol (rendered_for_prompt_async)
         - ImageRenderable protocol (render_with_images)
 
     Attributes:
@@ -280,8 +280,8 @@ class StuffArtefact:
     # TextFormatRenderable protocol implementation
     # -------------------------------------------------------------------------
 
-    async def rendered_str_async(self, text_format: TextFormat) -> str:
-        """Render content as string.
+    async def rendered_for_prompt_async(self, text_format: TextFormat) -> str:
+        """Render content for LLM prompts in the specified text format.
 
         Args:
             text_format: The format for rendering.
@@ -289,7 +289,7 @@ class StuffArtefact:
         Returns:
             The rendered string.
         """
-        result: str = await self._stuff.content.rendered_str_async(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
+        result: str = await self._stuff.content.rendered_for_prompt_async(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
         return result  # pyright: ignore[reportUnknownVariableType]
 
     # -------------------------------------------------------------------------

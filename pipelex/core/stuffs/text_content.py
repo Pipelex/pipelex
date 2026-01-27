@@ -1,7 +1,7 @@
+import html
 import json
 import re
 
-import markdown
 from rich.markdown import Markdown
 from rich.syntax import Syntax
 from typing_extensions import override
@@ -26,8 +26,8 @@ class TextContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        # Convert a markdown string to HTML and return HTML as a Unicode string.
-        return markdown.markdown(self.text)
+        # Escape HTML special characters so text displays literally in browsers
+        return html.escape(self.text)
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:

@@ -32,14 +32,6 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
         """
         return self.model_dump(serialize_as_any=True)
 
-    def rendered_for_prompt(self) -> str:
-        """Render content for inclusion in LLM prompts.
-
-        Uses markdown format which is the standard for LLM prompt templates.
-        Subclasses may override this method to provide custom prompt rendering.
-        """
-        return self.rendered_markdown()
-
     # -------------------------------------------------------------------------------------
     # Sync implementations - override these in subclasses for sync operations
     # -------------------------------------------------------------------------------------
@@ -72,8 +64,8 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
         """
         return kajson.dumps(self.smart_dump(), indent=4)
 
-    def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
-        """Sync rendering based on text format."""
+    @final
+    def rendered_for_prompt(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return self.rendered_plain()
@@ -88,7 +80,8 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     # Override these in subclasses that need async operations
     # -------------------------------------------------------------------------------------
 
-    async def rendered_str_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    @final
+    async def rendered_for_prompt_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return await self.rendered_plain_async()

@@ -24,10 +24,10 @@ class TestJSONContentRenders:
         assert content.rendered_markdown() == TestData.EXPECTED_RENDERED_MARKDOWN
 
     def test_rendered_for_prompt(self):
-        """Verify rendered_for_prompt returns markdown format."""
+        """Verify rendered_for_prompt returns JSON format for JSONContent."""
         content = JSONContent(json_obj=TestData.SAMPLE_JSON_OBJ)
-        # rendered_for_prompt calls rendered_markdown
-        assert content.rendered_for_prompt() == TestData.EXPECTED_RENDERED_MARKDOWN
+        # JSONContent overrides rendered_for_prompt to return JSON format
+        assert content.rendered_for_prompt() == TestData.EXPECTED_RENDERED_FOR_PROMPT
 
     async def test_rendered_plain_async(self):
         """Verify async rendered_plain returns the same as sync version."""

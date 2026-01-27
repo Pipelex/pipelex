@@ -1,7 +1,7 @@
 """Protocol for types that can render in multiple text formats.
 
 This module defines the TextFormatRenderable protocol, which enables the `text_format`
-Jinja2 filter to work with any type that implements the `rendered_str_async` method.
+Jinja2 filter to work with any type that implements the `rendered_for_prompt_async` method.
 
 The protocol uses `@runtime_checkable` to allow isinstance() checks at runtime,
 which enables the filter to determine if a value can be rendered in different text
@@ -21,7 +21,7 @@ class TextFormatRenderable(Protocol):
     """Protocol for types that can render in multiple text formats.
 
     Types implementing this protocol can be used with the `text_format` filter
-    (aliased as `format`). The filter will call `rendered_str_async()` to get
+    (aliased as `format`). The filter will call `rendered_for_prompt_async()` to get
     the rendered string in the specified format.
 
     Implementations:
@@ -29,8 +29,8 @@ class TextFormatRenderable(Protocol):
     - StuffArtefact: delegates to underlying content
     """
 
-    async def rendered_str_async(self, text_format: TextFormat) -> str:
-        """Render content in the specified text format.
+    async def rendered_for_prompt_async(self, text_format: TextFormat) -> str:
+        """Render content for LLM prompts in the specified text format.
 
         Args:
             text_format: The format for rendering (plain, markdown, html, json)

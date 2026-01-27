@@ -105,7 +105,7 @@ class Stuff(PrettyRenderable, CustomBaseModel):
             if type(content).__name__ == content_type.__name__:
                 # Use model_dump() instead of smart_dump() to ensure we get a dict
                 # smart_dump() may return a string for some content types (e.g., TextContent)
-                content_dict = content.model_dump(serialize_as_any=True)
+                content_dict = content.smart_dump()
                 validated_content = content_type.model_validate(content_dict)
                 log.verbose(f"Model validation passed: converted {type(content).__name__} to {content_type.__name__}")
                 return validated_content

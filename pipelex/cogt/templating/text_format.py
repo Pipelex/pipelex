@@ -6,4 +6,3 @@ class TextFormat(StrEnum):
     MARKDOWN = "markdown"
     HTML = "html"
     JSON = "json"
-

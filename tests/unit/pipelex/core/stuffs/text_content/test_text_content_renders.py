@@ -24,9 +24,14 @@ class TestTextContentRenders:
         assert content.rendered_markdown() == TestData.EXPECTED_RENDERED_MARKDOWN_WITH_MD
 
     def test_rendered_html(self):
-        """Verify rendered_html converts text to HTML via markdown processor."""
+        """Verify rendered_html escapes HTML special characters."""
         content = TextContent(text=TestData.SAMPLE_TEXT)
         assert content.rendered_html() == TestData.EXPECTED_RENDERED_HTML
+
+    def test_rendered_html_escapes_special_characters(self):
+        """Verify rendered_html properly escapes <, >, & characters."""
+        content = TextContent(text=TestData.SAMPLE_TEXT_WITH_HTML_CHARS)
+        assert content.rendered_html() == TestData.EXPECTED_RENDERED_HTML_WITH_SPECIAL_CHARS
 
     def test_rendered_json(self):
         """Verify rendered_json returns JSON string with text key."""

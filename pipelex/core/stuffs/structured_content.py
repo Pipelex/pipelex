@@ -1,6 +1,6 @@
+import html as html_module
 from typing import Any, cast
 
-from json2html import json2html
 from rich.pretty import Pretty
 from rich.table import Table
 from typing_extensions import override
@@ -22,14 +22,53 @@ class StructuredContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        dict_dump = clean_model_to_dict(obj=self)
+        """Render as HTML with field names and values in a definition list.
 
-        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
-            json=dict_dump,  # pyright: ignore[reportArgumentType]
-            clubbing=True,
-            table_attributes="",
-        )
-        return html
+        Recursively handles nested StructuredContent. If a string value looks like HTML
+        (starts with '<'), it is rendered as-is; otherwise it is escaped.
+        """
+        parts: list[str] = ["<dl>"]
+        for field_name in type(self).model_fields:
+            field_value = getattr(self, field_name)
+            rendered_value = self._render_value_html(field_value)
+            parts.append(f"<dt>{html_module.escape(field_name)}</dt>")
+            parts.append(f"<dd>{rendered_value}</dd>")
+        parts.append("</dl>")
+        return "".join(parts)
+
+    @override
+    async def rendered_html_async(self) -> str:
+        """Async version of rendered_html."""
+        return self.rendered_html()
+
+    def _render_value_html(self, value: Any) -> str:
+        """Render a value as HTML, recursively handling nested structures."""
+        if value is None:
+            return "<em>None</em>"
+        if isinstance(value, StructuredContent):
+            return value.rendered_html()
+        if isinstance(value, StuffContent):
+            return value.rendered_html()
+        if isinstance(value, str):
+            # If it looks like HTML (starts with <), render as-is
+            stripped = value.strip()
+            if stripped.startswith("<") and (">" in stripped):
+                return value
+            return html_module.escape(value)
+        if isinstance(value, (list, tuple)):
+            list_value = cast("list[Any]", value)
+            if len(list_value) == 0:
+                return "<em>empty</em>"
+            items = [f"<li>{self._render_value_html(item)}</li>" for item in list_value]
+            return f"<ul>{''.join(items)}</ul>"
+        if isinstance(value, dict):
+            dict_value = cast("dict[str, Any]", value)
+            if len(dict_value) == 0:
+                return "<em>empty</em>"
+            items = [f"<dt>{html_module.escape(str(key))}</dt><dd>{self._render_value_html(val)}</dd>" for key, val in dict_value.items()]
+            return f"<dl>{''.join(items)}</dl>"
+        # For other types (int, float, bool, etc.), escape the string representation
+        return html_module.escape(str(value))
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
@@ -105,7 +144,7 @@ class StructuredContent(StuffContent):
                     dict_parts.append(f"{key}: {rendered}")
             return "\n".join(dict_parts)
         if isinstance(value, StuffContent):
-            return value.rendered_str(text_format)
+            return value.rendered_for_prompt(text_format)
         return str(value)
 
     # -------------------------------------------------------------------------
