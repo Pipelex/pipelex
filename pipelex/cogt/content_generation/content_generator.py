@@ -305,7 +305,11 @@ class ContentGenerator(ContentGeneratorProtocol):
             templating_style=templating_style,
             category=template_category or TemplateCategory.BASIC,
         )
-        return await templating_gen_text(templating_assignment=templating_assignment)
+        from pipelex import pretty_print
+        pretty_print(templating_assignment, "templating_assignment")
+        a = await templating_gen_text(templating_assignment=templating_assignment)
+        pretty_print(a, "a")
+        return a
 
     @override
     async def make_render_page_views(

@@ -1,6 +1,5 @@
 import json
 import re
-from typing import Any
 
 import markdown
 from rich.markdown import Markdown
@@ -16,18 +15,10 @@ HTML_PATTERN = re.compile(r"^\s*<(!DOCTYPE|!--|[a-zA-Z])", re.IGNORECASE)
 class TextContent(StuffContent):
     text: str
 
-    @override
-    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
-        return self.text
-
     @property
     @override
     def short_desc(self) -> str:
         return f"some text ({len(self.text)} chars)"
-
-    @override
-    def __str__(self) -> str:
-        return self.text
 
     @override
     def rendered_plain(self) -> str:

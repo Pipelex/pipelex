@@ -21,10 +21,6 @@ class StructuredContent(StuffContent):
         return f"some structured content of class {self.__class__.__name__}"
 
     @override
-    def smart_dump(self):
-        return self.model_dump(serialize_as_any=True)
-
-    @override
     def rendered_html(self) -> str:
         dict_dump = clean_model_to_dict(obj=self)
 

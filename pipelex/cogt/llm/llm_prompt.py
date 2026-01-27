@@ -41,9 +41,7 @@ class LLMPrompt(BaseModel):
 
     @override
     def __str__(self) -> str:
-        # return json_str(self, title="llm_prompt", is_spaced=True)
         return self.desc()
-        # return "test"
 
     @override
     def __repr__(self) -> str:

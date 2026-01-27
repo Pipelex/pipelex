@@ -64,6 +64,12 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
         is_user_images_append: bool | None = None,
         template_inputs: LLMPromptTemplateInputs | None = None,
     ) -> LLMPrompt:
+        from pipelex import pretty_print
+        log.debug(system_text, "system_text")
+        log.debug(user_text, "user_text")
+        log.debug(user_images, "user_images")
+        log.debug(is_user_images_append, "is_user_images_append")
+        log.debug(template_inputs, "template_inputs")
         if not is_none_or_has_text(system_text):
             if system_text == "":
                 log.warning(f"Prompt template system_text should be None or contain text. system_text = '{system_text}'")

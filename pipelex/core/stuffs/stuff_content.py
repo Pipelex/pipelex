@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, TypeVar
+from typing import Any, TypeVar, final
 
 from kajson import kajson
 from rich.json import JSON
@@ -22,27 +22,54 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     def short_desc(self) -> str:
         return f"some {self.__class__.__name__}"
 
-    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
+    @final
+    def smart_dump(self) -> dict[str, Any]:
+        """Serialize content for storage or transmission.
+
+        Returns a dictionary representation suitable for JSON serialization.
+        This method is final and should not be overridden in subclasses.
+        For custom rendering, override the rendered_* methods instead.
+        """
         return self.model_dump(serialize_as_any=True)
+
+    def rendered_for_prompt(self) -> str:
+        """Render content for inclusion in LLM prompts.
+
+        Uses markdown format which is the standard for LLM prompt templates.
+        Subclasses may override this method to provide custom prompt rendering.
+        """
+        return self.rendered_markdown()
 
     # -------------------------------------------------------------------------------------
     # Sync implementations - override these in subclasses for sync operations
     # -------------------------------------------------------------------------------------
 
     def rendered_plain(self) -> str:
-        """Sync plain text rendering - defaults to markdown."""
+        """Render content as plain text for console output or simple text contexts.
+
+        Defaults to markdown rendering. Override in subclasses for custom plain text output.
+        """
         return self.rendered_markdown()
 
     def rendered_html(self) -> str:
-        """Sync HTML rendering - defaults to JSON in pre tags."""
+        """Render content as HTML for web display.
+
+        Defaults to JSON wrapped in pre tags. Override in subclasses for custom HTML output.
+        """
         return f"<pre>{self.rendered_json()}</pre>"
 
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
-        """Sync Markdown rendering - defaults to JSON in code block."""
+        """Render content as Markdown for documentation or LLM prompts.
+
+        Defaults to JSON in a code block. Override in subclasses for custom Markdown output.
+        """
         return f"```json\n{self.rendered_json()}\n```"
 
     def rendered_json(self) -> str:
-        """Sync JSON rendering - defaults to kajson.dumps of smart_dump."""
+        """Render content as a JSON string for data exchange.
+
+        Defaults to kajson.dumps of smart_dump. Override in subclasses for custom JSON output.
+        """
         return kajson.dumps(self.smart_dump(), indent=4)
 
     def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:

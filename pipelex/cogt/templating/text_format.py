@@ -7,6 +7,3 @@ class TextFormat(StrEnum):
     HTML = "html"
     JSON = "json"
 
-    @property
-    def render_method_name(self):
-        return f"rendered_{self}"

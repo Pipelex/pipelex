@@ -1,0 +1,54 @@
+from typing import Any, ClassVar
+
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.text_content import TextContent
+
+
+class TestData:
+    # Input content
+    SAMPLE_TEXT = TextContent(text="Hello World")
+    SAMPLE_IMAGES: ClassVar[list[ImageContent]] = [
+        ImageContent(url="https://example.com/image1.png"),
+        ImageContent(url="https://example.com/image2.png"),
+    ]
+
+    # Expected outputs for smart_dump (text only)
+    EXPECTED_SMART_DUMP_TEXT_ONLY: ClassVar[dict[str, Any]] = {
+        "text": {"text": "Hello World"},
+        "images": None,
+    }
+
+    # Expected outputs for smart_dump (text and images)
+    EXPECTED_SMART_DUMP_FULL: ClassVar[dict[str, Any]] = {
+        "text": {"text": "Hello World"},
+        "images": [
+            {
+                "url": "https://example.com/image1.png",
+                "display_link": None,
+                "source_prompt": None,
+                "source_negative_prompt": None,
+                "caption": None,
+                "mime_type": None,
+                "size": None,
+            },
+            {
+                "url": "https://example.com/image2.png",
+                "display_link": None,
+                "source_prompt": None,
+                "source_negative_prompt": None,
+                "caption": None,
+                "mime_type": None,
+                "size": None,
+            },
+        ],
+    }
+
+    # Expected outputs for render methods
+    EXPECTED_RENDERED_PLAIN = "Hello World"
+    EXPECTED_RENDERED_MARKDOWN = "Hello World"
+    EXPECTED_RENDERED_FOR_PROMPT = "Hello World"
+    EXPECTED_RENDERED_HTML = "<p>Hello World</p>"
+
+    # Empty content test cases
+    EXPECTED_SMART_DUMP_EMPTY: ClassVar[dict[str, Any]] = {"text": None, "images": None}
+    EXPECTED_RENDERED_PLAIN_EMPTY = ""
