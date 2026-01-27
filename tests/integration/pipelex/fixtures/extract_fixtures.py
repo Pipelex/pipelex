@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.hub import get_model_deck
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -13,7 +14,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 def is_extract_handle_supported(extract_handle: str) -> bool:
     """Check if an extract handle is available in the current model deck."""
     model_deck = get_model_deck()
-    return model_deck.is_handle_defined(extract_handle)
+    return model_deck.is_handle_defined(extract_handle, model_type=ModelType.TEXT_EXTRACTOR)
 
 
 # ================================================================================================
@@ -76,8 +77,8 @@ def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "extract_ocr_from_document",
-        "extract_basic_from_pdf",
+        "$extract-all-from-document",
+        "$extract-text-from-pdf",
     ],
 )
 def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
@@ -87,7 +88,7 @@ def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "extract_ocr_from_document",
+        "$extract-all-from-document",
     ],
 )
 def extract_choice_for_image(request: pytest.FixtureRequest) -> str:

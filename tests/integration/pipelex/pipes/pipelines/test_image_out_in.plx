@@ -9,14 +9,14 @@ type = "PipeImgGen"
 description = "Generate an image from a prompt"
 output = "Image"
 prompt = "A beautiful landscape"
-model = "img_gen_for_testing"
+model = "$gen-image-testing"
 
 [pipe.describe_image]
 type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image = "Image" }
 output = "Text"
-model = "llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Describe what you see in this image in 1-2 sentences, be concise.
 $image

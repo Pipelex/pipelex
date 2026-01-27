@@ -7,17 +7,13 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
+from pipelex.builder.talents.extract_talent import ExtractTalent
+from pipelex.config import get_config
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.extract.extract_setting import ExtractModelChoice
-
-
-class ExtractSkill(StrEnum):
-    PDF_TEXT_EXTRACTOR = "pdf_text_extractor"
-    IMAGE_TEXT_EXTRACTOR = "image_text_extractor"
 
 
 class PipeExtractSpec(PipeSpec):
@@ -34,7 +30,7 @@ class PipeExtractSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeExtract"]] = "PipeExtract"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    extract_skill: ExtractSkill | str = Field(description="Select the most adequate extraction model skill according to the task to be performed.")
+    extract_talent: ExtractTalent | str = Field(description="Select the most adequate extraction model talent according to the task to be performed.")
     max_page_images: int | None = Field(
         default=None, description="Max number of images to extract from pages: None=unlimited, 0=no images, N=limit to N images."
     )
@@ -47,10 +43,10 @@ class PipeExtractSpec(PipeSpec):
     def validate_output(cls, output: str) -> str:
         return "Page[]"
 
-    @field_validator("extract_skill", mode="before")
+    @field_validator("extract_talent", mode="before")
     @classmethod
-    def validate_extract_skill(cls, extract_skill_value: str) -> ExtractSkill:
-        return ExtractSkill(extract_skill_value)
+    def validate_extract_talent(cls, extract_talent_value: str) -> ExtractTalent:
+        return ExtractTalent(extract_talent_value)
 
     @field_validator("inputs", mode="before")
     @classmethod
@@ -74,7 +70,7 @@ class PipeExtractSpec(PipeSpec):
 
         # Add extract specific information
         extract_group.renderables.append(Text())  # Blank line
-        extract_group.renderables.append(Text.from_markup(f"Extract Skill: [bold yellow]{self.extract_skill}[/bold yellow]"))
+        extract_group.renderables.append(Text.from_markup(f"Extract Talent: [bold yellow]{self.extract_talent}[/bold yellow]"))
 
         # Add optional extraction settings if they are set
         if self.max_page_images is not None:
@@ -90,8 +86,9 @@ class PipeExtractSpec(PipeSpec):
     def to_blueprint(self) -> PipeExtractBlueprint:
         base_blueprint = super().to_blueprint()
 
-        # create extract choice as a str
-        extract_model_choice: ExtractModelChoice = self.extract_skill
+        # Get extract choice from config-based mapping
+        mappings = get_config().pipelex.builder_config.talent_preset_mappings.extract
+        extract_model_choice: ExtractModelChoice = mappings[self.extract_talent]
 
         return PipeExtractBlueprint(
             source=None,

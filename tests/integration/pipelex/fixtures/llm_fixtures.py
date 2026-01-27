@@ -5,6 +5,7 @@ import pytest
 from pipelex import log
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.hub import get_model_deck
 
 # ================================================================================================
@@ -30,7 +31,7 @@ def llm_job_params(request: pytest.FixtureRequest) -> LLMJobParams:
 
 @pytest.fixture(
     params=[
-        "llm_for_creative_writing",
+        "$writing-creative",
     ],
 )
 def llm_preset_id(request: pytest.FixtureRequest) -> str:
@@ -51,7 +52,7 @@ def _is_llm_preset_supported(llm_preset_id: str) -> bool:
     llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
     model_handle = llm_setting.model
     model_deck = get_model_deck()
-    inference_model = model_deck.get_optional_inference_model(model_handle=model_handle)
+    inference_model = model_deck.get_optional_inference_model(model_handle=model_handle, model_type=ModelType.LLM)
     if inference_model is None:
         return False
     log.debug(f"Inference model found!! {inference_model}")

@@ -18,6 +18,7 @@ VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
+SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -69,6 +70,7 @@ make check-gateway-models     - Check gateway models reference is up-to-date
 make cgm                      - Shorthand -> check-gateway-models
 make regenerate-test-models   - Regenerate test model fixtures from backend configs
 make rtm                      - Shorthand -> regenerate-test-models
+make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
 make up                       - Shorthand -> update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env and lock files
@@ -134,7 +136,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint pyright mypy pylint \
-    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu \
+    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
@@ -201,7 +203,7 @@ install: env-verbose
 	@. "$(VIRTUAL_ENV)/bin/activate" && \
 	uv sync --all-extras && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
-	@$(MAKE) regenerate-test-models
+	@$(MAKE) --silent regenerate-test-models-quiet
 
 lock: env
 	$(call PRINT_TITLE,"Resolving dependencies without update")
@@ -246,6 +248,8 @@ up-kit-configs:
 		--exclude='pipelex_override.toml' \
 		--exclude='telemetry_override.toml' \
 		--exclude='storage' \
+		--exclude='x_custom_llm_deck.toml' \
+		--exclude='x_custom_extract_deck.toml' \
 		.pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
@@ -296,13 +300,25 @@ regenerate-test-models: env
 rtm: regenerate-test-models
 	@echo "> done: rtm = regenerate-test-models"
 
+regenerate-test-models-quiet: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures")
+	@$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE) > /dev/null 2>&1
+
 rtm-full: env
 	$(call PRINT_TITLE,"Regenerating test model fixtures with full profile")
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile full
 
-##############################################################################################
-############################      Cleaning                        ############################
-##############################################################################################
+insert-skeleton:
+	@if [ ! -d $(SKELETON_DIR) ]; then \
+			echo "Error: Skeleton directory $(SKELETON_DIR) not found"; \
+			exit 1; \
+	fi
+	@cp -rn $(SKELETON_DIR). .
+	@echo "Skeleton files inserted from $(SKELETON_DIR)"
+
+##########################################################################################
+### CLEANING
+##########################################################################################
 
 cleanderived:
 	$(call PRINT_TITLE,"Erasing derived files and directories")
@@ -588,9 +604,9 @@ cov-missing: env
 cm: cov-missing
 	@echo "> done: cm = cov-missing"
 
-############################################################################################
-############################               Linting              ############################
-############################################################################################
+##########################################################################################
+### LINTING
+##########################################################################################
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
@@ -757,8 +773,8 @@ vg: view-graph
 c: format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived c
-	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
+cc: cleanderived regenerate-test-models-quiet c
+	@echo "> done: cc = cleanderived regenerate-test-models format lint pyright pylint mypy"
 
 up: update-gateway-models up-kit-configs rules
 	@echo "> done: up = update-gateway-models up-kit-configs rules"

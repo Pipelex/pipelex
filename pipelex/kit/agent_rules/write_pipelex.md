@@ -479,7 +479,7 @@ type = "PipeExtract"
 description = "Extract with specific model"
 inputs = { document = "Document" }
 output = "Page"
-model = "base_extract_mistral"  # Use predefined extract preset or model alias
+model = "$extract-text-from-pdf"  # Use predefined extract preset
 ```
 
 Only one input is allowed and it must either be an `Image` or a `PDF`. The input can be named anything.
@@ -761,7 +761,7 @@ type = "PipeImgGen"
 description = "Generate a high-quality photo"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Photo"
-model = { model = "fast-img-gen" }
+model = "$gen-image-fast"
 aspect_ratio = "16:9"
 quality = "hd"
 ```
@@ -783,7 +783,7 @@ type = "PipeImgGen"
 description = "Generate image with custom settings"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Image"
-model = "img_gen_preset_name"  # Use predefined preset
+model = "$gen-image"  # Use predefined preset
 aspect_ratio = "1:1"
 quality = "hd"
 background = "transparent"
@@ -907,24 +907,25 @@ async def process_function(working_memory: WorkingMemory) -> TextContent:
 ### LLM Configuration System
 
 In order to use it in a pipe, an LLM is referenced by its llm_handle (alias) and possibly by an llm_preset.
-LLM configurations are managed through the new inference backend system with files located in `.pipelex/inference/`:
+LLM configurations are managed through the inference backend system with files located in `.pipelex/inference/`:
 
-- **Model Deck**: `.pipelex/inference/deck/base_deck.toml` and `.pipelex/inference/deck/overrides.toml`
+- **Model Deck**: `.pipelex/inference/deck/1_llm_deck.toml`, `2_img_gen_deck.toml`, `3_extract_deck.toml`
+- **Custom Overrides**: `.pipelex/inference/deck/x_custom_llm_deck.toml`, `x_custom_extract_deck.toml`
 - **Backends**: `.pipelex/inference/backends.toml` and `.pipelex/inference/backends/*.toml`
 - **Routing**: `.pipelex/inference/routing_profiles.toml`
 
 ### LLM Handles
 
 An llm_handle can be either:
-1. **A direct model name** (like "gpt-4o-mini", "claude-3-sonnet") - automatically available for all models loaded by the inference backend system
+1. **A direct model name** (like "gpt-5.2", "claude-4.5-sonnet") - automatically available for all models loaded by the inference backend system
 2. **An alias** - user-defined shortcuts that map to model names, defined in the `[aliases]` section:
 
 ```toml
-[aliases]
-base-claude = "claude-4.5-sonnet"
-base-gpt = "gpt-5"
-base-gemini = "gemini-2.5-flash"
-base-mistral = "mistral-medium"
+[llm.aliases]
+best-claude = "claude-4.5-opus"
+best-gpt = "gpt-5.2"
+best-gemini = "gemini-3.0-pro"
+best-mistral = "mistral-large-3"
 ```
 
 The system first looks for direct model names, then checks aliases if no direct match is found. The system handles model routing through backends automatically.
@@ -952,29 +953,27 @@ Presets are meant to record the choice of an llm with its hyper parameters (temp
 
 Examples:
 ```toml
-llm_to_engineer = { model = "base-claude", temperature = 1 }
-llm_to_extract_invoice = { model = "claude-3-7-sonnet", temperature = 0.1, max_tokens = "auto" }
+writing-factual = { model = "@default-premium", temperature = 0.1 }
+engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
 ```
 
 The interest is that these presets can be used to set the LLM choice in a PipeLLM, like this:
 
 ```plx
-[pipe.extract_invoice]
+[pipe.analyze_document]
 type = "PipeLLM"
-description = "Extract invoice information from an invoice text transcript"
-inputs = { invoice_text = "InvoiceText" }
-output = "Invoice"
-model = "llm_to_extract_invoice"
+description = "Analyze a document using structured output"
+inputs = { technical_article = "Text" }
+output = "Analysis"
+model = "$engineering-structured"
 prompt = """
-Extract invoice information from this invoice:
+Analyze this article and extract key information:
 
-The category of this invoice is: $invoice_details.category.
-
-@invoice_text
+@technical_article
 """
 ```
 
-The setting here `model = "llm_to_extract_invoice"` works because "llm_to_extract_invoice" has been declared as an llm_preset in the deck.
+The setting here `model = "$engineering-structured"` works because "engineering-structured" has been declared as an llm_preset in the deck. Note the `$` prefix which indicates a preset reference.
 You must not use an LLM preset in a PipeLLM that does not exist in the deck. If needed, you can add llm presets.
 
 You can override the predefined llm presets by setting them in `.pipelex/inference/deck/overrides.toml`.

@@ -43,18 +43,16 @@ An LLM Preset is simply a name for a LLM Settings that you have predefined in or
 ### Example LLM Preset definitions
 
 ```toml
-[llm_presets]
+[llm.presets]
 
-llm_for_complex_reasoning = { 
-    llm_handle = "gpt-4-turbo", 
-    temperature = 0.7, 
-    max_tokens = "auto" 
+engineering-structured = {
+    model = "@default-premium-structured",
+    temperature = 0.2
 }
 
-llm_to_extract = { 
-    llm_handle = "claude-4.5-sonnet", 
-    temperature = 0.1, 
-    max_tokens = "auto" 
+retrieval = {
+    model = "@default-large-context-text",
+    temperature = 0.1
 }
 ```
 
@@ -69,9 +67,8 @@ description = "Generate a creative response"
 inputs = { question = "Question" }
 output = "Response"
 model = {
-    llm_handle = "gpt-4-turbo",  # Using inline LLM settings
+    model = "gpt-4-turbo",  # Using inline LLM settings
     temperature = 0.8,
-    max_tokens = "auto",
 }
 prompt = """
 Generate a creative response to this question:
@@ -84,7 +81,7 @@ type = "PipeLLM"
 description = "Extract structured weather data from text"
 inputs = { text = "Text" }
 output = "WeatherData"
-model = "llm_to_extract"  # Using a preset
+model = "$retrieval"  # Using a preset with $ prefix
 prompt = """
 Extract the weather data from this text:
 
@@ -94,10 +91,12 @@ Extract the weather data from this text:
 
 ## Model Deck
 
-The Model Deck is your central configuration hub for all LLM-related settings. It's stored in the `.pipelex/inference/deck/` directory and consists of:
+The Model Deck is your central configuration hub for all LLM-related settings. It's stored in the `.pipelex/inference/deck/` directory and consists of numbered deck files loaded in order:
 
-- `base_deck.toml`: Core LLM configurations including aliases and presets
-- `overrides.toml`: Custom overrides for specific use cases
+- `1_llm_deck.toml`: LLM aliases and presets
+- `2_img_gen_deck.toml`: Image generation configuration
+- `3_extract_deck.toml`: Document extraction configuration
+- `x_custom_llm_deck.toml`: Custom LLM waterfalls/overrides (loaded last)
 
 ### Directory Structure
 
@@ -111,8 +110,10 @@ The Model Deck is your central configuration hub for all LLM-related settings. I
     │   ├── anthropic.toml
     │   └── ...
     └── deck/                      # Model deck configurations
-        ├── base_deck.toml         # Aliases and presets
-        └── overrides.toml         # Custom overrides
+        ├── 1_llm_deck.toml           # LLM aliases & presets
+        ├── 2_img_gen_deck.toml       # Image generation config
+        ├── 3_extract_deck.toml       # Document extraction config
+        └── x_custom_llm_deck.toml    # Custom waterfalls/overrides
 ```
 
 

@@ -79,7 +79,7 @@ type = "PipeLLM"
 description = "Extract invoice information from an invoice text transcript"
 inputs = { "invoice_page.page_view" = "Image", invoice_details = "InvoiceDetails", invoice_page = "Page" }
 output = "Invoice"
-model = "llm_to_extract_invoice"
+model = "$engineering-structured"
 prompt = """
 Extract invoice information from this invoice: $invoice_page.page_view
 
@@ -89,7 +89,7 @@ The category of this invoice is: $invoice_details.category.
 """
 ```
 
-This shows how a complex workflow, including text extraction with `PipeExtract` and LLM calls, can be defined in a simple, readable format. The `model = "llm_to_extract_invoice"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
+This shows how a complex workflow, including text extraction with `PipeExtract` and LLM calls, can be defined in a simple, readable format. The `model = "$engineering-structured"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
 
 ## The Pipeline Flowchart
 
