@@ -726,10 +726,7 @@ class ModelDeck(ConfigModel):
         # For direct handles (HANDLE kind), try inference_models first
         if inference_model := self.inference_models.get(ref.name):
             if inference_model.model_type != model_type:
-                log.warning(
-                    f"Model handle '{ref.name}' has type '{inference_model.model_type}' "
-                    f"but was requested as '{model_type}'. Skipping."
-                )
+                log.warning(f"Model handle '{ref.name}' has type '{inference_model.model_type}' but was requested as '{model_type}'. Skipping.")
                 return None
             return inference_model
         # Then try aliases (without prefix)
