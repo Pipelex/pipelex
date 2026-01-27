@@ -172,12 +172,12 @@ class Concept(BaseModel):
             raise PipelexUnexpectedError(msg)
         return search_for_nested_image_fields(content_class=structure_class)
 
-    def generate_input_representation(
+    def render_concept_representation(
         self,
         output_format: ConceptRepresentationFormat,
         is_multiple: bool = False,
     ) -> tuple[dict[str, Any], set[str]]:
-        """Generate a representation for this concept's input.
+        """Render a representation for this concept.
 
         Args:
             output_format: The format to generate (JSON or PYTHON)
@@ -188,11 +188,9 @@ class Concept(BaseModel):
             - For JSON: content is a dict (or list of dicts if is_multiple)
             - For Python: content is a class instantiation string (wrapping handled by caller)
         """
-        structure_class = self.get_structure_class()
-
         generator = ConceptRepresentationGenerator(output_format)
         # For inputs, we only want required fields (not optional ones)
-        result = generator.generate_representation(self.concept_ref, structure_class, include_optional=False)
+        result = generator.generate_representation(self.concept_ref, self.get_structure_class(), include_optional=False)
 
         # If multiple and JSON format, wrap content in a list
         # For Python format, the caller handles wrapping since content is a string

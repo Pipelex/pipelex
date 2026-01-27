@@ -36,6 +36,7 @@ class ErrorContext(StrEnum):
     VALIDATION_BEFORE_BUILD_PIPE = "Pre-validation (build pipe)"
     VALIDATION_BEFORE_BUILD_RUNNER = "Pre-validation (build runner)"
     VALIDATION_BEFORE_BUILD_INPUTS = "Pre-validation (build inputs)"
+    VALIDATION_BEFORE_BUILD_OUTPUT = "Pre-validation (build output)"
     KIT = "Kit operation"
 
 

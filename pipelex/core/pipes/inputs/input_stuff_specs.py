@@ -132,30 +132,17 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_empty(self) -> bool:
         return not bool(self.root)
 
-    def generate_json_representation(self) -> dict[str, Any]:
-        """Generate a JSON representation for all inputs.
-
-        Returns:
-            Dictionary with JSON representations for each input
-        """
-        json_inputs: dict[str, Any] = {}
-        for var_name, stuff_spec in self.root.items():
-            json_value, _ = stuff_spec.concept.generate_input_representation(
-                output_format=ConceptRepresentationFormat.JSON,
-                is_multiple=stuff_spec.is_multiple(),
-            )
-            json_inputs[var_name] = json_value
-
-        return json_inputs
-
-    def generate_json_string(self, indent: int = 2) -> str:
-        """Generate a JSON representation for all inputs as a formatted string.
+    def render_inputs(self, indent: int = 2) -> str:
+        """Render a JSON representation for all stuff specs as a formatted string.
 
         Args:
             indent: Number of spaces for indentation (default: 2)
 
         Returns:
-            Formatted JSON string
+            Formatted JSON string with all inputs
         """
-        json_inputs = self.generate_json_representation()
+        json_inputs: dict[str, Any] = {}
+        for var_name, stuff_spec in self.root.items():
+            json_inputs[var_name] = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON)
+
         return json.dumps(json_inputs, indent=indent, ensure_ascii=False)

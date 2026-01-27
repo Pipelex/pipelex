@@ -1,4 +1,5 @@
 import asyncio
+import json
 from pathlib import Path
 from typing import Annotated
 
@@ -12,6 +13,7 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
 )
+from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
@@ -27,18 +29,18 @@ from pipelex.tools.misc.file_utils import (
 )
 
 COMMAND = "build"
-SUB_COMMAND_INPUTS = "inputs"
+SUB_COMMAND_OUTPUT = "output"
 
 
-async def _generate_inputs_core(
+async def _generate_output_core(
     pipe_code: str | None = None,
     bundle_path: Path | None = None,
     output_path: Path | None = None,
 ) -> None:
-    """Core logic for generating input JSON for a pipe.
+    """Core logic for generating output JSON for a pipe.
 
     Args:
-        pipe_code: The pipe code to generate inputs for.
+        pipe_code: The pipe code to generate output for.
         bundle_path: Path to the bundle file (.plx).
         output_path: Path to save the generated JSON file.
     """
@@ -51,7 +53,7 @@ async def _generate_inputs_core(
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
                     msg = (
-                        f"Bundle '{bundle_path}' does not declare a main_pipe. In order to build inputs for a bundle, "
+                        f"Bundle '{bundle_path}' does not declare a main_pipe. In order to build output for a bundle, "
                         "you must specify a main pipe in the bundle itself or specify a pipe code in the command line using the --pipe option."
                     )
                     typer.secho(
@@ -84,39 +86,35 @@ async def _generate_inputs_core(
         typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
-    # Check if pipe has any inputs
-    if not the_pipe.inputs.root:
-        typer.secho(f"No inputs required for pipe '{pipe_code}'.", fg=typer.colors.YELLOW)
-        raise typer.Exit(0)
-
-    # Generate the input JSON
+    # Generate the output JSON
     try:
-        inputs_json_str = the_pipe.inputs.render_inputs(indent=2)
+        output_dict = the_pipe.output.render_stuff_spec(ConceptRepresentationFormat.JSON)
+        output_json_str = json.dumps(output_dict, indent=2, ensure_ascii=False)
     except Exception as exc:
-        typer.secho(f"❌ Error generating input JSON: {exc}", fg=typer.colors.RED)
+        typer.secho(f"❌ Error generating output JSON: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
     # Determine output path - use bundle's directory if bundle provided, otherwise results/
     if output_path:
         final_output_path = output_path
     elif bundle_path:
-        # Place inputs.json in the same directory as the PLX file
-        bundle_dir = bundle_path.parent
-        final_output_path = bundle_dir / "inputs.json"
+        # Place output.json in the same directory as the PLX file
+        bundle_dir = Path(bundle_path).parent
+        final_output_path = bundle_dir / "output.json"
     else:
-        final_output_path = Path("results/inputs.json")
+        final_output_path = Path("results/output.json")
 
     # Save the file
     try:
         ensure_directory_for_file_path(file_path=str(final_output_path))
-        save_text_to_path(text=inputs_json_str, path=str(final_output_path))
-        typer.secho(f"✅ Generated input JSON file: {final_output_path}", fg=typer.colors.GREEN)
+        save_text_to_path(text=output_json_str, path=str(final_output_path))
+        typer.secho(f"✅ Generated output JSON file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
         typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
 
-def generate_inputs_cmd(
+def generate_output_cmd(
     target: Annotated[
         str | None,
         typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
@@ -140,17 +138,17 @@ def generate_inputs_cmd(
         ),
     ] = None,
 ) -> None:
-    """Generate example input JSON for a pipe.
+    """Generate example output JSON for a pipe.
 
-    The generated JSON file will include example values for all pipe inputs
-    based on their concept types.
+    The generated JSON file will show the expected output structure
+    based on the pipe's output concept type.
 
     Examples:
-        pipelex build inputs my_pipe
-        pipelex build inputs my_bundle.plx
-        pipelex build inputs my_bundle.plx --pipe my_pipe
-        pipelex build inputs my_pipe --output custom_inputs.json
-        pipelex build inputs my_pipe -L ./my_pipes
+        pipelex build output my_pipe
+        pipelex build output my_bundle.plx
+        pipelex build output my_bundle.plx --pipe my_pipe
+        pipelex build output my_pipe --output custom_output.json
+        pipelex build output my_pipe -L ./my_pipes
     """
     # Show help if nothing provided
     if target is None and pipe is None:
@@ -167,7 +165,7 @@ def generate_inputs_cmd(
         target_path = Path(target)
         if target_path.is_dir():
             typer.secho(
-                f"Failed to run: '{target}' is a directory. The inputs command requires a .plx file or a pipe code.",
+                f"Failed to run: '{target}' is a directory. The output command requires a .plx file or a pipe code.",
                 fg=typer.colors.RED,
                 err=True,
             )
@@ -193,15 +191,15 @@ def generate_inputs_cmd(
         typer.secho("Failed to run: no pipe code or bundle file specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
-    pipelex_instance = make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS, library_dirs=library_dir)
+    pipelex_instance = make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_OUTPUT, library_dirs=library_dir)
 
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
-            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_INPUTS}")
+            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_OUTPUT}")
 
-            asyncio.run(_generate_inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path_path))
+            asyncio.run(_generate_output_core(pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path_path))
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.BUILD)

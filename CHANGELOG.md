@@ -7,8 +7,10 @@
   - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
 
 ### Added
+ - **`pipelex build output` CLI Command**: New command to generate example output JSON for a pipe, complementing the existing `pipelex build inputs` command. Shows the expected output structure based on the pipe's output concept type, with multiplicity support.
  - **Telemetry System**: Introduced anonymous usage tracking and exception capture for CLI commands (`graph render`, `kit rules`, `kit remove-rules`, `kit migrations`), reporting to both user-configured and Pipelex analytics endpoints.
  - **PipeExtract Operator Validation**: Added strict input validation that raises configuration errors for incompatible input types or when document-specific parameters are used with image inputs.
+ - **PipeCondition Output Auto-Fix in Builder Loop**: The pipe builder now automatically fixes `PipeCondition` output concept errors during validation. If all mapped pipes have the same output, the `PipeCondition` output is set to that concept; otherwise it's set to `native.Anything`.
 
 ### Changed
  - **Test Profile System**: Refactored integration tests to use a new configuration system (`.pipelex/test_profiles.toml`) with `dev`, `ci`, and `full` profiles for controlling which AI models are used in parametrized tests, replacing runtime filtering and hardcoded model lists.
