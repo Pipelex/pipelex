@@ -6,15 +6,13 @@ pipe specs, and bundle header spec.
 """
 
 from pathlib import Path
-from typing import Callable, ClassVar
+from typing import TYPE_CHECKING, Callable
 
 import pytest
 
 from pipelex import pretty_print
-from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.bundle_spec import PipelexBundleSpec
-from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
@@ -23,41 +21,11 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from tests.integration.pipelex.test_data import AssemblePipelexBundleSpecTestCases
 
-
-class TestAssemblePipelexBundleSpecData:
-    """Test data for assemble_pipelex_bundle_spec tests."""
-
-    CONCEPT_SPECS: ClassVar[list[ConceptSpec]] = [
-        ConceptSpec(
-            the_concept_code="UserBrief",
-            description="A short, natural-language description of what the user wants.",
-            refines="Text",
-        ),
-        ConceptSpec(
-            the_concept_code="PlanDraft",
-            description="Natural-language pipeline plan text describing sequences, inputs, outputs.",
-            refines="Text",
-        ),
-    ]
-
-    PIPE_SPECS: ClassVar[list[PipeLLMSpec]] = [
-        PipeLLMSpec(
-            pipe_code="generate_plan",
-            description="Generate a plan from a user brief.",
-            inputs={"brief": "UserBrief"},
-            output="PlanDraft",
-            llm_talent="engineer",
-            prompt="Generate a plan for: @brief",
-        ),
-    ]
-
-    BUNDLE_HEADER = BundleHeaderSpec(
-        domain_code="test_domain",
-        description="A test domain for assembly testing.",
-        system_prompt=None,
-        main_pipe="generate_plan",
-    )
+if TYPE_CHECKING:
+    from pipelex.builder.concept.concept_spec import ConceptSpec
+    from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 
 
 @pytest.mark.dry_runnable
@@ -78,18 +46,18 @@ class TestAssemblePipelexBundleSpec:
         working_memory = WorkingMemory()
 
         # Add concept_specs as a list
-        concept_specs_content = ListContent(items=TestAssemblePipelexBundleSpecData.CONCEPT_SPECS)
+        concept_specs_content: ListContent[ConceptSpec] = ListContent(items=AssemblePipelexBundleSpecTestCases.CONCEPT_SPECS)
         concept_specs_stuff = StuffFactory.make_stuff(
-            concept=get_native_concept("Text"),
+            concept=get_native_concept(NativeConceptCode.TEXT),
             content=concept_specs_content,
             name="concept_specs",
         )
         working_memory.add_new_stuff(name="concept_specs", stuff=concept_specs_stuff)
 
         # Add pipe_specs as a list
-        pipe_specs_content = ListContent(items=TestAssemblePipelexBundleSpecData.PIPE_SPECS)
+        pipe_specs_content: ListContent[PipeLLMSpec] = ListContent(items=AssemblePipelexBundleSpecTestCases.PIPE_SPECS)
         pipe_specs_stuff = StuffFactory.make_stuff(
-            concept=get_native_concept("Text"),
+            concept=get_native_concept(NativeConceptCode.TEXT),
             content=pipe_specs_content,
             name="pipe_specs",
         )
@@ -97,8 +65,8 @@ class TestAssemblePipelexBundleSpec:
 
         # Add bundle_header_spec
         bundle_header_stuff = StuffFactory.make_stuff(
-            concept=get_native_concept("Text"),
-            content=TestAssemblePipelexBundleSpecData.BUNDLE_HEADER,
+            concept=get_native_concept(NativeConceptCode.TEXT),
+            content=AssemblePipelexBundleSpecTestCases.BUNDLE_HEADER,
             name="bundle_header_spec",
         )
         working_memory.add_new_stuff(name="bundle_header_spec", stuff=bundle_header_stuff)

@@ -167,9 +167,10 @@ class StructuredContentComposer:
         # Extract items from ListContent if needed
         items: list[Any]
         if isinstance(value, ListContent):
-            items = value.items
+            list_content = cast("ListContent[StuffContent]", value)
+            items = list_content.items
         elif isinstance(value, list):
-            items = value
+            items = cast("list[Any]", value)
         else:
             msg = f"list_to_dict_keyed_by requires ListContent or list, got {type(value).__name__}"
             raise StructuredContentComposerTypeError(msg)
@@ -182,13 +183,13 @@ class StructuredContentComposer:
             if hasattr(item, key_attr):
                 key = getattr(item, key_attr)
             elif isinstance(item, dict) and key_attr in item:
-                key = item[key_attr]
+                key = item[key_attr]  # pyright: ignore[reportUnknownVariableType]
             else:
                 msg = f"Item at index {idx} does not have attribute '{key_attr}'"
                 raise StructuredContentComposerValueError(msg)
 
             if not isinstance(key, str):
-                msg = f"Key attribute '{key_attr}' at index {idx} must be a string, got {type(key).__name__}"
+                msg = f"Key attribute '{key_attr}' at index {idx} must be a string, got {type(key).__name__}"  # pyright: ignore[reportUnknownArgumentType]
                 raise StructuredContentComposerTypeError(msg)
 
             result[key] = item
