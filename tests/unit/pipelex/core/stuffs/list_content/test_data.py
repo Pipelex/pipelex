@@ -21,10 +21,10 @@ class TestData:
     }
 
     # Expected outputs for render methods
-    # ListContent renders TextContent items as their str representation
-    EXPECTED_RENDERED_PLAIN = " \u2022 text='Item 1'\n \u2022 text='Item 2'\n \u2022 text='Item 3'\n"
-    EXPECTED_RENDERED_MARKDOWN = " \u2022 text='Item 1'\n \u2022 text='Item 2'\n \u2022 text='Item 3'\n"
-    EXPECTED_RENDERED_FOR_PROMPT = " \u2022 text='Item 1'\n \u2022 text='Item 2'\n \u2022 text='Item 3'\n"
+    # ListContent renders TextContent items using their rendered_markdown() method
+    EXPECTED_RENDERED_PLAIN = " • Item 1\n • Item 2\n • Item 3\n"
+    EXPECTED_RENDERED_MARKDOWN = " • Item 1\n • Item 2\n • Item 3\n"
+    EXPECTED_RENDERED_FOR_PROMPT = " • Item 1\n • Item 2\n • Item 3\n"
 
     # Empty list test cases
     EMPTY_ITEMS: ClassVar[list[TextContent]] = []
