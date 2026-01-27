@@ -91,6 +91,8 @@ extra_css:
 nav:
   - Home:
     - What is Pipelex?: index.md
+    - Releases:
+      - v0.18.0 "Chicago": home/1-releases/chicago.md
     - Get Started:
       - The Pipe Builder: home/2-get-started/pipe-builder.md
       - Write Workflows Manually: home/2-get-started/write-workflows-manually.md
