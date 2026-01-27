@@ -6,6 +6,14 @@ title: "Chicago Release"
 
 **The AI workflow framework that just works.**
 
+## Why Pipelex
+
+Pipelex eliminates the complexity of building AI-powered applications. Instead of managing multiple SDKs, API configurations, and infrastructure concerns, developers focus on what matters: their application logic.
+
+- **One framework** for prompts, pipelines, and structured outputs
+- **One API key** for dozens of AI models
+- **One workflow** from prototype to production
+
 ---
 
 ## A Major Milestone
@@ -81,7 +89,8 @@ Broad support for open-source AI:
 
 ### Developer Experience
 
-- **Pydantic Structure Generation** — Convert Pipelex's declarative structured concepts into Python code with full IDE autocomplete, type checking, and validation
+- **Pure PLX Workflows** — Inline concept structures now support nested concepts, making Pipelex fully usable with just `.plx` files and the CLI—no Python code required
+- **Deep Integration Options** — Generate Pydantic BaseModels from your declarative concepts for full IDE autocomplete, type checking, and validation (TypeScript Zod structures coming soon)
 - **PipeCompose Construct Mode** — Build `StructuredContent` objects deterministically without an LLM, composing outputs from working memory variables, fixed values, templates, and nested structures
 - **Cloud Storage for Artifacts** — Store generated images and extracted pages on AWS S3 or Google Cloud Storage with public or signed URLs
 - **Python 3.14 Support**
@@ -98,16 +107,6 @@ Then run `pipelex init` to configure your environment and obtain your Gateway AP
 
 !!! tip "Documentation"
     Explore our comprehensive guides at [docs.pipelex.com](https://docs.pipelex.com/)
-
----
-
-## Why Pipelex
-
-Pipelex eliminates the complexity of building AI-powered applications. Instead of managing multiple SDKs, API configurations, and infrastructure concerns, developers focus on what matters: their application logic.
-
-- **One framework** for prompts, pipelines, and structured outputs
-- **One API key** for dozens of AI models
-- **One workflow** from prototype to production
 
 ---
 
