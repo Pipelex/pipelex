@@ -37,7 +37,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM that outputs multiple",
             inputs={"input_text": "Text"},
             output="Text[3]",  # Multiple output
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -90,7 +90,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM with single output",
             inputs={"input_text": "Text"},
             output="Text",  # Single output
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -139,7 +139,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM with variable output",
             inputs={"input_text": "Text"},
             output="Text[]",  # Variable multiplicity
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -188,7 +188,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM with variable output",
             inputs={"input_text": "Text"},
             output="Text[]",  # Variable multiplicity
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -243,7 +243,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM with fixed output count",
             inputs={"input_text": "Text"},
             output="Text[3]",  # Fixed multiplicity of 3
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -295,7 +295,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM with variable output count",
             inputs={"input_text": "Text"},
             output="Text[]",  # Variable multiplicity
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -351,7 +351,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM that processes single item",
             inputs={"cv_pdf": "Document"},
             output="Text",  # Single output
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@cv_pdf",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -408,7 +408,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM that processes single item",
             inputs={"cv_pdf": "Document"},
             output="Text",  # Single output
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@cv_pdf",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -469,7 +469,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM that processes single item",
             inputs={"cv_pdf": "Document"},
             output="Text",  # Single output
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@cv_pdf",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -524,7 +524,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM that processes single item",
             inputs={"input_text": "Text"},
             output="Text",  # Single output
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -577,7 +577,7 @@ class TestPipeSequenceOutputMultiplicity:
             description="LLM that processes single item",
             inputs={"input_text": "Text"},
             output="Text",  # Single output
-            model="llm_for_testing_gen_text",
+            model="$testing-text",
             prompt="@input_text",
         )
         llm_pipe = PipeFactory[PipeLLM].make_from_blueprint(

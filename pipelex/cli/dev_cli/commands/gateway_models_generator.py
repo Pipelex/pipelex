@@ -94,6 +94,44 @@ def extract_reference_data(model_specs: BackendModelSpecs) -> dict[str, list[dic
     return models_by_type
 
 
+def generate_pure_markdown_list(models: list[dict[str, Any]]) -> str:
+    """Generate a pure Markdown bullet list for a list of models (no HTML/tables).
+
+    Args:
+        models: List of model info dictionaries.
+
+    Returns:
+        Pure Markdown bullet list string.
+    """
+    if not models:
+        return "_No models available in this category._\n"
+
+    lines: list[str] = []
+    for model in models:
+        name: str = model.get("name", "")
+        inputs: list[str] = model.get("inputs", [])
+        outputs: list[str] = model.get("outputs", [])
+
+        # Sort inputs and outputs using preferred order
+        def sort_by_preferred(items: list[str], preferred: list[str]) -> list[str]:
+            item_set = set(items)
+            ordered = [col for col in preferred if col in item_set]
+            remaining = sorted(item_set - set(preferred))
+            return ordered + remaining
+
+        sorted_inputs = sort_by_preferred(inputs, PREFERRED_INPUT_ORDER)
+        sorted_outputs = sort_by_preferred(outputs, PREFERRED_OUTPUT_ORDER)
+
+        inputs_str = ", ".join(sorted_inputs) if sorted_inputs else "none"
+        outputs_str = ", ".join(sorted_outputs) if sorted_outputs else "none"
+
+        lines.append(f"- **{name}**")
+        lines.append(f"  - inputs: {inputs_str}")
+        lines.append(f"  - outputs: {outputs_str}")
+
+    return "\n".join(lines) + "\n"
+
+
 def generate_markdown_table(models: list[dict[str, Any]]) -> str:
     """Generate an HTML table for a list of models with grouped input/output headers.
 
@@ -213,6 +251,62 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
     sections.append("## Image Generation Models")
     sections.append("")
     sections.append(generate_markdown_table(models_by_type["img_gen"]))
+
+    # Add auto-generated notice at the bottom
+    sections.append("")
+    sections.append("> **AUTO-GENERATED FILE** - Do not edit manually.")
+    sections.append(f"> Last updated: {timestamp}")
+    sections.append(">")
+    sections.append("> Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.")
+
+    return "\n".join(sections)
+
+
+def generate_reference_pure_markdown(model_specs: BackendModelSpecs) -> str:
+    """Generate a pure Markdown reference file content (no HTML, plain text readable).
+
+    Args:
+        model_specs: Raw model specifications from remote config.
+
+    Returns:
+        Complete pure Markdown content for the reference file.
+    """
+    models_by_type = extract_reference_data(model_specs)
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    sections = [
+        "# Pipelex Gateway — Available Models (Plain Text)",
+        "",
+        "This file lists the LLMs, document extraction models, and image generation models currently available through Pipelex Gateway.",
+        f"For configuration details, see the [documentation]({URLs.gateway_docs}).",
+        "",
+        "**Note:** This is the plain-text readable version. See `pipelex_gateway_models.md` for the HTML-styled version.",
+        "",
+    ]
+
+    # Add LLM section
+    sections.append("## Language Models (LLM)")
+    sections.append("")
+    sections.append(generate_pure_markdown_list(models_by_type["llm"]))
+
+    # Add document extractor section
+    sections.append("## Document Extraction Models")
+    sections.append("")
+    sections.append(generate_pure_markdown_list(models_by_type["text_extractor"]))
+    sections.append("")
+    sections.append(
+        "**About extracted pages:** "
+        "Each page contains Markdown text (based on AI-interpreted layout) and optional extracted images. "
+        "A single image input is treated as one page. Pipelex also wraps the `pypdfium2` library for raw text "
+        "(without any AI interpretation) and images extraction and page views rendering. "
+        "All these elements can be used as inputs into downstream pipes, including LLM prompts."
+    )
+
+    # Add image generation section
+    sections.append("")
+    sections.append("## Image Generation Models")
+    sections.append("")
+    sections.append(generate_pure_markdown_list(models_by_type["img_gen"]))
 
     # Add auto-generated notice at the bottom
     sections.append("")

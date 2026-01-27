@@ -14,7 +14,7 @@ output = "Color"
 prompt = """
 Choose {{ _nb_output }} colors.
 """
-model = "llm_for_creative_writing"
+model = "$writing-creative"
 
 [pipe.sequence_for_batch_test]
 type = "PipeSequence"

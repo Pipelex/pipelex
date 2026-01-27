@@ -117,7 +117,7 @@ class PipelexBundleBlueprint(BaseModel):
         External references (concepts from other domains) are not validated here - they're
         assumed to be declared in their respective bundles and loaded via dependencies.
         """
-        declared_concepts = set(self.concept.keys()) if self.concept else set[str]()
+        declared_concepts: set[str] = set(self.concept.keys()) if self.concept else set()
         native_codes = {native.value for native in NativeConceptCode.values_list()}
         all_refs = self._collect_local_concept_references()
 

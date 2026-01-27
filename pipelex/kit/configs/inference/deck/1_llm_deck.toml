@@ -1,0 +1,79 @@
+####################################################################################################
+# Pipelex Model Deck - LLM Configuration
+####################################################################################################
+#
+# This file defines model defaults, aliases, and presets for LLMs
+#
+# Model Reference Syntax:
+# - Preset:    $preset_name or preset:preset_name
+# - Alias:     @alias_name or alias:alias_name
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# LLM Default Choices
+####################################################################################################
+
+[llm.choice_defaults]
+default_temperature = 0.5
+for_text = "@default-general"
+for_object = "@default-general"
+
+####################################################################################################
+# LLM Aliases
+####################################################################################################
+
+[llm.aliases]
+best-gpt = "gpt-5.2"
+best-claude = "claude-4.5-opus"
+best-gemini = "gemini-3.0-pro"
+best-mistral = "mistral-large-3"
+
+# Default aliases (first choice from waterfalls)
+default-general = "claude-4.5-sonnet"
+default-premium = "claude-4.5-opus"
+default-premium-vision = "claude-4.5-opus"
+default-premium-structured = "claude-4.5-opus"
+default-large-context-code = "gemini-3.0-pro"
+default-large-context-text = "gemini-2.5-flash"
+default-small = "gemini-2.5-flash-lite"
+default-small-structured = "gemini-2.5-flash-lite"
+default-small-vision = "gemini-2.5-flash-lite"
+default-small-creative = "gemini-2.5-flash-lite"
+
+####################################################################################################
+# LLM Presets
+####################################################################################################
+
+[llm.presets]
+
+# Writing
+writing-factual = { model = "@default-premium", temperature = 0.1 }
+writing-creative = { model = "@default-premium", temperature = 0.9 }
+
+# Retrieval
+retrieval = { model = "@default-large-context-text", temperature = 0.1 }
+
+# Engineering
+engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
+engineering-code = { model = "@default-premium", temperature = 0.1 }
+engineering-codebase-analysis = { model = "@best-gemini", temperature = 0.1 }
+
+# Vision
+vision = { model = "@default-premium-vision", temperature = 0.5 }
+vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
+vision-diagram = { model = "@default-premium-vision", temperature = 0.3 }
+vision-table = { model = "@default-premium-vision", temperature = 0.3 }
+
+# Image generation prompting
+img-gen-prompting = { model = "@default-premium", temperature = 0.5 }
+img-gen-prompting-cheap = { model = "@default-small", temperature = 0.5 }
+
+# Testing
+testing-text = { model = "@default-small", temperature = 0.5 }
+testing-structured = { model = "@default-small-structured", temperature = 0.1 }
+testing-vision = { model = "@default-small-vision", temperature = 0.5 }
+testing-vision-structured = { model = "@default-small-vision", temperature = 0.5 }

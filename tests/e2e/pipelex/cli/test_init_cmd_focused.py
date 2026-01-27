@@ -227,8 +227,8 @@ class TestFocusedInitialization:
         # Execute with ROUTING focus and reset flag
         init_cmd(focus=InitFocus.ROUTING)
 
-        # Verify routing was reset to pipelex_gateway_first (correct for pipelex_gateway)
-        env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
+        # Verify routing was reset to all_pipelex_gateway (correct for pipelex_gateway)
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
 
     def test_everything_already_configured(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 7.1: Everything configured - decline reconfigure."""

@@ -1,4 +1,5 @@
 import uuid
+from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -10,6 +11,7 @@ from pipelex import log
 from pipelex.builder import builder
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
@@ -34,6 +36,7 @@ from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
+    from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
     from pipelex.core.domains.domain import Domain
 
 
@@ -251,10 +254,12 @@ class LibraryManager(LibraryManagerAbstract):
         self,
         blueprints: list[PipelexBundleBlueprint],
     ) -> list["Concept"]:
-        """Load concepts from blueprints.
+        """Load concepts from blueprints in topological order based on refines dependencies.
 
-        Concepts are loaded in iteration order. Forward references between concepts
-        are resolved later by _rebuild_models_with_forward_refs().
+        Concepts that refine other concepts are loaded after their base concepts,
+        ensuring the base class is always registered before the refining class.
+        Forward references between concepts (for structure fields) are resolved
+        later by _rebuild_models_with_forward_refs().
 
         Args:
             blueprints: List of parsed PLX blueprints to load
@@ -262,16 +267,59 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of loaded concepts
         """
-        all_concepts: list[Concept] = []
+        # Step 1: Collect all concept entries with metadata
+        ref_to_entry: dict[str, tuple[str, str, ConceptBlueprint | str]] = {}
+
         for blueprint in blueprints:
             if blueprint.concept is not None:
                 for concept_code, concept_blueprint in blueprint.concept.items():
-                    concept = ConceptFactory.make_from_blueprint(
+                    concept_ref = ConceptFactory.make_concept_ref_with_domain(
                         domain_code=blueprint.domain,
                         concept_code=concept_code,
-                        blueprint_or_string_description=concept_blueprint,
                     )
-                    all_concepts.append(concept)
+                    ref_to_entry[concept_ref] = (blueprint.domain, concept_code, concept_blueprint)
+
+        # Step 2: Build dependency graph and topologically sort using graphlib
+        sorter: TopologicalSorter[str] = TopologicalSorter()
+
+        for concept_ref, (domain_code, _concept_code, concept_blueprint) in ref_to_entry.items():
+            dependencies: set[str] = set()
+
+            if not isinstance(concept_blueprint, str) and concept_blueprint.refines:
+                refines = concept_blueprint.refines
+                # Skip native concepts (always available)
+                if not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=refines):
+                    # Resolve to full concept ref
+                    if "." in refines:
+                        refined_ref = refines
+                    else:
+                        refined_ref = ConceptFactory.make_concept_ref_with_domain(
+                            domain_code=domain_code,
+                            concept_code=refines,
+                        )
+                    # Only add dependency if it's a concept we're loading
+                    if refined_ref in ref_to_entry:
+                        dependencies.add(refined_ref)
+
+            sorter.add(concept_ref, *dependencies)
+
+        # Step 3: Get sorted order (raises CycleError if cycles detected)
+        try:
+            sorted_refs = list(sorter.static_order())
+        except CycleError as exc:
+            msg = f"Cycle detected in concept refines dependencies: {exc.args[1]}"
+            raise LibraryLoadingError(msg) from exc
+
+        # Step 4: Load concepts in topological order
+        all_concepts: list[Concept] = []
+        for concept_ref in sorted_refs:
+            domain_code, concept_code, concept_blueprint = ref_to_entry[concept_ref]
+            concept = ConceptFactory.make_from_blueprint(
+                domain_code=domain_code,
+                concept_code=concept_code,
+                blueprint_or_string_description=concept_blueprint,
+            )
+            all_concepts.append(concept)
 
         return all_concepts
 

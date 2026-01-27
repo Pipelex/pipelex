@@ -144,7 +144,7 @@ Extracts text content from the candidate's CV PDF document using OCR technology,
 """
 inputs = { cv_pdf = "PDF" }
 output = "Page[]"
-model = "extract_basic_from_pdf"
+model = "extract-text-from-pdf"
 
 [pipe.extract_job_offer_text]
 type = "PipeExtract"
@@ -153,7 +153,7 @@ Extracts text content from the job offer PDF document using OCR technology, conv
 """
 inputs = { job_offer_pdf = "PDF" }
 output = "Page[]"
-model = "extract_basic_from_pdf"
+model = "extract-text-from-pdf"
 
 [pipe.analyze_match]
 type = "PipeLLM"
@@ -162,7 +162,7 @@ Performs comprehensive analysis comparing the candidate's CV against the job off
 """
 inputs = { cv_pages = "Page[]", job_offer_pages = "Page[]" }
 output = "MatchAnalysis"
-model = "llm_to_answer_questions"
+model = "$writing-factual"
 system_prompt = """
 You are an expert HR analyst and recruiter specializing in candidate-job fit assessment. Your task is to generate a structured MatchAnalysis comparing a candidate's CV against job requirements.
 """
@@ -185,7 +185,7 @@ Generates exactly 5 targeted, relevant interview questions based on the match an
 """
 inputs = { match_analysis = "MatchAnalysis" }
 output = "Question[5]"
-model = "llm_for_writing_cheap"
+model = "$testing-structured"
 system_prompt = """
 You are an expert HR interviewer and talent assessment specialist. Your task is to generate structured interview questions based on candidate-position match analysis.
 """

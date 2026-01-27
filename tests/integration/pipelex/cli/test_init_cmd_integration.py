@@ -38,8 +38,8 @@ class TestInitCommandIntegration:
             if backend_key != "internal":
                 assert toml_doc[backend_key]["enabled"] is True  # type: ignore[index]
 
-        # Verify routing was set to pipelex_gateway_first (since pipelex_gateway is in "all")
-        env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
+        # Verify routing was set to all_pipelex_gateway (since pipelex_gateway is in "all")
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
 
         # Verify telemetry (always "off" - default from template)
         env.verify_telemetry("off")
@@ -126,7 +126,7 @@ class TestInitCommandIntegration:
 
         # CONFIG focus on first init triggers full flow
         env.verify_backends_enabled([PipelexBackend.GATEWAY])
-        env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
         # Telemetry should be created
         if (env.pipelex_dir / "telemetry.toml").exists():
             env.verify_telemetry("off")
@@ -270,8 +270,8 @@ class TestInitCommandIntegration:
         # Verify custom routing with automatic fallback order
         env.verify_routing("custom_routing", expected_default="anthropic", expected_fallback_order=["anthropic", "openai"])
 
-    def test_init_pipelex_gateway_sets_pipelex_gateway_first(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that selecting pipelex_gateway automatically sets pipelex_gateway_first routing."""
+    def test_init_pipelex_gateway_sets_all_pipelex_gateway(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that selecting pipelex_gateway automatically sets all_pipelex_gateway routing."""
         # Setup environment
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_empty_dir()
@@ -294,5 +294,5 @@ class TestInitCommandIntegration:
         # Verify backends
         env.verify_backends_enabled([PipelexBackend.GATEWAY, "openai"])
 
-        # Verify routing is automatically set to pipelex_gateway_first
-        env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
+        # Verify routing is automatically set to all_pipelex_gateway
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
