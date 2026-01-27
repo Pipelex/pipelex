@@ -67,6 +67,8 @@ make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
 make cgm                      - Shorthand -> check-gateway-models
+make regenerate-test-models   - Regenerate test model fixtures from backend configs
+make rtm                      - Shorthand -> regenerate-test-models
 
 make up                       - Shorthand -> update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env and lock files
@@ -199,6 +201,7 @@ install: env-verbose
 	@. "$(VIRTUAL_ENV)/bin/activate" && \
 	uv sync --all-extras && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
+	@$(MAKE) regenerate-test-models
 
 lock: env
 	$(call PRINT_TITLE,"Resolving dependencies without update")
@@ -280,6 +283,23 @@ smc-dry: env
 	$(call PRINT_TITLE,Previewing main config sync - dry run)
 	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
 
+# Support PROF as shorthand for TEST_PROFILE
+ifdef PROF
+TEST_PROFILE := $(PROF)
+endif
+TEST_PROFILE ?= dev
+
+regenerate-test-models: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures")
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
+
+rtm: regenerate-test-models
+	@echo "> done: rtm = regenerate-test-models"
+
+rtm-full: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures with full profile")
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile full
+
 ##############################################################################################
 ############################      Cleaning                        ############################
 ##############################################################################################
@@ -296,6 +316,8 @@ cleanderived:
 	find . -type d -wholename '**/.pytest_cache' -exec rm -rf {} + && \
 	find . -type d -wholename './logs/*.log' -exec rm -rf {} + && \
 	find . -type d -wholename './.reports/*' -exec rm -rf {} + && \
+	rm -f tests/integration/pipelex/fixtures/_generated_model_sets.py && \
+	rm -f .pipelex-dev/model_availability.json && \
 	echo "Cleaned up derived files and directories";
 
 cleanenv:
@@ -318,21 +340,29 @@ cleanall: cleanderived cleanenv cleanconfig
 
 codex-tests: env
 	$(call PRINT_TITLE,"Unit testing for Codex")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
+	@echo "• Regenerating test model fixtures"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
 	@echo "• Running all unit tests"
 	$(VENV_PYTEST) -n auto --exitfirst --quiet
 
 run-manual-trigger-gha-tests: env
 	$(call PRINT_TITLE,"Running GHA tests")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running GHA unit tests for inference, llm, and not gha_disabled"
 	$(VENV_PYTEST) --exitfirst --quiet -m "not (gha_disabled or pipelex_api) and (inference or llm)" || [ $$? = 5 ]
 
@@ -409,6 +439,10 @@ tb: env
 
 test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -421,6 +455,10 @@ test-inference-with-prints: env
 
 test-inference-fast: env
 	$(call PRINT_TITLE,"Unit testing")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -451,6 +489,10 @@ ti-dry: env
 
 test-llm: env
 	$(call PRINT_TITLE,"Unit testing LLM")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "llm" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -466,6 +508,10 @@ tl: test-llm
 
 test-extract: env
 	$(call PRINT_TITLE,"Unit testing Extract")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "extract" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -481,6 +527,10 @@ te: test-extract
 
 test-img-gen: env
 	$(call PRINT_TITLE,"Unit testing Image Generation")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \

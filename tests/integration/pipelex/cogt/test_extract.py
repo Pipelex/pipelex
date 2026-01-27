@@ -8,12 +8,12 @@ from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
 from pipelex.hub import get_extract_worker
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import DocumentTestCases, ImageTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 @pytest.mark.extract
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 @pytest.mark.filterwarnings("ignore:Accessing the 'model_fields' attribute on the instance is deprecated:DeprecationWarning")
 class TestExtract:
     @pytest.mark.parametrize("file_path", DocumentTestCases.DOCUMENT_FILE_PATHS)
@@ -21,12 +21,12 @@ class TestExtract:
         self,
         generated_content_factory: GeneratedContentFactory,
         job_metadata: JobMetadata,
-        extract_handle_from_pdf: str,
+        extract_combo: ModelCombo,
         extract_job_params: ExtractJobParams,
         file_path: str,
     ):
         pretty_print(extract_job_params, title=f"Extract Job Params for {file_path}")
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_pdf)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -53,11 +53,11 @@ class TestExtract:
     async def test_extract_pdf_url(
         self,
         job_metadata: JobMetadata,
-        extract_handle_from_pdf: str,
+        extract_combo: ModelCombo,
         extract_job_params: ExtractJobParams,
         url: str,
     ):
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_pdf)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -78,11 +78,11 @@ class TestExtract:
     async def test_extract_image_path(
         self,
         job_metadata: JobMetadata,
-        extract_handle_from_image: str,
+        extract_combo: ModelCombo,
         extract_job_params: ExtractJobParams,
         file_path: str,
     ):
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_image_supported:
             msg = f"Image extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -102,11 +102,11 @@ class TestExtract:
     async def test_extract_image_url(
         self,
         job_metadata: JobMetadata,
-        extract_handle_from_image: str,
+        extract_combo: ModelCombo,
         extract_job_params: ExtractJobParams,
         url: str,
     ):
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_image_supported:
             msg = f"Image extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -126,10 +126,10 @@ class TestExtract:
     async def test_extract_image_save(
         self,
         job_metadata: JobMetadata,
-        extract_handle_from_image: str,
+        extract_combo: ModelCombo,
         file_path: str,
     ):
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
