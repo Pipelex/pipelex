@@ -20,7 +20,6 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from tests.cases import DocumentTestCases, ImageTestCases
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestSystemPromptReferences:
     """Tests for image/document references in system prompts."""
 
@@ -124,6 +123,7 @@ class TestSystemPromptReferences:
         assert ref.kind == DocumentReferenceKind.DIRECT_LIST
         assert ref.variable_path == "documents"
 
+    @pytest.mark.asyncio
     async def test_system_prompt_image_extracted_to_user_images(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that image in system_prompt is extracted to user_images."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
@@ -162,6 +162,7 @@ class TestSystemPromptReferences:
         assert llm_prompt.system_text is not None
         assert "[Image 1]" in llm_prompt.system_text
 
+    @pytest.mark.asyncio
     async def test_system_prompt_document_extracted_to_user_documents(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that document in system_prompt is extracted to user_documents."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
@@ -200,6 +201,7 @@ class TestSystemPromptReferences:
         assert llm_prompt.system_text is not None
         assert "[Document 1]" in llm_prompt.system_text
 
+    @pytest.mark.asyncio
     async def test_images_in_both_prompts_have_global_numbering(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that images in system_prompt and user prompt have global sequential numbering.
 
@@ -253,6 +255,7 @@ class TestSystemPromptReferences:
         assert llm_prompt.user_text is not None
         assert "[Image 2]" in llm_prompt.user_text
 
+    @pytest.mark.asyncio
     async def test_documents_in_both_prompts_have_global_numbering(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that documents in system_prompt and user prompt have global sequential numbering."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
@@ -303,6 +306,7 @@ class TestSystemPromptReferences:
         assert llm_prompt.user_text is not None
         assert "[Document 2]" in llm_prompt.user_text
 
+    @pytest.mark.asyncio
     async def test_image_list_in_system_prompt_extracts_all(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that Image[] in system_prompt extracts all images."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])

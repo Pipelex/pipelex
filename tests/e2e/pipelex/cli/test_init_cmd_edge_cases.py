@@ -16,8 +16,8 @@ from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_in
 
 
 class TestEdgeCases:
-    def test_pipelex_gateway_sets_pipelex_gateway_first(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case 9.1: pipelex_gateway always sets pipelex_gateway_first."""
+    def test_pipelex_gateway_sets_all_pipelex_gateway(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test Case 9.1: pipelex_gateway always sets all_pipelex_gateway."""
         # Setup environment
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_empty_dir()
@@ -37,8 +37,8 @@ class TestEdgeCases:
         # Execute
         init_cmd(focus=InitFocus.ALL)
 
-        # Verify pipelex_gateway_first is set automatically
-        env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
+        # Verify all_pipelex_gateway is set automatically
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
 
     def test_single_non_pipelex_backend(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 9.2: Single non-pipelex backend."""
