@@ -28,23 +28,19 @@ if TYPE_CHECKING:
 SUB_COMMAND_STRUCTURES = "structures"
 
 
-def _compute_module_path_from_output_dir(output_directory: Path) -> str | None:
-    """Compute the Python module path from the output directory.
+def _compute_relative_path_from_output_dir(output_directory: Path) -> Path | None:
+    """Compute the relative path from the output directory to the current working directory.
 
     Args:
         output_directory: The directory where structure files will be generated
 
     Returns:
-        Module path string (e.g., "pipeline_01.structures") or None if cannot be determined
+        Relative path or None if cannot be determined
     """
     try:
-        # Get relative path from current working directory
         cwd = Path.cwd()
-        rel_path = output_directory.resolve().relative_to(cwd)
-        # Convert path to module path (replace / with .)
-        return str(rel_path).replace("/", ".").replace("\\", ".")
+        return output_directory.resolve().relative_to(cwd)
     except ValueError:
-        # output_directory is not relative to cwd
         return None
 
 
@@ -62,7 +58,7 @@ def _build_concept_ref_to_class_info(
         Mapping from concept_ref to ConceptClassInfo with module paths
     """
     concept_ref_to_class_info: dict[str, ConceptClassInfo] = {}
-    base_module_path = _compute_module_path_from_output_dir(output_directory)
+    base_relative_path = _compute_relative_path_from_output_dir(output_directory)
 
     for blueprint in blueprints:
         if blueprint.domain == "native":
@@ -80,7 +76,8 @@ def _build_concept_ref_to_class_info(
 
             # Build the module path for this concept's structure file
             class_name_snake_case = pascal_case_to_snake_case(class_name)
-            if base_module_path:
+            if base_relative_path:
+                base_module_path = ".".join(base_relative_path.parts)
                 module_path = f"{base_module_path}.{blueprint.domain}__{class_name_snake_case}"
             else:
                 module_path = None
