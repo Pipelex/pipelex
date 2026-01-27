@@ -47,7 +47,9 @@ A fully managed infrastructure providing unified access to AI models through a s
 
 ### Document Extraction
 
-Four powerful extraction options to fit any use case:
+From simple text extraction to advanced document understanding—Pipelex handles it all. Basic PDF text extraction works out of the box (via pypdfium2), but real documents demand more: OCR for scanned pages, layout analysis for complex structures, image extraction, and VLM-powered understanding when needed.
+
+Unlike LLM APIs (partly standardized around OpenAI's completions API), the OCR landscape is fragmented. Pipelex solves this with a unified interface: swap providers by changing your PipeExtract config, no code changes required.
 
 | Provider | Description |
 |----------|-------------|
