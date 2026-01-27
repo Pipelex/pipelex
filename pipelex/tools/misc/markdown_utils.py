@@ -51,6 +51,7 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False) -> s
         # Simple scalar types become paragraphs (strings) or inline text
         # If it's a string with multiple lines, just output them as-is.
         # No truncation - markdown output should preserve full content
+        # TODO: Detect if its an image and truncate the base64
         return str(data)
 
     elif data is None:
