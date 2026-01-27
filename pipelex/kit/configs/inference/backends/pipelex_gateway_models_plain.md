@@ -7,82 +7,192 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 ## Language Models (LLM)
 
-| Model | in:text | in:images | in:pdf | out:text | out:structured |
-| --- | :---: | :---: | :---: | :---: | :---: |
-| claude-3-haiku | ✅ | ✅ | ❌ | ✅ | ✅ |
-| claude-3.7-sonnet | ✅ | ✅ | ✅ | ✅ | ✅ |
-| claude-4-opus | ✅ | ✅ | ✅ | ✅ | ✅ |
-| claude-4-sonnet | ✅ | ✅ | ✅ | ✅ | ✅ |
-| claude-4.1-opus | ✅ | ✅ | ✅ | ✅ | ✅ |
-| claude-4.5-haiku | ✅ | ✅ | ✅ | ✅ | ✅ |
-| claude-4.5-opus | ✅ | ✅ | ✅ | ✅ | ✅ |
-| claude-4.5-sonnet | ✅ | ✅ | ✅ | ✅ | ✅ |
-| deepseek-v3.1 | ✅ | ❌ | ❌ | ✅ | ✅ |
-| deepseek-v3.2 | ✅ | ❌ | ❌ | ✅ | ✅ |
-| deepseek-v3.2-speciale | ✅ | ❌ | ❌ | ✅ | ✅ |
-| gemini-2.0-flash | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gemini-2.5-flash | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gemini-2.5-flash-lite | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gemini-2.5-pro | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gemini-3.0-flash-preview | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gemini-3.0-pro | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-4.1 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-4.1-mini | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-4.1-nano | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-4o | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-4o-mini | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5-chat | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5-mini | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5-nano | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5.1 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5.1-chat | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5.1-codex | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5.2 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5.2-chat | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-5.2-codex | ✅ | ✅ | ✅ | ✅ | ✅ |
-| gpt-oss-120b | ✅ | ❌ | ❌ | ✅ | ✅ |
-| gpt-oss-20b | ✅ | ❌ | ❌ | ✅ | ✅ |
-| grok-3 | ✅ | ❌ | ❌ | ✅ | ❌ |
-| grok-3-mini | ✅ | ❌ | ❌ | ✅ | ❌ |
-| grok-4 | ✅ | ❌ | ❌ | ✅ | ✅ |
-| grok-4-fast-non-reasoning | ✅ | ✅ | ❌ | ✅ | ✅ |
-| grok-4-fast-reasoning | ✅ | ✅ | ❌ | ✅ | ✅ |
-| kimi-k2-thinking | ✅ | ❌ | ❌ | ✅ | ✅ |
-| mistral-large-3 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| o1 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| o1-mini | ✅ | ✅ | ❌ | ✅ | ✅ |
-| o3 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| o3-mini | ✅ | ❌ | ❌ | ✅ | ✅ |
-| o4-mini | ✅ | ❌ | ❌ | ✅ | ✅ |
-| phi-4 | ✅ | ❌ | ❌ | ✅ | ❌ |
-| phi-4-multimodal | ✅ | ✅ | ❌ | ✅ | ❌ |
-| qwen3-vl-235b-a22b | ✅ | ✅ | ❌ | ✅ | ✅ |
+- **claude-3-haiku**
+  - inputs: text, images
+  - outputs: text, structured
+- **claude-3.7-sonnet**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **claude-4-opus**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **claude-4-sonnet**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **claude-4.1-opus**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **claude-4.5-haiku**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **claude-4.5-opus**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **claude-4.5-sonnet**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **deepseek-v3.1**
+  - inputs: text
+  - outputs: text, structured
+- **deepseek-v3.2**
+  - inputs: text
+  - outputs: text, structured
+- **deepseek-v3.2-speciale**
+  - inputs: text
+  - outputs: text, structured
+- **gemini-2.0-flash**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-2.5-flash**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-2.5-flash-lite**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-2.5-pro**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-3.0-flash-preview**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-3.0-pro**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-4.1**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-4.1-mini**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-4.1-nano**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-4o**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-4o-mini**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5-chat**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5-mini**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5-nano**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.1**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.1-chat**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.1-codex**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.2**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.2-chat**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-5.2-codex**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gpt-oss-120b**
+  - inputs: text
+  - outputs: text, structured
+- **gpt-oss-20b**
+  - inputs: text
+  - outputs: text, structured
+- **grok-3**
+  - inputs: text
+  - outputs: text
+- **grok-3-mini**
+  - inputs: text
+  - outputs: text
+- **grok-4**
+  - inputs: text
+  - outputs: text, structured
+- **grok-4-fast-non-reasoning**
+  - inputs: text, images
+  - outputs: text, structured
+- **grok-4-fast-reasoning**
+  - inputs: text, images
+  - outputs: text, structured
+- **kimi-k2-thinking**
+  - inputs: text
+  - outputs: text, structured
+- **mistral-large-3**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **o1**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **o1-mini**
+  - inputs: text, images
+  - outputs: text, structured
+- **o3**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **o3-mini**
+  - inputs: text
+  - outputs: text, structured
+- **o4-mini**
+  - inputs: text
+  - outputs: text, structured
+- **phi-4**
+  - inputs: text
+  - outputs: text
+- **phi-4-multimodal**
+  - inputs: text, images
+  - outputs: text
+- **qwen3-vl-235b-a22b**
+  - inputs: text, images
+  - outputs: text, structured
 
 ## Document Extraction Models
 
-| Model | in:image | in:pdf | out:pages | out:captions |
-| --- | :---: | :---: | :---: | :---: |
-| azure-document-intelligence | ✅ | ✅ | ✅ | ✅ |
-| deepseek-ocr | ✅ | ❌ | ✅ | ❌ |
-| mistral-document-ai-2505 | ✅ | ✅ | ✅ | ❌ |
+- **azure-document-intelligence**
+  - inputs: image, pdf
+  - outputs: pages, captions
+- **deepseek-ocr**
+  - inputs: image
+  - outputs: pages
+- **mistral-document-ai-2505**
+  - inputs: image, pdf
+  - outputs: pages
 
 
 **About extracted pages:** Each page contains Markdown text (based on AI-interpreted layout) and optional extracted images. A single image input is treated as one page. Pipelex also wraps the `pypdfium2` library for raw text (without any AI interpretation) and images extraction and page views rendering. All these elements can be used as inputs into downstream pipes, including LLM prompts.
 
 ## Image Generation Models
 
-| Model | in:text | out:image |
-| --- | :---: | :---: |
-| flux-2-pro | ✅ | ✅ |
-| gpt-image-1 | ✅ | ✅ |
-| gpt-image-1-mini | ✅ | ✅ |
-| gpt-image-1.5 | ✅ | ✅ |
-| nano-banana | ✅ | ✅ |
-| nano-banana-pro | ✅ | ✅ |
+- **flux-2-pro**
+  - inputs: text
+  - outputs: image
+- **gpt-image-1**
+  - inputs: text
+  - outputs: image
+- **gpt-image-1-mini**
+  - inputs: text
+  - outputs: image
+- **gpt-image-1.5**
+  - inputs: text
+  - outputs: image
+- **nano-banana**
+  - inputs: text
+  - outputs: image
+- **nano-banana-pro**
+  - inputs: text
+  - outputs: image
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-27T14:01:21Z
+> Last updated: 2026-01-27T14:08:51Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
