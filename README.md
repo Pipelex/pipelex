@@ -185,7 +185,7 @@ Generates exactly 5 targeted, relevant interview questions based on the match an
 """
 inputs = { match_analysis = "MatchAnalysis" }
 output = "Question[5]"
-model = "$testing-object"
+model = "$testing-structured"
 system_prompt = """
 You are an expert HR interviewer and talent assessment specialist. Your task is to generate structured interview questions based on candidate-position match analysis.
 """

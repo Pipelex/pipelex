@@ -36,7 +36,7 @@ type = "PipeLLM"
 description = "Generate a structured invoice from a text description"
 inputs = { description_text = "Text" }
 output = "Invoice"
-model = "llm_to_answer_questions_cheap"
+model = "$testing-structured"
 system_prompt = """
 You are an invoice generation assistant. You extract structured invoice information from text descriptions.
 Always generate realistic but fictional data when specifics are not provided.

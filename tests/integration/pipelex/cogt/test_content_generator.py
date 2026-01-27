@@ -71,7 +71,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_direct(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
-        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-object")
+        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_direct: Employee = await content_generator.make_object_direct(
             job_metadata=job_metadata,
@@ -86,7 +86,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_list_direct(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
-        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-object")
+        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_list_direct: list[Employee] = await content_generator.make_object_list_direct(
             job_metadata=job_metadata,
