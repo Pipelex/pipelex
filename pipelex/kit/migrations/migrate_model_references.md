@@ -105,48 +105,49 @@ llm_choice = "@best-claude"  # alias
 
 | Old Pattern                        | New Pattern                        | Type      |
 |------------------------------------|------------------------------------|-----------|
-| `cheap_llm`                        | `~cheap_llm`                       | Waterfall |
-| `cheap_llm_for_structured`         | `~cheap_llm_for_structured`        | Waterfall |
-| `cheap_llm_for_vision`             | `~cheap_llm_for_vision`            | Waterfall |
-| `cheap_llm_for_creativity`         | `~cheap_llm_for_creativity`        | Waterfall |
-| `smart_llm`                        | `~smart_llm`                       | Waterfall |
-| `smart_llm_for_structured`         | `~smart_llm_for_structured`        | Waterfall |
-| `smart_llm_with_vision`            | `~smart_llm_with_vision`           | Waterfall |
-| `llm_for_creativity`               | `~llm_for_creativity`              | Waterfall |
-| `llm_for_large_codebase`           | `~llm_for_large_codebase`          | Waterfall |
+| `cheap_llm`                        | `~small-llm`                       | Waterfall |
+| `cheap_llm_for_structured`         | `~small-llm-structured`            | Waterfall |
+| `cheap_llm_for_vision`             | `~small-llm-vision`                | Waterfall |
+| `cheap_llm_for_creativity`         | `~small-llm-creative`              | Waterfall |
+| `smart_llm`                        | `~premium-llm`                     | Waterfall |
+| `smart_llm_for_structured`         | `~premium-llm-structured`          | Waterfall |
+| `smart_llm_with_vision`            | `~premium-llm-vision`              | Waterfall |
+| `llm_for_large_codebase`           | `~large-context-llm-code`          | Waterfall |
 | `pdf_text_extractor`               | `~pdf_text_extractor`              | Waterfall |
 | `image_text_extractor`             | `~image_text_extractor`            | Waterfall |
 | `best-claude`                      | `@best-claude`                     | Alias     |
-| `base-gpt`                         | `@base-gpt`                        | Alias     |
-| `base-gemini`                      | `@base-gemini`                     | Alias     |
-| `base-mistral`                     | `@base-mistral`                    | Alias     |
-| `base-groq`                        | `@base-groq`                       | Alias     |
-| `best-claude`                      | `@best-claude`                     | Alias     |
+| `base-gpt`                         | `@best-gpt`                        | Alias     |
+| `base-gemini`                      | `@best-gemini`                     | Alias     |
+| `base-mistral`                     | `@best-mistral`                    | Alias     |
 | `best-gpt`                         | `@best-gpt`                        | Alias     |
-| `base-img-gen`                     | `@base-img-gen`                    | Alias     |
-| `best-img-gen`                     | `@best-img-gen`                    | Alias     |
-| `fast-img-gen`                     | `@fast-img-gen`                    | Alias     |
-| `writing-creative`         | `$writing-creative`        | Preset    |
-| `llm_for_factual_writing`          | `$llm_for_factual_writing`         | Preset    |
-| `llm_for_writing_cheap`            | `$llm_for_writing_cheap`           | Preset    |
-| `llm_to_answer_questions`          | `$llm_to_answer_questions`         | Preset    |
-| `default-small`    | `$default-small`   | Preset    |
-| `llm_to_retrieve`                  | `$llm_to_retrieve`                 | Preset    |
-| `engineering-structured`                  | `$engineering-structured`                 | Preset    |
-| `llm_to_code`                      | `$llm_to_code`                     | Preset    |
-| `llm_to_analyze_large_codebase`    | `$llm_to_analyze_large_codebase`   | Preset    |
-| `llm_for_img_to_text`              | `$llm_for_img_to_text`             | Preset    |
-| `llm_for_img_to_text_cheap`        | `$llm_for_img_to_text_cheap`       | Preset    |
-| `vision-diagram`          | `$vision-diagram`         | Preset    |
-| `llm_for_testing_gen_text`         | `$llm_for_testing_gen_text`        | Preset    |
-| `llm_for_testing_gen_object`       | `$llm_for_testing_gen_object`      | Preset    |
-| `vision-cheap`           | `$vision-cheap`          | Preset    |
+| `base-img-gen`                     | `@default-general` (img_gen)       | Alias     |
+| `best-img-gen`                     | `@default-premium` (img_gen)       | Alias     |
+| `fast-img-gen`                     | `@default-small` (img_gen)         | Alias     |
+| `default-general`                  | `@default-general`                 | Alias     |
+| `default-premium`                  | `@default-premium`                 | Alias     |
+| `default-small`                    | `@default-small`                   | Alias     |
+| `writing-creative`                 | `$writing-creative`                | Preset    |
+| `writing-factual`                  | `$writing-factual`                 | Preset    |
+| `llm_for_factual_writing`          | `$writing-factual`                 | Preset    |
+| `llm_to_retrieve`                  | `$retrieval`                       | Preset    |
+| `engineering-structured`           | `$engineering-structured`          | Preset    |
+| `llm_to_extract_invoice`           | `$engineering-structured`          | Preset    |
+| `llm_for_complex_reasoning`        | `$engineering-structured`          | Preset    |
+| `llm_to_code`                      | `$engineering-code`                | Preset    |
+| `llm_to_analyze_large_codebase`    | `$engineering-codebase-analysis`   | Preset    |
+| `llm_for_img_to_text`              | `$vision`                          | Preset    |
+| `llm_for_img_to_text_cheap`        | `$vision-cheap`                    | Preset    |
+| `llm_to_extract_diagram`           | `$vision-diagram`                  | Preset    |
+| `vision-diagram`                   | `$vision-diagram`                  | Preset    |
+| `llm_for_testing_gen_text`         | `$testing-text`                    | Preset    |
+| `llm_for_testing_gen_object`       | `$testing-object`                  | Preset    |
+| `vision-cheap`                     | `$vision-cheap`                    | Preset    |
 | `extract-all-from-document`        | `$extract-all-from-document`       | Preset    |
-| `extract-text-from-pdf`           | `$extract-text-from-pdf`          | Preset    |
-| `gen_image_basic`                  | `$gen_image_basic`                 | Preset    |
-| `gen_image_fast`                   | `$gen_image_fast`                  | Preset    |
-| `gen_image_high_quality`           | `$gen_image_high_quality`          | Preset    |
-| `gen-image-testing`              | `$gen-image-testing`             | Preset    |
+| `extract-text-from-pdf`            | `$extract-text-from-pdf`           | Preset    |
+| `gen_image_basic`                  | `$gen-image`                       | Preset    |
+| `gen_image_fast`                   | `$gen-image-fast`                  | Preset    |
+| `gen_image_high_quality`           | `$gen-image-high-quality`          | Preset    |
+| `gen-image-testing`                | `$gen-image-testing`               | Preset    |
 
 ## Error Messages
 

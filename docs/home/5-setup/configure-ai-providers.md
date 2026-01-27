@@ -157,7 +157,10 @@ This creates a `.pipelex/` directory with:
 └── inference/                # LLM configuration and model presets
     ├── backends.toml         # Enable/disable model providers
     ├── deck/
-    │   └── base_deck.toml    # LLM presets and aliases
+    │   ├── 1_llm_deck.toml           # LLM presets and aliases
+    │   ├── 2_img_gen_deck.toml       # Image generation config
+    │   ├── 3_extract_deck.toml       # Document extraction config
+    │   └── x_custom_llm_deck.toml    # Custom waterfalls/overrides
     └── routing_profiles.toml # Model routing configuration
 ```
 

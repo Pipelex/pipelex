@@ -107,7 +107,7 @@ Consolidates all pages from the job offer into a single structured job descripti
 """
 inputs = { job_offer_pages = "Page[]" }
 output = "JobRequirements"
-model = "llm_to_retrieve"
+model = "$retrieval"
 system_prompt = """
 You are an expert HR analyst specializing in extracting and structuring job requirements from job postings. Your task is to produce a structured JobRequirements object based on the provided job offer document.
 """
@@ -152,7 +152,7 @@ Analyzes the CV content against the job requirements and produces a match assess
 """
 inputs = { cv_pages = "Page[]", job_requirements = "JobRequirements" }
 output = "CvMatchAnalysis"
-model = "llm_to_answer_questions"
+model = "$engineering-structured"
 system_prompt = """
 You are an expert HR analyst and recruiter. Your task is to analyze candidate CVs against job requirements and produce structured assessments. Be thorough, objective, and provide actionable insights.
 """
