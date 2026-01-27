@@ -80,7 +80,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:
-                rendered += f" • {item}\n"
+                rendered += f" • {item.rendered_markdown(level=level, is_pretty=is_pretty)}\n"
         else:
             for item_index, item in enumerate(self.items):
                 rendered += f"\n • item #{item_index + 1}:\n\n"
@@ -101,7 +101,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:
-                rendered += f" • {item}\n"
+                rendered += f" • {await item.rendered_markdown_async(level=level, is_pretty=is_pretty)}\n"
         else:
             for item_index, item in enumerate(self.items):
                 rendered += f"\n • item #{item_index + 1}:\n\n"
@@ -120,7 +120,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
             if isinstance(item, ImageRenderable):  # pyright: ignore[reportUnnecessaryIsInstance]
                 rendered = item.render_with_images(registry, text_format)
             else:
-                rendered = str(item)
+                rendered = item.rendered_markdown()
             if rendered:
                 parts.append(rendered)
         return "\n".join(parts)
