@@ -11,7 +11,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
@@ -206,11 +206,25 @@ class ConceptSpec(StructuredContent):
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
-        if refines is not None:
-            if not NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refines):
-                msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
-                raise ValueError(msg)
-        return refines
+        """Validate the refines field.
+
+        Refines can be either:
+        - A native concept ref (e.g., "native.Text", "Text")
+        - A non-native concept ref (e.g., "myapp.BaseEntity") for concept-to-concept inheritance
+
+        Non-native concept refs are allowed since dependencies are loaded in topological order,
+        ensuring the refined concept exists before the refining concept is constructed.
+        """
+        if refines is None:
+            return None
+
+        # Check if it's a valid concept ref or code (domain.ConceptCode or ConceptCode in PascalCase)
+        if is_concept_ref_or_code_valid(concept_ref_or_code=refines):
+            return refines
+
+        # Invalid refines value
+        msg = f"Refines '{refines}' must be a valid concept ref (domain.ConceptCode) or concept code (PascalCase)"
+        raise ValueError(msg)
 
     @model_validator(mode="before")
     @classmethod

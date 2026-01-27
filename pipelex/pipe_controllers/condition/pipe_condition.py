@@ -119,7 +119,7 @@ class PipeCondition(PipeController):
 
         Rules:
         1. If all mapped pipes have the same output concept, PipeCondition's output MUST be that same concept.
-        2. If mapped pipes have different output concepts, PipeCondition's output MUST be Dynamic.
+        2. If mapped pipes have different output concepts, PipeCondition's output MUST be Anything.
 
         Special outcomes (CONTINUE/FAIL) do not influence the output validation - only actual pipes matter.
         When there are no mapped pipes (all special outcomes), any output is allowed.

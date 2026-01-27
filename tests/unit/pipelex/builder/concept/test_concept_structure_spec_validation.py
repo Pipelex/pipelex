@@ -3,6 +3,7 @@ from pydantic import ValidationError
 
 from pipelex import log
 from pipelex.builder.concept.concept_spec import ConceptStructureSpec, ConceptStructureSpecFieldType
+from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 
 
 class TestConceptStructureSpecValidation:
@@ -67,6 +68,6 @@ class TestConceptStructureSpecValidation:
         )
         blueprint = spec.to_blueprint()
         assert blueprint.type is not None
-        assert blueprint.type.value == "concept"
+        assert blueprint.type == ConceptStructureBlueprintFieldType.CONCEPT
         assert blueprint.concept_ref == "myapp.Customer"
         log.verbose(f"Blueprint: {blueprint}")
