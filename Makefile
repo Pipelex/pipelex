@@ -308,7 +308,7 @@ insert-skeleton:
 			exit 1; \
 	fi
 	@cp -rn $(SKELETON_DIR). .
-	@echo "Skeleton inserted from $(SKELETON_DIR)"
+	@echo "Skeleton files inserted from $(SKELETON_DIR)"
 
 ##########################################################################################
 ### CLEANING
