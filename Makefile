@@ -246,6 +246,8 @@ up-kit-configs:
 		--exclude='pipelex_override.toml' \
 		--exclude='telemetry_override.toml' \
 		--exclude='storage' \
+		--exclude='x_custom_llm_deck.toml' \
+		--exclude='x_custom_extract_deck.toml' \
 		.pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
