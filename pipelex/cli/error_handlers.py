@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import NoReturn
 
 import typer
@@ -120,7 +121,7 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
     raise typer.Exit(1) from exc
 
 
-def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: str | None = None) -> NoReturn:
+def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | None = None) -> NoReturn:
     """Handle and display ValidateBundleError with formatted output.
 
     Args:

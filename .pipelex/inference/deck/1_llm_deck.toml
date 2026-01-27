@@ -74,6 +74,6 @@ img-gen-prompting-cheap = { model = "@default-small", temperature = 0.5 }
 
 # Testing
 testing-text = { model = "@default-small", temperature = 0.5 }
-testing-object = { model = "@default-small-structured", temperature = 0.1 }
+testing-structured = { model = "@default-small-structured", temperature = 0.1 }
 testing-vision = { model = "@default-small-vision", temperature = 0.5 }
 testing-vision-structured = { model = "@default-small-vision", temperature = 0.5 }

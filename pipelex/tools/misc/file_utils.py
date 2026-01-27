@@ -320,7 +320,7 @@ def get_incremental_file_path(
     extension: str,
     start_at: int = 1,
     avoid_suffix_if_possible: bool = False,
-) -> str:
+) -> Path:
     """Generates a unique file path by incrementing a counter until an unused path is found.
 
     This function creates a file path in the format 'base_path/base_name_XX.extension' where XX
@@ -335,14 +335,14 @@ def get_incremental_file_path(
         avoid_suffix_if_possible (bool, optional): If True, avoids adding a suffix if possible. Defaults to False.
 
     Returns:
-        str: A unique file path that does not exist in the filesystem.
+        Path: A unique file path that does not exist in the filesystem.
 
     """
     if avoid_suffix_if_possible:
         # try without adding the suffix
         tested_path = f"{base_path}/{base_name}.{extension}"
         if not path_exists(tested_path):
-            return tested_path
+            return Path(tested_path)
 
     # we must add a number to the base name
     counter = start_at
@@ -351,7 +351,7 @@ def get_incremental_file_path(
         if not path_exists(tested_path):
             break
         counter += 1
-    return tested_path
+    return Path(tested_path)
 
 
 ########################################################

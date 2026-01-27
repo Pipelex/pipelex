@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+**Highlights:**
+
+  - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
+
 ### Added
  - **Telemetry System**: Introduced anonymous usage tracking and exception capture for CLI commands (`graph render`, `kit rules`, `kit remove-rules`, `kit migrations`), reporting to both user-configured and Pipelex analytics endpoints.
  - **PipeExtract Operator Validation**: Added strict input validation that raises configuration errors for incompatible input types or when document-specific parameters are used with image inputs.
@@ -12,9 +16,13 @@
  - **Default Image Generation Models**: Updated in `base_deck.toml`: `base-img-gen`: `flux-2-pro`, `best-img-gen`: `nano-banana-pro`, `fast-img-gen`: `gpt-image-1-mini`
  - **Remote Configuration**: Updated service URL to version 3.
  - **GatewayExtractWorker**: Now checks model capabilities before attempting image captioning.
+ - Change the output validation of `PipeCondition`: If all mapped pipes have the same output concept, `PipeCondition`'s output MUST be that same concept. If mapped pipes have different output concepts, `PipeCondition`'s output MUST be the native concept `Anything`.
+ - **CLI**: Changed `pipelex validate all` to `pipelex validate --all` (or `-a`).
 
 ### Fixed
  - Corrected output directory creation logic in `pipelex run` to properly respect the `--no-graph` flag and configuration settings.
+ - Fixed a bug when trying to print HTML content in a TextContent object.
+ - Fixed the Pipelex CLI for generating structures, inputs, runner files.
 
 ## [v0.18.0b2] - 2026-01-20
 

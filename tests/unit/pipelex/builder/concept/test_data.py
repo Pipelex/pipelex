@@ -147,12 +147,55 @@ class ConceptBlueprintTestCases:
         ),
     )
 
+    CONCEPT_WITH_CONCEPT_REF = (
+        "concept_with_concept_ref",
+        ConceptSpec(
+            the_concept_code="Invoice",
+            description="An invoice with a customer reference",
+            structure={
+                "invoice_number": ConceptStructureSpec(
+                    the_field_name="invoice_number",
+                    description="The invoice number",
+                    type=ConceptStructureSpecFieldType.TEXT,
+                    required=True,
+                ),
+                "customer": ConceptStructureSpec(
+                    the_field_name="customer",
+                    description="The customer for this invoice",
+                    type=ConceptStructureSpecFieldType.CONCEPT,
+                    concept_ref="myapp.Customer",
+                    required=True,
+                ),
+            },
+        ),
+        ConceptBlueprint(
+            description="An invoice with a customer reference",
+            refines=None,
+            structure={
+                "invoice_number": ConceptStructureBlueprint(
+                    description="The invoice number",
+                    type=ConceptStructureBlueprintFieldType.TEXT,
+                    required=True,
+                    default_value=None,
+                ),
+                "customer": ConceptStructureBlueprint(
+                    description="The customer for this invoice",
+                    type=ConceptStructureBlueprintFieldType.CONCEPT,
+                    concept_ref="myapp.Customer",
+                    required=True,
+                    default_value=None,
+                ),
+            },
+        ),
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, ConceptSpec, ConceptBlueprint]]] = [
         SIMPLE_CONCEPT,
         CONCEPT_WITH_REFINES,
         CONCEPT_WITH_TEXT_FIELD,
         CONCEPT_WITH_INTEGER_FIELD,
         CONCEPT_WITH_MULTIPLE_FIELDS,
+        CONCEPT_WITH_CONCEPT_REF,
     ]
 
 

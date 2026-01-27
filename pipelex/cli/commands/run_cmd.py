@@ -18,6 +18,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -141,7 +142,7 @@ def run_cmd(
 
     # Determine source:
     if target:
-        if target.endswith(".plx"):
+        if is_pipelex_file(Path(target)):
             bundle_path = target
             if bundle:
                 typer.secho(

@@ -122,9 +122,9 @@ pipelex run my_pipe -L /path/to/shared_pipes -L /path/to/project_pipes
 pipelex run my_bundle.plx --inputs data.json -L /path/to/pipelines
 
 # Available on multiple commands
-pipelex validate all -L /path/to/pipelines
-pipelex show pipes -L /path/to/pipelines
-pipelex which my_pipe -L /path/to/pipelines
+pipelex validate --all -L /path/to/pipelines/dir
+pipelex show pipes -L /path/to/pipelines/dir
+pipelex which my_pipe -L /path/to/pipelines/dir
 ```
 
 !!! tip "CLI Option Overrides PIPELEXPATH"
@@ -425,7 +425,7 @@ After making changes to your pipelines, validate them:
 
 ```bash
 # Validate all pipelines
-pipelex validate all
+pipelex validate --all
 
 # Validate a specific pipe
 pipelex validate pipe YOUR_PIPE_CODE
@@ -465,7 +465,7 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### 4. Validation
 
-- Run `pipelex validate all` after making changes
+- Run `pipelex validate --all` after making changes
 - Check for domain code consistency
 - Verify concept relationships
 - Test pipes individually before composing them
@@ -507,7 +507,7 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### Validation Errors
 
-**Problem:** `pipelex validate all` shows errors.
+**Problem:** `pipelex validate --all` shows errors.
 
 **Solutions:**
 

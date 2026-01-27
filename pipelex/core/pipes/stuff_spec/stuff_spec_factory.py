@@ -42,7 +42,7 @@ class StuffSpecFactory:
         try:
             domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_ref_or_code(
                 domain_code=domain_code,
-                concept_ref_or_code=parse_result.concept,
+                concept_ref_or_code=parse_result.concept_ref_or_code,
             )
         except ConceptFactoryError as exc:
             msg = f"Error resolving concept from output string '{output_string}': {exc}"

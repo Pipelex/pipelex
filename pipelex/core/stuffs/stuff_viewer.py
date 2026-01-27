@@ -4,8 +4,9 @@ This module provides functions to render a Stuff object as a standalone HTML vie
 with format tabs (HTML/JSON/Pretty) and action buttons (copy, download, open external).
 """
 
-import json
 from typing import Any
+
+from kajson import dumps
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff import Stuff
@@ -59,10 +60,10 @@ async def render_stuff_viewer(
             "title": display_title,
             "subtitle": display_subtitle,
             "html_tab_label": html_tab_label,
-            "stuff_data_json": json.dumps(stuff_data),
-            "stuff_data_text_json": json.dumps(stuff_data_text),
-            "stuff_data_html_json": json.dumps(stuff_data_html),
-            "content_type_json": json.dumps(content_type),
+            "stuff_data_json": dumps(stuff_data),
+            "stuff_data_text_json": dumps(stuff_data_text),
+            "stuff_data_html_json": dumps(stuff_data_html),
+            "content_type_json": dumps(content_type),
         },
         use_registry=True,
     )
@@ -105,10 +106,10 @@ async def render_stuff_content_viewer(
             "title": title,
             "subtitle": subtitle,
             "html_tab_label": html_tab_label,
-            "stuff_data_json": json.dumps(stuff_data),
-            "stuff_data_text_json": json.dumps(stuff_data_text),
-            "stuff_data_html_json": json.dumps(stuff_data_html),
-            "content_type_json": json.dumps(content_type),
+            "stuff_data_json": dumps(stuff_data),
+            "stuff_data_text_json": dumps(stuff_data_text),
+            "stuff_data_html_json": dumps(stuff_data_html),
+            "content_type_json": dumps(content_type),
         },
         use_registry=True,
     )

@@ -6,6 +6,9 @@ PIPE_FUNC = (
     """domain = "test_pipes"
 description = "Domain with function pipe"
 
+[concept]
+ProcessedData = "Processed data concept"
+
 [pipe.process_data]
 type = "PipeFunc"
 description = "Process data with function"
@@ -15,6 +18,7 @@ function_name = "process_data_function"
     PipelexBundleBlueprint(
         domain="test_pipes",
         description="Domain with function pipe",
+        concept={"ProcessedData": "Processed data concept"},
         pipe={
             "process_data": PipeFuncBlueprint(
                 type="PipeFunc",

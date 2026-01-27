@@ -180,7 +180,7 @@ class TemplateImageAnalyzer:
         """
         # Strip multiplicity brackets (e.g., "Image[]" -> "Image")
         parsed = parse_concept_with_multiplicity(concept_ref_or_code)
-        clean_concept_ref = parsed.concept
+        clean_concept_ref = parsed.concept_ref_or_code
 
         domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_ref_or_code(
             domain_code=domain_code,

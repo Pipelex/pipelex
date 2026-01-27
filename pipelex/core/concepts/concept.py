@@ -11,7 +11,7 @@ from pipelex.core.concepts.concept_representation_generator import (
 )
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.validation import validate_concept_code
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid, validate_concept_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
@@ -54,13 +54,25 @@ class Concept(BaseModel):
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None) -> str | None:
+        """Validate the refines field.
+
+        Refines can be either:
+        - A native concept ref (e.g., "native.Text", "Text")
+        - A non-native concept ref (e.g., "myapp.BaseEntity") for concept-to-concept inheritance
+
+        Non-native concept refs are allowed since dependencies are loaded in topological order,
+        ensuring the refined concept exists before the refining concept is constructed.
+        """
         if refines is None:
             return None
-        if not NativeConceptCode.is_valid_native_concept_ref(concept_ref=refines):
-            valid_native_concepts = ", ".join(native.concept_ref for native in NativeConceptCode.values_list())
-            msg = f"Refines '{refines}' is not a valid native concept string. Valid options are: {valid_native_concepts}"
-            raise ConceptValueError(msg)
-        return refines
+
+        # Check if it's a valid concept ref or code (domain.ConceptCode or ConceptCode in PascalCase)
+        if is_concept_ref_or_code_valid(concept_ref_or_code=refines):
+            return refines
+
+        # Invalid refines value
+        msg = f"Refines '{refines}' must be a valid concept ref (domain.ConceptCode) or concept code (PascalCase)"
+        raise ConceptValueError(msg)
 
     @property
     def concept_ref(self) -> str:

@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
@@ -10,19 +11,83 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.helpers import normalize_structure_blueprint
+from pipelex.core.concepts.helpers import get_structure_class_name_from_blueprint, normalize_structure_blueprint
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError
-from pipelex.core.concepts.structure_generation.generator import StructureGenerator
-from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.concepts.structure_generation.generator import ConceptClassInfo, StructureGenerator
+from pipelex.core.interpreter.helpers import is_pipelex_file
+from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry, get_func_registry
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
-from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 SUB_COMMAND_STRUCTURES = "structures"
+
+
+def _compute_relative_path_from_output_dir(output_directory: Path) -> Path | None:
+    """Compute the relative path from the output directory to the current working directory.
+
+    Args:
+        output_directory: The directory where structure files will be generated
+
+    Returns:
+        Relative path or None if cannot be determined
+    """
+    try:
+        cwd = Path.cwd()
+        return output_directory.resolve().relative_to(cwd)
+    except ValueError:
+        return None
+
+
+def _build_concept_ref_to_class_info(
+    blueprints: list["PipelexBundleBlueprint"],
+    output_directory: Path,
+) -> dict[str, ConceptClassInfo]:
+    """Build a mapping from concept refs to their class info including module paths.
+
+    Args:
+        blueprints: List of PipelexBundleBlueprint containing concept definitions
+        output_directory: Directory where structure files will be generated
+
+    Returns:
+        Mapping from concept_ref to ConceptClassInfo with module paths
+    """
+    concept_ref_to_class_info: dict[str, ConceptClassInfo] = {}
+    base_relative_path = _compute_relative_path_from_output_dir(output_directory)
+
+    for blueprint in blueprints:
+        if blueprint.domain == "native":
+            continue
+
+        if not blueprint.concept:
+            continue
+
+        for concept_code, concept_blueprint in blueprint.concept.items():
+            # Build the concept ref (domain.ConceptCode)
+            concept_ref = f"{blueprint.domain}.{concept_code}"
+
+            # Get the class name from the blueprint
+            class_name = get_structure_class_name_from_blueprint(concept_blueprint, concept_code)
+
+            # Build the module path for this concept's structure file
+            class_name_snake_case = pascal_case_to_snake_case(class_name)
+            if base_relative_path:
+                base_module_path = ".".join(base_relative_path.parts)
+                module_path = f"{base_module_path}.{blueprint.domain}__{class_name_snake_case}"
+            else:
+                module_path = None
+
+            concept_ref_to_class_info[concept_ref] = ConceptClassInfo(
+                class_name=class_name,
+                module_path=module_path,
+            )
+
+    return concept_ref_to_class_info
 
 
 def generate_structures_from_blueprints(
@@ -44,17 +109,12 @@ def generate_structures_from_blueprints(
     """
     output_directory.mkdir(parents=True, exist_ok=True)
 
+    # Build concept_ref_to_class_info mapping for all concepts
+    concept_ref_to_class_info = _build_concept_ref_to_class_info(blueprints, output_directory)
+    class_registry = get_class_registry()
+
     # Only check for existing classes if we're not skipping and have a target path
     check_existing = not skip_existing_check and target_path is not None
-    class_registry = KajsonManager.get_class_registry()
-    if check_existing:
-        class_registry.teardown()
-        class_registry.setup()
-        ClassRegistryUtils.register_classes_in_folder(
-            folder_path=str(target_path),
-            base_class=StructuredContent,
-            force_exclude_dirs=[str(output_directory.resolve())],
-        )
 
     generated_files: list[tuple[str, str]] = []
 
@@ -72,8 +132,6 @@ def generate_structures_from_blueprints(
             if check_existing and class_registry.has_class(name=concept_code):
                 existing_class = class_registry.get_class(name=concept_code)
                 if existing_class:
-                    import inspect  # noqa: PLC0415
-
                     try:
                         source_file = inspect.getfile(existing_class)
                         log.warning(
@@ -90,10 +148,11 @@ def generate_structures_from_blueprints(
             # Handle simple string concept definitions (description only, refines Text by default)
             if isinstance(concept_blueprint, str):
                 try:
-                    generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                    generated_code, _ = StructureGenerator(concept_ref_to_class_info=concept_ref_to_class_info).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
+                        description=concept_blueprint,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
@@ -113,13 +172,19 @@ def generate_structures_from_blueprints(
                 normalized_structure = normalize_structure_blueprint(concept_blueprint.structure)
 
                 try:
-                    generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                    generated_code, the_generated_class = StructureGenerator(
+                        concept_ref_to_class_info=concept_ref_to_class_info
+                    ).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint=normalized_structure,
+                        description=concept_blueprint.description,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating python code for structure class of concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
                     raise PipelexError(msg) from exc
+
+                # Register the generated class so it can be used as a base class for refined concepts
+                KajsonManager.get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
@@ -130,20 +195,32 @@ def generate_structures_from_blueprints(
             # Handle concepts with refines
             elif concept_blueprint.refines:
                 try:
-                    current_refine = ConceptFactory.make_refine(refine=concept_blueprint.refines)
+                    current_refine = ConceptFactory.make_refine(refine=concept_blueprint.refines, domain_code=blueprint.domain)
                 except Exception as exc:
                     msg = (
                         f"Could not validate refine '{concept_blueprint.refines}' for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
                     )
                     raise PipelexError(msg) from exc
 
-                refined_structure_class_name = current_refine.split(".")[1] + "Content" if current_refine else TextContent.__name__
+                # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
+                # For custom concepts, the structure class name is just the concept code (e.g., Customer)
+                if current_refine:
+                    refined_concept_code = current_refine.split(".")[1]
+                    if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
+                        refined_structure_class_name = refined_concept_code + "Content"
+                    else:
+                        refined_structure_class_name = refined_concept_code
+                else:
+                    refined_structure_class_name = TextContent.__name__
 
                 try:
-                    generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                    generated_code, the_generated_class = StructureGenerator(
+                        concept_ref_to_class_info=concept_ref_to_class_info
+                    ).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=refined_structure_class_name,
+                        description=concept_blueprint.description,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = (
@@ -151,6 +228,9 @@ def generate_structures_from_blueprints(
                         f"refining '{refined_structure_class_name}' in domain '{blueprint.domain}': {exc}"
                     )
                     raise PipelexError(msg) from exc
+
+                # Register the generated class so it can be used as a base class for other refined concepts
+                KajsonManager.get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
@@ -161,14 +241,20 @@ def generate_structures_from_blueprints(
             # Handle concepts with neither structure nor refines - defaults to TextContent
             else:
                 try:
-                    generated_code, _ = StructureGenerator().generate_from_structure_blueprint(
+                    generated_code, the_generated_class = StructureGenerator(
+                        concept_ref_to_class_info=concept_ref_to_class_info
+                    ).generate_from_structure_blueprint(
                         class_name=concept_code,
                         structure_blueprint={},
                         base_class_name=TextContent.__name__,
+                        description=concept_blueprint.description,
                     )
                 except ConceptStructureGeneratorError as exc:
                     msg = f"Error generating structure class for concept '{concept_code}' in domain '{blueprint.domain}': {exc}"
                     raise PipelexError(msg) from exc
+
+                # Register the generated class so it can be used as a base class for refined concepts
+                KajsonManager.get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
@@ -188,15 +274,13 @@ def generate_structures_from_blueprints(
 def build_structures_command(
     target: Annotated[
         str,
-        typer.Argument(help="Target directory to scan for PLX files, or a specific .plx file"),
+        typer.Argument(help="Target directory to scan for .plx files, or a specific .plx file"),
     ],
     output_dir: Annotated[
         str | None,
         typer.Option("--output-dir", "-o", help="Output directory for generated structures (default: structures/ in target's directory)"),
     ] = None,
 ) -> None:
-    """Generate Python structure files from concept definitions in PLX files."""
-
     async def _build_structures_cmd():
         target_path = Path(target).resolve()
 
@@ -205,8 +289,7 @@ def build_structures_command(
             raise typer.Exit(1)
 
         # Determine if target is a file or directory
-        is_plx_file = target_path.is_file() and target_path.suffix == ".plx"
-
+        is_plx_file = target_path.is_file() and is_pipelex_file(target_path)
         pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD)
 
         try:
@@ -218,7 +301,12 @@ def build_structures_command(
                 typer.echo(f"🔍 Validating bundle: {target_path}")
 
                 # Validate single bundle
-                validate_result = await validate_bundle(plx_file_path=str(target_path))
+                validate_result = await validate_bundle(plx_file_path=target_path)
+                # THIS IS A HACK, while waiting class/func registries to be in libraries.
+                get_class_registry().teardown()
+                get_func_registry().teardown()
+                get_class_registry().register_classes(CoreRegistryModels.get_all_models())
+
                 all_blueprints: list[PipelexBundleBlueprint] = validate_result.blueprints
 
                 typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
@@ -241,13 +329,16 @@ def build_structures_command(
 
                 # Validate bundles from directory
                 validate_result = await validate_bundles_from_directory(directory=target_path)
-                all_blueprints = validate_result.blueprints
+                # THIS IS A HACK, while waiting class/func registries to be in libraries.
+                get_class_registry().teardown()
+                get_func_registry().teardown()
+                get_class_registry().register_classes(CoreRegistryModels.get_all_models())
 
-                typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
+                typer.echo(f"✅ Validated {len(validate_result.blueprints)} blueprint(s)")
 
                 # Generate structures using the helper function
                 generated_files = generate_structures_from_blueprints(
-                    blueprints=all_blueprints,
+                    blueprints=validate_result.blueprints,
                     output_directory=output_directory,
                     target_path=target_path,
                 )

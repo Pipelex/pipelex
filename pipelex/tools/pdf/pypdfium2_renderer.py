@@ -87,7 +87,6 @@ def _extract_image_from_pdf_object(
         ExtractedImageFromPage with the extracted image data and page coordinates
     """
     # Get image dimensions directly from the PDF object
-    # pypdfium2 lacks type stubs, so we cast the return value
     width, height = cast("tuple[int, int]", image_obj.get_size())  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
 
     # Get the position on the page (left, bottom, right, top) in PDF coordinates

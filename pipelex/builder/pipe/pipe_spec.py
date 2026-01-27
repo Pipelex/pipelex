@@ -79,7 +79,7 @@ class PipeSpec(StructuredContent):
     def validate_output(cls, output: str) -> str:
         # Extract concept without multiplicity for validation
         parse_result = parse_concept_with_multiplicity(output)
-        validate_concept_ref_or_code(concept_ref_or_code=parse_result.concept)
+        validate_concept_ref_or_code(concept_ref_or_code=parse_result.concept_ref_or_code)
         return output  # Return original with brackets intact
 
     @field_validator("inputs", mode="after")

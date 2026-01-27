@@ -49,7 +49,7 @@ class TestLLMReport:
         prompt_text = LLMTestCases.USER_TEXT_HAIKU
         llm_preset_ids = [
             "$testing-text",
-            "$testing-object",
+            "$testing-structured",
         ]
         tasks: list[asyncio.Task[str]] = []
         for llm_preset_id in llm_preset_ids:

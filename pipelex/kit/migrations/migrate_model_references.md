@@ -140,7 +140,7 @@ llm_choice = "@best-claude"  # alias
 | `llm_to_extract_diagram`           | `$vision-diagram`                  | Preset    |
 | `vision-diagram`                   | `$vision-diagram`                  | Preset    |
 | `llm_for_testing_gen_text`         | `$testing-text`                    | Preset    |
-| `llm_for_testing_gen_object`       | `$testing-object`                  | Preset    |
+| `llm_for_testing_gen_object`       | `$testing-structured`                  | Preset    |
 | `vision-cheap`                     | `$vision-cheap`                    | Preset    |
 | `extract-all-from-document`        | `$extract-all-from-document`       | Preset    |
 | `extract-text-from-pdf`            | `$extract-text-from-pdf`           | Preset    |

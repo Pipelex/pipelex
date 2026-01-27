@@ -189,7 +189,7 @@ def categorize_pipe_validation_with_libraries_error(
     return PipesAndConceptValidationErrorData(
         error_type=error_type,
         domain_code=pipe_error.domain_code,
-        source=pipe_error.file_path or None,
+        source=pipe_error.file_path,
         pipe_code=pipe_error.pipe_code,
         concept_code=None,  # This is a pipe error, not a concept error
         field_name=None,  # Field name is not provided in PipeValidationError

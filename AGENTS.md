@@ -49,14 +49,14 @@
    ```bash
    source .venv/bin/activate
    pytest -s -v -k test_render_jinja2_from_text
-   pipelex validate all
+   pipelex validate --all
    ```
 
    or do that:
 
    ```bash
    .venv/bin/python -m pytest -s -v -k test_render_jinja2_from_text
-   .venv/bin/pipelex validate all
+   .venv/bin/pipelex validate --all
    ```
 
    (adapt the above command to the OS and available virtual environment name)

@@ -16,26 +16,12 @@ if TYPE_CHECKING:
 class PipelexInterpreter(BaseModel):
     """plx -> PipelexBundleBlueprint"""
 
-    # TODO: rethink this method
-    @staticmethod
-    def is_pipelex_file(file_path: Path) -> bool:
-        """Check if a file is a Pipelex PLX file based on its extension.
-
-        Args:
-            file_path: Path to the file to check
-
-        Returns:
-            True if the file has .plx extension, False otherwise
-        """
-        return file_path.suffix == ".plx"
-
     @classmethod
-    def make_pipelex_bundle_blueprint(cls, bundle_path: str | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:
+    def make_pipelex_bundle_blueprint(cls, bundle_path: Path | None = None, plx_content: str | None = None) -> PipelexBundleBlueprint:
         blueprint_dict: dict[str, Any]
         try:
             if bundle_path is not None:
-                blueprint_dict = load_toml_from_path(path=bundle_path)
-                blueprint_dict.update(source=bundle_path)
+                blueprint_dict = load_toml_from_path(path=str(bundle_path))
             elif plx_content is not None:
                 blueprint_dict = load_toml_from_content(content=plx_content)
             else:
@@ -49,7 +35,9 @@ class PipelexInterpreter(BaseModel):
             raise PipelexInterpreterError(msg)
 
         try:
-            return PipelexBundleBlueprint.model_validate(blueprint_dict)
+            pipelex_bundle_blueprint = PipelexBundleBlueprint.model_validate(blueprint_dict)
+            pipelex_bundle_blueprint.source = str(bundle_path) if bundle_path else None
+            return pipelex_bundle_blueprint
         except ValidationError as exc:
             # TODO: Move this to the validate_bundle function
             blueprint_validation_errors: list[PipelexBundleBlueprintValidationErrorData] = []

@@ -11,7 +11,7 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.misc.string_utils import is_pascal_case, normalize_to_ascii, snake_to_pascal_case
@@ -24,6 +24,7 @@ class ConceptStructureSpecFieldType(StrEnum):
     BOOLEAN = "boolean"
     NUMBER = "number"
     DATE = "date"
+    CONCEPT = "concept"
 
 
 class ConceptSpecError(PipelexError):
@@ -32,22 +33,19 @@ class ConceptSpecError(PipelexError):
 
 class ConceptStructureSpec(StructuredContent):
     """ConceptStructureSpec represents the schema for a single field in a concept's structure. It supports
-    various field types including text, integer, boolean, number, and date.
+    various field types including text, integer, boolean, number, date, and concept.
 
     Attributes:
         the_field_name: Field name. Must be snake_case.
         description: Natural language description of the field's purpose and usage.
         type: The field's data type.
         required: Whether the field is mandatory. Defaults to False unless explicitly set to True.
-        default_value: Default value for the field. Must match the specified type, and for choice
-                      fields must be one of the valid choices. When provided, type must be specified
-                      (unless choices are provided).
+        default_value: Default value for the field. Must match the specified type.
+        concept_ref: For type="concept", the reference to the concept (e.g., "myapp.Customer").
 
     Validation Rules:
-        3. Default values: When default_value is provided:
-           - For typed fields: type must be specified and default_value must match that type
-           - Type validation includes: text (str), integer (int), boolean (bool),
-             number (int/float), dict (dict)
+        1. CONCEPT type: concept_ref must be set; default_value cannot be set.
+        3. Default values: When default_value is provided, it must match the specified type.
 
     """
 
@@ -56,6 +54,7 @@ class ConceptStructureSpec(StructuredContent):
     type: ConceptStructureSpecFieldType = Field(description="The type of the field.")
     required: bool | None = False
     default_value: Any | None = None
+    concept_ref: str | None = Field(default=None, description="For type='concept', the concept reference (e.g., 'myapp.Customer').")
 
     @field_validator("type", mode="before")
     @classmethod
@@ -65,9 +64,33 @@ class ConceptStructureSpec(StructuredContent):
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
         """Validate the structure blueprint according to type rules."""
+        match self.type:
+            case ConceptStructureSpecFieldType.CONCEPT:
+                if not self.concept_ref:
+                    msg = "When type is 'concept', concept_ref must be set."
+                    raise ValueError(msg)
+                if self.default_value is not None:
+                    msg = "default_value cannot be set for concept type (complex objects cannot have defaults)."
+                    raise ValueError(msg)
+
+            case (
+                ConceptStructureSpecFieldType.TEXT
+                | ConceptStructureSpecFieldType.INTEGER
+                | ConceptStructureSpecFieldType.BOOLEAN
+                | ConceptStructureSpecFieldType.NUMBER
+                | ConceptStructureSpecFieldType.DATE
+            ):
+                pass
+
+        # Validate concept_ref can only be set when type is 'concept'
+        if self.concept_ref and self.type != ConceptStructureSpecFieldType.CONCEPT:
+            msg = f"'concept_ref' can only be set when type is 'concept'. Actual type: {self.type}"
+            raise ValueError(msg)
+
         # Check default_value type is the same as type
         if self.default_value is not None:
             self._validate_default_value_type()
+
         return self
 
     def _validate_default_value_type(self) -> None:
@@ -91,6 +114,9 @@ class ConceptStructureSpec(StructuredContent):
             case ConceptStructureSpecFieldType.DATE:
                 if not isinstance(self.default_value, datetime):
                     self._raise_type_mismatch_error("date", type(self.default_value).__name__)
+            case ConceptStructureSpecFieldType.CONCEPT:
+                # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
+                pass
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
@@ -107,6 +133,7 @@ class ConceptStructureSpec(StructuredContent):
             type=core_type,
             required=self.required,
             default_value=self.default_value,
+            concept_ref=self.concept_ref,
         )
 
 
@@ -179,11 +206,25 @@ class ConceptSpec(StructuredContent):
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
-        if refines is not None:
-            if not NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refines):
-                msg = f"Forbidden to refine a non-native concept: '{refines}'. Refining non-native concepts will come soon."
-                raise ValueError(msg)
-        return refines
+        """Validate the refines field.
+
+        Refines can be either:
+        - A native concept ref (e.g., "native.Text", "Text")
+        - A non-native concept ref (e.g., "myapp.BaseEntity") for concept-to-concept inheritance
+
+        Non-native concept refs are allowed since dependencies are loaded in topological order,
+        ensuring the refined concept exists before the refining concept is constructed.
+        """
+        if refines is None:
+            return None
+
+        # Check if it's a valid concept ref or code (domain.ConceptCode or ConceptCode in PascalCase)
+        if is_concept_ref_or_code_valid(concept_ref_or_code=refines):
+            return refines
+
+        # Invalid refines value
+        msg = f"Refines '{refines}' must be a valid concept ref (domain.ConceptCode) or concept code (PascalCase)"
+        raise ValueError(msg)
 
     @model_validator(mode="before")
     @classmethod
@@ -206,6 +247,20 @@ class ConceptSpec(StructuredContent):
                 converted_structure[field_name] = field_spec.to_blueprint()
 
         return ConceptBlueprint(description=self.description, structure=converted_structure, refines=self.refines)
+
+    def _format_type_display(self, field_spec: ConceptStructureSpec) -> str:
+        """Format the type display string for a field, including extra info for complex types."""
+        match field_spec.type:
+            case ConceptStructureSpecFieldType.CONCEPT:
+                return f"concept[{field_spec.concept_ref}]"
+            case (
+                ConceptStructureSpecFieldType.TEXT
+                | ConceptStructureSpecFieldType.INTEGER
+                | ConceptStructureSpecFieldType.BOOLEAN
+                | ConceptStructureSpecFieldType.NUMBER
+                | ConceptStructureSpecFieldType.DATE
+            ):
+                return field_spec.type.value
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
@@ -239,7 +294,8 @@ class ConceptSpec(StructuredContent):
 
             for field_name, field_spec in self.structure.items():
                 required_text = "Yes" if field_spec.required else "No"
-                row_data = [field_name, field_spec.description, field_spec.type.value, required_text]
+                type_display = self._format_type_display(field_spec)
+                row_data = [field_name, field_spec.description, type_display, required_text]
                 if has_default_values:
                     row_data.append(str(field_spec.default_value) if field_spec.default_value is not None else "")
                 structure_table.add_row(*row_data)

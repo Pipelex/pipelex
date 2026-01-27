@@ -77,9 +77,6 @@ output = "Analysis"
 
 ## Current Limitations
 
-!!! warning "You can only refine native concepts (For Now)"
-    Currently, you can **only refine [native concepts](native-concepts.md)**. Refining custom concepts will be supported in a future release
-
 !!! warning "No structure on refined concepts (For Now)"
     When you refine a concept, you **cannot** add an inline structure or specify a `structure_class_name`. This limitation will be lifted in future releases.
     
@@ -108,7 +105,15 @@ Define a refined concept using the `refines` field:
 ```toml
 [concept.ConceptName]
 description = "Description of the refined concept"
-refines = "NativeConceptName"
+refines = "BaseConceptName"
+```
+
+For concepts in a different domain, use the fully qualified reference:
+
+```toml
+[concept.SpecializedConcept]
+description = "A more specialized version of an existing concept"
+refines = "otherdomain.BaseConceptName"
 ```
 
 ### Refining Document
@@ -151,6 +156,34 @@ description = "A condensed version of a longer text"
 refines = "Text"
 ```
 
+### Building Concept Hierarchies
+
+You can build hierarchies by refining concepts that have their own structures. The refined concept inherits the structure from the base concept:
+
+```toml
+domain = "crm"
+
+# Base concept with structure
+[concept.Customer]
+description = "A customer in our system"
+
+[concept.Customer.structure]
+name = { type = "text", required = true, description = "Customer name" }
+email = { type = "text", required = true, description = "Customer email" }
+
+# Refined concept - inherits Customer's structure
+[concept.VIPCustomer]
+description = "A VIP customer with special privileges"
+refines = "Customer"
+
+# Another refined concept from the same base
+[concept.InactiveCustomer]
+description = "A customer who has not been active recently"
+refines = "Customer"
+```
+
+Both `VIPCustomer` and `InactiveCustomer` will have access to the `name` and `email` fields defined in `Customer`. When you create content for these concepts, it will be compatible with the base `Customer` structure.
+
 ## Type Compatibility
 
 Understanding how refined concepts interact with pipe inputs is crucial.
@@ -158,14 +191,14 @@ Understanding how refined concepts interact with pipe inputs is crucial.
 ### How Refinement Affects Type Checking
 
 !!! important "Key Rule"
-    A pipe that accepts a **native concept** will **NOT** accept concepts that refine it.
-    
+    A pipe that accepts a **base concept** will **NOT** accept concepts that refine it.
+
 ```toml
 [pipe.extract_text]
 inputs = { document = "Document" }  # Only accepts Document, not Invoice or Contract
 ```
-    
-    If you want a pipe to accept both a native concept and its refinements, you must explicitly define the pipe to accept the refined concepts or use a more general approach.
+
+    If you want a pipe to accept both a base concept and its refinements, you must explicitly define the pipe to accept the refined concepts or use a more general approach.
 
 ### Practical Example
 
@@ -251,21 +284,25 @@ refines = "Document"
 
 ### Refine When:
 
-- ✅ Your concept is semantically a specific type of a native concept
-- ✅ The native structure is sufficient for your needs
+- ✅ Your concept is semantically a specific type of an existing concept
+- ✅ The base concept's structure is sufficient for your needs
 - ✅ You want to inherit existing validation and behavior
 - ✅ You're building domain-specific workflows with clear document/content types
+- ✅ You need to create specialized versions of an existing concept
 
-**Example:**
+**Examples:**
 ```toml
 [concept.Invoice]  # Clearly a type of Document
 refines = "Document"
+
+[concept.VIPCustomer]  # A specialized type of Customer
+refines = "Customer"
 ```
 
 ### Create New Concept When:
 
 - ✅ Your concept needs custom structure with multiple fields
-- ✅ Your concept doesn't naturally fit any native concept
+- ✅ Your concept doesn't naturally fit any existing concept
 - ✅ You need complex validation or computed properties
 
 

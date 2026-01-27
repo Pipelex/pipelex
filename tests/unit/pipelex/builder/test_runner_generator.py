@@ -284,3 +284,24 @@ class TestGenerateRunnerCode:
         # Custom imports should NOT use relative import (no leading dot) for standalone scripts
         assert "from structures.test_domain__custom_output import CustomOutput" in runner_code
         assert "from .structures" not in runner_code
+
+    def test_runner_code_anything_output_uses_any_return_type(self) -> None:
+        """Test that Anything output concept uses Any return type and main_stuff instead of main_stuff_as."""
+        anything_concept = ConceptFactory.make_native_concept(NativeConceptCode.ANYTHING)
+        text_concept = ConceptFactory.make_native_concept(NativeConceptCode.TEXT)
+
+        mock_pipe = MagicMock()
+        mock_pipe.code = "anything_output_pipe"
+        mock_pipe.output = StuffSpec(concept=anything_concept)
+        mock_pipe.inputs = InputStuffSpecs(root={"message": StuffSpec(concept=text_concept)})
+
+        runner_code = generate_runner_code(mock_pipe)
+        # Should use Any as return type, not AnythingContent
+        assert "async def run_anything_output_pipe() -> Any:" in runner_code
+        # Should use main_stuff, not main_stuff_as
+        assert "pipe_output.main_stuff" in runner_code
+        assert "main_stuff_as(content_type=" not in runner_code
+        # Should NOT import AnythingContent (it doesn't exist)
+        assert "AnythingContent" not in runner_code
+        # Should import Any from typing
+        assert "from typing import Any" in runner_code

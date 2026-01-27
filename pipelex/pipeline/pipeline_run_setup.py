@@ -157,11 +157,11 @@ async def pipeline_run_setup(
         bundle_already_loaded = False
         if bundle_uri:
             try:
-                resolved_bundle_uri = str(Path(bundle_uri).resolve())
+                resolved_bundle_uri = Path(bundle_uri).resolve()
             except (OSError, RuntimeError):
                 # Use str(Path(...)) to normalize the path (e.g., "./file.plx" -> "file.plx")
                 # to match the normalization done in library_manager._load_plx_files_into_library
-                resolved_bundle_uri = str(Path(bundle_uri))
+                resolved_bundle_uri = Path(bundle_uri)
             current_library = library_manager.get_library(library_id=library_id)
             bundle_already_loaded = resolved_bundle_uri in current_library.loaded_plx_paths
             if bundle_already_loaded:

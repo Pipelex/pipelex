@@ -82,10 +82,10 @@ class ValidateBundleResult(BaseModel):
 
 
 async def validate_bundle(
-    plx_file_path: str | None = None,
+    plx_file_path: Path | None = None,
     plx_content: str | None = None,
     blueprints: list[PipelexBundleBlueprint] | None = None,
-    library_dirs: Sequence[str | Path] | None = None,
+    library_dirs: Sequence[Path] | None = None,
 ) -> ValidateBundleResult:
     provided_params = sum([blueprints is not None, plx_content is not None, plx_file_path is not None])
     if provided_params == 0:
@@ -96,7 +96,7 @@ async def validate_bundle(
         raise ValidateBundleError(message=msg)
 
     library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
+    library_id, library = library_manager.open_library()
     set_current_library(library_id=library_id)
 
     # Load libraries from resolved directories before loading the bundle
@@ -114,18 +114,32 @@ async def validate_bundle(
         if blueprints is not None:
             loaded_blueprints = blueprints
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
         elif plx_content is not None:
             blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
             loaded_blueprints = [blueprint]
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
-        else:  # plx_file_path is not None
+        else:
+            assert plx_file_path is not None
             blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file_path)
             loaded_blueprints = [blueprint]
-            loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
 
-        dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            if plx_file_path.resolve() not in library.loaded_plx_paths:
+                # File not yet loaded - load it from the blueprint
+                loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+            else:
+                # File already loaded - get existing pipes from library by their codes
+                pipe_codes = list(blueprint.pipe.keys()) if blueprint.pipe else []
+                loaded_pipes = [library.pipe_library.get_required_pipe(pipe_code=code) for code in pipe_codes]
+
+            dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+            return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
+
     except PipelexInterpreterError as interpreter_error:
         raise ValidateBundleError(
             message=interpreter_error.message,
@@ -157,8 +171,6 @@ async def validate_bundle(
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
 
-    return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
-
 
 async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
     plx_files = get_pipelex_plx_files_from_dirs(dirs={directory})
@@ -169,7 +181,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
     set_current_library(library_id=library_id)
     try:
         for plx_file in plx_files:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=str(plx_file))
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file)
             all_blueprints.append(blueprint)
 
         loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
@@ -204,5 +216,4 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
             message=dry_run_error.message,
             dry_run_error_message=dry_run_error.message,
         ) from dry_run_error
-
     return ValidateBundleResult(blueprints=all_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)

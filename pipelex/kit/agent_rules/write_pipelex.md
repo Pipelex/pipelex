@@ -3,7 +3,7 @@
 - Always first write your "plan" in natural language, then transcribe it in pipelex.
 - You should ALWAYS RUN validation when you are writing or editing a `.plx` file. It will ensure the pipe is runnable. If not, iterate.
   - For a specific file: `pipelex validate path_to_file.plx`
-  - For all pipelines: `pipelex validate all`
+  - For all pipelines: `pipelex validate --all`
   - **IMPORTANT**: Ensure the Python virtual environment is activated before running `pipelex` commands. For standard installations, the venv is named `.venv` - always check that first. The commands will not work without proper venv activation.
 - Please use POSIX standard for files. (empty lines, no trailing whitespaces, etc.)
 
@@ -43,14 +43,22 @@ ConceptName = "Description of the concept"
 **Native Concepts:**
 Pipelex provides built-in native concepts: `Text`, `Image`, `PDF`, `TextAndImages`, `Number`, `Page`, `JSON`. Use these directly or refine them when appropriate.
 
-**Refining Native Concepts:**
-To create a concept that specializes a native concept without adding fields:
+**Refining Concepts:**
+To create a concept that specializes another concept without adding fields, use `refines`:
 
 ```plx
+# Refining a native concept
 [concept.Landscape]
 description = "A scenic outdoor photograph"
 refines = "Image"
+
+# Refining a custom concept (must be in domain.ConceptCode format)
+[concept.PremiumCustomer]
+description = "A premium customer with special benefits"
+refines = "myapp.Customer"
 ```
+
+Note: When refining a custom (non-native) concept, you must use the fully qualified concept ref in `domain.ConceptCode` format. Pipelex automatically handles the dependency order to ensure referenced concepts are loaded first.
 
 For details on how to structure concepts with fields, see the "Structuring Models" section below.
 
@@ -131,9 +139,9 @@ vendor_name = "The name of the vendor" # This will be optional by default
 line_items = { type = "list", item_type = "text", description = "List of items" }
 ```
 
-**Supported inline field types:** `text`, `integer`, `boolean`, `number`, `date`, `list`, `dict`
+**Supported inline field types:** `text`, `integer`, `boolean`, `number`, `date`, `list`, `dict`, `concept`
 
-**Field properties:** `type`, `description`, `required` (default: false), `default_value`, `choices`, `item_type` (for lists), `key_type` and `value_type` (for dicts)
+**Field properties:** `type`, `description`, `required` (default: false), `default_value`, `choices`, `item_type` (for lists), `key_type` and `value_type` (for dicts), `concept_ref` (for concept references), `item_concept_ref` (for lists of concepts)
 
 **Simple syntax** (creates required text field):
 ```plx
@@ -144,6 +152,43 @@ field_name = "Field description"
 ```plx
 field_name = { type = "text", description = "Field description", default_value = "default" }
 ```
+
+**Concept reference syntax** (referencing another concept):
+```plx
+# Single concept reference
+customer = { type = "concept", concept_ref = "myapp.Customer", description = "The customer" }
+
+# List of concepts
+line_items = { type = "list", item_type = "concept", item_concept_ref = "myapp.LineItem", description = "Line items" }
+```
+
+Example with concept references:
+```plx
+[concept.Customer]
+description = "A customer entity"
+
+[concept.Customer.structure]
+name = { type = "text", description = "Customer name" }
+email = { type = "text", description = "Customer email" }
+
+[concept.LineItem]
+description = "A line item in an invoice"
+
+[concept.LineItem.structure]
+product = { type = "text", description = "Product name" }
+quantity = { type = "integer", description = "Quantity ordered" }
+unit_price = { type = "number", description = "Price per unit" }
+
+[concept.Invoice]
+description = "An invoice document"
+
+[concept.Invoice.structure]
+customer = { type = "concept", concept_ref = "myapp.Customer", description = "The customer" }
+items = { type = "list", item_type = "concept", item_concept_ref = "myapp.LineItem", description = "Line items" }
+total = { type = "number", description = "Invoice total" }
+```
+
+Note: Pipelex automatically determines the correct loading order for concepts based on their dependencies (topological sort), so concepts can reference each other across domains as long as there are no circular dependencies.
 
 **3. Python StructuredContent Class (For Advanced Features)**
 
@@ -197,12 +242,14 @@ class Invoice(StructuredContent):
 ### Inline Structure Limitations
 
 Inline structures:
-- ✅ Support all common field types (text, number, date, list, dict, etc.)
+- ✅ Support all common field types (text, number, date, list, dict, concept, etc.)
 - ✅ Support required/optional fields, defaults, choices
+- ✅ Support concept-to-concept references (type = "concept" with concept_ref)
+- ✅ Support lists of concepts (type = "list" with item_type = "concept")
+- ✅ Support refining both native and custom concepts
 - ✅ Generate full Pydantic models with validation
 - ❌ Cannot have custom validators or complex validation logic
 - ❌ Cannot have computed properties or custom methods
-- ❌ Cannot refine custom (non-native) concepts
 - ❌ Limited IDE autocomplete compared to explicit Python classes
 
 
@@ -982,7 +1029,7 @@ You can override the predefined llm presets by setting them in `.pipelex/inferen
 
 ALWAYS RUN validation when you are finished writing pipelines: This checks for errors. If there are errors, iterate until it works.
 - For a specific bundle/file: `pipelex validate path_to_file.plx`
-- For all pipelines: `pipelex validate all`
+- For all pipelines: `pipelex validate --all`
 - Remember: Ensure your Python virtual environment is activated (typically `.venv` for standard installations) before running `pipelex` commands.
 
 Then, create an example file to run the pipeline in the `examples` folder.

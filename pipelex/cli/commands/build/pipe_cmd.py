@@ -198,7 +198,7 @@ def build_pipe_cmd(
                     base_name="failure_memory",
                     extension="json",
                 )
-                save_as_json_to_path(object_to_save=exc.working_memory.smart_dump(), path=failure_memory_path)
+                save_as_json_to_path(object_to_save=exc.working_memory.smart_dump(), path=str(failure_memory_path))
                 typer.secho(f"❌ {msg}", fg=typer.colors.RED)
                 typer.secho(f"❌ Failure memory saved to: {failure_memory_path}", fg=typer.colors.RED)
             else:
@@ -214,7 +214,7 @@ def build_pipe_cmd(
         base_dir = output_dir or builder_config.default_output_dir
 
         # Determine output path and whether to generate extras
-        bundle_file_name = f"{builder_config.default_bundle_file_name}.plx"
+        bundle_file_name = Path(f"{builder_config.default_bundle_file_name}.plx")
 
         if no_extras:
             # Generate single file: {base_dir}/{name}_01.plx
@@ -232,12 +232,12 @@ def build_pipe_cmd(
                 base_path=base_dir,
                 base_name=dir_name,
             )
-            plx_file_path = os.path.join(extras_output_dir, bundle_file_name)
+            plx_file_path = Path(extras_output_dir) / bundle_file_name
 
         # Save the PLX file
-        ensure_directory_for_file_path(file_path=plx_file_path)
+        ensure_directory_for_file_path(file_path=str(plx_file_path))
         plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-        save_text_to_path(text=plx_content, path=plx_file_path)
+        save_text_to_path(text=plx_content, path=str(plx_file_path))
         typer.secho(f"✅ Pipelex bundle saved to: {plx_file_path}", fg=typer.colors.GREEN)
 
         # Generate extras (inputs and runner) if requested
