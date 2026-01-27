@@ -57,7 +57,7 @@ type = "PipeImgGen"
 description = "Generate a futuristic car image"
 output = "Image"
 prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
-model = "gen_image_basic"
+model = "$gen-image"
 aspect_ratio = "16:9"
 quality = "hd"
 ```
@@ -75,7 +75,7 @@ type = "PipeImgGen"
 description = "Generate three logo variations from a prompt"
 inputs = { prompt = "ImgGenPrompt" }
 output = "Image[3]"
-model = "gen_image_basic"
+model = "$gen-image"
 aspect_ratio = "1:1"
 ```
 

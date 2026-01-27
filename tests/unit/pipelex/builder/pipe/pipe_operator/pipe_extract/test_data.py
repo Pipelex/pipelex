@@ -1,6 +1,7 @@
 from typing import ClassVar
 
-from pipelex.builder.pipe.pipe_extract_spec import ExtractSkill, PipeExtractSpec
+from pipelex.builder.pipe.pipe_extract_spec import PipeExtractSpec
+from pipelex.builder.talents.extract_talent import ExtractTalent
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 
 
@@ -12,14 +13,14 @@ class PipeExtractTestCases:
             description="Extract text from image",
             inputs={"image": "Image"},
             output="Page",
-            extract_skill=ExtractSkill.PDF_TEXT_EXTRACTOR,
+            extract_talent=ExtractTalent.PDF_TEXT_EXTRACTOR,
         ),
         PipeExtractBlueprint(
             source=None,
             description="Extract text from image",
             inputs={"image": "Image"},
             output="Page[]",
-            model=ExtractSkill.PDF_TEXT_EXTRACTOR,
+            model="$extract-text-from-pdf",
         ),
     )
 
@@ -30,7 +31,7 @@ class PipeExtractTestCases:
             description="Extract with page options",
             inputs={"document": "Document"},
             output="Page[]",
-            extract_skill=ExtractSkill.PDF_TEXT_EXTRACTOR,
+            extract_talent=ExtractTalent.PDF_TEXT_EXTRACTOR,
             max_page_images=None,
             page_image_captions=True,
             page_views=True,
@@ -40,7 +41,7 @@ class PipeExtractTestCases:
             description="Extract with page options",
             inputs={"document": "Document"},
             output="Page[]",
-            model=ExtractSkill.PDF_TEXT_EXTRACTOR,
+            model="$extract-text-from-pdf",
             max_page_images=None,
             page_image_captions=True,
             page_views=True,
