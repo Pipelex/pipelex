@@ -1,8 +1,9 @@
-from typing import Union
+from typing import Annotated, Union
 
-from pydantic import Field, model_validator
+from pydantic import BeforeValidator, Field, model_validator
 
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
+from pipelex.cogt.models.model_reference import ModelReference, parse_model_reference
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import Self
 
@@ -37,4 +38,10 @@ class ImgGenSetting(ConfigModel):
         )
 
 
-ImgGenModelChoice = Union[ImgGenSetting, str]
+# ImgGenModelChoice accepts ImgGenSetting, ModelReference, or a string (which gets parsed to ModelReference)
+# The BeforeValidator ensures that strings are automatically converted to ModelReference during validation
+# ModelReference.model_serializer handles serialization back to the raw string value
+ImgGenModelChoice = Union[
+    ImgGenSetting,
+    Annotated[str | ModelReference, BeforeValidator(parse_model_reference)],
+]

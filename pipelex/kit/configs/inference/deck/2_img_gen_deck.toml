@@ -1,0 +1,49 @@
+####################################################################################################
+# Pipelex Model Deck - Image Generation Configuration
+####################################################################################################
+#
+# This file defines model aliases and presets for image generation models
+#
+# Model Reference Syntax:
+# - Preset:    $preset_name or preset:preset_name
+# - Alias:     @alias_name or alias:alias_name
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# Image Generation Default Choices
+####################################################################################################
+
+[img_gen]
+default_quality = "medium"
+choice_default = "$gen-image"
+
+####################################################################################################
+# Image Generation Aliases
+####################################################################################################
+
+[img_gen.aliases]
+best-gpt = "gpt-image-1.5"
+best-gemini = "nano-banana-pro"
+best-blackforestlabs = "flux-2-pro"
+
+default-general = "flux-2-pro"
+default-premium = "nano-banana-pro"
+default-small = "gpt-image-1-mini"
+
+####################################################################################################
+# Image Generation Presets
+####################################################################################################
+
+[img_gen.presets]
+
+# General purpose
+gen-image = { model = "@default-general", quality = "medium" }
+gen-image-fast = { model = "@default-small", quality = "low" }
+gen-image-high-quality = { model = "@default-premium", quality = "high" }
+
+# Testing
+gen-image-testing = { model = "@default-small", quality = "low" }

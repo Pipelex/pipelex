@@ -11,6 +11,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_setting import LLMModelChoice, LLMSetting, LLMSettingChoices
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_llm_choice_with_deck
 from pipelex.config import get_config
 from pipelex.core.concepts.concept import Concept
@@ -74,8 +75,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
     @override
     def validate_inputs_static(self):
         if self.llm_choices:
-            for llm_choice in self.llm_choices.list_choice_strings():
-                check_llm_choice_with_deck(llm_choice=llm_choice)
+            for llm_choice_ref in self.llm_choices.list_choice_references():
+                check_llm_choice_with_deck(llm_choice=llm_choice_ref)
 
         needed_inputs = self.needed_inputs()
         required_variable_paths = self.required_variables()
@@ -208,7 +209,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         llm_setting_for_object: LLMSetting = model_deck.get_llm_setting(llm_choice=llm_setting_or_preset_id_for_object)
 
         if (not self.llm_prompt_spec.templating_style) and (
-            inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model)
+            inference_model := model_deck.get_optional_inference_model(model_handle=llm_setting_main.model, model_type=ModelType.LLM)
         ):
             # Note: the case where we don't get an inference model corresponds to the use of an external LLM Plugin
             # TODO: improve this by making it possible to get the inference model for external LLM Plugins

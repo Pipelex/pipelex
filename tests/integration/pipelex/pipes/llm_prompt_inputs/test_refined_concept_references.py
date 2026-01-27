@@ -22,7 +22,6 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from tests.cases import DocumentTestCases, ImageTestCases
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestRefinedConceptReferences:
     """Tests that concepts refining Image/Document work correctly as LLM inputs."""
 
@@ -72,6 +71,7 @@ class TestRefinedConceptReferences:
         assert ref.kind == DocumentReferenceKind.DIRECT
         assert ref.variable_path == "report"
 
+    @pytest.mark.asyncio
     async def test_refined_image_concept_extracted_to_user_images(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that refined Image concept is extracted to user_images at runtime."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
@@ -108,6 +108,7 @@ class TestRefinedConceptReferences:
         assert llm_prompt.user_text is not None
         assert "[Image 1]" in llm_prompt.user_text
 
+    @pytest.mark.asyncio
     async def test_refined_document_concept_extracted_to_user_documents(self, load_test_library: Callable[[list[Path]], None]) -> None:
         """Test that refined Document concept is extracted to user_documents at runtime."""
         load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])

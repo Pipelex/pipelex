@@ -62,7 +62,7 @@ type = "PipeLLM"
 description = "Write markdown from page content of a 'Diagnostic de Performance Energetique'"
 inputs = { "page_content.page_view" = "Image", page_content = "Page" }
 output = "Dpe"
-model = "llm_for_img_to_text"
+model = "$vision"
 structuring_method = "preliminary_text"
 system_prompt = """You are a multimodal LLM, expert at converting images into perfect markdown."""
 prompt = """

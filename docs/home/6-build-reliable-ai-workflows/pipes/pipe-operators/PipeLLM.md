@@ -255,7 +255,7 @@ This pipe takes no input and writes a poem.
 type = "PipeLLM"
 description = "Write a short poem"
 output = "Text"
-model = "llm_for_creative_writing"
+model = "$writing-creative"
 prompt = """
 Write a four-line poem about pipes.
 """
