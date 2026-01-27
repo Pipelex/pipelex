@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 
 
-@pytest.mark.dry_runnable
 @pytest.mark.asyncio(loop_scope="class")
 class TestAssemblePipelexBundleSpec:
     """Integration tests for the assemble_pipelex_bundle_spec pipe."""
