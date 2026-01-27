@@ -94,61 +94,42 @@ def extract_reference_data(model_specs: BackendModelSpecs) -> dict[str, list[dic
     return models_by_type
 
 
-def generate_pure_markdown_table(models: list[dict[str, Any]]) -> str:
-    """Generate a pure Markdown table for a list of models (no HTML).
+def generate_pure_markdown_list(models: list[dict[str, Any]]) -> str:
+    """Generate a pure Markdown bullet list for a list of models (no HTML/tables).
 
     Args:
         models: List of model info dictionaries.
 
     Returns:
-        Pure Markdown table string.
+        Pure Markdown bullet list string.
     """
     if not models:
         return "_No models available in this category._\n"
 
-    # Collect all unique input and output types across all models
-    all_inputs: set[str] = set()
-    all_outputs: set[str] = set()
+    lines: list[str] = []
     for model in models:
-        all_inputs.update(model.get("inputs", []))
-        all_outputs.update(model.get("outputs", []))
+        name: str = model.get("name", "")
+        inputs: list[str] = model.get("inputs", [])
+        outputs: list[str] = model.get("outputs", [])
 
-    # Sort columns using preferred order, with any unlisted columns appended alphabetically
-    def sort_by_preferred(items: set[str], preferred: list[str]) -> list[str]:
-        ordered = [col for col in preferred if col in items]
-        remaining = sorted(items - set(preferred))
-        return ordered + remaining
+        # Sort inputs and outputs using preferred order
+        def sort_by_preferred(items: list[str], preferred: list[str]) -> list[str]:
+            item_set = set(items)
+            ordered = [col for col in preferred if col in item_set]
+            remaining = sorted(item_set - set(preferred))
+            return ordered + remaining
 
-    input_cols = sort_by_preferred(all_inputs, PREFERRED_INPUT_ORDER)
-    output_cols = sort_by_preferred(all_outputs, PREFERRED_OUTPUT_ORDER)
+        sorted_inputs = sort_by_preferred(inputs, PREFERRED_INPUT_ORDER)
+        sorted_outputs = sort_by_preferred(outputs, PREFERRED_OUTPUT_ORDER)
 
-    # Build column headers with prefixes to distinguish inputs from outputs
-    input_headers = [f"in:{col}" for col in input_cols]
-    output_headers = [f"out:{col}" for col in output_cols]
-    all_headers = ["Model", *input_headers, *output_headers]
+        inputs_str = ", ".join(sorted_inputs) if sorted_inputs else "none"
+        outputs_str = ", ".join(sorted_outputs) if sorted_outputs else "none"
 
-    # Build header row
-    header_row = "| " + " | ".join(all_headers) + " |"
+        lines.append(f"- **{name}**")
+        lines.append(f"  - inputs: {inputs_str}")
+        lines.append(f"  - outputs: {outputs_str}")
 
-    # Build separator row (align center for all columns)
-    separator_row = "| " + " | ".join(":---:" if idx > 0 else "---" for idx in range(len(all_headers))) + " |"
-
-    # Build data rows
-    data_rows = []
-    for model in models:
-        model_inputs = set(model.get("inputs", []))
-        model_outputs = set(model.get("outputs", []))
-        name = model.get("name", "")
-
-        row_cells = [name]
-        for inp in input_cols:
-            row_cells.append("✅" if inp in model_inputs else "❌")
-        for out in output_cols:
-            row_cells.append("✅" if out in model_outputs else "❌")
-
-        data_rows.append("| " + " | ".join(row_cells) + " |")
-
-    return "\n".join([header_row, separator_row, *data_rows]) + "\n"
+    return "\n".join(lines) + "\n"
 
 
 def generate_markdown_table(models: list[dict[str, Any]]) -> str:
@@ -306,12 +287,12 @@ def generate_reference_pure_markdown(model_specs: BackendModelSpecs) -> str:
     # Add LLM section
     sections.append("## Language Models (LLM)")
     sections.append("")
-    sections.append(generate_pure_markdown_table(models_by_type["llm"]))
+    sections.append(generate_pure_markdown_list(models_by_type["llm"]))
 
     # Add document extractor section
     sections.append("## Document Extraction Models")
     sections.append("")
-    sections.append(generate_pure_markdown_table(models_by_type["text_extractor"]))
+    sections.append(generate_pure_markdown_list(models_by_type["text_extractor"]))
     sections.append("")
     sections.append(
         "**About extracted pages:** "
@@ -325,7 +306,7 @@ def generate_reference_pure_markdown(model_specs: BackendModelSpecs) -> str:
     sections.append("")
     sections.append("## Image Generation Models")
     sections.append("")
-    sections.append(generate_pure_markdown_table(models_by_type["img_gen"]))
+    sections.append(generate_pure_markdown_list(models_by_type["img_gen"]))
 
     # Add auto-generated notice at the bottom
     sections.append("")
