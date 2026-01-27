@@ -36,7 +36,7 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | No
 
     # Protocol-based rendering
     if isinstance(value, TextFormatRenderable):
-        return await value.rendered_str_async(text_format=applied_text_format)
+        return await value.rendered_for_prompt_async(text_format=applied_text_format)
     if isinstance(value, StrEnum):
         return value.value
     return value

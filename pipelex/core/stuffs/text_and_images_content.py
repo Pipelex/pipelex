@@ -75,7 +75,7 @@ class TextAndImagesContent(StuffContent):
         """Render text, then register images."""
         parts: list[str] = []
         if self.text:
-            parts.append(self.text.rendered_str(text_format))
+            parts.append(self.text.rendered_for_prompt(text_format))
         if self.images:
             for image in self.images:
                 image_index = registry.register_image(image)
