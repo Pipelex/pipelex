@@ -136,7 +136,7 @@ export HELP
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint pyright mypy pylint \
-    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu \
+    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
@@ -303,11 +303,11 @@ rtm-full: env
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile full
 
 insert-skeleton:
-	@if [ ! -d "$(SKELETON_DIR)" ]; then \
+	@if [ ! -d $(SKELETON_DIR) ]; then \
 			echo "Error: Skeleton directory $(SKELETON_DIR) not found"; \
 			exit 1; \
 	fi
-	@cp -rn $(SKELETON_DIR)/. .
+	@cp -rn $(SKELETON_DIR). .
 	@echo "Skeleton inserted from $(SKELETON_DIR)"
 
 ##########################################################################################
