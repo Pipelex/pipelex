@@ -1,5 +1,4 @@
 import asyncio
-import json
 from pathlib import Path
 from typing import Annotated
 
@@ -13,10 +12,10 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
 )
-from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
+from pipelex.core.pipes.output.output_renderer import render_output
 from pipelex.hub import get_required_pipe, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
@@ -86,11 +85,12 @@ async def _generate_output_core(
         typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
-    # Generate the output JSON (content only, no concept wrapper)
+    # Generate the output JSON
     try:
-        output_dict = the_pipe.output.render_stuff_spec(ConceptRepresentationFormat.JSON)
-        content = output_dict.get("content", output_dict)
-        output_json_str = json.dumps(content, indent=2, ensure_ascii=False)
+        output_json_str = render_output(the_pipe)
+    except ValueError as exc:
+        typer.secho(str(exc), fg=typer.colors.YELLOW)
+        raise typer.Exit(0) from exc
     except Exception as exc:
         typer.secho(f"❌ Error generating output JSON: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc

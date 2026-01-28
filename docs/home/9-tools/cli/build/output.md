@@ -46,12 +46,15 @@ pipelex build output my_bundle.plx --output expected_output.json
 
 ## Output Format
 
-The generated JSON file shows the content structure of the pipe's output, with example values based on the output concept type:
+The generated JSON file shows the output structure including the concept type and content:
 
 ```json
 {
-  "title": "title_value",
-  "key_points": "key_points_value"
+  "concept": "my_domain.MyOutputConcept",
+  "content": {
+    "title": "title_value",
+    "key_points": "key_points_value"
+  }
 }
 ```
 
@@ -61,7 +64,10 @@ For native concepts like `Text`, `Image`, or `Document`:
 
 ```json
 {
-  "text": "text_value"
+  "concept": "native.Text",
+  "content": {
+    "text": "text_value"
+  }
 }
 ```
 
@@ -70,13 +76,39 @@ For native concepts like `Text`, `Image`, or `Document`:
 When a pipe's output has multiplicity (returns multiple items), the content is a list:
 
 ```json
-[
-  {
-    "name": "name_value",
-    "description": "description_value"
-  }
-]
+{
+  "concept": "my_domain.Item",
+  "content": [
+    {
+      "name": "name_value",
+      "description": "description_value"
+    }
+  ]
+}
 ```
+
+### `native.Anything` Output
+
+When a pipe's output is `native.Anything` (e.g., a `PipeCondition` with mapped pipes that have different output types), the command shows all possible outputs from the mapped pipes:
+
+```json
+{
+  "output_option_1": {
+    "concept": "my_domain.Result1",
+    "content": {
+      "field1": "field1_value"
+    }
+  },
+  "output_option_2": {
+    "concept": "my_domain.Result2",
+    "content": {
+      "field2": "field2_value"
+    }
+  }
+}
+```
+
+This helps you understand all possible output structures that the pipe could return depending on execution path.
 
 ## Use Cases
 

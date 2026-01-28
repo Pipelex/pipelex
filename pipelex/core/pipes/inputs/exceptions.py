@@ -43,3 +43,7 @@ class PipeRunInputsError(PipeRunError):
         self.variable_name = variable_name
         self.concept_code = concept_code
         super().__init__(message, run_mode, pipe_code)
+
+
+class NoInputsRequiredError(Exception):
+    """Raised when a pipe has no inputs."""
