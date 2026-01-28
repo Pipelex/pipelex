@@ -4,7 +4,6 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from tests.unit.pipelex.core.stuffs.text_and_images_content.test_data import TestData
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestTextAndImagesContentRenders:
     """Tests for TextAndImagesContent render methods."""
 
@@ -34,18 +33,21 @@ class TestTextAndImagesContentRenders:
         result = content.rendered_html()
         assert result == TestData.EXPECTED_RENDERED_HTML
 
+    @pytest.mark.asyncio
     async def test_rendered_plain_async(self):
         """Verify async rendered_plain returns the same as sync version."""
         content = TextAndImagesContent(text=TestData.SAMPLE_TEXT, images=None)
         result = await content.rendered_plain_async()
         assert result == TestData.EXPECTED_RENDERED_PLAIN
 
+    @pytest.mark.asyncio
     async def test_rendered_markdown_async(self):
         """Verify async rendered_markdown returns the same as sync version."""
         content = TextAndImagesContent(text=TestData.SAMPLE_TEXT, images=None)
         result = await content.rendered_markdown_async()
         assert result == TestData.EXPECTED_RENDERED_MARKDOWN
 
+    @pytest.mark.asyncio
     async def test_rendered_html_async(self):
         """Verify async rendered_html returns the same as sync version."""
         content = TextAndImagesContent(text=TestData.SAMPLE_TEXT, images=None)

@@ -567,9 +567,8 @@ class ModelDeck(ConfigModel):
                     pass
 
     def validate_inference_models(self):
-        for model_handle in self.inference_models:
-            # model_type doesn't matter here since we're validating direct inference models (not aliases/waterfalls)
-            self.get_required_inference_model(model_handle=model_handle, model_type=ModelType.LLM)
+        for model_handle, model_spec in self.inference_models.items():
+            self.get_required_inference_model(model_handle=model_handle, model_type=model_spec.model_type)
 
     def _get_enabled_backends(self) -> set[str]:
         """Return the set of backend names that have at least one model enabled."""
@@ -726,6 +725,9 @@ class ModelDeck(ConfigModel):
 
         # For direct handles (HANDLE kind), try inference_models first
         if inference_model := self.inference_models.get(ref.name):
+            if inference_model.model_type != model_type:
+                log.warning(f"Model handle '{ref.name}' has type '{inference_model.model_type}' but was requested as '{model_type}'. Skipping.")
+                return None
             return inference_model
         # Then try aliases (without prefix)
         if alias := aliases.get(ref.name):

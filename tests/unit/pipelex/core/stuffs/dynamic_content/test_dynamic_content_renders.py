@@ -3,7 +3,6 @@ import pytest
 from tests.unit.pipelex.core.stuffs.dynamic_content.test_data import SampleDynamicContent, TestData
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestDynamicContentRenders:
     """Tests for DynamicContent render methods."""
 
@@ -25,12 +24,14 @@ class TestDynamicContentRenders:
         result = content.rendered_for_prompt()
         assert result == TestData.EXPECTED_RENDERED_FOR_PROMPT
 
+    @pytest.mark.asyncio
     async def test_rendered_markdown_async(self):
         """Verify async rendered_markdown returns the same as sync version."""
         content = SampleDynamicContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
         result = await content.rendered_markdown_async()
         assert result == TestData.EXPECTED_RENDERED_MARKDOWN
 
+    @pytest.mark.asyncio
     async def test_rendered_html_async(self):
         """Verify async rendered_html returns the same as sync version."""
         content = SampleDynamicContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
