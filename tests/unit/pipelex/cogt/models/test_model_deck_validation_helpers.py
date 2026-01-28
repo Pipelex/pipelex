@@ -242,3 +242,49 @@ class TestModelDeckValidationHelpers:
         cycle_members = set(cycles[0][1])
         assert "alpha" in cycle_members
         assert "beta" in cycle_members
+
+    def test_detects_unprefixed_circular_alias(self):
+        """Unprefixed circular reference (A -> B -> A without @ prefix) is detected.
+
+        This tests the fix for the issue where cycles like {"alpha": "beta", "beta": "alpha"}
+        without @ prefixes would not be detected by validation, even though they cause issues
+        at runtime. The runtime code follows unprefixed alias references when the target string
+        exists as a key in the aliases dict.
+        """
+        circular_aliases = {
+            "alpha": "beta",
+            "beta": "alpha",
+        }
+
+        cycles = find_circular_aliases(aliases=circular_aliases)
+
+        assert len(cycles) >= 1
+        cycle_members = set(cycles[0][1])
+        assert "alpha" in cycle_members
+        assert "beta" in cycle_members
+
+    def test_detects_mixed_prefix_circular_alias(self):
+        """Circular reference with mixed prefixes (A -> @B -> C -> A) is detected."""
+        circular_aliases = {
+            "alpha": "@beta",
+            "beta": "gamma",
+            "gamma": "alpha",
+        }
+
+        cycles = find_circular_aliases(aliases=circular_aliases)
+
+        assert len(cycles) >= 1
+        cycle_members = set(cycles[0][1])
+        assert "alpha" in cycle_members
+        assert "beta" in cycle_members
+        assert "gamma" in cycle_members
+
+    def test_no_cycle_when_unprefixed_target_is_not_alias_key(self):
+        """Unprefixed reference to a non-alias key does not create a cycle."""
+        aliases = {
+            "alpha": "gpt-4o",  # gpt-4o is not an alias key, so no cycle
+        }
+
+        cycles = find_circular_aliases(aliases=aliases)
+
+        assert len(cycles) == 0

@@ -135,10 +135,19 @@ def find_circular_aliases(
             target = aliases[current]
             ref = ModelReference.parse(target)
 
-            if ref.kind == ModelReferenceKind.ALIAS:
-                current = ref.name
-            else:
-                break
+            match ref.kind:
+                case ModelReferenceKind.ALIAS:
+                    # Explicit alias reference (@name or alias:name)
+                    current = ref.name
+                case ModelReferenceKind.HANDLE:
+                    # Unprefixed reference - follow if it's an alias key (matches runtime behavior)
+                    if ref.name in aliases:
+                        current = ref.name
+                    else:
+                        break
+                case ModelReferenceKind.WATERFALL | ModelReferenceKind.PRESET:
+                    # Waterfalls and presets don't continue the alias chain
+                    break
 
     unique_cycles: list[tuple[str, list[str]]] = []
     seen_cycles: set[frozenset[str]] = set()
