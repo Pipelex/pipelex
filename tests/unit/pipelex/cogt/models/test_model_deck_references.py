@@ -9,6 +9,7 @@ import pytest
 from pipelex.cogt.extract.extract_setting import ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenSetting
 from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import (
     ModelDeckBlueprint,
 )
@@ -19,6 +20,11 @@ from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
+from tests.unit.pipelex.cogt.models.model_deck_validation_utils import (
+    find_circular_aliases,
+    find_invalid_alias_targets,
+    find_invalid_waterfall_entries,
+)
 
 
 class TestModelDeckReferences:
@@ -31,14 +37,17 @@ class TestModelDeckReferences:
         return load_model_deck_blueprint(model_deck_paths=model_deck_paths)
 
     @pytest.fixture(scope="class")
-    def all_known_model_handles(self) -> set[str]:
-        """Collect all valid model handles from local backends + Pipelex Gateway.
+    def all_known_model_handles(self) -> dict[str, ModelType]:
+        """Collect all valid model handles with their types from local backends + Pipelex Gateway.
 
         Sources:
         1. Local backend TOML files (.pipelex/inference/backends/*.toml)
         2. Pipelex Gateway remote config (uses session-level cache from conftest.py)
+
+        Returns:
+            Mapping of model_handle -> ModelType
         """
-        known_handles: set[str] = set()
+        known_handles: dict[str, ModelType] = {}
 
         # 1. Parse local backend TOML files
         known_handles.update(self._get_local_backend_models())
@@ -46,7 +55,9 @@ class TestModelDeckReferences:
         # 2. Get gateway models from cached remote config
         remote_config = RemoteConfigFetcher.fetch_remote_config()  # Uses cached version
         gateway_specs = remote_config.backend_model_specs
-        known_handles.update(gateway_specs.keys())
+        for model_name, spec in gateway_specs.items():
+            if isinstance(spec, dict) and "model_type" in spec:
+                known_handles[model_name] = ModelType(spec["model_type"])
 
         return known_handles
 
@@ -54,74 +65,45 @@ class TestModelDeckReferences:
     # Helper methods
     # ============================================================
 
-    def _get_local_backend_models(self) -> set[str]:
-        """Parse all local backend TOML files to collect model handles.
+    def _get_local_backend_models(self) -> dict[str, ModelType]:
+        """Parse all local backend TOML files to collect model handles with their types.
 
         Model names are the top-level keys in each backend TOML file,
         excluding the 'defaults' section which contains shared config.
+        Model types are determined from the model's 'model_type' field or the defaults section.
+
+        Returns:
+            Mapping of model_handle -> ModelType
         """
-        known_handles: set[str] = set()
+        known_handles: dict[str, ModelType] = {}
         backends_dir = ConfigPaths.BACKENDS_DIR_PATH
 
         toml_files = find_files_in_dir(backends_dir, pattern="*.toml", is_recursive=False)
         for toml_path in toml_files:
             backend_data = load_toml_from_path_if_exists(str(toml_path))
             if backend_data:
+                # Get default model_type from defaults section if present
+                defaults = backend_data.get("defaults", {})
+                default_model_type_str = defaults.get("model_type")
+
                 # Model names are top-level keys except "defaults"
                 for key in backend_data:
                     if key != "defaults":
-                        known_handles.add(key)
+                        model_config = backend_data[key]
+                        # Model can override the default model_type
+                        model_type_str = model_config.get("model_type", default_model_type_str)
+                        if model_type_str:
+                            known_handles[key] = ModelType(model_type_str)
 
         return known_handles
-
-    def _find_invalid_alias_targets(
-        self,
-        aliases: dict[str, str],
-        all_aliases: dict[str, str],
-        all_waterfalls: dict[str, list[str]],
-        known_model_handles: set[str],
-    ) -> list[tuple[str, str, str]]:
-        """Find aliases that reference invalid targets.
-
-        Args:
-            aliases: The aliases dict to validate
-            all_aliases: All available aliases for this model type
-            all_waterfalls: All available waterfalls for this model type
-            known_model_handles: Set of valid direct model handles
-
-        Returns:
-            List of (alias_name, target_value, reason) tuples for invalid references
-        """
-        invalid_refs: list[tuple[str, str, str]] = []
-
-        for alias_name, target_value in aliases.items():
-            ref = ModelReference.parse(target_value)
-
-            match ref.kind:
-                case ModelReferenceKind.ALIAS:
-                    # Alias can point to another alias
-                    if ref.name not in all_aliases:
-                        invalid_refs.append((alias_name, target_value, f"alias '{ref.name}' not found"))
-                case ModelReferenceKind.WATERFALL:
-                    # Alias can point to a waterfall
-                    if ref.name not in all_waterfalls:
-                        invalid_refs.append((alias_name, target_value, f"waterfall '{ref.name}' not found"))
-                case ModelReferenceKind.PRESET:
-                    # Alias should NOT point to a preset
-                    invalid_refs.append((alias_name, target_value, "aliases cannot reference presets ($ prefix)"))
-                case ModelReferenceKind.HANDLE:
-                    # Validate direct handle exists in known models
-                    if ref.name not in known_model_handles:
-                        invalid_refs.append((alias_name, target_value, f"model handle '{ref.name}' not found in backends"))
-
-        return invalid_refs
 
     def _find_invalid_preset_references(
         self,
         presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting],
         all_aliases: dict[str, str],
         all_waterfalls: dict[str, list[str]],
-        known_model_handles: set[str],
+        known_model_handles: dict[str, ModelType],
+        expected_model_type: ModelType,
     ) -> list[tuple[str, str, str]]:
         """Find presets that reference invalid model targets.
 
@@ -129,7 +111,8 @@ class TestModelDeckReferences:
             presets: The presets dict to validate
             all_aliases: All available aliases for this model type
             all_waterfalls: All available waterfalls for this model type
-            known_model_handles: Set of valid direct model handles
+            known_model_handles: Mapping of model handle -> ModelType
+            expected_model_type: The expected model type for this deck (LLM, TEXT_EXTRACTOR, IMG_GEN)
 
         Returns:
             List of (preset_name, model_value, reason) tuples for invalid references
@@ -142,113 +125,23 @@ class TestModelDeckReferences:
 
             match ref.kind:
                 case ModelReferenceKind.ALIAS:
-                    # Preset can use an alias
                     if ref.name not in all_aliases:
                         invalid_refs.append((preset_name, model_value, f"alias '{ref.name}' not found"))
                 case ModelReferenceKind.WATERFALL:
-                    # Preset can use a waterfall
                     if ref.name not in all_waterfalls:
                         invalid_refs.append((preset_name, model_value, f"waterfall '{ref.name}' not found"))
                 case ModelReferenceKind.PRESET:
-                    # Preset should NOT reference another preset
                     invalid_refs.append((preset_name, model_value, "presets cannot reference other presets ($ prefix)"))
                 case ModelReferenceKind.HANDLE:
-                    # Validate direct handle exists in known models
                     if ref.name not in known_model_handles:
                         invalid_refs.append((preset_name, model_value, f"model handle '{ref.name}' not found in backends"))
+                    elif known_model_handles[ref.name] != expected_model_type:
+                        actual_type = known_model_handles[ref.name]
+                        invalid_refs.append(
+                            (preset_name, model_value, f"model handle '{ref.name}' has type '{actual_type}' but expected '{expected_model_type}'")
+                        )
 
         return invalid_refs
-
-    def _find_invalid_waterfall_entries(
-        self,
-        waterfalls: dict[str, list[str]],
-        all_aliases: dict[str, str],
-        known_model_handles: set[str],
-    ) -> list[tuple[str, int, str, str]]:
-        """Find waterfall entries that reference invalid targets.
-
-        Args:
-            waterfalls: The waterfalls dict to validate
-            all_aliases: All available aliases for this model type
-            known_model_handles: Set of valid direct model handles
-
-        Returns:
-            List of (waterfall_name, index, entry_value, reason) tuples for invalid entries
-        """
-        invalid_refs: list[tuple[str, int, str, str]] = []
-
-        for waterfall_name, entries in waterfalls.items():
-            for index, entry_value in enumerate(entries):
-                ref = ModelReference.parse(entry_value)
-
-                match ref.kind:
-                    case ModelReferenceKind.ALIAS:
-                        # Waterfall can contain aliases
-                        if ref.name not in all_aliases:
-                            invalid_refs.append((waterfall_name, index, entry_value, f"alias '{ref.name}' not found"))
-                    case ModelReferenceKind.WATERFALL:
-                        # Waterfall should NOT contain other waterfalls
-                        invalid_refs.append((waterfall_name, index, entry_value, "waterfalls cannot contain other waterfalls (~ prefix)"))
-                    case ModelReferenceKind.PRESET:
-                        # Waterfall should NOT contain presets
-                        invalid_refs.append((waterfall_name, index, entry_value, "waterfalls cannot contain presets ($ prefix)"))
-                    case ModelReferenceKind.HANDLE:
-                        # Validate direct handle exists in known models
-                        if ref.name not in known_model_handles:
-                            invalid_refs.append((waterfall_name, index, entry_value, f"model handle '{ref.name}' not found in backends"))
-
-        return invalid_refs
-
-    def _find_circular_aliases(
-        self,
-        aliases: dict[str, str],
-    ) -> list[tuple[str, list[str]]]:
-        """Find circular alias chains.
-
-        Args:
-            aliases: The aliases dict to check for cycles
-
-        Returns:
-            List of (starting_alias, cycle_path) tuples for detected cycles
-        """
-        cycles: list[tuple[str, list[str]]] = []
-
-        for start_alias in aliases:
-            visited: list[str] = []
-            current = start_alias
-
-            while current in aliases:
-                if current in visited:
-                    # Found a cycle
-                    cycle_start_idx = visited.index(current)
-                    cycle_path = [*visited[cycle_start_idx:], current]
-                    # Only report if this cycle starts with our starting alias
-                    if start_alias in cycle_path:
-                        cycles.append((start_alias, cycle_path))
-                    break
-
-                visited.append(current)
-                target = aliases[current]
-                ref = ModelReference.parse(target)
-
-                # Only follow alias references
-                if ref.kind == ModelReferenceKind.ALIAS:
-                    current = ref.name
-                else:
-                    # Not an alias reference, chain ends
-                    break
-
-        # Deduplicate cycles (same cycle can be found from different starting points)
-        unique_cycles: list[tuple[str, list[str]]] = []
-        seen_cycles: set[frozenset[str]] = set()
-
-        for start_alias, cycle_path in cycles:
-            cycle_set = frozenset(cycle_path)
-            if cycle_set not in seen_cycles:
-                seen_cycles.add(cycle_set)
-                unique_cycles.append((start_alias, cycle_path))
-
-        return unique_cycles
 
     # ============================================================
     # LLM Tests
@@ -257,16 +150,17 @@ class TestModelDeckReferences:
     def test_llm_aliases_reference_valid_targets(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify LLM aliases point to valid targets (other aliases, waterfalls, or direct handles)."""
         llm_deck = model_deck_blueprint.llm
 
-        invalid_refs = self._find_invalid_alias_targets(
+        invalid_refs = find_invalid_alias_targets(
             aliases=llm_deck.aliases,
             all_aliases=llm_deck.aliases,
             all_waterfalls=llm_deck.waterfalls,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.LLM,
         )
 
         if invalid_refs:
@@ -278,7 +172,7 @@ class TestModelDeckReferences:
     def test_llm_presets_reference_valid_models(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify LLM preset model fields use valid aliases, waterfalls, or direct handles."""
         llm_deck = model_deck_blueprint.llm
@@ -288,6 +182,7 @@ class TestModelDeckReferences:
             all_aliases=llm_deck.aliases,
             all_waterfalls=llm_deck.waterfalls,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.LLM,
         )
 
         if invalid_refs:
@@ -299,15 +194,16 @@ class TestModelDeckReferences:
     def test_llm_waterfalls_contain_valid_models(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify LLM waterfall entries are valid aliases or direct model handles."""
         llm_deck = model_deck_blueprint.llm
 
-        invalid_refs = self._find_invalid_waterfall_entries(
+        invalid_refs = find_invalid_waterfall_entries(
             waterfalls=llm_deck.waterfalls,
             all_aliases=llm_deck.aliases,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.LLM,
         )
 
         if invalid_refs:
@@ -320,7 +216,7 @@ class TestModelDeckReferences:
         """Detect LLM alias chains that form cycles."""
         llm_deck = model_deck_blueprint.llm
 
-        cycles = self._find_circular_aliases(aliases=llm_deck.aliases)
+        cycles = find_circular_aliases(aliases=llm_deck.aliases)
 
         if cycles:
             error_lines = ["Circular LLM alias references detected:"]
@@ -336,16 +232,17 @@ class TestModelDeckReferences:
     def test_extract_aliases_reference_valid_targets(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify Extract aliases point to valid targets (other aliases, waterfalls, or direct handles)."""
         extract_deck = model_deck_blueprint.extract
 
-        invalid_refs = self._find_invalid_alias_targets(
+        invalid_refs = find_invalid_alias_targets(
             aliases=extract_deck.aliases,
             all_aliases=extract_deck.aliases,
             all_waterfalls=extract_deck.waterfalls,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.TEXT_EXTRACTOR,
         )
 
         if invalid_refs:
@@ -357,7 +254,7 @@ class TestModelDeckReferences:
     def test_extract_presets_reference_valid_models(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify Extract preset model fields use valid aliases, waterfalls, or direct handles."""
         extract_deck = model_deck_blueprint.extract
@@ -367,6 +264,7 @@ class TestModelDeckReferences:
             all_aliases=extract_deck.aliases,
             all_waterfalls=extract_deck.waterfalls,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.TEXT_EXTRACTOR,
         )
 
         if invalid_refs:
@@ -378,15 +276,16 @@ class TestModelDeckReferences:
     def test_extract_waterfalls_contain_valid_models(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify Extract waterfall entries are valid aliases or direct model handles."""
         extract_deck = model_deck_blueprint.extract
 
-        invalid_refs = self._find_invalid_waterfall_entries(
+        invalid_refs = find_invalid_waterfall_entries(
             waterfalls=extract_deck.waterfalls,
             all_aliases=extract_deck.aliases,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.TEXT_EXTRACTOR,
         )
 
         if invalid_refs:
@@ -399,7 +298,7 @@ class TestModelDeckReferences:
         """Detect Extract alias chains that form cycles."""
         extract_deck = model_deck_blueprint.extract
 
-        cycles = self._find_circular_aliases(aliases=extract_deck.aliases)
+        cycles = find_circular_aliases(aliases=extract_deck.aliases)
 
         if cycles:
             error_lines = ["Circular Extract alias references detected:"]
@@ -415,16 +314,17 @@ class TestModelDeckReferences:
     def test_img_gen_aliases_reference_valid_targets(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify ImgGen aliases point to valid targets (other aliases, waterfalls, or direct handles)."""
         img_gen_deck = model_deck_blueprint.img_gen
 
-        invalid_refs = self._find_invalid_alias_targets(
+        invalid_refs = find_invalid_alias_targets(
             aliases=img_gen_deck.aliases,
             all_aliases=img_gen_deck.aliases,
             all_waterfalls=img_gen_deck.waterfalls,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.IMG_GEN,
         )
 
         if invalid_refs:
@@ -436,7 +336,7 @@ class TestModelDeckReferences:
     def test_img_gen_presets_reference_valid_models(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify ImgGen preset model fields use valid aliases, waterfalls, or direct handles."""
         img_gen_deck = model_deck_blueprint.img_gen
@@ -446,6 +346,7 @@ class TestModelDeckReferences:
             all_aliases=img_gen_deck.aliases,
             all_waterfalls=img_gen_deck.waterfalls,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.IMG_GEN,
         )
 
         if invalid_refs:
@@ -457,15 +358,16 @@ class TestModelDeckReferences:
     def test_img_gen_waterfalls_contain_valid_models(
         self,
         model_deck_blueprint: ModelDeckBlueprint,
-        all_known_model_handles: set[str],
+        all_known_model_handles: dict[str, ModelType],
     ):
         """Verify ImgGen waterfall entries are valid aliases or direct model handles."""
         img_gen_deck = model_deck_blueprint.img_gen
 
-        invalid_refs = self._find_invalid_waterfall_entries(
+        invalid_refs = find_invalid_waterfall_entries(
             waterfalls=img_gen_deck.waterfalls,
             all_aliases=img_gen_deck.aliases,
             known_model_handles=all_known_model_handles,
+            expected_model_type=ModelType.IMG_GEN,
         )
 
         if invalid_refs:
@@ -478,7 +380,7 @@ class TestModelDeckReferences:
         """Detect ImgGen alias chains that form cycles."""
         img_gen_deck = model_deck_blueprint.img_gen
 
-        cycles = self._find_circular_aliases(aliases=img_gen_deck.aliases)
+        cycles = find_circular_aliases(aliases=img_gen_deck.aliases)
 
         if cycles:
             error_lines = ["Circular ImgGen alias references detected:"]
