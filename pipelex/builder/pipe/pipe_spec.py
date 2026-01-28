@@ -8,6 +8,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
@@ -35,14 +36,16 @@ class PipeSpec(StructuredContent):
         output = "Image[5]"  # produces exactly 5 images
     """
 
-    pipe_code: str = Field(description="Unique pipe identifier. Must be snake_case.")
+    pipe_code: str = Field(description="Unique pipe identifier. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
     type: Any = Field(
         description=(
             f"Pipe type. Validated at runtime, must be one of: {PipeType}. Examples: PipeLLM, PipeImgGen, PipeExtract, PipeSequence, PipeParallel."
-        )
+        ),
+        examples=["PipeLLM"],
     )
     pipe_category: Any = Field(
-        description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'.")
+        description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'."),
+        examples=["PipeOperator"],
     )
     description: str = Field(description="Natural language description of the pipe's purpose and functionality.")
     inputs: dict[str, str] = Field(
@@ -58,7 +61,8 @@ class PipeSpec(StructuredContent):
             "Output concept code in PascalCase with optional multiplicity brackets. "
             "Examples: 'Text' (single text), 'Article[]' (list of articles), 'Image[3]' (exactly 3 images). "
             "IMPORTANT: Always use PascalCase for the concept name."
-        )
+        ),
+        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
     )
 
     @field_validator("pipe_code", mode="before")

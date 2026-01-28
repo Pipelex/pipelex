@@ -9,6 +9,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
@@ -49,12 +50,16 @@ class ConceptStructureSpec(StructuredContent):
 
     """
 
-    the_field_name: str = Field(description="Field name. Must be snake_case.")
+    the_field_name: str = Field(description="Field name. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
     description: str
-    type: ConceptStructureSpecFieldType = Field(description="The type of the field.")
+    type: ConceptStructureSpecFieldType = Field(description="The type of the field.", examples=["concept"])
     required: bool | None = False
-    default_value: Any | None = None
-    concept_ref: str | None = Field(default=None, description="For type='concept', the concept reference (e.g., 'myapp.Customer').")
+    default_value: Any | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.IGNORE})
+    concept_ref: str | None = Field(
+        default=None,
+        description="For type='concept', the concept reference (e.g., 'myapp.Customer').",
+        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
+    )
 
     @field_validator("type", mode="before")
     @classmethod
@@ -154,13 +159,14 @@ class ConceptSpec(StructuredContent):
 
     model_config = ConfigDict(extra="forbid")
 
-    the_concept_code: str = Field(description="Name of the concept. Must be PascalCase.")
+    the_concept_code: str = Field(description="Name of the concept. Must be PascalCase.", json_schema_extra={"mock_format": MockFormat.PASCAL_CASE})
     description: str = Field(description="Description of the concept, in natural language.")
     structure: dict[str, ConceptStructureSpec] | None = Field(
         default=None,
         description=(
             "Definition of the concept's structure. Each attribute (snake_case) specifies: definition, type, and required or default_value if needed"
         ),
+        json_schema_extra={"mock_format": MockFormat.IGNORE},
     )
     refines: str | None = Field(
         default=None,
@@ -168,6 +174,7 @@ class ConceptSpec(StructuredContent):
             "If applicable: the native concept this concept extends (Text, Image, Document, TextAndImages, Number, Page) "
             "in PascalCase format. Cannot be used together with 'structure'."
         ),
+        examples=["Text"],
     )
 
     @field_validator("the_concept_code", mode="before")

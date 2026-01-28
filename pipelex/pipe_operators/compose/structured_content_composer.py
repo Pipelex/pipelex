@@ -71,13 +71,6 @@ class StructuredContentComposer:
         try:
             return self.output_class.model_validate(field_values)
         except ValidationError as exc:
-            # In dry run mode, validation errors are expected due to mock values
-            # that may not satisfy cross-field constraints (e.g., main_pipe must
-            # exist in the pipe dict for PipelexBundleSpec). In this case, we
-            # fall back to model_construct which bypasses validators.
-            if self.pipe_run_params and self.pipe_run_params.run_mode.is_dry:
-                log.verbose(f"Dry run validation failed for {self.output_class.__name__}, using model_construct: {exc}")
-                return self.output_class.model_construct(**field_values)
             formatted_error = format_pydantic_validation_error(exc)
             msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}"
             msg += f"\nField values: {kajson.dumps(field_values, indent=4)}"
@@ -164,12 +157,15 @@ class StructuredContentComposer:
     def _convert_list_to_dict_keyed_by(self, value: Any, key_attr: str) -> dict[str, Any]:
         """Convert a ListContent or list to a dict keyed by a specified attribute.
 
+        Items are converted to dicts to allow Pydantic's discriminated union validation
+        to work properly when the target field uses union types with discriminators.
+
         Args:
             value: The value to convert (must be ListContent or list)
             key_attr: The attribute name to use as the dict key
 
         Returns:
-            A dict mapping the key_attr values to the items
+            A dict mapping the key_attr values to the items (converted to dicts)
 
         Raises:
             StructuredContentComposerTypeError: If value is not a ListContent or list
@@ -203,7 +199,13 @@ class StructuredContentComposer:
                 msg = f"Key attribute '{key_attr}' at index {idx} must be a string, got {type(key).__name__}"  # pyright: ignore[reportUnknownArgumentType]
                 raise StructuredContentComposerTypeError(msg)
 
-            result[key] = item
+            # Convert StuffContent items to dicts for proper discriminated union validation
+            if isinstance(item, StuffContent):
+                result[key] = item.model_dump(exclude_none=False, serialize_as_any=True)
+            elif isinstance(item, dict):
+                result[key] = item
+            else:
+                result[key] = item  # pyright: ignore[reportUnknownVariableType]
 
         log.verbose(f"  Converted to dict with keys: {list(result.keys())}")
         return result
@@ -639,7 +641,7 @@ class StructuredContentComposer:
         # Get the field type from the output class to determine nested class
         nested_class: type[StuffContent] = self._get_nested_field_class(field_name=field_name)
 
-        # Create a new composer for the nested structure, passing through runtime params, extra context, and content generator
+        # Create a new composer for the nested structure, passing through all context
         nested_composer = StructuredContentComposer(
             construct_blueprint=field_blueprint.nested,
             working_memory=self.working_memory,
@@ -647,6 +649,7 @@ class StructuredContentComposer:
             runtime_params=self.runtime_params,
             extra_context=self.extra_context,
             content_generator=self.content_generator,
+            pipe_run_params=self.pipe_run_params,
         )
 
         return await nested_composer.compose()

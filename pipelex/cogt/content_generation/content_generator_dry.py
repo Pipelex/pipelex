@@ -70,11 +70,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
         object_factory = DryRunFactory.make_dry_run_factory(object_class)
-        # `factory_use_contruct=True` prevents from running the model_validator/field_validator.
-        # It is that way because the dry run was failing a lot of pipes that had validation test on the
-        # field values. For example, if a string requires to be a snake_case, the ObjectFactory would
-        # generate something like `DOIJZjoDoIJDZOjDZJo` which is... not a snake_case.
-        return object_factory.build(factory_use_construct=True)
+        # We run validators to ensure mock data is valid. Fields with format constraints
+        # (snake_case, PascalCase, etc.) should have `examples` defined in their Field()
+        # so polyfactory uses those instead of random strings.
+        return object_factory.build()
 
     @override
     @update_job_metadata
