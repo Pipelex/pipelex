@@ -382,6 +382,43 @@ function buildDataflowGraph(graphspec, analysis) {
         }
     }
 
+    // Create batch edges (BATCH_ITEM and BATCH_AGGREGATE) from GraphSpec
+    // These edges connect pipe nodes directly to show list-item relationships
+    for (const edge of graphspec.edges) {
+        if (edge.kind === 'batch_item' || edge.kind === 'batch_aggregate') {
+            // Only include if both source and target are in participating pipes
+            if (participatingPipes.has(edge.source) && participatingPipes.has(edge.target)) {
+                const isBatchItem = edge.kind === 'batch_item';
+                edges.push({
+                    id: edge.id,
+                    source: edge.source,
+                    target: edge.target,
+                    type: {{ edge_type | tojson }},
+                    animated: false,
+                    label: edge.label || '',
+                    labelStyle: {
+                        fontSize: '10px',
+                        fontFamily: "'JetBrains Mono', monospace",
+                        fill: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+                    },
+                    labelBgStyle: {
+                        fill: 'var(--color-bg)',
+                        fillOpacity: 0.9,
+                    },
+                    style: {
+                        stroke: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+                        strokeWidth: 2,
+                        strokeDasharray: '5,5',
+                    },
+                    markerEnd: {
+                        type: MarkerType?.ArrowClosed || 'arrowclosed',
+                        color: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+                    },
+                });
+            }
+        }
+    }
+
     return { nodes, edges };
 }
 
