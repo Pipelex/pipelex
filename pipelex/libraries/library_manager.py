@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.kajson_manager import KajsonManager
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -20,6 +20,7 @@ from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_current_library
 from pipelex.libraries.exceptions import (
     LibraryError,
@@ -141,7 +142,7 @@ class LibraryManager(LibraryManagerAbstract):
             raise LibraryError(msg)
 
         if not library_dirs:
-            library_dirs = [Path()]
+            library_dirs = []
 
         all_dirs: list[Path] = []
         all_plx_paths: list[Path] = []
@@ -187,7 +188,7 @@ class LibraryManager(LibraryManagerAbstract):
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
         # Load PLX files into the specific library
-
+        log.debug(f"Loading plx files from: {[str(p) for p in valid_plx_paths]}")
         return self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
 
     @override
@@ -277,12 +278,20 @@ class LibraryManager(LibraryManagerAbstract):
                         domain_code=blueprint.domain,
                         concept_code=concept_code,
                     )
-                    ref_to_entry[concept_ref] = (blueprint.domain, concept_code, concept_blueprint)
+                    ref_to_entry[concept_ref] = (
+                        blueprint.domain,
+                        concept_code,
+                        concept_blueprint,
+                    )
 
         # Step 2: Build dependency graph and topologically sort using graphlib
         sorter: TopologicalSorter[str] = TopologicalSorter()
 
-        for concept_ref, (domain_code, _concept_code, concept_blueprint) in ref_to_entry.items():
+        for concept_ref, (
+            domain_code,
+            _concept_code,
+            concept_blueprint,
+        ) in ref_to_entry.items():
             dependencies: set[str] = set()
 
             if not isinstance(concept_blueprint, str) and concept_blueprint.refines:
@@ -364,7 +373,14 @@ class LibraryManager(LibraryManagerAbstract):
                 resolved_path = plx_file_path
             library.loaded_plx_paths.append(resolved_path)
 
-        return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+        try:
+            return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+        except ValidationError as validation_error:
+            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+            msg = f"Could not load blueprints from {[str(pth) for pth in valid_plx_paths]} because of: {validation_error_msg}"
+            raise LibraryError(
+                message=msg,
+            ) from validation_error
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

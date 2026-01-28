@@ -96,6 +96,8 @@ def which_cmd(
 
         if effective_dirs:
             library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+        else:
+            log.info(f"No library directories to load ({source_label})")
 
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)

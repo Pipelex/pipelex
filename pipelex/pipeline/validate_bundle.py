@@ -111,6 +111,8 @@ async def validate_bundle(
                 library_id=library_id,
                 library_dirs=effective_dirs,
             )
+        else:
+            log.verbose(f"No library directories to load ({source_label})")
         if blueprints is not None:
             loaded_blueprints = blueprints
             loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
