@@ -196,6 +196,26 @@ class TestModelDeckValidationHelpers:
         assert invalid_refs[0][1] == 1  # index of bad entry (dall-e-3)
         assert "has type 'img_gen' but expected 'llm'" in invalid_refs[0][3]
 
+    def test_detects_empty_waterfall(
+        self,
+        valid_aliases: dict[str, str],
+        known_model_handles: dict[str, ModelType],
+    ):
+        """Empty waterfall is detected (would cause IndexError at runtime)."""
+        bad_waterfalls = {"empty-waterfall": []}
+
+        invalid_refs = find_invalid_waterfall_entries(
+            waterfalls=bad_waterfalls,
+            all_aliases=valid_aliases,
+            known_model_handles=known_model_handles,
+            expected_model_type=ModelType.LLM,
+        )
+
+        assert len(invalid_refs) == 1
+        assert invalid_refs[0][0] == "empty-waterfall"
+        assert invalid_refs[0][1] == -1  # special index for empty waterfall
+        assert "cannot be empty" in invalid_refs[0][3]
+
     # ============================================================
     # Circular reference tests
     # ============================================================

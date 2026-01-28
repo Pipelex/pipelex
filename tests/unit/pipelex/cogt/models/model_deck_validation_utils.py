@@ -73,6 +73,11 @@ def find_invalid_waterfall_entries(
     invalid_refs: list[tuple[str, int, str, str]] = []
 
     for waterfall_name, entries in waterfalls.items():
+        # Empty waterfalls cause IndexError at runtime (fallback_list[0])
+        if not entries:
+            invalid_refs.append((waterfall_name, -1, "", "waterfall cannot be empty"))
+            continue
+
         for index, entry_value in enumerate(entries):
             ref = ModelReference.parse(entry_value)
 
