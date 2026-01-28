@@ -61,6 +61,7 @@ class PipelineResponseFactory:
             pipe_output=DictPipeOutput(
                 working_memory=PipelineResponseFactory._serialize_working_memory_with_dict_stuffs(pipe_output.working_memory),
                 pipeline_run_id=pipe_output.pipeline_run_id,
+                graph_spec=pipe_output.graph_spec,
             ),
             main_stuff_name=pipe_output.working_memory.aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME),
         )
