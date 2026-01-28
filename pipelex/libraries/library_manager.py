@@ -17,11 +17,6 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.core.pipes.handle_pipe_errors import (
-    categorize_pipe_factory_error,
-    categorize_pipe_validation_error,
-    categorize_pipe_validation_with_libraries_error,
-)
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
