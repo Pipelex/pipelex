@@ -55,12 +55,18 @@ class TestModelDeckReferences:
         # 2. Get gateway models from cached remote config
         remote_config = RemoteConfigFetcher.fetch_remote_config()  # Uses cached version
         gateway_specs = remote_config.backend_model_specs
+
+        # Get default model_type from gateway defaults section (same pattern as local backends)
+        gateway_defaults = gateway_specs.get("defaults", {})
+        gateway_default_model_type_str = gateway_defaults.get("model_type") if isinstance(gateway_defaults, dict) else None
+
         for model_name, spec in gateway_specs.items():
-            if isinstance(spec, dict) and "model_type" in spec:
-                known_handles[model_name] = ModelType(spec["model_type"])
-            elif model_name not in known_handles:
-                # Gateway models without explicit model_type default to LLM (most common type)
-                known_handles[model_name] = ModelType.LLM
+            if model_name == "defaults":
+                continue  # Skip the defaults section itself
+            if isinstance(spec, dict):
+                model_type_str = spec.get("model_type", gateway_default_model_type_str)
+                if model_type_str:
+                    known_handles[model_name] = ModelType(model_type_str)
 
         return known_handles
 
