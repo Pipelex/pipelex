@@ -142,8 +142,7 @@ class LibraryManager(LibraryManagerAbstract):
             raise LibraryError(msg)
 
         if not library_dirs:
-            log.info("No library directories to load")
-            return []
+            library_dirs = []
 
         all_dirs: list[Path] = []
         all_plx_paths: list[Path] = []

@@ -229,7 +229,7 @@ def show_pipe_cmd(
         )
         raise typer.Exit(1)
 
-    library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else [Path.cwd()]
+    library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE, library_dirs=library_dirs)
 
     try:
