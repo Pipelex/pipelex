@@ -1,9 +1,9 @@
 import shortuuid
-from polyfactory.factories.pydantic_factory import ModelFactory
 from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.client.protocol import PipelineInputs
+from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import TypedNamedStuffSpec
@@ -12,6 +12,12 @@ from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+
+# Field names that require snake_case format for pipelex bundle specs
+SNAKE_CASE_FIELD_NAMES = {"domain", "domain_code", "pipe_code", "main_pipe"}
+
+# Field names that require PascalCase format for pipelex concept specs
+PASCAL_CASE_FIELD_NAMES = {"the_concept_code"}
 
 
 class WorkingMemoryFactory(BaseModel):
@@ -79,16 +85,18 @@ class WorkingMemoryFactory(BaseModel):
         return working_memory
 
     @classmethod
-    def create_mock_content(cls, typed_named_stuff_spec: TypedNamedStuffSpec) -> StuffContent:
-        """Helper method to create mock content for a typed_named_stuff_spec."""
+    def make_mock_content(cls, typed_named_stuff_spec: TypedNamedStuffSpec) -> StuffContent:
+        """Helper method to create mock content for a typed_named_stuff_spec.
 
-        class MockFactory(ModelFactory[typed_named_stuff_spec.structure_class]):  # type: ignore[name-defined]
-            __model__ = typed_named_stuff_spec.structure_class
-            __check_model__ = True
-            __use_examples__ = True
-            __allow_none_optionals__ = False  # Ensure Optional fields always get values
-
-        return MockFactory.build(factory_use_construct=True)  # type: ignore[no-any-return]
+        Uses DryRunFactory to generate mock values with field-specific generators
+        for known constrained fields (e.g., domain, pipe_code require snake_case).
+        """
+        mock_factory = DryRunFactory.make_dry_run_factory(
+            object_class=typed_named_stuff_spec.structure_class,
+            snake_case_field_names=SNAKE_CASE_FIELD_NAMES,
+            pascal_case_field_names=PASCAL_CASE_FIELD_NAMES,
+        )
+        return mock_factory.build(factory_use_construct=True)  # type: ignore[no-any-return]
 
     @classmethod
     def make_mock_inputs(cls, needed_inputs: list[TypedNamedStuffSpec]) -> "WorkingMemory":
@@ -106,7 +114,7 @@ class WorkingMemoryFactory(BaseModel):
         for typed_named_stuff_spec in needed_inputs:
             try:
                 if not typed_named_stuff_spec.multiplicity:
-                    mock_content = cls.create_mock_content(typed_named_stuff_spec)
+                    mock_content = cls.make_mock_content(typed_named_stuff_spec)
 
                     # Create stuff with mock content
                     mock_stuff = StuffFactory.make_stuff(
@@ -128,7 +136,7 @@ class WorkingMemoryFactory(BaseModel):
 
                     items: list[StuffContent] = []
                     for _ in range(nb_stuffs):
-                        item_mock_content = cls.create_mock_content(typed_named_stuff_spec)
+                        item_mock_content = cls.make_mock_content(typed_named_stuff_spec)
                         items.append(item_mock_content)
 
                     mock_list_content = ListContent[StuffContent](items=items)

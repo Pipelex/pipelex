@@ -164,7 +164,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             structure_class=return_type,
             multiplicity=False,
         )
-        mock_content = WorkingMemoryFactory.create_mock_content(stuff_spec)
+        mock_content = WorkingMemoryFactory.make_mock_content(stuff_spec)
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,

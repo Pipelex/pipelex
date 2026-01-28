@@ -19,6 +19,7 @@ from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerValidationError,
     StructuredContentComposerValueError,
 )
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.tools.typing.class_utils import are_classes_equivalent
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -39,6 +40,7 @@ class StructuredContentComposer:
         runtime_params: Additional runtime parameters for template context (from PipeRunParams.params)
         extra_context: Extra context values for template rendering (from PipeCompose.extra_context)
         content_generator: The content generator to use for template rendering (supports dry run mode)
+        pipe_run_params: The pipe run parameters (used to check if we're in dry run mode)
     """
 
     def __init__(
@@ -49,6 +51,7 @@ class StructuredContentComposer:
         runtime_params: dict[str, Any] | None = None,
         extra_context: dict[str, Any] | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
+        pipe_run_params: PipeRunParams | None = None,
     ):
         self.construct_blueprint = construct_blueprint
         self.working_memory = working_memory
@@ -56,6 +59,7 @@ class StructuredContentComposer:
         self.runtime_params = runtime_params or {}
         self.extra_context = extra_context or {}
         self.content_generator = content_generator or get_content_generator()
+        self.pipe_run_params = pipe_run_params
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -67,6 +71,13 @@ class StructuredContentComposer:
         try:
             return self.output_class.model_validate(field_values)
         except ValidationError as exc:
+            # In dry run mode, validation errors are expected due to mock values
+            # that may not satisfy cross-field constraints (e.g., main_pipe must
+            # exist in the pipe dict for PipelexBundleSpec). In this case, we
+            # fall back to model_construct which bypasses validators.
+            if self.pipe_run_params and self.pipe_run_params.run_mode.is_dry:
+                log.verbose(f"Dry run validation failed for {self.output_class.__name__}, using model_construct: {exc}")
+                return self.output_class.model_construct(**field_values)
             formatted_error = format_pydantic_validation_error(exc)
             msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}"
             msg += f"\nField values: {kajson.dumps(field_values, indent=4)}"

@@ -231,6 +231,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             runtime_params=pipe_run_params.params if pipe_run_params else None,
             extra_context=self.extra_context,
             content_generator=content_generator,
+            pipe_run_params=pipe_run_params,
         )
         the_content = await composer.compose()
         log.verbose(f"Composed structured content: {the_content}")

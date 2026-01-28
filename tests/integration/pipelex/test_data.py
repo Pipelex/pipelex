@@ -1,7 +1,5 @@
 from typing import ClassVar
 
-import pytest
-
 from pipelex.builder.bundle_header_spec import BundleHeaderSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
@@ -19,7 +17,6 @@ from pipelex.pipe_run.exceptions import PipeRouterError
 from tests.cases import DocumentTestCases, ImageTestCases
 
 
-@pytest.mark.dry_runnable
 class SomeContentWithImageAttribute(StructuredContent):
     image_attribute: ImageContent
 
