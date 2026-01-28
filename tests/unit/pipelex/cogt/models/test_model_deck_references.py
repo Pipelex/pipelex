@@ -4,6 +4,8 @@ This test suite systematically validates that model deck references point to val
 preventing configuration errors from being discovered at runtime.
 """
 
+from typing import cast
+
 import pytest
 
 from pipelex.cogt.extract.extract_setting import ExtractSetting
@@ -58,13 +60,17 @@ class TestModelDeckReferences:
 
         # Get default model_type from gateway defaults section (same pattern as local backends)
         gateway_defaults = gateway_specs.get("defaults", {})
-        gateway_default_model_type_str = gateway_defaults.get("model_type") if isinstance(gateway_defaults, dict) else None
+        gateway_default_model_type_str: str | None = None
+        if isinstance(gateway_defaults, dict):
+            typed_defaults = cast("dict[str, str]", gateway_defaults)
+            gateway_default_model_type_str = typed_defaults.get("model_type")
 
         for model_name, spec in gateway_specs.items():
             if model_name == "defaults":
                 continue  # Skip the defaults section itself
             if isinstance(spec, dict):
-                model_type_str = spec.get("model_type", gateway_default_model_type_str)
+                typed_spec = cast("dict[str, str]", spec)
+                model_type_str: str | None = typed_spec.get("model_type") or gateway_default_model_type_str
                 if model_type_str:
                     known_handles[model_name] = ModelType(model_type_str)
 

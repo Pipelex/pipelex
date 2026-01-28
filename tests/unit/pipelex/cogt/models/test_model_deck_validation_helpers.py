@@ -202,7 +202,7 @@ class TestModelDeckValidationHelpers:
         known_model_handles: dict[str, ModelType],
     ):
         """Empty waterfall is detected (would cause IndexError at runtime)."""
-        bad_waterfalls = {"empty-waterfall": []}
+        bad_waterfalls: dict[str, list[str]] = {"empty-waterfall": []}
 
         invalid_refs = find_invalid_waterfall_entries(
             waterfalls=bad_waterfalls,
