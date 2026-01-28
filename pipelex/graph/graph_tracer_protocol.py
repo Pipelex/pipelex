@@ -122,6 +122,36 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def register_batch_item_extraction(
+        self,
+        list_stuff_code: str,
+        item_stuff_code: str,
+        item_index: int,
+    ) -> None:
+        """Register that a list stuff produced an item stuff during batch iteration.
+
+        Args:
+            list_stuff_code: The stuff_code of the input list.
+            item_stuff_code: The stuff_code of the extracted item.
+            item_index: The index of the item in the list.
+        """
+        ...
+
+    def register_batch_aggregation(
+        self,
+        output_list_stuff_code: str,
+        item_stuff_code: str,
+        item_index: int,
+    ) -> None:
+        """Register that an item stuff will be aggregated into an output list.
+
+        Args:
+            output_list_stuff_code: The stuff_code of the output list.
+            item_stuff_code: The stuff_code of the item to aggregate.
+            item_index: The index of the item in the output list.
+        """
+        ...
+
 
 class GraphTracerNoOp(GraphTracerProtocol):
     """No-operation implementation of GraphTracerProtocol.
@@ -189,5 +219,23 @@ class GraphTracerNoOp(GraphTracerProtocol):
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,
+    ) -> None:
+        pass
+
+    @override
+    def register_batch_item_extraction(
+        self,
+        list_stuff_code: str,
+        item_stuff_code: str,
+        item_index: int,
+    ) -> None:
+        pass
+
+    @override
+    def register_batch_aggregation(
+        self,
+        output_list_stuff_code: str,
+        item_stuff_code: str,
+        item_index: int,
     ) -> None:
         pass

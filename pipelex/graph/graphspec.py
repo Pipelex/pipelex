@@ -47,6 +47,8 @@ class EdgeKind(StrEnum):
     DATA = "data"
     CONTAINS = "contains"
     SELECTED_OUTCOME = "selected_outcome"
+    BATCH_ITEM = "batch_item"  # list → item extraction during batch iteration
+    BATCH_AGGREGATE = "batch_aggregate"  # items → output list aggregation
 
 
 def _truncate_string(value: str | None, max_length: int) -> str | None:

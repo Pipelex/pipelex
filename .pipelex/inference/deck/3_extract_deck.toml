@@ -39,4 +39,4 @@ extract-all-from-document = { model = "@default-extract-document", max_nb_images
 extract-text-from-pdf = { model = "@default-extract-text-from-pdf", max_nb_images = 100, image_min_size = 50 }
 
 # Testing
-extract-testing = { model = "@default-software-extract-no-inference", max_nb_images = 100, image_min_size = 50 }
+extract-testing = { model = "pypdfium2-extract-pdf", max_nb_images = 100, image_min_size = 50 }

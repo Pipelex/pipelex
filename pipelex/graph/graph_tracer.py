@@ -103,6 +103,10 @@ class GraphTracer(GraphTracerProtocol):
         self._edge_sequence: int = 0
         # Maps stuff_code (digest) to the node_id that produced it
         self._stuff_producer_map: dict[str, str] = {}
+        # Maps list_stuff_code -> [(item_stuff_code, item_index), ...]
+        self._batch_item_map: dict[str, list[tuple[str, int]]] = {}
+        # Maps output_list_stuff_code -> [(item_stuff_code, item_index), ...]
+        self._batch_aggregate_map: dict[str, list[tuple[str, int]]] = {}
 
     @property
     def is_active(self) -> bool:
@@ -130,6 +134,8 @@ class GraphTracer(GraphTracerProtocol):
         self._node_sequence = 0
         self._edge_sequence = 0
         self._stuff_producer_map = {}
+        self._batch_item_map = {}
+        self._batch_aggregate_map = {}
 
         return GraphContext(
             graph_id=graph_id,
@@ -153,6 +159,8 @@ class GraphTracer(GraphTracerProtocol):
         # Generate DATA edges by correlating input stuff_codes with producer nodes
         # (must happen before setting _is_active = False since add_edge checks it)
         self._generate_data_edges()
+        self._generate_batch_item_edges()
+        self._generate_batch_aggregate_edges()
 
         self._is_active = False
 
@@ -174,6 +182,8 @@ class GraphTracer(GraphTracerProtocol):
         self._nodes = {}
         self._edges = []
         self._stuff_producer_map = {}
+        self._batch_item_map = {}
+        self._batch_aggregate_map = {}
 
         return graph
 
@@ -201,6 +211,107 @@ class GraphTracer(GraphTracerProtocol):
                     edge_kind=EdgeKind.DATA,
                     label=input_spec.name,
                 )
+
+    def _generate_batch_item_edges(self) -> None:
+        """Generate BATCH_ITEM edges from list producer/consumer to item consumers.
+
+        For each registered batch item extraction, find the consumer nodes for
+        the extracted items and create BATCH_ITEM edges from the list source
+        to the branch pipes that process individual items.
+        """
+        for list_stuff_code, item_entries in self._batch_item_map.items():
+            # Find list producer or consumer (the PipeBatch node that takes the list as input)
+            list_producer_node_id = self._stuff_producer_map.get(list_stuff_code)
+            list_consumer_node_id: str | None = None
+
+            for node_id, node_data in self._nodes.items():
+                for input_spec in node_data.input_specs:
+                    if input_spec.digest == list_stuff_code:
+                        list_consumer_node_id = node_id
+                        break
+                if list_consumer_node_id:
+                    break
+
+            source_node_id = list_producer_node_id or list_consumer_node_id
+            if not source_node_id:
+                continue
+
+            for item_stuff_code, item_index in item_entries:
+                # Find consumer nodes for this item (the branch pipes)
+                for consumer_node_id, node_data in self._nodes.items():
+                    for input_spec in node_data.input_specs:
+                        if input_spec.digest == item_stuff_code:
+                            if source_node_id != consumer_node_id:
+                                self.add_edge(
+                                    source_node_id=source_node_id,
+                                    target_node_id=consumer_node_id,
+                                    edge_kind=EdgeKind.BATCH_ITEM,
+                                    label=f"[{item_index}]",
+                                )
+                            break
+
+    def _generate_batch_aggregate_edges(self) -> None:
+        """Generate BATCH_AGGREGATE edges from item producers to output list producer.
+
+        For each registered batch aggregation, create edges from the branch pipe
+        outputs to the PipeBatch node that produces the aggregated list.
+        """
+        for output_list_stuff_code, item_entries in self._batch_aggregate_map.items():
+            # Find the output list producer (the PipeBatch node)
+            output_list_producer_id = self._stuff_producer_map.get(output_list_stuff_code)
+            if not output_list_producer_id:
+                continue
+
+            for item_stuff_code, item_index in item_entries:
+                # Find the producer of this item (the branch pipe)
+                item_producer_id = self._stuff_producer_map.get(item_stuff_code)
+                if item_producer_id and item_producer_id != output_list_producer_id:
+                    self.add_edge(
+                        source_node_id=item_producer_id,
+                        target_node_id=output_list_producer_id,
+                        edge_kind=EdgeKind.BATCH_AGGREGATE,
+                        label=f"[{item_index}]",
+                    )
+
+    @override
+    def register_batch_item_extraction(
+        self,
+        list_stuff_code: str,
+        item_stuff_code: str,
+        item_index: int,
+    ) -> None:
+        """Register that a list stuff produced an item stuff during batch iteration.
+
+        Args:
+            list_stuff_code: The stuff_code of the input list.
+            item_stuff_code: The stuff_code of the extracted item.
+            item_index: The index of the item in the list.
+        """
+        if not self._is_active:
+            return
+        if list_stuff_code not in self._batch_item_map:
+            self._batch_item_map[list_stuff_code] = []
+        self._batch_item_map[list_stuff_code].append((item_stuff_code, item_index))
+
+    @override
+    def register_batch_aggregation(
+        self,
+        output_list_stuff_code: str,
+        item_stuff_code: str,
+        item_index: int,
+    ) -> None:
+        """Register that an item stuff will be aggregated into an output list.
+
+        Args:
+            output_list_stuff_code: The stuff_code of the output list.
+            item_stuff_code: The stuff_code of the item to aggregate.
+            item_index: The index of the item in the output list.
+        """
+        if not self._is_active:
+            return
+        if output_list_stuff_code not in self._batch_aggregate_map:
+            self._batch_aggregate_map[output_list_stuff_code] = []
+        self._batch_aggregate_map[output_list_stuff_code].append((item_stuff_code, item_index))
 
     @override
     def on_pipe_start(

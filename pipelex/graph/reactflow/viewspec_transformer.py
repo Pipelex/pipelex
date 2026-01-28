@@ -59,6 +59,10 @@ def _map_edge_kind_to_view_type(kind: EdgeKind) -> str:
             return "contains"
         case EdgeKind.SELECTED_OUTCOME:
             return "control"  # Treat selected_outcome as control for now
+        case EdgeKind.BATCH_ITEM:
+            return "batch_item"
+        case EdgeKind.BATCH_AGGREGATE:
+            return "batch_aggregate"
 
 
 def _build_node_label(node_spec: Any) -> str:

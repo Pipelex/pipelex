@@ -13,6 +13,7 @@ from typing import Any
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graphspec import (
+    EdgeKind,
     GraphSpec,
     NodeKind,
     NodeSpec,
@@ -207,6 +208,28 @@ class MermaidflowFactory:
                 consumer_mermaid_id = id_mapping.get(consumer_node_id)
                 if consumer_mermaid_id:
                     lines.append(f"    {cons_stuff_mermaid_id} --> {consumer_mermaid_id}")
+
+        # Render batch edges (BATCH_ITEM and BATCH_AGGREGATE) with dashed styling
+        batch_item_edges = [edge for edge in graph.edges if edge.kind == EdgeKind.BATCH_ITEM]
+        batch_aggregate_edges = [edge for edge in graph.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+
+        if batch_item_edges or batch_aggregate_edges:
+            lines.append("")
+            lines.append("    %% Batch edges: list-item relationships")
+
+            for edge in batch_item_edges:
+                source_mermaid_id = id_mapping.get(edge.source)
+                target_mermaid_id = id_mapping.get(edge.target)
+                if source_mermaid_id and target_mermaid_id:
+                    label = edge.label or ""
+                    lines.append(f'    {source_mermaid_id} -."{label}".-> {target_mermaid_id}')
+
+            for edge in batch_aggregate_edges:
+                source_mermaid_id = id_mapping.get(edge.source)
+                target_mermaid_id = id_mapping.get(edge.target)
+                if source_mermaid_id and target_mermaid_id:
+                    label = edge.label or ""
+                    lines.append(f'    {source_mermaid_id} -."{label}".-> {target_mermaid_id}')
 
         # Style definitions
         lines.append("")
