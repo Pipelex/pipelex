@@ -58,6 +58,9 @@ class TestModelDeckReferences:
         for model_name, spec in gateway_specs.items():
             if isinstance(spec, dict) and "model_type" in spec:
                 known_handles[model_name] = ModelType(spec["model_type"])
+            elif model_name not in known_handles:
+                # Gateway models without explicit model_type default to LLM (most common type)
+                known_handles[model_name] = ModelType.LLM
 
         return known_handles
 
