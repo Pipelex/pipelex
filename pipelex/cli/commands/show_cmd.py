@@ -24,6 +24,7 @@ from pipelex.hub import (
     get_required_pipe,
     get_secrets_provider,
     get_telemetry_manager,
+    resolve_library_dirs,
     set_current_library,
 )
 from pipelex.pipelex import Pipelex
@@ -235,7 +236,10 @@ def show_pipe_cmd(
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
         set_current_library(library_id=library_id)
-        library_manager.load_libraries(library_id=library_id, library_dirs=library_dirs)
+        effective_dirs, _ = resolve_library_dirs(library_dirs)
+
+        if effective_dirs:
+            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
