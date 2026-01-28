@@ -383,39 +383,59 @@ function buildDataflowGraph(graphspec, analysis) {
     }
 
     // Create batch edges (BATCH_ITEM and BATCH_AGGREGATE) from GraphSpec
-    // These edges connect pipe nodes directly to show list-item relationships
+    // Configuration controls whether edges connect to pipe nodes or stuff nodes
+    const showBatchController = {{ show_batch_controller | default(true) | tojson }};
+
     for (const edge of graphspec.edges) {
         if (edge.kind === 'batch_item' || edge.kind === 'batch_aggregate') {
-            // Only include if both source and target are in participating pipes
-            if (participatingPipes.has(edge.source) && participatingPipes.has(edge.target)) {
-                const isBatchItem = edge.kind === 'batch_item';
-                edges.push({
-                    id: edge.id,
-                    source: edge.source,
-                    target: edge.target,
-                    type: {{ edge_type | tojson }},
-                    animated: false,
-                    label: edge.label || '',
-                    labelStyle: {
-                        fontSize: '10px',
-                        fontFamily: "'JetBrains Mono', monospace",
-                        fill: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
-                    },
-                    labelBgStyle: {
-                        fill: 'var(--color-bg)',
-                        fillOpacity: 0.9,
-                    },
-                    style: {
-                        stroke: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
-                        strokeWidth: 2,
-                        strokeDasharray: '5,5',
-                    },
-                    markerEnd: {
-                        type: MarkerType?.ArrowClosed || 'arrowclosed',
-                        color: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
-                    },
-                });
+            const isBatchItem = edge.kind === 'batch_item';
+            let sourceId, targetId;
+
+            if (showBatchController) {
+                // Connect to pipe nodes (PipeBatch controller)
+                // Only include if both source and target are in participating pipes
+                if (!participatingPipes.has(edge.source) || !participatingPipes.has(edge.target)) {
+                    continue;
+                }
+                sourceId = edge.source;
+                targetId = edge.target;
+            } else {
+                // Connect stuff nodes directly using stuff digests
+                if (edge.source_stuff_digest && edge.target_stuff_digest) {
+                    sourceId = `stuff_${edge.source_stuff_digest}`;
+                    targetId = `stuff_${edge.target_stuff_digest}`;
+                } else {
+                    // Skip if no stuff digests available
+                    continue;
+                }
             }
+
+            edges.push({
+                id: edge.id,
+                source: sourceId,
+                target: targetId,
+                type: {{ edge_type | tojson }},
+                animated: false,
+                label: edge.label || '',
+                labelStyle: {
+                    fontSize: '10px',
+                    fontFamily: "'JetBrains Mono', monospace",
+                    fill: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+                },
+                labelBgStyle: {
+                    fill: 'var(--color-bg)',
+                    fillOpacity: 0.9,
+                },
+                style: {
+                    stroke: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+                    strokeWidth: 2,
+                    strokeDasharray: '5,5',
+                },
+                markerEnd: {
+                    type: MarkerType?.ArrowClosed || 'arrowclosed',
+                    color: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+                },
+            });
         }
     }
 

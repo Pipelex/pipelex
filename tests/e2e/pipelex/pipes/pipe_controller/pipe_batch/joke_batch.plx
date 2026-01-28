@@ -23,7 +23,7 @@ steps = [
 type = "PipeLLM"
 description = "Generate 3 distinct topics suitable for one-liner jokes"
 output = "Topic[3]"
-model = "$writing-creative"
+model = "$testing-text"
 system_prompt = """
 You are a creative comedy writer. Your task is to generate structured topic outputs that can serve as inspiration for one-liner jokes.
 """
@@ -45,5 +45,5 @@ type = "PipeLLM"
 description = "Write a clever one-liner joke based on the given topic"
 inputs = { topic = "Topic" }
 output = "Joke"
-model = "$writing-creative"
+model = "$testing-text"
 prompt = "Write a clever one-liner joke about $topic. Be concise and witty."

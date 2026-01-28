@@ -71,6 +71,7 @@ def generate_reactflow_html(
             "pan_to_top": config.pan_to_top,
             "initial_theme": config.style.theme,
             "initial_palette": config.style.palette,
+            "show_batch_controller": config.show_batch_controller,
         },
         use_registry=True,
     )
@@ -131,6 +132,7 @@ async def generate_reactflow_html_async(
             "pan_to_top": config.pan_to_top,
             "initial_theme": config.style.theme,
             "initial_palette": config.style.palette,
+            "show_batch_controller": config.show_batch_controller,
         },
         use_registry=True,
     )

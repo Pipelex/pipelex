@@ -41,3 +41,6 @@ class ReactFlowRenderingConfig(ConfigModel):
     pan_to_top: bool
     default_title: str
     style: ReactFlowStyle
+    # When True, PipeBatch controller nodes appear in the graph as pipe nodes for batch edges
+    # When False, batch edges connect stuff nodes directly (list -> items, items -> list)
+    show_batch_controller: bool

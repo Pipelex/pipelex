@@ -186,6 +186,9 @@ class EdgeSpec(BaseModel):
     target: str
     kind: EdgeKind
     label: str | None = None
+    # For batch edges, specify the stuff digests for renderers to connect stuff nodes directly
+    source_stuff_digest: str | None = None
+    target_stuff_digest: str | None = None
     meta: dict[str, Any] = Field(default_factory=dict)
 
 

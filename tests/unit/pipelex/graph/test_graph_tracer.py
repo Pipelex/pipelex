@@ -757,3 +757,118 @@ class TestGraphTracer:
         # Teardown should return None since tracer was never active
         result = tracer.teardown()
         assert result is None
+
+    def test_batch_item_edges_contain_stuff_digests(self) -> None:
+        """Test that BATCH_ITEM edges include source and target stuff digests.
+
+        The source_stuff_digest should be the list stuff code,
+        and target_stuff_digest should be the item stuff code.
+        """
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="batch-digest-test", data_inclusion=make_defaulted_data_inclusion_config())
+
+        started_at = datetime.now(timezone.utc)
+
+        # PipeBatch that consumes the list
+        batch_id, batch_ctx = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="my_batch",
+            pipe_type="PipeBatch",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+            input_specs=[IOSpec(name="articles", concept="List", digest="list_digest_abc")],
+        )
+
+        # Branch: processes item
+        branch_id, _ = tracer.on_pipe_start(
+            graph_context=batch_ctx,
+            pipe_code="branch_pipe",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=10),
+            input_specs=[IOSpec(name="article", concept="Text", digest="item_digest_xyz")],
+        )
+        tracer.on_pipe_end_success(
+            node_id=branch_id,
+            ended_at=started_at + timedelta(milliseconds=50),
+        )
+
+        # Register batch item extraction
+        tracer.register_batch_item_extraction(
+            list_stuff_code="list_digest_abc",
+            item_stuff_code="item_digest_xyz",
+            item_index=0,
+        )
+
+        tracer.on_pipe_end_success(
+            node_id=batch_id,
+            ended_at=started_at + timedelta(milliseconds=100),
+        )
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_ITEM]
+        assert len(batch_item_edges) == 1
+
+        edge = batch_item_edges[0]
+        assert edge.source_stuff_digest == "list_digest_abc"
+        assert edge.target_stuff_digest == "item_digest_xyz"
+
+    def test_batch_aggregate_edges_contain_stuff_digests(self) -> None:
+        """Test that BATCH_AGGREGATE edges include source and target stuff digests.
+
+        The source_stuff_digest should be the item stuff code,
+        and target_stuff_digest should be the output list stuff code.
+        """
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="batch-agg-digest-test", data_inclusion=make_defaulted_data_inclusion_config())
+
+        started_at = datetime.now(timezone.utc)
+
+        # PipeBatch
+        batch_id, batch_ctx = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="my_batch",
+            pipe_type="PipeBatch",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+            input_specs=[IOSpec(name="items", concept="List", digest="input_list")],
+        )
+
+        # Branch: produces item
+        branch_id, _ = tracer.on_pipe_start(
+            graph_context=batch_ctx,
+            pipe_code="branch_pipe",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=10),
+        )
+        tracer.on_pipe_end_success(
+            node_id=branch_id,
+            ended_at=started_at + timedelta(milliseconds=50),
+            output_spec=IOSpec(name="result", concept="Text", digest="item_result_digest"),
+        )
+
+        # Register batch aggregation
+        tracer.register_batch_aggregation(
+            output_list_stuff_code="output_list_digest",
+            item_stuff_code="item_result_digest",
+            item_index=0,
+        )
+
+        tracer.on_pipe_end_success(
+            node_id=batch_id,
+            ended_at=started_at + timedelta(milliseconds=100),
+            output_spec=IOSpec(name="results", concept="List", digest="output_list_digest"),
+        )
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+        assert len(batch_aggregate_edges) == 1
+
+        edge = batch_aggregate_edges[0]
+        assert edge.source_stuff_digest == "item_result_digest"
+        assert edge.target_stuff_digest == "output_list_digest"

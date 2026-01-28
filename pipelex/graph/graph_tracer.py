@@ -247,6 +247,8 @@ class GraphTracer(GraphTracerProtocol):
                                     target_node_id=consumer_node_id,
                                     edge_kind=EdgeKind.BATCH_ITEM,
                                     label=f"[{item_index}]",
+                                    source_stuff_digest=list_stuff_code,
+                                    target_stuff_digest=item_stuff_code,
                                 )
                             break
 
@@ -271,6 +273,8 @@ class GraphTracer(GraphTracerProtocol):
                         target_node_id=output_list_producer_id,
                         edge_kind=EdgeKind.BATCH_AGGREGATE,
                         label=f"[{item_index}]",
+                        source_stuff_digest=item_stuff_code,
+                        target_stuff_digest=output_list_stuff_code,
                     )
 
     @override
@@ -424,6 +428,8 @@ class GraphTracer(GraphTracerProtocol):
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,
+        source_stuff_digest: str | None = None,
+        target_stuff_digest: str | None = None,
     ) -> None:
         """Add an edge between two nodes."""
         if not self._is_active:
@@ -438,6 +444,8 @@ class GraphTracer(GraphTracerProtocol):
             target=target_node_id,
             kind=edge_kind,
             label=label,
+            source_stuff_digest=source_stuff_digest,
+            target_stuff_digest=target_stuff_digest,
         )
         self._edges.append(edge)
 

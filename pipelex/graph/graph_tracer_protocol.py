@@ -111,6 +111,8 @@ class GraphTracerProtocol(Protocol):
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,
+        source_stuff_digest: str | None = None,
+        target_stuff_digest: str | None = None,
     ) -> None:
         """Add an edge between two nodes.
 
@@ -119,6 +121,8 @@ class GraphTracerProtocol(Protocol):
             target_node_id: The target node ID.
             edge_kind: The type of edge.
             label: Optional label for the edge.
+            source_stuff_digest: Optional stuff digest for the source (for batch edges).
+            target_stuff_digest: Optional stuff digest for the target (for batch edges).
         """
         ...
 
@@ -219,6 +223,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
         target_node_id: str,
         edge_kind: EdgeKind,
         label: str | None = None,
+        source_stuff_digest: str | None = None,
+        target_stuff_digest: str | None = None,
     ) -> None:
         pass
 
