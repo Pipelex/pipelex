@@ -36,13 +36,10 @@ class PipelineResponseFactory:
     @staticmethod
     def make_from_pipe_output(
         pipe_output: PipeOutput,
-        status: str,
         pipeline_run_id: str = "",
         created_at: str = "",
         pipeline_state: PipelineState = PipelineState.COMPLETED,
         finished_at: str | None = None,
-        message: str | None = None,
-        error: str | None = None,
     ) -> PipelineResponse:
         """Create a PipelineResponse from a PipeOutput object.
 
@@ -52,9 +49,6 @@ class PipelineResponseFactory:
             created_at: Timestamp when the pipeline was created
             pipeline_state: Current state of the pipeline
             finished_at: Timestamp when the pipeline finished
-            status: Status of the API call
-            message: Optional message providing additional information
-            error: Optional error message
         Returns:
             PipelineResponse with the pipe output serialized to reduced format
 
@@ -69,9 +63,6 @@ class PipelineResponseFactory:
                 pipeline_run_id=pipe_output.pipeline_run_id,
             ),
             main_stuff_name=pipe_output.working_memory.aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME),
-            status=status,
-            message=message,
-            error=error,
         )
 
     @staticmethod

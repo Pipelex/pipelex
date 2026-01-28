@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -8,12 +8,8 @@ from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.talents.extract_talent import ExtractTalent
-from pipelex.config import get_config
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-
-if TYPE_CHECKING:
-    from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 
 
 class PipeExtractSpec(PipeSpec):
@@ -87,15 +83,15 @@ class PipeExtractSpec(PipeSpec):
         base_blueprint = super().to_blueprint()
 
         # Get extract choice from config-based mapping
-        mappings = get_config().pipelex.builder_config.talent_preset_mappings.extract
-        extract_model_choice: ExtractModelChoice = mappings[self.extract_talent]
+        # mappings = get_config().pipelex.builder_config.talent_preset_mappings.extract
+        # extract_model_choice: ExtractModelChoice = mappings[self.extract_talent]
 
         return PipeExtractBlueprint(
             source=None,
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
-            model=extract_model_choice,
+            model=None,
             max_page_images=self.max_page_images,
             page_image_captions=self.page_image_captions,
             page_views=self.page_views,
