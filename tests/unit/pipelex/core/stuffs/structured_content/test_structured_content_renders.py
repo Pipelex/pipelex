@@ -3,7 +3,6 @@ import pytest
 from tests.unit.pipelex.core.stuffs.structured_content.test_data import SampleStructuredContent, TestData
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestStructuredContentRenders:
     """Tests for StructuredContent render methods."""
 
@@ -46,12 +45,14 @@ class TestStructuredContentRenders:
         result = content.rendered_html()
         assert result == TestData.EXPECTED_RENDERED_HTML_FULL
 
+    @pytest.mark.asyncio
     async def test_rendered_markdown_async(self):
         """Verify async rendered_markdown returns the same as sync version."""
         content = SampleStructuredContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)
         result = await content.rendered_markdown_async()
         assert result == TestData.EXPECTED_RENDERED_MARKDOWN_MINIMAL
 
+    @pytest.mark.asyncio
     async def test_rendered_html_async(self):
         """Verify async rendered_html returns the same as sync version."""
         content = SampleStructuredContent(name=TestData.SAMPLE_NAME, value=TestData.SAMPLE_VALUE)

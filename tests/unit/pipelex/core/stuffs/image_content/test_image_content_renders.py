@@ -4,7 +4,6 @@ from pipelex.core.stuffs.image_content import ImageContent
 from tests.unit.pipelex.core.stuffs.image_content.test_data import TestData
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestImageContentRenders:
     """Tests for ImageContent render methods."""
 
@@ -43,24 +42,28 @@ class TestImageContentRenders:
         content = ImageContent(url=TestData.SAMPLE_URL)
         assert content.rendered_for_prompt() == TestData.EXPECTED_RENDERED_FOR_PROMPT
 
+    @pytest.mark.asyncio
     async def test_rendered_plain_async(self):
         """Verify async rendered_plain returns the same as sync version."""
         content = ImageContent(url=TestData.SAMPLE_URL)
         result = await content.rendered_plain_async()
         assert result == TestData.EXPECTED_RENDERED_PLAIN
 
+    @pytest.mark.asyncio
     async def test_rendered_markdown_async(self):
         """Verify async rendered_markdown returns the same as sync version."""
         content = ImageContent(url=TestData.SAMPLE_URL)
         result = await content.rendered_markdown_async()
         assert result == TestData.EXPECTED_RENDERED_MARKDOWN
 
+    @pytest.mark.asyncio
     async def test_rendered_html_async(self):
         """Verify async rendered_html returns the same as sync version."""
         content = ImageContent(url=TestData.SAMPLE_URL)
         result = await content.rendered_html_async()
         assert result == TestData.EXPECTED_RENDERED_HTML
 
+    @pytest.mark.asyncio
     async def test_rendered_json_async(self):
         """Verify async rendered_json returns the same as sync version."""
         content = ImageContent(url=TestData.SAMPLE_URL)

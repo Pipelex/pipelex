@@ -196,6 +196,27 @@ class TestModelDeckGetOptionalInferenceModel:
         # Assert - cycle detection returns None instead of causing RecursionError
         assert result is None
 
+    def test_model_type_mismatch_returns_none(self):
+        """Test that requesting a model with wrong model_type returns None."""
+        # Arrange - create a TEXT_EXTRACTOR model
+        extractor_spec = InferenceModelSpec(
+            backend_name="test_backend",
+            name="mistral-extractor",
+            sdk="test_sdk",
+            model_type=ModelType.TEXT_EXTRACTOR,
+            model_id="mistral-extractor-id",
+            costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+            max_tokens=1000,
+            max_prompt_images=None,
+        )
+        model_deck = self._create_test_model_deck(inference_models={"mistral-extractor": extractor_spec})
+
+        # Act - request it as LLM
+        result = model_deck.get_optional_inference_model("mistral-extractor", model_type=ModelType.LLM)
+
+        # Assert - should return None due to model_type mismatch
+        assert result is None
+
     def test_complex_waterfall_scenario(self):
         # Arrange
         model_spec = self._create_test_model_spec("claude-3")
