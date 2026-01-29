@@ -140,7 +140,7 @@ class PipeCondition(PipeController):
         if all_outputs_same:
             # All mapped pipes have the same output - PipeCondition MUST use that same output
             expected_output_ref = next(iter(mapped_output_refs))
-            if self.output.concept.concept_ref != expected_output_ref:
+            if self.output.concept.concept_ref not in {expected_output_ref, NativeConceptCode.ANYTHING.concept_ref}:
                 msg = (
                     f"All mapped pipes of PipeCondition '{self.code}' have the same output concept "
                     f"'{expected_output_ref}', but PipeCondition declares output '{self.output.concept.concept_ref}'. "
