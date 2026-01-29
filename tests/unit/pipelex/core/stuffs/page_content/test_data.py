@@ -43,4 +43,4 @@ class TestData:
     EXPECTED_RENDERED_MARKDOWN = "# text_and_images\n\n## text: ### text: Page content text\n\n## images: None\n\n# page_view: None"
     EXPECTED_RENDERED_FOR_PROMPT = "# text_and_images\n\n## text: ### text: Page content text\n\n## images: None\n\n# page_view: None"
     # json2html renders nested structures as nested tables
-    EXPECTED_RENDERED_HTML = "<table ><tr><th>text_and_images</th><td><table ><tr><th>text</th><td><table ><tr><th>text</th><td>Page content text</td></tr></table></td></tr><tr><th>images</th><td>None</td></tr></table></td></tr><tr><th>page_view</th><td>None</td></tr></table>"
+    EXPECTED_RENDERED_HTML = "<table ><tr><th>text_and_images</th><td><table ><tr><th>text</th><td><table ><tr><th>text</th><td>Page content text</td></tr></table></td></tr><tr><th>images</th><td>None</td></tr></table></td></tr><tr><th>page_view</th><td>None</td></tr></table>"  # noqa: E501
