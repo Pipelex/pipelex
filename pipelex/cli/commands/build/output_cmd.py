@@ -12,6 +12,7 @@ from pipelex.cli.error_handlers import (
     handle_model_availability_error,
     handle_model_choice_error,
 )
+from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
@@ -35,13 +36,15 @@ async def _generate_output_core(
     pipe_code: str | None = None,
     bundle_path: Path | None = None,
     output_path: Path | None = None,
+    output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.JSON,
 ) -> None:
-    """Core logic for generating output JSON for a pipe.
+    """Core logic for generating output representation for a pipe.
 
     Args:
         pipe_code: The pipe code to generate output for.
         bundle_path: Path to the bundle file (.plx).
-        output_path: Path to save the generated JSON file.
+        output_path: Path to save the generated file.
+        output_format: The format to generate (JSON, PYTHON, or SCHEMA).
     """
     if bundle_path:
         try:
@@ -82,36 +85,48 @@ async def _generate_output_core(
     try:
         the_pipe = get_required_pipe(pipe_code=pipe_code)
     except Exception as exc:
-        typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
+        typer.secho(f"Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
-    # Generate the output JSON
+    # Generate the output representation
     try:
-        output_json_str = render_output(the_pipe)
+        output_str = render_output(the_pipe, output_format=output_format)
     except ValueError as exc:
         typer.secho(str(exc), fg=typer.colors.YELLOW)
         raise typer.Exit(0) from exc
     except Exception as exc:
-        typer.secho(f"❌ Error generating output JSON: {exc}", fg=typer.colors.RED)
+        typer.secho(f"Error generating output: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
-    # Determine output path - use bundle's directory if bundle provided, otherwise results/
+    # Determine output path and file extension
     if output_path:
         final_output_path = output_path
     elif bundle_path:
-        # Place output.json in the same directory as the PLX file
+        # Place output file in the same directory as the PLX file
         bundle_dir = Path(bundle_path).parent
-        final_output_path = bundle_dir / "output.json"
+        match output_format:
+            case ConceptRepresentationFormat.JSON:
+                final_output_path = bundle_dir / "output.json"
+            case ConceptRepresentationFormat.PYTHON:
+                final_output_path = bundle_dir / "output.py"
+            case ConceptRepresentationFormat.SCHEMA:
+                final_output_path = bundle_dir / "output_schema.json"
     else:
-        final_output_path = Path("results/output.json")
+        match output_format:
+            case ConceptRepresentationFormat.JSON:
+                final_output_path = Path("results/output.json")
+            case ConceptRepresentationFormat.PYTHON:
+                final_output_path = Path("results/output.py")
+            case ConceptRepresentationFormat.SCHEMA:
+                final_output_path = Path("results/output_schema.json")
 
     # Save the file
     try:
         ensure_directory_for_file_path(file_path=str(final_output_path))
-        save_text_to_path(text=output_json_str, path=str(final_output_path))
-        typer.secho(f"✅ Generated output JSON file: {final_output_path}", fg=typer.colors.GREEN)
+        save_text_to_path(text=output_str, path=str(final_output_path))
+        typer.secho(f"Generated output file: {final_output_path}", fg=typer.colors.GREEN)
     except Exception as exc:
-        typer.secho(f"❌ Error saving file: {exc}", fg=typer.colors.RED)
+        typer.secho(f"Error saving file: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
 
@@ -135,17 +150,31 @@ def generate_output_cmd(
     output_path: Annotated[
         str | None,
         typer.Option(
-            "--output", "-o", help="Path to save the generated JSON file (defaults to bundle's directory if bundle provided, otherwise 'results/')"
+            "--output", "-o", help="Path to save the generated file (defaults to bundle's directory if bundle provided, otherwise 'results/')"
         ),
     ] = None,
+    output_format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format: 'json' for JSON example (default), 'python' for Python code, 'schema' for JSON Schema",
+        ),
+    ] = "json",
 ) -> None:
-    """Generate example output JSON for a pipe.
+    """Generate example output representation for a pipe.
 
-    The generated JSON file will show the expected output structure
+    The generated file will show the expected output structure
     based on the pipe's output concept type.
+
+    Supported formats:
+    - json: JSON object with example data (default)
+    - python: Python class instantiation code
+    - schema: JSON Schema
 
     Examples:
         pipelex build output my_pipe
+        pipelex build output my_pipe --format schema
         pipelex build output my_bundle.plx
         pipelex build output my_bundle.plx --pipe my_pipe
         pipelex build output my_pipe --output custom_output.json
@@ -156,6 +185,22 @@ def generate_output_cmd(
         ctx: click.Context = click.get_current_context()
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
+
+    # Parse output format
+    format_lower = output_format.lower()
+    if format_lower == "json":
+        concept_format = ConceptRepresentationFormat.JSON
+    elif format_lower == "python":
+        concept_format = ConceptRepresentationFormat.PYTHON
+    elif format_lower == "schema":
+        concept_format = ConceptRepresentationFormat.SCHEMA
+    else:
+        typer.secho(
+            f"Invalid format '{output_format}'. Must be 'json', 'python', or 'schema'.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
 
     # Determine pipe_code and bundle_path from target
     pipe_code: str | None = None
@@ -200,7 +245,9 @@ def generate_output_cmd(
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_OUTPUT}")
 
-            asyncio.run(_generate_output_core(pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path_path))
+            asyncio.run(
+                _generate_output_core(pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path_path, output_format=concept_format)
+            )
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.BUILD)

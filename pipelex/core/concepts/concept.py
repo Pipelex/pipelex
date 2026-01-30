@@ -180,21 +180,49 @@ class Concept(BaseModel):
         """Render a representation for this concept.
 
         Args:
-            output_format: The format to generate (JSON or PYTHON)
-            is_multiple: If True, wrap content in a list (only for JSON format)
+            output_format: The format to generate (JSON, PYTHON, or SCHEMA)
+            is_multiple: If True, wrap content in a list/array schema
 
         Returns:
             Tuple of (representation dict, imports_needed set)
             - For JSON: content is a dict (or list of dicts if is_multiple)
             - For Python: content is a class instantiation string (wrapping handled by caller)
+            - For SCHEMA: content is a JSON Schema dict (or array schema if is_multiple)
         """
-        generator = ConceptRepresentationGenerator(output_format)
-        # For inputs, we only want required fields (not optional ones)
-        result = generator.generate_representation(self.concept_ref, self.get_structure_class(), include_optional=False)
+        match output_format:
+            case ConceptRepresentationFormat.SCHEMA:
+                return self._render_schema_representation(is_multiple=is_multiple)
+            case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
+                generator = ConceptRepresentationGenerator(output_format)
+                # For inputs, we only want required fields (not optional ones)
+                result = generator.generate_representation(self.concept_ref, self.get_structure_class(), include_optional=False)
 
-        # If multiple and JSON format, wrap content in a list
-        # For Python format, the caller handles wrapping since content is a string
-        if is_multiple and output_format == ConceptRepresentationFormat.JSON:
-            result["content"] = [result["content"]]
+                # If multiple and JSON format, wrap content in a list
+                # For Python format, the caller handles wrapping since content is a string
+                if is_multiple and output_format == ConceptRepresentationFormat.JSON:
+                    result["content"] = [result["content"]]
 
-        return result, generator.imports_needed
+                return result, generator.imports_needed
+
+    def _render_schema_representation(self, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
+        """Render JSON Schema for this concept.
+
+        Args:
+            is_multiple: If True, wrap the schema in an array type
+
+        Returns:
+            Tuple of (representation dict with JSON Schema content, empty set)
+            The dict has "concept" and "content" keys where content is the JSON Schema.
+        """
+        structure_class = self.get_structure_class()
+        json_schema = structure_class.model_json_schema()
+
+        if is_multiple:
+            # Wrap the schema in an array schema
+            array_schema: dict[str, Any] = {
+                "type": "array",
+                "items": json_schema,
+            }
+            return {"concept": self.concept_ref, "content": array_schema}, set()
+
+        return {"concept": self.concept_ref, "content": json_schema}, set()
