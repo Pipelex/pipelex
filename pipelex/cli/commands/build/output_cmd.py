@@ -158,26 +158,37 @@ def generate_output_cmd(
         typer.Option(
             "--format",
             "-f",
-            help="Output format: 'json' for JSON example (default), 'python' for Python code, 'schema' for JSON Schema",
+            help="Output format: 'json' for JSON example, 'python' for Python code, 'schema' for JSON Schema (useful for TypeScript/Zod generation)",
         ),
     ] = "json",
 ) -> None:
     """Generate example output representation for a pipe.
 
     The generated file will show the expected output structure
-    based on the pipe's output concept type.
+    based on the pipe's output concept type. For pipes with multiple
+    possible outputs (e.g., PipeCondition), all options are included.
 
     Supported formats:
-    - json: JSON object with example data (default)
+
+    - json: JSON object with example placeholder data (default)
+
     - python: Python class instantiation code
-    - schema: JSON Schema
+
+    - schema: JSON Schema definition, ideal for generating TypeScript
+      interfaces or Zod schemas. Array outputs (e.g., MyType[5]) are
+      represented as {"type": "array", "items": {...}}
 
     Examples:
         pipelex build output my_pipe
+
         pipelex build output my_pipe --format schema
+
         pipelex build output my_bundle.plx
+
         pipelex build output my_bundle.plx --pipe my_pipe
+
         pipelex build output my_pipe --output custom_output.json
+
         pipelex build output my_pipe -L ./my_pipes
     """
     # Show help if nothing provided
