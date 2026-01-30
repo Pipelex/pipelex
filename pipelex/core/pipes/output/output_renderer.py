@@ -1,11 +1,15 @@
 import json
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.hub import get_required_pipe
+
+if TYPE_CHECKING:
+    from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
+    from pipelex.pipe_controllers.sequence.pipe_sequence import PipeSequence
 
 
 def _collect_possible_outputs(the_pipe: PipeAbstract) -> list[dict[str, Any]]:
@@ -25,7 +29,8 @@ def _collect_possible_outputs(the_pipe: PipeAbstract) -> list[dict[str, Any]]:
     # Check if the pipe is a PipeCondition
     match pipe_type:
         case PipeType.PIPE_CONDITION:
-            mapped_pipe_codes: set[str] = getattr(the_pipe, "mapped_pipe_codes", set())
+            the_pipe = cast("PipeCondition", the_pipe)
+            mapped_pipe_codes = the_pipe.pipe_dependencies()
 
             if not mapped_pipe_codes:
                 return []
@@ -54,6 +59,7 @@ def _collect_possible_outputs(the_pipe: PipeAbstract) -> list[dict[str, Any]]:
             return possible_outputs
 
         case PipeType.PIPE_SEQUENCE:
+            the_pipe = cast("PipeSequence", the_pipe)
             sequential_sub_pipes: list[Any] = getattr(the_pipe, "sequential_sub_pipes", [])
             if not sequential_sub_pipes:
                 return []

@@ -229,9 +229,9 @@ class BuilderLoop:
 
                     # Fix output concept for PipeCondition by checking mapped pipes' outputs
                     elif isinstance(pipe_spec, PipeConditionSpec):
-                        # Get the PipeCondition instance to access mapped_pipe_codes
+                        # Get the PipeCondition instance to access pipe_dependencies()
                         pipe_condition = cast("PipeCondition", get_required_pipe(pipe_code=val_error.pipe_code))
-                        mapped_pipe_codes = pipe_condition.mapped_pipe_codes
+                        mapped_pipe_codes = pipe_condition.pipe_dependencies()
 
                         if not mapped_pipe_codes:
                             # No mapped pipes (all special outcomes), any output is fine
