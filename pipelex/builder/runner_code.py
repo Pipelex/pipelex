@@ -239,7 +239,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         input_entries: list[str] = []
         for var_name, input_req in pipe.inputs.root.items():
             is_multiple = _is_multiple(input_req.multiplicity)
-            result, _ = input_req.concept.generate_input_representation(
+            result, _ = input_req.concept.render_concept_representation(
                 output_format=ConceptRepresentationFormat.PYTHON,
                 is_multiple=is_multiple,
             )

@@ -2,6 +2,7 @@
 
 from pydantic import Field
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import (
     ConceptRepresentationFormat,
     ConceptRepresentationGenerator,
@@ -95,11 +96,12 @@ class TestConceptRepresentationFormat:
         """Test that the enum has the expected values."""
         assert ConceptRepresentationFormat.JSON.value == "json"
         assert ConceptRepresentationFormat.PYTHON.value == "python"
+        assert ConceptRepresentationFormat.SCHEMA.value == "schema"
 
     def test_enum_iteration(self) -> None:
         """Test that we can iterate over enum values."""
         values = list(ConceptRepresentationFormat)
-        assert len(values) == 2
+        assert len(values) == 3
 
 
 # =============================================================================
@@ -459,3 +461,100 @@ class TestIncludeOptionalParameter:
         assert "source_prompt" not in result
         assert "caption" not in result
         assert "base_64" not in result
+
+
+# =============================================================================
+# Tests for SCHEMA format with is_multiple parameter
+# =============================================================================
+
+
+class TestSchemaRepresentationWithMultiple:
+    """Test schema representation with is_multiple parameter."""
+
+    def test_schema_single_item(self) -> None:
+        """Schema for single item returns the JSON schema directly."""
+        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+
+        # Register the test class
+        KajsonManager.get_class_registry().register_class(SimpleContent)
+
+        # Create a concept with the registered class
+        concept = Concept(
+            code="SimpleContent",
+            domain_code="test",
+            description="Test concept",
+            structure_class_name="SimpleContent",
+        )
+
+        result, imports = concept.render_concept_representation(
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            is_multiple=False,
+        )
+
+        assert result["concept"] == "test.SimpleContent"
+        assert result["content"]["type"] == "object"
+        assert "properties" in result["content"]
+        assert "name" in result["content"]["properties"]
+        assert "count" in result["content"]["properties"]
+        assert imports == set()
+
+    def test_schema_multiple_items_wraps_in_array(self) -> None:
+        """Schema for multiple items wraps the schema in an array type."""
+        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+
+        # Register the test class
+        KajsonManager.get_class_registry().register_class(SimpleContent)
+
+        # Create a concept with the registered class
+        concept = Concept(
+            code="SimpleContent",
+            domain_code="test",
+            description="Test concept",
+            structure_class_name="SimpleContent",
+        )
+
+        result, imports = concept.render_concept_representation(
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            is_multiple=True,
+        )
+
+        assert result["concept"] == "test.SimpleContent"
+        # The content should be wrapped in an array schema
+        assert result["content"]["type"] == "array"
+        assert "items" in result["content"]
+        # The items should be the original schema
+        assert result["content"]["items"]["type"] == "object"
+        assert "properties" in result["content"]["items"]
+        assert "name" in result["content"]["items"]["properties"]
+        assert "count" in result["content"]["items"]["properties"]
+        assert imports == set()
+
+    def test_schema_nested_content_multiple(self) -> None:
+        """Schema for nested content with multiple items wraps correctly."""
+        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+
+        # Register the test classes
+        KajsonManager.get_class_registry().register_class(NestedChild)
+        KajsonManager.get_class_registry().register_class(ContentWithNestedClass)
+
+        # Create a concept with the registered class
+        concept = Concept(
+            code="ContentWithNestedClass",
+            domain_code="test",
+            description="Test concept with nested class",
+            structure_class_name="ContentWithNestedClass",
+        )
+
+        result, _ = concept.render_concept_representation(
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            is_multiple=True,
+        )
+
+        assert result["concept"] == "test.ContentWithNestedClass"
+        # The content should be wrapped in an array schema
+        assert result["content"]["type"] == "array"
+        assert "items" in result["content"]
+        # The items should contain the nested structure
+        items_schema = result["content"]["items"]
+        assert items_schema["type"] == "object"
+        assert "properties" in items_schema

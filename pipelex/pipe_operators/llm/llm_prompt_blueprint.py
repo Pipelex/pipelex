@@ -51,9 +51,9 @@ class LLMPromptBlueprint(BaseModel):
             required_variables.update(system_doc_ref_root_names)
 
         if self.prompt_blueprint:
-            required_variables.update(self.prompt_blueprint.required_variables())
+            required_variables.update(get_root_from_dotted_path(path) for path in self.prompt_blueprint.required_variables())
         if self.system_prompt_blueprint:
-            required_variables.update(self.system_prompt_blueprint.required_variables())
+            required_variables.update(get_root_from_dotted_path(path) for path in self.system_prompt_blueprint.required_variables())
         return {
             variable_name
             for variable_name in required_variables

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 from pipelex import builder, log
 from pipelex.builder.builder import (
@@ -7,6 +8,7 @@ from pipelex.builder.builder import (
     reconstruct_bundle_with_pipe_fixes,
 )
 from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
@@ -21,6 +23,9 @@ from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundl
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
+
+if TYPE_CHECKING:
+    from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 
 
 class BuilderLoop:
@@ -200,29 +205,57 @@ class BuilderLoop:
 
                 case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
                     # Fix output concept/multiplicity mismatch for PipeSequence by updating to match last step's output
-                    if not isinstance(pipe_spec, PipeSequenceSpec):
-                        continue
+                    if isinstance(pipe_spec, PipeSequenceSpec):
+                        last_step = pipe_spec.steps[-1]
+                        last_step_pipe_code = last_step.pipe_code
 
-                    last_step = pipe_spec.steps[-1]
-                    last_step_pipe_code = last_step.pipe_code
+                        # Get the last step's pipe spec to retrieve its output
+                        last_step_pipe_spec = pipelex_bundle_spec.pipe.get(last_step_pipe_code)
+                        if not last_step_pipe_spec:
+                            continue
 
-                    # Get the last step's pipe spec to retrieve its output
-                    last_step_pipe_spec = pipelex_bundle_spec.pipe.get(last_step_pipe_code)
-                    if not last_step_pipe_spec:
-                        continue
+                        old_output = pipe_spec.output
+                        new_output = last_step_pipe_spec.output
 
-                    old_output = pipe_spec.output
-                    new_output = last_step_pipe_spec.output
+                        # Set the sequence output to match the last step's output
+                        pipe_spec.output = new_output
+                        fixed_pipes.append(pipe_spec)
+                        # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
+                        error_kind = "concept" if val_error.error_type == PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT else "multiplicity"
+                        log.info(
+                            f"🔧 Fixed output {error_kind} for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
+                                '{new_output}' (matching last step '{last_step_pipe_code}')"
+                        )
 
-                    # Set the sequence output to match the last step's output
-                    pipe_spec.output = new_output
-                    fixed_pipes.append(pipe_spec)
-                    # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
-                    error_kind = "concept" if val_error.error_type == PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT else "multiplicity"
-                    log.info(
-                        f"🔧 Fixed output {error_kind} for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
-                            '{new_output}' (matching last step '{last_step_pipe_code}')"
-                    )
+                    # Fix output concept for PipeCondition by checking mapped pipes' outputs
+                    elif isinstance(pipe_spec, PipeConditionSpec):
+                        # Get the PipeCondition instance to access pipe_dependencies()
+                        pipe_condition = cast("PipeCondition", get_required_pipe(pipe_code=val_error.pipe_code))
+                        mapped_pipe_codes = pipe_condition.pipe_dependencies()
+
+                        if not mapped_pipe_codes:
+                            # No mapped pipes (all special outcomes), any output is fine
+                            continue
+
+                        # Collect all unique output concept refs from mapped pipes
+                        mapped_output_refs: set[str] = set()
+                        for mapped_pipe_code in mapped_pipe_codes:
+                            mapped_pipe = get_required_pipe(pipe_code=mapped_pipe_code)
+                            mapped_output_refs.add(mapped_pipe.output.concept.concept_ref)
+
+                        old_output = pipe_spec.output
+
+                        # If all mapped pipes have same output, use that; otherwise use Anything
+                        if len(mapped_output_refs) == 1:
+                            new_output = next(iter(mapped_output_refs))
+                        else:
+                            new_output = "native.Anything"
+
+                        pipe_spec.output = new_output
+                        fixed_pipes.append(pipe_spec)
+                        log.info(
+                            f"🔧 Fixed output concept for PipeCondition '{val_error.pipe_code}': output changed from '{old_output}' → '{new_output}'"
+                        )
 
                 case (
                     PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
