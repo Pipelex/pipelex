@@ -54,10 +54,6 @@ class ImageContent(StuffContent):
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return f"![{self.url[:100]}]({self.url})"
 
-    @override
-    def rendered_json(self) -> str:
-        return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
-
     def render_with_images(
         self,
         registry: ImageRegistry,
