@@ -408,6 +408,14 @@ Common scenarios for hybrid routing:
 3. **Gradual Migration**: Start with Pipelex Gateway, gradually move to your own keys as usage grows
 4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Gateway
 
+### Internal Backend (Always Available)
+
+The **internal backend** is a special backend containing software-only models that run locally without requiring AI services. These include models for PDF text extraction, local document parsing, and other processing tasks that don't need external API calls.
+
+Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_pipelex_gateway` or `all_openai`).
+
+This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
+
 ## Model Deck
 
 The Model Deck is the unified configuration hub for all AI model-related settings, including LLMs, OCR models, and image generation models.
