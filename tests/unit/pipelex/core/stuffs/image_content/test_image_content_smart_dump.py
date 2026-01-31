@@ -16,7 +16,7 @@ class TestImageContentSmartDump:
         """Verify smart_dump returns a dict with all populated fields."""
         content = ImageContent(
             url=TestData.SAMPLE_URL,
-            display_link=TestData.SAMPLE_DISPLAY_LINK,
+            public_url=TestData.SAMPLE_PUBLIC_URL,
             source_prompt=TestData.SAMPLE_SOURCE_PROMPT,
             caption=TestData.SAMPLE_CAPTION,
             mime_type=TestData.SAMPLE_MIME_TYPE,

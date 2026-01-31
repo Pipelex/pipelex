@@ -4,7 +4,7 @@ from typing import Any, ClassVar
 class TestData:
     # Input content
     SAMPLE_URL = "https://example.com/image.png"
-    SAMPLE_DISPLAY_LINK = "https://cdn.example.com/image.png"
+    SAMPLE_PUBLIC_URL = "https://cdn.example.com/image.png"
     SAMPLE_CAPTION = "A beautiful sunset"
     SAMPLE_MIME_TYPE = "image/png"
     SAMPLE_SOURCE_PROMPT = "sunset over mountains"
@@ -12,7 +12,7 @@ class TestData:
     # Expected outputs for smart_dump (minimal)
     EXPECTED_SMART_DUMP_MINIMAL: ClassVar[dict[str, Any]] = {
         "url": "https://example.com/image.png",
-        "display_link": None,
+        "public_url": None,
         "source_prompt": None,
         "source_negative_prompt": None,
         "caption": None,
@@ -23,7 +23,7 @@ class TestData:
     # Expected outputs for smart_dump (with optional fields)
     EXPECTED_SMART_DUMP_FULL: ClassVar[dict[str, Any]] = {
         "url": "https://example.com/image.png",
-        "display_link": "https://cdn.example.com/image.png",
+        "public_url": "https://cdn.example.com/image.png",
         "source_prompt": "sunset over mountains",
         "source_negative_prompt": None,
         "caption": "A beautiful sunset",
@@ -38,7 +38,7 @@ class TestData:
     EXPECTED_RENDERED_HTML_WITH_DISPLAY_LINK = '<img src="https://cdn.example.com/image.png" class="msg-img">'
     EXPECTED_RENDERED_JSON = """{
     "url": "https://example.com/image.png",
-    "display_link": null,
+    "public_url": null,
     "source_prompt": null,
     "source_negative_prompt": null,
     "caption": null,
@@ -47,7 +47,7 @@ class TestData:
 }"""
     EXPECTED_RENDERED_JSON_WITH_PROMPT = """{
     "url": "https://example.com/image.png",
-    "display_link": null,
+    "public_url": null,
     "source_prompt": "sunset over mountains",
     "source_negative_prompt": null,
     "caption": null,

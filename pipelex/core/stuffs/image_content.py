@@ -15,7 +15,7 @@ from pipelex.tools.uri.uri_resolver import describe_uri
 
 class ImageContent(StuffContent):
     url: str
-    display_link: str | None = None
+    public_url: str | None = None
     source_prompt: str | None = None
     source_negative_prompt: str | None = None
     caption: str | None = None
@@ -44,7 +44,7 @@ class ImageContent(StuffContent):
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             templating_context={
-                "url": self.display_link or self.url,
+                "url": self.public_url or self.url,
             },
         )
 
@@ -75,10 +75,10 @@ class ImageContent(StuffContent):
         group.renderables.append(url_markdown)
 
         # Display link if present
-        if self.display_link is not None:
+        if self.public_url is not None:
             link_text = Text()
             link_text.append("Display: ", style="bold")
-            link_text.append("Open Image", style=f"cyan link {self.display_link}")
+            link_text.append("Open Image", style=f"cyan link {self.public_url}")
             group.renderables.append(link_text)
 
         # Caption if present

@@ -30,7 +30,7 @@ class TestData:
         },
         "page_view": {
             "url": "https://example.com/page-view.png",
-            "display_link": None,
+            "public_url": None,
             "source_prompt": None,
             "source_negative_prompt": None,
             "caption": None,
