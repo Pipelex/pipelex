@@ -42,7 +42,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> ImageContent:
         return ImageContent(
             url=raw_details.actual_url or "https://example.com/image.jpg",
-            display_link=raw_details.actual_url or "https://example.com/image.jpg",
+            public_url=raw_details.actual_url or "https://example.com/image.jpg",
             mime_type=raw_details.mime_type or "image/jpeg",
             size=raw_details.size,
         )
