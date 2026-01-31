@@ -68,4 +68,4 @@ class TestImageContentRenders:
         """Verify async rendered_json returns the same as sync version."""
         content = ImageContent(url=TestData.SAMPLE_URL)
         result = await content.rendered_json_async()
-        assert result == TestData.EXPECTED_RENDERED_JSON
+        assert result == content.rendered_json()

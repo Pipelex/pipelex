@@ -36,7 +36,23 @@ class TestData:
     EXPECTED_RENDERED_MARKDOWN = "![https://example.com/image.png](https://example.com/image.png)"
     EXPECTED_RENDERED_HTML = '<img src="https://example.com/image.png" class="msg-img">'
     EXPECTED_RENDERED_HTML_WITH_DISPLAY_LINK = '<img src="https://cdn.example.com/image.png" class="msg-img">'
-    EXPECTED_RENDERED_JSON = '{"image_url": "https://example.com/image.png", "source_prompt": null}'
-    EXPECTED_RENDERED_JSON_WITH_PROMPT = '{"image_url": "https://example.com/image.png", "source_prompt": "sunset over mountains"}'
+    EXPECTED_RENDERED_JSON = """{
+    "url": "https://example.com/image.png",
+    "display_link": null,
+    "source_prompt": null,
+    "source_negative_prompt": null,
+    "caption": null,
+    "mime_type": null,
+    "size": null
+}"""
+    EXPECTED_RENDERED_JSON_WITH_PROMPT = """{
+    "url": "https://example.com/image.png",
+    "display_link": null,
+    "source_prompt": "sunset over mountains",
+    "source_negative_prompt": null,
+    "caption": null,
+    "mime_type": null,
+    "size": null
+}"""
     # rendered_for_prompt returns just the URL for images
     EXPECTED_RENDERED_FOR_PROMPT = "https://example.com/image.png"

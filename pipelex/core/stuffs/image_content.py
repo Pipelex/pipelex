@@ -1,5 +1,3 @@
-import json
-
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
@@ -12,7 +10,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.tools.uri.uri_resolver import describe_uri
 
 
 class ImageContent(StuffContent):
@@ -32,7 +30,7 @@ class ImageContent(StuffContent):
     @property
     @override
     def short_desc(self) -> str:
-        url_desc = resolve_uri(self.url).kind.desc
+        url_desc = describe_uri(self.url)
         return f"{url_desc} of an image"
 
     @override
