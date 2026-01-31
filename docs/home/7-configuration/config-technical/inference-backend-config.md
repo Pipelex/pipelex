@@ -482,16 +482,15 @@ Extract presets combine document extraction model selection with optimized param
 
 ```toml
 [extract.presets]
-# General purpose document extraction
-extract-all-from-document = { model = "@default-extract-document", max_nb_images = 100, image_min_size = 50 }
-extract-text-from-pdf = { model = "@default-extract-text-from-pdf", max_nb_images = 100, image_min_size = 50 }
+# Testing preset
+extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50 }
 ```
 
-When using extract presets in `.plx` files, prefix them with `$`:
+You can also use aliases directly in `.plx` files for document extraction:
 
 ```toml
-model = "$extract-all-from-document"   # Uses preset for document extraction
-model = "$extract-text-from-pdf"       # Uses preset for PDF text extraction
+model = "@default-extract-document"   # Uses default document extraction alias
+model = "@default-text-from-pdf"      # Uses alias for basic PDF text extraction
 ```
 
 ### Image Generation Presets
@@ -524,7 +523,7 @@ for_text = "@default-general"
 for_object = "@default-general"
 
 [extract]
-choice_default = "$extract-all-from-document"
+choice_default = "@default-extract-document"
 
 [img_gen]
 choice_default = "$gen-image"
