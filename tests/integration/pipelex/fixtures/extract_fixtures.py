@@ -77,8 +77,8 @@ def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "$extract-all-from-document",
-        "$extract-text-from-pdf",
+        "@default-extract-document",
+        "@default-text-from-pdf",
     ],
 )
 def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
@@ -88,7 +88,7 @@ def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "$extract-all-from-document",
+        "@default-extract-document",
     ],
 )
 def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
