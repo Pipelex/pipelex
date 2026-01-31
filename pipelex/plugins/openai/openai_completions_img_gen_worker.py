@@ -9,7 +9,6 @@ from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundEr
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -63,15 +62,14 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                 )
                 raise ImgGenParameterError(msg)
             image_format = ImageFormat.JPEG
-        if img_gen_job.job_params.aspect_ratio != AspectRatio.SQUARE:
-            msg = f"OpenAI Completions ImgGen worker only supports square images. Aspect ratio: {img_gen_job.job_params.aspect_ratio}"
-            raise ImgGenParameterError(msg)
         img_gen_prompt_text = img_gen_job.img_gen_prompt.positive_text
         messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": img_gen_prompt_text}]
         try:
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
                 inference_model=self.inference_model, inference_job=img_gen_job, output_desc=InferenceOutputType.IMAGE
             )
+            log.debug(f"Extra headers: {extra_headers}")
+            log.debug(f"Extra body: {extra_body}")
             response = await self.openai_client.chat.completions.create(
                 model=self.inference_model.model_id,
                 messages=messages,
@@ -121,7 +119,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         return GeneratedImageRawDetails(
             actual_url=actual_url,
             base64_str=base64_str,
-            size=ImageSize(width=1024, height=1024),
+            size=None,
             mime_type=base64_extracted_mime_type,
             image_format=image_format,
         )
