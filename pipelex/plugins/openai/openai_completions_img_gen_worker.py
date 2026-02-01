@@ -67,8 +67,6 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
                 inference_model=self.inference_model, inference_job=img_gen_job, output_desc=InferenceOutputType.IMAGE
             )
-            log.debug(f"Extra headers: {extra_headers}")
-            log.debug(f"Extra body: {extra_body}")
             response = await self.openai_client.chat.completions.create(
                 model=self.inference_model.model_id,
                 messages=messages,

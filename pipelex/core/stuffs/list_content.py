@@ -1,4 +1,4 @@
-from typing import Any, Generic
+from typing import Any, Generic, Iterator, overload
 
 from json2html import json2html
 from rich.pretty import Pretty
@@ -21,6 +21,39 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
     def get_items(self, item_type: type[StuffContent]) -> list[StuffContent]:
         return [item for item in self.items if isinstance(item, item_type)]
+
+    # -------------------------------------------------------------------------------------
+    # Iterator protocol - enables direct iteration over ListContent
+    # Overrides BaseModel.__iter__ which iterates field names. This is intentional:
+    # ListContent should iterate over its items, not its field names.
+    # -------------------------------------------------------------------------------------
+
+    @override
+    def __iter__(self) -> Iterator[StuffContentType]:  # type: ignore[override]
+        """Enable direct iteration: for item in list_content.
+
+        Note: This overrides BaseModel.__iter__ which would iterate field names.
+        For ListContent, iterating over items is the expected behavior.
+        """
+        return iter(self.items)
+
+    def __len__(self) -> int:
+        """Enable len(list_content)."""
+        return len(self.items)
+
+    @overload
+    def __getitem__(self, index: int) -> StuffContentType: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list[StuffContentType]: ...
+
+    def __getitem__(self, index: int | slice) -> StuffContentType | list[StuffContentType]:
+        """Enable indexing: list_content[0], list_content[-1], list_content[1:3]."""
+        return self.items[index]
+
+    def __contains__(self, item: object) -> bool:
+        """Enable 'in' operator: if item in list_content."""
+        return item in self.items
 
     @property
     @override

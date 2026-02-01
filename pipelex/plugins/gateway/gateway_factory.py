@@ -94,7 +94,6 @@ class GatewayFactory:
             # Mistral models really want non-null seed
             extra_body["seed"] = random.randint(0, 1000000)
         elif isinstance(inference_job, ImgGenJob) and inference_model.model_id.startswith("gemini"):
-            log.warning(f"Adding image config for Nano Banana: {inference_job.job_params.aspect_ratio}")
             aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_literal(inference_job.job_params.aspect_ratio)
             extra_body["image_config"] = {
                 "aspect_ratio": aspect_ratio_str,
