@@ -95,11 +95,18 @@ class ImageContent(StuffContent):
             size_text.append(f"{self.size.width}x{self.size.height}", style="dim")
             group.renderables.append(size_text)
 
+        # MIME type if present
+        if self.mime_type:
+            mime_type_text = Text()
+            mime_type_text.append("MIME Type: ", style="bold")
+            mime_type_text.append(self.mime_type, style="dim")
+            group.renderables.append(mime_type_text)
+
         # Source prompt if present
         if self.source_prompt:
             group.renderables.append(Text())  # Add spacing
             prompt_text = Text()
-            prompt_text.append("Source Prompt: ", style="bold")
+            prompt_text.append("Source Prompt:\n", style="bold")
             prompt_text.append(self.source_prompt, style="dim italic")
             group.renderables.append(prompt_text)
 
@@ -110,12 +117,5 @@ class ImageContent(StuffContent):
             negative_prompt_text.append("Source Negative Prompt: ", style="bold")
             negative_prompt_text.append(self.source_negative_prompt, style="dim italic")
             group.renderables.append(negative_prompt_text)
-
-        # MIME type if present
-        if self.mime_type:
-            mime_type_text = Text()
-            mime_type_text.append("MIME Type: ", style="bold")
-            mime_type_text.append(self.mime_type, style="dim")
-            group.renderables.append(mime_type_text)
 
         return group
