@@ -4,6 +4,7 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
+from pydantic import Field
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -13,8 +14,8 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class TextAndImagesContent(StuffContent):
-    text: TextContent | None
-    images: list[ImageContent] | None
+    text: TextContent | None = Field(None, description="A text content")
+    images: list[ImageContent] | None = Field(None, description="A list of images that were extracted from the text")
 
     @property
     @override

@@ -497,6 +497,9 @@ class TestSchemaRepresentationWithMultiple:
         assert "name" in result["content"]["properties"]
         assert "count" in result["content"]["properties"]
         assert imports == set()
+        # Title fields should be stripped from schema
+        assert "title" not in result["content"]
+        assert "title" not in result["content"]["properties"]["name"]
 
     def test_schema_multiple_items_wraps_in_array(self) -> None:
         """Schema for multiple items wraps the schema in an array type."""

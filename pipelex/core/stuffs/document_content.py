@@ -1,5 +1,6 @@
 from typing_extensions import override
 
+from pydantic import Field
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
@@ -7,9 +8,9 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 class DocumentContent(StuffContent):
-    url: str
-    mime_type: str | None = None
-    display_link: str | None = None
+    url: str = Field(..., description="The pipelex storage URI of the document")
+    mime_type: str | None = Field(None, description="The MIME type of the document")
+    display_link: str | None = Field(None, description="The public URL of the document")
 
     @property
     @override

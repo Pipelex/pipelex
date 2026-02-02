@@ -120,18 +120,40 @@ def render_output(
         output_format: The format to generate (JSON, PYTHON, or SCHEMA)
 
     Returns:
-        Formatted string with the output representation
+        Formatted string with the output representation:
+        - JSON: JSON object with concept and content fields
+        - PYTHON: Python code with class instantiation
+        - SCHEMA: JSON Schema definition
 
     Raises:
         ValueError: If the output cannot be rendered
     """
-    # For SCHEMA format, handle specially
-    if output_format == ConceptRepresentationFormat.SCHEMA:
-        return _render_schema_output(the_pipe, indent)
+    # Handle each format type
+    match output_format:
+        case ConceptRepresentationFormat.SCHEMA:
+            return _render_schema_output(the_pipe, indent)
+        case ConceptRepresentationFormat.PYTHON:
+            return _render_python_output(the_pipe)
+        case ConceptRepresentationFormat.JSON:
+            return _render_json_output(the_pipe, indent)
 
+
+def _render_json_output(the_pipe: PipeAbstract, indent: int = 2) -> str:
+    """Render JSON representation of the pipe's output.
+
+    Args:
+        the_pipe: The pipe to render output for
+        indent: Number of spaces for indentation
+
+    Returns:
+        JSON string with concept and content fields
+
+    Raises:
+        ValueError: If the output cannot be rendered
+    """
     # Check if output is native.Anything (has no specific shape)
     if the_pipe.output.concept.code == NativeConceptCode.ANYTHING:
-        possible_outputs = _collect_possible_outputs(the_pipe, output_format)
+        possible_outputs = _collect_possible_outputs(the_pipe, ConceptRepresentationFormat.JSON)
 
         if not possible_outputs:
             msg = f"Output is '{NativeConceptCode.ANYTHING.concept_ref}' which has no specific shape and no possible outputs could be determined."
@@ -149,8 +171,57 @@ def render_output(
         return json.dumps(result, indent=indent, ensure_ascii=False)
 
     # Normal output rendering - returns dict with "concept" and "content"
-    output_dict = the_pipe.output.render_stuff_spec(output_format)
+    output_dict = the_pipe.output.render_stuff_spec(ConceptRepresentationFormat.JSON)
     return json.dumps(output_dict, indent=indent, ensure_ascii=False)
+
+
+def _render_python_output(the_pipe: PipeAbstract) -> str:
+    """Render Python code representation of the pipe's output.
+
+    Args:
+        the_pipe: The pipe to render output for
+
+    Returns:
+        Python code string with class instantiation
+
+    Raises:
+        ValueError: If the output cannot be rendered
+    """
+    # Check if output is native.Anything (has no specific shape)
+    if the_pipe.output.concept.code == NativeConceptCode.ANYTHING:
+        possible_outputs = _collect_possible_outputs(the_pipe, ConceptRepresentationFormat.PYTHON)
+
+        if not possible_outputs:
+            msg = f"Output is '{NativeConceptCode.ANYTHING.concept_ref}' which has no specific shape and no possible outputs could be determined."
+            raise ValueError(msg)
+
+        # Generate Python code for multiple possible outputs
+        lines: list[str] = [
+            "# Multiple possible output types",
+            "# The actual output will be one of the following:",
+            "",
+        ]
+
+        for idx, output_info in enumerate(possible_outputs, start=1):
+            concept_ref = output_info["concept_ref"]
+            content = output_info["content"]
+            lines.append(f"# Option {idx}: {concept_ref}")
+            lines.append(f"output_{idx} = {content}")
+            lines.append("")
+
+        return "\n".join(lines)
+
+    # Normal output rendering
+    output_dict = the_pipe.output.render_stuff_spec(ConceptRepresentationFormat.PYTHON)
+    concept_ref = output_dict.get("concept", "")
+    content = output_dict.get("content", "")
+
+    lines = [
+        f"# Concept: {concept_ref}",
+        f"output = {content}",
+    ]
+
+    return "\n".join(lines)
 
 
 def _render_schema_output(the_pipe: PipeAbstract, indent: int = 2) -> str:

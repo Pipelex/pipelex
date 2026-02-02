@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 
 from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -217,6 +217,9 @@ class Concept(BaseModel):
         structure_class = self.get_structure_class()
         json_schema = structure_class.model_json_schema()
 
+        # Remove "title" keys from the schema (Pydantic auto-generates them but they add noise)
+        json_schema = _strip_titles_from_schema(json_schema)
+
         if is_multiple:
             # Wrap the schema in an array schema
             array_schema: dict[str, Any] = {
@@ -226,3 +229,40 @@ class Concept(BaseModel):
             return {"concept": self.concept_ref, "content": array_schema}, set()
 
         return {"concept": self.concept_ref, "content": json_schema}, set()
+
+
+def _strip_titles_from_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Recursively remove 'title' keys from a JSON Schema.
+
+    Pydantic auto-generates title fields based on class and field names,
+    but these add noise to the schema output. Descriptions (when present)
+    provide more meaningful documentation.
+
+    Args:
+        schema: The JSON Schema dict to process
+
+    Returns:
+        A new dict with all 'title' keys removed at all levels
+    """
+    result: dict[str, Any] = {}
+
+    for key, value in schema.items():
+        if key == "title":
+            continue
+        if isinstance(value, dict):
+            nested_dict = cast(dict[str, Any], value)
+            result[key] = _strip_titles_from_schema(nested_dict)
+        elif isinstance(value, list):
+            value_list = cast(list[Any], value)
+            processed_list: list[Any] = []
+            for item in value_list:
+                if isinstance(item, dict):
+                    item_dict = cast(dict[str, Any], item)
+                    processed_list.append(_strip_titles_from_schema(item_dict))
+                else:
+                    processed_list.append(item)
+            result[key] = processed_list
+        else:
+            result[key] = value
+
+    return result

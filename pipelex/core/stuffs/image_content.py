@@ -1,5 +1,6 @@
 import json
 
+from pydantic import Field
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
@@ -16,13 +17,13 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 class ImageContent(StuffContent):
-    url: str
-    display_link: str | None = None
-    source_prompt: str | None = None
-    source_negative_prompt: str | None = None
-    caption: str | None = None
-    mime_type: str | None = None
-    size: ImageSize | None = None
+    url: str = Field(..., description="The pipelex storage URI of the image")
+    display_link: str | None = Field(None, description="The public URL of the image")
+    source_prompt: str | None = Field(None, description="The source prompt of the image")
+    source_negative_prompt: str | None = Field(None, description="The source negative prompt of the image")
+    caption: str | None = Field(None, description="The caption of the image")
+    mime_type: str | None = Field(None, description="The MIME type of the image")
+    size: ImageSize | None = Field(None, description="The size in pixels (width and height) of the image")
 
     @property
     @override

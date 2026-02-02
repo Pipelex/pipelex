@@ -3,6 +3,7 @@ from rich.markdown import Markdown
 from rich.text import Text
 from typing_extensions import override
 
+from pydantic import Field
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -10,8 +11,8 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PageContent(StructuredContent):
-    text_and_images: TextAndImagesContent
-    page_view: ImageContent | None = None
+    text_and_images: TextAndImagesContent = Field(..., description="The text and images content extracted from the page")
+    page_view: ImageContent | None = Field(None, description="The screenshot of the page")
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

@@ -1,5 +1,6 @@
 import json
 
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -8,8 +9,8 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 
 
 class HtmlContent(StuffContent):
-    inner_html: str
-    css_class: str
+    inner_html: str = Field(..., description="The inner HTML of the content")
+    css_class: str = Field(..., description="The CSS class of the content")
 
     @property
     @override
