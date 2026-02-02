@@ -34,8 +34,8 @@ function extractUrl(jsonData) {
     if (typeof jsonData === 'string') {
         return isValidHttpUrl(jsonData) ? jsonData : null;
     }
-    // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
-    const candidates = [jsonData.display_link, jsonData.src, jsonData.href, jsonData.uri, jsonData.url];
+    // Prefer public_url (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
+    const candidates = [jsonData.public_url, jsonData.src, jsonData.href, jsonData.uri, jsonData.url];
     for (const candidate of candidates) {
         if (isValidHttpUrl(candidate)) return candidate;
     }

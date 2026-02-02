@@ -47,7 +47,7 @@ class TestModelDeckGetOptionalInferenceModel:
             extract_aliases={},
             extract_waterfalls={},
             extract_presets={},
-            extract_choice_default="extract-all-from-document",
+            extract_choice_default="default-extract-document",
             # ImgGen-specific
             img_gen_default_quality=Quality.MEDIUM,
             img_gen_aliases={},
@@ -320,7 +320,7 @@ class TestModelDeckPrefixedAliasReferences:
             extract_aliases={},
             extract_waterfalls={},
             extract_presets={},
-            extract_choice_default="extract-all-from-document",
+            extract_choice_default="default-extract-document",
             # ImgGen-specific
             img_gen_default_quality=Quality.MEDIUM,
             img_gen_aliases={},
@@ -470,7 +470,7 @@ class TestModelDeckGetLLMSettingWithPresets:
             extract_aliases={},
             extract_waterfalls={},
             extract_presets={},
-            extract_choice_default="extract-all-from-document",
+            extract_choice_default="default-extract-document",
             # ImgGen-specific
             img_gen_default_quality=Quality.MEDIUM,
             img_gen_aliases={},

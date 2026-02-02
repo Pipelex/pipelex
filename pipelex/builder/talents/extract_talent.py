@@ -2,5 +2,6 @@ from pipelex.types import StrEnum
 
 
 class ExtractTalent(StrEnum):
-    PDF_TEXT_EXTRACTOR = "pdf-text-extractor"
+    PDF_BASIC_TEXT_EXTRACTOR = "pdf-basic-text-extractor"
     IMAGE_TEXT_EXTRACTOR = "image-text-extractor"
+    FULL_DOCUMENT_EXTRACTOR = "full-document-extractor"

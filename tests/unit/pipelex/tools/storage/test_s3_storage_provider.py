@@ -157,32 +157,32 @@ class TestS3StorageProvider:
 
         assert "should not include scheme prefix" in str(exc_info.value).lower()
 
-    async def test_display_link_returns_public_url_when_signed_urls_disabled(
+    async def test_public_url_returns_public_url_when_signed_urls_disabled(
         self,
         s3_provider_no_signed_urls: S3StorageProvider,
         mock_aioboto3: dict[str, Any],  # noqa: ARG002
     ) -> None:
-        """Test that display_link() returns a public URL when signed URLs are disabled."""
+        """Test that public_url() returns a public URL when signed URLs are disabled."""
         key = "display/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
 
-        display = await s3_provider_no_signed_urls.display_link(uri=uri)
+        display = await s3_provider_no_signed_urls.public_url(uri=uri)
 
         expected_url = f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}"
         assert display == expected_url
 
-    async def test_display_link_returns_presigned_url_when_signed_urls_enabled(
+    async def test_public_url_returns_presigned_url_when_signed_urls_enabled(
         self,
         s3_provider_with_signed_urls: S3StorageProvider,
         mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that display_link() returns a presigned URL when signed URLs are enabled."""
+        """Test that public_url() returns a presigned URL when signed URLs are enabled."""
         key = "presigned/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
         expected_presigned = "https://test-bucket.s3.amazonaws.com/presigned/test.bin?X-Amz-Signature=xyz"
         mock_aioboto3["client"].generate_presigned_url = AsyncMock(return_value=expected_presigned)
 
-        display = await s3_provider_with_signed_urls.display_link(uri=uri)
+        display = await s3_provider_with_signed_urls.public_url(uri=uri)
 
         assert display == expected_presigned
         mock_aioboto3["client"].generate_presigned_url.assert_called_once_with(
@@ -191,19 +191,19 @@ class TestS3StorageProvider:
             ExpiresIn=3600,
         )
 
-    async def test_display_link_handles_sync_presigned_url(
+    async def test_public_url_handles_sync_presigned_url(
         self,
         s3_provider_with_signed_urls: S3StorageProvider,
         mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that display_link() handles sync presigned URL generation (non-awaitable)."""
+        """Test that public_url() handles sync presigned URL generation (non-awaitable)."""
         key = "sync-presign/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
         expected_presigned = "https://test-bucket.s3.amazonaws.com/sync-presign/test.bin?X-Amz-Signature=sync"
         # Return a plain string (non-awaitable) to simulate sync behavior in some aioboto3 versions
         mock_aioboto3["client"].generate_presigned_url = MagicMock(return_value=expected_presigned)
 
-        display = await s3_provider_with_signed_urls.display_link(uri=uri)
+        display = await s3_provider_with_signed_urls.public_url(uri=uri)
 
         assert display == expected_presigned
 
@@ -364,18 +364,18 @@ class TestS3StorageProvider:
 
         assert "connectivity/credentials error" in str(exc_info.value)
 
-    async def test_display_link_falls_back_to_public_url_on_client_error(
+    async def test_public_url_falls_back_to_public_url_on_client_error(
         self,
         s3_provider_with_signed_urls: S3StorageProvider,
         mock_aioboto3: dict[str, Any],
     ) -> None:
-        """Test that display_link() falls back to public URL on botocore ClientError."""
+        """Test that public_url() falls back to public URL on botocore ClientError."""
         key = "fallback/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
         error_response: Any = {"Error": {"Code": "SignatureDoesNotMatch", "Message": "Signature error"}}
         mock_aioboto3["client"].generate_presigned_url = MagicMock(side_effect=ClientError(error_response, "GeneratePresignedUrl"))
 
-        display = await s3_provider_with_signed_urls.display_link(uri=uri)
+        display = await s3_provider_with_signed_urls.public_url(uri=uri)
 
         expected_public_url = f"https://{S3_TEST_BUCKET}.s3.{S3_TEST_REGION}.amazonaws.com/{key}"
         assert display == expected_public_url

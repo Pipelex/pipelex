@@ -68,8 +68,9 @@ gen-image-fast = "$gen-image-fast"
 gen-image-high-quality = "$gen-image-high-quality"
 
 [pipelex.builder_config.talent_preset_mappings.extract]
-pdf-text-extractor = "$extract-text-from-pdf"
-image-text-extractor = "$extract-all-from-document"
+pdf-basic-text-extractor = "@default-text-from-pdf"
+image-text-extractor = "@default-extract-image"
+full-document-extractor = "@default-extract-document"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags

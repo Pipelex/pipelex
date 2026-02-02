@@ -9,8 +9,8 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 
 class DocumentContent(StuffContent):
     url: str = Field(..., description="The pipelex storage URI of the document")
+    public_url: str | None = Field(None, description="The public URL of the document")
     mime_type: str | None = Field(None, description="The MIME type of the document")
-    display_link: str | None = Field(None, description="The public URL of the document")
 
     @property
     @override
@@ -36,11 +36,11 @@ class DocumentContent(StuffContent):
             template_category=TemplateCategory.HTML,
             templating_context={
                 "url": self.url,
-                "display_text": self.display_link or self.url,
+                "display_text": self.public_url or self.url,
             },
         )
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
-        display_text = self.display_link or self.url
+        display_text = self.public_url or self.url
         return f"[{display_text}]({self.url})"

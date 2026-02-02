@@ -11,12 +11,14 @@ from portkey_ai.api_resources import exceptions as portkey_exc
 
 from pipelex import log
 from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_schemas import GatewayExtractRequestParams
+from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.urls import URLs
@@ -91,7 +93,12 @@ class GatewayFactory:
         elif isinstance(inference_job, LLMJob) and inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
             # Mistral models really want non-null seed
             extra_body["seed"] = random.randint(0, 1000000)
-
+        elif isinstance(inference_job, ImgGenJob) and inference_model.model_id.startswith("gemini"):
+            aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_literal(inference_job.job_params.aspect_ratio)
+            extra_body["image_config"] = {
+                "aspect_ratio": aspect_ratio_str,
+                # "image_size": "2K",
+            }
         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
         if get_telemetry_manager().is_pipelex_gateway_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
             # Use OTel trace_id and span_id for correlation
