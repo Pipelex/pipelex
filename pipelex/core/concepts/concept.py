@@ -250,14 +250,14 @@ def _strip_titles_from_schema(schema: dict[str, Any]) -> dict[str, Any]:
         if key == "title":
             continue
         if isinstance(value, dict):
-            nested_dict = cast(dict[str, Any], value)
+            nested_dict = cast("dict[str, Any]", value)
             result[key] = _strip_titles_from_schema(nested_dict)
         elif isinstance(value, list):
-            value_list = cast(list[Any], value)
+            value_list = cast("list[Any]", value)
             processed_list: list[Any] = []
             for item in value_list:
                 if isinstance(item, dict):
-                    item_dict = cast(dict[str, Any], item)
+                    item_dict = cast("dict[str, Any]", item)
                     processed_list.append(_strip_titles_from_schema(item_dict))
                 else:
                     processed_list.append(item)

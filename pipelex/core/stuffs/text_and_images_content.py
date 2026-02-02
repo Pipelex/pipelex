@@ -1,10 +1,10 @@
+from pydantic import Field
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
-from pydantic import Field
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.stuff_content import StuffContent
