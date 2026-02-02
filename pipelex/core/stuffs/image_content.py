@@ -1,3 +1,4 @@
+from pydantic import Field
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
@@ -14,13 +15,13 @@ from pipelex.tools.uri.uri_resolver import describe_uri
 
 
 class ImageContent(StuffContent):
-    url: str
-    public_url: str | None = None
-    source_prompt: str | None = None
-    source_negative_prompt: str | None = None
-    caption: str | None = None
-    mime_type: str | None = None
-    size: ImageSize | None = None
+    url: str = Field(..., description="The image URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
+    public_url: str | None = Field(default=None, description="The public URL of the image")
+    source_prompt: str | None = Field(default=None, description="The source prompt of the image")
+    source_negative_prompt: str | None = Field(default=None, description="The source negative prompt of the image")
+    caption: str | None = Field(default=None, description="The caption of the image")
+    mime_type: str | None = Field(default=None, description="The MIME type of the image")
+    size: ImageSize | None = Field(default=None, description="The size in pixels (width and height) of the image")
 
     @property
     @override
@@ -77,7 +78,7 @@ class ImageContent(StuffContent):
         # Display link if present
         if self.public_url is not None:
             link_text = Text()
-            link_text.append("Display: ", style="bold")
+            link_text.append("Public URL: ", style="bold")
             link_text.append("Open Image", style=f"cyan link {self.public_url}")
             group.renderables.append(link_text)
 

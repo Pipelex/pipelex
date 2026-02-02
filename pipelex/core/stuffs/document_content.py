@@ -1,3 +1,4 @@
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -7,9 +8,9 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 
 
 class DocumentContent(StuffContent):
-    url: str
-    public_url: str | None = None
-    mime_type: str | None = None
+    url: str = Field(..., description="The document URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
+    public_url: str | None = Field(default=None, description="The public HTTPS URL of the document")
+    mime_type: str | None = Field(default=None, description="The MIME type of the document")
 
     @property
     @override

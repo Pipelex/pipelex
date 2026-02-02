@@ -1,3 +1,4 @@
+from pydantic import Field
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.table import Table
@@ -13,8 +14,8 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class TextAndImagesContent(StuffContent):
-    text: TextContent | None
-    images: list[ImageContent] | None
+    text: TextContent | None = Field(default=None, description="A text content")
+    images: list[ImageContent] | None = Field(default=None, description="A list of images that were extracted from the text")
 
     @property
     @override

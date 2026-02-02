@@ -16,11 +16,11 @@ class PipeFactoryErrorData(BaseModel):
     )
 
     # === Source Context ===
-    domain_code: str | None = Field(None, description="Domain where error occurred")
+    domain_code: str | None = Field(default=None, description="Domain where error occurred")
 
     # === Entity Context (what failed) ===
-    pipe_code: str | None = Field(None, description="Pipe code that failed to be created")
-    missing_concept_code: str | None = Field(None, description="The concept code that is missing")
+    pipe_code: str | None = Field(default=None, description="Pipe code that failed to be created")
+    missing_concept_code: str | None = Field(default=None, description="The concept code that is missing")
     declared_concepts: list[str] = Field(default_factory=list, description="List of concepts declared in the domain")
 
     # === Error Details ===
@@ -39,13 +39,13 @@ class PipesAndConceptValidationErrorData(BaseModel):
     """
 
     # === Source Context ===
-    domain_code: str | None = Field(None, description="Domain where error occurred")
-    source: str | None = Field(None, description="Source file path")
+    domain_code: str | None = Field(default=None, description="Domain where error occurred")
+    source: str | None = Field(default=None, description="Source file path")
 
     # === Entity Context (what failed) ===
-    pipe_code: str | None = Field(None, description="Pipe code if error is in a pipe")
-    concept_code: str | None = Field(None, description="Concept code if error is in a concept")
-    field_name: str | None = Field(None, description="Specific field that failed")
+    pipe_code: str | None = Field(default=None, description="Pipe code if error is in a pipe")
+    concept_code: str | None = Field(default=None, description="Concept code if error is in a concept")
+    field_name: str | None = Field(default=None, description="Specific field that failed")
 
     # === Error Classification ===
     error_type: PipeValidationErrorType = Field(
@@ -57,4 +57,4 @@ class PipesAndConceptValidationErrorData(BaseModel):
     field_path: str = Field(description="Path to field in dot notation")
 
     # === Variable names for input/output errors ===
-    variable_names: list[str] | None = Field(None, description="Variable names (for input errors)")
+    variable_names: list[str] | None = Field(default=None, description="Variable names (for input errors)")

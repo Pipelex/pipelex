@@ -10,9 +10,9 @@ from pipelex.cogt.llm.llm_report import LLMTokensUsage
 
 class LLMJobParams(BaseModel):
     temperature: float = Field(..., ge=0, le=1)
-    max_tokens: int | None = Field(None, gt=0)
+    max_tokens: int | None = Field(default=None, gt=0)
     image_detail: PromptImageDetail | None = None
-    seed: int | None = Field(None, ge=0)
+    seed: int | None = Field(default=None, ge=0)
 
 
 class LLMJobConfig(BaseModel):
