@@ -78,7 +78,7 @@ class ImageContent(StuffContent):
         # Display link if present
         if self.public_url is not None:
             link_text = Text()
-            link_text.append("Display: ", style="bold")
+            link_text.append("Public URL: ", style="bold")
             link_text.append("Open Image", style=f"cyan link {self.public_url}")
             group.renderables.append(link_text)
 
