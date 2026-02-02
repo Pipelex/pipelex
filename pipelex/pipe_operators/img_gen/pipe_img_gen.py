@@ -193,7 +193,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         the_content: StuffContent
         nb_images: int
         if isinstance(applied_output_multiplicity, bool):
-            if self.output_multiplicity:
+            if self.output_multiplicity is True:
                 msg = "Cannot guess how many images to generate if multiplicity is just True."
                 msg += f" Got PipeImgGen.output_multiplicity = {self.output_multiplicity},"
                 msg += f" and pipe_run_params.output_multiplicity = {pipe_run_params.output_multiplicity}."

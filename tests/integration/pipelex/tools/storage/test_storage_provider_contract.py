@@ -9,7 +9,7 @@ Storage Provider Contract Requirements:
 
 - store(data: bytes, key: str) -> str: Must return a pipelex-storage:// URI
 - load(uri: str) -> bytes: Must load data from a pipelex-storage:// URI
-- display_link(uri: str) -> str | None: Must return a human-readable link or None
+- public_url(uri: str) -> str | None: Must return a human-readable link or None
 """
 
 import pytest
@@ -64,11 +64,11 @@ class TestStorageProviderContract:
 
         assert retrieved == image_bytes
 
-    async def test_display_link_returns_string_or_none(
+    async def test_public_url_returns_string_or_none(
         self,
         storage_provider: StorageProviderAbstract,
     ) -> None:
-        """Contract: display_link() must return either a string or None.
+        """Contract: public_url() must return either a string or None.
 
         - Local storage: Returns file:// URI for terminal clickability
         - In-memory storage: Returns None (no persistent location)
@@ -80,7 +80,7 @@ class TestStorageProviderContract:
         key = "contract/display.bin"
 
         uri = await storage_provider.store(data=test_data, key=key)
-        display = await storage_provider.display_link(uri=uri)
+        display = await storage_provider.public_url(uri=uri)
 
         # Must be string or None
         assert display is None or isinstance(display, str)

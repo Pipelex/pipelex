@@ -2,7 +2,7 @@ import json
 from typing import Any
 
 from json2html import json2html
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from rich.json import JSON
 from typing_extensions import override
 
@@ -13,7 +13,7 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 
 # TODO: use pipelex.tools.misc.json_utils.JsonContent to support lists in addition to dicts
 class JSONContent(StuffContent):
-    json_obj: dict[str, Any]
+    json_obj: dict[str, Any] = Field(..., description="The JSON object")
 
     @field_validator("json_obj", mode="before")
     @classmethod

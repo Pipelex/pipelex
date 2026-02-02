@@ -26,7 +26,8 @@ class TextContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        # Escape HTML special characters so text displays literally in browsers
+        # Always escape HTML special characters so text displays literally in browsers.
+        # If you need to render trusted HTML content, use HtmlContent instead.
         return html.escape(self.text)
 
     @override
@@ -37,7 +38,6 @@ class TextContent(StuffContent):
     def rendered_json(self) -> str:
         return json.dumps({"text": self.text})
 
-    # TODO: This should not exist: In PipeCompose, if the category is HTML, the user should be recommended to use HtmlContent instead.
     def _looks_like_html(self) -> bool:
         """Check if the text content appears to be HTML."""
         return bool(HTML_PATTERN.match(self.text))

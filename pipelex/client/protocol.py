@@ -39,32 +39,6 @@ StuffContentOrData = (
 PipelineInputs = dict[str, StuffContentOrData]  # Can include both dict and StuffContent
 
 
-class PipelineState(StrEnum):
-    """Enum representing the possible states of a pipe execution."""
-
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
-    FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
-    ERROR = "ERROR"
-    STARTED = "STARTED"
-
-
-class ApiResponse(BaseModel):
-    """Base response class for Pipelex API calls.
-
-    Attributes:
-        status (str): Application-level status ("success", "error")
-        message (str | None): Optional message providing additional information
-        error (str | None): Optional error message when status is not "success"
-
-    """
-
-    status: str | None
-    message: str | None = None
-    error: str | None = None
-
-
 class PipelineRequestError(PipelexError):
     pass
 
@@ -103,7 +77,18 @@ class PipelineRequest(BaseModel):
         return values
 
 
-class PipelineResponse(ApiResponse):
+class PipelineState(StrEnum):
+    """Enum representing the possible states of a pipe execution."""
+
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+    ERROR = "ERROR"
+    STARTED = "STARTED"
+
+
+class PipelineResponse(BaseModel):
     """Response for pipeline execution requests.
 
     Attributes:
@@ -113,7 +98,6 @@ class PipelineResponse(ApiResponse):
         finished_at (str | None): Timestamp when the pipeline finished, if completed
         pipe_output (DictPipeOutput | None): Output data from the pipeline execution (working_memory dict + pipeline_run_id)
         main_stuff_name (str | None): Name of the main stuff in the pipeline output
-        pipe_structures (dict[str, Any] | None): Structure of the pipeline to execute
 
     """
 
@@ -123,7 +107,6 @@ class PipelineResponse(ApiResponse):
     finished_at: str | None = None
     pipe_output: DictPipeOutput | None = None
     main_stuff_name: str | None = None
-    pipe_structures: dict[str, Any] | None = None
 
 
 @runtime_checkable

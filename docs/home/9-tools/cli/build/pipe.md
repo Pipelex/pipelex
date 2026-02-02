@@ -14,10 +14,26 @@ The Pipe Builder is an AI-powered tool that generates Pipelex pipelines from nat
 ## Usage
 
 ```bash
-pipelex build pipe "Brief description of what the pipeline should do"
+pipelex build pipe <PROMPT> [OPTIONS]
 ```
 
-The resulting pipeline will be saved in a folder `pipeline_01/` (with increasing number) containing:
+**Arguments:**
+
+- `PROMPT` - Description of what the pipeline should do (required)
+
+**Options:**
+
+- `--output-name`, `-o` - Base name for the generated file or directory (without extension)
+- `--output-dir` - Directory where files will be generated
+- `--no-output` - Skip saving the pipeline to file (useful for testing)
+- `--no-extras` - Skip generating `inputs.json` and `runner.py`, only generate the PLX file
+- `--builder-pipe` - Builder pipe to use for generating the pipeline (default: `pipe_builder`)
+- `--graph` / `--no-graph` - Generate execution graphs for both build process and built pipeline
+- `--graph-full-data` / `--graph-no-data` - Include or exclude full serialized data in graphs (requires `--graph`)
+
+## Output
+
+The resulting pipeline will be saved in a folder (e.g., `pipeline_01/`) containing:
 
 | File | Description |
 |------|-------------|
@@ -31,16 +47,31 @@ The resulting pipeline will be saved in a folder `pipeline_01/` (with increasing
 
 The HTML and SVG files provide a visual representation of the resulting workflow.
 
-**Example:**
+## Examples
+
+**Basic usage:**
 
 ```bash
-pipelex build pipe "Given an expense report, apply company rules" -o results/expense_pipeline.plx
+pipelex build pipe "Given an expense report, apply company rules"
 ```
 
-## Options
+**Custom output name:**
 
-- `--output`, `-o`: Path to save the generated `.plx` file
-- `--no-output`: Skip saving the file (useful for testing)
+```bash
+pipelex build pipe "Extract data from invoices" -o invoice_extractor
+```
+
+**Custom output directory:**
+
+```bash
+pipelex build pipe "Analyze customer feedback" --output-dir ./pipelines/
+```
+
+**Generate only the PLX file (no extras):**
+
+```bash
+pipelex build pipe "Summarize documents" --no-extras
+```
 
 ## Example Use Cases
 
@@ -96,11 +127,15 @@ After generating your pipeline:
 2. **Run it**: `pipelex run your_pipe.plx` - See [Run Command](../run.md)
 3. **Generate a runner**: `pipelex build runner your_pipe.plx` - See [Build Runner](runner.md)
 4. **Generate structures**: `pipelex build structures ./` - See [Build Structures](structures.md)
+5. **Generate input template**: `pipelex build inputs your_pipe.plx` - See [Build Inputs](inputs.md)
+6. **View output structure**: `pipelex build output your_pipe.plx` - See [Build Output](output.md)
 
 ## Related Documentation
 
 - [Pipe Builder Deep Dive](../../pipe-builder.md) - How the builder works under the hood
 - [Design and Run Pipelines](../../../6-build-reliable-ai-workflows/pipes/index.md)
+- [Build Inputs](inputs.md) - Generate example input JSON
+- [Build Output](output.md) - Generate example output JSON
 - [Pipe Operators](../../../6-build-reliable-ai-workflows/pipes/pipe-operators/index.md)
 - [Pipe Controllers](../../../6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md)
 

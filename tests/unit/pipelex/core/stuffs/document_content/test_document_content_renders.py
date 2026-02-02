@@ -17,9 +17,9 @@ class TestDocumentContentRenders:
         content = DocumentContent(url=TestData.SAMPLE_URL)
         assert content.rendered_markdown() == TestData.EXPECTED_RENDERED_MARKDOWN
 
-    def test_rendered_markdown_with_display_link(self):
-        """Verify rendered_markdown uses display_link when available."""
-        content = DocumentContent(url=TestData.SAMPLE_URL, display_link=TestData.SAMPLE_DISPLAY_LINK)
+    def test_rendered_markdown_with_public_url(self):
+        """Verify rendered_markdown uses public_url when available."""
+        content = DocumentContent(url=TestData.SAMPLE_URL, public_url=TestData.SAMPLE_PUBLIC_URL)
         assert content.rendered_markdown() == TestData.EXPECTED_RENDERED_MARKDOWN_WITH_DISPLAY_LINK
 
     def test_rendered_html(self):
@@ -27,9 +27,9 @@ class TestDocumentContentRenders:
         content = DocumentContent(url=TestData.SAMPLE_URL)
         assert content.rendered_html() == TestData.EXPECTED_RENDERED_HTML
 
-    def test_rendered_html_with_display_link(self):
-        """Verify rendered_html uses display_link when available."""
-        content = DocumentContent(url=TestData.SAMPLE_URL, display_link=TestData.SAMPLE_DISPLAY_LINK)
+    def test_rendered_html_with_public_url(self):
+        """Verify rendered_html uses public_url when available."""
+        content = DocumentContent(url=TestData.SAMPLE_URL, public_url=TestData.SAMPLE_PUBLIC_URL)
         assert content.rendered_html() == TestData.EXPECTED_RENDERED_HTML_WITH_DISPLAY_LINK
 
     def test_rendered_for_prompt(self):

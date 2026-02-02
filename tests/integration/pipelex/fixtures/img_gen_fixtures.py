@@ -31,7 +31,7 @@ from pipelex.tools.misc.image_utils import ImageFormat
             is_moderated=None,
             safety_tolerance=1,
             is_raw=None,
-            output_format=ImageFormat.JPEG,
+            output_format=ImageFormat.PNG,
         ),
         ImgGenJobParams(
             aspect_ratio=AspectRatio.LANDSCAPE_4_3,
@@ -41,7 +41,7 @@ from pipelex.tools.misc.image_utils import ImageFormat
             is_moderated=None,
             safety_tolerance=1,
             is_raw=None,
-            output_format=ImageFormat.PNG,
+            output_format=ImageFormat.JPEG,
         ),
     ],
 )

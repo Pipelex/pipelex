@@ -790,47 +790,88 @@ country = "France"
 
 The PipeImgGen operator is used to generate images using AI image generation models.
 
+### The `prompt` Field is Required
+
+**IMPORTANT:** `PipeImgGen` requires an explicit `prompt` field. When using dynamic inputs, the `prompt` field must reference the input variable using the `$` prefix.
+
+**Wrong - Missing required `prompt` field:**
+```plx
+[pipe.render_slide]
+type = "PipeImgGen"
+inputs = { img_prompt = "ImgGenPrompt" }
+output = "Image"
+model = "$gen-image"
+# ERROR: Missing required field 'prompt'
+```
+
+**Correct - `prompt` field references the input:**
+```plx
+[pipe.render_slide]
+type = "PipeImgGen"
+inputs = { img_prompt = "ImgGenPrompt" }
+output = "Image"
+prompt = "$img_prompt"
+model = "$gen-image"
+```
+
 ### Basic Usage
 
-Simple Image Generation:
+Static prompt (no inputs needed):
 ```plx
-[pipe.generate_image]
+[pipe.generate_car_image]
 type = "PipeImgGen"
-description = "Generate an image from prompt"
-inputs = { prompt = "ImgGenPrompt" }
+description = "Generate a futuristic car image"
 output = "Image"
-```
-
-Using Image Generation Settings:
-```plx
-[pipe.generate_photo]
-type = "PipeImgGen"
-description = "Generate a high-quality photo"
-inputs = { prompt = "ImgGenPrompt" }
-output = "Photo"
-model = "$gen-image-fast"
+prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
+model = "$gen-image"
 aspect_ratio = "16:9"
-quality = "hd"
 ```
 
-Multiple Image Generation:
+Dynamic prompt from input:
+```plx
+[pipe.generate_from_description]
+type = "PipeImgGen"
+description = "Generate an image from a description"
+inputs = { description = "ImgGenPrompt" }
+output = "Image"
+prompt = "$description"
+model = "$gen-image"
+```
+
+Dynamic prompt with prefix text:
+```plx
+[pipe.generate_sketch]
+type = "PipeImgGen"
+description = "Generate a black and white sketch from a description"
+inputs = { subject = "ImgGenPrompt" }
+output = "Image"
+prompt = "Create a black and white pencil sketch of: $subject"
+model = "$gen-image"
+```
+
+### Multiple Image Generation
+
+Generate multiple outputs (fixed number) - use bracket notation:
 ```plx
 [pipe.generate_variations]
 type = "PipeImgGen"
 description = "Generate multiple image variations"
-inputs = { prompt = "ImgGenPrompt" }
+inputs = { img_prompt = "ImgGenPrompt" }
 output = "Image[3]"
+prompt = "$img_prompt"
 seed = "auto"
 ```
 
-Advanced Configuration:
+### Advanced Configuration
+
 ```plx
 [pipe.generate_custom]
 type = "PipeImgGen"
 description = "Generate image with custom settings"
-inputs = { prompt = "ImgGenPrompt" }
+inputs = { img_prompt = "ImgGenPrompt" }
 output = "Image"
-model = "$gen-image"  # Use predefined preset
+prompt = "$img_prompt"
+model = "$gen-image"
 aspect_ratio = "1:1"
 quality = "hd"
 background = "transparent"
@@ -840,6 +881,9 @@ safety_tolerance = 3
 ```
 
 ### Key Parameters
+
+**Required:**
+- `prompt`: The image generation prompt. Can be a static string or reference input variables using `$` prefix (e.g., `"$description"` or `"A sketch of: $subject"`)
 
 **Image Generation Settings:**
 - `model`: Model choice (preset name or inline settings with model name)
@@ -858,11 +902,11 @@ safety_tolerance = 3
 
 ### Input Requirements
 
-PipeImgGen requires exactly one input that must be either:
+When using dynamic prompts, the input must be either:
 - An `ImgGenPrompt` concept
 - A concept that refines `ImgGenPrompt`
 
-The input can be named anything but must contain the prompt text for image generation.
+The input can be named anything, but must be referenced in the `prompt` field using the `$` prefix.
 
 ## PipeFunc operator
 

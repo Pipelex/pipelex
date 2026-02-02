@@ -206,7 +206,7 @@ class GcpStorageProvider(StorageProviderAbstract):
             return self._make_public_url(key)
 
     @override
-    async def display_link(self, uri: str) -> str | None:
+    async def public_url(self, uri: str) -> str | None:
         """Return a URL for this storage URI.
 
         Args:

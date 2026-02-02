@@ -18,6 +18,7 @@ class ConceptRepresentationFormat(StrEnum):
 
     JSON = "json"
     PYTHON = "python"
+    SCHEMA = "schema"
 
 
 class ConceptRepresentationGenerator:
@@ -93,6 +94,9 @@ class ConceptRepresentationGenerator:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
                 return self._format_as_python(class_name, fields_dict)
+            case ConceptRepresentationFormat.SCHEMA:
+                msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
+                raise ValueError(msg)
 
     def _generate_fields_dict(
         self,
@@ -256,6 +260,9 @@ class ConceptRepresentationGenerator:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
                 return self._format_as_python(class_name, fields_dict)
+            case ConceptRepresentationFormat.SCHEMA:
+                msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
+                raise ValueError(msg)
 
     def _generate_basic_value(self, actual_type: Any, field_name: str) -> Any:
         """Generate a value for basic Python types.
