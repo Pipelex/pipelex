@@ -12,7 +12,7 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 
 class PageContent(StructuredContent):
     text_and_images: TextAndImagesContent = Field(..., description="The text and images content extracted from the page")
-    page_view: ImageContent | None = Field(None, description="The screenshot of the page")
+    page_view: ImageContent | None = Field(default=None, description="The screenshot of the page")
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

@@ -9,8 +9,8 @@ from pipelex.tools.uri.uri_resolver import resolve_uri
 
 class DocumentContent(StuffContent):
     url: str = Field(..., description="The pipelex storage URI of the document")
-    public_url: str | None = Field(None, description="The public URL of the document")
-    mime_type: str | None = Field(None, description="The MIME type of the document")
+    public_url: str | None = Field(default=None, description="The public URL of the document")
+    mime_type: str | None = Field(default=None, description="The MIME type of the document")
 
     @property
     @override

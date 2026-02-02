@@ -16,12 +16,12 @@ from pipelex.tools.uri.uri_resolver import describe_uri
 
 class ImageContent(StuffContent):
     url: str = Field(..., description="The pipelex storage URI of the image")
-    public_url: str | None = Field(None, description="The public URL of the image")
-    source_prompt: str | None = Field(None, description="The source prompt of the image")
-    source_negative_prompt: str | None = Field(None, description="The source negative prompt of the image")
-    caption: str | None = Field(None, description="The caption of the image")
-    mime_type: str | None = Field(None, description="The MIME type of the image")
-    size: ImageSize | None = Field(None, description="The size in pixels (width and height) of the image")
+    public_url: str | None = Field(default=None, description="The public URL of the image")
+    source_prompt: str | None = Field(default=None, description="The source prompt of the image")
+    source_negative_prompt: str | None = Field(default=None, description="The source negative prompt of the image")
+    caption: str | None = Field(default=None, description="The caption of the image")
+    mime_type: str | None = Field(default=None, description="The MIME type of the image")
+    size: ImageSize | None = Field(default=None, description="The size in pixels (width and height) of the image")
 
     @property
     @override

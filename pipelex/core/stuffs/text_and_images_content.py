@@ -14,8 +14,8 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class TextAndImagesContent(StuffContent):
-    text: TextContent | None = Field(None, description="A text content")
-    images: list[ImageContent] | None = Field(None, description="A list of images that were extracted from the text")
+    text: TextContent | None = Field(default=None, description="A text content")
+    images: list[ImageContent] | None = Field(default=None, description="A list of images that were extracted from the text")
 
     @property
     @override
