@@ -526,7 +526,7 @@ type = "PipeExtract"
 description = "Extract with specific model"
 inputs = { document = "Document" }
 output = "Page"
-model = "$extract-text-from-pdf"  # Use predefined extract preset
+model = "@default-text-from-pdf"  # Use default alias for PDF text extraction
 ```
 
 Only one input is allowed and it must either be an `Image` or a `PDF`. The input can be named anything.

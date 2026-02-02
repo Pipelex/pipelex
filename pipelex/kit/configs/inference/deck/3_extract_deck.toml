@@ -19,24 +19,24 @@
 ####################################################################################################
 
 [extract]
-choice_default = "$extract-all-from-document"
+choice_default = "@default-extract-document"
 
 ####################################################################################################
 # Aliases
 ####################################################################################################
 
 [extract.aliases]
-default-extract-document = "azure-document-intelligence"
-default-extract-text-from-pdf = "pypdfium2-extract-pdf"
-default-software-extract-no-inference = "pypdfium2-extract-pdf"
+default-premium = "azure-document-intelligence"
+default-extract-document = "mistral-document-ai-2505"
+default-extract-image = "mistral-document-ai-2505"
+default-text-from-pdf = "pypdfium2-extract-pdf"
+default-no-inference = "pypdfium2-extract-pdf"
 
 ####################################################################################################
 # Extract Presets
 ####################################################################################################
 
 [extract.presets]
-extract-all-from-document = { model = "@default-extract-document", max_nb_images = 100, image_min_size = 50 }
-extract-text-from-pdf = { model = "@default-extract-text-from-pdf", max_nb_images = 100, image_min_size = 50 }
 
 # Testing
-extract-testing = { model = "@default-software-extract-no-inference", max_nb_images = 100, image_min_size = 50 }
+extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50 }
