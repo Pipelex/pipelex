@@ -1,5 +1,3 @@
-import json
-
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
@@ -12,12 +10,12 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.tools.uri.uri_resolver import describe_uri
 
 
 class ImageContent(StuffContent):
     url: str
-    display_link: str | None = None
+    public_url: str | None = None
     source_prompt: str | None = None
     source_negative_prompt: str | None = None
     caption: str | None = None
@@ -32,7 +30,7 @@ class ImageContent(StuffContent):
     @property
     @override
     def short_desc(self) -> str:
-        url_desc = resolve_uri(self.url).kind.desc
+        url_desc = describe_uri(self.url)
         return f"{url_desc} of an image"
 
     @override
@@ -46,17 +44,13 @@ class ImageContent(StuffContent):
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             templating_context={
-                "url": self.display_link or self.url,
+                "url": self.public_url or self.url,
             },
         )
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return f"![{self.url[:100]}]({self.url})"
-
-    @override
-    def rendered_json(self) -> str:
-        return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
 
     def render_with_images(
         self,
@@ -81,10 +75,10 @@ class ImageContent(StuffContent):
         group.renderables.append(url_markdown)
 
         # Display link if present
-        if self.display_link is not None:
+        if self.public_url is not None:
             link_text = Text()
             link_text.append("Display: ", style="bold")
-            link_text.append("Open Image", style=f"cyan link {self.display_link}")
+            link_text.append("Open Image", style=f"cyan link {self.public_url}")
             group.renderables.append(link_text)
 
         # Caption if present
@@ -101,11 +95,18 @@ class ImageContent(StuffContent):
             size_text.append(f"{self.size.width}x{self.size.height}", style="dim")
             group.renderables.append(size_text)
 
+        # MIME type if present
+        if self.mime_type:
+            mime_type_text = Text()
+            mime_type_text.append("MIME Type: ", style="bold")
+            mime_type_text.append(self.mime_type, style="dim")
+            group.renderables.append(mime_type_text)
+
         # Source prompt if present
         if self.source_prompt:
             group.renderables.append(Text())  # Add spacing
             prompt_text = Text()
-            prompt_text.append("Source Prompt: ", style="bold")
+            prompt_text.append("Source Prompt:\n", style="bold")
             prompt_text.append(self.source_prompt, style="dim italic")
             group.renderables.append(prompt_text)
 
@@ -116,12 +117,5 @@ class ImageContent(StuffContent):
             negative_prompt_text.append("Source Negative Prompt: ", style="bold")
             negative_prompt_text.append(self.source_negative_prompt, style="dim italic")
             group.renderables.append(negative_prompt_text)
-
-        # MIME type if present
-        if self.mime_type:
-            mime_type_text = Text()
-            mime_type_text.append("MIME Type: ", style="bold")
-            mime_type_text.append(self.mime_type, style="dim")
-            group.renderables.append(mime_type_text)
 
         return group

@@ -14,6 +14,7 @@ class PipelexBackend(StrEnum):
 
     GATEWAY = "pipelex_gateway"
     LEGACY_INFERENCE = "pipelex_inference"  # Legacy, deprecated
+    INTERNAL = "internal"  # Software-only backend, runs locally without AI
 
     @property
     def display_name(self) -> str:
@@ -22,6 +23,8 @@ class PipelexBackend(StrEnum):
                 return "Pipelex Gateway"
             case PipelexBackend.LEGACY_INFERENCE:
                 return "Pipelex Inference (deprecated)"
+            case PipelexBackend.INTERNAL:
+                return "Internal (software-only)"
 
     @classmethod
     def is_gateway_backend(cls, backend_name: str) -> bool:
@@ -32,7 +35,7 @@ class PipelexBackend(StrEnum):
         match the_backend:
             case PipelexBackend.GATEWAY:
                 return True
-            case PipelexBackend.LEGACY_INFERENCE:
+            case PipelexBackend.LEGACY_INFERENCE | PipelexBackend.INTERNAL:
                 return False
 
 

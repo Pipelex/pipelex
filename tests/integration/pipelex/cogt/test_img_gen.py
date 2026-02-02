@@ -48,8 +48,8 @@ class TestImageGeneration:
             raw_details=generated_image_raw_details,
         )
         pretty_print(image_content, title=f"Image content for topic '{topic}'")
-        assert image_content.display_link is not None
-        pretty_print_url(image_content.display_link, title=f"Image URL for topic '{topic}'")
+        assert image_content.public_url is not None
+        pretty_print_url(image_content.public_url, title=f"Image URL for topic '{topic}'")
 
     @pytest.mark.parametrize(("topic", "positive_text", "negative_text"), ImageGenTestCases.IMAGE_GEN_PROMPT_CONTENTS)
     async def test_img_gen_single_transparent(
@@ -84,8 +84,8 @@ class TestImageGeneration:
             raw_details=generated_image_raw_details,
         )
         pretty_print(image_content, title=f"Image content for topic '{topic}'")
-        assert image_content.display_link is not None
-        pretty_print_url(image_content.display_link, title=f"Image URL for topic '{topic}'")
+        assert image_content.public_url is not None
+        pretty_print_url(image_content.public_url, title=f"Image URL for topic '{topic}'")
 
     @pytest.mark.parametrize(("topic", "positive_text", "negative_text"), ImageGenTestCases.IMAGE_GEN_PROMPT_CONTENTS)
     async def test_img_gen_multiple(
@@ -122,5 +122,5 @@ class TestImageGeneration:
         ]
         pretty_print(image_content_list, title=f"Image contents for topic '{topic}'")
         for image_index, image in enumerate(image_content_list):
-            assert image.display_link is not None
-            pretty_print_url(image.display_link, title=f"Image URL #{image_index}")
+            assert image.public_url is not None
+            pretty_print_url(image.public_url, title=f"Image URL #{image_index}")

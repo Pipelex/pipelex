@@ -669,13 +669,13 @@ class ModelDeck(ConfigModel):
         Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
         them and looking up the appropriate dictionary.
         """
-        return self._get_optional_inference_model_impl(
+        return self._get_optional_inference_model(
             model_handle=model_handle,
             model_type=model_type,
             _visited=frozenset(),
         )
 
-    def _get_optional_inference_model_impl(
+    def _get_optional_inference_model(
         self,
         model_handle: str,
         model_type: ModelType,
@@ -698,7 +698,7 @@ class ModelDeck(ConfigModel):
                     if alias_target in _visited:
                         log.error(f"Circular alias detected: '{model_handle}' -> '{alias_target}'")
                         return None
-                    return self._get_optional_inference_model_impl(
+                    return self._get_optional_inference_model(
                         model_handle=alias_target,
                         model_type=model_type,
                         _visited=_visited | {model_handle},
@@ -735,7 +735,7 @@ class ModelDeck(ConfigModel):
             if alias in _visited:
                 log.warning(f"Circular alias detected: '{model_handle}' -> '{alias}'")
                 return None
-            return self._get_optional_inference_model_impl(
+            return self._get_optional_inference_model(
                 model_handle=alias,
                 model_type=model_type,
                 _visited=_visited | {model_handle},

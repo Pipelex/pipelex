@@ -20,7 +20,7 @@ class StorageProviderAbstract(ABC):
     Subclasses must implement:
         - _load_with_metadata(key): Load data with MIME type by key (without scheme)
         - _store(data, key, content_type): Store data and return URI
-        - display_link(uri): Return human-readable link for URI
+        - public_url(uri): Return human-readable link for URI
     """
 
     def _strip_scheme(self, uri: str) -> str:
@@ -122,7 +122,7 @@ class StorageProviderAbstract(ABC):
         """
 
     @abstractmethod
-    async def display_link(self, uri: str) -> str | None:
+    async def public_url(self, uri: str) -> str | None:
         """Return human-readable link for this URI.
 
         Args:

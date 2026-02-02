@@ -123,7 +123,7 @@ class GeneratedContentFactory:
         else:
             mime_type = "image/jpeg"
 
-        display_link: str | None
+        public_url: str | None
         if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content_enabled:
             actual_bytes = await self._fetch_remote_content(url=url)
             storage_key = self._build_storage_key(
@@ -134,15 +134,15 @@ class GeneratedContentFactory:
                 image_format=image_format,
             )
             url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
-            display_link = await self.storage_provider.display_link(uri=url)
+            public_url = await self.storage_provider.public_url(uri=url)
         elif not is_remote_url:
-            display_link = await self.storage_provider.display_link(uri=url)
+            public_url = await self.storage_provider.public_url(uri=url)
         else:
-            display_link = url
+            public_url = url
 
         return ImageContent(
             url=url,
-            display_link=display_link,
+            public_url=public_url,
             size=raw_details.size,
             mime_type=mime_type,
             caption=raw_details.caption,
