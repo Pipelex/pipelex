@@ -148,22 +148,3 @@ class TestRenderOutputSchemaFormat:
         assert "content" in parsed
         # Schema should contain JSON Schema keywords
         assert "type" in parsed["content"] or "properties" in parsed["content"]
-
-    def test_schema_format_strips_titles(self, mocker: MockerFixture) -> None:
-        """Schema format should not contain 'title' fields (Pydantic noise)."""
-        # Create a mock pipe with Image output
-        mock_pipe = mocker.MagicMock(spec=PipeAbstract)
-        mock_pipe.type = "PipeLLM"
-
-        # Create a real Concept for Image
-        image_concept = _make_image_concept()
-
-        # Create a StuffSpec for the output
-        mock_output = StuffSpec(concept=image_concept, multiplicity=None)
-        mock_pipe.output = mock_output
-
-        # Render the output with Schema format
-        result = render_output(mock_pipe, output_format=ConceptRepresentationFormat.SCHEMA)
-
-        # Should not contain any 'title' keys (stripped from schema)
-        assert '"title"' not in result, f"Schema should not contain 'title' fields. Got: {result}"

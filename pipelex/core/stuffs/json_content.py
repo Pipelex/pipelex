@@ -13,7 +13,7 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 
 # TODO: use pipelex.tools.misc.json_utils.JsonContent to support lists in addition to dicts
 class JSONContent(StuffContent):
-    json_obj: dict[str, Any] = Field(..., description="The JSON object to render")
+    json_obj: dict[str, Any] = Field(..., description="The JSON object")
 
     @field_validator("json_obj", mode="before")
     @classmethod
