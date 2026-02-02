@@ -15,7 +15,7 @@ from pipelex.tools.uri.uri_resolver import describe_uri
 
 
 class ImageContent(StuffContent):
-    url: str = Field(..., description="The image URI: pipelex storage URI, HTTP/HTTPS URL, or base64 data URI")
+    url: str = Field(..., description="The image URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
     public_url: str | None = Field(default=None, description="The public URL of the image")
     source_prompt: str | None = Field(default=None, description="The source prompt of the image")
     source_negative_prompt: str | None = Field(default=None, description="The source negative prompt of the image")
