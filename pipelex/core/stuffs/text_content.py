@@ -26,8 +26,12 @@ class TextContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        # Escape HTML special characters so text displays literally in browsers
-        return html.escape(self.text)
+        # If text looks like HTML, return it as-is (trusted HTML content from templates)
+        # Otherwise, escape HTML special characters so text displays literally in browsers
+        if self._looks_like_html():
+            return self.text
+        else:
+            return html.escape(self.text)
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
