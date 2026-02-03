@@ -447,6 +447,9 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             concepts: List of concepts to check for cycles
         """
+        # TODO: Refactor to inspect ConceptStructureBlueprint directly (concept_ref and item_concept_ref fields)
+        # instead of the generated Python types. This would be more direct and wouldn't depend on
+        # how types are generated (e.g., Optional wrappers for non-required fields).
         class_registry = KajsonManager.get_class_registry()
 
         # Build mappings from class names to concept refs
@@ -462,24 +465,36 @@ class LibraryManager(LibraryManagerAbstract):
             if structure_class is None or not issubclass(structure_class, BaseModel):
                 return refs
 
+            def extract_type_names(annotation: type) -> list[str]:
+                """Recursively extract type names from possibly nested generic types."""
+                if annotation is type(None):
+                    return []
+
+                type_names: list[str] = []
+                origin = getattr(annotation, "__origin__", None)
+                args = getattr(annotation, "__args__", ())
+
+                if origin is None:
+                    # Simple type, get its name
+                    type_name = getattr(annotation, "__name__", None)
+                    if type_name:
+                        type_names.append(type_name)
+                else:
+                    # Generic type (like Optional[X], list[X], Union[X, Y], etc.)
+                    # Recursively extract from all type arguments
+                    for arg in args:
+                        type_names.extend(extract_type_names(arg))
+
+                return type_names
+
             for field_info in structure_class.model_fields.values():
                 annotation = field_info.annotation
                 if annotation is None:
                     continue
 
-                # Handle Optional types, List types, etc.
-                origin = getattr(annotation, "__origin__", None)
-                args = getattr(annotation, "__args__", ())
-
-                # Check direct type or args for concept references
-                types_to_check = [annotation] if origin is None else list(args)
-
-                for type_to_check in types_to_check:
-                    if type_to_check is type(None):
-                        continue
-                    # Get the class name
-                    type_name = getattr(type_to_check, "__name__", None)
-                    if type_name and type_name in class_to_concept:
+                # Recursively extract all type names from the annotation
+                for type_name in extract_type_names(annotation):
+                    if type_name in class_to_concept:
                         refs.append(class_to_concept[type_name])
 
             return refs
