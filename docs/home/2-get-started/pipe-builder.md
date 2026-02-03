@@ -82,7 +82,7 @@ Now, thanks to our Pipelex language, you can easily edit the pipeline, even if y
 pipelex kit rules
 ```
 
-This installs Pipelex rules for `Cursor`, `Claude Code`, `OpenAI Codex`, `GitHub Copilot`, `Windsurf`, and `Blackbox AI`.
+This installs Pipelex rules for your preferred AI assistant (Claude Code by default). Configure the target in `.pipelex/pipelex.toml` under `[pipelex.kit_config]`.
 
 Now refine your pipeline with natural language directly in your AI assistant's chatbot:
 

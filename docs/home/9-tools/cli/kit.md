@@ -6,31 +6,37 @@ The Pipelex Kit provides commands for managing agent rules and migration instruc
 
 ### Install Agent Rules
 
-Install Pipelex agent rules for AI coding assistants:
+Install Pipelex agent rules for your preferred AI coding assistant:
 
 ```bash
 pipelex kit rules
 ```
 
-This command:
-
-1. Exports agent markdown files to Cursor `.mdc` files with YAML front-matter in `.cursor/rules`
-2. Builds merged agent documentation and updates target files for other AI assistants
+This command installs agent rules for **one preferred target** configured in your `pipelex.toml`. By default, this is Claude Code (`CLAUDE.md`).
 
 **Supported AI Assistants:**
 
-- **Cursor** (`.cursor/rules/`)
-- **Claude Code** (`CLAUDE.md`)
-- **OpenAI Codex** (`AGENTS.md`)
-- **GitHub Copilot** (`.github/copilot-instructions.md`)
-- **Windsurf** (`.windsurfrules.md`)
-- **Blackbox AI** (`BLACKBOX_RULES.md`)
+| Target | Value | File(s) |
+|--------|-------|---------|
+| **Cursor** | `cursor` | `.cursor/rules/*.mdc` |
+| **Claude Code** | `claude` | `CLAUDE.md` |
+| **OpenAI Codex** | `agents` | `AGENTS.md` |
+| **GitHub Copilot** | `github_copilot` | `.github/copilot-instructions.md` |
+
+**Configuration:**
+
+Configure your preferred agent target in `.pipelex/pipelex.toml`:
+
+```toml
+[pipelex.kit_config]
+preferred_agent_target = "claude"  # Options: cursor, agents, claude, github_copilot
+```
 
 **Options:**
 
 - `--repo-root PATH`: Repository root directory (default: current directory)
-- `--cursor/--no-cursor`: Export Cursor rules (default: enabled)
-- `--single-files/--no-single-files`: Update single-file agent documentation targets (default: enabled)
+- `--set NAME`: Agent rule set to sync (e.g., `coding_standards`, `pipelex_language`)
+- `--cleanup`: Remove Pipelex rules from other agent targets (preserves non-Pipelex content)
 - `--dry-run`: Show what would be done without making changes
 - `--diff`: Show unified diff of changes
 - `--backup SUFFIX`: Create backups with the specified suffix (e.g., `.bak`)
@@ -38,18 +44,21 @@ This command:
 **Examples:**
 
 ```bash
-# Install rules for all supported AI assistants
+# Install rules for your preferred agent target (default: claude)
 pipelex kit rules
 
 # Preview changes without applying them
 pipelex kit rules --dry-run --diff
 
-# Install only Cursor rules
-pipelex kit rules --no-single-files
+# Install rules and clean up rules from other targets
+pipelex kit rules --cleanup
 
 # Create backups before updating
 pipelex kit rules --backup .bak
 ```
+
+!!! tip "Switching Agent Targets"
+    When switching from one AI assistant to another (e.g., from Cursor to Claude Code), use `--cleanup` to remove Pipelex rules from the previous target while installing them for the new one.
 
 ### Remove Agent Rules
 

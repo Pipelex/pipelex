@@ -307,7 +307,7 @@ Install AI assistant rules to easily modify your pipelines:
 pipelex kit rules
 ```
 
-This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI. Now you can refine pipelines with natural language:
+This installs rules for your preferred AI assistant (Claude by default). You can configure the target in `.pipelex/pipelex.toml`. Now you can refine pipelines with natural language:
 
 - "Include confidence scores between 0 and 100 in the match analysis"
 - "Write a recap email at the end"

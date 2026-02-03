@@ -380,4 +380,15 @@ img_gen_skill = "img_gen_talent"
 extract_skill = "extract_talent"
 
 
+####################################################################################################
+# Kit Config
+####################################################################################################
+
+[pipelex.kit_config]
+# Preferred agent for rules installation (used by `pipelex kit rules`)
+# Options: "cursor", "agents", "claude", "github_copilot", "windsurf", "blackbox"
+# - "cursor" installs .cursor/rules/*.mdc files
+# - Other options install a single markdown file for that agent
+preferred_agent_target = "claude"
+
 [migration.migration_maps.telemetry]
