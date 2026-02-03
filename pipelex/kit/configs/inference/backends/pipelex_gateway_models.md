@@ -22,14 +22,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </thead>
 <tbody>
 <tr>
-<td>claude-3-haiku</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
 <td>claude-3.7-sonnet</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -106,14 +98,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gemini-2.0-flash</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -466,11 +450,12 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <thead>
 <tr>
 <th rowspan="2">Model</th>
-<th colspan="1" style="text-align:center;background-color:rgba(33,150,243,0.15)">Inputs</th>
+<th colspan="2" style="text-align:center;background-color:rgba(33,150,243,0.15)">Inputs</th>
 <th colspan="1" style="text-align:center;background-color:rgba(76,175,80,0.15)">Outputs</th>
 </tr>
 <tr>
 <th style="text-align:center;background-color:rgba(33,150,243,0.15)">text</th>
+<th style="text-align:center;background-color:rgba(33,150,243,0.15)">images</th>
 <th style="text-align:center;background-color:rgba(76,175,80,0.15)">image</th>
 </tr>
 </thead>
@@ -478,30 +463,36 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <tr>
 <td>flux-2-pro</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>gpt-image-1</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>gpt-image-1-mini</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>gpt-image-1.5</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>nano-banana</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>nano-banana-pro</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -510,6 +501,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-27T14:08:51Z
+> Last updated: 2026-02-03T13:26:06Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
