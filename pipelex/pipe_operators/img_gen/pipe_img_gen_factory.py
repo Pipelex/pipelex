@@ -8,8 +8,10 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
 
 
 class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
@@ -44,6 +46,26 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             if blueprint.negative_prompt
             else None
         )
+
+        # Analyze template for image references
+        image_references = None
+        if blueprint.prompt and blueprint.inputs:
+            image_references = (
+                TemplateImageAnalyzer.analyze_template_for_images(
+                    template_source=blueprint.prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                    template_category=TemplateCategory.IMG_GEN_PROMPT,
+                )
+                or None
+            )
+
+        img_gen_prompt_blueprint = ImgGenPromptBlueprint(
+            prompt_blueprint=prompt_blueprint,
+            negative_prompt_blueprint=negative_prompt_blueprint,
+            image_references=image_references,
+        )
+
         return PipeImgGen(
             domain_code=domain_code,
             code=pipe_code,
@@ -51,8 +73,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             inputs=inputs,
             output=output,
             output_multiplicity=final_multiplicity,
-            prompt_blueprint=prompt_blueprint,
-            negative_prompt_blueprint=negative_prompt_blueprint,
+            img_gen_prompt_blueprint=img_gen_prompt_blueprint,
             img_gen_choice=blueprint.model,
             aspect_ratio=blueprint.aspect_ratio,
             is_raw=blueprint.is_raw,
