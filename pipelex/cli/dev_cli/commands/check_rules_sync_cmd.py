@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import sys
-import tomllib
 from pathlib import Path
 
 from rich.panel import Panel
@@ -12,6 +11,7 @@ from pipelex.hub import get_console
 from pipelex.kit.index_loader import load_index
 from pipelex.kit.single_file_agent_rules import build_merged_rules, unified_diff
 from pipelex.system.configuration.configs import AgentTarget
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
 def _get_preferred_target_from_toml() -> AgentTarget:
@@ -20,8 +20,7 @@ def _get_preferred_target_from_toml() -> AgentTarget:
     if not pipelex_toml.exists():
         return AgentTarget.CLAUDE  # Default fallback
 
-    with pipelex_toml.open("rb") as file_handle:
-        config = tomllib.load(file_handle)
+    config = load_toml_from_path(str(pipelex_toml))
 
     try:
         target_str = config["pipelex"]["kit_config"]["preferred_agent_target"]
