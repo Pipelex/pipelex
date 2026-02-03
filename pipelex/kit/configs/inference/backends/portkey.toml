@@ -225,13 +225,6 @@ costs = { input = 5.0, output = 25.0 }
 x-portkey-provider = "@anthropic"
 
 # --- Gemini LLMs --------------------------------------------------------------
-["gemini-2.0-flash"]
-model_id = "gemini-2.0-flash"
-inputs = ["text", "images", "pdf"]
-outputs = ["text", "structured"]
-costs = { input = 0.10, output = 0.40 }
-x-portkey-provider = "@google"
-
 ["gemini-2.5-pro"]
 model_id = "gemini-2.5-pro"
 inputs = ["text", "images", "pdf"]

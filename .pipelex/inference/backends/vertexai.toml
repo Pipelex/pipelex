@@ -8,7 +8,7 @@
 #
 # Configuration structure:
 # - Each model is defined in its own section with the model name as the header
-# - Headers with dots must be quoted (e.g., ["gemini-2.0-flash"])
+# - Headers with dots must be quoted (e.g., ["gemini-2.5-pro"])
 # - Model costs are in USD per million tokens (input/output)
 #
 # Documentation: https://docs.pipelex.com
@@ -29,14 +29,6 @@ structure_method = "instructor/vertexai_tools"
 ################################################################################
 # LANGUAGE MODELS
 ################################################################################
-
-# --- Gemini 2.0 Series --------------------------------------------------------
-["gemini-2.0-flash"]
-model_id = "google/gemini-2.0-flash"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-max_prompt_images = 3000
-costs = { input = 0.1, output = 0.4 }
 
 # --- Gemini 2.5 Series --------------------------------------------------------
 ["gemini-2.5-pro"]
