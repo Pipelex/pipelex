@@ -45,9 +45,6 @@ class AgentTarget(StrEnum):
     CURSOR = "cursor"
     AGENTS = "agents"
     CLAUDE = "claude"
-    GITHUB_COPILOT = "github_copilot"
-    WINDSURF = "windsurf"
-    BLACKBOX = "blackbox"
 
 
 class KitConfig(ConfigModel):

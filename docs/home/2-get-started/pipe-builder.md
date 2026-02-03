@@ -74,22 +74,6 @@ print(pipe_output.main_stuff)
 
 ```
 
-## Easily iterate on your pipe
-
-Now, thanks to our Pipelex language, you can easily edit the pipeline, even if you're not a coder. Better yet, you can get assisted in making changes with the help of your favorite AI coding assistant. To that end, we have prepared comprehensive rules meant for the most popular AI coding assistants. You can install those rules with one call:
-
-```bash
-pipelex kit rules
-```
-
-This installs Pipelex rules for your preferred AI assistant (Claude Code by default). Configure the target in `.pipelex/pipelex.toml` under `[pipelex.kit_config]`.
-
-Now refine your pipeline with natural language directly in your AI assistant's chatbot:
-
-- "Include confidence scores between 0 and 100 in the match analysis"
-- "Write a recap email at the end"
-- "Split the first pipe into 2 more detailed pipe"
-
 ## IDE Support
 
 We **highly** recommend installing our own extension for PLX files into your IDE of choice. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex) and download it directly using [this link](https://open-vsx.org/api/Pipelex/pipelex/0.2.1/file/Pipelex.pipelex-0.2.1.vsix). It's coming soon to the VS Code marketplace too and if you are using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.

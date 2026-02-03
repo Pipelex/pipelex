@@ -7,15 +7,12 @@
   - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
 
 ### Added
- - **`pipelex kit rules --cleanup` Option**: New option to remove Pipelex rules from other agent targets when switching assistants. Preserves non-Pipelex content in single-file targets (only removes marked sections) and deletes Cursor `.mdc` files when switching away from Cursor.
  - **`pipelex build output` CLI Command**: New command to generate example output JSON for a pipe, complementing the existing `pipelex build inputs` command. Shows the expected output structure based on the pipe's output concept type, with multiplicity support. For pipes with `native.Anything` output (e.g., `PipeCondition` with different mapped pipe outputs), displays all possible outputs from mapped pipes.
- - **Telemetry System**: Introduced anonymous usage tracking and exception capture for CLI commands (`graph render`, `kit rules`, `kit remove-rules`, `kit migrations`), reporting to both user-configured and Pipelex analytics endpoints.
+ - **Telemetry System**: Introduced anonymous usage tracking and exception capture for CLI commands (`graph render`), reporting to both user-configured and Pipelex analytics endpoints.
  - **PipeExtract Operator Validation**: Added strict input validation that raises configuration errors for incompatible input types or when document-specific parameters are used with image inputs.
  - **PipeCondition Output Auto-Fix in Builder Loop**: The pipe builder now automatically fixes `PipeCondition` output concept errors during validation. If all mapped pipes have the same output, the `PipeCondition` output is set to that concept; otherwise it's set to `native.Anything`.
 
 ### Changed
- - **`pipelex kit rules` Single Target Mode**: The command now installs rules for a single preferred agent target instead of all targets. Configure via `preferred_agent_target` in `[pipelex.kit_config]` section of `pipelex.toml`. Default target is `claude` (CLAUDE.md). Supported targets: `cursor`, `agents`, `claude`, `github_copilot`.
- - **`pipelex kit rules` CLI Options**: Removed `--cursor/--no-cursor` and `--single-files/--no-single-files` options in favor of the configuration-based approach.
  - **Test Profile System**: Refactored integration tests to use a new configuration system (`.pipelex/test_profiles.toml`) with `dev`, `ci`, and `full` profiles for controlling which AI models are used in parametrized tests, replacing runtime filtering and hardcoded model lists.
  - **`pipelex run --graph` Flag**: Now acts as an override for `pipelex.toml` settings instead of defaulting to `true`.
  - **Default Image Generation Models**: Updated in `base_deck.toml`: `base-img-gen`: `flux-2-pro`, `best-img-gen`: `nano-banana-pro`, `fast-img-gen`: `gpt-image-1-mini`
@@ -28,6 +25,13 @@
  - Corrected output directory creation logic in `pipelex run` to properly respect the `--no-graph` flag and configuration settings.
  - Fixed a bug when trying to print HTML content in a TextContent object.
  - Fixed the Pipelex CLI for generating structures, inputs, runner files.
+
+### Removed
+ - **`pipelex kit` Command**: The kit commands have been removed from the main CLI. They are now internal tools for Pipelex contributors only, available via `pipelex-dev kit rules`.
+ - **`pipelex kit migrations` Command**: Removed entirely.
+ - **`pipelex kit remove-rules` Command**: Removed entirely.
+ - **PLX Syntax Agent Rules**: Removed `write_pipelex.md` and `run_pipelex.md` agent rules. These PLX syntax guides are no longer installed in client projects.
+ - **`[pipelex.kit_config]` Configuration**: Removed from client project configuration (`.pipelex/pipelex.toml`).
 
 ## [v0.18.0b2] - 2026-01-20
 

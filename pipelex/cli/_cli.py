@@ -11,7 +11,6 @@ from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
@@ -27,7 +26,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["init", "doctor", "kit", "build", "validate", "run", "graph", "show", "which"]
+        return ["init", "doctor", "build", "validate", "run", "graph", "show", "which"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -123,7 +122,6 @@ def doctor_command(
     doctor_cmd(fix=fix)
 
 
-app.add_typer(kit_app, name="kit", help="Manage kit assets: agent rules, migration rules")
 app.add_typer(
     build_app, name="build", help="Generate AI workflows from natural language requirements: pipelines in .plx format and python code to run them"
 )

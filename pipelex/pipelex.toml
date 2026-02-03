@@ -386,7 +386,7 @@ extract_skill = "extract_talent"
 
 [pipelex.kit_config]
 # Preferred agent for rules installation (used by `pipelex kit rules`)
-# Options: "cursor", "agents", "claude", "github_copilot", "windsurf", "blackbox"
+# Options: "cursor", "agents", "claude"
 # - "cursor" installs .cursor/rules/*.mdc files
 # - Other options install a single markdown file for that agent
 preferred_agent_target = "claude"

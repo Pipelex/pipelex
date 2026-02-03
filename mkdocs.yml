@@ -179,7 +179,6 @@ nav:
         - Validate: home/9-tools/cli/validate.md
         - Run: home/9-tools/cli/run.md
         - Show: home/9-tools/cli/show.md
-        - Kit: home/9-tools/cli/kit.md
         - Build:
           - Overview: home/9-tools/cli/build/index.md
           - Pipe: home/9-tools/cli/build/pipe.md
