@@ -148,3 +148,4 @@ model_id = "blackboxai/qwen3-vl-32b"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.00, output = 5.00 }
+structure_method = "instructor/openrouter_structured_outputs"

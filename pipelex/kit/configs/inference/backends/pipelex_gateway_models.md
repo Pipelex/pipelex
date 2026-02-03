@@ -501,6 +501,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-02-03T13:26:06Z
+> Last updated: 2026-02-03T13:57:10Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
