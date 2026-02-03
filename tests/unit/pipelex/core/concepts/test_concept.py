@@ -319,6 +319,7 @@ class TestConcept:
                     "text": ConceptStructureBlueprint(
                         type=ConceptStructureBlueprintFieldType.TEXT,
                         description="The text content",
+                        required=True,
                     ),
                 },
             ),
