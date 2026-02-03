@@ -68,8 +68,28 @@ app = typer.Typer(
 )
 
 
+def version_callback(value: bool) -> None:
+    """Print version and exit when --version is passed."""
+    if value:
+        package_version = get_package_version()
+        typer.echo(f"pipelex {package_version}")
+        raise typer.Exit
+
+
 @app.callback(invoke_without_command=True)
-def app_callback(ctx: typer.Context) -> None:
+def app_callback(
+    ctx: typer.Context,
+    version: Annotated[  # noqa: ARG001
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            help="Show version and exit.",
+            callback=version_callback,
+            is_eager=True,
+        ),
+    ] = False,
+) -> None:
     console = get_console()
     package_version = get_package_version()
 
