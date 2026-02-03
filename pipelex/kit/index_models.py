@@ -22,19 +22,14 @@ class Target(ConfigModel):
     """Configuration for a single-file merge target."""
 
     path: str = Field(description="Path to the target file relative to repo root")
-    marker_begin: str = Field(description="Beginning marker for content insertion")
-    marker_end: str = Field(description="Ending marker for content insertion")
-    heading_1: str | None = Field(default=None, description="Main title (H1) to add when inserting into empty file or file with no H1 headings")
-    sets: dict[str, list[str]] | None = Field(
-        default=None, description="Target-specific named sets overrides for agent_rules files (e.g., coding_standards, pipelex_language, all)"
-    )
+    sets: dict[str, list[str]] | None = Field(default=None, description="Target-specific named sets overrides for agent_rules files (e.g., all)")
 
 
 class AgentRules(ConfigModel):
     """Configuration for merging agent documentation files."""
 
-    sets: dict[str, list[str]] = Field(description="Named sets of agent_rules files (e.g., coding_standards, pipelex_language, all)")
-    default_set: str = Field(default="pipelex_language", description="Default set to use when syncing")
+    sets: dict[str, list[str]] = Field(description="Named sets of agent_rules files (e.g., all)")
+    default_set: str = Field(default="all", description="Default set to use when syncing")
     demote: int = Field(default=1, description="Number of levels to demote headings when merging")
     cursor: CursorSpec = Field(description="Cursor rules export configuration")
     targets: dict[str, Target] = Field(description="Dictionary of single-file merge targets keyed by ID")

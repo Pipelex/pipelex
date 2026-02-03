@@ -226,7 +226,7 @@ build: env
 
 rules: env
 	$(call PRINT_TITLE,"Installing agent rules for contributing to Pipelex")
-	$(VENV_PIPELEX) kit rules --set coding_standards
+	$(VENV_PIPELEX_DEV) kit rules --set all
 
 check-rules: env
 	$(call PRINT_TITLE,"Checking installed agent rules against templates")
