@@ -51,9 +51,8 @@ def _sync_agent_rules(
         case AgentTarget.AGENTS | AgentTarget.CLAUDE:
             typer.echo(f"Updating {preferred_target} rules...")
             all_targets = loaded_kit_index.agent_rules.targets
-            target_key = str(preferred_target)
-            if target_key in all_targets:
-                filtered_targets = {target_key: all_targets[target_key]}
+            if preferred_target in all_targets:
+                filtered_targets: dict[str, Target] = {preferred_target: all_targets[preferred_target]}
                 update_single_file_agent_rules(
                     repo_root=resolved_repo_root,
                     kit_index=loaded_kit_index,
@@ -110,7 +109,7 @@ def _cleanup_other_targets(
 
     for target_key, target in all_targets.items():
         # Skip the preferred target
-        if target_key == str(preferred_target):
+        if target_key == preferred_target:
             continue
         targets_to_clean[target_key] = target
 
@@ -130,7 +129,7 @@ def agent_rules(
     diff: Annotated[bool, typer.Option("--diff", help="Show unified diff of changes")] = False,
     backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
     agent_set: Annotated[str | None, typer.Option("--set", help="Agent rule set to sync (use 'pipelex' for Pipelex repo)")] = None,
-    cleanup: Annotated[bool, typer.Option("--cleanup", help="Remove Pipelex rules from other agent targets (preserves non-Pipelex content)")] = False,
+    cleanup: Annotated[bool, typer.Option("--cleanup", help="Delete Pipelex rules files from other agent targets")] = False,
 ) -> None:
     try:
         make_pipelex_for_cli(context=ErrorContext.KIT)

@@ -54,7 +54,7 @@ def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
                 console.print("[dim]Cursor target selected - sync check not applicable[/dim]")
             return
         case AgentTarget.AGENTS | AgentTarget.CLAUDE:
-            target_key = str(preferred_target)
+            target_key = preferred_target
             if target_key not in kit_index.agent_rules.targets:
                 console.print(f"[red]Target '{preferred_target}' not found in index.toml[/red]")
                 sys.exit(1)
