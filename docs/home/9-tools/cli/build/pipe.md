@@ -107,18 +107,6 @@ The Pipe Builder is in active development and currently:
 - May require manual adjustments for complex conditional logic or custom functions
 - Validation focuses on structural correctness, not business logic
 
-## Iterating on Generated Pipelines
-
-After generating a pipeline, you can continue refining it using any Software Engineering (SWE) agent. The generated `.plx` file can be iteratively improved through natural language instructions.
-
-Pipelex provides specialized agent rules that guide AI assistants in working with pipelines. Install them with:
-
-```bash
-pipelex kit rules
-```
-
-See [Kit Commands](../kit.md) for details on supported AI assistants.
-
 ## Next Steps
 
 After generating your pipeline:

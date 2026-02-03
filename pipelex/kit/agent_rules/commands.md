@@ -79,16 +79,3 @@
    ```
 
    For standard installations, the virtual environment is named `.venv`. Always check this first. On Windows, the path is `.venv\Scripts\` instead of `.venv/bin/`.
-
-## Pipelex CLI Commands
-
-   To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.
-
-   ```bash
-   .venv/bin/pipelex --help
-   .venv/bin/pipelex build --help --no-logo
-   .venv/bin/pipelex run --help --no-logo
-   .venv/bin/pipelex validate --help --no-logo
-   .venv/bin/pipelex doctor --help --no-logo
-   .venv/bin/pipelex init --help --no-logo
-   ```

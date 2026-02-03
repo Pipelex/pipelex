@@ -299,19 +299,6 @@ Pipelex.make()
 asyncio.run(run_pipeline())
 ```
 
-## 5. Iterate with AI Assistance
-
-Install AI assistant rules to easily modify your pipelines:
-
-```bash
-pipelex kit rules
-```
-
-This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI. Now you can refine pipelines with natural language:
-
-- "Include confidence scores between 0 and 100 in the match analysis"
-- "Write a recap email at the end"
-
 <div>
   <h2 align="center">🚀 See Pipelex in Action</h2>
   
