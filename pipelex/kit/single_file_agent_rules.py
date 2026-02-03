@@ -109,9 +109,6 @@ def update_single_file_agent_rules(
     kit_index: KitIndex,
     agent_set: str,
     targets: dict[str, Target],
-    dry_run: bool,
-    diff: bool,
-    backup: str | None,
 ) -> None:
     """Update single-file agent rules targets with merged agent documentation.
 
@@ -120,9 +117,6 @@ def update_single_file_agent_rules(
         kit_index: Kit index configuration
         agent_set: Default agent set to use (can be overridden by target.sets)
         targets: Dictionary of target file configurations keyed by ID
-        dry_run: If True, only print what would be done
-        diff: If True, show unified diff
-        backup: Backup suffix (e.g., ".bak"), or None for no backup
     """
     for target in targets.values():
         # Check if this target has its own set override for the given agent_set
@@ -139,26 +133,10 @@ def update_single_file_agent_rules(
         target_path = repo_root / target.path
         before = target_path.read_text(encoding="utf-8") if target_path.exists() else ""
 
-        if dry_run:
-            typer.echo(f"[DRY] update {target_path}")
-            if diff:
-                diff_output = unified_diff(before, after, str(target_path))
-                if diff_output:
-                    typer.echo(diff_output)
-        elif before != after:
-            if backup and target_path.exists():
-                backup_path = target_path.with_suffix(target_path.suffix + backup)
-                backup_path.write_text(before, encoding="utf-8")
-                typer.echo(f"📦 Backup saved to {backup_path}")
-
+        if before != after:
             target_path.parent.mkdir(parents=True, exist_ok=True)
             target_path.write_text(after, encoding="utf-8")
             typer.echo(f"✅ Updated {target_path}")
-
-            if diff:
-                diff_output = unified_diff(before, after, str(target_path))
-                if diff_output:
-                    typer.echo(diff_output)
         else:
             typer.echo(f"⚪ Unchanged {target_path}")
 
@@ -166,16 +144,12 @@ def update_single_file_agent_rules(
 def remove_from_targets(
     repo_root: Path,
     targets: dict[str, Target],
-    dry_run: bool,
-    backup: str | None,
 ) -> None:
     """Remove agent rule files.
 
     Args:
         repo_root: Repository root directory
         targets: Dictionary of target file configurations keyed by ID
-        dry_run: If True, only print what would be done
-        backup: Backup suffix (e.g., ".bak"), or None for no backup
     """
     for target in targets.values():
         target_path = repo_root / target.path
@@ -184,13 +158,5 @@ def remove_from_targets(
             typer.echo(f"⚠️  File {target_path} does not exist - skipping")
             continue
 
-        if dry_run:
-            typer.echo(f"[DRY] delete {target_path}")
-        else:
-            if backup:
-                backup_path = target_path.with_suffix(target_path.suffix + backup)
-                target_path.rename(backup_path)
-                typer.echo(f"📦 Backup saved to {backup_path}")
-            else:
-                target_path.unlink()
-            typer.echo(f"🗑️  Deleted {target_path}")
+        target_path.unlink()
+        typer.echo(f"🗑️  Deleted {target_path}")

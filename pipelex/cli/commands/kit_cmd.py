@@ -29,9 +29,6 @@ kit_app = typer.Typer(no_args_is_help=True)
 
 def _sync_agent_rules(
     repo_root: Path | None,
-    dry_run: bool,
-    diff: bool,
-    backup: str | None,
     agent_set: str | None,
     cleanup: bool,
     kit_index: KitIndex | None = None,
@@ -47,7 +44,7 @@ def _sync_agent_rules(
     match preferred_target:
         case AgentTarget.CURSOR:
             typer.echo("Updating Cursor rules...")
-            update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set, dry_run=dry_run)
+            update_cursor_rules(resolved_repo_root, loaded_kit_index, agent_set=agent_set)
         case AgentTarget.AGENTS | AgentTarget.CLAUDE:
             typer.echo(f"Updating {preferred_target} rules...")
             all_targets = loaded_kit_index.agent_rules.targets
@@ -58,9 +55,6 @@ def _sync_agent_rules(
                     kit_index=loaded_kit_index,
                     agent_set=agent_set,
                     targets=filtered_targets,
-                    dry_run=dry_run,
-                    diff=diff,
-                    backup=backup,
                 )
             else:
                 msg = f"Target '{preferred_target}' not found in index.toml"
@@ -73,22 +67,15 @@ def _sync_agent_rules(
             repo_root=resolved_repo_root,
             kit_index=loaded_kit_index,
             preferred_target=preferred_target,
-            dry_run=dry_run,
-            backup=backup,
         )
 
-    if dry_run:
-        typer.echo("Dry run completed - no changes made")
-    else:
-        typer.echo("Kit sync completed successfully")
+    typer.echo("Kit sync completed successfully")
 
 
 def _cleanup_other_targets(
     repo_root: Path,
     kit_index: KitIndex,
     preferred_target: AgentTarget,
-    dry_run: bool,
-    backup: str | None,
 ) -> None:
     """Remove Pipelex rules from all targets except the preferred one.
 
@@ -101,7 +88,7 @@ def _cleanup_other_targets(
             pass  # Don't remove cursor rules since it's the preferred target
         case AgentTarget.AGENTS | AgentTarget.CLAUDE:
             # Remove cursor rules
-            remove_cursor_rules(repo_root, dry_run=dry_run)
+            remove_cursor_rules(repo_root)
 
     # For single-file targets, delete files for all except the preferred one
     all_targets = kit_index.agent_rules.targets
@@ -117,17 +104,12 @@ def _cleanup_other_targets(
         remove_from_targets(
             repo_root=repo_root,
             targets=targets_to_clean,
-            dry_run=dry_run,
-            backup=backup,
         )
 
 
 @kit_app.command("rules", help="Install agent rules for the preferred agent target (configured in pipelex.toml)")
 def agent_rules(
     repo_root: Annotated[Path | None, typer.Option("--repo-root", dir_okay=True, writable=True, help="Repository root directory")] = None,
-    dry_run: Annotated[bool, typer.Option("--dry-run", help="Show what would be done without making changes")] = False,
-    diff: Annotated[bool, typer.Option("--diff", help="Show unified diff of changes")] = False,
-    backup: Annotated[str | None, typer.Option("--backup", help="Backup suffix (e.g., '.bak')")] = None,
     agent_set: Annotated[str | None, typer.Option("--set", help="Agent rule set to sync (use 'pipelex' for Pipelex repo)")] = None,
     cleanup: Annotated[bool, typer.Option("--cleanup", help="Delete Pipelex rules files from other agent targets")] = False,
 ) -> None:
@@ -139,9 +121,6 @@ def agent_rules(
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_RULES}")
             _sync_agent_rules(
                 repo_root=repo_root,
-                dry_run=dry_run,
-                diff=diff,
-                backup=backup,
                 agent_set=agent_set,
                 cleanup=cleanup,
             )

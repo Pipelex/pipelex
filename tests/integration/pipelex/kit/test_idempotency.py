@@ -21,21 +21,15 @@ class TestIdempotency:
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 
         # First update
-        update_single_file_agent_rules(
-            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=None
-        )
+        update_single_file_agent_rules(repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets)
         first_result = target_file.read_text(encoding="utf-8")
 
         # Second update (should be identical)
-        update_single_file_agent_rules(
-            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=None
-        )
+        update_single_file_agent_rules(repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets)
         second_result = target_file.read_text(encoding="utf-8")
 
         # Third update (should also be identical)
-        update_single_file_agent_rules(
-            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=None
-        )
+        update_single_file_agent_rules(repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets)
         third_result = target_file.read_text(encoding="utf-8")
 
         assert first_result == second_result, "Second run produced different output than first run"
@@ -55,21 +49,15 @@ class TestIdempotency:
         test_targets = {"test": idx.agent_rules.targets["agents"].model_copy(update={"path": "test_target.md"})}
 
         # First update
-        update_single_file_agent_rules(
-            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=None
-        )
+        update_single_file_agent_rules(repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets)
         first_result = target_file.read_text(encoding="utf-8")
 
         # Second update (should be identical)
-        update_single_file_agent_rules(
-            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=None
-        )
+        update_single_file_agent_rules(repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets)
         second_result = target_file.read_text(encoding="utf-8")
 
         # Third update (should also be identical)
-        update_single_file_agent_rules(
-            repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets, dry_run=False, diff=False, backup=None
-        )
+        update_single_file_agent_rules(repo_root=repo_root, kit_index=idx, agent_set=agent_set, targets=test_targets)
         third_result = target_file.read_text(encoding="utf-8")
 
         assert first_result == second_result, "Second run produced different output than first run"
