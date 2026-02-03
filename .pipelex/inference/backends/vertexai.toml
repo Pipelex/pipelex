@@ -8,7 +8,7 @@
 #
 # Configuration structure:
 # - Each model is defined in its own section with the model name as the header
-# - Headers with dots must be quoted (e.g., ["gemini-2.0-flash"])
+# - Headers with dots must be quoted (e.g., ["gemini-3.0-pro"])
 # - Model costs are in USD per million tokens (input/output)
 #
 # Documentation: https://docs.pipelex.com
