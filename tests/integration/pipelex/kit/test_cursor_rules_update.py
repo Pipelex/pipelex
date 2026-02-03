@@ -8,19 +8,11 @@ from pipelex.kit.index_loader import load_index
 
 
 class TestUpdateCursorRules:
-    def test_update_cursor_rules_dry_run(self, tmp_path: Path, agent_set: str):
-        kit_index = load_index()
-        repo_root = tmp_path
-
-        update_cursor_rules(repo_root, kit_index, agent_set=agent_set, dry_run=True)
-        cursor_rules_dir = repo_root / ".cursor" / "rules"
-        assert not cursor_rules_dir.exists() or len(list(cursor_rules_dir.iterdir())) == 0
-
     def test_update_cursor_rules_creates_mdc_files(self, tmp_path: Path, agent_set: str):
         kit_index = load_index()
         repo_root = tmp_path
 
-        update_cursor_rules(repo_root, kit_index, agent_set=agent_set, dry_run=False)
+        update_cursor_rules(repo_root, kit_index, agent_set=agent_set)
 
         cursor_rules_dir = repo_root / ".cursor" / "rules"
         assert cursor_rules_dir.exists()
@@ -31,7 +23,7 @@ class TestUpdateCursorRules:
         kit_index = load_index()
         repo_root = tmp_path
 
-        update_cursor_rules(repo_root, kit_index, agent_set=agent_set, dry_run=False)
+        update_cursor_rules(repo_root, kit_index, agent_set=agent_set)
 
         # Check first .mdc file for front-matter
         cursor_rules_dir = repo_root / ".cursor" / "rules"
@@ -45,7 +37,7 @@ class TestUpdateCursorRules:
         kit_index = load_index()
         repo_root = tmp_path
 
-        update_cursor_rules(repo_root, kit_index, agent_set=agent_set, dry_run=False)
+        update_cursor_rules(repo_root, kit_index, agent_set=agent_set)
 
         cursor_rules_dir = repo_root / ".cursor" / "rules"
         exported_files: set[str] = set()
@@ -60,4 +52,4 @@ class TestUpdateCursorRules:
         kit_index = load_index()
 
         with pytest.raises(KitError, match=r"Agent set 'unknown' not found in index.toml"):
-            update_cursor_rules(tmp_path, kit_index, agent_set="unknown", dry_run=True)
+            update_cursor_rules(tmp_path, kit_index, agent_set="unknown")

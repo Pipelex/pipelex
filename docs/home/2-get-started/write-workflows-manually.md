@@ -341,7 +341,6 @@ Now that you understand the basics, explore more:
 **Explore Tools:**
 
 - [Pipe Builder](../../home/9-tools/pipe-builder.md) - Generate pipelines from natural language
-- [Kit Commands](../9-tools/cli/kit.md) - Manage agent rules and migrations
 - [CLI Commands](../9-tools/cli/index.md) - Command-line interface reference
 
 **Configure:**
