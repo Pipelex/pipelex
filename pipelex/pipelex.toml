@@ -306,7 +306,7 @@ theme = "dark"
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config]
 is_use_cdn = true
-layout_direction = "LR"
+layout_direction = "left_to_right"
 nodesep = 50
 ranksep = 30
 edge_type = "bezier"

@@ -1,6 +1,7 @@
 from pydantic import Field
 
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.types import StrEnum
 
 
@@ -33,7 +34,7 @@ class ReactFlowRenderingConfig(ConfigModel):
     """Configuration for ReactFlow HTML rendering."""
 
     is_use_cdn: bool
-    layout_direction: str
+    layout_direction: FlowchartDirection = Field(strict=False)
     nodesep: int
     ranksep: int
     edge_type: ReactFlowEdgeType = Field(strict=False)

@@ -116,7 +116,7 @@ async def generate_graph_outputs(
         analysis = GraphAnalysis.from_graphspec(graph_spec)
         rf_config = graph_config.reactflow_config
         layout = LayoutSpec(
-            direction=rf_config.layout_direction,  # type: ignore[arg-type]
+            direction=rf_config.layout_direction,
             nodesep=rf_config.nodesep,
             ranksep=rf_config.ranksep,
         )
