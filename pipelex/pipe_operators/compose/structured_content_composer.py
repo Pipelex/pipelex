@@ -1,3 +1,4 @@
+import inspect
 import types
 from typing import Any, Union, cast, get_args, get_origin
 
@@ -462,20 +463,28 @@ class StructuredContentComposer:
             ValueError: If the item cannot be converted to the expected type
         """
         actual_type = type(item)
+        expected_type_name = getattr(expected_type, "__name__", str(expected_type))
 
         # Case 1: Exact match or subclass - OK
-        if isinstance(item, expected_type):
-            log.verbose(f"     Item[{idx}]: {actual_type.__name__} is compatible with {expected_type.__name__}")
-            return
+        # Note: isinstance() only works with actual classes, not ForwardRef, GenericAlias, or strings
+        # We use inspect.isclass() to check if expected_type is a valid class for isinstance()
+        if inspect.isclass(expected_type):
+            try:
+                if isinstance(item, expected_type):
+                    log.verbose(f"     Item[{idx}]: {actual_type.__name__} is compatible with {expected_type_name}")
+                    return
+            except TypeError:
+                # isinstance() failed - expected_type is not a valid type for this check
+                pass
 
         # Case 2: Check structural equivalence - OK
         if hasattr(actual_type, "model_fields") and hasattr(expected_type, "model_fields"):
             if are_classes_equivalent(class_1=actual_type, class_2=expected_type):
-                log.verbose(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent to {expected_type.__name__}")
+                log.verbose(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent to {expected_type_name}")
                 return
 
         # Case 3: Try to validate via dict
-        log.verbose(f"     Item[{idx}]: Validating conversion {actual_type.__name__} -> {expected_type.__name__}")
+        log.verbose(f"     Item[{idx}]: Validating conversion {actual_type.__name__} -> {expected_type_name}")
         item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
 
         if hasattr(expected_type, "model_validate"):
@@ -483,7 +492,7 @@ class StructuredContentComposer:
                 expected_type.model_validate(item_dict)
             except ValidationError as exc:
                 formatted_error = format_pydantic_validation_error(exc)
-                msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type.__name__}: {formatted_error}"
+                msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type_name}: {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 
     def _convert_single_item_as_object(self, item: StuffContent, expected_type: type[Any], idx: int) -> StuffContent:

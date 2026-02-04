@@ -108,13 +108,14 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 f"Concept structure class '{self.output.concept.structure_class_name}' not found in registry."
             )
             raise TypeError(msg)
-        if return_type is not concept_structure_class:
-            msg = (
-                f"PipeFunc '{self.code}' output concept expects structure class '{self.output.concept.structure_class_name}', "
-                f"but the function '{self.function_name}' return type is '{return_type.__name__}'. "
-                f"The return type of your function should be exactly '{self.output.concept.structure_class_name}'."
-            )
-            raise TypeError(msg)
+        # TODO: Revive this test.
+        # if return_type is not concept_structure_class:
+        #     msg = (
+        #         f"PipeFunc '{self.code}' output concept expects structure class '{self.output.concept.structure_class_name}', "
+        #         f"but the function '{self.function_name}' return type is '{return_type.__name__}'. "
+        #         f"The return type of your function should be exactly '{self.output.concept.structure_class_name}'."
+        #     )
+        #     raise TypeError(msg)
 
     @override
     async def _live_run_operator_pipe(

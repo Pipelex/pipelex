@@ -353,16 +353,29 @@ class StructureGenerator:
         """Resolve a concept reference to a Python type annotation.
 
         Args:
-            concept_ref: The concept reference (e.g., "myapp.Customer")
+            concept_ref: The concept reference (e.g., "myapp.Customer" or "native.Html")
 
         Returns:
             The Python type annotation (structure class name).
+            - For native concepts: generates import and returns class name (e.g., HtmlContent)
             - If module_path is available in concept_ref_to_class_info: generates an import,
               tracks for mocking, returns class name directly (for file generation)
             - Otherwise: returns a forward reference string (for runtime - resolved via model_rebuild)
         """
         if not concept_ref:
             return "Any"
+
+        # Handle native concepts (e.g., "native.Html" -> HtmlContent)
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
+            # Extract the concept code (e.g., "Html" from "native.Html")
+            concept_code = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref)
+            try:
+                structure_class = NativeConceptCode(concept_code).structure_class
+                if structure_class:
+                    self.imports.add(f"from {structure_class.__module__} import {structure_class.__name__}")
+                    return structure_class.__name__
+            except ValueError:
+                pass
 
         # Check concept_ref_to_class_info for the concept reference
         if concept_ref in self.concept_ref_to_class_info:
@@ -538,6 +551,14 @@ class StructureGenerator:
             "Literal": Literal,
             "Field": Field,
         }
+
+        # Add all native content classes to exec_globals so they're available during validation
+        # This is needed because exec() with separate globals/locals puts imports in locals,
+        # but class annotations look in globals
+        for native_code in NativeConceptCode:
+            structure_class = native_code.structure_class
+            if structure_class:
+                exec_globals[structure_class.__name__] = structure_class
 
         validation_code = python_code
 
