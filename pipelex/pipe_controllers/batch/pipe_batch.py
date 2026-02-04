@@ -144,14 +144,15 @@ class PipeBatch(PipeController):
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             # We create a deep copy of the run params to avoid modifying the original run params,
-            # and we set the final stuff code to use the one provided fro the branch pipe.
-            # Note: the batching will yield a list by aggregating the outputs of each run of the branch pipe,
-            # but each run of the branch pipe will only yield one output, so we set the output multiplicity to False.
+            # and we set the final stuff code to use the one provided for the branch pipe.
+            # Note: we set output_multiplicity to None to allow inner pipes to use their own
+            # multiplicity settings (e.g., a PipeLLM with output="Item[]" should still produce ListContent).
+            # PipeBatch aggregates the final outputs of each branch run into a list.
             branch_pipe_run_params = pipe_run_params.model_copy(
                 deep=True,
                 update={
                     "final_stuff_code": branch_output_item_code,
-                    "output_multiplicity": False,
+                    "output_multiplicity": None,
                 },
             )
             branch_pipe_run_params.run_mode = pipe_run_params.run_mode
