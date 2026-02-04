@@ -13,7 +13,6 @@ from typing import Any
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graphspec import (
-    EdgeKind,
     GraphSpec,
     NodeKind,
     NodeSpec,
@@ -221,8 +220,8 @@ class MermaidflowFactory:
                     lines.append(f"    {cons_stuff_mermaid_id} --> {consumer_mermaid_id}")
 
         # Render batch edges (BATCH_ITEM and BATCH_AGGREGATE) with dashed styling
-        batch_item_edges = [edge for edge in graph.edges if edge.kind == EdgeKind.BATCH_ITEM]
-        batch_aggregate_edges = [edge for edge in graph.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+        batch_item_edges = [edge for edge in graph.edges if edge.kind.is_batch_item]
+        batch_aggregate_edges = [edge for edge in graph.edges if edge.kind.is_batch_aggregate]
 
         if batch_item_edges or batch_aggregate_edges:
             lines.append("")

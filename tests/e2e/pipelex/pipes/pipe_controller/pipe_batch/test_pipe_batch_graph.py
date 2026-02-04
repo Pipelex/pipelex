@@ -84,8 +84,8 @@ class TestPipeBatchGraph:
         log.info(f"Edge counts by kind: {edges_by_kind}")
 
         # Get batch edges
-        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_ITEM]
-        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_item]
+        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_aggregate]
 
         log.info(f"BATCH_ITEM edges: {len(batch_item_edges)}")
         for edge in batch_item_edges:
@@ -270,7 +270,7 @@ class TestPipeBatchGraph:
         sequence_node = nodes_by_pipe_code["generate_jokes_from_topics"][0]
         branch_nodes = nodes_by_pipe_code["generate_joke"]
 
-        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_aggregate]
         for edge in batch_aggregate_edges:
             # Source should be one of the branch nodes (generate_joke)
             source_node = nodes_by_id.get(edge.source)
@@ -286,7 +286,7 @@ class TestPipeBatchGraph:
             assert edge.target != sequence_node.node_id, "BATCH_AGGREGATE edge should NOT target the outer PipeSequence!"
 
         # 5. Verify containment edges (branch nodes are inside PipeBatch)
-        contains_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.CONTAINS]
+        contains_edges = [edge for edge in graph_spec.edges if edge.kind.is_contains]
         batch_children = {edge.target for edge in contains_edges if edge.source == batch_node.node_id}
         branch_node_ids = {node.node_id for node in branch_nodes}
         assert branch_node_ids.issubset(batch_children), (

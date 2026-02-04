@@ -50,6 +50,46 @@ class EdgeKind(StrEnum):
     BATCH_ITEM = "batch_item"  # list → item extraction during batch iteration
     BATCH_AGGREGATE = "batch_aggregate"  # items → output list aggregation
 
+    @property
+    def is_data(self) -> bool:
+        match self:
+            case EdgeKind.DATA:
+                return True
+            case EdgeKind.CONTROL | EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE:
+                return False
+
+    @property
+    def is_contains(self) -> bool:
+        match self:
+            case EdgeKind.CONTAINS:
+                return True
+            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE:
+                return False
+
+    @property
+    def is_selected_outcome(self) -> bool:
+        match self:
+            case EdgeKind.SELECTED_OUTCOME:
+                return True
+            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE:
+                return False
+
+    @property
+    def is_batch_item(self) -> bool:
+        match self:
+            case EdgeKind.BATCH_ITEM:
+                return True
+            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_AGGREGATE:
+                return False
+
+    @property
+    def is_batch_aggregate(self) -> bool:
+        match self:
+            case EdgeKind.BATCH_AGGREGATE:
+                return True
+            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_ITEM:
+                return False
+
 
 def _truncate_string(value: str | None, max_length: int) -> str | None:
     """Truncate a string to max_length with ellipsis if needed."""

@@ -142,7 +142,7 @@ class TestGraphTracer:
 
         # Check containment edges
         edges = graph_spec.edges
-        assert all(edge.kind == EdgeKind.CONTAINS for edge in edges)
+        assert all(edge.kind.is_contains for edge in edges)
         assert {edge.source for edge in edges} == {parent_id}
         assert {edge.target for edge in edges} == {child1_id, child2_id}
 
@@ -240,7 +240,7 @@ class TestGraphTracer:
         edge = graph_spec.edges[0]
         assert edge.source == node1_id
         assert edge.target == node2_id
-        assert edge.kind == EdgeKind.DATA
+        assert edge.kind.is_data
         assert edge.label == "output_text"
 
     def test_selected_outcome_edge(self) -> None:
@@ -278,7 +278,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        selected_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.SELECTED_OUTCOME]
+        selected_edges = [edge for edge in graph_spec.edges if edge.kind.is_selected_outcome]
         assert len(selected_edges) == 1
         assert selected_edges[0].label == "true"
 
@@ -386,7 +386,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        data_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.DATA]
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
         assert len(data_edges) == 1
         assert data_edges[0].source == node1_id
         assert data_edges[0].target == node2_id
@@ -416,7 +416,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        data_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.DATA]
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
         assert len(data_edges) == 0
 
     def test_no_self_loop_data_edges(self) -> None:
@@ -444,7 +444,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        data_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.DATA]
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
         # Should be 0 - no self-loops
         assert len(data_edges) == 0
 
@@ -494,7 +494,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        data_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.DATA]
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
         assert len(data_edges) == 2
 
         # Both edges should have producer as source
@@ -574,7 +574,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_ITEM]
+        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_item]
         assert len(batch_item_edges) == 2
 
         # Both edges should have batch_id as source (the list consumer)
@@ -656,7 +656,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_aggregate]
         assert len(batch_aggregate_edges) == 2
 
         # Both edges should have batch_id as target (the list producer)
@@ -722,8 +722,8 @@ class TestGraphTracer:
 
         assert graph_spec is not None
 
-        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_ITEM]
-        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_item]
+        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_aggregate]
 
         assert len(batch_item_edges) == 1
         assert len(batch_aggregate_edges) == 1
@@ -808,7 +808,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_ITEM]
+        batch_item_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_item]
         assert len(batch_item_edges) == 1
 
         edge = batch_item_edges[0]
@@ -866,7 +866,7 @@ class TestGraphTracer:
         graph_spec = tracer.teardown()
 
         assert graph_spec is not None
-        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind.is_batch_aggregate]
         assert len(batch_aggregate_edges) == 1
 
         edge = batch_aggregate_edges[0]
