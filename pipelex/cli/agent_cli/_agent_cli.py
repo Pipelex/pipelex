@@ -7,6 +7,7 @@ from click import Command, Context
 from typer.core import TyperGroup
 from typing_extensions import override
 
+from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -17,7 +18,7 @@ class PipelexAgentCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["doctor"]
+        return ["build", "doctor"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -62,6 +63,21 @@ def app_callback(
 ) -> None:
     """Agent CLI callback - no logo, minimal output."""
     # No logo, no banner - agent CLI is silent by default
+
+
+@app.command(name="build", help="Build a pipeline from a prompt")
+def build_command(
+    prompt: Annotated[
+        str,
+        typer.Argument(help="Prompt describing what the pipeline should do"),
+    ],
+    builder_pipe: Annotated[
+        str,
+        typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
+    ] = "pipe_builder",
+) -> None:
+    """Build a pipeline from a prompt and output JSON with paths."""
+    build_cmd(prompt=prompt, builder_pipe=builder_pipe)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")
