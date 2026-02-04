@@ -174,7 +174,7 @@ def assemble_cmd(
 
         # Ensure file ends with newline (POSIX standard)
         with open(output_path, "a", encoding="utf-8") as out_file:
-            out_file.write("")
+            out_file.write("\n")
 
         result = {
             "success": True,
