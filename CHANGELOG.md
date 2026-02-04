@@ -25,6 +25,7 @@
  - Corrected output directory creation logic in `pipelex run` to properly respect the `--no-graph` flag and configuration settings.
  - Fixed a bug when trying to print HTML content in a TextContent object.
  - Fixed the Pipelex CLI for generating structures, inputs, runner files.
+ - Fixed PipeLLM with list output (e.g., `output = "Item[]"`) not producing `ListContent` when run inside a nested PipeSequence with `batch_over`.
 
 ### Removed
  - **`pipelex kit` Command**: The kit commands have been removed from the main CLI. They are now internal tools for Pipelex contributors only, available via `pipelex-dev kit rules`.
