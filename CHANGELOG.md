@@ -26,6 +26,7 @@
  - Fixed a bug when trying to print HTML content in a TextContent object.
  - Fixed the Pipelex CLI for generating structures, inputs, runner files.
  - Fixed `@pipe_func` decorated functions showing "function not found" instead of explaining why the function is ineligible (e.g., missing return type annotation).
+ - Fixed PipeLLM with list output (e.g., `output = "Item[]"`) not producing `ListContent` when run inside a nested PipeSequence with `batch_over`.
 
 ### Removed
  - **`pipelex kit` Command**: The kit commands have been removed from the main CLI. They are now internal tools for Pipelex contributors only, available via `pipelex-dev kit rules`.
