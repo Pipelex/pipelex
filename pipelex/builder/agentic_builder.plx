@@ -9,7 +9,7 @@ description = "Agent-focused builder sequences for structured generation. Assume
 [pipe.detail_all_pipe_specs]
 type = "PipeBatch"
 description = "Generate detailed specs for all pipe signatures by batching over them."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signatures = "pipe_design.PipeSignature[]", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signatures = "pipe_design.PipeSignature[]", concept_specs = "builder.ConceptSpec[]" }
 output = "pipe_design.PipeSpec[]"
 input_list_name = "pipe_signatures"
 input_item_name = "pipe_signature"
@@ -19,7 +19,7 @@ branch_pipe_code = "detail_pipe_spec"
 [pipe.build_from_flow]
 type = "PipeSequence"
 description = "Build a complete PipelexBundleSpec from pre-generated flow and concepts. This is the main entry point for agent-driven building."
-inputs = { brief = "builder.UserBrief", plan_draft = "builder.PlanDraft", prepared_flow = "builder.FlowDraft", concept_specs = "builder.ConceptSpec" }
+inputs = { brief = "builder.UserBrief", plan_draft = "builder.PlanDraft", prepared_flow = "builder.FlowDraft", concept_specs = "builder.ConceptSpec[]" }
 output = "builder.PipelexBundleSpec"
 steps = [
     { pipe = "design_pipe_signatures", result = "pipe_signatures" },
