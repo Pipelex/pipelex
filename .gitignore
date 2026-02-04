@@ -67,3 +67,4 @@ tests/integration/pipelex/fixtures/_generated_model_sets.py
 
 # Local test profile overrides (not tracked - for personal customization)
 .pipelex-dev/test_profiles_override.toml
+pipelex-wip
