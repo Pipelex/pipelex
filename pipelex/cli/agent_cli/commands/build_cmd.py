@@ -10,6 +10,7 @@ import typer
 from pipelex.cli.agent_cli.commands.build_core import BuildPipeError, build_pipe_core
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
+from pipelex.pipelex import Pipelex
 
 AGENT_OUTPUT_DIR = "pipelex-wip"
 AGENT_OUTPUT_NAME = "pipeline"
@@ -77,3 +78,6 @@ def build_cmd(
         }
         print(json.dumps(error_json, indent=2), file=sys.stderr)
         raise typer.Exit(1) from exc
+
+    finally:
+        Pipelex.teardown_if_needed()
