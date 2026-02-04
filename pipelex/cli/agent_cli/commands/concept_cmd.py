@@ -69,8 +69,8 @@ def _structure_field_to_dict(field_spec: ConceptStructureSpec) -> dict[str, Any]
     result: dict[str, Any] = {}
 
     # Type is always needed unless it's just a text description
-    if field_spec.type.value != "text" or field_spec.required or field_spec.default_value is not None:
-        result["type"] = field_spec.type.value
+    if not field_spec.type.is_text or field_spec.required or field_spec.default_value is not None:
+        result["type"] = field_spec.type
 
     result["description"] = field_spec.description
 

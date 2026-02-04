@@ -26,6 +26,20 @@ class ConceptStructureSpecFieldType(StrEnum):
     DATE = "date"
     CONCEPT = "concept"
 
+    @property
+    def is_text(self) -> bool:
+        match self:
+            case ConceptStructureSpecFieldType.TEXT:
+                return True
+            case (
+                ConceptStructureSpecFieldType.INTEGER
+                | ConceptStructureSpecFieldType.BOOLEAN
+                | ConceptStructureSpecFieldType.NUMBER
+                | ConceptStructureSpecFieldType.DATE
+                | ConceptStructureSpecFieldType.CONCEPT
+            ):
+                return False
+
 
 class ConceptSpecError(PipelexError):
     pass

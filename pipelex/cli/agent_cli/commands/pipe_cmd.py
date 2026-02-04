@@ -101,7 +101,7 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
     """
     if isinstance(pipe_spec, PipeLLMSpec):
         # Convert llm_talent to model preset using static mappings
-        model_preset = LLM_TALENT_TO_MODEL.get(str(pipe_spec.llm_talent), "$writing-creative")
+        model_preset = LLM_TALENT_TO_MODEL.get(pipe_spec.llm_talent, "$writing-creative")
         pipe_table.add("model", model_preset)
         if pipe_spec.system_prompt:
             pipe_table.add("system_prompt", pipe_spec.system_prompt)
@@ -109,7 +109,7 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
             pipe_table.add("prompt", pipe_spec.prompt)
 
     elif isinstance(pipe_spec, PipeComposeSpec):
-        pipe_table.add("target_format", str(pipe_spec.target_format))
+        pipe_table.add("target_format", pipe_spec.target_format)
         pipe_table.add("template", pipe_spec.template)
 
     elif isinstance(pipe_spec, PipeSequenceSpec):
@@ -139,7 +139,7 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         for condition, outcome in pipe_spec.outcomes.items():
             outcomes_table.append(condition, outcome)
         pipe_table.add("outcomes", outcomes_table)
-        pipe_table.add("default_outcome", str(pipe_spec.default_outcome))
+        pipe_table.add("default_outcome", pipe_spec.default_outcome)
 
     elif isinstance(pipe_spec, PipeBatchSpec):
         pipe_table.add("branch_pipe_code", pipe_spec.branch_pipe_code)
@@ -148,12 +148,12 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
 
     elif isinstance(pipe_spec, PipeExtractSpec):
         # Convert extract_talent to model preset using static mappings
-        model_preset = EXTRACT_TALENT_TO_MODEL.get(str(pipe_spec.extract_talent), "@default-extract-document")
+        model_preset = EXTRACT_TALENT_TO_MODEL.get(pipe_spec.extract_talent, "@default-extract-document")
         pipe_table.add("model", model_preset)
 
     elif isinstance(pipe_spec, PipeImgGenSpec):
         # Convert img_gen_talent to model preset using static mappings
-        model_preset = IMG_GEN_TALENT_TO_MODEL.get(str(pipe_spec.img_gen_talent), "$gen-image")
+        model_preset = IMG_GEN_TALENT_TO_MODEL.get(pipe_spec.img_gen_talent, "$gen-image")
         pipe_table.add("model", model_preset)
         pipe_table.add("prompt", pipe_spec.prompt)
 
