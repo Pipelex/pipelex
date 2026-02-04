@@ -260,6 +260,22 @@ function buildDataflowGraph(graphspec, analysis) {
         }
     }
 
+    // Build batch index map: stuff_digest -> index label (e.g., "[0]", "[1]")
+    // This is used to add index suffixes to batch item node labels
+    const showBatchItemIndex = {{ show_batch_item_index | default(false) | tojson }};
+    const batchItemIndexMap = {};  // stuff_digest -> index string
+    if (showBatchItemIndex) {
+        for (const edge of graphspec.edges) {
+            if (edge.kind === 'batch_item' && edge.label && edge.target_stuff_digest) {
+                // batch_item edge: target is the item, label contains the index
+                batchItemIndexMap[edge.target_stuff_digest] = edge.label;
+            } else if (edge.kind === 'batch_aggregate' && edge.label && edge.source_stuff_digest) {
+                // batch_aggregate edge: source is the item, label contains the index
+                batchItemIndexMap[edge.source_stuff_digest] = edge.label;
+            }
+        }
+    }
+
     // Create pipe nodes (only those that participate in data flow)
     for (const node of graphspec.nodes) {
         if (!participatingPipes.has(node.node_id)) continue;
@@ -310,7 +326,12 @@ function buildDataflowGraph(graphspec, analysis) {
     // Create stuff nodes
     for (const [digest, stuffInfo] of Object.entries(analysis.stuffRegistry)) {
         const stuffId = `stuff_${digest}`;
-        const label = stuffInfo.name;
+        const baseName = stuffInfo.name;
+        // Append batch index to label if available (e.g., "topic" -> "topic[0]")
+        // But only if the name doesn't already end with an index like [0], [1], etc.
+        const batchIndex = batchItemIndexMap[digest] || '';
+        const alreadyHasIndex = /\[\d+\]$/.test(baseName);
+        const label = alreadyHasIndex ? baseName : baseName + batchIndex;
         const concept = stuffInfo.concept || '';
         // For pill shape, need extra padding. ~7px per char (12px font) + side padding (48px)
         const textWidth = Math.max(label.length, concept.length) * 7 + 48;

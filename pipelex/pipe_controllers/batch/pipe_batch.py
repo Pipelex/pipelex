@@ -158,7 +158,7 @@ class PipeBatch(PipeController):
             task = sub_pipe.run_pipe(
                 job_metadata=job_metadata,
                 working_memory=branch_memory,
-                output_name=f"Batch result {branch_index + 1} of {output_name}",
+                output_name=output_name,
                 pipe_run_params=branch_pipe_run_params,
             )
             tasks.append(task)
