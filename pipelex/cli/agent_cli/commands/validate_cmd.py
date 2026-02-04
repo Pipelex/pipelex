@@ -123,6 +123,43 @@ async def _validate_pipe_core(
     }
 
 
+async def _validate_pipe_in_bundle_core(
+    bundle_path: Path,
+    pipe_code: str,
+    library_dirs: list[Path] | None = None,
+) -> dict[str, Any]:
+    """Validate a single pipe within a bundle.
+
+    This first validates the bundle to load its pipes into the library,
+    then validates only the specified pipe.
+
+    Args:
+        bundle_path: Path to the bundle file.
+        pipe_code: The pipe code to validate within the bundle.
+        library_dirs: List of library directories to search for pipe definitions.
+
+    Returns:
+        Dictionary with validation results suitable for JSON serialization.
+
+    Raises:
+        ValidateBundleError: If validation fails.
+    """
+    # Validate the bundle to load all its pipes into the library
+    # This ensures all dependencies are available
+    await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+
+    # Now get the specific pipe and dry-run only that one
+    the_pipe = get_required_pipe(pipe_code=pipe_code)
+    await dry_run_pipe(the_pipe, raise_on_failure=True)
+
+    return {
+        "success": True,
+        "bundle_path": str(bundle_path),
+        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
+        "total_pipes": 1,
+    }
+
+
 def validate_cmd(
     target: Annotated[
         str | None,
@@ -265,9 +302,14 @@ def validate_cmd(
     make_pipelex_for_cli(context=ErrorContext.VALIDATION)
 
     try:
-        if bundle_path:
+        if bundle_path and pipe_code:
+            # Validate a specific pipe within a bundle
+            result = asyncio.run(_validate_pipe_in_bundle_core(bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs))
+        elif bundle_path:
+            # Validate the entire bundle
             result = asyncio.run(_validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs))
         else:
+            # Validate a standalone pipe
             result = asyncio.run(_validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))  # type: ignore[arg-type]
 
         print(json.dumps(result, indent=2))
