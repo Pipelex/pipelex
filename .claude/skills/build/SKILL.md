@@ -87,7 +87,9 @@ For each concept, draft:
 - **Type**: Either `refines: NativeConcept` OR `structure: {...}`
 
 **Native concepts** (use directly without defining):
-`Text`, `Image`, `PDF`, `Document`, `TextAndImages`, `Number`, `Page`, `JSON`, `ImgGenPrompt`, `Html`
+`Text`, `Image`, `Document`, `TextAndImages`, `Number`, `Page`, `JSON`, `ImgGenPrompt`, `Html`, `Anything`, `Dynamic`
+
+> **Note**: `Document` is the native concept for any document (PDF, Word, etc.). `Image` is for any image format (JPEG, PNG, etc.). File formats like "PDF" or "JPEG" are not concepts.
 
 **Concept naming rules**:
 - No adjectives: `Article` not `LongArticle`
@@ -102,30 +104,28 @@ For each concept, draft:
 
 **Goal**: Convert concept drafts to validated TOML using the CLI.
 
-For each concept, prepare a JSON spec and call:
+Prepare JSON specs for all concepts, then convert them **in parallel** by making multiple concurrent tool calls:
 
+**Important**: Call all `pipelex-agent concept` commands in a single response using parallel tool calls. Do not wait for one to complete before starting the next.
+
+**Example** (3 concepts converted in parallel):
 ```bash
-pipelex-agent concept --spec '{
-  "the_concept_code": "Invoice",
-  "description": "A commercial invoice document",
-  "structure": {
-    "invoice_number": "The unique identifier",
-    "vendor_name": {"type": "text", "description": "Vendor name", "required": true},
-    "total_amount": {"type": "number", "description": "Total amount", "required": true}
-  }
-}'
+# Call all three in parallel (single response, multiple tool calls):
+pipelex-agent concept --spec '{"the_concept_code": "Invoice", "description": "A commercial invoice document", "structure": {"invoice_number": "The unique identifier", "vendor_name": {"type": "text", "description": "Vendor name", "required": true}, "total_amount": {"type": "number", "description": "Total amount", "required": true}}}'
+pipelex-agent concept --spec '{"the_concept_code": "LineItem", "description": "A single line item on an invoice", "structure": {"description": "Item description", "quantity": {"type": "integer", "required": true}, "unit_price": {"type": "number", "required": true}}}'
+pipelex-agent concept --spec '{"the_concept_code": "Summary", "description": "A text summary of content", "refines": "Text"}'
 ```
 
-Or for refined concepts:
-```bash
-pipelex-agent concept --spec '{
-  "the_concept_code": "Summary",
-  "description": "A text summary of content",
-  "refines": "Text"
-}'
-```
+**Field types**: `text`, `integer`, `boolean`, `number`, `date`, `concept`, `list`
 
-**Field types**: `text`, `integer`, `boolean`, `number`, `date`, `concept`
+**Nested concept references** in structures:
+```toml
+# Single concept reference - needs full domain path
+field = {type = "concept", concept_ref = "my_domain.OtherConcept", description = "...", required = true}
+
+# List of concepts - different syntax
+field = {type = "list", item_type = "concept", item_concept_ref = "my_domain.OtherConcept", description = "...", required = true}
+```
 
 **Output**: Validated concept TOML fragments
 
@@ -153,6 +153,8 @@ pipelex-agent concept --spec '{
 | **PipeCompose** | Template text or construct objects |
 | **PipeImgGen** | Generate images from text prompts |
 | **PipeFunc** | Custom Python logic |
+
+> **Note**: `Page[]` outputs from PipeExtract automatically convert to text when inserted into prompts using `@variable`. No explicit conversion step is needed when passing extracted pages to PipeLLM.
 
 **Show detailed ASCII flow**:
 
@@ -237,7 +239,9 @@ Check:
 
 **Goal**: Convert pipe drafts to validated TOML using the CLI.
 
-For each pipe, call the appropriate command based on type:
+Prepare JSON specs for all pipes, then convert them **in parallel** by making multiple concurrent tool calls:
+
+**Important**: Call all `pipelex-agent pipe` commands in a single response using parallel tool calls. Do not wait for one to complete before starting the next.
 
 ### PipeLLM
 ```bash
@@ -256,7 +260,7 @@ pipelex-agent pipe --type PipeLLM --spec '{
 pipelex-agent pipe --type PipeSequence --spec '{
   "pipe_code": "process_invoice",
   "description": "Full invoice processing",
-  "inputs": {"document": "PDF"},
+  "inputs": {"document": "Document"},
   "output": "InvoiceData",
   "steps": [
     {"pipe": "extract_text", "result": "pages"},
@@ -292,18 +296,103 @@ pipelex-agent pipe --type PipeCondition --spec '{
 ```
 
 ### PipeCompose
+
+PipeCompose has **two modes** - use the CLI for template mode only, write directly for construct mode:
+
+**Template mode** (via CLI) - generates Text or Html:
 ```bash
 pipelex-agent pipe --type PipeCompose --spec '{
   "pipe_code": "format_report",
   "description": "Format final report",
   "inputs": {"summary": "Summary", "details": "Details"},
-  "output": "Report",
+  "output": "Text",
   "target_format": "markdown",
   "template": "# Report\n\n$summary\n\n## Details\n\n@details"
 }'
 ```
 
-**LLM Talents**: `data-retrieval`, `hr-expert`, `accounting-expert`, `creative-writer`, `engineer`, `coder`, `code-analyzer`, `vision-language-model`, `visual-designer`
+**Construct mode** (write directly to .plx) - builds structured objects:
+```toml
+[pipe.build_output]
+type = "PipeCompose"
+description = "Assemble final output"
+inputs = {analysis = "Analysis", items = "Item[]"}
+output = "FinalOutput"
+
+[pipe.build_output.construct]
+summary = {from = "analysis.summary"}
+score = {from = "analysis.score"}
+items = {from = "items"}
+label = {template = "Analysis for $analysis.name"}
+version = "1.0"  # Static value
+```
+
+**Construct field methods:**
+- `{from = "variable.path"}` - Reference input or nested field
+- `{template = "text with $var"}` - String interpolation
+- `"value"` or `123` - Static/fixed values
+
+### PipeParallel
+
+Run multiple pipes concurrently on the same inputs:
+```bash
+pipelex-agent pipe --type PipeParallel --spec '{
+  "pipe_code": "analyze_all",
+  "description": "Run analyses in parallel",
+  "inputs": {"document": "Document"},
+  "output": "CombinedAnalysis",
+  "parallels": [
+    {"pipe": "analyze_sentiment", "result": "sentiment"},
+    {"pipe": "extract_topics", "result": "topics"}
+  ],
+  "add_each_output": true,
+  "combined_output": "CombinedAnalysis"
+}'
+```
+
+**Required**: Must set either `add_each_output: true` OR `combined_output` (or both).
+
+---
+
+### Talents vs Model Presets
+
+The agent CLI uses human-friendly "talent" names that map to model presets. This shields you from needing to know specific model names.
+
+**LLM Talents** (CLI) → **Model Presets** (.plx):
+| Talent | Model Preset |
+|--------|--------------|
+| `data-retrieval` | `$retrieval` |
+| `hr-expert` | `$writing-factual` |
+| `accounting-expert` | `$writing-factual` |
+| `creative-writer` | `$writing-creative` |
+| `engineer` | `$engineering-structured` |
+| `coder` | `$engineering-code` |
+| `code-analyzer` | `$engineering-codebase-analysis` |
+| `vision-language-model` | `$vision` |
+| `visual-designer` | `$img-gen-prompting` |
+
+**Extract Talents** → **Model Presets**:
+| Talent | Model Preset |
+|--------|--------------|
+| `pdf-basic-text-extractor` | `@default-text-from-pdf` |
+| `image-text-extractor` | `@default-extract-image` |
+| `full-document-extractor` | `@default-extract-document` |
+
+**Image Generation Talents** → **Model Presets**:
+| Talent | Model Preset |
+|--------|--------------|
+| `gen-image` | `$gen-image` |
+| `gen-image-fast` | `$gen-image-fast` |
+| `gen-image-high-quality` | `$gen-image-high-quality` |
+
+**Parallel Conversion Example** (converting 4 pipes at once):
+```bash
+# Call all pipe commands in parallel (single response, multiple tool calls):
+pipelex-agent pipe --type PipeLLM --spec '{"pipe_code": "summarize", "description": "Summarize document", "inputs": {"document": "Document"}, "output": "Summary", "llm_talent": "creative-writer", "prompt": "Summarize:\n\n@document"}'
+pipelex-agent pipe --type PipeExtract --spec '{"pipe_code": "extract_pages", "description": "Extract text from document", "inputs": {"document": "Document"}, "output": "Page[]", "extract_talent": "pdf-basic-text-extractor"}'
+pipelex-agent pipe --type PipeLLM --spec '{"pipe_code": "analyze", "description": "Analyze content", "inputs": {"pages": "Page[]"}, "output": "Analysis", "llm_talent": "engineer", "prompt": "Analyze:\n\n@pages"}'
+pipelex-agent pipe --type PipeSequence --spec '{"pipe_code": "main_workflow", "description": "Main orchestration", "inputs": {"document": "Document"}, "output": "Analysis", "steps": [{"pipe": "extract_pages", "result": "pages"}, {"pipe": "analyze", "result": "analysis"}]}'
+```
 
 **Output**: Validated pipe TOML fragments
 
@@ -312,6 +401,8 @@ pipelex-agent pipe --type PipeCompose --spec '{
 ## Phase 8: Assemble Bundle
 
 **Goal**: Combine all parts into a complete .plx file.
+
+**Save location**: Always save workflow bundles to `pipelex-wip/`. Do not ask the user for the save location.
 
 Save concept and pipe TOML to temporary files, then:
 
@@ -322,7 +413,7 @@ pipelex-agent assemble \
   --description "Description of the workflow" \
   --concepts concepts.toml \
   --pipes pipes.toml \
-  --output bundle.plx
+  --output pipelex-wip/bundle.plx
 ```
 
 Or write the .plx file directly following this structure:
@@ -358,9 +449,11 @@ type = "PipeLLM"
 description = "First step"
 inputs = { input = "MyInput" }
 output = "Intermediate"
-llm_talent = "ENGINEER"
+model = "$engineering-structured"
 prompt = "@input"
 ```
+
+> **Note**: In .plx files, use `model` with preset references (e.g., `$writing-factual`). The agent CLI uses `llm_talent` names which it converts to model presets automatically.
 
 ---
 

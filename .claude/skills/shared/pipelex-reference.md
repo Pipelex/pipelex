@@ -37,7 +37,9 @@ Your prompt here with @block_var and $inline_var
 
 ## Native Concepts
 
-Use directly without defining: `Text`, `Image`, `PDF`, `Document`, `TextAndImages`, `Number`, `Page`, `JSON`, `ImgGenPrompt`, `Html`
+Use directly without defining: `Text`, `Image`, `Document`, `TextAndImages`, `Number`, `Page`, `JSON`, `ImgGenPrompt`, `Html`, `Anything`, `Dynamic`
+
+> **Note**: `Document` is the native concept for any document (PDF, Word, etc.). `Image` is for any image format (JPEG, PNG, etc.). File formats like "PDF" or "JPEG" are not concepts.
 
 ## Concept Definitions
 
@@ -130,7 +132,7 @@ prompt = "Describe this image: $image"
 [pipe.process_document]
 type = "PipeSequence"
 description = "Extract, summarize, translate"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "FrenchSummary"
 steps = [
     { pipe = "extract_text", result = "extracted" },
@@ -197,48 +199,59 @@ Items are processed in parallel for efficiency. Output list preserves input orde
 
 ### PipeParallel - Run multiple pipes concurrently
 
-Execute multiple independent pipes in parallel on the same inputs.
+Execute multiple independent pipes in parallel on the same inputs. Each branch runs in isolation with a deep copy of working memory.
 
-**Mode 1: Separate outputs** (each branch adds to working memory)
+**Required**: Must set either `add_each_output = true` OR `combined_output` (or both).
+
+**With separate outputs** (each branch adds to working memory):
 ```toml
 [pipe.analyze_all_aspects]
 type = "PipeParallel"
 description = "Run multiple analyses in parallel"
 inputs = { document = "Document" }
-
-[pipe.analyze_all_aspects.branches]
-sentiment = "analyze_sentiment"
-topics = "extract_topics"
-summary = "generate_summary"
+output = "Text"
+add_each_output = true
+parallels = [
+    { pipe = "analyze_sentiment", result = "sentiment" },
+    { pipe = "extract_topics", result = "topics" },
+    { pipe = "generate_summary", result = "summary" }
+]
 ```
 
-**Mode 2: Combined output** (merge branch results into single concept)
+**With combined output** (merge branch results into single concept):
 ```toml
 [pipe.analyze_all_aspects]
 type = "PipeParallel"
 description = "Run multiple analyses in parallel"
 inputs = { document = "Document" }
 output = "FullAnalysis"
-
-[pipe.analyze_all_aspects.branches]
-sentiment = "analyze_sentiment"
-topics = "extract_topics"
-summary = "generate_summary"
+add_each_output = true
+combined_output = "FullAnalysis"
+parallels = [
+    { pipe = "analyze_sentiment", result = "sentiment" },
+    { pipe = "extract_topics", result = "topics" }
+]
 ```
 
-**Branches**: Each key identifies the branch, value is the pipe to run. All branches receive the same inputs and execute concurrently.
+**Parameters**:
+- `parallels`: Array of `{ pipe = "pipe_code", result = "result_name" }` entries
+- `add_each_output`: If `true`, adds each branch result to working memory individually
+- `combined_output`: Concept name to bundle all results into (fields must match result names)
 
-### PipeExtract - Extract text/images from PDF/Image
+### PipeExtract - Extract text/images from Document/Image
 
 ```toml
 [pipe.extract_document]
 type = "PipeExtract"
-description = "Extract content from PDF"
-inputs = { document = "PDF" }
-output = "Page"
+description = "Extract content from document"
+inputs = { document = "Document" }
+output = "Page[]"
+model = "@default-text-from-pdf"
 ```
 
-Output is always `Page` (a `ListContent` of pages with `text_and_images` and `page_view`).
+Output is `Page[]` (a list of pages with `text_and_images` and `page_view`).
+
+> **Note**: Use `Document` for PDFs and other document formats, `Image` for images. "PDF" is a file format, not a native concept.
 
 ### PipeCompose - Template composition
 
@@ -468,7 +481,7 @@ items = { type = "list", item_type = "text", description = "Line items" }
 [pipe.process_invoice]
 type = "PipeSequence"
 description = "Full invoice processing pipeline"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "InvoiceData"
 steps = [
     { pipe = "extract_from_pdf", result = "pages" },
@@ -476,11 +489,12 @@ steps = [
 ]
 
 # Then sub-pipes in execution order
-[pipe.extract_from_pdf]
+[pipe.extract_from_document]
 type = "PipeExtract"
-description = "Extract content from PDF"
-inputs = { document = "PDF" }
-output = "Page"
+description = "Extract content from document"
+inputs = { document = "Document" }
+output = "Page[]"
+model = "@default-text-from-pdf"
 
 [pipe.analyze_invoice]
 type = "PipeLLM"
