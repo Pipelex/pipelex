@@ -1,5 +1,6 @@
 """E2E test for PipeBatch with graph tracing to verify BATCH_ITEM and BATCH_AGGREGATE edges."""
 
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -8,12 +9,13 @@ from pipelex import log, pretty_print
 from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.graph.graph_factory import generate_graph_outputs
-from pipelex.graph.graphspec import EdgeKind, GraphSpec
+from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
+from tests.e2e.pipelex.pipes.pipe_controller.pipe_batch.test_data import JokeBatchGraphExpectations
 
 
 def _get_next_output_folder() -> Path:
@@ -236,3 +238,59 @@ class TestPipeBatchGraph:
             },
             title="Joke Batch Graph Outputs",
         )
+
+        # ===== Structural validation =====
+        # Build node lookup by pipe_code
+        nodes_by_id: dict[str, NodeSpec] = {node.node_id: node for node in graph_spec.nodes}
+        nodes_by_pipe_code: dict[str, list[NodeSpec]] = {}
+        for node in graph_spec.nodes:
+            if node.pipe_code:
+                nodes_by_pipe_code.setdefault(node.pipe_code, []).append(node)
+
+        # 1. Verify all expected pipe_codes exist
+        actual_pipe_codes = set(nodes_by_pipe_code.keys())
+        assert actual_pipe_codes == JokeBatchGraphExpectations.EXPECTED_PIPE_CODES, (
+            f"Unexpected pipe codes. Expected: {JokeBatchGraphExpectations.EXPECTED_PIPE_CODES}, Got: {actual_pipe_codes}"
+        )
+
+        # 2. Verify node counts per pipe_code
+        for pipe_code, expected_count in JokeBatchGraphExpectations.EXPECTED_NODE_COUNTS.items():
+            actual_count = len(nodes_by_pipe_code.get(pipe_code, []))
+            assert actual_count == expected_count, f"Expected {expected_count} nodes for pipe_code '{pipe_code}', got {actual_count}"
+
+        # 3. Verify edge counts by kind
+        actual_edge_counts = Counter(str(edge.kind) for edge in graph_spec.edges)
+        for kind, expected_count in JokeBatchGraphExpectations.EXPECTED_EDGE_COUNTS.items():
+            actual_count = actual_edge_counts.get(kind, 0)
+            assert actual_count == expected_count, f"Expected {expected_count} edges of kind '{kind}', got {actual_count}"
+
+        # 4. Verify BATCH_AGGREGATE edges target PipeBatch, not outer PipeSequence
+        # Get the PipeBatch node and PipeSequence node
+        batch_node = nodes_by_pipe_code["batch_generate_jokes"][0]
+        sequence_node = nodes_by_pipe_code["generate_jokes_from_topics"][0]
+        branch_nodes = nodes_by_pipe_code["generate_joke"]
+
+        batch_aggregate_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.BATCH_AGGREGATE]
+        for edge in batch_aggregate_edges:
+            # Source should be one of the branch nodes (generate_joke)
+            source_node = nodes_by_id.get(edge.source)
+            assert source_node is not None, f"Source node {edge.source} not found"
+            assert source_node.pipe_code == "generate_joke", f"BATCH_AGGREGATE source should be 'generate_joke', got '{source_node.pipe_code}'"
+
+            # Target should be the PipeBatch node, NOT the outer PipeSequence
+            assert edge.target == batch_node.node_id, (
+                f"BATCH_AGGREGATE edge should target PipeBatch node '{batch_node.node_id}' "
+                f"(pipe_code='batch_generate_jokes'), but targets '{edge.target}'. "
+                f"This is a bug if target is the outer PipeSequence '{sequence_node.node_id}'."
+            )
+            assert edge.target != sequence_node.node_id, "BATCH_AGGREGATE edge should NOT target the outer PipeSequence!"
+
+        # 5. Verify containment edges (branch nodes are inside PipeBatch)
+        contains_edges = [edge for edge in graph_spec.edges if edge.kind == EdgeKind.CONTAINS]
+        batch_children = {edge.target for edge in contains_edges if edge.source == batch_node.node_id}
+        branch_node_ids = {node.node_id for node in branch_nodes}
+        assert branch_node_ids.issubset(batch_children), (
+            f"Branch nodes {branch_node_ids} should be children of PipeBatch node. Actual PipeBatch children: {batch_children}"
+        )
+
+        log.info("Structural validation passed: BATCH_AGGREGATE edges correctly target PipeBatch")

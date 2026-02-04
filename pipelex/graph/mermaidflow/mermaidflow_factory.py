@@ -122,6 +122,10 @@ class MermaidflowFactory:
             return Mermaidflow(mermaid_code=mermaid_code, stuff_data=None)
 
         if include_subgraphs:
+            # Track which orphan stuffs have been rendered inside subgraphs
+            # This allows batch item stuffs to be placed inside their consumer's subgraph
+            rendered_orphan_stuffs: set[str] = set()
+
             # Render pipe nodes and their produced stuff within controller subgraphs
             lines.append("")
             lines.append("    %% Pipe and stuff nodes within controller subgraphs")
@@ -133,14 +137,21 @@ class MermaidflowFactory:
                     children_map=analysis.containment_tree,
                     stuff_registry=stuff_registry,
                     stuff_producers=analysis.stuff_producers,
+                    stuff_consumers=analysis.stuff_consumers,
                     stuff_id_mapping=stuff_id_mapping,
                     subgraph_depths=subgraph_depths,
                     show_stuff_codes=show_stuff_codes,
+                    rendered_orphan_stuffs=rendered_orphan_stuffs,
                 )
                 lines.extend(node_lines)
 
             # Render stuff nodes without a producer (pipeline inputs) at top level
-            orphan_stuffs = [(digest, name, concept) for digest, (name, concept) in stuff_registry.items() if digest not in analysis.stuff_producers]
+            # Skip any that were already rendered inside subgraphs (e.g., batch item stuffs)
+            orphan_stuffs = [
+                (digest, name, concept)
+                for digest, (name, concept) in stuff_registry.items()
+                if digest not in analysis.stuff_producers and digest not in rendered_orphan_stuffs
+            ]
             if orphan_stuffs:
                 lines.append("")
                 lines.append("    %% Pipeline input stuff nodes (no producer)")
@@ -380,15 +391,19 @@ class MermaidflowFactory:
         children_map: dict[str, list[str]],
         stuff_registry: dict[str, tuple[str, str | None]],
         stuff_producers: dict[str, str],
+        stuff_consumers: dict[str, list[str]],
         stuff_id_mapping: dict[str, str],
         subgraph_depths: dict[str, int],
         show_stuff_codes: bool,
+        rendered_orphan_stuffs: set[str],
         indent_level: int = 1,
         depth: int = 0,
     ) -> list[str]:
         """Recursively render pipes and their produced stuff within controller subgraphs.
 
         This renders both pipe nodes and their produced stuff nodes inside subgraphs.
+        Orphan stuffs (no producer) consumed by leaf nodes are also rendered inside
+        the same subgraph as their consumer, enabling proper placement of batch item stuffs.
 
         Args:
             node_id: The node to render.
@@ -397,9 +412,11 @@ class MermaidflowFactory:
             children_map: Map of parent node_id to list of child node_ids.
             stuff_registry: Map of digest to (name, concept) for all stuffs.
             stuff_producers: Map of digest to producer node_id.
+            stuff_consumers: Map of digest to list of consumer node_ids.
             stuff_id_mapping: Map to store stuff mermaid IDs (mutated).
             subgraph_depths: Map to track subgraph IDs and their depths (mutated).
             show_stuff_codes: Whether to show digest in stuff labels.
+            rendered_orphan_stuffs: Set of orphan stuff digests already rendered (mutated).
             indent_level: Current indentation level.
             depth: Current depth in the subgraph hierarchy (for coloring).
 
@@ -443,9 +460,11 @@ class MermaidflowFactory:
                     children_map=children_map,
                     stuff_registry=stuff_registry,
                     stuff_producers=stuff_producers,
+                    stuff_consumers=stuff_consumers,
                     stuff_id_mapping=stuff_id_mapping,
                     subgraph_depths=subgraph_depths,
                     show_stuff_codes=show_stuff_codes,
+                    rendered_orphan_stuffs=rendered_orphan_stuffs,
                     indent_level=indent_level + 1,
                     depth=depth + 1,
                 )
@@ -455,6 +474,29 @@ class MermaidflowFactory:
         else:
             # Leaf node - render as simple node
             lines.append(cls._render_node(node, mermaid_id, indent))
+
+            # Render batch item stuffs (no producer, with -branch-N suffix) consumed by this node
+            # This ensures batch item stuffs are placed inside the batch controller's subgraph
+            # rather than appearing as orphan "pipeline inputs" at the top level
+            for digest, consumer_node_ids in stuff_consumers.items():
+                if node_id in consumer_node_ids and digest not in stuff_producers:
+                    # Only move stuffs that look like batch items (have -branch- suffix)
+                    # Regular pipeline inputs should stay at top level
+                    if "-branch-" not in digest:
+                        continue
+                    # This is a batch item stuff consumed by this node
+                    if digest in stuff_registry and digest not in rendered_orphan_stuffs:
+                        name, concept = stuff_registry[digest]
+                        stuff_line = cls._render_stuff_node(
+                            digest=digest,
+                            name=name,
+                            concept=concept,
+                            stuff_id_mapping=stuff_id_mapping,
+                            show_stuff_codes=show_stuff_codes,
+                            indent=indent,
+                        )
+                        lines.append(stuff_line)
+                        rendered_orphan_stuffs.add(digest)
 
             # Also render any stuff nodes produced by this pipe
             for digest, producer_node_id in stuff_producers.items():

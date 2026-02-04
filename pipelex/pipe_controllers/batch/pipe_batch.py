@@ -130,11 +130,14 @@ class PipeBatch(PipeController):
             if job_metadata.graph_context is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
+                    # Pass this PipeBatch's node_id so BATCH_ITEM edges can source from the controller
+                    batch_controller_node_id = job_metadata.graph_context.parent_node_id
                     tracer_manager.register_batch_item_extraction(
                         graph_id=job_metadata.graph_context.graph_id,
                         list_stuff_code=input_stuff.stuff_code,
                         item_stuff_code=branch_input_item_code,
                         item_index=branch_index,
+                        batch_controller_node_id=batch_controller_node_id,
                     )
 
             branch_memory = working_memory.make_deep_copy()
@@ -181,12 +184,17 @@ class PipeBatch(PipeController):
         if job_metadata.graph_context is not None:
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
+                # Pass the PipeBatch's node_id (from graph_context.parent_node_id) so that
+                # BATCH_AGGREGATE edges correctly target this PipeBatch node, not a parent
+                # controller that may later finish and register as producer of the same output
+                batch_controller_node_id = job_metadata.graph_context.parent_node_id
                 for agg_index, item_stuff_code in enumerate(branch_output_stuff_codes):
                     tracer_manager.register_batch_aggregation(
                         graph_id=job_metadata.graph_context.graph_id,
                         output_list_stuff_code=output_stuff.stuff_code,
                         item_stuff_code=item_stuff_code,
                         item_index=agg_index,
+                        batch_controller_node_id=batch_controller_node_id,
                     )
 
         working_memory.set_new_main_stuff(

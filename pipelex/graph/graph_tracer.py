@@ -103,10 +103,13 @@ class GraphTracer(GraphTracerProtocol):
         self._edge_sequence: int = 0
         # Maps stuff_code (digest) to the node_id that produced it
         self._stuff_producer_map: dict[str, str] = {}
-        # Maps list_stuff_code -> [(item_stuff_code, item_index), ...]
-        self._batch_item_map: dict[str, list[tuple[str, int]]] = {}
-        # Maps output_list_stuff_code -> [(item_stuff_code, item_index), ...]
-        self._batch_aggregate_map: dict[str, list[tuple[str, int]]] = {}
+        # Maps list_stuff_code -> (batch_controller_node_id, [(item_stuff_code, item_index), ...])
+        # The batch_controller_node_id is tracked to ensure BATCH_ITEM edges can source from the correct node
+        self._batch_item_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
+        # Maps output_list_stuff_code -> (batch_controller_node_id, [(item_stuff_code, item_index), ...])
+        # The batch_controller_node_id is tracked to ensure BATCH_AGGREGATE edges target the correct node
+        # (the PipeBatch), not a parent controller that may later register as producer of the same stuff
+        self._batch_aggregate_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
 
     @property
     def is_active(self) -> bool:
@@ -213,26 +216,31 @@ class GraphTracer(GraphTracerProtocol):
                 )
 
     def _generate_batch_item_edges(self) -> None:
-        """Generate BATCH_ITEM edges from list producer/consumer to item consumers.
+        """Generate BATCH_ITEM edges for batch fan-out.
 
-        For each registered batch item extraction, find the consumer nodes for
-        the extracted items and create BATCH_ITEM edges from the list source
-        to the branch pipes that process individual items.
+        For each registered batch item extraction, create BATCH_ITEM edges.
+        The edge connects:
+        - Source: the batch controller node (if provided) or the list producer
+        - Target: the branch pipe that consumes the extracted item
+
+        The source/target stuff digests are preserved for the JS renderer to use
+        when connecting stuff nodes directly in data-centric mode.
         """
-        for list_stuff_code, item_entries in self._batch_item_map.items():
-            # Find list producer or consumer (the PipeBatch node that takes the list as input)
+        for list_stuff_code, (batch_controller_node_id, item_entries) in self._batch_item_map.items():
+            # Determine source node: prefer batch controller, fall back to list producer
             list_producer_node_id = self._stuff_producer_map.get(list_stuff_code)
-            list_consumer_node_id: str | None = None
+            source_node_id = batch_controller_node_id or list_producer_node_id
 
-            for node_id, node_data in self._nodes.items():
-                for input_spec in node_data.input_specs:
-                    if input_spec.digest == list_stuff_code:
-                        list_consumer_node_id = node_id
+            if not source_node_id:
+                # Try to find a consumer of the list (legacy fallback)
+                for node_id, node_data in self._nodes.items():
+                    for input_spec in node_data.input_specs:
+                        if input_spec.digest == list_stuff_code:
+                            source_node_id = node_id
+                            break
+                    if source_node_id:
                         break
-                if list_consumer_node_id:
-                    break
 
-            source_node_id = list_producer_node_id or list_consumer_node_id
             if not source_node_id:
                 continue
 
@@ -257,20 +265,29 @@ class GraphTracer(GraphTracerProtocol):
 
         For each registered batch aggregation, create edges from the branch pipe
         outputs to the PipeBatch node that produces the aggregated list.
+
+        The target node is determined as follows:
+        1. If batch_controller_node_id was provided during registration, use that
+        2. Otherwise, fall back to looking up the producer from _stuff_producer_map
+
+        The explicit batch_controller_node_id is preferred because the _stuff_producer_map
+        may be overwritten when a parent controller (e.g., PipeSequence) finishes after
+        the PipeBatch and registers the same output stuff as its own output.
         """
-        for output_list_stuff_code, item_entries in self._batch_aggregate_map.items():
-            # Find the output list producer (the PipeBatch node)
-            output_list_producer_id = self._stuff_producer_map.get(output_list_stuff_code)
-            if not output_list_producer_id:
+        for output_list_stuff_code, (batch_controller_node_id, item_entries) in self._batch_aggregate_map.items():
+            # Determine the target node for aggregate edges
+            # Prefer the explicitly tracked batch controller node_id if available
+            target_node_id = batch_controller_node_id or self._stuff_producer_map.get(output_list_stuff_code)
+            if not target_node_id:
                 continue
 
             for item_stuff_code, item_index in item_entries:
                 # Find the producer of this item (the branch pipe)
                 item_producer_id = self._stuff_producer_map.get(item_stuff_code)
-                if item_producer_id and item_producer_id != output_list_producer_id:
+                if item_producer_id and item_producer_id != target_node_id:
                     self.add_edge(
                         source_node_id=item_producer_id,
-                        target_node_id=output_list_producer_id,
+                        target_node_id=target_node_id,
                         edge_kind=EdgeKind.BATCH_AGGREGATE,
                         label=f"[{item_index}]",
                         source_stuff_digest=item_stuff_code,
@@ -283,6 +300,7 @@ class GraphTracer(GraphTracerProtocol):
         list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
+        batch_controller_node_id: str | None = None,
     ) -> None:
         """Register that a list stuff produced an item stuff during batch iteration.
 
@@ -290,12 +308,18 @@ class GraphTracer(GraphTracerProtocol):
             list_stuff_code: The stuff_code of the input list.
             item_stuff_code: The stuff_code of the extracted item.
             item_index: The index of the item in the list.
+            batch_controller_node_id: The node_id of the PipeBatch controller performing the fan-out.
+                If provided, this will be used as the source node for BATCH_ITEM edges in controller-centric mode.
         """
         if not self._is_active:
             return
         if list_stuff_code not in self._batch_item_map:
-            self._batch_item_map[list_stuff_code] = []
-        self._batch_item_map[list_stuff_code].append((item_stuff_code, item_index))
+            self._batch_item_map[list_stuff_code] = (batch_controller_node_id, [])
+        # Unpack tuple to append to the item list (tuples are immutable, but the contained list is mutable)
+        _existing_controller_id, item_list = self._batch_item_map[list_stuff_code]
+        item_list.append((item_stuff_code, item_index))
+        # Note: We keep the first batch_controller_node_id registered for this list
+        # (all items for the same input list should come from the same batch controller)
 
     @override
     def register_batch_aggregation(
@@ -303,6 +327,7 @@ class GraphTracer(GraphTracerProtocol):
         output_list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
+        batch_controller_node_id: str | None = None,
     ) -> None:
         """Register that an item stuff will be aggregated into an output list.
 
@@ -310,12 +335,18 @@ class GraphTracer(GraphTracerProtocol):
             output_list_stuff_code: The stuff_code of the output list.
             item_stuff_code: The stuff_code of the item to aggregate.
             item_index: The index of the item in the output list.
+            batch_controller_node_id: The node_id of the PipeBatch controller that will produce the output list.
+                If provided, this will be used as the target node for BATCH_AGGREGATE edges.
         """
         if not self._is_active:
             return
         if output_list_stuff_code not in self._batch_aggregate_map:
-            self._batch_aggregate_map[output_list_stuff_code] = []
-        self._batch_aggregate_map[output_list_stuff_code].append((item_stuff_code, item_index))
+            self._batch_aggregate_map[output_list_stuff_code] = (batch_controller_node_id, [])
+        # Unpack tuple to append to the item list (tuples are immutable, but the contained list is mutable)
+        _existing_controller_id, item_list = self._batch_aggregate_map[output_list_stuff_code]
+        item_list.append((item_stuff_code, item_index))
+        # Note: We keep the first batch_controller_node_id registered for this output list
+        # (all items for the same output list should come from the same batch controller)
 
     @override
     def on_pipe_start(
