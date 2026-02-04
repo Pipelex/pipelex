@@ -7,8 +7,11 @@ from click import Command, Context
 from typer.core import TyperGroup
 from typing_extensions import override
 
+from pipelex.cli.agent_cli.commands.assemble_cmd import assemble_cmd
 from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
+from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
+from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run_cmd import run_cmd
 from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
@@ -21,7 +24,7 @@ class PipelexAgentCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["build", "run", "validate", "inputs", "doctor"]
+        return ["build", "run", "validate", "inputs", "concept", "pipe", "assemble", "doctor"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -179,6 +182,83 @@ def inputs_command(
         target=target,
         pipe=pipe,
         library_dir=library_dir,
+    )
+
+
+@app.command(name="concept", help="Structure a concept from JSON spec and output TOML")
+def concept_command(
+    spec: Annotated[
+        str | None,
+        typer.Option("--spec", "-s", help="JSON string with concept specification"),
+    ] = None,
+    spec_file: Annotated[
+        str | None,
+        typer.Option("--spec-file", "-f", help="Path to JSON file with concept specification"),
+    ] = None,
+) -> None:
+    """Structure a concept from JSON spec and output TOML."""
+    concept_cmd(spec=spec, spec_file=spec_file)
+
+
+@app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")
+def pipe_command(
+    pipe_type: Annotated[
+        str,
+        typer.Option("--type", "-t", help="Pipe type (e.g., PipeLLM, PipeSequence)"),
+    ],
+    spec: Annotated[
+        str | None,
+        typer.Option("--spec", "-s", help="JSON string with pipe specification"),
+    ] = None,
+    spec_file: Annotated[
+        str | None,
+        typer.Option("--spec-file", "-f", help="Path to JSON file with pipe specification"),
+    ] = None,
+) -> None:
+    """Structure a pipe from JSON spec and output TOML."""
+    pipe_cmd(pipe_type=pipe_type, spec=spec, spec_file=spec_file)
+
+
+@app.command(name="assemble", help="Assemble a complete .plx bundle from TOML parts")
+def assemble_command(
+    domain: Annotated[
+        str,
+        typer.Option("--domain", "-d", help="Domain code for the bundle (snake_case)"),
+    ],
+    main_pipe: Annotated[
+        str,
+        typer.Option("--main-pipe", "-m", help="Main pipe code for the bundle"),
+    ],
+    output: Annotated[
+        str,
+        typer.Option("--output", "-o", help="Output file path for the assembled bundle (.plx)"),
+    ],
+    description: Annotated[
+        str | None,
+        typer.Option("--description", help="Description of the bundle"),
+    ] = None,
+    system_prompt: Annotated[
+        str | None,
+        typer.Option("--system-prompt", help="Default system prompt for LLM pipes"),
+    ] = None,
+    concepts: Annotated[
+        list[str] | None,
+        typer.Option("--concepts", "-c", help="TOML file(s) or inline TOML containing concept definitions"),
+    ] = None,
+    pipes: Annotated[
+        list[str] | None,
+        typer.Option("--pipes", "-p", help="TOML file(s) or inline TOML containing pipe definitions"),
+    ] = None,
+) -> None:
+    """Assemble a complete .plx bundle from individual TOML parts."""
+    assemble_cmd(
+        domain=domain,
+        main_pipe=main_pipe,
+        output=output,
+        description=description,
+        system_prompt=system_prompt,
+        concepts=concepts,
+        pipes=pipes,
     )
 
 
