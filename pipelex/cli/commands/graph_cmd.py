@@ -25,6 +25,7 @@ from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, re
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.reactflow.viewspec import LayoutSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipelex import Pipelex
@@ -129,7 +130,13 @@ def _do_graph_render(
         if generate_reactflow:
             # Create ViewSpec from GraphSpec
             analysis = GraphAnalysis.from_graphspec(graph_spec)
-            viewspec = graphspec_to_viewspec(graph_spec, analysis)
+            rf_config = graph_config.reactflow_config
+            layout = LayoutSpec(
+                direction=rf_config.layout_direction,  # type: ignore[arg-type]
+                nodesep=rf_config.nodesep,
+                ranksep=rf_config.ranksep,
+            )
+            viewspec = graphspec_to_viewspec(graph_spec, analysis, layout=layout)
 
             # Collect stuff data in alternate formats
             rf_stuff_data_text = collect_stuff_data_text(graph_spec) if graph_config.data_inclusion.stuff_text_content else None
