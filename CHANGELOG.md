@@ -27,6 +27,7 @@
  - Fixed the Pipelex CLI for generating structures, inputs, runner files.
  - Fixed `@pipe_func` decorated functions showing "function not found" instead of explaining why the function is ineligible (e.g., missing return type annotation).
  - Fixed PipeLLM with list output (e.g., `output = "Item[]"`) not producing `ListContent` when run inside a nested PipeSequence with `batch_over`.
+ - Fixed `pipelex build runner` and `pipelex build inputs` generating string placeholders (e.g., `"number_int | float"`) instead of numeric values for Number concepts with `int | float` union type fields.
 
 ### Removed
  - **`pipelex kit` Command**: The kit commands have been removed from the main CLI. They are now internal tools for Pipelex contributors only, available via `pipelex-dev kit rules`.
