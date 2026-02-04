@@ -197,6 +197,11 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
 
     dagre.layout(g);
 
+    // Determine handle positions based on layout direction
+    const isHorizontal = direction === 'LR' || direction === 'RL';
+    const sourcePosition = isHorizontal ? 'right' : 'bottom';
+    const targetPosition = isHorizontal ? 'left' : 'top';
+
     const layoutedNodes = nodes.map((node) => {
         const nodeWithPosition = g.node(node.id);
         const nodeData = node.data || {};
@@ -208,6 +213,8 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
                 x: nodeWithPosition.x - width / 2,
                 y: nodeWithPosition.y - 30,
             },
+            sourcePosition,
+            targetPosition,
         };
     });
 
