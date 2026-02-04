@@ -26,6 +26,7 @@
  - Fixed a bug when trying to print HTML content in a TextContent object.
  - Fixed the Pipelex CLI for generating structures, inputs, runner files.
  - Fixed PipeLLM with list output (e.g., `output = "Item[]"`) not producing `ListContent` when run inside a nested PipeSequence with `batch_over`.
+ - Fixed `pipelex build runner` generating string placeholders (e.g., `"number_int | float"`) instead of numeric values for Number concepts with `int | float` union type fields.
 
 ### Removed
  - **`pipelex kit` Command**: The kit commands have been removed from the main CLI. They are now internal tools for Pipelex contributors only, available via `pipelex-dev kit rules`.
