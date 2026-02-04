@@ -145,7 +145,7 @@ prompt = """
 [pipe.draft_flow]
 type = "PipeLLM"
 description = "Draft the flow of the pipeline."
-inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "ConceptSpec" }
+inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "ConceptSpec[]" }
 output = "FlowDraft"
 model = "$engineering-structured"
 system_prompt = """
