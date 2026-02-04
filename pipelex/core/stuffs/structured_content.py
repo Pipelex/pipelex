@@ -1,4 +1,6 @@
 import html as html_module
+from datetime import date, datetime
+from enum import Enum
 from typing import Any, cast
 
 from rich.pretty import Pretty
@@ -22,19 +24,17 @@ class StructuredContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        """Render as HTML with field names and values in a definition list.
-
-        Recursively handles nested StructuredContent. If a string value looks like HTML
-        (starts with '<'), it is rendered as-is; otherwise it is escaped.
-        """
-        parts: list[str] = ["<dl>"]
+        """Render the structured content as HTML, recursively handling nested StuffContent."""
+        rows: list[str] = []
         for field_name in type(self).model_fields:
             field_value = getattr(self, field_name)
+            if field_value is None:
+                continue
             rendered_value = self._render_value_html(field_value)
-            parts.append(f"<dt>{html_module.escape(field_name)}</dt>")
-            parts.append(f"<dd>{rendered_value}</dd>")
-        parts.append("</dl>")
-        return "".join(parts)
+            rows.append(f"<tr><th>{html_module.escape(field_name)}</th><td>{rendered_value}</td></tr>")
+        if not rows:
+            return "<table><tr><td><em>empty</em></td></tr></table>"
+        return f"<table>{''.join(rows)}</table>"
 
     @override
     async def rendered_html_async(self) -> str:
@@ -42,33 +42,72 @@ class StructuredContent(StuffContent):
         return self.rendered_html()
 
     def _render_value_html(self, value: Any) -> str:
-        """Render a value as HTML, recursively handling nested structures."""
-        if value is None:
-            return "<em>None</em>"
-        if isinstance(value, StructuredContent):
-            return value.rendered_html()
-        if isinstance(value, StuffContent):
-            return value.rendered_html()
-        if isinstance(value, str):
-            # If it looks like HTML (starts with <), render as-is
-            stripped = value.strip()
-            if stripped.startswith("<") and (">" in stripped):
-                return value
-            return html_module.escape(value)
-        if isinstance(value, (list, tuple)):
-            list_value = cast("list[Any]", value)
-            if len(list_value) == 0:
-                return "<em>empty</em>"
-            items = [f"<li>{self._render_value_html(item)}</li>" for item in list_value]
-            return f"<ul>{''.join(items)}</ul>"
-        if isinstance(value, dict):
-            dict_value = cast("dict[str, Any]", value)
-            if len(dict_value) == 0:
-                return "<em>empty</em>"
-            items = [f"<dt>{html_module.escape(str(key))}</dt><dd>{self._render_value_html(val)}</dd>" for key, val in dict_value.items()]
-            return f"<dl>{''.join(items)}</dl>"
-        # For other types (int, float, bool, etc.), escape the string representation
-        return html_module.escape(str(value))
+        """Render a value as HTML, recursively handling nested structures.
+
+        Uses match/case to handle all common Pydantic field types:
+        - None: renders as <em>None</em>
+        - StuffContent subclasses: calls their rendered_html() method
+        - str: escapes HTML (or passes through if already HTML)
+        - bool: renders as "True" or "False" (must be before int, as bool is subclass of int)
+        - int: renders as string
+        - float: renders as string
+        - Enum: renders the enum value
+        - datetime/date: renders in ISO format
+        - list/tuple: renders as <ul> list
+        - dict: renders as <dl> definition list
+        - Other: escapes string representation
+        """
+        match value:
+            case None:
+                return "<em>None</em>"
+
+            case StuffContent():
+                return value.rendered_html()
+
+            case str():
+                # If it looks like HTML (starts with <), render as-is
+                stripped = value.strip()
+                if stripped.startswith("<") and (">" in stripped):
+                    return value
+                return html_module.escape(value)
+
+            case bool():
+                # Must be before int because bool is a subclass of int
+                return "True" if value else "False"
+
+            case int():
+                return str(value)
+
+            case float():
+                return str(value)
+
+            case Enum():
+                # Handles StrEnum and regular Enum
+                return html_module.escape(str(value.value))
+
+            case datetime():
+                return html_module.escape(value.isoformat())
+
+            case date():
+                return html_module.escape(value.isoformat())
+
+            case list() | tuple():
+                list_value = cast("list[Any]", value)
+                if len(list_value) == 0:
+                    return "<em>empty</em>"
+                items = [f"<li>{self._render_value_html(item)}</li>" for item in list_value]
+                return f"<ul>{''.join(items)}</ul>"
+
+            case dict():
+                dict_value = cast("dict[str, Any]", value)
+                if len(dict_value) == 0:
+                    return "<em>empty</em>"
+                items = [f"<dt>{html_module.escape(str(key))}</dt><dd>{self._render_value_html(val)}</dd>" for key, val in dict_value.items()]
+                return f"<dl>{''.join(items)}</dl>"
+
+            case _:
+                # Fallback for any other types
+                return html_module.escape(str(value))
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:

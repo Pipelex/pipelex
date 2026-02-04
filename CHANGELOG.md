@@ -20,6 +20,7 @@
  - **GatewayExtractWorker**: Now checks model capabilities before attempting image captioning.
  - Change the output validation of `PipeCondition`: If all mapped pipes have the same output concept, `PipeCondition`'s output MUST be that same concept. If mapped pipes have different output concepts, `PipeCondition`'s output MUST be the native concept `Anything`.
  - **CLI**: Changed `pipelex validate all` to `pipelex validate --all` (or `-a`).
+ - **StructuredContent.rendered_html()**: Now recursively calls `rendered_html()` on nested `StuffContent` fields instead of using json2html conversion. Also skips `None` values and uses HTML table format.
 
 ### Fixed
  - Corrected output directory creation logic in `pipelex run` to properly respect the `--no-graph` flag and configuration settings.
