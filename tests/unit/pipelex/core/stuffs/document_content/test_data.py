@@ -4,21 +4,21 @@ from typing import Any, ClassVar
 class TestData:
     # Input content
     SAMPLE_URL = "https://example.com/document.pdf"
-    SAMPLE_DISPLAY_LINK = "Report.pdf"
+    SAMPLE_PUBLIC_URL = "Report.pdf"
     SAMPLE_MIME_TYPE = "application/pdf"
 
     # Expected outputs for smart_dump (minimal)
     EXPECTED_SMART_DUMP_MINIMAL: ClassVar[dict[str, Any]] = {
         "url": "https://example.com/document.pdf",
         "mime_type": None,
-        "display_link": None,
+        "public_url": None,
     }
 
     # Expected outputs for smart_dump (with optional fields)
     EXPECTED_SMART_DUMP_FULL: ClassVar[dict[str, Any]] = {
         "url": "https://example.com/document.pdf",
         "mime_type": "application/pdf",
-        "display_link": "Report.pdf",
+        "public_url": "Report.pdf",
     }
 
     # Expected outputs for render methods

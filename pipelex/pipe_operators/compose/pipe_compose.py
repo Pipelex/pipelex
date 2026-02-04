@@ -14,6 +14,7 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
@@ -108,16 +109,23 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.is_construct_mode:
             return
 
-        # In template mode, output must be Text-compatible
-        if not get_concept_library().is_compatible(
+        # In template mode, output must be Text-compatible or Html-compatible
+        concept_library = get_concept_library()
+        is_text_compatible = concept_library.is_compatible(
             tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
             strict=True,
-        ):
+        )
+        is_html_compatible = concept_library.is_compatible(
+            tested_concept=self.output.concept,
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.HTML),
+            strict=True,
+        )
+        if not (is_text_compatible or is_html_compatible):
             msg = (
-                f"The output of a PipeCompose in template mode must be strictly compatible with the Text concept. "
+                f"The output of a PipeCompose in template mode must be strictly compatible with the Text or Html concept. "
                 f"In the pipe '{self.code}' the output is '{self.output.concept.concept_ref}'. "
-                "Make sure this concept refines the native Text concept, or use construct mode for StructuredContent."
+                "Make sure this concept refines the native Text or Html concept, or use construct mode for StructuredContent."
             )
             raise PipeValidationError(
                 message=msg,
@@ -125,7 +133,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-                required_concept_codes=[NativeConceptCode.TEXT.concept_ref],
+                required_concept_codes=[NativeConceptCode.TEXT.concept_ref, NativeConceptCode.HTML.concept_ref],
             )
 
     @override
@@ -164,7 +172,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         output_name: str | None,
         content_generator: ContentGeneratorProtocol,
     ) -> PipeComposeOutput:
-        """Run PipeCompose in template mode (produces Text output)."""
+        """Run PipeCompose in template mode (produces Text or Html output)."""
         if self.template is None:
             msg = "Template is required for template mode"
             raise ValueError(msg)
@@ -184,12 +192,17 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
         assert isinstance(jinja2_text, str)
 
-        # Get the structure class from the registry (might be a subclass of TextContent)
+        # Get the structure class from the registry (might be a subclass of TextContent or HtmlContent)
         structure_class = get_class_registry().get_required_subclass(
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
-        the_content = structure_class(text=jinja2_text)
+
+        # Construct content based on the structure class type
+        if issubclass(structure_class, HtmlContent):
+            the_content = structure_class(inner_html=jinja2_text, css_class="")
+        else:
+            the_content = structure_class(text=jinja2_text)
 
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
 

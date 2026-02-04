@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from pipelex.core.stuffs.text_content import TextContent
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestListContentRenders:
     """Tests for ListContent render methods."""
 
@@ -40,12 +39,14 @@ class TestListContentRenders:
         content: ListContent[TextContent] = ListContent(items=[])
         assert content.rendered_markdown() == TestData.EXPECTED_RENDERED_EMPTY
 
+    @pytest.mark.asyncio
     async def test_rendered_plain_async(self):
         """Verify async rendered_plain returns the same as sync version."""
         content: ListContent[TextContent] = ListContent(items=TestData.SAMPLE_TEXT_ITEMS)
         result = await content.rendered_plain_async()
         assert result == TestData.EXPECTED_RENDERED_PLAIN
 
+    @pytest.mark.asyncio
     async def test_rendered_markdown_async(self):
         """Verify async rendered_markdown returns the same as sync version."""
         content: ListContent[TextContent] = ListContent(items=TestData.SAMPLE_TEXT_ITEMS)

@@ -15,6 +15,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
+from pipelex.core.pipes.inputs.input_renderer import NoInputsRequiredError, render_inputs
 from pipelex.hub import get_required_pipe, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
@@ -84,14 +85,12 @@ async def _generate_inputs_core(
         typer.secho(f"❌ Error: Could not find pipe '{pipe_code}': {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
 
-    # Check if pipe has any inputs
-    if not the_pipe.inputs.root:
-        typer.secho(f"No inputs required for pipe '{pipe_code}'.", fg=typer.colors.YELLOW)
-        raise typer.Exit(0)
-
     # Generate the input JSON
     try:
-        inputs_json_str = the_pipe.inputs.generate_json_string(indent=2)
+        inputs_json_str = render_inputs(the_pipe, indent=2)
+    except NoInputsRequiredError as exc:
+        typer.secho(str(exc), fg=typer.colors.YELLOW)
+        raise typer.Exit(0) from exc
     except Exception as exc:
         typer.secho(f"❌ Error generating input JSON: {exc}", fg=typer.colors.RED)
         raise typer.Exit(1) from exc
@@ -101,7 +100,7 @@ async def _generate_inputs_core(
         final_output_path = output_path
     elif bundle_path:
         # Place inputs.json in the same directory as the PLX file
-        bundle_dir = Path(bundle_path).parent
+        bundle_dir = bundle_path.parent
         final_output_path = bundle_dir / "inputs.json"
     else:
         final_output_path = Path("results/inputs.json")

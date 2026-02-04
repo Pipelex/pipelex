@@ -112,6 +112,13 @@ class ConceptFactory:
                     description="A document",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.HTML:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="HTML content",
+                    structure_class_name=structure_class_name,
+                )
             case NativeConceptCode.TEXT_AND_IMAGES:
                 return Concept(
                     code=native_concept_code,

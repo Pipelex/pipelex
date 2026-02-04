@@ -41,6 +41,16 @@ class ValidationErrorReaction(StrEnum):
     IGNORE = "ignore"
 
 
+class AgentTarget(StrEnum):
+    CURSOR = "cursor"
+    AGENTS = "agents"
+    CLAUDE = "claude"
+
+
+class KitConfig(ConfigModel):
+    preferred_agent_target: AgentTarget = Field(strict=False)
+
+
 class PipeRunConfig(ConfigModel):
     pipe_stack_limit: int
 
@@ -183,6 +193,7 @@ class Pipelex(ConfigModel):
     observer_config: ObserverConfig
     scan_config: ScanConfig
     builder_config: BuilderConfig
+    kit_config: KitConfig
 
 
 class MigrationConfig(ConfigModel):

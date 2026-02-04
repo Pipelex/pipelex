@@ -105,7 +105,7 @@ class LocalStorageProvider(StorageProviderAbstract):
             await file_handle.write(data)
 
     @override
-    async def display_link(self, uri: str) -> str:
+    async def public_url(self, uri: str) -> str:
         """Return a file:// URI for this storage URI.
 
         Args:

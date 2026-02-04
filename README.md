@@ -144,7 +144,7 @@ Extracts text content from the candidate's CV PDF document using OCR technology,
 """
 inputs = { cv_pdf = "PDF" }
 output = "Page[]"
-model = "extract-text-from-pdf"
+model = "@default-text-from-pdf"
 
 [pipe.extract_job_offer_text]
 type = "PipeExtract"
@@ -153,7 +153,7 @@ Extracts text content from the job offer PDF document using OCR technology, conv
 """
 inputs = { job_offer_pdf = "PDF" }
 output = "Page[]"
-model = "extract-text-from-pdf"
+model = "@default-text-from-pdf"
 
 [pipe.analyze_match]
 type = "PipeLLM"
@@ -298,19 +298,6 @@ async def run_pipeline():
 Pipelex.make()
 asyncio.run(run_pipeline())
 ```
-
-## 5. Iterate with AI Assistance
-
-Install AI assistant rules to easily modify your pipelines:
-
-```bash
-pipelex kit rules
-```
-
-This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI. Now you can refine pipelines with natural language:
-
-- "Include confidence scores between 0 and 100 in the match analysis"
-- "Write a recap email at the end"
 
 <div>
   <h2 align="center">🚀 See Pipelex in Action</h2>

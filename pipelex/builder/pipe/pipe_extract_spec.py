@@ -8,12 +8,13 @@ from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.talents.extract_talent import ExtractTalent
-from pipelex.config import get_config
-from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
-from pipelex.tools.misc.pretty import PrettyPrintable
 
 if TYPE_CHECKING:
     from pipelex.cogt.extract.extract_setting import ExtractModelChoice
+
+from pipelex.config import get_config
+from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeExtractSpec(PipeSpec):

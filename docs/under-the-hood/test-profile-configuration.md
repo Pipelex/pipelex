@@ -48,7 +48,7 @@ all = ["pipelex_gateway", "anthropic", "openai", "google", ...]
 [collections.llm]
 anthropic = ["claude-3-haiku", "claude-4-opus", "claude-4.5-sonnet", ...]
 openai = ["gpt-4o-mini", "gpt-4o", "gpt-5", ...]
-google = ["gemini-2.0-flash", "gemini-2.5-pro", ...]
+google = ["gemini-2.5-flash", "gemini-2.5-pro", ...]
 
 [collections.img_gen]
 openai = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"]

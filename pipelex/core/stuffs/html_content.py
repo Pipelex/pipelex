@@ -1,5 +1,6 @@
 import json
 
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -8,8 +9,8 @@ from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 
 
 class HtmlContent(StuffContent):
-    inner_html: str
-    css_class: str
+    inner_html: str = Field(..., description="The inner HTML of the content")
+    css_class: str = Field(..., description="The CSS class of the content")
 
     @property
     @override
@@ -26,6 +27,9 @@ class HtmlContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
+        # If no css_class is provided, return raw inner_html without wrapping
+        if not self.css_class:
+            return self.inner_html
         template_source = '<div class="{{ css_class|e }}">{{ inner_html | safe }}</div>'
         return render_jinja2_sync(
             template_source=template_source,

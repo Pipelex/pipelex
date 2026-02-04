@@ -567,9 +567,8 @@ class ModelDeck(ConfigModel):
                     pass
 
     def validate_inference_models(self):
-        for model_handle in self.inference_models:
-            # model_type doesn't matter here since we're validating direct inference models (not aliases/waterfalls)
-            self.get_required_inference_model(model_handle=model_handle, model_type=ModelType.LLM)
+        for model_handle, model_spec in self.inference_models.items():
+            self.get_required_inference_model(model_handle=model_handle, model_type=model_spec.model_type)
 
     def _get_enabled_backends(self) -> set[str]:
         """Return the set of backend names that have at least one model enabled."""
@@ -670,13 +669,13 @@ class ModelDeck(ConfigModel):
         Handles prefixed references (e.g., @alias_name, ~waterfall_name) by parsing
         them and looking up the appropriate dictionary.
         """
-        return self._get_optional_inference_model_impl(
+        return self._get_optional_inference_model(
             model_handle=model_handle,
             model_type=model_type,
             _visited=frozenset(),
         )
 
-    def _get_optional_inference_model_impl(
+    def _get_optional_inference_model(
         self,
         model_handle: str,
         model_type: ModelType,
@@ -699,7 +698,7 @@ class ModelDeck(ConfigModel):
                     if alias_target in _visited:
                         log.error(f"Circular alias detected: '{model_handle}' -> '{alias_target}'")
                         return None
-                    return self._get_optional_inference_model_impl(
+                    return self._get_optional_inference_model(
                         model_handle=alias_target,
                         model_type=model_type,
                         _visited=_visited | {model_handle},
@@ -726,6 +725,9 @@ class ModelDeck(ConfigModel):
 
         # For direct handles (HANDLE kind), try inference_models first
         if inference_model := self.inference_models.get(ref.name):
+            if inference_model.model_type != model_type:
+                log.warning(f"Model handle '{ref.name}' has type '{inference_model.model_type}' but was requested as '{model_type}'. Skipping.")
+                return None
             return inference_model
         # Then try aliases (without prefix)
         if alias := aliases.get(ref.name):
@@ -733,7 +735,7 @@ class ModelDeck(ConfigModel):
             if alias in _visited:
                 log.warning(f"Circular alias detected: '{model_handle}' -> '{alias}'")
                 return None
-            return self._get_optional_inference_model_impl(
+            return self._get_optional_inference_model(
                 model_handle=alias,
                 model_type=model_type,
                 _visited=_visited | {model_handle},

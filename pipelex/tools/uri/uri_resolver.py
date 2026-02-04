@@ -18,6 +18,19 @@ BASE64_DATA_URL_PREFIX = "data:"
 BASE64_DATA_URL_MARKER = ";base64,"
 
 
+def describe_uri(uri: str) -> str:
+    """Describe a URI string.
+
+    Args:
+        uri: The URI string to describe.
+
+    Returns:
+        A human-readable description of the URI.
+    """
+    resolved_uri = resolve_uri(uri)
+    return resolved_uri.kind.desc
+
+
 def resolve_uri(uri: str) -> ResolvedUri:
     """Resolve a URI string to its typed representation.
 

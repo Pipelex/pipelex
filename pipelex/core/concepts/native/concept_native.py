@@ -3,6 +3,7 @@ from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
+from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.number_content import NumberContent
@@ -17,6 +18,7 @@ class NativeConceptCode(StrEnum):
     TEXT = "Text"
     IMAGE = "Image"
     DOCUMENT = "Document"
+    HTML = "Html"
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
     IMG_GEN_PROMPT = "ImgGenPrompt"
@@ -52,6 +54,8 @@ class NativeConceptCode(StrEnum):
                 return ImageContent
             case NativeConceptCode.DOCUMENT:
                 return DocumentContent
+            case NativeConceptCode.HTML:
+                return HtmlContent
             case NativeConceptCode.TEXT_AND_IMAGES:
                 return TextAndImagesContent
             case NativeConceptCode.NUMBER:
@@ -108,6 +112,7 @@ class NativeConceptCode(StrEnum):
                 NativeConceptCode.DYNAMIC
                 | NativeConceptCode.IMAGE
                 | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.IMG_GEN_PROMPT
@@ -129,6 +134,7 @@ class NativeConceptCode(StrEnum):
                 NativeConceptCode.TEXT
                 | NativeConceptCode.IMAGE
                 | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.IMG_GEN_PROMPT

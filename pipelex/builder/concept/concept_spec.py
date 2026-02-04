@@ -52,7 +52,7 @@ class ConceptStructureSpec(StructuredContent):
     the_field_name: str = Field(description="Field name. Must be snake_case.")
     description: str
     type: ConceptStructureSpecFieldType = Field(description="The type of the field.")
-    required: bool | None = False
+    required: bool = Field(default=False, description="Whether the field is mandatory. Defaults to False unless explicitly set to True.")
     default_value: Any | None = None
     concept_ref: str | None = Field(default=None, description="For type='concept', the concept reference (e.g., 'myapp.Customer').")
 

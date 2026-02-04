@@ -24,7 +24,7 @@ class TestData:
         "images": [
             {
                 "url": "https://example.com/image1.png",
-                "display_link": None,
+                "public_url": None,
                 "source_prompt": None,
                 "source_negative_prompt": None,
                 "caption": None,
@@ -33,7 +33,7 @@ class TestData:
             },
             {
                 "url": "https://example.com/image2.png",
-                "display_link": None,
+                "public_url": None,
                 "source_prompt": None,
                 "source_negative_prompt": None,
                 "caption": None,

@@ -6,7 +6,6 @@ from pipelex.core.stuffs.text_content import TextContent
 from tests.unit.pipelex.core.stuffs.page_content.test_data import TestData
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestPageContentRenders:
     """Tests for PageContent render methods."""
 
@@ -40,6 +39,7 @@ class TestPageContentRenders:
         result = content.rendered_html()
         assert result == TestData.EXPECTED_RENDERED_HTML
 
+    @pytest.mark.asyncio
     async def test_rendered_markdown_async(self):
         """Verify async rendered_markdown returns the same as sync version."""
         text_and_images = TextAndImagesContent(
@@ -50,6 +50,7 @@ class TestPageContentRenders:
         result = await content.rendered_markdown_async()
         assert result == TestData.EXPECTED_RENDERED_MARKDOWN
 
+    @pytest.mark.asyncio
     async def test_rendered_html_async(self):
         """Verify async rendered_html returns the same as sync version."""
         text_and_images = TextAndImagesContent(
