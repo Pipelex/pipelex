@@ -118,6 +118,18 @@ pipelex-agent concept --spec '{"the_concept_code": "Summary", "description": "A 
 
 **Field types**: `text`, `integer`, `boolean`, `number`, `date`, `concept`, `list`
 
+**Choices (enum-like constrained values)**:
+```toml
+# Use choices instead of type when the field has a fixed set of allowed values
+status = {choices = ["pending", "processing", "completed"], description = "Order status", required = true}
+priority = {choices = ["low", "medium", "high"], description = "Priority level"}
+```
+
+This generates type-safe `Literal` types in Python. Use choices when:
+- A field should only accept specific string values
+- You want to route with PipeCondition based on the field value
+- Input validation should reject invalid values
+
 **Nested concept references** in structures:
 ```toml
 # Single concept reference - needs full domain path

@@ -76,8 +76,23 @@ When inputs require actual files (Image, Document), use the appropriate generati
 Use the `synthesize_image` Pipelex pipeline to generate test images.
 
 **Command:**
+
+First, create an input file (e.g., `pipelex-wip/inputs/image_request.json`):
+```json
+{
+  "request": {
+    "concept": "synthetic_data.ImageRequest",
+    "content": {
+      "category": "<category>",
+      "description": "<optional description>"
+    }
+  }
+}
+```
+
+Then run:
 ```bash
-pipelex run synthesize_image.plx --input request='{"category": "<category>", "description": "<optional description>"}'
+pipelex run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs pipelex-wip/inputs/image_request.json
 ```
 
 **Image Categories:**
@@ -91,19 +106,36 @@ pipelex run synthesize_image.plx --input request='{"category": "<category>", "de
 | `document_scan` | Scanned papers, receipts, forms | "A scanned invoice from a hardware store" |
 | `handwritten` | Handwritten notes, signatures | "Handwritten meeting notes on lined paper" |
 
-**Examples:**
-```bash
-# Generate a product photo
-pipelex run synthesize_image.plx --input request='{"category": "photograph", "description": "A red sneaker on white background"}'
+**Example input files:**
 
-# Generate a chart
-pipelex run synthesize_image.plx --input request='{"category": "chart", "description": "Pie chart showing market share percentages"}'
+`photo_request.json`:
+```json
+{
+  "request": {
+    "concept": "synthetic_data.ImageRequest",
+    "content": {"category": "photograph", "description": "A red sneaker on white background"}
+  }
+}
+```
 
-# Generate a scanned document
-pipelex run synthesize_image.plx --input request='{"category": "document_scan", "description": "A utility bill with usage details"}'
+`chart_request.json`:
+```json
+{
+  "request": {
+    "concept": "synthetic_data.ImageRequest",
+    "content": {"category": "chart", "description": "Pie chart showing market share percentages"}
+  }
+}
+```
 
-# Simple generation (category only)
-pipelex run synthesize_image.plx --input request='{"category": "screenshot"}'
+`screenshot_request.json` (minimal):
+```json
+{
+  "request": {
+    "concept": "synthetic_data.ImageRequest",
+    "content": {"category": "screenshot", "description": ""}
+  }
+}
 ```
 
 **Output**: The pipeline saves the generated image to `pipelex-wip/test-files/` and returns the file path.
@@ -326,8 +358,20 @@ pipelex-agent inputs image_analyzer.plx
 - `analysis_prompt`: Need instruction text
 
 **Step 3**: Generate image
+
+Create `pipelex-wip/inputs/city_image.json`:
+```json
+{
+  "request": {
+    "concept": "synthetic_data.ImageRequest",
+    "content": {"category": "photograph", "description": "A busy city street with pedestrians and storefronts"}
+  }
+}
+```
+
+Run:
 ```bash
-pipelex run synthesize_image.plx --input request='{"category": "photograph", "description": "A busy city street with pedestrians and storefronts"}'
+pipelex run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs pipelex-wip/inputs/city_image.json
 ```
 
 **Step 4**: Assemble input file
