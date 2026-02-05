@@ -11,6 +11,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
+from pipelex.pipe_operators.compose.exceptions import StructuredContentComposerValidationError
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -55,7 +56,7 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
-    except (PipeStackOverflowError, ValidationError) as exc:
+    except (PipeStackOverflowError, ValidationError, StructuredContentComposerValidationError) as exc:
         formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
         if pipe.code in get_config().pipelex.dry_run_config.allowed_to_fail_pipes:
             error_message = f"Allowed to fail dry run for pipe '{pipe.code}': {formatted_error}"

@@ -1,10 +1,10 @@
 from typing import Any
 
-from polyfactory.factories.pydantic_factory import ModelFactory
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
@@ -69,17 +69,11 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
-        class ObjectFactory(ModelFactory[object_class]):  # type: ignore[valid-type]
-            __model__ = object_class
-            __check_model__ = True
-            __use_examples__ = True
-            __allow_none_optionals__ = False  # Ensure Optional fields always get values
-
-        # `factory_use_contruct=True` prevents from running the model_validator/field_validator.
-        # It is that way because the dry run was failing a lot of pipes that had validation test on the
-        # field values. For example, if a string requires to be a snake_case, the ObjectFactory would
-        # generate something like `DOIJZjoDoIJDZOjDZJo` which is... not a snake_case.
-        return ObjectFactory.build(factory_use_construct=True)
+        object_factory = DryRunFactory.make_dry_run_factory(object_class)
+        # We run validators to ensure mock data is valid. Fields with format constraints
+        # (snake_case, PascalCase, etc.) should have `examples` defined in their Field()
+        # so polyfactory uses those instead of random strings.
+        return object_factory.build()
 
     @override
     @update_job_metadata
@@ -115,15 +109,20 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_object_list_direct"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
-        return [
-            await self.make_object_direct(
+        items: list[BaseModelTypeVar] = []
+        for idx in range(nb_list_items):
+            item = await self.make_object_direct(
                 job_metadata=job_metadata,
                 object_class=object_class,
                 llm_setting_for_object=llm_setting_for_object_list,
                 llm_prompt_for_object=llm_prompt_for_object_list,
             )
-            for _ in range(nb_list_items)
-        ]
+            # Set first item's pipe_code to "mock_main" to coordinate with BundleHeaderSpec.main_pipe
+            # which uses examples=["mock_main"] for dry run validation
+            if idx == 0 and hasattr(item, "pipe_code"):
+                item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+            items.append(item)
+        return items
 
     @override
     @update_job_metadata
