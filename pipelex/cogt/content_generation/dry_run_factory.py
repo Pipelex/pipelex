@@ -17,6 +17,7 @@ class MockFormat(StrEnum):
 
     SNAKE_CASE = "snake_case"
     PASCAL_CASE = "pascal_case"
+    CONCEPT_REF = "concept_ref"
     IGNORE = "ignore"
     DICT_SNAKE_KEY_PASCAL_VALUE = "dict_snake_key_pascal_value"
     DICT_SINGLE_EXTRACT_INPUT = "dict_single_extract_input"
@@ -48,6 +49,14 @@ class DryRunFactory:
         """Generate a valid PascalCase code for dry run mocks."""
         suffix = "".join(random.choices(string.ascii_lowercase, k=4))
         return f"Mock{suffix.capitalize()}"
+
+    @classmethod
+    def generate_concept_ref(cls) -> str:
+        """Generate a valid concept reference for dry run mocks.
+
+        Format: snake_case.PascalCase (e.g., mock_domain.MockConcept)
+        """
+        return f"{cls.generate_snake_case_code()}.{cls.generate_pascal_case_code()}"
 
     @classmethod
     def generate_dict_snake_key_pascal_value(cls, num_items: int = 2) -> dict[str, str]:
@@ -224,6 +233,10 @@ class DryRunFactory:
             if field_name in nested_class.model_fields and field_name not in class_attrs:
                 class_attrs[field_name] = Use(cls.generate_pascal_case_code)
 
+        for field_name in detected_formats[MockFormat.CONCEPT_REF]:
+            if field_name in nested_class.model_fields and field_name not in class_attrs:
+                class_attrs[field_name] = Use(cls.generate_concept_ref)
+
         for field_name in detected_formats[MockFormat.IGNORE]:
             if field_name in nested_class.model_fields and field_name not in class_attrs:
                 class_attrs[field_name] = Ignore()
@@ -312,6 +325,11 @@ class DryRunFactory:
         for field_name in all_pascal_case:
             if field_name in object_class.model_fields:
                 class_attrs[field_name] = Use(cls.generate_pascal_case_code)
+
+        # Add concept ref providers (snake_case@PascalCase)
+        for field_name in detected_formats[MockFormat.CONCEPT_REF]:
+            if field_name in object_class.model_fields:
+                class_attrs[field_name] = Use(cls.generate_concept_ref)
 
         # Add Ignore for fields that should be None/default
         for field_name in detected_formats[MockFormat.IGNORE]:

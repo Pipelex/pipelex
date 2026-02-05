@@ -72,7 +72,7 @@ class ConceptStructureSpec(StructuredContent):
     concept_ref: str | None = Field(
         default=None,
         description="For type='concept', the concept reference (e.g., 'myapp.Customer').",
-        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
+        json_schema_extra={"mock_format": MockFormat.CONCEPT_REF},
     )
     choices: list[str] | None = Field(
         default=None, description="List of allowed values for the field. When set, the field value must be one of these choices."
