@@ -306,13 +306,18 @@ theme = "dark"
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config]
 is_use_cdn = true
-layout_direction = "TB"
+layout_direction = "left_to_right"
 nodesep = 50
 ranksep = 30
 edge_type = "bezier"
 initial_zoom = 1.0
 pan_to_top = true
 default_title = "Pipelex Graph"
+# When true, PipeBatch controller nodes appear in the graph as pipe nodes for batch edges
+# When false, batch edges connect stuff nodes directly (list -> items, items -> list)
+show_batch_controller = false
+# When true, batch item nodes display their index suffix (e.g., "topic[0]" instead of "topic")
+show_batch_item_index = false
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
 theme = "dark"

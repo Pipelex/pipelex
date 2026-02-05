@@ -64,6 +64,7 @@ def generate_reactflow_html(
             "stuff_data_text_json": json.dumps(stuff_data_text or {}),
             "stuff_data_html_json": json.dumps(stuff_data_html or {}),
             "use_cdn": config.is_use_cdn,
+            "layout_direction": config.layout_direction.reactflow_code,
             "nodesep": config.nodesep,
             "ranksep": config.ranksep,
             "edge_type": config.edge_type,
@@ -71,6 +72,8 @@ def generate_reactflow_html(
             "pan_to_top": config.pan_to_top,
             "initial_theme": config.style.theme,
             "initial_palette": config.style.palette,
+            "show_batch_controller": config.show_batch_controller,
+            "show_batch_item_index": config.show_batch_item_index,
         },
         use_registry=True,
     )
@@ -124,6 +127,7 @@ async def generate_reactflow_html_async(
             "stuff_data_text_json": json.dumps(stuff_data_text or {}),
             "stuff_data_html_json": json.dumps(stuff_data_html or {}),
             "use_cdn": config.is_use_cdn,
+            "layout_direction": config.layout_direction.reactflow_code,
             "nodesep": config.nodesep,
             "ranksep": config.ranksep,
             "edge_type": config.edge_type,
@@ -131,6 +135,8 @@ async def generate_reactflow_html_async(
             "pan_to_top": config.pan_to_top,
             "initial_theme": config.style.theme,
             "initial_palette": config.style.palette,
+            "show_batch_controller": config.show_batch_controller,
+            "show_batch_item_index": config.show_batch_item_index,
         },
         use_registry=True,
     )
