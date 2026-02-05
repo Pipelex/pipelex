@@ -14,6 +14,7 @@
  - **PipeFunc Return Type Validation**: Added validation to ensure that a `PipeFunc` function's return type matches the output concept's structure class.
 
 ### Changed
+ - **`pipelex build structures` Command**: Now uses a lightweight loading mechanism that only processes domains and concepts, skipping pipe loading and validation entirely. This fixes the chicken-and-egg problem where structure generation would fail due to pipe validation errors before the structures were even created.
  - **Test Profile System**: Refactored integration tests to use a new configuration system (`.pipelex/test_profiles.toml`) with `dev`, `ci`, and `full` profiles for controlling which AI models are used in parametrized tests, replacing runtime filtering and hardcoded model lists.
  - **`pipelex run --graph` Flag**: Now acts as an override for `pipelex.toml` settings instead of defaulting to `true`.
  - **Default Image Generation Models**: Updated in `base_deck.toml`: `base-img-gen`: `flux-2-pro`, `best-img-gen`: `nano-banana-pro`, `fast-img-gen`: `gpt-image-1-mini`
