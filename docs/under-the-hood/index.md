@@ -13,6 +13,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Image Handling in LLM Prompts** - How images flow from inputs to LLM calls
 - **StuffArtefact & Image Rendering** - How template access and image extraction work
 - **Test Profile Configuration** - How to configure which models are used in tests
+- **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Technical Design Decisions** - Why we chose X over Y
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
@@ -28,3 +29,4 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button }
 - [:material-code-braces: StuffArtefact & Image Rendering](./stuffartefact-and-image-rendering.md){ .md-button }
 - [:material-test-tube: Test Profile Configuration](./test-profile-configuration.md){ .md-button }
+- [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }

@@ -30,7 +30,10 @@ class PipeImgGenSpec(PipeSpec):
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
-    img_gen_talent: ImgGenTalent | str = Field(description="Select the most adequate image generation talent according to the task to be performed.")
+    img_gen_talent: ImgGenTalent | str = Field(
+        description="Select the most adequate image generation talent according to the task to be performed.",
+        examples=list(ImgGenTalent),
+    )
     prompt: str = Field(description="A finalized image generation prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).")
 
     @field_validator("img_gen_talent", mode="before")

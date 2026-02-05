@@ -216,12 +216,23 @@ class PipeBatch(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        return await self._live_run_controller_pipe(
+        pipe_output = await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
         )
+        # For dry run coordination: set the first item's pipe_code to "mock_main"
+        # to match the BundleHeaderSpec.main_pipe examples=["mock_main"]
+        main_stuff = pipe_output.main_stuff
+        content = main_stuff.content
+        if isinstance(content, ListContent):
+            list_content = cast("ListContent[StuffContent]", content)
+            if list_content.items:
+                first_item = list_content.items[0]
+                if hasattr(first_item, "pipe_code"):
+                    first_item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+        return pipe_output
 
     @override
     async def _validate_after_run(
