@@ -74,6 +74,9 @@ class ConceptStructureSpec(StructuredContent):
         description="For type='concept', the concept reference (e.g., 'myapp.Customer').",
         json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
     )
+    choices: list[str] | None = Field(
+        default=None, description="List of allowed values for the field. When set, the field value must be one of these choices."
+    )
 
     @field_validator("type", mode="before")
     @classmethod
@@ -153,6 +156,7 @@ class ConceptStructureSpec(StructuredContent):
             required=self.required,
             default_value=self.default_value,
             concept_ref=self.concept_ref,
+            choices=self.choices,
         )
 
 

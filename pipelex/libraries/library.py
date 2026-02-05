@@ -45,9 +45,9 @@ class Library(BaseModel):
         self.loaded_plx_paths = []
 
     def validate_library(self) -> None:
-        self.validate_pipe_library_with_libraries()
-        self.validate_concept_library_with_libraries()
         self.validate_domain_library_with_libraries()
+        self.validate_concept_library_with_libraries()
+        self.validate_pipe_library_with_libraries()
 
     def validate_pipe_library_with_libraries(self) -> None:
         for pipe in self.pipe_library.get_pipes():

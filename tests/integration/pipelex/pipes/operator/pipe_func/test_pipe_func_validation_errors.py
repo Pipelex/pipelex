@@ -356,3 +356,73 @@ class TestPipeFuncValidationErrors:
             assert expected_error_substring.lower() in error_message.lower(), (
                 f"Error should mention '{expected_error_substring}' to explain the specific issue. Got: {error_message}"
             )
+
+    @pytest.mark.xfail(
+        reason="This test will fail because the building of the structures of the concepts are actually validating the pipes as well. \
+        So when you validate a pipe, it will validate the pipe func but it will not have created the structure for the pipe func, and this test \
+            will fail because the output of the pipe func function is not matching the output concept. (chicken and egg paradox). \
+            So first, we need to make sure thatwhen we call this the structure build structure command it only \
+                validates the concepts and not the pipes."
+    )
+    async def test_pipe_func_return_type_must_match_concept_structure_class(self):
+        """Test that the function's return type must exactly match the output concept's structure class.
+
+        When a PipeFunc's output concept expects a specific structure class (e.g., TextContent),
+        the function's return type must be exactly that class. If the function returns a different
+        structure class (e.g., StructuredContent when TextContent is expected), validation should
+        fail with a clear error.
+        """
+        # Function that returns StructuredContent instead of TextContent
+        func_code = """
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.system.registries.func_registry import pipe_func
+
+
+class MyStructuredContent(StructuredContent):
+    name: str
+
+
+@pipe_func()
+async def func_wrong_structure_class(working_memory: WorkingMemory) -> MyStructuredContent:
+    return MyStructuredContent(name="test")
+"""
+        # PLX file that expects Text output (which uses TextContent)
+        plx_content = """
+domain = "test_pipe_func_validation"
+description = "Test bundle for pipe_func return type validation"
+
+[pipe.test_pipe_func]
+type = "PipeFunc"
+description = "Test pipe expecting Text output but function returns StructuredContent"
+function_name = "func_wrong_structure_class"
+output = "Text"
+"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create the .plx file
+            plx_file = temp_path / "test_bundle.plx"
+            plx_file.write_text(plx_content)
+
+            # Create the .py file with the function
+            py_file = temp_path / "my_funcs.py"
+            py_file.write_text(func_code)
+
+            # Validate the bundle - should fail because return type doesn't match concept's structure class
+            with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
+                await validate_bundle(
+                    plx_file_path=plx_file,
+                    library_dirs=[temp_path],
+                )
+
+            error = exc_info.value
+            error_message = str(error)
+
+            # The error should mention the function name
+            assert "func_wrong_structure_class" in error_message, f"Error should mention the function name. Got: {error_message}"
+
+            # The error should explain that the return type doesn't match the expected structure class
+            assert "TextContent" in error_message or "structure class" in error_message.lower(), (
+                f"Error should mention the expected structure class 'TextContent' or 'structure class'. Got: {error_message}"
+            )

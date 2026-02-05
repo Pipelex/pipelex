@@ -329,7 +329,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
 
         # Check return type annotation
         if "return" not in type_hints:
-            return "must have a return type annotation (e.g., '-> TextContent' or '-> StructuredContent')"
+            return "must have a return type annotation that is a subclass of StuffContent"
 
         return_type = type_hints["return"]
 
