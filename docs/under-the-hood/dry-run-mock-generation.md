@@ -23,8 +23,8 @@ class ConceptSpec(StructuredContent):
 
 Standard mock generators (like Polyfactory) produce random strings like `"uygNjiAuDMOtZEyibgHw"` which fail validation. The dry run system addresses this at two levels:
 
-1. **Field-level**: Generate values matching expected formats (snake_case, PascalCase)
-2. **Model-level**: Gracefully handle cross-field validators that mock data cannot satisfy
+1. **Field-level**: Generate values matching expected formats (snake_case, PascalCase, concept refs, etc.)
+2. **Model-level**: Bypass validators using `factory_use_construct=True`
 
 ---
 
@@ -42,26 +42,37 @@ flowchart TD
     H --> E
 
     I[PipeCompose dry run] --> J[StructuredContentComposer.compose]
-    J --> K{Validation fails?}
-    K -->|Yes + dry run| L[model_construct fallback]
-    K -->|Yes + live run| M[Raise error]
-    K -->|No| N[Return validated object]
+    J --> K[model_validate with resolved values]
 ```
 
 | Trigger | Entry Point | Mock Generation |
 |---------|-------------|-----------------|
 | `pipelex validate` | `dry_run_pipe()` | `WorkingMemoryFactory.make_mock_inputs()` |
-| `PipeLLM` output in dry mode | `ContentGeneratorDry.make_object_direct()` | `DryRunFactory` (no field constraints) |
-| `PipeFunc` output in dry mode | `WorkingMemoryFactory.make_mock_content()` | `DryRunFactory` (with field constraints) |
-| `PipeCompose` validation failure in dry mode | `StructuredContentComposer.compose()` | Falls back to `model_construct` |
+| `PipeLLM` output in dry mode | `ContentGeneratorDry.make_object_direct()` | `DryRunFactory` (auto-detects from field definitions) |
+| `PipeFunc` output in dry mode | `WorkingMemoryFactory.make_mock_content()` | `DryRunFactory` (with explicit field constraints) |
+| `PipeCompose` in dry mode | `StructuredContentComposer.compose()` | Uses resolved values from working memory (no mocks) |
 
 ---
 
 ## Architecture
 
+### MockFormat Enum
+
+Located at `pipelex/cogt/content_generation/dry_run_factory.py`, the `MockFormat` enum defines all supported mock value formats:
+
+```python
+class MockFormat(StrEnum):
+    SNAKE_CASE = "snake_case"
+    PASCAL_CASE = "pascal_case"
+    CONCEPT_REF = "concept_ref"
+    IGNORE = "ignore"
+    DICT_SNAKE_KEY_PASCAL_VALUE = "dict_snake_key_pascal_value"
+    DICT_SINGLE_EXTRACT_INPUT = "dict_single_extract_input"
+```
+
 ### DryRunFactory
 
-Located at `pipelex/cogt/content_generation/dry_run_factory.py`:
+The factory dynamically creates a Polyfactory `ModelFactory` subclass with field-specific providers:
 
 ```python
 class DryRunFactory:
@@ -76,6 +87,11 @@ class DryRunFactory:
         return f"Mock{suffix.capitalize()}"  # e.g., "MockAbcd"
 
     @classmethod
+    def generate_concept_ref(cls) -> str:
+        return f"{cls.generate_snake_case_code()}.{cls.generate_pascal_case_code()}"
+        # e.g., "mock_abcd.MockCdef"
+
+    @classmethod
     def make_dry_run_factory(
         cls,
         object_class: type[BaseModelTypeVar],
@@ -85,21 +101,97 @@ class DryRunFactory:
         ...
 ```
 
-The factory dynamically creates a Polyfactory `ModelFactory` subclass with field-specific providers using the `Use` directive.
+---
 
-### Field Constraint Configuration
+## Generated Mock Value Formats
 
-Field name sets are defined in `WorkingMemoryFactory` (not in `DryRunFactory`) because they are domain-specific to Pipelex bundle/concept specs:
+| Format | Generator | Example Output | Used For |
+|--------|-----------|----------------|----------|
+| `SNAKE_CASE` | `generate_snake_case_code()` | `mock_abcd` | `domain_code`, `pipe_code`, `the_field_name` |
+| `PASCAL_CASE` | `generate_pascal_case_code()` | `MockAbcd` | `the_concept_code` |
+| `CONCEPT_REF` | `generate_concept_ref()` | `mock_abcd.MockCdef` | `concept_ref` field (domain.ConceptCode format) |
+| `IGNORE` | Sets field to `Ignore()` | None/default | `default_value`, `structure` fields |
+| `DICT_SNAKE_KEY_PASCAL_VALUE` | `generate_dict_snake_key_pascal_value()` | `{mock_abcd: MockCdef}` | `inputs` dict in PipeSpec |
+| `DICT_SINGLE_EXTRACT_INPUT` | `generate_dict_single_extract_input()` | `{mock_abcd: "Image"}` | `inputs` dict in PipeExtract |
+| Random string | Polyfactory default | `uygNjiAuDMOtZEyibgHw` | All other string fields |
+
+---
+
+## Declaring MockFormat on Fields
+
+The `DryRunFactory` auto-detects format constraints from Pydantic `Field` definitions using the `mock_format` key in `json_schema_extra`:
 
 ```python
-# pipelex/core/memory/working_memory_factory.py
+from pydantic import Field
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 
-SNAKE_CASE_FIELD_NAMES = {"domain", "domain_code", "pipe_code", "main_pipe"}
-PASCAL_CASE_FIELD_NAMES = {"the_concept_code"}
+class ConceptStructureSpec(StructuredContent):
+    # Snake case field
+    the_field_name: str = Field(
+        description="Field name. Must be snake_case.",
+        json_schema_extra={"mock_format": MockFormat.SNAKE_CASE}
+    )
+
+    # Concept reference field (domain.ConceptCode format)
+    concept_ref: str | None = Field(
+        default=None,
+        description="For type='concept', the concept reference.",
+        json_schema_extra={"mock_format": MockFormat.CONCEPT_REF},
+    )
+
+    # Field to ignore during mock generation (use default/None)
+    default_value: Any | None = Field(
+        default=None,
+        json_schema_extra={"mock_format": MockFormat.IGNORE}
+    )
 ```
 
-!!! info "Why constraints live in WorkingMemoryFactory"
-    The `DryRunFactory` is a generic utility at the `cogt` (cognitive) layer. Field format constraints like `domain_code` are specific to Pipelex bundle definitions. Keeping them separate maintains layer boundaries.
+---
+
+## Using Field Examples for Enum-like Values
+
+For fields that should pick from a set of valid values (like enum members or known strings), use the `examples` parameter. The factory's `__use_examples__: True` configuration makes Polyfactory randomly select from provided examples:
+
+```python
+class ConceptSpec(StructuredContent):
+    # Refines should be one of the native concepts
+    refines: str | None = Field(
+        default=None,
+        examples=["Text", "Image", "Document", "TextAndImages", "Number", "Page"],
+    )
+
+class PipeSpec(StructuredContent):
+    # Extract talent should be a valid ExtractTalent value
+    extract_talent: ExtractTalent | str = Field(
+        description="Select extraction model talent",
+        examples=list(ExtractTalent),  # Polyfactory picks randomly from these
+    )
+```
+
+---
+
+## Cross-Field Dependencies with PostGenerated
+
+For fields that depend on values generated for other fields, use Polyfactory's `PostGenerated` directive. The factory automatically handles the `main_pipe` field which must reference a key from the generated `pipe` dict:
+
+```python
+# Inside DryRunFactory.make_dry_run_factory():
+if "main_pipe" in object_class.model_fields and "pipe" in object_class.model_fields:
+    class_attrs["main_pipe"] = PostGenerated(cls._main_pipe_from_pipe_dict)
+```
+
+The callback receives all previously generated values and can compute the dependent field:
+
+```python
+@staticmethod
+def _main_pipe_from_pipe_dict(_field_name: str, values: dict[str, Any]) -> str:
+    pipe_dict: dict[str, Any] | None = values.get("pipe")
+    if pipe_dict and len(pipe_dict) > 0:
+        pipe_keys: list[str] = list(pipe_dict.keys())
+        return random.choice(pipe_keys)
+    # Fallback to a mock value if pipe dict is empty/not available
+    return "mock_" + "".join(random.choices(string.ascii_lowercase, k=4))
+```
 
 ---
 
@@ -131,11 +223,11 @@ object_factory = DryRunFactory.make_dry_run_factory(object_class)
 return object_factory.build(factory_use_construct=True)
 ```
 
-No field constraints are passed here—LLM output classes may have arbitrary schemas not matching bundle spec patterns.
+No explicit field constraints are passed—the factory auto-detects `MockFormat` from field definitions.
 
-### PipeCompose Validation Fallback
+### PipeCompose Resolution
 
-`StructuredContentComposer` handles cross-field validation failures in dry run mode:
+`StructuredContentComposer.compose()` does **not** generate mocks. Instead, it resolves field values from working memory and validates the result:
 
 ```python
 async def compose(self) -> StuffContent:
@@ -143,48 +235,38 @@ async def compose(self) -> StuffContent:
     try:
         return self.output_class.model_validate(field_values)
     except ValidationError as exc:
-        if self.pipe_run_params and self.pipe_run_params.run_mode.is_dry:
-            log.verbose(f"Dry run validation failed, using model_construct: {exc}")
-            return self.output_class.model_construct(**field_values)
-        raise StructuredContentComposerValidationError(...) from exc
+        formatted_error = format_pydantic_validation_error(exc)
+        msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}"
+        raise StructuredContentComposerValidationError(msg) from exc
 ```
 
-This handles cases like `PipelexBundleSpec` where `main_pipe` must reference an existing key in the `pipe` dict—impossible to guarantee with independently generated mock values.
+In dry run mode, the working memory already contains properly formatted mock values (generated by `WorkingMemoryFactory`), so validation typically succeeds.
 
 ---
 
 ## Behavior Matrix
 
-| Scenario | Field Constraints Applied | Validators Bypassed | Fallback on Error |
-|----------|--------------------------|---------------------|-------------------|
-| `WorkingMemoryFactory.make_mock_content()` | Yes (snake_case, PascalCase) | Yes (`factory_use_construct`) | N/A |
-| `ContentGeneratorDry.make_object_direct()` | No | Yes (`factory_use_construct`) | N/A |
-| `StructuredContentComposer.compose()` (dry) | N/A (uses resolved values) | No (tries validation first) | Yes (`model_construct`) |
-| `StructuredContentComposer.compose()` (live) | N/A | No | No (raises error) |
-
----
-
-## Generated Mock Value Formats
-
-| Format | Generator | Example Output | Used For |
-|--------|-----------|----------------|----------|
-| snake_case | `generate_snake_case_code()` | `mock_abcd` | `domain`, `domain_code`, `pipe_code`, `main_pipe` |
-| PascalCase | `generate_pascal_case_code()` | `MockAbcd` | `the_concept_code` |
-| Random string | Polyfactory default | `uygNjiAuDMOtZEyibgHw` | All other string fields |
+| Scenario | Format Constraints | Validators Bypassed |
+|----------|-------------------|---------------------|
+| `WorkingMemoryFactory.make_mock_content()` | Yes (from `json_schema_extra` + explicit params) | Yes (`factory_use_construct`) |
+| `ContentGeneratorDry.make_object_direct()` | Yes (from `json_schema_extra` only) | Yes (`factory_use_construct`) |
+| `StructuredContentComposer.compose()` | N/A (uses resolved values) | No (validates) |
 
 ---
 
 ## Extending Field Constraints
 
-To add new constrained fields:
+### Adding a New MockFormat Value
 
-1. **Add to field name sets** in `working_memory_factory.py`:
+1. **Add to the MockFormat enum** in `dry_run_factory.py`:
 
     ```python
-    SNAKE_CASE_FIELD_NAMES = {"domain", "domain_code", "pipe_code", "main_pipe", "new_field"}
+    class MockFormat(StrEnum):
+        ...
+        KEBAB_CASE = "kebab_case"
     ```
 
-2. **For new format types**, add a generator to `DryRunFactory`:
+2. **Add a generator method**:
 
     ```python
     @classmethod
@@ -193,17 +275,23 @@ To add new constrained fields:
         return f"mock-{suffix}"
     ```
 
-3. **Add a new parameter** to `make_dry_run_factory()`:
+3. **Handle the format in `make_dry_run_factory()`**:
 
     ```python
-    def make_dry_run_factory(
-        cls,
-        object_class: type[BaseModelTypeVar],
-        snake_case_field_names: set[str] | None = None,
-        pascal_case_field_names: set[str] | None = None,
-        kebab_case_field_names: set[str] | None = None,  # New
-    ) -> type[ModelFactory[BaseModelTypeVar]]:
+    for field_name in detected_formats[MockFormat.KEBAB_CASE]:
+        if field_name in object_class.model_fields:
+            class_attrs[field_name] = Use(cls.generate_kebab_case_code)
     ```
+
+### Using the New Format on Fields
+
+```python
+class MySpec(StructuredContent):
+    my_kebab_field: str = Field(
+        description="A kebab-case identifier",
+        json_schema_extra={"mock_format": MockFormat.KEBAB_CASE}
+    )
+```
 
 !!! warning "Field name matching is exact"
     The field name must exactly match a key in `object_class.model_fields`. No glob patterns or inheritance traversal.
@@ -214,10 +302,10 @@ To add new constrained fields:
 
 | File | Purpose |
 |------|---------|
-| `pipelex/cogt/content_generation/dry_run_factory.py` | `DryRunFactory` class with format generators |
+| `pipelex/cogt/content_generation/dry_run_factory.py` | `DryRunFactory` class with `MockFormat` enum and generators |
 | `pipelex/cogt/content_generation/content_generator_dry.py` | `ContentGeneratorDry` for mock LLM/image outputs |
 | `pipelex/core/memory/working_memory_factory.py` | `WorkingMemoryFactory.make_mock_content()` with field constraints |
-| `pipelex/pipe_operators/compose/structured_content_composer.py` | Validation fallback for `PipeCompose` |
+| `pipelex/pipe_operators/compose/structured_content_composer.py` | Composes `StructuredContent` from working memory (no mocks) |
 | `pipelex/pipe_run/dry_run.py` | `dry_run_pipe()` orchestration |
 
 ---
