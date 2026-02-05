@@ -18,7 +18,7 @@ from pipelex.core.concepts.structure_generation.generator import ConceptClassInf
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry, get_func_registry
+from pipelex.hub import get_class_registry, get_func_registry, resolve_library_dirs
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
@@ -305,8 +305,8 @@ def build_structures_command(
             typer.secho(f"❌ Target does not exist: {target_path}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
 
-        # Convert library_dir strings to Path objects
-        library_dirs_paths: list[Path] | None = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
+        # Resolve library directories using the standard 3-tier priority
+        library_dirs_paths, _ = resolve_library_dirs(library_dir)
 
         # Determine if target is a file or directory
         is_plx_file = target_path.is_file() and is_pipelex_file(target_path)

@@ -7,6 +7,7 @@ from kajson.kajson_manager import KajsonManager
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -368,7 +369,7 @@ class StructureGenerator:
         # Handle native concepts (e.g., "native.Html" -> HtmlContent)
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
             # Extract the concept code (e.g., "Html" from "native.Html")
-            concept_code = concept_ref.split(".")[-1] if "." in concept_ref else concept_ref
+            concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
             try:
                 native_code = NativeConceptCode(concept_code)
                 structure_class = native_code.structure_class
@@ -391,7 +392,7 @@ class StructureGenerator:
 
         # Default: extract concept code and use as forward reference
         # e.g., "myapp.Customer" -> '"Customer"'
-        concept_code = concept_ref.split(".")[-1]
+        concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
         return f'"{concept_code}"'
 
     def _generate_field(self, field_name: str, field_def: dict[str, Any] | str) -> str:
