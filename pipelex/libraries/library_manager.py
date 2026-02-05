@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.kajson_manager import KajsonManager
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -20,6 +20,7 @@ from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_current_library
 from pipelex.libraries.exceptions import (
     LibraryError,
@@ -141,7 +142,7 @@ class LibraryManager(LibraryManagerAbstract):
             raise LibraryError(msg)
 
         if not library_dirs:
-            library_dirs = [Path()]
+            library_dirs = []
 
         all_dirs: list[Path] = []
         all_plx_paths: list[Path] = []
@@ -187,7 +188,7 @@ class LibraryManager(LibraryManagerAbstract):
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
         # Load PLX files into the specific library
-
+        log.debug(f"Loading plx files from: {[str(p) for p in valid_plx_paths]}")
         return self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
 
     @override
@@ -277,12 +278,20 @@ class LibraryManager(LibraryManagerAbstract):
                         domain_code=blueprint.domain,
                         concept_code=concept_code,
                     )
-                    ref_to_entry[concept_ref] = (blueprint.domain, concept_code, concept_blueprint)
+                    ref_to_entry[concept_ref] = (
+                        blueprint.domain,
+                        concept_code,
+                        concept_blueprint,
+                    )
 
         # Step 2: Build dependency graph and topologically sort using graphlib
         sorter: TopologicalSorter[str] = TopologicalSorter()
 
-        for concept_ref, (domain_code, _concept_code, concept_blueprint) in ref_to_entry.items():
+        for concept_ref, (
+            domain_code,
+            _concept_code,
+            concept_blueprint,
+        ) in ref_to_entry.items():
             dependencies: set[str] = set()
 
             if not isinstance(concept_blueprint, str) and concept_blueprint.refines:
@@ -364,7 +373,14 @@ class LibraryManager(LibraryManagerAbstract):
                 resolved_path = plx_file_path
             library.loaded_plx_paths.append(resolved_path)
 
-        return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+        try:
+            return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+        except ValidationError as validation_error:
+            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+            msg = f"Could not load blueprints from {[str(pth) for pth in valid_plx_paths]} because of: {validation_error_msg}"
+            raise LibraryError(
+                message=msg,
+            ) from validation_error
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()
@@ -431,6 +447,9 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             concepts: List of concepts to check for cycles
         """
+        # TODO: Refactor to inspect ConceptStructureBlueprint directly (concept_ref and item_concept_ref fields)
+        # instead of the generated Python types. This would be more direct and wouldn't depend on
+        # how types are generated (e.g., Optional wrappers for non-required fields).
         class_registry = KajsonManager.get_class_registry()
 
         # Build mappings from class names to concept refs
@@ -446,24 +465,36 @@ class LibraryManager(LibraryManagerAbstract):
             if structure_class is None or not issubclass(structure_class, BaseModel):
                 return refs
 
+            def extract_type_names(annotation: type) -> list[str]:
+                """Recursively extract type names from possibly nested generic types."""
+                if annotation is type(None):
+                    return []
+
+                type_names: list[str] = []
+                origin = getattr(annotation, "__origin__", None)
+                args = getattr(annotation, "__args__", ())
+
+                if origin is None:
+                    # Simple type, get its name
+                    type_name = getattr(annotation, "__name__", None)
+                    if type_name:
+                        type_names.append(type_name)
+                else:
+                    # Generic type (like Optional[X], list[X], Union[X, Y], etc.)
+                    # Recursively extract from all type arguments
+                    for arg in args:
+                        type_names.extend(extract_type_names(arg))
+
+                return type_names
+
             for field_info in structure_class.model_fields.values():
                 annotation = field_info.annotation
                 if annotation is None:
                     continue
 
-                # Handle Optional types, List types, etc.
-                origin = getattr(annotation, "__origin__", None)
-                args = getattr(annotation, "__args__", ())
-
-                # Check direct type or args for concept references
-                types_to_check = [annotation] if origin is None else list(args)
-
-                for type_to_check in types_to_check:
-                    if type_to_check is type(None):
-                        continue
-                    # Get the class name
-                    type_name = getattr(type_to_check, "__name__", None)
-                    if type_name and type_name in class_to_concept:
+                # Recursively extract all type names from the annotation
+                for type_name in extract_type_names(annotation):
+                    if type_name in class_to_concept:
                         refs.append(class_to_concept[type_name])
 
             return refs

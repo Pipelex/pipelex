@@ -27,6 +27,20 @@ class ConceptStructureSpecFieldType(StrEnum):
     DATE = "date"
     CONCEPT = "concept"
 
+    @property
+    def is_text(self) -> bool:
+        match self:
+            case ConceptStructureSpecFieldType.TEXT:
+                return True
+            case (
+                ConceptStructureSpecFieldType.INTEGER
+                | ConceptStructureSpecFieldType.BOOLEAN
+                | ConceptStructureSpecFieldType.NUMBER
+                | ConceptStructureSpecFieldType.DATE
+                | ConceptStructureSpecFieldType.CONCEPT
+            ):
+                return False
+
 
 class ConceptSpecError(PipelexError):
     pass
@@ -53,7 +67,7 @@ class ConceptStructureSpec(StructuredContent):
     the_field_name: str = Field(description="Field name. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
     description: str
     type: ConceptStructureSpecFieldType = Field(description="The type of the field.", examples=["concept"])
-    required: bool | None = False
+    required: bool = Field(default=False, description="Whether the field is mandatory. Defaults to False unless explicitly set to True.")
     default_value: Any | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.IGNORE})
     concept_ref: str | None = Field(
         default=None,

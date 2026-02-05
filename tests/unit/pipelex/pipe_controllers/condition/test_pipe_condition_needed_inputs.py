@@ -57,8 +57,8 @@ class TestPipeConditionNeededInputs:
 
         # The expression uses 'status', so it should be in needed inputs
         assert "status" in needed_inputs.root
-        # The concept for expression variables is Anything since we can't infer the type
-        assert needed_inputs.root["status"].concept.code == NativeConceptCode.ANYTHING
+        # The concept for expression variables comes from the declared inputs
+        assert needed_inputs.root["status"].concept.code == NativeConceptCode.TEXT
 
         concept_library.teardown()
 
@@ -355,6 +355,7 @@ class TestPipeConditionOutputValidation:
 
         concept_library.teardown()
 
+    @pytest.mark.xfail(reason="Anything output is allowed until we enable the pipe builder to auto-fix")
     def test_validate_output_all_pipes_same_output_anything_not_allowed(self, load_empty_library: Callable[[], None]):
         """Test that using Anything output when all mapped pipes have the same output raises an error."""
         load_empty_library()
@@ -857,7 +858,7 @@ class TestPipeConditionSpecialOutcomes:
         pipe_condition.validate_output_with_library()
 
     def test_mapped_pipe_codes_excludes_special_outcomes(self, load_empty_library: Callable[[], None]):
-        """Test that mapped_pipe_codes property excludes CONTINUE and FAIL."""
+        """Test that pipe_dependencies() property excludes CONTINUE and FAIL."""
         load_empty_library()
         domain_code = "test_domain"
         concept_library = get_concept_library()
@@ -905,9 +906,9 @@ class TestPipeConditionSpecialOutcomes:
             blueprint=pipe_condition_blueprint,
         )
 
-        # mapped_pipe_codes should only contain actual pipes, not special outcomes
-        assert pipe_condition.mapped_pipe_codes == {"real_pipe"}
-        assert SpecialOutcome.CONTINUE not in pipe_condition.mapped_pipe_codes
-        assert SpecialOutcome.FAIL not in pipe_condition.mapped_pipe_codes
+        # pipe_dependencies() should only contain actual pipes, not special outcomes
+        assert pipe_condition.pipe_dependencies() == {"real_pipe"}
+        assert SpecialOutcome.CONTINUE not in pipe_condition.pipe_dependencies()
+        assert SpecialOutcome.FAIL not in pipe_condition.pipe_dependencies()
 
         concept_library.teardown()

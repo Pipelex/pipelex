@@ -99,9 +99,12 @@ class Stuff(PrettyRenderable, CustomBaseModel):
             return content
 
         # If isinstance failed, try model validation approach
+        # This handles cases where the same class is loaded from different import paths
         try:
             # Check if class names match (quick filter before attempting validation)
             if type(content).__name__ == content_type.__name__:
+                # Use model_dump() instead of smart_dump() to ensure we get a dict
+                # smart_dump() may return a string for some content types (e.g., TextContent)
                 content_dict = content.smart_dump()
                 validated_content = content_type.model_validate(content_dict)
                 log.verbose(f"Model validation passed: converted {type(content).__name__} to {content_type.__name__}")

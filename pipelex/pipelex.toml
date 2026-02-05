@@ -68,8 +68,9 @@ gen-image-fast = "$gen-image-fast"
 gen-image-high-quality = "$gen-image-high-quality"
 
 [pipelex.builder_config.talent_preset_mappings.extract]
-pdf-text-extractor = "$extract-text-from-pdf"
-image-text-extractor = "$extract-all-from-document"
+pdf-basic-text-extractor = "@default-text-from-pdf"
+image-text-extractor = "@default-extract-image"
+full-document-extractor = "@default-extract-document"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags
@@ -378,5 +379,16 @@ llm_skill = "llm_talent"
 img_gen_skill = "img_gen_talent"
 extract_skill = "extract_talent"
 
+
+####################################################################################################
+# Kit Config
+####################################################################################################
+
+[pipelex.kit_config]
+# Preferred agent for rules installation (used by `pipelex kit rules`)
+# Options: "cursor", "agents", "claude"
+# - "cursor" installs .cursor/rules/*.mdc files
+# - Other options install a single markdown file for that agent
+preferred_agent_target = "claude"
 
 [migration.migration_maps.telemetry]

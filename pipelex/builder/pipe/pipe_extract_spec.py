@@ -8,12 +8,14 @@ from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.talents.extract_talent import ExtractTalent
-from pipelex.config import get_config
-from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
-from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 
 if TYPE_CHECKING:
     from pipelex.cogt.extract.extract_setting import ExtractModelChoice
+
+from pipelex.config import get_config
+from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
+from pipelex.tools.misc.pretty import PrettyPrintable
 
 
 class PipeExtractSpec(PipeSpec):
@@ -30,7 +32,17 @@ class PipeExtractSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeExtract"]] = "PipeExtract"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    extract_talent: ExtractTalent | str = Field(description="Select the most adequate extraction model talent according to the task to be performed.")
+    inputs: dict[str, str] = Field(
+        description=(
+            "Input specifications mapping variable names to concept codes. "
+            "PipeExtract must have exactly one input which must be either `Image` or `Document` (a PDF is a document)."
+        ),
+        json_schema_extra={"mock_format": MockFormat.DICT_SINGLE_EXTRACT_INPUT},
+    )
+    extract_talent: ExtractTalent | str = Field(
+        description="Select the most adequate extraction model talent according to the task to be performed.",
+        examples=list(ExtractTalent),
+    )
     max_page_images: int | None = Field(
         default=None, description="Max number of images to extract from pages: None=unlimited, 0=no images, N=limit to N images."
     )

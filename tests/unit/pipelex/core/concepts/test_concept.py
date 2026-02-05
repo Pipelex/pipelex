@@ -19,7 +19,7 @@ class NestedImageInfo(StructuredContent):
     """A nested structure that contains image-like data (same structure as ImageContent)."""
 
     url: str
-    display_link: str | None = None
+    public_url: str | None = None
     source_prompt: str | None = None
     source_negative_prompt: str | None = None
     caption: str | None = None
@@ -319,6 +319,7 @@ class TestConcept:
                     "text": ConceptStructureBlueprint(
                         type=ConceptStructureBlueprintFieldType.TEXT,
                         description="The text content",
+                        required=True,
                     ),
                 },
             ),

@@ -4,7 +4,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory, WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
@@ -32,20 +31,17 @@ class PipeCondition(PipeController):
     default_outcome: str | SpecialOutcome
     add_alias_from_expression_to: str | None = None
 
-    @property
-    def mapped_pipe_codes(self) -> set[str]:
+    @override
+    def pipe_dependencies(self) -> set[str]:
         codes = set(self.outcome_map.values())
         if self.default_outcome:
             codes.add(self.default_outcome)
         return codes - set(SpecialOutcome.value_list())
 
     @override
-    def pipe_dependencies(self) -> set[str]:
-        return self.mapped_pipe_codes
-
-    @override
     def required_variables(self) -> set[str]:
         required_variables: set[str] = set()
+
         # Variables from the expression/expression_template
         full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
@@ -56,7 +52,9 @@ class PipeCondition(PipeController):
         # Variables from the outcomes map and default_outcome
         for pipe_code in self.pipe_dependencies():
             required_variables.update(get_required_pipe(pipe_code=pipe_code).required_variables())
-        return required_variables
+
+        # Exclude internal variables starting with `_`
+        return {var for var in required_variables if not var.startswith("_")}
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -72,26 +70,24 @@ class PipeCondition(PipeController):
 
         needed_inputs = InputStuffSpecsFactory.make_empty()
 
-        # Add the variables from the expression/expression_template
+        # Add the expression variables from self.inputs (with their declared concepts)
         full_paths = detect_jinja2_required_variables(
             template_category=TemplateCategory.EXPRESSION,
             template_source=self.expression,
         )
-        required_variables = {get_root_from_dotted_path(path) for path in full_paths}
-
-        for var_name in required_variables:
-            if not var_name.startswith("_"):  # exclude internal variables starting with `_`
-                # We don't know the concept code from just the variable name,
-                # so we'll use a generic placeholder that will be validated later
+        expression_variables = {get_root_from_dotted_path(path) for path in full_paths}
+        for var_name in expression_variables:
+            if not var_name.startswith("_"):
+                # Get the concept from declared inputs
+                stuff_spec = self.inputs.get_required_stuff_spec(variable_name=var_name)
                 needed_inputs.add_stuff_spec(
                     variable_name=var_name,
-                    concept=ConceptFactory.make_native_concept(
-                        native_concept_code=NativeConceptCode.ANYTHING,
-                    ),
+                    concept=stuff_spec.concept,
+                    multiplicity=stuff_spec.multiplicity,
                 )
 
         # Add the inputs needed by all possible target pipes
-        for pipe_code in self.mapped_pipe_codes:
+        for pipe_code in self.pipe_dependencies():
             pipe = get_required_pipe(pipe_code=pipe_code)
             # Use the centralized recursion detection
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
@@ -124,7 +120,7 @@ class PipeCondition(PipeController):
         Special outcomes (CONTINUE/FAIL) do not influence the output validation - only actual pipes matter.
         When there are no mapped pipes (all special outcomes), any output is allowed.
         """
-        mapped_pipe_codes = self.mapped_pipe_codes
+        mapped_pipe_codes = self.pipe_dependencies()
         if not mapped_pipe_codes:
             # No actual pipes to validate against (all special outcomes)
             return
@@ -140,7 +136,7 @@ class PipeCondition(PipeController):
         if all_outputs_same:
             # All mapped pipes have the same output - PipeCondition MUST use that same output
             expected_output_ref = next(iter(mapped_output_refs))
-            if self.output.concept.concept_ref != expected_output_ref:
+            if self.output.concept.concept_ref not in {expected_output_ref, NativeConceptCode.ANYTHING.concept_ref}:
                 msg = (
                     f"All mapped pipes of PipeCondition '{self.code}' have the same output concept "
                     f"'{expected_output_ref}', but PipeCondition declares output '{self.output.concept.concept_ref}'. "
@@ -171,26 +167,28 @@ class PipeCondition(PipeController):
                 required_concept_codes=[NativeConceptCode.ANYTHING.concept_ref],
             )
 
-    # TODO: Restore this validation. The problem lies with needed_inputs that construct Anything concepts.
-    # @override
-    # async def _validate_before_run(
-    #     self,
-    #     job_metadata: JobMetadata,
-    #     working_memory: WorkingMemory,
-    #     pipe_run_params: PipeRunParams,
-    #     output_name: str | None = None,
-    # ):
-    #     evaluated_expression = await get_content_generator().make_templated_text(
-    #         context=working_memory.generate_context(),
-    #         template=self.expression,
-    #         template_category=TemplateCategory.EXPRESSION,
-    #     )
-    #     if not evaluated_expression or evaluated_expression == "None":
-    #         error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
-    #         raise PipeRunError(
-    #             message=error_msg,
-    #             run_mode=pipe_run_params.run_mode,
-    #         )
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        evaluated_expression = await get_content_generator().make_templated_text(
+            context=working_memory.generate_context(),
+            template=self.expression,
+            template_category=TemplateCategory.EXPRESSION,
+        )
+        if not evaluated_expression or evaluated_expression == "None":
+            error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
+            raise PipeRunError(
+                pipe_code=self.code,
+                message=error_msg,
+                run_mode=pipe_run_params.run_mode,
+            )
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
 
     async def _evaluate_expression(
         self,
@@ -306,7 +304,7 @@ class PipeCondition(PipeController):
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
         # Here, it should launch the dry run of all the pipes in the outcomes map
-        for pipe_code in self.mapped_pipe_codes:
+        for pipe_code in self.pipe_dependencies():
             pipe = get_required_pipe(pipe_code=pipe_code)
             await pipe.run_pipe(
                 job_metadata=job_metadata,
@@ -314,15 +312,3 @@ class PipeCondition(PipeController):
                 pipe_run_params=pipe_run_params,
             )
         return PipeOutput(working_memory=working_memory)
-
-    @override
-    async def _validate_before_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
-    ):
-        pass
-
-    @override
-    async def _validate_after_run(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
-    ):
-        pass

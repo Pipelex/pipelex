@@ -41,7 +41,8 @@ class PipeSpec(StructuredContent):
         description=(
             f"Pipe type. Validated at runtime, must be one of: {PipeType}. Examples: PipeLLM, PipeImgGen, PipeExtract, PipeSequence, PipeParallel."
         ),
-        examples=["PipeLLM"],
+        # Do NOT set examples here - subclasses have Literal types with defaults
+        # Setting examples would cause mocking issues where the base class type doesn't match subclass fields
     )
     pipe_category: Any = Field(
         description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'."),
@@ -54,7 +55,8 @@ class PipeSpec(StructuredContent):
             "Keys: input names in snake_case. "
             "Values: ConceptCodes in PascalCase with optional brackets. "
             "Examples: 'Text' (single), 'Text[]' (variable list), 'Image[2]' (exactly 2 images), 'domain.Concept[]' (domain-qualified list)."
-        )
+        ),
+        json_schema_extra={"mock_format": MockFormat.DICT_SNAKE_KEY_PASCAL_VALUE},
     )
     output: str = Field(
         description=(

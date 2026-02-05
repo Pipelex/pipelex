@@ -21,7 +21,7 @@ PipeFailure = "Details of a single pipe failure during dry run."
 [pipe.detail_pipe_spec]
 type = "PipeCondition"
 description = "Route by signature.type to the correct spec emitter."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "Anything"
 expression = "pipe_signature.type"
 default_outcome = "fail"
@@ -42,7 +42,7 @@ PipeBatch     = "detail_pipe_batch"
 [pipe.detail_pipe_sequence]
 type = "PipeLLM"
 description = "Build a PipeSequenceSpec from the signature (children referenced by code)."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeSequenceSpec"
 model = "$engineering-structured"
 prompt = """
@@ -66,7 +66,7 @@ Note:
 [pipe.detail_pipe_parallel]
 type = "PipeLLM"
 description = "Build a PipeParallelSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeParallelSpec"
 model = "$engineering-structured"
 prompt = """
@@ -87,7 +87,7 @@ Based on the pipe signature, build the PipeParallelSpec.
 [pipe.detail_pipe_condition]
 type = "PipeLLM"
 description = "Build a PipeConditionSpec from the signature (provide expression/outcome consistent with children)."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeConditionSpec"
 model = "$engineering-structured"
 prompt = """
@@ -108,7 +108,7 @@ Based on the pipe signature, build the PipeConditionSpec.
 [pipe.detail_pipe_batch]
 type = "PipeLLM"
 description = "Build a PipeBatchSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeBatchSpec"
 model = "$engineering-structured"
 prompt = """
@@ -133,7 +133,7 @@ Based on the pipe signature, build the PipeComposeSpec.
 [pipe.detail_pipe_llm]
 type = "PipeLLM"
 description = "Build a PipeLLMSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeLLMSpec"
 model = "$engineering-structured"
 prompt = """
@@ -160,7 +160,7 @@ Notes:
 [pipe.detail_pipe_extract]
 type = "PipeLLM"
 description = "Build a PipeExtractSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeExtractSpec"
 model = "$engineering-structured"
 prompt = """
@@ -181,7 +181,7 @@ Based on the pipe signature, build the PipeExtractSpec.
 [pipe.detail_pipe_img_gen]
 type = "PipeLLM"
 description = "Build a PipeImgGenSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeImgGenSpec"
 model = "$engineering-structured"
 prompt = """
@@ -205,7 +205,7 @@ Notes:
 [pipe.detail_pipe_compose]
 type = "PipeLLM"
 description = "Build a PipeComposeSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeComposeSpec"
 model = "$engineering-structured"
 prompt = """

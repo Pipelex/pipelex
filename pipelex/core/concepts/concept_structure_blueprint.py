@@ -59,7 +59,7 @@ class ConceptStructureBlueprint(BaseModel):
 
     choices: list[str] | None = Field(default=None)
     default_value: Any | None = None
-    required: bool | None = Field(default=True)
+    required: bool = Field(default=False)
 
     # TODO: date translator for default_value
 

@@ -47,3 +47,6 @@ gen-image-high-quality = { model = "@default-premium", quality = "high" }
 
 # Testing
 gen-image-testing = { model = "@default-small", quality = "low" }
+synthesize-photo = { model = "@default-small", quality = "low" }
+synthesize-ui = { model = "nano-banana-pro" }
+synthesize-chart = { model = "nano-banana-pro" }

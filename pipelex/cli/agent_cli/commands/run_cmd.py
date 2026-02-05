@@ -1,0 +1,316 @@
+"""Agent CLI run command - simplified pipeline execution with JSON output."""
+
+import asyncio
+import json
+import sys
+from pathlib import Path
+from typing import Annotated, Any
+
+import typer
+
+from pipelex.cli.cli_factory import make_pipelex_for_cli
+from pipelex.cli.error_handlers import ErrorContext
+from pipelex.config import get_config
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.helpers import is_pipelex_file
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipelex import Pipelex
+from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.execute import execute_pipeline
+from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path
+
+
+async def _run_pipeline_core(
+    pipe_code: str,
+    plx_content: str | None = None,
+    bundle_uri: str | None = None,
+    inputs: dict[str, Any] | None = None,
+    dry_run: bool = False,
+    mock_inputs: bool = False,
+    library_dirs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Core logic for running a pipeline and returning JSON-serializable output.
+
+    Args:
+        pipe_code: The pipe code to run.
+        plx_content: PLX content string (optional).
+        bundle_uri: Bundle file path (optional).
+        inputs: Input dictionary for the pipeline.
+        dry_run: Whether to run in dry mode (no actual inference).
+        mock_inputs: Whether to generate mock data for missing inputs.
+        library_dirs: List of library directories to search for pipe definitions.
+
+    Returns:
+        Dictionary with execution results suitable for JSON serialization.
+
+    Raises:
+        PipelineExecutionError: If the pipeline execution fails.
+    """
+    pipe_run_mode = PipeRunMode.DRY if dry_run else None
+
+    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        generate_graph=False,
+        mock_inputs=mock_inputs or None,
+    )
+
+    pipe_output = await execute_pipeline(
+        pipe_code=pipe_code,
+        plx_content=plx_content,
+        bundle_uri=bundle_uri,
+        inputs=inputs,
+        pipe_run_mode=pipe_run_mode,
+        execution_config=execution_config,
+        library_dirs=library_dirs,
+    )
+
+    main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+    main_stuff_json: dict[str, Any] = {}
+    if main_stuff:
+        main_stuff_json = {
+            "json": await main_stuff.content.rendered_json_async(),
+            "markdown": await main_stuff.content.rendered_markdown_async(),
+            "html": await main_stuff.content.rendered_html_async(),
+        }
+
+    return {
+        "success": True,
+        "pipe_code": pipe_code,
+        "dry_run": dry_run,
+        "main_stuff": main_stuff_json,
+        "working_memory": pipe_output.working_memory.smart_dump(),
+    }
+
+
+def run_cmd(
+    target: Annotated[
+        str | None,
+        typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
+    ] = None,
+    pipe: Annotated[
+        str | None,
+        typer.Option("--pipe", help="Pipe code to run"),
+    ] = None,
+    bundle: Annotated[
+        str | None,
+        typer.Option("--bundle", help="Bundle file path (.plx)"),
+    ] = None,
+    inputs: Annotated[
+        str | None,
+        typer.Option("--inputs", "-i", help="Path to JSON file with inputs or inline JSON"),
+    ] = None,
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
+    ] = False,
+    mock_inputs: Annotated[
+        bool,
+        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
+    ] = False,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+    ] = None,
+) -> None:
+    """Execute a pipeline and output JSON results.
+
+    Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
+
+    Examples:
+        pipelex-agent run my_pipe --inputs data.json
+        pipelex-agent run my_bundle.plx --pipe my_pipe
+        pipelex-agent run my_pipe --dry-run --mock-inputs
+    """
+    # Validate that at least one target is provided
+    provided_options = sum([target is not None, pipe is not None, bundle is not None])
+    if provided_options == 0:
+        error_json: dict[str, Any] = {
+            "error": True,
+            "error_type": "ArgumentError",
+            "message": "No pipe code or bundle file specified",
+        }
+        print(json.dumps(error_json, indent=2), file=sys.stderr)
+        raise typer.Exit(1)
+
+    # Validate --mock-inputs requires --dry-run
+    if mock_inputs and not dry_run:
+        error_json = {
+            "error": True,
+            "error_type": "ArgumentError",
+            "message": "--mock-inputs requires --dry-run",
+        }
+        print(json.dumps(error_json, indent=2), file=sys.stderr)
+        raise typer.Exit(1)
+
+    # Determine pipe_code and bundle_path from arguments
+    pipe_code: str | None = None
+    bundle_path: str | None = None
+
+    if target:
+        if is_pipelex_file(Path(target)):
+            bundle_path = target
+            if bundle:
+                error_json = {
+                    "error": True,
+                    "error_type": "ArgumentError",
+                    "message": "Cannot use --bundle if already passing a bundle file as positional argument",
+                }
+                print(json.dumps(error_json, indent=2), file=sys.stderr)
+                raise typer.Exit(1)
+        else:
+            pipe_code = target
+            if pipe:
+                error_json = {
+                    "error": True,
+                    "error_type": "ArgumentError",
+                    "message": "Cannot use --pipe if already passing a pipe code as positional argument",
+                }
+                print(json.dumps(error_json, indent=2), file=sys.stderr)
+                raise typer.Exit(1)
+
+    if bundle:
+        bundle_path = bundle
+
+    if pipe:
+        pipe_code = pipe
+
+    if not pipe_code and not bundle_path:
+        error_json = {
+            "error": True,
+            "error_type": "ArgumentError",
+            "message": "No pipe code or bundle file specified",
+        }
+        print(json.dumps(error_json, indent=2), file=sys.stderr)
+        raise typer.Exit(1)
+
+    # Load plx content from bundle if provided
+    plx_content: str | None = None
+    if bundle_path:
+        try:
+            plx_content = Path(bundle_path).read_text(encoding="utf-8")
+            if not pipe_code:
+                bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
+                main_pipe_code = bundle_blueprint.main_pipe
+                if not main_pipe_code:
+                    error_json = {
+                        "error": True,
+                        "error_type": "BundleError",
+                        "message": f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe.",
+                    }
+                    print(json.dumps(error_json, indent=2), file=sys.stderr)
+                    raise typer.Exit(1)
+                pipe_code = main_pipe_code
+        except FileNotFoundError as exc:
+            error_json = {
+                "error": True,
+                "error_type": "FileNotFoundError",
+                "message": f"Bundle file not found: {bundle_path}",
+            }
+            print(json.dumps(error_json, indent=2), file=sys.stderr)
+            raise typer.Exit(1) from exc
+        except (PipelexInterpreterError, PLXDecodeError) as exc:
+            error_json = {
+                "error": True,
+                "error_type": type(exc).__name__,
+                "message": f"Failed to parse bundle '{bundle_path}': {exc}",
+            }
+            print(json.dumps(error_json, indent=2), file=sys.stderr)
+            raise typer.Exit(1) from exc
+
+    # Load inputs if provided
+    pipeline_inputs: dict[str, Any] | None = None
+    if inputs:
+        if inputs.startswith("{"):
+            try:
+                pipeline_inputs = json.loads(inputs)
+            except json.JSONDecodeError as exc:
+                error_json = {
+                    "error": True,
+                    "error_type": "JSONDecodeError",
+                    "message": f"Failed to parse inline JSON inputs: {exc}",
+                }
+                print(json.dumps(error_json, indent=2), file=sys.stderr)
+                raise typer.Exit(1) from exc
+        else:
+            try:
+                pipeline_inputs = load_json_dict_from_path(inputs)
+            except FileNotFoundError as exc:
+                error_json = {
+                    "error": True,
+                    "error_type": "FileNotFoundError",
+                    "message": f"Input file not found: {inputs}",
+                }
+                print(json.dumps(error_json, indent=2), file=sys.stderr)
+                raise typer.Exit(1) from exc
+            except JsonTypeError as exc:
+                error_json = {
+                    "error": True,
+                    "error_type": "JsonTypeError",
+                    "message": f"Input file must be a valid JSON dictionary: {inputs}",
+                }
+                print(json.dumps(error_json, indent=2), file=sys.stderr)
+                raise typer.Exit(1) from exc
+
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
+
+    try:
+        result = asyncio.run(
+            _run_pipeline_core(
+                pipe_code=pipe_code,  # type: ignore[arg-type]
+                plx_content=plx_content,
+                bundle_uri=bundle_path,
+                inputs=pipeline_inputs,
+                dry_run=dry_run,
+                mock_inputs=mock_inputs,
+                library_dirs=library_dir,
+            )
+        )
+        print(json.dumps(result, indent=2))
+
+    except PipelineExecutionError as exc:
+        error_json = {
+            "error": True,
+            "error_type": "PipelineExecutionError",
+            "message": exc.message,
+            "pipe_code": exc.pipe_code,
+            "pipe_stack": exc.pipe_stack,
+        }
+        print(json.dumps(error_json, indent=2), file=sys.stderr)
+        raise typer.Exit(1) from exc
+
+    except PipeOperatorModelChoiceError as exc:
+        error_json = {
+            "error": True,
+            "error_type": "PipeOperatorModelChoiceError",
+            "message": exc.message,
+            "pipe_code": exc.pipe_code,
+            "model_type": exc.model_type,
+            "model_choice": exc.model_choice,
+        }
+        print(json.dumps(error_json, indent=2), file=sys.stderr)
+        raise typer.Exit(1) from exc
+
+    except PipeOperatorModelAvailabilityError as exc:
+        error_json = {
+            "error": True,
+            "error_type": "PipeOperatorModelAvailabilityError",
+            "message": str(exc),
+            "pipe_code": exc.pipe_code,
+            "model_handle": exc.model_handle,
+        }
+        print(json.dumps(error_json, indent=2), file=sys.stderr)
+        raise typer.Exit(1) from exc
+
+    except Exception as exc:
+        error_json = {
+            "error": True,
+            "error_type": type(exc).__name__,
+            "message": str(exc),
+        }
+        print(json.dumps(error_json, indent=2), file=sys.stderr)
+        raise typer.Exit(1) from exc
+
+    finally:
+        Pipelex.teardown_if_needed()

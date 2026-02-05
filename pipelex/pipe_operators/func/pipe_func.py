@@ -43,7 +43,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     def validate_function_name(cls, function_name: str) -> str:
         function = func_registry.get_function(function_name)
         if not function:
-            msg = f"Function '{function_name}' not found in registry"
+            # Check if this function was found but is ineligible (e.g., missing return type)
+            ineligible_info = func_registry.get_ineligible_function_info(function_name)
+            if ineligible_info:
+                msg = f"Function '{function_name}' has @pipe_func() decorator but is not eligible for registration: {ineligible_info.reason}"
+            else:
+                msg = f"Function '{function_name}' not found in registry"
             raise ValueError(msg)
 
         return_type = get_type_hints(function).get("return")

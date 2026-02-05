@@ -9,6 +9,7 @@ import typer
 from posthog import tag
 from rich.traceback import Traceback
 
+from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -18,7 +19,14 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.hub import get_console, get_library_manager, get_required_pipe, get_telemetry_manager, set_current_library
+from pipelex.hub import (
+    get_console,
+    get_library_manager,
+    get_required_pipe,
+    get_telemetry_manager,
+    resolve_library_dirs,
+    set_current_library,
+)
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
@@ -30,7 +38,9 @@ from pipelex.tools.misc.package_utils import get_package_version
 COMMAND = "validate"
 
 
-def do_validate_all_libraries_and_dry_run(library_dirs: list[Path] | None = None) -> None:
+def do_validate_all_libraries_and_dry_run(
+    library_dirs: list[Path] | None = None,
+) -> None:
     try:
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
@@ -40,7 +50,11 @@ def do_validate_all_libraries_and_dry_run(library_dirs: list[Path] | None = None
             library_manager = get_library_manager()
             library_id, library = library_manager.open_library()
             set_current_library(library_id=library_id)
-            library_manager.load_libraries(library_id=library_id, library_dirs=library_dirs)
+            effective_dirs, source_label = resolve_library_dirs(library_dirs)
+            if effective_dirs:
+                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+            else:
+                log.info(f"No library directories to load ({source_label})")
 
             pipes = library.pipe_library.get_pipes()
             if library_dirs:
@@ -70,7 +84,10 @@ def validate_cmd(
     ] = None,
     bundle: Annotated[
         str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx) - validates all pipes in the bundle"),
+        typer.Option(
+            "--bundle",
+            help="Bundle file path (.plx) - validates all pipes in the bundle",
+        ),
     ] = None,
     validate_all: Annotated[
         bool,
@@ -103,7 +120,10 @@ def validate_cmd(
             )
             raise typer.Exit(1)
         try:
-            make_pipelex_for_cli(context=ErrorContext.VALIDATION, library_dirs=[Path(lib_dir) for lib_dir in library_dir] if library_dir else None)
+            make_pipelex_for_cli(
+                context=ErrorContext.VALIDATION,
+                library_dirs=[Path(lib_dir) for lib_dir in library_dir] if library_dir else None,
+            )
             do_validate_all_libraries_and_dry_run(library_dirs=[Path(lib_dir) for lib_dir in library_dir] if library_dir else None)
         finally:
             Pipelex.teardown_if_needed()
@@ -152,17 +172,32 @@ def validate_cmd(
         pipe_code = pipe
 
     if not pipe_code and not bundle_path:
-        typer.secho("Failed to validate: no pipe code or bundle file specified", fg=typer.colors.RED, err=True)
+        typer.secho(
+            "Failed to validate: no pipe code or bundle file specified",
+            fg=typer.colors.RED,
+            err=True,
+        )
         raise typer.Exit(1)
 
-    async def validate_pipe(pipe_code: str | None = None, bundle_path: Path | None = None, library_dirs: list[Path] | None = None):
+    async def validate_pipe(
+        pipe_code: str | None = None,
+        bundle_path: Path | None = None,
+        library_dirs: list[Path] | None = None,
+    ):
         if bundle_path:
             try:
                 await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
-                typer.secho(f"✅ Successfully validated bundle '{bundle_path}'", fg=typer.colors.GREEN)
+                typer.secho(
+                    f"✅ Successfully validated bundle '{bundle_path}'",
+                    fg=typer.colors.GREEN,
+                )
             except FileNotFoundError as exc:
                 get_console().print(Traceback())
-                typer.secho(f"Failed to load bundle '{bundle_path}':", fg=typer.colors.RED, err=True)
+                typer.secho(
+                    f"Failed to load bundle '{bundle_path}':",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
                 raise typer.Exit(1) from exc
             except ValidateBundleError as bundle_error:
                 handle_validate_bundle_error(bundle_error, bundle_path=bundle_path)
@@ -171,7 +206,10 @@ def validate_cmd(
             library_manager = get_library_manager()
             library_id, _ = library_manager.open_library()
             set_current_library(library_id=library_id)
-            library_manager.load_libraries(library_id=library_id, library_dirs=library_dirs)
+            effective_dirs, _ = resolve_library_dirs(library_dirs)
+
+            if effective_dirs:
+                library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
             pipe = get_required_pipe(pipe_code=pipe_code)
             get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
@@ -181,7 +219,11 @@ def validate_cmd(
             )
             typer.secho(f"✅ Successfully validated pipe '{pipe_code}'", fg=typer.colors.GREEN)
         else:
-            typer.secho("Failed to validate: no pipe code or bundle specified", fg=typer.colors.RED, err=True)
+            typer.secho(
+                "Failed to validate: no pipe code or bundle specified",
+                fg=typer.colors.RED,
+                err=True,
+            )
             raise typer.Exit(1)
 
     make_pipelex_for_cli(context=ErrorContext.VALIDATION)
@@ -195,7 +237,13 @@ def validate_cmd(
             else:
                 tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} pipe")
 
-            asyncio.run(validate_pipe(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs))
+            asyncio.run(
+                validate_pipe(
+                    pipe_code=pipe_code,
+                    bundle_path=bundle_path,
+                    library_dirs=library_dirs,
+                )
+            )
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
     except PipeOperatorModelAvailabilityError as exc:

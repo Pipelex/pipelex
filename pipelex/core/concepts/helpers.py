@@ -76,9 +76,11 @@ def normalize_structure_blueprint(structure_dict: dict[str, str | ConceptStructu
 
     for field_name, field_value in structure_dict.items():
         if isinstance(field_value, str):
+            # Simple string descriptions default to required=True (shorthand syntax implies required)
             normalized[field_name] = ConceptStructureBlueprint(
                 description=field_value,
                 type=ConceptStructureBlueprintFieldType.TEXT,
+                required=True,
             )
         else:
             normalized[field_name] = field_value

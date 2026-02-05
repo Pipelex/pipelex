@@ -12,7 +12,8 @@ class BundleHeaderSpec(StructuredContent):
     domain_code: str = Field(description="Name of the domain of the knowledge work.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
     description: str = Field(description="Definition of the domain of the knowledge work.")
     system_prompt: str | None = Field(description="System prompt for the domain.")
-    main_pipe: str = Field(description="The main pipe of the domain.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
+    # Use a specific mock value that matches DRY_RUN_MAIN_PIPE_CODE in working_memory_factory
+    main_pipe: str = Field(description="The main pipe of the domain.", examples=["mock_main"])
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

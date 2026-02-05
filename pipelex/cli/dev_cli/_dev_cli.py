@@ -13,6 +13,7 @@ from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, ch
 from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd
@@ -31,6 +32,7 @@ class PipelexDevCLI(TyperGroup):
             "check-gateway-models",
             "check-rules",
             "check-urls",
+            "kit",
             "preprocess-test-models",
             "sync-main-config",
             "update-gateway-models",
@@ -58,6 +60,8 @@ app = typer.Typer(
     pretty_exceptions_show_locals=False,
     cls=PipelexDevCLI,
 )
+
+app.add_typer(kit_app, name="kit", help="Manage agent rules for the Pipelex repository")
 
 
 @app.callback(invoke_without_command=True)

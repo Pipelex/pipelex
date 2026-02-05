@@ -34,7 +34,7 @@ class ConstructFieldBlueprint(BaseModel):
     """Blueprint for composing a single field in a StructuredContent.
 
     Defines how a field value is composed using one of 4 methods:
-    1. Fixed value: literal string, number, bool
+    1. Fixed value: literal string, number, bool, or list
     2. Variable reference (from): path to variable in working memory
     3. Template: Jinja2 template string (with $ preprocessing)
     4. Nested construct: recursive ConstructBlueprint
@@ -86,7 +86,7 @@ class ConstructFieldBlueprint(BaseModel):
 
         Args:
             raw: The raw value from TOML parsing. Can be:
-                - str/int/float/bool: Fixed value
+                - str/int/float/bool/list: Fixed value
                 - dict with 'from' key: Variable reference
                 - dict with 'template' key: Template
                 - dict with other keys: Nested construct
@@ -105,6 +105,11 @@ class ConstructFieldBlueprint(BaseModel):
             return cls(
                 method=ConstructFieldMethod.FIXED,
                 fixed_value=raw,
+            )
+        elif isinstance(raw, list):
+            return cls(
+                method=ConstructFieldMethod.FIXED,
+                fixed_value=cast("list[Any]", raw),
             )
         elif isinstance(raw, dict):
             raw_dict = cast("dict[str, Any]", raw)

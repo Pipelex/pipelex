@@ -271,7 +271,7 @@ def build_pipe_cmd(
                         typer.secho(f"✅ Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
 
                     # Generate inputs.json
-                    inputs_json_str = pipe.inputs.generate_json_string(indent=2)
+                    inputs_json_str = pipe.inputs.render_inputs(indent=2)
                     inputs_json_path = os.path.join(extras_output_dir, "inputs.json")
                     save_text_to_path(text=inputs_json_str, path=inputs_json_path)
                     typer.secho(f"✅ Inputs template saved to: {inputs_json_path}", fg=typer.colors.GREEN)

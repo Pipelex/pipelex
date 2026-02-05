@@ -5,7 +5,8 @@ It supports two output formats: JSON (dict) and Python (class instantiation stri
 """
 
 import inspect
-from typing import Any, cast, get_args, get_origin
+import types
+from typing import Any, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
 
@@ -18,6 +19,7 @@ class ConceptRepresentationFormat(StrEnum):
 
     JSON = "json"
     PYTHON = "python"
+    SCHEMA = "schema"
 
 
 class ConceptRepresentationGenerator:
@@ -93,6 +95,9 @@ class ConceptRepresentationGenerator:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
                 return self._format_as_python(class_name, fields_dict)
+            case ConceptRepresentationFormat.SCHEMA:
+                msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
+                raise ValueError(msg)
 
     def _generate_fields_dict(
         self,
@@ -256,12 +261,15 @@ class ConceptRepresentationGenerator:
                 return fields_dict
             case ConceptRepresentationFormat.PYTHON:
                 return self._format_as_python(class_name, fields_dict)
+            case ConceptRepresentationFormat.SCHEMA:
+                msg = "Schema format is not supported by ConceptRepresentationGenerator. Use render_concept_representation on Concept instead."
+                raise ValueError(msg)
 
     def _generate_basic_value(self, actual_type: Any, field_name: str) -> Any:
         """Generate a value for basic Python types.
 
         Args:
-            actual_type: The type (str, int, float, bool, or unknown)
+            actual_type: The type (str, int, float, bool, union types, or unknown)
             field_name: Name of the field (used for generating placeholder)
 
         Returns:
@@ -276,6 +284,18 @@ class ConceptRepresentationGenerator:
         elif actual_type is bool:
             return False
         else:
+            # Handle union types like int | float (used by NumberContent)
+            origin = get_origin(actual_type)
+            if origin is Union or origin is types.UnionType:
+                union_args = get_args(actual_type)
+                # Filter out NoneType (already handled by _unwrap_optional)
+                non_none_args = [arg for arg in union_args if arg is not type(None)]
+                if non_none_args:
+                    # Check if it's a numeric union (int | float or float | int)
+                    if set(non_none_args) == {int, float}:
+                        return 1  # Return a sensible default for number types
+                    # For other unions, try to generate a value for the first type
+                    return self._generate_basic_value(non_none_args[0], field_name)
             type_name = getattr(actual_type, "__name__", str(actual_type))
             return f"{field_name}_{type_name}"
 

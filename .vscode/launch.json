@@ -41,7 +41,7 @@
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug test inference img gen",
+            "name": "Debug test inference Img Gen",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",

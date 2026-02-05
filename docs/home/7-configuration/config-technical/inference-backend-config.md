@@ -408,6 +408,14 @@ Common scenarios for hybrid routing:
 3. **Gradual Migration**: Start with Pipelex Gateway, gradually move to your own keys as usage grows
 4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Gateway
 
+### Internal Backend (Always Available)
+
+The **internal backend** is a special backend containing software-only models that run locally without requiring AI services. These include models for PDF text extraction, local document parsing, and other processing tasks that don't need external API calls.
+
+Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_pipelex_gateway` or `all_openai`).
+
+This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
+
 ## Model Deck
 
 The Model Deck is the unified configuration hub for all AI model-related settings, including LLMs, OCR models, and image generation models.
@@ -474,16 +482,15 @@ Extract presets combine document extraction model selection with optimized param
 
 ```toml
 [extract.presets]
-# General purpose document extraction
-extract-all-from-document = { model = "@default-extract-document", max_nb_images = 100, image_min_size = 50 }
-extract-text-from-pdf = { model = "@default-extract-text-from-pdf", max_nb_images = 100, image_min_size = 50 }
+# Testing preset
+extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50 }
 ```
 
-When using extract presets in `.plx` files, prefix them with `$`:
+You can also use aliases directly in `.plx` files for document extraction:
 
 ```toml
-model = "$extract-all-from-document"   # Uses preset for document extraction
-model = "$extract-text-from-pdf"       # Uses preset for PDF text extraction
+model = "@default-extract-document"   # Uses default document extraction alias
+model = "@default-text-from-pdf"      # Uses alias for basic PDF text extraction
 ```
 
 ### Image Generation Presets
@@ -516,7 +523,7 @@ for_text = "@default-general"
 for_object = "@default-general"
 
 [extract]
-choice_default = "$extract-all-from-document"
+choice_default = "@default-extract-document"
 
 [img_gen]
 choice_default = "$gen-image"

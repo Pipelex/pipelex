@@ -65,7 +65,7 @@ class TestPipelexStorageImageFlow:
         # Step 1: Create ImageContent as would be returned by GeneratedContentFactory
         image_content = ImageContent(
             url=storage_uri,
-            display_link=None,
+            public_url=None,
             mime_type="image/png",
         )
 

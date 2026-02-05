@@ -67,47 +67,15 @@
 
 ---
 
-## Prerequisites for running command lines: activate virtual environment
+## Prerequisites for running command lines: use virtual environment
 
-   **CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST activate the appropriate Python virtual environment. The only exceptions are our `make` commands which already include the env activation.
+   **CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST use the appropriate Python virtual environment. The only exceptions are our `make` commands which already include the env activation.
 
-   Do this:
-
-   ```bash
-   source .venv/bin/activate
-   pytest -s -v -k test_render_jinja2_from_text
-   pipelex validate --all
-   ```
-
-   or do that:
+   Call the CLI directly from the virtual environment:
 
    ```bash
-   .venv/bin/python -m pytest -s -v -k test_render_jinja2_from_text
+   .venv/bin/pytest -s -v -k test_render_jinja2_from_text
    .venv/bin/pipelex validate --all
    ```
 
-   (adapt the above command to the OS and available virtual environment name)
-
-   For standard installations, the virtual environment is named `.venv`. Always check this first:
-
-   ```bash
-   # Activate the virtual environment (standard installation)
-   source .venv/bin/activate  # On macOS/Linux
-   # or
-   .venv\Scripts\activate  # On Windows
-   ```
-
-   If the installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
-
-## Pipelex CLI Commands
-
-   To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.
-
-   ```bash
-   pipelex --help
-   pipelex build --help --no-logo
-   pipelex run --help --no-logo
-   pipelex validate --help --no-logo
-   pipelex doctor --help --no-logo
-   pipelex init --help --no-logo
-   ```
+   For standard installations, the virtual environment is named `.venv`. Always check this first. On Windows, the path is `.venv\Scripts\` instead of `.venv/bin/`.

@@ -42,7 +42,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     ) -> ImageContent:
         return ImageContent(
             url=raw_details.actual_url or "https://example.com/image.jpg",
-            display_link=raw_details.actual_url or "https://example.com/image.jpg",
+            public_url=raw_details.actual_url or "https://example.com/image.jpg",
             mime_type=raw_details.mime_type or "image/jpeg",
             size=raw_details.size,
         )
@@ -109,15 +109,20 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_object_list_direct"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
-        return [
-            await self.make_object_direct(
+        items: list[BaseModelTypeVar] = []
+        for idx in range(nb_list_items):
+            item = await self.make_object_direct(
                 job_metadata=job_metadata,
                 object_class=object_class,
                 llm_setting_for_object=llm_setting_for_object_list,
                 llm_prompt_for_object=llm_prompt_for_object_list,
             )
-            for _ in range(nb_list_items)
-        ]
+            # Set first item's pipe_code to "mock_main" to coordinate with BundleHeaderSpec.main_pipe
+            # which uses examples=["mock_main"] for dry run validation
+            if idx == 0 and hasattr(item, "pipe_code"):
+                item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+            items.append(item)
+        return items
 
     @override
     @update_job_metadata

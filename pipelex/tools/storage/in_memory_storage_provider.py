@@ -56,8 +56,8 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         self.root[key] = data
 
     @override
-    async def display_link(self, uri: str) -> str | None:
-        """In-memory storage cannot generate a display link.
+    async def public_url(self, uri: str) -> str | None:
+        """In-memory storage cannot generate a public URL.
 
         Args:
             uri: Full URI including pipelex-storage:// scheme.

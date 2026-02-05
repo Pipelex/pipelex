@@ -1,4 +1,4 @@
-from typing import Any, Generic
+from typing import Any, Generic, Iterator, overload
 
 from json2html import json2html
 from rich.pretty import Pretty
@@ -21,6 +21,39 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
     def get_items(self, item_type: type[StuffContent]) -> list[StuffContent]:
         return [item for item in self.items if isinstance(item, item_type)]
+
+    # -------------------------------------------------------------------------------------
+    # Iterator protocol - enables direct iteration over ListContent
+    # Overrides BaseModel.__iter__ which iterates field names. This is intentional:
+    # ListContent should iterate over its items, not its field names.
+    # -------------------------------------------------------------------------------------
+
+    @override
+    def __iter__(self) -> Iterator[StuffContentType]:  # type: ignore[override]
+        """Enable direct iteration: for item in list_content.
+
+        Note: This overrides BaseModel.__iter__ which would iterate field names.
+        For ListContent, iterating over items is the expected behavior.
+        """
+        return iter(self.items)
+
+    def __len__(self) -> int:
+        """Enable len(list_content)."""
+        return len(self.items)
+
+    @overload
+    def __getitem__(self, index: int) -> StuffContentType: ...
+
+    @overload
+    def __getitem__(self, index: slice) -> list[StuffContentType]: ...
+
+    def __getitem__(self, index: int | slice) -> StuffContentType | list[StuffContentType]:
+        """Enable indexing: list_content[0], list_content[-1], list_content[1:3]."""
+        return self.items[index]
+
+    def __contains__(self, item: object) -> bool:
+        """Enable 'in' operator: if item in list_content."""
+        return item in self.items
 
     @property
     @override
@@ -80,7 +113,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:
-                rendered += f" • {item}\n"
+                rendered += f" • {item.rendered_markdown(level=level, is_pretty=is_pretty)}\n"
         else:
             for item_index, item in enumerate(self.items):
                 rendered += f"\n • item #{item_index + 1}:\n\n"
@@ -101,7 +134,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
         rendered = ""
         if self._single_class_name == "TextContent":
             for item in self.items:
-                rendered += f" • {item}\n"
+                rendered += f" • {await item.rendered_markdown_async(level=level, is_pretty=is_pretty)}\n"
         else:
             for item_index, item in enumerate(self.items):
                 rendered += f"\n • item #{item_index + 1}:\n\n"
@@ -120,7 +153,7 @@ class ListContent(StuffContent, Generic[StuffContentType]):
             if isinstance(item, ImageRenderable):  # pyright: ignore[reportUnnecessaryIsInstance]
                 rendered = item.render_with_images(registry, text_format)
             else:
-                rendered = str(item)
+                rendered = item.rendered_markdown()
             if rendered:
                 parts.append(rendered)
         return "\n".join(parts)

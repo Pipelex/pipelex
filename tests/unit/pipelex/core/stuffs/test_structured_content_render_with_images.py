@@ -39,6 +39,18 @@ class CustomStructuredWithNestedList(StructuredContent):
     image_groups: list[list[ImageContent]]
 
 
+class TestData:
+    """Expected values for render_with_images tests."""
+
+    EXPECTED_PLAIN_LIST = "title: Test Document\nimages: [Image 1]\n[Image 2]\n[Image 3]"
+    EXPECTED_DICT = "title: Gallery\nimage_map: cover: [Image 1]\nbackground: [Image 2]"
+    EXPECTED_NESTED_LIST = "title: Nested Gallery\nimage_groups: [Image 1]\n[Image 2]\n[Image 3]"
+    EXPECTED_IMAGE_RENDERABLE = "text_and_images: Some document text\n[Image 1]\npage_view: [Image 2]"
+    EXPECTED_PAGE_CONTENT_ALL = "text_and_images: Page content\n[Image 1]\n[Image 2]\npage_view: [Image 3]"
+    EXPECTED_EMPTY_LIST = "title: Empty Gallery"
+    EXPECTED_NONE_PAGE_VIEW = "text_and_images: Text only\n[Image 1]"
+
+
 class TestStructuredContentRenderWithImages:
     """Tests for StructuredContent.render_with_images()."""
 
@@ -56,9 +68,7 @@ class TestStructuredContentRenderWithImages:
 
         result = content.render_with_images(registry, TextFormat.PLAIN)
 
-        assert "[Image 1]" in result
-        assert "[Image 2]" in result
-        assert "[Image 3]" in result
+        assert result == TestData.EXPECTED_PLAIN_LIST
         assert len(registry.images) == 3
         assert registry.images[0].url == "https://example.com/image1.png"
         assert registry.images[1].url == "https://example.com/image2.png"
@@ -77,8 +87,7 @@ class TestStructuredContentRenderWithImages:
 
         result = content.render_with_images(registry, TextFormat.PLAIN)
 
-        assert "[Image 1]" in result
-        assert "[Image 2]" in result
+        assert result == TestData.EXPECTED_DICT
         assert len(registry.images) == 2
 
     def test_nested_list_of_images_extracts_all(self) -> None:
@@ -99,9 +108,7 @@ class TestStructuredContentRenderWithImages:
 
         result = content.render_with_images(registry, TextFormat.PLAIN)
 
-        assert "[Image 1]" in result
-        assert "[Image 2]" in result
-        assert "[Image 3]" in result
+        assert result == TestData.EXPECTED_NESTED_LIST
         assert len(registry.images) == 3
 
     def test_image_renderable_field_delegates_properly(self) -> None:
@@ -119,9 +126,7 @@ class TestStructuredContentRenderWithImages:
 
         result = content.render_with_images(registry, TextFormat.PLAIN)
 
-        assert "[Image 1]" in result
-        assert "[Image 2]" in result
-        assert "Some document text" in result
+        assert result == TestData.EXPECTED_IMAGE_RENDERABLE
         assert len(registry.images) == 2
 
     def test_page_content_extracts_all_nested_images(self) -> None:
@@ -140,9 +145,7 @@ class TestStructuredContentRenderWithImages:
 
         result = page.render_with_images(registry, TextFormat.PLAIN)
 
-        assert "[Image 1]" in result
-        assert "[Image 2]" in result
-        assert "[Image 3]" in result
+        assert result == TestData.EXPECTED_PAGE_CONTENT_ALL
         assert len(registry.images) == 3
         assert registry.images[0].url == "https://example.com/embedded1.png"
         assert registry.images[1].url == "https://example.com/embedded2.png"
@@ -158,7 +161,7 @@ class TestStructuredContentRenderWithImages:
 
         result = content.render_with_images(registry, TextFormat.PLAIN)
 
-        assert "title:" in result.lower()
+        assert result == TestData.EXPECTED_EMPTY_LIST
         assert len(registry.images) == 0
 
     def test_none_page_view_handled_correctly(self) -> None:
@@ -174,7 +177,7 @@ class TestStructuredContentRenderWithImages:
 
         result = page.render_with_images(registry, TextFormat.PLAIN)
 
-        assert "[Image 1]" in result
+        assert result == TestData.EXPECTED_NONE_PAGE_VIEW
         assert len(registry.images) == 1
 
 
