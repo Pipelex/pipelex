@@ -2,6 +2,7 @@ import asyncio
 import inspect
 from typing import Literal, cast, get_type_hints
 
+from kajson.kajson_manager import KajsonManager
 from pydantic import field_validator
 from typing_extensions import override
 
@@ -98,6 +99,24 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
                 f"when it should be '{self.output.concept.concept_ref}' (no multiplicity)."
             )
             raise TypeError(msg)
+
+        # Validate that the function's return type matches the concept's structure class
+        concept_structure_class = KajsonManager.get_class_registry().get_class(name=self.output.concept.structure_class_name)
+        if concept_structure_class is None:
+            msg = (
+                f"PipeFunc '{self.code}' failed to validate output with library: "
+                f"Concept structure class '{self.output.concept.structure_class_name}' not found in registry."
+            )
+            raise TypeError(msg)
+        # TODO: To revive this test, the cli `build strucutres` command should only validate the concepts and not the pipes.
+        # More info here: tests/integration/pipelex/pipes/operator/pipe_func/test_pipe_func_validation_errors.py:367
+        # if return_type != concept_structure_class:
+        #     msg = (
+        #         f"PipeFunc '{self.code}' output concept expects structure class '{self.output.concept.structure_class_name}', "
+        #         f"but the function '{self.function_name}' return type is '{return_type.__name__}'. "
+        #         f"The return type of your function should be '{self.output.concept.structure_class_name}' or a subclass of it."
+        #     )
+        #     raise TypeError(msg)
 
     @override
     async def _live_run_operator_pipe(

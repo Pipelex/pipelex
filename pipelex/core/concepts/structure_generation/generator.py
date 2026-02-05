@@ -7,6 +7,7 @@ from kajson.kajson_manager import KajsonManager
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -353,16 +354,30 @@ class StructureGenerator:
         """Resolve a concept reference to a Python type annotation.
 
         Args:
-            concept_ref: The concept reference (e.g., "myapp.Customer")
+            concept_ref: The concept reference (e.g., "myapp.Customer" or "native.Html")
 
         Returns:
             The Python type annotation (structure class name).
+            - For native concepts: generates import and returns class name (e.g., HtmlContent)
             - If module_path is available in concept_ref_to_class_info: generates an import,
               tracks for mocking, returns class name directly (for file generation)
             - Otherwise: returns a forward reference string (for runtime - resolved via model_rebuild)
         """
         if not concept_ref:
             return "Any"
+
+        # Handle native concepts (e.g., "native.Html" -> HtmlContent)
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
+            # Extract the concept code (e.g., "Html" from "native.Html")
+            concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
+            try:
+                native_code = NativeConceptCode(concept_code)
+                structure_class = native_code.structure_class
+                if structure_class:
+                    self.imports.add(f"from {structure_class.__module__} import {structure_class.__name__}")
+                    return structure_class.__name__
+            except ValueError:
+                pass
 
         # Check concept_ref_to_class_info for the concept reference
         if concept_ref in self.concept_ref_to_class_info:
@@ -377,7 +392,7 @@ class StructureGenerator:
 
         # Default: extract concept code and use as forward reference
         # e.g., "myapp.Customer" -> '"Customer"'
-        concept_code = concept_ref.split(".")[-1]
+        concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
         return f'"{concept_code}"'
 
     def _generate_field(self, field_name: str, field_def: dict[str, Any] | str) -> str:
@@ -538,6 +553,14 @@ class StructureGenerator:
             "Literal": Literal,
             "Field": Field,
         }
+
+        # Add all native content classes to exec_globals so they're available during validation
+        # This is needed because exec() with separate globals/locals puts imports in locals,
+        # but class annotations look in globals
+        for native_code in NativeConceptCode:
+            structure_class = native_code.structure_class
+            if structure_class:
+                exec_globals[structure_class.__name__] = structure_class
 
         validation_code = python_code
 

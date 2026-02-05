@@ -18,7 +18,7 @@ from pipelex.core.concepts.structure_generation.generator import ConceptClassInf
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.text_content import TextContent
-from pipelex.hub import get_class_registry, get_func_registry
+from pipelex.hub import get_class_registry, get_func_registry, resolve_library_dirs
 from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
@@ -280,7 +280,24 @@ def build_structures_command(
         str | None,
         typer.Option("--output-dir", "-o", help="Output directory for generated structures (default: structures/ in target's directory)"),
     ] = None,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--library-dir",
+            "-L",
+            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+        ),
+    ] = None,
 ) -> None:
+    """Generate Python structure classes from concept definitions in .plx files.
+
+    Examples:
+        pipelex build structures my_bundle.plx
+        pipelex build structures ./my_pipes/
+        pipelex build structures my_bundle.plx -o ./generated/
+        pipelex build structures my_bundle.plx -L ./shared_pipes/
+    """
+
     async def _build_structures_cmd():
         target_path = Path(target).resolve()
 
@@ -288,9 +305,12 @@ def build_structures_command(
             typer.secho(f"❌ Target does not exist: {target_path}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1)
 
+        # Resolve library directories using the standard 3-tier priority
+        library_dirs_paths, _ = resolve_library_dirs(library_dir)
+
         # Determine if target is a file or directory
         is_plx_file = target_path.is_file() and is_pipelex_file(target_path)
-        pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD)
+        pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD, library_dirs=library_dir)
 
         try:
             if is_plx_file:
@@ -301,7 +321,7 @@ def build_structures_command(
                 typer.echo(f"🔍 Validating bundle: {target_path}")
 
                 # Validate single bundle
-                validate_result = await validate_bundle(plx_file_path=target_path)
+                validate_result = await validate_bundle(plx_file_path=target_path, library_dirs=library_dirs_paths)
                 # THIS IS A HACK, while waiting class/func registries to be in libraries.
                 get_class_registry().teardown()
                 get_func_registry().teardown()

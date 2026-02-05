@@ -1,6 +1,5 @@
 from typing import Any, Generic, Iterator, overload
 
-from json2html import json2html
 from rich.pretty import Pretty
 from rich.table import Table
 from typing_extensions import override
@@ -91,14 +90,11 @@ class ListContent(StuffContent, Generic[StuffContentType]):
 
     @override
     def rendered_html(self) -> str:
-        list_dump = [item.smart_dump() for item in self.items]
+        if not self.items:
+            return "<ul><li><em>empty</em></li></ul>"
 
-        html: str = json2html.convert(  # pyright: ignore[reportAssignmentType, reportUnknownVariableType]
-            json=list_dump,  # pyright: ignore[reportArgumentType]
-            clubbing=True,
-            table_attributes="",
-        )
-        return html
+        rows = [f"<li>{item.rendered_html()}</li>" for item in self.items]
+        return f"<ul>{''.join(rows)}</ul>"
 
     # -------------------------------------------------------------------------------------
     # Sync implementations
