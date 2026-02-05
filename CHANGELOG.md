@@ -24,6 +24,7 @@
  - **StructuredContent.rendered_html()**: Now recursively calls `rendered_html()` on nested `StuffContent` fields instead of using json2html conversion. Also skips `None` values and uses HTML table format.
 
 ### Fixed
+ - Fixed `PipeImgGen` not properly converting `ImageContent` to custom subclasses (e.g., `Receipt(ImageContent)`). The pipe now uses `smart_dump()` before `model_validate()` to correctly instantiate the output concept's structure class.
  - Corrected output directory creation logic in `pipelex run` to properly respect the `--no-graph` flag and configuration settings.
  - Fixed a bug when trying to print HTML content in a TextContent object.
  - Fixed the Pipelex CLI for generating structures, inputs, runner files.
