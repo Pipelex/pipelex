@@ -9,11 +9,11 @@ from rich.traceback import Traceback
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex.cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, check_config_sync_cmd
 from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import update_gateway_models_cmd

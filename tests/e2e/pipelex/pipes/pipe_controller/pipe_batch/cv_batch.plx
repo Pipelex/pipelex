@@ -21,10 +21,10 @@ responsibilities = { type = "text", description = "Main duties and tasks of the 
 qualifications = { type = "text", description = "Required education, certifications, or experience levels", required = true }
 nice_to_haves = { type = "text", description = "Preferred but not mandatory qualifications" }
 
-[concept.MatchAnalysis]
+[concept.CandidateMatch]
 description = "An evaluation of how well a candidate fits a job position."
 
-[concept.MatchAnalysis.structure]
+[concept.CandidateMatch.structure]
 match_score = { type = "number", description = "Numerical score representing overall fit percentage between 0 and 100", required = true }
 strengths = { type = "text", description = "Areas where the candidate meets or exceeds requirements", required = true }
 gaps = { type = "text", description = "Areas where the candidate falls short of requirements", required = true }
@@ -36,7 +36,7 @@ description = """
 Main orchestrator pipe that takes a bunch of CVs and a job offer in PDF format, and analyzes how they match.
 """
 inputs = { cvs = "Document[]", job_offer_pdf = "Document" }
-output = "MatchAnalysis[]"
+output = "CandidateMatch[]"
 steps = [
     { pipe = "extract_one_job_offer", result = "job_offer_pages" },
     { pipe = "analyze_job_requirements", result = "job_requirements" },
@@ -71,7 +71,7 @@ Analyze the following job offer content and extract the key requirements for the
 type = "PipeSequence"
 description = "Processes one application"
 inputs = { cv_pdf = "Document", job_requirements = "JobRequirements" }
-output = "MatchAnalysis"
+output = "CandidateMatch"
 steps = [
     { pipe = "extract_one_cv", result = "cv_pages" },
     { pipe = "analyze_one_cv", result = "candidate_profile" },
@@ -108,7 +108,7 @@ description = """
 Evaluates how well the candidate matches the job requirements, calculating a match score and identifying strengths and gaps
 """
 inputs = { candidate_profile = "CandidateProfile", job_requirements = "JobRequirements" }
-output = "MatchAnalysis"
+output = "CandidateMatch"
 model = "$writing-factual"
 system_prompt = """
 You are an expert HR analyst specializing in candidate-job fit evaluation. Your task is to produce a structured match analysis comparing a candidate's profile against job requirements.
