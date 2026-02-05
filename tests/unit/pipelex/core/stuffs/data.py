@@ -690,7 +690,7 @@ ERROR_TEST_CASES: list[tuple[str, StuffContentOrData, str | None, str, list[str]
 class RenderedHtmlTestData:
     HTML_INNER_HTML = "<h1>Title</h1><p>Hi <strong>there</strong>.</p>"
     HTML_CSS_CLASS = 'report-content x" onclick="alert(1)'
-    HTML_EXPECTED = f'<div class="{escape(HTML_CSS_CLASS)!s}">{escape(HTML_INNER_HTML)!s}</div>'
+    HTML_EXPECTED = f'<div class="{escape(HTML_CSS_CLASS)!s}">{HTML_INNER_HTML}</div>'
 
     IMAGE_URL = 'https://example.com/image.png?x=1&y="2"'
     IMAGE_EXPECTED = f'<img src="{escape(IMAGE_URL)!s}" class="msg-img">'

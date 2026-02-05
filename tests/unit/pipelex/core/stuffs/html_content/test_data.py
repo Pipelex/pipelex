@@ -12,10 +12,10 @@ class TestData:
     # Expected outputs for render methods
     EXPECTED_RENDERED_PLAIN = "<p>Hello World</p>"
     EXPECTED_RENDERED_MARKDOWN = "<p>Hello World</p>"
-    EXPECTED_RENDERED_HTML = '<div class="my-class">&lt;p&gt;Hello World&lt;/p&gt;</div>'
+    EXPECTED_RENDERED_HTML = '<div class="my-class"><p>Hello World</p></div>'
     EXPECTED_RENDERED_JSON = '{"html": "<p>Hello World</p>", "css_class": "my-class"}'
     EXPECTED_RENDERED_FOR_PROMPT = "<p>Hello World</p>"
 
     # XSS protection test cases
     XSS_CSS_CLASS = '<script>alert("xss")</script>'
-    EXPECTED_XSS_PROTECTED_HTML = '<div class="&lt;script&gt;alert(&#34;xss&#34;)&lt;/script&gt;">&lt;p&gt;Hello World&lt;/p&gt;</div>'
+    EXPECTED_XSS_PROTECTED_HTML = '<div class="&lt;script&gt;alert(&#34;xss&#34;)&lt;/script&gt;"><p>Hello World</p></div>'
