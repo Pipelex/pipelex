@@ -44,6 +44,7 @@ class PipeSpec(StructuredContent):
         # Do NOT set examples here - subclasses have Literal types with defaults
         # Setting examples would cause mocking issues where the base class type doesn't match subclass fields
     )
+    # TODO: Change examples to list(PipeCategory) for randomness in mocks
     pipe_category: Any = Field(
         description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'."),
         examples=["PipeOperator"],

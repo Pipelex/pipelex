@@ -31,6 +31,7 @@ class PipeSignature(StructuredContent):
     """
 
     code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
+    # TODO: Change examples to list(PipeType) for randomness in mocks
     type: PipeType | str = Field(description="Pipe type.", examples=["PipeLLM"])
     pipe_category: SkipJsonSchema[PipeCategory] = Field(description="Pipe category set according to its type.")
     description: str = Field(description="What the pipe does")

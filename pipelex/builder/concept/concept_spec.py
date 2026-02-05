@@ -66,6 +66,7 @@ class ConceptStructureSpec(StructuredContent):
 
     the_field_name: str = Field(description="Field name. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
     description: str
+    # TODO: Change examples to list(ConceptStructureSpecFieldType) for randomness in mocks
     type: ConceptStructureSpecFieldType = Field(description="The type of the field.", examples=["concept"])
     required: bool = Field(default=False, description="Whether the field is mandatory. Defaults to False unless explicitly set to True.")
     default_value: Any | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.IGNORE})
