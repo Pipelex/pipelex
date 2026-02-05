@@ -251,6 +251,56 @@ class LibraryManager(LibraryManagerAbstract):
         library.validate_library()
         return all_pipes
 
+    @override
+    def load_concepts_only_from_blueprints(
+        self,
+        library_id: str,
+        blueprints: list[PipelexBundleBlueprint],
+    ) -> list["Concept"]:
+        """Load only domains and concepts from blueprints, skipping pipes.
+
+        This is a lightweight alternative to load_from_blueprints() that only processes
+        domains and concepts. It does not load pipes, does not perform pipe validation,
+        and does not run library.validate_library().
+
+        Args:
+            library_id: The ID of the library to load into
+            blueprints: List of parsed PLX blueprints to load
+
+        Returns:
+            List of all concepts that were loaded
+        """
+        library = self.get_library(library_id=library_id)
+
+        # Load all domains first
+        all_domains: list[Domain] = []
+        for blueprint in blueprints:
+            domain = DomainFactory.make_from_blueprint(
+                blueprint=DomainBlueprint(
+                    source=blueprint.source,
+                    code=blueprint.domain,
+                    description=blueprint.description or "",
+                    system_prompt=blueprint.system_prompt,
+                ),
+            )
+            all_domains.append(domain)
+        library.domain_library.add_domains(domains=all_domains)
+
+        # Load concepts (forward references resolved after all are loaded)
+        all_concepts = self._load_concepts_from_blueprints(blueprints)
+        library.concept_library.add_concepts(concepts=all_concepts)
+
+        # Resolve forward references in dynamically generated structure classes
+        self._rebuild_models_with_forward_refs(all_concepts)
+
+        # Detect cycles in concept references (A -> B -> A is forbidden)
+        self._detect_concept_cycles(all_concepts)
+
+        library.validate_domain_library_with_libraries()
+        library.validate_concept_library_with_libraries()
+
+        return all_concepts
+
     def _load_concepts_from_blueprints(
         self,
         blueprints: list[PipelexBundleBlueprint],
