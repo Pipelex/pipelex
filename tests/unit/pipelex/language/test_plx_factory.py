@@ -4,8 +4,10 @@ import pytest
 import tomlkit
 from pytest_mock import MockerFixture
 
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.language.plx_config import PlxConfig, PlxConfigForConcepts, PlxConfigForPipes, PlxConfigInlineTables, PlxConfigStrings
 from pipelex.language.plx_factory import PIPE_CATEGORY_FIELD_KEY, PlxFactory
+from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 
 
 class TestPlxFactoryUnit:
@@ -409,3 +411,77 @@ class TestPlxFactoryUnit:
         assert "domain" in result
         assert "[concept]" in result
         assert "TestConcept" in result
+
+    def test_pipe_compose_construct_serialization_format(self, mocker: MockerFixture, mock_plx_config: PlxConfig):
+        """Test PipeComposeBlueprint construct serializes to correct PLX format."""
+        _mock_config = mocker.patch.object(PlxFactory, "_plx_config", return_value=mock_plx_config)
+
+        blueprint = PipelexBundleBlueprint(
+            domain="test_domain",
+            pipe={
+                "compose_test": PipeComposeBlueprint.model_validate(
+                    {
+                        "description": "Test compose",
+                        "inputs": {"data": "Text", "info": "Text"},
+                        "output": "JSON",
+                        "construct": {
+                            "value": {"from": "data.field"},
+                            "name": {"from": "info.name"},
+                        },
+                    }
+                )
+            },
+        )
+
+        plx_content = PlxFactory.make_plx_content(blueprint=blueprint)
+
+        # Should have nested table section, not inline
+        assert "[pipe.compose_test.construct]" in plx_content
+        # Should use concise format { from = '...' }
+        assert "value = { from = 'data.field' }" in plx_content
+        assert "name = { from = 'info.name' }" in plx_content
+        # Should NOT have internal field names
+        assert "construct_blueprint" not in plx_content
+        assert "fields" not in plx_content
+        assert "from_path" not in plx_content
+        assert "method" not in plx_content
+
+    def test_pipe_compose_construct_fixed_and_template_serialization(self, mocker: MockerFixture, mock_plx_config: PlxConfig):
+        """Test PipeComposeBlueprint construct with FIXED and TEMPLATE methods serializes correctly."""
+        _mock_config = mocker.patch.object(PlxFactory, "_plx_config", return_value=mock_plx_config)
+
+        blueprint = PipelexBundleBlueprint(
+            domain="test_domain",
+            pipe={
+                "compose_mixed": PipeComposeBlueprint.model_validate(
+                    {
+                        "description": "Mixed construct methods",
+                        "inputs": {"data": "Text"},
+                        "output": "JSON",
+                        "construct": {
+                            "fixed_string": "hello world",
+                            "fixed_number": 42,
+                            "from_var": {"from": "data.value"},
+                            "templated": {"template": "Hello {{ data.name }}!"},
+                        },
+                    }
+                )
+            },
+        )
+
+        plx_content = PlxFactory.make_plx_content(blueprint=blueprint)
+
+        # Should have nested table section
+        assert "[pipe.compose_mixed.construct]" in plx_content
+        # Fixed values should appear directly
+        assert "fixed_string = 'hello world'" in plx_content
+        assert "fixed_number = 42" in plx_content
+        # From var should use { from = '...' }
+        assert "from_var = { from = 'data.value' }" in plx_content
+        # Template should use { template = '...' }
+        assert "templated = { template = 'Hello {{ data.name }}!' }" in plx_content
+        # Should NOT have internal field names (as key names in construct)
+        assert "fixed_value" not in plx_content
+        assert "from_path" not in plx_content
+        # Check that 'method' does not appear as a key in construct section
+        assert "method =" not in plx_content

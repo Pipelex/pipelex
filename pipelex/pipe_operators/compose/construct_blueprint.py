@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, SerializationInfo, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
@@ -79,6 +79,30 @@ class ConstructFieldBlueprint(BaseModel):
                     msg = "nested is required for NESTED method"
                     raise ValueError(msg)
         return self
+
+    def to_plx_dict(self) -> Any:
+        """Convert to PLX-format dict for serialization.
+
+        Returns the format expected in PLX files:
+        - FIXED: Just the value itself
+        - FROM_VAR: { from: "path" } with optional list_to_dict_keyed_by
+        - TEMPLATE: { template: "..." }
+        - NESTED: The nested construct's PLX dict
+        """
+        match self.method:
+            case ConstructFieldMethod.FIXED:
+                return self.fixed_value
+            case ConstructFieldMethod.FROM_VAR:
+                result: dict[str, Any] = {"from": self.from_path}
+                if self.list_to_dict_keyed_by:
+                    result["list_to_dict_keyed_by"] = self.list_to_dict_keyed_by
+                return result
+            case ConstructFieldMethod.TEMPLATE:
+                return {"template": self.template}
+            case ConstructFieldMethod.NESTED:
+                if self.nested:
+                    return self.nested.to_plx_dict()
+                return {}
 
     @classmethod
     def make_from_raw(cls, raw: Any) -> ConstructFieldBlueprint:
@@ -245,6 +269,26 @@ class ConstructBlueprint(BaseModel):
                     pass
 
         return required
+
+    def to_plx_dict(self) -> dict[str, Any]:
+        """Convert to PLX-format dict (fields at root, no wrapper).
+
+        Returns the format expected in PLX files where field names are at
+        the root level, not wrapped in a 'fields' key.
+        """
+        return {field_name: field_bp.to_plx_dict() for field_name, field_bp in self.fields.items()}
+
+    @model_serializer(mode="wrap")
+    def serialize_with_context(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo) -> dict[str, Any]:
+        """Serialize with format-aware context.
+
+        When context contains {"format": "plx"}, outputs PLX-format dict.
+        Otherwise, uses default Pydantic serialization.
+        """
+        if info.context and info.context.get("format") == "plx":
+            return self.to_plx_dict()
+        result = handler(self)
+        return dict(result)  # Ensure dict return type
 
     @classmethod
     def make_from_raw(cls, raw: dict[str, Any]) -> ConstructBlueprint:
