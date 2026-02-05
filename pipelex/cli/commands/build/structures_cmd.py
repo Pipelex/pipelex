@@ -1,4 +1,3 @@
-import asyncio
 import inspect
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
@@ -19,7 +18,7 @@ from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry, get_func_registry, resolve_library_dirs
-from pipelex.pipeline.validate_bundle import validate_bundle, validate_bundles_from_directory
+from pipelex.pipeline.validate_bundle import load_concepts_only, load_concepts_only_from_directory
 from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 if TYPE_CHECKING:
@@ -288,6 +287,14 @@ def build_structures_command(
             help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
         ),
     ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Force regeneration of all structures, overwriting existing files without checking if classes already exist.",
+        ),
+    ] = False,
 ) -> None:
     """Generate Python structure classes from concept definitions in .plx files.
 
@@ -296,9 +303,10 @@ def build_structures_command(
         pipelex build structures ./my_pipes/
         pipelex build structures my_bundle.plx -o ./generated/
         pipelex build structures my_bundle.plx -L ./shared_pipes/
+        pipelex build structures my_bundle.plx --force
     """
 
-    async def _build_structures_cmd():
+    def _build_structures_cmd():
         target_path = Path(target).resolve()
 
         if not target_path.exists():
@@ -318,24 +326,25 @@ def build_structures_command(
                 base_dir = target_path.parent
                 output_directory = Path(output_dir) if output_dir else base_dir / "structures"
 
-                typer.echo(f"🔍 Validating bundle: {target_path}")
+                typer.echo(f"🔍 Loading concepts from bundle: {target_path}")
 
-                # Validate single bundle
-                validate_result = await validate_bundle(plx_file_path=target_path, library_dirs=library_dirs_paths)
+                # Load concepts only (no pipes)
+                load_result = load_concepts_only(plx_file_path=target_path, library_dirs=library_dirs_paths)
                 # THIS IS A HACK, while waiting class/func registries to be in libraries.
                 get_class_registry().teardown()
                 get_func_registry().teardown()
                 get_class_registry().register_classes(CoreRegistryModels.get_all_models())
 
-                all_blueprints: list[PipelexBundleBlueprint] = validate_result.blueprints
+                all_blueprints: list[PipelexBundleBlueprint] = load_result.blueprints
 
-                typer.echo(f"✅ Validated {len(all_blueprints)} blueprint(s)")
+                typer.echo(f"✅ Loaded {len(all_blueprints)} blueprint(s)")
 
                 # Generate structures using the helper function
                 generated_files = generate_structures_from_blueprints(
                     blueprints=all_blueprints,
                     output_directory=output_directory,
                     target_path=base_dir,
+                    skip_existing_check=force,
                 )
             else:
                 # Directory: scan for all PLX files
@@ -345,22 +354,23 @@ def build_structures_command(
 
                 output_directory = Path(output_dir) if output_dir else target_path / "structures"
 
-                typer.echo(f"🔍 Validating bundles in: {target_path}")
+                typer.echo(f"🔍 Loading concepts from bundles in: {target_path}")
 
-                # Validate bundles from directory
-                validate_result = await validate_bundles_from_directory(directory=target_path)
+                # Load concepts only from directory (no pipes)
+                load_result = load_concepts_only_from_directory(directory=target_path)
                 # THIS IS A HACK, while waiting class/func registries to be in libraries.
                 get_class_registry().teardown()
                 get_func_registry().teardown()
                 get_class_registry().register_classes(CoreRegistryModels.get_all_models())
 
-                typer.echo(f"✅ Validated {len(validate_result.blueprints)} blueprint(s)")
+                typer.echo(f"✅ Loaded {len(load_result.blueprints)} blueprint(s)")
 
                 # Generate structures using the helper function
                 generated_files = generate_structures_from_blueprints(
-                    blueprints=validate_result.blueprints,
+                    blueprints=load_result.blueprints,
                     output_directory=output_directory,
                     target_path=target_path,
+                    skip_existing_check=force,
                 )
 
             if generated_files:
@@ -371,4 +381,4 @@ def build_structures_command(
         finally:
             pipelex_instance.teardown()
 
-    asyncio.run(_build_structures_cmd())
+    _build_structures_cmd()
