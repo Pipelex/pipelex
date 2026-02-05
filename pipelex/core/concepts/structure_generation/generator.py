@@ -368,9 +368,10 @@ class StructureGenerator:
         # Handle native concepts (e.g., "native.Html" -> HtmlContent)
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
             # Extract the concept code (e.g., "Html" from "native.Html")
-            concept_code = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref)
+            concept_code = concept_ref.split(".")[-1] if "." in concept_ref else concept_ref
             try:
-                structure_class = NativeConceptCode(concept_code).structure_class
+                native_code = NativeConceptCode(concept_code)
+                structure_class = native_code.structure_class
                 if structure_class:
                     self.imports.add(f"from {structure_class.__module__} import {structure_class.__name__}")
                     return structure_class.__name__
