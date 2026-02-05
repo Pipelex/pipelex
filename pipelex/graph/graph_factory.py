@@ -16,6 +16,7 @@ from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, re
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
+from pipelex.graph.reactflow.viewspec import LayoutSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.string_utils import snake_to_title_case
@@ -113,7 +114,13 @@ async def generate_graph_outputs(
     # Generate ReactFlow outputs
     if inclusion.reactflow_viewspec or inclusion.reactflow_html:
         analysis = GraphAnalysis.from_graphspec(graph_spec)
-        viewspec = graphspec_to_viewspec(graph_spec, analysis)
+        rf_config = graph_config.reactflow_config
+        layout = LayoutSpec(
+            direction=rf_config.layout_direction,
+            nodesep=rf_config.nodesep,
+            ranksep=rf_config.ranksep,
+        )
+        viewspec = graphspec_to_viewspec(graph_spec, analysis, layout=layout)
 
         if inclusion.reactflow_viewspec:
             reactflow_viewspec = viewspec.model_dump_json(indent=2)

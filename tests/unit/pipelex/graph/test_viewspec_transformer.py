@@ -19,6 +19,7 @@ from pipelex.graph.graphspec import (
 )
 from pipelex.graph.reactflow.viewspec import LayoutSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -327,10 +328,10 @@ class TestViewSpecTransformer:
         graph = self._make_graph(nodes=[node])
         analysis = GraphAnalysis.from_graphspec(graph)
 
-        custom_layout = LayoutSpec(direction="LR", nodesep=100, ranksep=150)
+        custom_layout = LayoutSpec(direction=FlowchartDirection.LEFT_TO_RIGHT, nodesep=100, ranksep=150)
         viewspec = graphspec_to_viewspec(graph, analysis, layout=custom_layout)
 
-        assert viewspec.layout.direction == "LR"
+        assert viewspec.layout.direction == FlowchartDirection.LEFT_TO_RIGHT
         assert viewspec.layout.nodesep == 100
         assert viewspec.layout.ranksep == 150
 

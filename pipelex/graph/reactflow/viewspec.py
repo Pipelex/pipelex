@@ -13,6 +13,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 # Current ViewSpec schema version (independent of GraphSpec version)
@@ -20,7 +21,6 @@ CURRENT_VIEWSPEC_VERSION = "1.0"
 
 ViewEngine = Literal["reactflow"]
 LayoutEngine = Literal["dagre"]
-LayoutDirection = Literal["TB", "LR", "BT", "RL"]
 
 
 class LayoutSpec(BaseModel):
@@ -32,7 +32,7 @@ class LayoutSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
 
     engine: LayoutEngine = "dagre"
-    direction: LayoutDirection = "TB"
+    direction: FlowchartDirection = Field(default=FlowchartDirection.TOP_DOWN, strict=False)
     nodesep: int | None = 50
     ranksep: int | None = 80
     align: str | None = None
