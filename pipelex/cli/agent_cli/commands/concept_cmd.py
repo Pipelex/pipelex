@@ -83,6 +83,9 @@ def _structure_field_to_dict(field_spec: ConceptStructureSpec) -> dict[str, Any]
     if field_spec.concept_ref:
         result["concept_ref"] = field_spec.concept_ref
 
+    if field_spec.choices:
+        result["choices"] = field_spec.choices
+
     return result
 
 

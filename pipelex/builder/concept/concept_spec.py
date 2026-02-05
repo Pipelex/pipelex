@@ -69,6 +69,9 @@ class ConceptStructureSpec(StructuredContent):
     required: bool = Field(default=False, description="Whether the field is mandatory. Defaults to False unless explicitly set to True.")
     default_value: Any | None = None
     concept_ref: str | None = Field(default=None, description="For type='concept', the concept reference (e.g., 'myapp.Customer').")
+    choices: list[str] | None = Field(
+        default=None, description="List of allowed values for the field. When set, the field value must be one of these choices."
+    )
 
     @field_validator("type", mode="before")
     @classmethod
@@ -148,6 +151,7 @@ class ConceptStructureSpec(StructuredContent):
             required=self.required,
             default_value=self.default_value,
             concept_ref=self.concept_ref,
+            choices=self.choices,
         )
 
 
