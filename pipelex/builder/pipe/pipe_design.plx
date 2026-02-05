@@ -34,6 +34,7 @@ PipeLLM       = "detail_pipe_llm"
 PipeExtract   = "detail_pipe_extract"
 PipeImgGen    = "detail_pipe_img_gen"
 PipeBatch     = "detail_pipe_batch"
+PipeCompose   = "detail_pipe_compose"
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PIPE CONTROLLERS
@@ -121,7 +122,7 @@ You must pick the relevant concepts for inputs and outputs from the following po
 
 + you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
-Based on the pipe signature, build the PipeComposeSpec.
+Based on the pipe signature, build the PipeBatchSpec.
 
 @pipe_signature
 """
@@ -209,7 +210,7 @@ inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", c
 output = "PipeComposeSpec"
 model = "$engineering-structured"
 prompt = """
-Design a PipeComposeSpec to render a jinja2 template.
+Design a PipeComposeSpec to compose content from working memory variables.
 Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
@@ -219,6 +220,22 @@ You must pick the relevant concepts for inputs and outputs from the following po
 + you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
 
 Based on the pipe signature, build the PipeComposeSpec.
+
+PipeCompose has two modes - choose the appropriate one based on the pipe's purpose:
+
+**Template mode** (for Text/Html output):
+- Use when you need to render a Jinja2 template to produce formatted text
+- Requires: template (Jinja2 string), target_format (plain/markdown/html/json/mermaid)
+- Output must be Text, Html, or a concept that refines Text
+
+**Construct mode** (for StructuredContent output):
+- Use when you need to assemble a structured object from working memory variables
+- Requires: construct (dict mapping field names to composition specs)
+- Each field can use:
+  - A fixed value (string, number, boolean, list)
+  - { from = "variable.path" } to reference a variable from working memory
+  - { template = "Jinja2 template string" } to render a template
+- Output must be a structured concept
 
 @pipe_signature
 """

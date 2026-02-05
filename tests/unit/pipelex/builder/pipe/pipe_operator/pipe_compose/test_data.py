@@ -35,6 +35,35 @@ class PipeComposeTestCases:
         ),
     )
 
+    CONSTRUCT_COMPOSE = (
+        "construct_compose",
+        PipeComposeSpec.model_validate(
+            {
+                "pipe_code": "compose_sheet",
+                "description": "Compose interview sheet",
+                "inputs": {"analysis": "MatchAnalysis", "questions": "InterviewQuestion[]"},
+                "output": "InterviewSheet",
+                "construct": {
+                    "score": {"from": "analysis.overall_score"},
+                    "questions": {"from": "questions"},
+                },
+            }
+        ),
+        # Use model_validate to create the expected blueprint via the same validation path
+        PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose interview sheet",
+                "inputs": {"analysis": "MatchAnalysis", "questions": "InterviewQuestion[]"},
+                "output": "InterviewSheet",
+                "construct": {
+                    "score": {"from": "analysis.overall_score"},
+                    "questions": {"from": "questions"},
+                },
+            }
+        ),
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, PipeComposeSpec, PipeComposeBlueprint]]] = [
         SIMPLE_COMPOSE,
+        CONSTRUCT_COMPOSE,
     ]

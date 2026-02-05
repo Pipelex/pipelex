@@ -62,6 +62,7 @@ When describing the task of a pipe controller, be concise, don't detail all the 
 - LLM: uses a Vision/LLM to generate text or structured objects. It can generate single items or lists of items.
 - IMG_GEN: uses an AI model to generate images from a prompt that is either the result of a previous step or part of the pipeline's original inputs. As the image generation prompt MUST be a text, you can plan to use an LLM step to write it.
 - EXTRACT: extracts content from an image or a document, always outputs a list of pages (possibly a list of one page). Use it only when you need to use OCR or document extraction.
+- COMPOSE: combines variables from working memory into a new structured object using field composition (construct mode) or renders a Jinja2 template to produce Text/Html output (template mode).
 
 ---
 
@@ -168,13 +169,17 @@ You can use the native concepts for the inputs and outputs of the pipes, as requ
 
 ## For PipeOperators:
 
-The flow you design must include the contracts for each of the PipeOperators to use: PipeLLM, PipeImgGen, PipeExtract.
+The flow you design must include the contracts for each of the PipeOperators to use: PipeLLM, PipeImgGen, PipeExtract, PipeCompose.
 Shape of the contract for PipeOperator is:
-- type: PipeLLM | PipeImgGen | PipeExtract
+- type: PipeLLM | PipeImgGen | PipeExtract | PipeCompose
 - description: What the pipe does (string)
 - inputs: Dictionary mapping variable names (snake_case) to concept codes (PascalCase), possibly with multiplicity brackets.
 - result: Variable name for the pipe's result (snake_case). Can be referenced in subsequent pipes.
 - output: Output concept code (PascalCase) possibly with multiplicity: 'Text' (single), 'Article[]' (list), 'Image[5]' (exactly 5).
+
+**PipeCompose** has two modes:
+- Template mode: Renders a Jinja2 template using variables from working memory. Output must be Text, Html, or a concept that refines Text. Use for generating formatted text/documents.
+- Construct mode: Composes a StructuredContent object by mapping fields from working memory variables. Use for assembling structured objects from multiple sources.
 
 ## For the PipeControllers, which really define the flow, we need a more detailed contract, related to each type of controller:
 
