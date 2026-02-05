@@ -30,7 +30,7 @@ class HtmlContent(StuffContent):
         # If no css_class is provided, return raw inner_html without wrapping
         if not self.css_class:
             return self.inner_html
-        template_source = '<div class="{{ css_class|e }}">{{ inner_html | safe }}</div>'
+        template_source = '<div class="{{ css_class|e }}">{{ inner_html }}</div>'
         return render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
