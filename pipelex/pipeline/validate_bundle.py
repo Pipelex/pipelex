@@ -272,8 +272,8 @@ def load_concepts_only(
     loaded_blueprints: list[PipelexBundleBlueprint] | None = None
     try:
         if effective_dirs:
-            log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}) for concept loading")
-            library_manager.load_libraries(
+            log.verbose(f"Loading concepts only from {len(effective_dirs)} library directory(ies) ({source_label})")
+            library_manager.load_libraries_concepts_only(
                 library_id=library_id,
                 library_dirs=effective_dirs,
             )

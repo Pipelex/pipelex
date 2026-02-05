@@ -192,6 +192,92 @@ class LibraryManager(LibraryManagerAbstract):
         return self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
 
     @override
+    def load_libraries_concepts_only(
+        self,
+        library_id: str,
+        library_dirs: list[Path] | None = None,
+        library_file_paths: list[Path] | None = None,
+    ) -> list["Concept"]:
+        """Load only domains and concepts from library directories, skipping pipes.
+
+        This is a lightweight alternative to load_libraries() that only processes
+        domains and concepts. It does not load pipes, does not perform pipe validation,
+        and does not run library.validate_library().
+
+        Args:
+            library_id: The ID of the library to load into
+            library_dirs: List of directories containing PLX files
+            library_file_paths: List of specific PLX file paths to load
+
+        Returns:
+            List of all concepts that were loaded
+        """
+        # Ensure libraries exist for this library_id
+        if library_id not in self._libraries:
+            msg = f"Trying to load a library that does not exist: '{library_id}'"
+            raise LibraryError(msg)
+
+        if not library_dirs:
+            library_dirs = []
+
+        all_dirs: list[Path] = []
+        all_plx_paths: list[Path] = []
+        all_dirs.extend(library_dirs)
+        all_plx_paths.extend(get_pipelex_plx_files_from_dirs(set(library_dirs)))
+
+        if library_file_paths:
+            all_plx_paths.extend(library_file_paths)
+
+        # Combine and deduplicate
+        seen_absolute_paths: set[str] = set()
+        valid_plx_paths: list[Path] = []
+        for plx_path in all_plx_paths:
+            try:
+                absolute_path = str(plx_path.resolve())
+            except (OSError, RuntimeError):
+                # For paths that can't be resolved (e.g., in zipped packages), use string representation
+                absolute_path = str(plx_path)
+
+            if absolute_path not in seen_absolute_paths:
+                valid_plx_paths.append(plx_path)
+                seen_absolute_paths.add(absolute_path)
+
+        # Import modules and register in global registries
+        # Import from user directories - still needed for StructuredContent classes
+        for library_dir in all_dirs:
+            # Only import files that contain StructuredContent subclasses (uses AST pre-check)
+            ClassRegistryUtils.import_modules_in_folder(
+                folder_path=str(library_dir),
+                base_class_names=[StructuredContent.__name__],
+                force_include_dirs=[str(Path(builder.__file__).parent)],
+            )
+            # NOTE: We skip FuncRegistryUtils.register_funcs_in_folder() since we're not loading pipes
+
+        # Auto-discover and register all StructuredContent classes from sys.modules
+        num_registered = ClassRegistryUtils.auto_register_all_subclasses(
+            base_class=StructuredContent,
+        )
+        log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
+
+        # Load PLX files as concepts only (no pipes)
+        log.debug(f"Loading concepts only from plx files: {[str(p) for p in valid_plx_paths]}")
+        library = self.get_library(library_id=library_id)
+        all_concepts: list[Concept] = []
+        for plx_path in valid_plx_paths:
+            # Track loaded path (resolve if possible)
+            try:
+                resolved_path = plx_path.resolve()
+            except (OSError, RuntimeError):
+                resolved_path = plx_path
+            library.loaded_plx_paths.append(resolved_path)
+
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_path)
+            concepts = self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
+            all_concepts.extend(concepts)
+
+        return all_concepts
+
+    @override
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
 

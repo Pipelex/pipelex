@@ -287,6 +287,14 @@ def build_structures_command(
             help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
         ),
     ] = None,
+    force: Annotated[
+        bool,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Force regeneration of all structures, overwriting existing files without checking if classes already exist.",
+        ),
+    ] = False,
 ) -> None:
     """Generate Python structure classes from concept definitions in .plx files.
 
@@ -295,6 +303,7 @@ def build_structures_command(
         pipelex build structures ./my_pipes/
         pipelex build structures my_bundle.plx -o ./generated/
         pipelex build structures my_bundle.plx -L ./shared_pipes/
+        pipelex build structures my_bundle.plx --force
     """
 
     def _build_structures_cmd():
@@ -335,6 +344,7 @@ def build_structures_command(
                     blueprints=all_blueprints,
                     output_directory=output_directory,
                     target_path=base_dir,
+                    skip_existing_check=force,
                 )
             else:
                 # Directory: scan for all PLX files
@@ -360,6 +370,7 @@ def build_structures_command(
                     blueprints=load_result.blueprints,
                     output_directory=output_directory,
                     target_path=target_path,
+                    skip_existing_check=force,
                 )
 
             if generated_files:

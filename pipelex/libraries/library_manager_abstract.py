@@ -82,3 +82,25 @@ class LibraryManagerAbstract(ABC):
         library_file_paths: list[Path] | None = None,
     ) -> list[PipeAbstract]:
         pass
+
+    @abstractmethod
+    def load_libraries_concepts_only(
+        self,
+        library_id: str,
+        library_dirs: list[Path] | None = None,
+        library_file_paths: list[Path] | None = None,
+    ) -> list["Concept"]:
+        """Load only domains and concepts from library directories, skipping pipes.
+
+        This is a lightweight alternative to load_libraries() that only processes
+        domains and concepts. It does not load pipes, does not perform pipe validation,
+        and does not run library.validate_library().
+
+        Args:
+            library_id: The ID of the library to load into
+            library_dirs: List of directories containing PLX files
+            library_file_paths: List of specific PLX file paths to load
+
+        Returns:
+            List of all concepts that were loaded
+        """
