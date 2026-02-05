@@ -2,23 +2,30 @@ from pipelex.types import StrEnum
 
 
 class FlowchartDirection(StrEnum):
-    TOP_TO_BOTTOM = "top_to_bottom"
+    """Flowchart layout direction.
+
+    This is the single source of truth for direction naming across all renderers.
+    External formats (Mermaid, ReactFlow/Dagre) use different codes which are
+    provided via properties for last-mile conversion.
+    """
+
     TOP_DOWN = "top_down"
-    BOTTOM_TO_TOP = "bottom_to_top"
-    RIGHT_TO_LEFT = "right_to_left"
     LEFT_TO_RIGHT = "left_to_right"
 
     @property
     def mermaid_code(self) -> str:
-        """Return the 2-letter Mermaid code for this direction."""
+        """Return the Mermaid code for this direction (TD or LR)."""
         match self:
-            case FlowchartDirection.TOP_TO_BOTTOM:
-                return "TB"
             case FlowchartDirection.TOP_DOWN:
                 return "TD"
-            case FlowchartDirection.BOTTOM_TO_TOP:
-                return "BT"
-            case FlowchartDirection.RIGHT_TO_LEFT:
-                return "RL"
+            case FlowchartDirection.LEFT_TO_RIGHT:
+                return "LR"
+
+    @property
+    def reactflow_code(self) -> str:
+        """Return the ReactFlow/Dagre code for this direction (TB or LR)."""
+        match self:
+            case FlowchartDirection.TOP_DOWN:
+                return "TB"
             case FlowchartDirection.LEFT_TO_RIGHT:
                 return "LR"
