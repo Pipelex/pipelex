@@ -46,7 +46,7 @@ class StructuredContent(StuffContent):
 
         Uses match/case to handle all common Pydantic field types:
         - None: renders as <em>None</em>
-        - StructuredContent subclasses: calls rendered_html() recursively
+        - StuffContent subclasses: calls rendered_html() recursively
         - str: escapes HTML (or passes through if already HTML)
         - bool: renders as "True" or "False" (must be before int, as bool is subclass of int)
         - int: renders as string
@@ -61,7 +61,7 @@ class StructuredContent(StuffContent):
             case None:
                 return "<em>None</em>"
 
-            case StructuredContent():
+            case StuffContent():
                 return value.rendered_html()
 
             case str():
