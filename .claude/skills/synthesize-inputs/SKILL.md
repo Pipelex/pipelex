@@ -279,7 +279,7 @@ Test the synthetic inputs:
 
 ```bash
 # Dry run with the generated inputs
-pipelex-agent run <bundle.plx> --dry-run --input-file pipelex-wip/inputs/test_input.json
+pipelex-agent run <bundle.plx> --dry --input-file pipelex-wip/inputs/test_input.json
 
 # Full run (uses actual AI/extraction models)
 pipelex-agent run <bundle.plx> --input-file pipelex-wip/inputs/test_input.json

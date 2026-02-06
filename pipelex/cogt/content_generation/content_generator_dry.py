@@ -41,8 +41,8 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         raw_details: GeneratedImageRawDetails,
     ) -> ImageContent:
         return ImageContent(
-            url=raw_details.actual_url or "https://example.com/image.jpg",
-            public_url=raw_details.actual_url or "https://example.com/image.jpg",
+            url=raw_details.actual_url or "https://example.com",
+            public_url=raw_details.actual_url or "https://example.com",
             mime_type=raw_details.mime_type or "image/jpeg",
             size=raw_details.size,
         )
@@ -269,10 +269,10 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
             raise ValueError(msg)
         nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
         page_view_images_resolved: list[ImageContent] = []
-        for page_index in range(1, nb_pages + 1):
+        for _ in range(1, nb_pages + 1):
             page_view_image = self._make_generated_image_fake(
                 raw_details=GeneratedImageRawDetails(
-                    actual_url=f"https://example.com/page_{page_index}.png",
+                    actual_url="https://example.com",
                     size=ImageSize(width=1024, height=1024),
                     mime_type="image/jpeg",
                 ),

@@ -10,6 +10,7 @@ import typer
 from posthog import tag
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -91,11 +92,11 @@ def run_cmd(
     ] = "results",
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
+        typer.Option("--dry", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
     mock_inputs: Annotated[
         bool,
-        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
+        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry)"),
     ] = False,
     library_dir: Annotated[
         list[str] | None,
@@ -117,8 +118,8 @@ def run_cmd(
         pipelex run my_pipe --no-graph                  # Disable graph generation
         pipelex run my_pipe --graph-full-data           # Force include full data in graph
         pipelex run my_pipe --graph-no-data             # Force exclude full data from graph
-        pipelex run my_pipe --dry-run
-        pipelex run my_pipe --dry-run --mock-inputs
+        pipelex run my_pipe --dry
+        pipelex run my_pipe --dry --mock-inputs
     """
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -127,10 +128,10 @@ def run_cmd(
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
 
-    # Validate --mock-inputs requires --dry-run
+    # Validate --mock-inputs requires --dry
     if mock_inputs and not dry_run:
         typer.secho(
-            "Failed to run: --mock-inputs requires --dry-run",
+            "Failed to run: --mock-inputs requires --dry",
             fg=typer.colors.RED,
             err=True,
         )
@@ -247,7 +248,10 @@ def run_cmd(
                 library_dirs=library_dir,
             )
         except PipelineExecutionError as exc:
-            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
+            typer.secho(f"Failed to execute pipeline '{exc.pipe_code}': {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
+        except PipelexError as exc:
+            typer.secho(f"Failed to execute pipeline '{pipe_code or bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
         # Pretty print main_stuff unless disabled or in dry run mode

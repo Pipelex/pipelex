@@ -1,4 +1,4 @@
-from pydantic import Field
+from pydantic import Field, field_validator
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
@@ -10,12 +10,20 @@ from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.tools.uri.uri_resolver import describe_uri
 
 
 class ImageContent(StuffContent):
     url: str = Field(..., description="The image URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
+
+    @field_validator("url", mode="after")
+    @classmethod
+    def validate_url_reachable(cls, url: str) -> str:
+        validate_url_resource_exists(url)
+        return url
+
     public_url: str | None = Field(default=None, description="The public URL of the image")
     source_prompt: str | None = Field(default=None, description="The source prompt of the image")
     source_negative_prompt: str | None = Field(default=None, description="The source negative prompt of the image")

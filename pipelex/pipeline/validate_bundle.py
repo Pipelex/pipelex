@@ -22,6 +22,7 @@ from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library
 from pipelex.libraries.library_utils import get_pipelex_plx_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
+from pipelex.pipe_run.exceptions import PipeRunError
 
 
 class ValidateBundleError(PipelexError):
@@ -168,6 +169,11 @@ async def validate_bundle(
             message=msg,
             pipe_validation_errors=pipe_validation_errors,
         ) from validation_error
+    except PipeRunError as pipe_run_error:
+        raise ValidateBundleError(
+            message=pipe_run_error.message,
+            dry_run_error_message=pipe_run_error.message,
+        ) from pipe_run_error
     except DryRunError as dry_run_error:
         raise ValidateBundleError(
             message=dry_run_error.message,
@@ -214,6 +220,11 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
             message=msg,
             pipe_validation_errors=pipe_validation_errors,
         ) from validation_error
+    except PipeRunError as pipe_run_error:
+        raise ValidateBundleError(
+            message=pipe_run_error.message,
+            dry_run_error_message=pipe_run_error.message,
+        ) from pipe_run_error
     except DryRunError as dry_run_error:
         raise ValidateBundleError(
             message=dry_run_error.message,

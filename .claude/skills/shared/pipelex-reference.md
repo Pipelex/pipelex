@@ -434,8 +434,8 @@ pipelex --no-logo build inputs my_bundle.plx --pipe specific_pipe
 pipelex --no-logo validate my_bundle.plx
 
 # Dry run (no API calls, validates logic)
-pipelex --no-logo run my_bundle.plx --dry-run
-pipelex --no-logo run my_bundle.plx --dry-run --mock-inputs
+pipelex --no-logo run my_bundle.plx --dry
+pipelex --no-logo run my_bundle.plx --dry --mock-inputs
 
 # Run with inputs
 pipelex --no-logo run my_bundle.plx --inputs inputs.json

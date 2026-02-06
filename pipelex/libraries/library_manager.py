@@ -32,6 +32,7 @@ from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
     get_pipelex_plx_files_from_dirs,
 )
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
@@ -327,9 +328,24 @@ class LibraryManager(LibraryManagerAbstract):
                         concept_codes_from_the_same_domain=[the_concept.code for the_concept in all_concepts],
                     )
                     pipes.append(pipe)
-                    # Track source file for this pipe
-                    if blueprint.source:
-                        self._pipe_source_map[pipe_code] = Path(blueprint.source)
+                    # Track source file for this pipe, and detect duplicates
+                    new_source = Path(blueprint.source) if blueprint.source else None
+                    if pipe_code in self._pipe_source_map:
+                        existing_source = self._pipe_source_map[pipe_code]
+                        if existing_source == new_source:
+                            msg = (
+                                f"Pipe '{pipe_code}' is declared twice in the same bundle file: '{existing_source}'. "
+                                "Please remove the duplicate declaration."
+                            )
+                        else:
+                            msg = (
+                                f"Pipe '{pipe_code}' is declared in two different bundle files: "
+                                f"'{existing_source}' and '{new_source}'. "
+                                "Please remove one of the declarations or rename one of the pipes."
+                            )
+                        raise PipeLibraryError(msg)
+                    if new_source:
+                        self._pipe_source_map[pipe_code] = new_source
             all_pipes.extend(pipes)
 
         library.pipe_library.add_pipes(pipes=all_pipes)

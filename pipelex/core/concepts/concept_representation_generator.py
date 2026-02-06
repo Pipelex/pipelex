@@ -5,7 +5,10 @@ It supports two output formats: JSON (dict) and Python (class instantiation stri
 """
 
 import inspect
+import random
 import types
+import typing
+import uuid
 from typing import Any, Union, cast, get_args, get_origin
 
 from pydantic import BaseModel
@@ -155,6 +158,10 @@ class ConceptRepresentationGenerator:
         if origin is dict:
             return self._generate_dict_value(field_name)
 
+        # Handle Literal types (fields with choices)
+        if origin is typing.Literal:
+            return self._generate_literal_value(args, field_name)
+
         # Handle StrEnum types
         if inspect.isclass(actual_type) and issubclass(actual_type, StrEnum):
             return self._generate_enum_value(actual_type, field_name)
@@ -225,6 +232,21 @@ class ConceptRepresentationGenerator:
         """
         return {f"{field_name}_key": f"{field_name}_value"}
 
+    def _generate_literal_value(self, literal_args: tuple[Any, ...], field_name: str) -> Any:
+        """Generate a value from a Literal type by randomly picking one of its choices.
+
+        Args:
+            literal_args: The literal values (e.g., ('Casual', 'Professional', 'Humorous') for Literal['Casual', 'Professional', 'Humorous'])
+            field_name: Name of the field (used as fallback)
+
+        Returns:
+            One of the literal values chosen at random, or a placeholder if empty
+        """
+        # TODO: use polyfactory example
+        if literal_args:
+            return random.choice(literal_args)
+        return f"{field_name}_value"
+
     def _generate_enum_value(self, enum_type: type[StrEnum], field_name: str) -> str:
         """Generate a value from a StrEnum type.
 
@@ -276,6 +298,8 @@ class ConceptRepresentationGenerator:
             Appropriate placeholder value for the type
         """
         if actual_type is str:
+            if field_name == "url" or field_name.endswith("_url"):
+                return f"https://mock-{uuid.uuid4().hex[:8]}.invalid/{uuid.uuid4()}"
             return f"{field_name}_value"
         elif actual_type is int:
             return 0

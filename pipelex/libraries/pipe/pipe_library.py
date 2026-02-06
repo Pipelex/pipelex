@@ -38,9 +38,9 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     def add_new_pipe(self, pipe: PipeAbstract):
         if pipe.code in self.root:
             msg = (
-                f"Pipe '{pipe.code}' already exists in the library. You might be running the same pipe twice in the same pipeline. "
-                "We do not yet handle this case, so please avoid running the same pipe twice in the same pipeline. "
-                "Or consider adding for good in the library and call it by its code."
+                f"Pipe '{pipe.code}' already exists in the library. "
+                "It is likely declared in two different bundle files within the same library, or twice in the same bundle. "
+                "Please remove one of the declarations or rename one of the pipes."
             )
             raise PipeLibraryError(msg)
         self.root[pipe.code] = pipe

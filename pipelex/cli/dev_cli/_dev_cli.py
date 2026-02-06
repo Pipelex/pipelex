@@ -160,7 +160,7 @@ def sync_main_config_command(
         SyncTarget,
         typer.Option(help="Target to sync: 'kit', 'project', or 'all'"),
     ] = SyncTarget.ALL,
-    dry_run: Annotated[bool, typer.Option("--dry-run", "-n", help="Preview changes without applying")] = False,
+    dry_run: Annotated[bool, typer.Option("--dry", "-n", help="Preview changes without applying")] = False,
     quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only minimal validation lines")] = False,
     show_diff: Annotated[bool, typer.Option("--show-diff/--no-diff", help="Show detailed changes")] = True,
 ) -> None:

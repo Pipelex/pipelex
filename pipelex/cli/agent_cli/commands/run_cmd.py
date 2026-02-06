@@ -103,11 +103,11 @@ def run_cmd(
     ] = None,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
+        typer.Option("--dry", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
     mock_inputs: Annotated[
         bool,
-        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
+        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry)"),
     ] = False,
     library_dir: Annotated[
         list[str] | None,
@@ -121,7 +121,7 @@ def run_cmd(
     Examples:
         pipelex-agent run my_pipe --inputs data.json
         pipelex-agent run my_bundle.plx --pipe my_pipe
-        pipelex-agent run my_pipe --dry-run --mock-inputs
+        pipelex-agent run my_pipe --dry --mock-inputs
     """
     # Validate that at least one target is provided
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -134,12 +134,12 @@ def run_cmd(
         print(json.dumps(error_json, indent=2), file=sys.stderr)
         raise typer.Exit(1)
 
-    # Validate --mock-inputs requires --dry-run
+    # Validate --mock-inputs requires --dry
     if mock_inputs and not dry_run:
         error_json = {
             "error": True,
             "error_type": "ArgumentError",
-            "message": "--mock-inputs requires --dry-run",
+            "message": "--mock-inputs requires --dry",
         }
         print(json.dumps(error_json, indent=2), file=sys.stderr)
         raise typer.Exit(1)
