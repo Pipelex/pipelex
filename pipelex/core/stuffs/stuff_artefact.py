@@ -23,9 +23,10 @@ from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from pipelex.cogt.templating.text_format import TextFormat
     from pipelex.core.stuffs.stuff import Stuff
     from pipelex.tools.jinja2.image_registry import ImageRegistry
+
+from pipelex.cogt.templating.text_format import TextFormat
 
 
 class BaseStuffArtefactField(StrEnum):
@@ -52,12 +53,12 @@ _PASSTHROUGH_ATTRS = frozenset(
         "__dict__",
         "__doc__",
         # Methods that must remain accessible (TagRenderable protocol)
-        "render_for_tag",
+        "render_for_tag_async",
         "default_tag_name",
         # Methods that must remain accessible (ImageRenderable protocol)
         "render_with_images",
         # Methods that must remain accessible (TextFormatRenderable protocol)
-        "rendered_for_prompt_async",
+        "rendered_for_template_async",
         "stuff",
         # Dict-like methods for template iteration
         "iter_keys",
@@ -307,13 +308,15 @@ class StuffArtefact:
     # TagRenderable protocol implementation
     # -------------------------------------------------------------------------
 
-    def render_for_tag(self) -> str:
+    async def render_for_tag_async(self) -> str:
         """Render content as plain string for tagging.
 
         Returns:
-            Plain text representation via rendered_plain().
+            Plain text representation via rendered_for_template_async(PLAIN).
         """
-        result: str = self._stuff.content.rendered_plain()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        result: str = await self._stuff.content.rendered_for_template_async(  # pyright: ignore[reportUnknownVariableType]
+            text_format=TextFormat.PLAIN
+        )
         return result  # pyright: ignore[reportUnknownVariableType]
 
     @property
@@ -329,8 +332,8 @@ class StuffArtefact:
     # TextFormatRenderable protocol implementation
     # -------------------------------------------------------------------------
 
-    async def rendered_for_prompt_async(self, text_format: TextFormat) -> str:
-        """Render content for LLM prompts in the specified text format.
+    async def rendered_for_template_async(self, text_format: TextFormat) -> str:
+        """Render content for templates in the specified text format.
 
         Args:
             text_format: The format for rendering.
@@ -338,7 +341,7 @@ class StuffArtefact:
         Returns:
             The rendered string.
         """
-        result: str = await self._stuff.content.rendered_for_prompt_async(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
+        result: str = await self._stuff.content.rendered_for_template_async(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
         return result  # pyright: ignore[reportUnknownVariableType]
 
     # -------------------------------------------------------------------------
@@ -384,6 +387,12 @@ class StuffArtefact:
             The wrapped Stuff object.
         """
         return self._stuff  # type: ignore[no-any-return]
+
+    @override
+    def __str__(self) -> str:
+        """Return plain text content for string conversion."""
+        result: str = self._stuff.content.rendered_plain()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        return result  # pyright: ignore[reportUnknownVariableType]
 
     @override
     def __repr__(self) -> str:
