@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -8,8 +9,9 @@ from pipelex.builder.builder import (
     reconstruct_bundle_with_pipe_fixes,
 )
 from pipelex.builder.builder_errors import PipeBuilderError
-from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpecFieldType
 from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
+from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
@@ -27,6 +29,7 @@ from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundl
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
     from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -405,6 +408,14 @@ class BuilderLoop:
                 ):
                     continue
 
+        # Handle dry run errors (e.g., PipeCompose multiplicity mismatches)
+        if bundle_error.dry_run_error_message:
+            dry_run_fixed_pipes = self._fix_dry_run_compose_multiplicity_mismatch(
+                dry_run_error_message=bundle_error.dry_run_error_message,
+                pipelex_bundle_spec=pipelex_bundle_spec,
+            )
+            fixed_pipes.extend(dry_run_fixed_pipes)
+
         # Reconstruct bundle if we made pipe changes
         if fixed_pipes:
             pipelex_bundle_spec = reconstruct_bundle_with_pipe_fixes(pipelex_bundle_spec=pipelex_bundle_spec, fixed_pipes=fixed_pipes)
@@ -423,3 +434,206 @@ class BuilderLoop:
                 log.warning(f"Could not save second iteration PLX: {exc}")
 
         return pipelex_bundle_spec
+
+    # --- Dry run multiplicity mismatch fix ---
+
+    def _fix_dry_run_compose_multiplicity_mismatch(
+        self,
+        dry_run_error_message: str,
+        pipelex_bundle_spec: PipelexBundleSpec,
+    ) -> list[PipeSpecUnion]:
+        """Fix multiplicity mismatches detected in PipeCompose dry run errors.
+
+        Parses dry run error messages to identify cases where a PipeCompose field
+        receives ListContent but the concept structure expects a scalar type (e.g., str).
+        Fixes by adding [] to the pipe input and changing the concept structure field to list type.
+
+        Args:
+            dry_run_error_message: The error message from dry run failure
+            pipelex_bundle_spec: The bundle spec to fix (modified in place for concept structure)
+
+        Returns:
+            List of fixed pipe specs to include in bundle reconstruction
+        """
+        fixed_pipes: list[PipeSpecUnion] = []
+
+        if not pipelex_bundle_spec.pipe:
+            return fixed_pipes
+
+        # Extract compose pipe code and output concept from error message
+        # Pattern: "In pipe 'compose_pipe_code' (output: OutputConcept)"
+        pipe_match = re.search(r"In pipe '(\w+)' \(output: (\w+)\)", dry_run_error_message)
+        if not pipe_match:
+            return fixed_pipes
+
+        compose_pipe_code = pipe_match.group(1)
+        output_concept_code = pipe_match.group(2)
+
+        # Find all multiplicity mismatches: "field_name: ListContent (expected str) <-- MISMATCH"
+        mismatch_matches = re.findall(r"(\w+): ListContent \(expected (\w+)\) <-- MISMATCH", dry_run_error_message)
+        if not mismatch_matches:
+            return fixed_pipes
+
+        # Get the PipeComposeSpec
+        pipe_spec = pipelex_bundle_spec.pipe.get(compose_pipe_code)
+        if not isinstance(pipe_spec, PipeComposeSpec):
+            return fixed_pipes
+
+        any_fix_applied = False
+        for field_name, _expected_type in mismatch_matches:
+            fix_applied = self._fix_single_multiplicity_mismatch(
+                pipe_spec=pipe_spec,
+                pipelex_bundle_spec=pipelex_bundle_spec,
+                compose_pipe_code=compose_pipe_code,
+                output_concept_code=output_concept_code,
+                field_name=field_name,
+            )
+            if fix_applied:
+                any_fix_applied = True
+
+        if any_fix_applied:
+            fixed_pipes.append(pipe_spec)
+
+        return fixed_pipes
+
+    def _fix_single_multiplicity_mismatch(
+        self,
+        pipe_spec: PipeComposeSpec,
+        pipelex_bundle_spec: PipelexBundleSpec,
+        compose_pipe_code: str,
+        output_concept_code: str,
+        field_name: str,
+    ) -> bool:
+        """Fix a single field's multiplicity mismatch in a PipeCompose.
+
+        Adds [] to the pipe input concept ref and changes the concept structure
+        field from its current scalar type to a list type.
+
+        Returns:
+            True if a fix was applied, False otherwise
+        """
+        # Find which input variable maps to this field via construct spec
+        input_variable = self._find_input_for_construct_field(
+            pipe_spec=pipe_spec,
+            field_name=field_name,
+        )
+        if not input_variable:
+            log.warning(f"Could not find input variable for field '{field_name}' in compose pipe '{compose_pipe_code}'")
+            return False
+
+        # Get the input's concept ref
+        if not pipe_spec.inputs or input_variable not in pipe_spec.inputs:
+            log.warning(f"Input variable '{input_variable}' not found in inputs of '{compose_pipe_code}'")
+            return False
+
+        old_input_concept = pipe_spec.inputs[input_variable]
+        parse_result = parse_concept_with_multiplicity(old_input_concept)
+
+        any_fix_applied = False
+
+        # Fix 1: Add [] to the input concept (skip if already has multiplicity)
+        if parse_result.multiplicity is None:
+            new_input_concept = format_concept_with_multiplicity(
+                concept_code_or_string=parse_result.concept_ref_or_code,
+                multiplicity=True,
+            )
+            pipe_spec.inputs[input_variable] = new_input_concept
+            any_fix_applied = True
+            log.info(
+                f"🔧 Fixed input multiplicity in '{compose_pipe_code}': "
+                f"input '{input_variable}' changed from '{old_input_concept}' → '{new_input_concept}'"
+            )
+
+        # Fix 2: Update the output concept's structure field to LIST type
+        concept_fixed = self._fix_concept_field_to_list(
+            pipelex_bundle_spec=pipelex_bundle_spec,
+            concept_code=output_concept_code,
+            field_name=field_name,
+            item_concept_ref=parse_result.concept_ref_or_code,
+        )
+        if concept_fixed:
+            any_fix_applied = True
+            log.info(f"🔧 Fixed concept field '{output_concept_code}.{field_name}' changed to list[concept[{parse_result.concept_ref_or_code}]]")
+
+        return any_fix_applied
+
+    def _find_input_for_construct_field(
+        self,
+        pipe_spec: PipeComposeSpec,
+        field_name: str,
+    ) -> str | None:
+        """Find the input variable that maps to a construct field.
+
+        Examines the construct_spec to find which input variable is used
+        for a given field, looking for {"from": "variable_name"} patterns.
+
+        Args:
+            pipe_spec: The PipeComposeSpec to examine
+            field_name: The field name to look up
+
+        Returns:
+            The input variable name, or None if not found
+        """
+        if not pipe_spec.construct_spec:
+            return None
+
+        field_spec = pipe_spec.construct_spec.get(field_name)
+        if not field_spec:
+            return None
+
+        # Check if it's a {"from": "variable_name"} pattern
+        if isinstance(field_spec, dict):
+            from_dict = cast("dict[str, str]", field_spec)
+            from_value = from_dict.get("from")
+            if isinstance(from_value, str):
+                # Handle dotted paths like "deal.customer" -> "deal"
+                return get_root_from_dotted_path(from_value)
+
+        return None
+
+    def _fix_concept_field_to_list(
+        self,
+        pipelex_bundle_spec: PipelexBundleSpec,
+        concept_code: str,
+        field_name: str,
+        item_concept_ref: str,
+    ) -> bool:
+        """Fix a concept's structure field type from scalar to list[concept[X]].
+
+        Args:
+            pipelex_bundle_spec: The bundle spec containing concepts
+            concept_code: The concept code whose structure field to modify
+            field_name: The field name within the concept's structure
+            item_concept_ref: The concept reference for list items
+
+        Returns:
+            True if the fix was applied, False otherwise
+        """
+        if not pipelex_bundle_spec.concept:
+            return False
+
+        concept_spec = pipelex_bundle_spec.concept.get(concept_code)
+        if not isinstance(concept_spec, ConceptSpec):
+            return False
+
+        if not concept_spec.structure:
+            return False
+
+        field_spec = concept_spec.structure.get(field_name)
+        if not field_spec:
+            return False
+
+        # Skip if the field is already correctly typed as LIST with the right item_concept_ref
+        if (
+            field_spec.type == ConceptStructureSpecFieldType.LIST
+            and field_spec.item_type == "concept"
+            and field_spec.item_concept_ref == item_concept_ref
+        ):
+            return False
+
+        # Update the field to LIST type
+        field_spec.type = ConceptStructureSpecFieldType.LIST
+        field_spec.item_type = "concept"
+        field_spec.item_concept_ref = item_concept_ref
+
+        return True

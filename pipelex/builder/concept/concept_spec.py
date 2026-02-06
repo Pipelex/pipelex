@@ -26,6 +26,7 @@ class ConceptStructureSpecFieldType(StrEnum):
     NUMBER = "number"
     DATE = "date"
     CONCEPT = "concept"
+    LIST = "list"
 
     @property
     def is_text(self) -> bool:
@@ -38,6 +39,7 @@ class ConceptStructureSpecFieldType(StrEnum):
                 | ConceptStructureSpecFieldType.NUMBER
                 | ConceptStructureSpecFieldType.DATE
                 | ConceptStructureSpecFieldType.CONCEPT
+                | ConceptStructureSpecFieldType.LIST
             ):
                 return False
 
@@ -78,6 +80,15 @@ class ConceptStructureSpec(StructuredContent):
     choices: list[str] | None = Field(
         default=None, description="List of allowed values for the field. When set, the field value must be one of these choices."
     )
+    item_type: str | None = Field(
+        default=None,
+        description="For type='list', the type of items in the list (e.g., 'text', 'concept').",
+    )
+    item_concept_ref: str | None = Field(
+        default=None,
+        description="For type='list' with item_type='concept', the concept reference for list items.",
+        json_schema_extra={"mock_format": MockFormat.CONCEPT_REF},
+    )
 
     @field_validator("type", mode="before")
     @classmethod
@@ -96,6 +107,20 @@ class ConceptStructureSpec(StructuredContent):
                     msg = "default_value cannot be set for concept type (complex objects cannot have defaults)."
                     raise ValueError(msg)
 
+            case ConceptStructureSpecFieldType.LIST:
+                if not self.item_type:
+                    msg = "When type is 'list', item_type must be set."
+                    raise ValueError(msg)
+                if self.item_type == "concept" and not self.item_concept_ref:
+                    msg = "When item_type is 'concept', item_concept_ref must be set."
+                    raise ValueError(msg)
+                if self.item_concept_ref and self.item_type != "concept":
+                    msg = f"item_concept_ref can only be set when item_type is 'concept'. Actual item_type: {self.item_type}"
+                    raise ValueError(msg)
+                if self.default_value is not None:
+                    msg = "default_value cannot be set for list type."
+                    raise ValueError(msg)
+
             case (
                 ConceptStructureSpecFieldType.TEXT
                 | ConceptStructureSpecFieldType.INTEGER
@@ -108,6 +133,14 @@ class ConceptStructureSpec(StructuredContent):
         # Validate concept_ref can only be set when type is 'concept'
         if self.concept_ref and self.type != ConceptStructureSpecFieldType.CONCEPT:
             msg = f"'concept_ref' can only be set when type is 'concept'. Actual type: {self.type}"
+            raise ValueError(msg)
+
+        # Validate item_type and item_concept_ref can only be set when type is 'list'
+        if self.item_type and self.type != ConceptStructureSpecFieldType.LIST:
+            msg = f"'item_type' can only be set when type is 'list'. Actual type: {self.type}"
+            raise ValueError(msg)
+        if self.item_concept_ref and self.type != ConceptStructureSpecFieldType.LIST:
+            msg = f"'item_concept_ref' can only be set when type is 'list'. Actual type: {self.type}"
             raise ValueError(msg)
 
         # Check default_value type is the same as type
@@ -140,6 +173,9 @@ class ConceptStructureSpec(StructuredContent):
             case ConceptStructureSpecFieldType.CONCEPT:
                 # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
                 pass
+            case ConceptStructureSpecFieldType.LIST:
+                # LIST type cannot have default values, this is already validated in validate_structure_blueprint
+                pass
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"
@@ -158,6 +194,8 @@ class ConceptStructureSpec(StructuredContent):
             default_value=self.default_value,
             concept_ref=self.concept_ref,
             choices=self.choices,
+            item_type=self.item_type,
+            item_concept_ref=self.item_concept_ref,
         )
 
 
@@ -279,6 +317,10 @@ class ConceptSpec(StructuredContent):
         match field_spec.type:
             case ConceptStructureSpecFieldType.CONCEPT:
                 return f"concept[{field_spec.concept_ref}]"
+            case ConceptStructureSpecFieldType.LIST:
+                if field_spec.item_type == "concept":
+                    return f"list[concept[{field_spec.item_concept_ref}]]"
+                return f"list[{field_spec.item_type}]"
             case (
                 ConceptStructureSpecFieldType.TEXT
                 | ConceptStructureSpecFieldType.INTEGER
