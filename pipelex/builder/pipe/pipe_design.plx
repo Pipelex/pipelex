@@ -224,18 +224,42 @@ Based on the pipe signature, build the PipeComposeSpec.
 PipeCompose has two modes - choose the appropriate one based on the pipe's purpose:
 
 **Template mode** (for Text/Html output):
-- Use when you need to render a Jinja2 template to produce formatted text
-- Requires: template (Jinja2 string), target_format (plain/markdown/html/json/mermaid)
+- Use when you need to render a template to produce formatted text
+- Requires: template (template string), target_format (plain/markdown/html/json/mermaid)
 - Output must be Text (or a concept that refines Text), or Html (or a concept that refines Html) if generating HTML content
+- **IMPORTANT - Use Pipelex pre-processor syntax in templates:**
+  - Use `@ + variable_name` to render an entire object with all its attributes automatically formatted
+  - Use `$ + variable_name.field` for inline field access within text
+  - Only use raw Jinja2 double-braces when you need a specific single field in isolation
+  - **NEVER manually list all attributes** of an object in a template - use @ syntax instead to render the whole object
 
 **Construct mode** (for StructuredContent output):
 - Use when you need to assemble a structured object from working memory variables
 - Requires: construct (dict mapping field names to composition specs)
 - Each field can use:
   - A fixed value (string, number, boolean, list)
-  - { from = "variable.path" } to reference a variable from working memory
-  - { template = "Jinja2 template string" } to render a template
-- Output must be a structured concept
+  - `{ from = "the_variable" }` to reference a variable directly from working memory
+  - `{ from = "the_variable.path" }` to reference a nested field
+  - `{ template = "..." }` ONLY when string interpolation is needed (e.g., combining a prefix with a variable)
+- **IMPORTANT - Best practices for construct mode:**
+  - **PREFER `{ from = "the_variable" }`** for direct object/value assignment
+  - **NEVER use templates to manually list attributes** - if you need the whole object, use `{ from = "the_variable" }`
+  - Use `{ template = "..." }` only for string composition like prefixes, formatting, or combining multiple fields into a single string
+
+**Examples of CORRECT vs INCORRECT usage:**
+
+WRONG - manually listing attributes in a template:
+  summary = { template = "Skills: (( the_obj.skills ))\nExperience: (( the_obj.experience ))" }
+CORRECT - direct reference to get the whole object:
+  summary = { from = "the_obj" }
+
+WRONG - template mode manually listing attributes:
+  template = "Skills: (( the_data.skills ))\nExperience: (( the_data.experience ))"
+CORRECT - use @ + the_data to auto-render the whole object:
+  template = "(@ + the_data)"
+
+CORRECT - template for string composition (prefix + field):
+  code = { template = "INV-($ + the_order.id)" }
 
 @pipe_signature
 """

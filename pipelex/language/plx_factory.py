@@ -63,6 +63,10 @@ class PlxFactory:
                 for key in field_ordering:
                     if key in value:
                         inline_table_obj[key] = cls.convert_dicts_to_inline_tables(value=value[key])
+                # Add any remaining fields not in the ordering
+                for key, value_item in value.items():
+                    if key not in field_ordering:
+                        inline_table_obj[key] = cls.convert_dicts_to_inline_tables(value=value_item)
             else:
                 for key, value_item in value.items():
                     inline_table_obj[key] = cls.convert_dicts_to_inline_tables(value=value_item)

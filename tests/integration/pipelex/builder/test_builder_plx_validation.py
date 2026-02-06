@@ -25,10 +25,10 @@ class TestData:
     PIPE_DESIGN_PLX_PATH: ClassVar[Path] = BUILDER_DIR / "pipe" / "pipe_design.plx"
 
 
-@pytest.mark.asyncio(loop_scope="class")
 class TestBuilderPlxValidation:
     """Tests that builder domain PLX files are valid and type-consistent."""
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_builder_plx_loads_and_validates(self):
         """Test that builder.plx can be loaded and validated successfully."""
         result = await validate_bundle(
@@ -41,6 +41,7 @@ class TestBuilderPlxValidation:
         assert result.blueprints[0].domain == "builder"
         assert len(result.pipes) > 0
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_agentic_builder_plx_loads_and_validates(self):
         """Test that agentic_builder.plx can be loaded and validated successfully."""
         result = await validate_bundle(
@@ -53,6 +54,7 @@ class TestBuilderPlxValidation:
         assert result.blueprints[0].domain == "agentic_builder"
         assert len(result.pipes) > 0
 
+    @pytest.mark.asyncio(loop_scope="class")
     async def test_pipe_design_plx_loads_and_validates(self):
         """Test that pipe_design.plx can be loaded and validated successfully."""
         result = await validate_bundle(

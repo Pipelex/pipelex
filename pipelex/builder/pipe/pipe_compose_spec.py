@@ -75,15 +75,35 @@ class PipeComposeSpec(PipeSpec):
     """PipeComposeSpec defines a composition operation.
 
     Two modes are supported:
-    - Template mode: Renders a Jinja2 template to produce Text/Html output
-    - Construct mode: Composes a StructuredContent from working memory variables
+
+    **Template mode** (for Text/Html output):
+    - Renders a template to produce formatted text
+    - Use Pipelex pre-processor syntax:
+      - `@variable` renders an entire object with all attributes auto-formatted
+      - `$variable.field` for inline field access (e.g., "Order #$order.id")
+      - Only use `{{ variable.field }}` for isolated single-field access
+    - NEVER manually list all attributes - use `@variable` instead
+
+    **Construct mode** (for StructuredContent output):
+    - Assembles a structured object from working memory variables
+    - PREFER `{ from = "variable" }` for direct object/value assignment
+    - Use `{ template = "..." }` ONLY for string composition (e.g., "INV-$order.id")
+    - NEVER use templates to manually replicate object attributes
     """
 
     type: SkipJsonSchema[Literal["PipeCompose"]] = "PipeCompose"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
 
     # Template mode fields
-    template: str | None = Field(default=None, description="Jinja2 template string (template mode)")
+    template: str | None = Field(
+        default=None,
+        description=(
+            "Template string using Pipelex pre-processor syntax: "
+            "use @variable to render entire objects with auto-formatting, "
+            "$variable.field for inline access. "
+            "NEVER manually list all attributes of an object - use @variable instead."
+        ),
+    )
     target_format: TargetFormat | str | None = Field(
         default=None, description="Target format for the output (template mode)", examples=list(TargetFormat)
     )
@@ -95,7 +115,12 @@ class PipeComposeSpec(PipeSpec):
     construct_spec: dict[str, Any] | None = Field(
         default=None,
         validation_alias="construct",
-        description="Field composition spec (construct mode)",
+        description=(
+            "Field composition spec mapping field names to values. "
+            "PREFER { from = 'variable' } for direct object assignment. "
+            "Use { template = '...' } ONLY for string composition like 'INV-$order.id'. "
+            "NEVER use templates to manually replicate object attributes."
+        ),
         json_schema_extra={"mock_format": "ignore"},
     )
 

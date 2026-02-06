@@ -124,7 +124,7 @@ class TestPlxFactoryUnit:
         assert result["key2"].value == "value2"
 
     def test_convert_dicts_to_inline_tables_with_field_ordering(self, mocker: MockerFixture, mock_plx_config: PlxConfig):
-        """Test converting dictionary with field ordering."""
+        """Test converting dictionary with field ordering preserves all fields."""
         _mock_config = mocker.patch.object(PlxFactory, "_plx_config", return_value=mock_plx_config)
 
         input_dict = {"key2": "value2", "key1": "value1", "key3": "value3"}
@@ -132,13 +132,68 @@ class TestPlxFactoryUnit:
         result = PlxFactory.convert_dicts_to_inline_tables(input_dict, field_ordering)
 
         assert isinstance(result, tomlkit.items.InlineTable)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
-        # Check that ordered fields come first
+        # All input keys must be present in the result
+        assert set(result.keys()) == set(input_dict.keys())
+        # Ordered fields come first, remaining fields follow
         keys = list(result.keys())
         assert keys[0] == "key1"
         assert keys[1] == "key3"
-        # Note: the implementation might not include all keys if not in ordering
-        if len(keys) > 2:
-            assert keys[2] == "key2"
+        assert keys[2] == "key2"
+
+    @pytest.mark.parametrize(
+        ("topic", "input_dict", "field_ordering"),
+        [
+            (
+                "concept_ref not in ordering",
+                {"type": "str", "concept_ref": "MyConcept", "description": "A field referencing a concept"},
+                ["type", "description"],
+            ),
+            (
+                "item_concept_ref not in ordering",
+                {"type": "list", "item_concept_ref": "ItemConcept", "description": "A list field"},
+                ["type", "description"],
+            ),
+            (
+                "multiple extra fields not in ordering",
+                {"type": "str", "concept_ref": "MyConcept", "item_concept_ref": "ItemConcept", "required": True},
+                ["type"],
+            ),
+            (
+                "all fields in ordering",
+                {"type": "str", "description": "A field", "required": True},
+                ["type", "description", "required"],
+            ),
+            (
+                "empty ordering",
+                {"type": "str", "concept_ref": "MyConcept"},
+                [],
+            ),
+        ],
+    )
+    def test_convert_dicts_to_inline_tables_with_field_ordering_preserves_all_fields(
+        self,
+        mocker: MockerFixture,
+        mock_plx_config: PlxConfig,
+        topic: str,
+        input_dict: dict[str, Any],
+        field_ordering: list[str],
+    ):
+        """Test that all input fields are preserved in the output regardless of field_ordering."""
+        _mock_config = mocker.patch.object(PlxFactory, "_plx_config", return_value=mock_plx_config)
+
+        result = PlxFactory.convert_dicts_to_inline_tables(input_dict, field_ordering or None)
+
+        assert isinstance(result, tomlkit.items.InlineTable)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+        result_keys = set(result.keys())
+        input_keys = set(input_dict.keys())
+        assert result_keys == input_keys, f"[{topic}] Fields lost during conversion: {input_keys - result_keys}"
+        # Also verify values match
+        for key, expected_value in input_dict.items():
+            result_value = result[key]
+            if isinstance(expected_value, str):
+                assert result_value.value == expected_value, f"[{topic}] Value mismatch for key '{key}'"
+            else:
+                assert result_value == expected_value, f"[{topic}] Value mismatch for key '{key}'"
 
     def test_convert_dicts_to_inline_tables_nested_dict(self, mocker: MockerFixture, mock_plx_config: PlxConfig):
         """Test converting nested dictionary."""

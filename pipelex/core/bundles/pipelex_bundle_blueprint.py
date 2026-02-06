@@ -140,7 +140,7 @@ class PipelexBundleBlueprint(BaseModel):
 
         if undeclared_refs:
             msg = (
-                f"The following local concept references are not declared in bundle '{self.domain}' "
+                f"The following local concept references are not declared in domain '{self.domain}' at '{self.source}' "
                 f"and are not native concepts: {', '.join(undeclared_refs)}. "
                 f"Declared concepts: {sorted(declared_concepts) if declared_concepts else '(none)'}. "
                 f"Native concepts: {sorted(native_codes)}"
@@ -198,5 +198,10 @@ class PipelexBundleBlueprint(BaseModel):
         # Check output
         local_ref = parse_concept_with_multiplicity(pipe_blueprint.output).concept_ref_or_code
         local_refs.append((local_ref, f"pipe.{pipe_code}.output"))
+
+        # Check combined_output for PipeParallel
+        if isinstance(pipe_blueprint, PipeParallelBlueprint) and pipe_blueprint.combined_output:
+            local_ref = parse_concept_with_multiplicity(pipe_blueprint.combined_output).concept_ref_or_code
+            local_refs.append((local_ref, f"pipe.{pipe_code}.combined_output"))
 
         return local_refs

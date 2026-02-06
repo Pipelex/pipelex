@@ -133,9 +133,17 @@ Else, if you need structure for your concept, draft its structure:
 - field name in snake_case
 - description:
   - description: the description of the field, in natural language
-  - type: the type of the field (text, integer, boolean, number, date)
+  - type: the type of the field:
+    - text, integer, boolean, number, date for primitive values
+    - concept when the field should contain a previously-defined structured concept
+  - concept_ref: (only when type=concept) the name of the referenced concept (e.g., "CVAnalysis")
   - required: add required = true if the field is required (otherwise, leave it empty)
   - default_value: the default value of the field
+
+When building composite/aggregate concepts that combine multiple other concepts:
+- Use type=concept with concept_ref to reference the other structured concepts
+- Example: if ProjectReport needs to include ProjectSummary, RiskAnalysis, and BudgetBreakdown, each field should use type=concept with the appropriate concept_ref, NOT type=text
+- This allows proper object composition rather than flattening structured data into text
 
 @plan_draft
 
@@ -194,8 +202,10 @@ Shape of the contract for PipeOperator is:
 - output: Output concept code (PascalCase) possibly with multiplicity: 'Text' (single), 'Article[]' (list), 'Image[5]' (exactly 5).
 
 **PipeCompose** has two modes:
-- Template mode: Renders a Jinja2 template using variables from working memory. Output must be Text (or a concept that refines Text), or Html (or a concept that refines Html) if generating HTML content. Use for generating formatted text/documents.
+- Template mode: Renders a template using variables from working memory. Output must be Text (or a concept that refines Text), or Html (or a concept that refines Html) if generating HTML content. Use for generating formatted text/documents.
 - Construct mode: Composes a StructuredContent object by mapping fields from working memory variables. Use for assembling structured objects from multiple sources.
+  - PREFER `{ from = "the_varname" }` for direct object assignment
+  - Use `{ template = "..." }` ONLY for string composition (combining prefix with a variable)
 
 ## For the PipeControllers, which really define the flow, we need a more detailed contract, related to each type of controller:
 
