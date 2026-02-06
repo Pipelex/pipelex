@@ -27,6 +27,7 @@
  - **StructuredContent.rendered_html()**: Now recursively calls `rendered_html()` on nested `StuffContent` fields instead of using json2html conversion. Also skips `None` values and uses HTML table format.
 
 ### Fixed
+ - **Helpful Error for `get_stuff_as(ListContent[T])`**: When users incorrectly call `get_stuff_as("name", ListContent[Something])` instead of `get_stuff_as_list("name", Something)`, the error message now explicitly suggests using `get_stuff_as_list()`.
  - **PipeFunc `ListContent[T]` Validation**: Fixed validation rejecting valid `ListContent[T]` return types for array outputs (`T[]`). Previously, a function returning `ListContent[Expense]` would fail validation for `output = "Expense[]"` with a misleading error. The validation now correctly extracts and validates the generic type parameter from Pydantic's metadata.
  - **PipeFunc Class Name Matching**: Fixed validation failing when the return type class and concept structure class are logically the same but loaded from different contexts. The validation now uses class name matching as a fallback, allowing `ListContent[Expense]` to match `Expense[]` even if the `Expense` class objects differ.
  - Fixed `PipeImgGen` not properly converting `ImageContent` to custom subclasses (e.g., `Receipt(ImageContent)`). The pipe now uses `smart_dump()` before `model_validate()` to correctly instantiate the output concept's structure class.

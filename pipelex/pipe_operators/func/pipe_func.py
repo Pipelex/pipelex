@@ -200,9 +200,8 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             output_desc = self.output.to_bundle_representation()
             msg = (
                 f"PipeFunc '{self.code}' failed during execution.\n"
-                f"  Function: {self.function_name}\n"
-                f"  Inputs:\n{inputs_desc}\n"
                 f"  Expected output: {output_desc}\n"
+                f"  Inputs:\n{inputs_desc}\n\n"
                 f"  Error: {type(exc).__name__}: {exc}"
             )
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
