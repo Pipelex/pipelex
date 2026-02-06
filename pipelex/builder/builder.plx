@@ -48,7 +48,11 @@ DO NOT indicate the inputs or output type. Just name them.
 - We have a memory system: the outputs of each pipe are added to the memory and can be used as inputs by subsequent pipes.
 - The pipeline's initial inputs are added to the memory at the beginning.
 - You don't need to flatten lists at the end or even in intermediate steps: our system manages branching and the memory flows into each branch.
-- At the end of the pipeline, all the memory is delivered so there is not need to gather all the elements unless expressly requested by the brief.
+- At the end of the pipeline, all the memory is delivered. However, consider adding a final COMPOSE step when:
+  - The brief asks for a cohesive deliverable (report, document, result, summary, card, profile, package)
+  - Multiple related outputs should be bundled as a single structured object
+  - The user would benefit from a unified output rather than scattered variables
+- Skip the final composition only when the outputs are truly independent or when the user explicitly wants separate items.
 
 ## Available orchestration controllers:
 - SEQUENCE: execute a sequence of pipes in order. It must reference the pipes it will execute.
@@ -63,6 +67,18 @@ When describing the task of a pipe controller, be concise, don't detail all the 
 - IMG_GEN: uses an AI model to generate images from a prompt that is either the result of a previous step or part of the pipeline's original inputs. As the image generation prompt MUST be a text, you can plan to use an LLM step to write it.
 - EXTRACT: extracts content from an image or a document, always outputs a list of pages (possibly a list of one page). Use it only when you need to use OCR or document extraction.
 - COMPOSE: combines variables from working memory into a new structured object using field composition (construct mode) or renders a Jinja2 template to produce Text/Html output (template mode).
+  Use COMPOSE at the end of a pipeline when the brief implies a unified deliverable. For example:
+  - A "report" combining analysis, findings, and recommendations
+  - A "product card" combining description, price, and image
+  - A "profile" combining biography, skills, and achievements
+
+---
+
+## Final output decision:
+Ask yourself: "Would the user prefer to receive one cohesive object or multiple separate pieces?"
+- If the brief mentions words like "report", "document", "card", "profile", "summary", "package", "bundle" → likely needs a final COMPOSE
+- If the brief lists multiple things that logically go together → likely needs a final COMPOSE
+- If the outputs are independent items to be used separately → no final COMPOSE needed
 
 ---
 
@@ -230,9 +246,12 @@ Becareful, the outputs "fail" and "continue" are special outcomes, they are not 
 ## Flow:
 - We have a memory system: the outputs of each pipe are added to the memory and can be used as inputs by subsequent pipes.
 - The pipeline's initial inputs are added to the memory at the beginning.
-- Do not bother with planning a final step that gathers all the elements unless it's clear from the brief that the user wants the pipe to do that.
 - You don't need to flatten lists at the end or even in intermediate steps: our system manages branching and the memory flows into each branch.
-- At the end of the pipeline, all the memory is delivered so there is not need to gather all the elements unless expressly requested by the brief.
+- At the end of the pipeline, all the memory is delivered. However, consider adding a final PipeCompose step when:
+  - The brief asks for a cohesive deliverable (report, document, result, summary, card, profile, package)
+  - Multiple related outputs should be bundled as a single structured object
+  - The user would benefit from a unified output rather than scattered variables
+- Skip the final composition only when the outputs are truly independent or when the user explicitly wants separate items.
 - If you have a sequence which has only one step, then don't make that a sequence, make it a single pipe. Or check if you forgot to include another step maybe.
 - If you're in a sequence and you are to apply a pipe to a previous output which is multiple, use a PipeBatch step.
 - PipeBatch is a map operator: it transforms the input list in a new list of outputs, so if you want to apply several steps to the individual items, the branch_pipe_code MUST be a PipeSequence of these steps.
@@ -269,6 +288,7 @@ Is the flow consistent? Issues to watch out for:
 - If the main pipe has an input which is multiple (a list), are we correctly batching over it?
 - Are there any missing variables or variable names that are not the expected names?
 - PipeImgGen must take a single input which must be a text or a concept that refines text, if it's not the case, it needs fixing. For instance if the input is some structured concept, you'll have to add a PipeLLM step to write the prompt from the structured concept.
+- Does the pipeline produce multiple related outputs that should be delivered as a single cohesive object? If the brief implies a unified deliverable (report, document, card, profile, summary), consider adding a final PipeCompose step to bundle them.
 
 If the flow is consistent, state it in a declarative sentence like "The flow has been checked and is consistent:" and then copy the flow like you received it.
 
@@ -307,9 +327,8 @@ prompt = """
 ## Flow:
 - We have a memory system: the outputs of each pipe are added to the memory and can be used as inputs by subsequent pipes.
 - The pipeline's initial inputs are added to the memory at the beginning.
-- Do not bother with planning a final step that gathers all the elements unless it's clear from the brief that the user wants the pipe to do that.
 - You don't need to flatten lists at the end or even in intermediate steps: our system manages branching and the memory flows into each branch.
-- At the end of the pipeline, all the memory is delivered so there is not need to gather all the elements unless expressly requested by the brief.
+- At the end of the pipeline, all the memory is delivered. However, if the flow ends with a final PipeCompose step to bundle multiple outputs into a cohesive deliverable, ensure the pipe signatures reflect this.
 """
 
 [pipe.write_bundle_header]
