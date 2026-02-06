@@ -110,8 +110,8 @@ For instance:
   If we need multiple items, we'll indicate it elsewhere so you don't bother with it here.
 - Provide a concise description for each concept
 
-If the concept can be expressed as a text, image, document, number, or page:
-- Name the concept, define it and just write "refines: Text", "refines: Document" (and note that PDF is a document), or "refines: Image" etc.
+If the concept can be expressed as a text, html, image, document, number, or page:
+- Name the concept, define it and just write "refines: Text", "refines: Html" (for HTML content), "refines: Document" (and note that PDF is a document), or "refines: Image" etc.
 - No need to define its structure
 Else, if you need structure for your concept, draft its structure:
 - field name in snake_case
@@ -123,7 +123,7 @@ Else, if you need structure for your concept, draft its structure:
 
 @plan_draft
 
-DO NOT redefine native concepts such as: Text, Image, Document, Number, Page. if you need one of these, they already exist so you should NOT REDEFINE THEM.
+DO NOT redefine native concepts such as: Text, Html, Image, Document, Number, Page. if you need one of these, they already exist so you should NOT REDEFINE THEM.
 
 Do not write any intro or outro, do not mention the brief or the plan draft, just write the concept drafts.
 List the concept drafts in Markdown format with a heading 3 for each, e.g. `### Concept FooBar`.
@@ -162,9 +162,9 @@ prompt = """
 {% if concept_specs %}
 We have already defined the concepts you must use for the inputs and outputs of the pipes:
 @concept_specs
-And of course you still have the native concepts if required: Text, Image, Document, Number, Page.
+And of course you still have the native concepts if required: Text, Html, Image, Document, Number, Page.
 {% else %}
-You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Image, Document, Number, Page.
+You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Html, Image, Document, Number, Page.
 {% endif %}
 
 ## For PipeOperators:
@@ -178,7 +178,7 @@ Shape of the contract for PipeOperator is:
 - output: Output concept code (PascalCase) possibly with multiplicity: 'Text' (single), 'Article[]' (list), 'Image[5]' (exactly 5).
 
 **PipeCompose** has two modes:
-- Template mode: Renders a Jinja2 template using variables from working memory. Output must be Text, Html, or a concept that refines Text. Use for generating formatted text/documents.
+- Template mode: Renders a Jinja2 template using variables from working memory. Output must be Text (or a concept that refines Text), or Html (or a concept that refines Html) if generating HTML content. Use for generating formatted text/documents.
 - Construct mode: Composes a StructuredContent object by mapping fields from working memory variables. Use for assembling structured objects from multiple sources.
 
 ## For the PipeControllers, which really define the flow, we need a more detailed contract, related to each type of controller:
