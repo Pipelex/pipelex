@@ -10,6 +10,7 @@ from posthog import tag
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
@@ -236,7 +237,11 @@ def build_pipe_cmd(
 
         # Save the PLX file
         ensure_directory_for_file_path(file_path=str(plx_file_path))
-        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+        try:
+            plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+        except PipelexBundleSpecBlueprintError as exc:
+            typer.secho(f"❌ Failed to convert bundle spec to blueprint: {exc}", fg=typer.colors.RED)
+            raise typer.Exit(1) from exc
         save_text_to_path(text=plx_content, path=str(plx_file_path))
         typer.secho(f"✅ Pipelex bundle saved to: {plx_file_path}", fg=typer.colors.GREEN)
 

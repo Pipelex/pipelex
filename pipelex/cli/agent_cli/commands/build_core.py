@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.config import get_config
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
@@ -129,7 +130,11 @@ async def build_pipe_core(
 
     # Save the PLX file
     ensure_directory_for_file_path(file_path=str(plx_file_path))
-    plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+    try:
+        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+    except PipelexBundleSpecBlueprintError as exc:
+        msg = f"Failed to convert bundle spec to blueprint: {exc}"
+        raise BuildPipeError(message=msg) from exc
     save_text_to_path(text=plx_content, path=str(plx_file_path))
 
     main_pipe_code = pipelex_bundle_spec.main_pipe or ""

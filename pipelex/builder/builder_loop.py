@@ -7,14 +7,18 @@ from pipelex.builder.builder import (
     PipeSpecUnion,
     reconstruct_bundle_with_pipe_fixes,
 )
+from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
-from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
@@ -56,31 +60,38 @@ class BuilderLoop:
             save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=str(working_memory_path), create_directory=True)
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
-        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
 
         if is_save_first_iteration_enabled:
-            first_iteration_path = get_incremental_file_path(
-                base_path=output_dir or "results/pipe-builder",
-                base_name="generated_pipeline_1st_iteration",
-                extension="plx",
-            )
-            save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
+            try:
+                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                first_iteration_path = get_incremental_file_path(
+                    base_path=output_dir or "results/pipe-builder",
+                    base_name="generated_pipeline_1st_iteration",
+                    extension="plx",
+                )
+                save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
+            except PipelexBundleSpecBlueprintError as exc:
+                log.warning(f"Could not save first iteration PLX: {exc}")
 
-        bundle_blueprint = pipelex_bundle_spec.to_blueprint()
         max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts
         for attempt in range(1, max_attempts + 1):
+            # Phase 1: Create blueprint from spec
             try:
-                if attempt == 1:
-                    await validate_bundle(blueprints=[bundle_blueprint])
-                else:
-                    log.info(f"Validating bundle after fixes (attempt {attempt}/{max_attempts})...")
-                    fixed_bundle_blueprint = pipelex_bundle_spec.to_blueprint()
-                    await validate_bundle(blueprints=[fixed_bundle_blueprint])
+                bundle_blueprint = pipelex_bundle_spec.to_blueprint()
+            except PipelexBundleSpecBlueprintError as exc:
+                if attempt < max_attempts:
+                    log.info(f"⚠️ Blueprint creation failed on attempt {attempt}/{max_attempts}, fixing undeclared concepts...")
+                    pipelex_bundle_spec = await self._fix_undeclared_concept_references(pipelex_bundle_spec=pipelex_bundle_spec)
+                    continue
+                msg = f"Failed to create bundle blueprint after {max_attempts} attempts: {exc}"
+                raise PipeBuilderError(msg) from exc
 
+            # Phase 2: Validate the bundle
+            try:
+                await validate_bundle(blueprints=[bundle_blueprint])
                 if attempt > 1:
                     log.info(f"✅ Bundle validation passed after fixes (attempt {attempt}/{max_attempts})")
-                break  # Validation passed, exit the loop
-
+                break  # Validation passed
             except ValidateBundleError as exc:
                 if attempt < max_attempts:
                     log.info(f"⚠️ Validation failed on attempt {attempt}/{max_attempts}, attempting fixes...")
@@ -88,11 +99,139 @@ class BuilderLoop:
                         bundle_error=exc, pipelex_bundle_spec=pipelex_bundle_spec, is_save_second_iteration_enabled=is_save_second_iteration_enabled
                     )
                 else:
-                    # Final attempt failed, re-raise the error
                     log.error(f"❌ Validation failed after {max_attempts} attempts, raising error")
                     raise
 
         return pipelex_bundle_spec, pipe_output.graph_spec
+
+    async def _fix_undeclared_concept_references(
+        self,
+        pipelex_bundle_spec: PipelexBundleSpec,
+    ) -> PipelexBundleSpec:
+        """Fix undeclared concept references in pipe specs.
+
+        Collects all concept references from pipe specs, determines which are undeclared,
+        fixes PipeParallel combined_output references deterministically, and generates
+        ConceptSpec definitions for any remaining undeclared concepts via an LLM pipeline.
+        """
+        # Step 1: Collect all local concept references from pipe specs
+        concept_references: list[tuple[str, str, str]] = []  # (concept_code, pipe_code, field_context)
+        if pipelex_bundle_spec.pipe:
+            for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
+                # Parse output
+                output_parse = parse_concept_with_multiplicity(pipe_spec.output)
+                output_concept = output_parse.concept_ref_or_code
+                if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                    bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
+                    concept_references.append((bare_code, pipe_code, "output"))
+
+                # Parse inputs
+                if pipe_spec.inputs:
+                    for input_name, input_concept_str in pipe_spec.inputs.items():
+                        input_parse = parse_concept_with_multiplicity(input_concept_str)
+                        input_concept = input_parse.concept_ref_or_code
+                        if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                            bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
+                            concept_references.append((bare_code, pipe_code, f"input '{input_name}'"))
+
+                # Parse PipeParallel combined_output
+                if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
+                    combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
+                    combined_concept = combined_parse.concept_ref_or_code
+                    if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                        bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
+                        concept_references.append((bare_code, pipe_code, "combined_output"))
+
+        # Step 2: Determine which are undeclared
+        declared_concepts: set[str] = set()
+        if pipelex_bundle_spec.concept:
+            declared_concepts = set(pipelex_bundle_spec.concept.keys())
+        native_concept_codes = {native.value for native in NativeConceptCode.values_list()}
+
+        undeclared: set[str] = set()
+        undeclared_refs: list[tuple[str, str, str]] = []
+        for concept_code, pipe_code, field_context in concept_references:
+            if concept_code not in declared_concepts and concept_code not in native_concept_codes:
+                undeclared.add(concept_code)
+                undeclared_refs.append((concept_code, pipe_code, field_context))
+
+        if not undeclared:
+            return pipelex_bundle_spec
+
+        log.info(f"🔍 Found {len(undeclared)} undeclared concept(s): {', '.join(sorted(undeclared))}")
+
+        # Step 3: Fix PipeParallel combined_output deterministically (no pipeline needed)
+        fixed_pipe_parallel_concepts: set[str] = set()
+        if pipelex_bundle_spec.pipe:
+            for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
+                if not isinstance(pipe_spec, PipeParallelSpec):
+                    continue
+                if not pipe_spec.combined_output:
+                    continue
+
+                combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
+                combined_concept = combined_parse.concept_ref_or_code
+                bare_combined = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
+
+                if bare_combined not in undeclared:
+                    continue
+
+                if pipe_spec.add_each_output:
+                    log.info(f"🔧 Removing undeclared combined_output '{pipe_spec.combined_output}' from PipeParallel '{pipe_code}'")
+                    pipe_spec.combined_output = None
+                    fixed_pipe_parallel_concepts.add(bare_combined)
+
+                    # Also fix output if it references an undeclared concept
+                    output_parse = parse_concept_with_multiplicity(pipe_spec.output)
+                    output_concept = output_parse.concept_ref_or_code
+                    bare_output = output_concept.split(".")[-1] if "." in output_concept else output_concept
+                    if bare_output in undeclared:
+                        log.info(f"🔧 Setting output of PipeParallel '{pipe_code}' to 'Anything'")
+                        pipe_spec.output = "Anything"
+                        fixed_pipe_parallel_concepts.add(bare_output)
+
+        undeclared -= fixed_pipe_parallel_concepts
+
+        # Step 4: Create remaining undeclared concepts via pipeline
+        if undeclared:
+            # Build context for the LLM
+            lines: list[str] = ["Missing concepts that need to be defined:\n"]
+            for concept_code, pipe_code, field_context in undeclared_refs:
+                if concept_code in undeclared:
+                    lines.append(f"- '{concept_code}' referenced in pipe '{pipe_code}' ({field_context})")
+
+            lines.append("\nExisting declared concepts for context:")
+            if pipelex_bundle_spec.concept:
+                for concept_code, concept_spec_or_name in pipelex_bundle_spec.concept.items():
+                    if isinstance(concept_spec_or_name, ConceptSpec):
+                        lines.append(f"- {concept_code}: {concept_spec_or_name.description}")
+                    else:
+                        lines.append(f"- {concept_code}: {concept_spec_or_name}")
+            else:
+                lines.append("- (none)")
+
+            undeclared_concepts = "\n".join(lines)
+            log.info(f"🤖 Generating ConceptSpec definitions for {len(undeclared)} undeclared concept(s) via LLM...")
+
+            concept_fixer_output = await execute_pipeline(
+                pipe_code="generate_missing_concepts",
+                library_dirs=[str(Path(builder.__file__).parent / "concept")],
+                inputs={"undeclared_concepts": undeclared_concepts},
+            )
+
+            generated_concepts_list = concept_fixer_output.working_memory.get_stuff_as_list(
+                name="generate_missing_concepts",
+                item_type=ConceptSpec,
+            )
+
+            if pipelex_bundle_spec.concept is None:
+                pipelex_bundle_spec.concept = {}
+
+            for concept_spec in generated_concepts_list.items:
+                pipelex_bundle_spec.concept[concept_spec.the_concept_code] = concept_spec
+                log.info(f"🔧 Added generated concept '{concept_spec.the_concept_code}' to bundle")
+
+        return pipelex_bundle_spec
 
     def _fix_bundle_validation_error(
         self,
@@ -272,12 +411,15 @@ class BuilderLoop:
 
         # Save second iteration if we made any changes (pipes or concepts)
         if (fixed_pipes or added_concepts) and is_save_second_iteration_enabled:
-            plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-            second_iteration_path = get_incremental_file_path(
-                base_path="results",
-                base_name="generated_pipeline_2nd_iteration",
-                extension="plx",
-            )
-            save_text_to_path(text=plx_content, path=str(second_iteration_path))
+            try:
+                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                second_iteration_path = get_incremental_file_path(
+                    base_path="results",
+                    base_name="generated_pipeline_2nd_iteration",
+                    extension="plx",
+                )
+                save_text_to_path(text=plx_content, path=str(second_iteration_path))
+            except PipelexBundleSpecBlueprintError as exc:
+                log.warning(f"Could not save second iteration PLX: {exc}")
 
         return pipelex_bundle_spec

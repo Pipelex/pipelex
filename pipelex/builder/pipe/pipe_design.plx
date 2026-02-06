@@ -83,6 +83,11 @@ You must pick the relevant concepts for inputs and outputs from the following po
 @pipe_signature
 
 Based on the pipe signature, build the PipeParallelSpec.
+
+Notes:
+- Set add_each_output to true: each parallel branch's output will be available individually in working memory by its result name.
+- Do NOT set combined_output unless the concept is explicitly listed in the concept specs above.
+- The output of the PipeParallel should be set to "Anything" when add_each_output is true and no combined_output is used.
 """
 
 [pipe.detail_pipe_condition]

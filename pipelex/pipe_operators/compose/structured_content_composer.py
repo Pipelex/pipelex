@@ -2,7 +2,6 @@ import inspect
 import types
 from typing import Any, Union, cast, get_args, get_origin
 
-from kajson import kajson
 from pydantic import ValidationError
 
 from pipelex import log
@@ -73,9 +72,36 @@ class StructuredContentComposer:
             return self.output_class.model_validate(field_values)
         except ValidationError as exc:
             formatted_error = format_pydantic_validation_error(exc)
-            msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}"
-            msg += f"\nField values: {kajson.dumps(field_values, indent=4)}"
+            field_type_summary = self._build_field_type_summary(field_values)
+            msg = f"Cannot validate {self.output_class.__name__}: {formatted_error}\n{field_type_summary}"
             raise StructuredContentComposerValidationError(msg) from exc
+
+    def _build_field_type_summary(self, field_values: dict[str, Any]) -> str:
+        """Build a diagnostic summary comparing actual vs expected types for each field.
+
+        This is used in error messages to help users quickly identify type mismatches.
+        The method is defensive: it never raises, returning a fallback message instead.
+
+        Args:
+            field_values: The resolved field values that failed validation
+
+        Returns:
+            A formatted string showing actual vs expected types per field
+        """
+        try:
+            lines: list[str] = ["Field type summary:"]
+            for field_name, value in field_values.items():
+                actual_type_name = type(value).__name__
+                field_info = self.output_class.model_fields.get(field_name)
+                if field_info and field_info.annotation:
+                    expected_type_name = getattr(field_info.annotation, "__name__", str(field_info.annotation))
+                else:
+                    expected_type_name = "unknown"
+                mismatch_marker = "" if actual_type_name == expected_type_name else " <-- MISMATCH"
+                lines.append(f"  {field_name}: {actual_type_name} (expected {expected_type_name}){mismatch_marker}")
+            return "\n".join(lines)
+        except Exception:
+            return "Field type summary: unavailable (introspection failed)"
 
     async def _resolve_all_fields(self) -> dict[str, Any]:
         """Resolve all fields in the blueprint to their values.
