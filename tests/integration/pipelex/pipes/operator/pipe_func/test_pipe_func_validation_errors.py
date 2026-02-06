@@ -357,13 +357,6 @@ class TestPipeFuncValidationErrors:
                 f"Error should mention '{expected_error_substring}' to explain the specific issue. Got: {error_message}"
             )
 
-    @pytest.mark.xfail(
-        reason="This test will fail because the building of the structures of the concepts are actually validating the pipes as well. \
-        So when you validate a pipe, it will validate the pipe func but it will not have created the structure for the pipe func, and this test \
-            will fail because the output of the pipe func function is not matching the output concept. (chicken and egg paradox). \
-            So first, we need to make sure thatwhen we call this the structure build structure command it only \
-                validates the concepts and not the pipes."
-    )
     async def test_pipe_func_return_type_must_match_concept_structure_class(self):
         """Test that the function's return type must exactly match the output concept's structure class.
 
@@ -426,3 +419,169 @@ output = "Text"
             assert "TextContent" in error_message or "structure class" in error_message.lower(), (
                 f"Error should mention the expected structure class 'TextContent' or 'structure class'. Got: {error_message}"
             )
+
+    async def test_pipe_func_list_content_with_array_output_validates_successfully(self):
+        """Test that ListContent[T] return type validates successfully with T[] output.
+
+        When a PipeFunc's output concept has array notation (e.g., "Text[]"),
+        the function should be allowed to return ListContent[TextContent].
+        """
+        # Function that returns ListContent[TextContent] for Text[] output
+        func_code = """
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+
+@pipe_func()
+async def func_returns_list_content(working_memory: WorkingMemory) -> ListContent[TextContent]:
+    return ListContent(items=[TextContent(text="test1"), TextContent(text="test2")])
+"""
+        # PLX file with array output notation using built-in Text concept
+        plx_content = """
+domain = "test_pipe_func_validation"
+description = "Test bundle for ListContent validation"
+
+[pipe.test_list_content_pipe]
+type = "PipeFunc"
+description = "Test pipe with array output"
+function_name = "func_returns_list_content"
+output = "Text[]"
+"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create the .plx file
+            plx_file = temp_path / "test_bundle.plx"
+            plx_file.write_text(plx_content)
+
+            # Create the .py file with the function
+            py_file = temp_path / "my_funcs.py"
+            py_file.write_text(func_code)
+
+            # Validate the bundle - should succeed
+            result = await validate_bundle(
+                plx_file_path=plx_file,
+                library_dirs=[temp_path],
+            )
+
+            assert result is not None
+            assert len(result.pipes) > 0
+
+    async def test_pipe_func_list_content_with_wrong_item_type_fails_validation(self):
+        """Test that ListContent[WrongType] fails validation when output expects DifferentType[].
+
+        When a PipeFunc's output concept expects "Text[]" (TextContent) but the function returns
+        ListContent[StructuredContent subclass], validation should fail with a clear error message.
+        """
+        func_code = """
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.list_content import ListContent
+from pipelex.core.stuffs.structured_content import StructuredContent
+from pipelex.system.registries.func_registry import pipe_func
+
+
+class WrongItem(StructuredContent):
+    different_field: int
+
+
+@pipe_func()
+async def func_returns_wrong_list_content(working_memory: WorkingMemory) -> ListContent[WrongItem]:
+    return ListContent(items=[WrongItem(different_field=42)])
+"""
+        # PLX file expects Text[] (TextContent) but function returns ListContent[WrongItem]
+        plx_content = """
+domain = "test_pipe_func_validation"
+description = "Test bundle for ListContent validation error"
+
+[pipe.test_wrong_list_content_pipe]
+type = "PipeFunc"
+description = "Test pipe with mismatched list item type"
+function_name = "func_returns_wrong_list_content"
+output = "Text[]"
+"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create the .plx file
+            plx_file = temp_path / "test_bundle.plx"
+            plx_file.write_text(plx_content)
+
+            # Create the .py file with the function
+            py_file = temp_path / "my_funcs.py"
+            py_file.write_text(func_code)
+
+            # Validate the bundle - should fail with clear error about item type mismatch
+            with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
+                await validate_bundle(
+                    plx_file_path=plx_file,
+                    library_dirs=[temp_path],
+                )
+
+            error = exc_info.value
+            error_message = str(error)
+
+            # The error should mention the function name
+            assert "func_returns_wrong_list_content" in error_message, f"Error should mention the function name. Got: {error_message}"
+
+            # The error should mention the expected item type (TextContent) or ListContent
+            assert "TextContent" in error_message or "ListContent" in error_message, (
+                f"Error should mention 'TextContent' or 'ListContent'. Got: {error_message}"
+            )
+
+    async def test_pipe_func_array_output_requires_list_content_return_type(self):
+        """Test that array output (T[]) requires ListContent return type.
+
+        When a PipeFunc's output has array notation (e.g., "Text[]") but the function
+        returns a non-ListContent type (e.g., TextContent), validation should fail
+        with a clear error message explaining that ListContent is required.
+        """
+        # Function that returns TextContent (not ListContent) for Text[] output
+        func_code = """
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.system.registries.func_registry import pipe_func
+
+
+@pipe_func()
+async def func_returns_single_instead_of_list(working_memory: WorkingMemory) -> TextContent:
+    return TextContent(text="single item - should be a list!")
+"""
+        # PLX file expects Text[] (array) but function returns single TextContent
+        plx_content = """
+domain = "test_pipe_func_validation"
+description = "Test bundle for ListContent requirement"
+
+[pipe.test_array_requires_list_content]
+type = "PipeFunc"
+description = "Test pipe with array output expecting ListContent"
+function_name = "func_returns_single_instead_of_list"
+output = "Text[]"
+"""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+
+            # Create the .plx file
+            plx_file = temp_path / "test_bundle.plx"
+            plx_file.write_text(plx_content)
+
+            # Create the .py file with the function
+            py_file = temp_path / "my_funcs.py"
+            py_file.write_text(func_code)
+
+            # Validate the bundle - should fail because return type is not ListContent
+            with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
+                await validate_bundle(
+                    plx_file_path=plx_file,
+                    library_dirs=[temp_path],
+                )
+
+            error = exc_info.value
+            error_message = str(error)
+
+            # The error should mention the function name
+            assert "func_returns_single_instead_of_list" in error_message, f"Error should mention the function name. Got: {error_message}"
+
+            # The error should explicitly mention ListContent is required
+            assert "ListContent" in error_message, f"Error should mention that 'ListContent' is required for array output. Got: {error_message}"
