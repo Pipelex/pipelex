@@ -171,6 +171,20 @@ structured_output_timeout_seconds = 1200
 [cogt.llm_config.llm_job_config]
 max_retries = 3
 
+[cogt.llm_config.effort_to_budget_maps.anthropic]
+none = 0
+low = 1024
+medium = 5000
+high = 16384
+max = 65536
+
+[cogt.llm_config.effort_to_budget_maps.gemini]
+none = 0
+low = 1024
+medium = 5000
+high = 16384
+max = 65536
+
 [cogt.llm_config.generic_templates]
 structure_from_preliminary_text_system = """
 You are a data modeling expert specialized in extracting structure from text.
