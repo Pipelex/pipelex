@@ -662,9 +662,12 @@ class BuilderLoop:
         ):
             return False
 
-        # Update the field to LIST type
+        # Update the field to LIST type and clear fields that are invalid for LIST
         field_spec.type = ConceptStructureSpecFieldType.LIST
         field_spec.item_type = "concept"
         field_spec.item_concept_ref = item_concept_ref
+        field_spec.default_value = None
+        field_spec.concept_ref = None
+        field_spec.choices = None
 
         return True
