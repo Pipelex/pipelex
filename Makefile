@@ -1,3 +1,6 @@
+SHELL := /bin/bash
+.SHELLFLAGS := -o pipefail -c
+
 ifeq ($(wildcard .env),.env)
 include .env
 export
