@@ -356,7 +356,7 @@ ensure_trailing_newline = true
 ensure_leading_blank_line = true
 
 [pipelex.plx_config.concepts]
-structure_field_ordering = ["type", "concept_ref", "item_concept_ref", "description", "choices", "required"]
+structure_field_ordering = ["type", "concept_ref", "item_type", "item_concept_ref", "description", "choices", "required"]
 
 [pipelex.plx_config.pipes]
 field_ordering = ["type", "description", "inputs", "output"]
