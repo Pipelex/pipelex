@@ -101,6 +101,7 @@ class StructuredContentComposer:
                 lines.append(f"  {field_name}: {actual_type_name} (expected {expected_type_name}){mismatch_marker}")
             return "\n".join(lines)
         except Exception:
+            # General exception catching tolerated here because the method is purely defensive diagnostic code that builds error messages
             return "Field type summary: unavailable (introspection failed)"
 
     async def _resolve_all_fields(self) -> dict[str, Any]:
