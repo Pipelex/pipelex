@@ -6,6 +6,7 @@ import click
 import typer
 from posthog import tag
 
+from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -101,9 +102,9 @@ async def _generate_inputs_core(
     elif bundle_path:
         # Place inputs.json in the same directory as the PLX file
         bundle_dir = bundle_path.parent
-        final_output_path = bundle_dir / "inputs.json"
+        final_output_path = bundle_dir / DEFAULT_INPUTS_FILE_NAME
     else:
-        final_output_path = Path("results/inputs.json")
+        final_output_path = Path("results") / DEFAULT_INPUTS_FILE_NAME
 
     # Save the file
     try:

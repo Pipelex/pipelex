@@ -10,6 +10,7 @@ from posthog import tag
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
@@ -272,7 +273,7 @@ def build_pipe_cmd(
 
                     # Generate inputs.json
                     inputs_json_str = pipe.inputs.render_inputs(indent=2)
-                    inputs_json_path = os.path.join(extras_output_dir, "inputs.json")
+                    inputs_json_path = os.path.join(extras_output_dir, DEFAULT_INPUTS_FILE_NAME)
                     save_text_to_path(text=inputs_json_str, path=inputs_json_path)
                     typer.secho(f"✅ Inputs template saved to: {inputs_json_path}", fg=typer.colors.GREEN)
 

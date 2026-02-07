@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.config import get_config
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
@@ -142,7 +143,7 @@ async def build_pipe_core(
         try:
             pipe = get_required_pipe(pipe_code=main_pipe_code)
             inputs_json_str = pipe.inputs.render_inputs(indent=2)
-            inputs_file_path = Path(extras_output_dir) / "inputs.json"
+            inputs_file_path = Path(extras_output_dir) / DEFAULT_INPUTS_FILE_NAME
             save_text_to_path(text=inputs_json_str, path=str(inputs_file_path))
         except Exception as exc:
             log.warning(f"Could not generate inputs.json: {exc}")

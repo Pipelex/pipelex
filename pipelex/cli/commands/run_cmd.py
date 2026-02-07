@@ -10,6 +10,7 @@ import typer
 from posthog import tag
 
 from pipelex import log
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
     ErrorContext,
@@ -41,7 +42,7 @@ COMMAND = "run"
 def run_cmd(
     target: Annotated[
         str | None,
-        typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
+        typer.Argument(help="Pipe code, bundle file path (.plx), or pipeline directory (auto-detected)"),
     ] = None,
     pipe: Annotated[
         str | None,
@@ -105,6 +106,7 @@ def run_cmd(
     """Execute a pipeline from a specific bundle file (or not), specifying its pipe code or not.
     If the bundle is provided, it will run its main pipe unless you specify a pipe code.
     If the pipe code is provided, you don't need to provide a bundle file if it's already part of the imported packages.
+    If a directory is provided, it auto-detects bundle.plx and inputs.json inside it.
 
     Examples:
         pipelex run my_pipe
@@ -112,6 +114,8 @@ def run_cmd(
         pipelex run --bundle my_bundle.plx --pipe my_pipe
         pipelex run --pipe my_pipe --inputs data.json
         pipelex run my_bundle.plx --inputs data.json
+        pipelex run pipeline_01/
+        pipelex run pipeline_01/ --pipe my_pipe
         pipelex run my_pipe --working-memory-path results.json --no-pretty-print
         pipelex run my_pipe --no-save-working-memory --no-save-main-stuff
         pipelex run my_pipe --no-graph                  # Disable graph generation
@@ -142,7 +146,63 @@ def run_cmd(
 
     # Determine source:
     if target:
-        if is_pipelex_file(Path(target)):
+        target_path = Path(target)
+        if target_path.is_dir():
+            # Directory mode: auto-detect bundle and inputs
+            if bundle:
+                typer.secho(
+                    "Failed to run: cannot use option --bundle when passing a pipeline directory as target",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+
+            # Find .plx: try default name first, then fall back to single .plx
+            bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
+            if bundle_file.is_file():
+                bundle_path = str(bundle_file)
+            else:
+                plx_files = list(target_path.glob("*.plx"))
+                if len(plx_files) == 0:
+                    typer.secho(
+                        f"Failed to run: no .plx bundle file found in directory '{target}'",
+                        fg=typer.colors.RED,
+                        err=True,
+                    )
+                    raise typer.Exit(1)
+                if len(plx_files) > 1:
+                    plx_names = ", ".join(plx_file.name for plx_file in plx_files)
+                    typer.secho(
+                        f"Failed to run: multiple .plx files found in '{target}' ({plx_names}) "
+                        f"and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
+                        f"Pass the .plx file directly, e.g.: pipelex run {target_path / plx_files[0].name}",
+                        fg=typer.colors.RED,
+                        err=True,
+                    )
+                    raise typer.Exit(1)
+                bundle_path = str(plx_files[0])
+
+            # Auto-detect inputs if --inputs not explicitly provided
+            inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
+            if not inputs and inputs_file.is_file():
+                inputs = str(inputs_file)
+                typer.echo(f"Auto-detected inputs: {inputs}")
+
+            # Add directory as library dir (prepend to user-supplied list)
+            target_dir_str = str(target_path)
+            if library_dir is None:
+                library_dir = [target_dir_str]
+            elif target_dir_str not in library_dir:
+                library_dir = [target_dir_str, *library_dir]
+
+            # Consume --pipe if provided
+            if pipe:
+                pipe_code = pipe
+                pipe = None  # prevent double-assignment below
+
+            typer.echo(f"Auto-detected bundle: {bundle_path}")
+
+        elif is_pipelex_file(target_path):
             bundle_path = target
             if bundle:
                 typer.secho(
