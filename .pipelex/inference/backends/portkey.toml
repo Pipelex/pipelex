@@ -159,6 +159,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 0.25, output = 1.25 }
+thinking_mode = "none"
 x-portkey-provider = "@anthropic"
 
 ["claude-3.7-sonnet"]
@@ -168,6 +169,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 [claude-4-sonnet]
@@ -177,6 +179,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 [claude-4-opus]
@@ -186,6 +189,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.1-opus"]
@@ -195,6 +199,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-sonnet"]
@@ -204,6 +209,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-haiku"]
@@ -213,6 +219,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-opus"]
@@ -222,6 +229,17 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+thinking_mode = "manual"
+x-portkey-provider = "@anthropic"
+
+["claude-4.6-opus"]
+model_id = "claude-opus-4-6"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
 x-portkey-provider = "@anthropic"
 
 # --- Gemini LLMs --------------------------------------------------------------
