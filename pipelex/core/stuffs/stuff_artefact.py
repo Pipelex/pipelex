@@ -97,8 +97,8 @@ class StuffArtefact:
     Use `artefact.iter_items()` for explicit dict-like iteration.
 
     Implements:
-        - TagRenderable protocol (render_for_tag, default_tag_name)
-        - TextFormatRenderable protocol (rendered_for_prompt_async)
+        - TagRenderable protocol (render_for_tag_async, default_tag_name)
+        - TextFormatRenderable protocol (rendered_for_template_async)
         - ImageRenderable protocol (render_with_images)
 
     Attributes:
