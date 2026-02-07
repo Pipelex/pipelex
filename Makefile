@@ -87,6 +87,7 @@ make codex-tests              - Run tests for Codex (exit on first failure) (no 
 make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
 make test                     - Run unit tests (no inference)
 make test-xdist               - Run unit tests with xdist (no inference)
+make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
 make t                        - Shorthand -> test-xdist
 make test-quiet               - Run unit tests without prints (no inference)
 make tq                       - Shorthand -> test-quiet
@@ -141,7 +142,7 @@ export HELP
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
-	validate v check c cc agent-check \
+	validate v check c cc agent-check agent-test \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
@@ -574,6 +575,16 @@ test-pipelex-api: env
 
 ta: test-pipelex-api
 	@echo "> done: ta = test-pipelex-api"
+
+agent-test: env
+	@echo "• Running unit tests..."
+	@tmpfile=$$(mktemp); \
+	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1; \
+	exit_code=$$?; \
+	if [ $$exit_code -ne 0 ]; then grep -vE '\[\s*[0-9]+%\]\s*$$' "$$tmpfile"; fi; \
+	rm -f "$$tmpfile"; \
+	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
+	exit $$exit_code
 
 cov: env
 	$(call PRINT_TITLE,"Unit testing with coverage")

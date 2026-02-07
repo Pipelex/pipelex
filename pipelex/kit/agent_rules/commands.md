@@ -27,12 +27,12 @@
 
 ## Running Tests
 
-   After you're finished making code changes, you must always run tests using `make test-xdist`.
+   After you're finished making code changes, you must always run tests using `make agent-test`.
 
    ```bash
-   make test-xdist
-   # If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
-   # If some test failes, re-run it with `-s -vv` to see more details
+   make agent-test
+   # If the current system doesn't have the `make` command, lookup the "agent-test" target in the Makefile and run the command manually.
+   # Zero output on success; full output on failure.
    ```
 
 ## Running Tests with Prints
