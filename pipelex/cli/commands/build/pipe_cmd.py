@@ -16,6 +16,7 @@ from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
 from pipelex.cli.error_handlers import (
     ErrorContext,
+    handle_build_validation_failure,
     handle_model_availability_error,
     handle_model_choice_error,
 )
@@ -31,6 +32,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
@@ -206,6 +208,8 @@ def build_pipe_cmd(
                 typer.secho(f"❌ {msg}", fg=typer.colors.RED)
                 typer.secho("❌ No failure memory available", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
+        except ValidateBundleError as exc:
+            handle_build_validation_failure(exc)
 
         # Return early if no output requested
         if no_output:

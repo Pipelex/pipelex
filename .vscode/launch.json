@@ -93,18 +93,6 @@
             "justMyCode": false
         },
         {
-            "name": "Debug validate generated pipeline 1st iteration",
-            "type": "debugpy",
-            "request": "launch",
-            "program": "${workspaceFolder}/.venv/bin/pipelex",
-            "args": [
-                "validate",
-                "results/pipe-builder/generated_pipeline_1st_iteration_11.plx"
-            ],
-            "console": "integratedTerminal",
-            "justMyCode": false
-        },
-        {
             "name": "Debug run pipe bundle no inputs",
             "type": "debugpy",
             "request": "launch",

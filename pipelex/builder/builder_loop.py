@@ -309,8 +309,8 @@ class BuilderLoop:
                                 new_inputs[variable_name] = concept_code_with_multiplicity
                                 # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
                                 log.info(
-                                    f"🔧 Fixed input requirement mismatch for pipe '{val_error.pipe_code}': input '{variable_name}' \
-                                        changed from '{old_value}' → '{concept_code_with_multiplicity}'"
+                                    f"🔧 Fixed input requirement mismatch for pipe '{val_error.pipe_code}': input '{variable_name}' "
+                                    f"changed from '{old_value}' → '{concept_code_with_multiplicity}'"
                                 )
                                 break
 
@@ -339,10 +339,11 @@ class BuilderLoop:
                         fixed_pipes.append(pipe_spec)
                         log.info(f"🔧 Fixed input variables for pipe '{val_error.pipe_code}': BEFORE={old_inputs} → AFTER={fixed_inputs}")
                     else:
+                        variable_names_str = ", ".join(val_error.variable_names) if val_error.variable_names else "unknown"
                         log.warning(
-                            f"⚠️ Cannot auto-fix MISSING_INPUT_VARIABLE for pipe '{val_error.pipe_code}': needed_inputs() \
-                                doesn't include the missing variable '{val_error.variable_names}'. \
-                                    This might be an intermediate variable that shouldn't be in inputs."
+                            f"⚠️ Cannot auto-fix {val_error.error_type.replace('_', ' ')} for pipe '{val_error.pipe_code}': needed_inputs() "
+                            f"doesn't include the missing variable '{variable_names_str}'. "
+                            f"This might be an intermediate variable that shouldn't be in inputs."
                         )
 
                 case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
@@ -365,8 +366,8 @@ class BuilderLoop:
                         # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
                         error_kind = "concept" if val_error.error_type == PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT else "multiplicity"
                         log.info(
-                            f"🔧 Fixed output {error_kind} for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
-                                '{new_output}' (matching last step '{last_step_pipe_code}')"
+                            f"🔧 Fixed output {error_kind} for pipe '{val_error.pipe_code}': output changed from '{old_output}' → "
+                            f"'{new_output}' (matching last step '{last_step_pipe_code}')"
                         )
 
                     # Fix output concept for PipeCondition by checking mapped pipes' outputs

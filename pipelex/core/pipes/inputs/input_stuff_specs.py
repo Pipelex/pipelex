@@ -132,6 +132,23 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_empty(self) -> bool:
         return not bool(self.root)
 
+    def format_for_display(self, indent: int = 6) -> str:
+        """Format input stuff specs as a human-readable multi-line string.
+
+        Args:
+            indent: Number of spaces to indent each input line
+
+        Returns:
+            A multi-line string with one input per line, e.g.:
+                  - cv: cv_screening.CV
+                  - scorecard: cv_screening.Scorecard
+        """
+        if not self.root:
+            return "(none)"
+        prefix = " " * indent
+        lines = [f"{prefix}- {var_name}: {stuff_spec.to_bundle_representation()}" for var_name, stuff_spec in self.root.items()]
+        return "\n" + "\n".join(lines)
+
     def render_inputs(self, indent: int = 2) -> str:
         """Render a JSON representation for all stuff specs as a formatted string.
 
