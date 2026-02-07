@@ -250,8 +250,8 @@ def run_cmd(
             typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
-        # Pretty print main_stuff unless disabled
-        if not no_pretty_print:
+        # Pretty print main_stuff unless disabled or in dry run mode
+        if not no_pretty_print and not dry_run:
             title = f"Final output of pipe [red]{pipe_code}[/red]"
             pipe_output.main_stuff.pretty_print_stuff(title=title)
             # TODO: no_pretty_print should also disable the pretty printing of each pipe operator step

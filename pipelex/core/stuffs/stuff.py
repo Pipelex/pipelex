@@ -1,5 +1,5 @@
 # pyright: reportImportCycles=false
-from typing import Any, cast
+from typing import Any, cast, get_args, get_origin
 
 from kajson import kajson
 from pydantic import ConfigDict, ValidationError
@@ -128,6 +128,33 @@ class Stuff(PrettyRenderable, CustomBaseModel):
             ) from exc
 
         actual_type = type(content)
+
+        # Check if user is trying to use ListContent[Something] - suggest get_stuff_as_list() instead
+        origin = get_origin(content_type)
+        if origin is None:
+            # For Pydantic generics, check __pydantic_generic_metadata__
+            pydantic_metadata: dict[str, Any] | None = getattr(content_type, "__pydantic_generic_metadata__", None)
+            if pydantic_metadata is not None:
+                origin = pydantic_metadata.get("origin")
+
+        if origin is not None and issubclass(origin, ListContent):
+            # User passed ListContent[Something] - extract the item type and suggest the correct method
+            type_args = get_args(content_type)
+            if not type_args:
+                pydantic_metadata = getattr(content_type, "__pydantic_generic_metadata__", None)
+                if pydantic_metadata is not None:
+                    type_args = pydantic_metadata.get("args", ())
+
+            if type_args:
+                item_type_name = type_args[0].__name__
+                msg = (
+                    f"Cannot use ListContent[{item_type_name}] with get_stuff_as() or content_as(). "
+                    f'Use get_stuff_as_list("<name>", {item_type_name}) instead.'
+                )
+            else:
+                msg = 'Cannot use ListContent[...] with get_stuff_as() or content_as(). Use get_stuff_as_list("<name>", ItemType) instead.'
+            raise StuffContentTypeError(message=msg, expected_type=content_type.__name__, actual_type=actual_type.__name__)
+
         msg = f"Content is of type '{actual_type}', instead of the expected '{content_type}'"
         raise StuffContentTypeError(message=msg, expected_type=content_type.__name__, actual_type=actual_type.__name__)
 
