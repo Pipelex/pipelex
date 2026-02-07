@@ -98,3 +98,11 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+
+["claude-4.6-opus"]
+model_id = "claude-opus-4-6"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
