@@ -1,3 +1,6 @@
+SHELL := /bin/bash
+.SHELLFLAGS := -o pipefail -c
+
 ifeq ($(wildcard .env),.env)
 include .env
 export
@@ -131,6 +134,15 @@ make li                       - Shorthand -> lock install
 make test-count               - Count the number of tests
 make check-test-badge         - Check if the test count matches the badge value
 
+make test-durations           - Show slowest tests with xdist (TOP=30, MIN=0.5)
+make td                       - Shorthand -> test-durations
+make test-durations-serial    - Show slowest tests without xdist (TOP=30, MIN=0.5)
+make tds                      - Shorthand -> test-durations-serial
+make test-time                - Timed test run with xdist (wall clock)
+make tt                       - Shorthand -> test-time
+make test-time-serial         - Timed test run without xdist (wall clock)
+make tts                      - Shorthand -> test-time-serial
+
 endef
 export HELP
 
@@ -143,6 +155,7 @@ export HELP
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc agent-check agent-test \
+	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
@@ -585,6 +598,41 @@ agent-test: env
 	rm -f "$$tmpfile"; \
 	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
 	exit $$exit_code
+
+##########################################################################################
+### TEST DIAGNOSTICS
+##########################################################################################
+
+TOP ?= 30
+MIN ?= 0.5
+
+test-durations: env
+	$(call PRINT_TITLE,"Slowest tests - xdist - top=$(TOP) min=$(MIN)s")
+	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --durations=$(TOP) --durations-min=$(MIN) --tb=no -q
+
+td: test-durations
+	@echo "> done: td = test-durations"
+
+test-durations-serial: env
+	$(call PRINT_TITLE,"Slowest tests - serial - top=$(TOP) min=$(MIN)s")
+	$(VENV_PYTEST) -p no:xdist -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --durations=$(TOP) --durations-min=$(MIN) --tb=no -q
+
+tds: test-durations-serial
+	@echo "> done: tds = test-durations-serial"
+
+test-time: env
+	$(call PRINT_TITLE,"Timed test run - xdist")
+	@time $(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=no -q --no-header 2>&1 | tail -1
+
+tt: test-time
+	@echo "> done: tt = test-time"
+
+test-time-serial: env
+	$(call PRINT_TITLE,"Timed test run - serial")
+	@time $(VENV_PYTEST) -p no:xdist -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=no -q --no-header 2>&1 | tail -1
+
+tts: test-time-serial
+	@echo "> done: tts = test-time-serial"
 
 cov: env
 	$(call PRINT_TITLE,"Unit testing with coverage")
