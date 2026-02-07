@@ -1,6 +1,7 @@
 import pytest
 
 from pipelex import pretty_print
+from pipelex.cogt.exceptions import LLMCapabilityError
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -47,7 +48,10 @@ class TestLLMReasoning:
             llm_job_params=llm_job_params,
             llm_job_config=LLMJobConfig(max_retries=3),
         )
-        generated_text = await llm_worker.gen_text(llm_job=llm_job)
+        try:
+            generated_text = await llm_worker.gen_text(llm_job=llm_job)
+        except LLMCapabilityError as exc:
+            pytest.skip(f"Reasoning not supported for {llm_combo.handle}: {exc}")
         assert generated_text
         pretty_print(generated_text, title=f"Result ({topic}, {prompt_topic})")
 
@@ -82,7 +86,10 @@ class TestLLMReasoning:
             llm_job_params=llm_job_params,
             llm_job_config=LLMJobConfig(max_retries=3),
         )
-        generated_text = await llm_worker.gen_text(llm_job=llm_job)
+        try:
+            generated_text = await llm_worker.gen_text(llm_job=llm_job)
+        except LLMCapabilityError as exc:
+            pytest.skip(f"Reasoning not supported for {llm_combo.handle}: {exc}")
         assert generated_text
         pretty_print(generated_text, title=f"Result (budget={budget}, {topic})")
 
