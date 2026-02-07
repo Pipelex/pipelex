@@ -111,22 +111,24 @@ class BuilderLoop:
         self,
         pipelex_bundle_spec: PipelexBundleSpec,
     ) -> PipelexBundleSpec:
-        """Fix undeclared concept references in pipe specs.
+        """Fix undeclared concept references in pipe and concept specs.
 
-        Collects all concept references from pipe specs, determines which are undeclared,
+        Collects all concept references from pipe specs and concept definitions (refines,
+        structure concept_ref, item_concept_ref), determines which are undeclared,
         fixes PipeParallel combined_output references deterministically, and generates
         ConceptSpec definitions for any remaining undeclared concepts via an LLM pipeline.
         """
-        # Step 1: Collect all local concept references from pipe specs
-        concept_references: list[tuple[str, str, str]] = []  # (concept_code, pipe_code, field_context)
+        # Step 1: Collect all local concept references from pipe specs and concept definitions
+        concept_references: list[tuple[str, str, str]] = []  # (bare_concept_code, source_description, field_context)
         if pipelex_bundle_spec.pipe:
             for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
+                source = f"pipe '{pipe_code}'"
                 # Parse output
                 output_parse = parse_concept_with_multiplicity(pipe_spec.output)
                 output_concept = output_parse.concept_ref_or_code
                 if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
                     bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
-                    concept_references.append((bare_code, pipe_code, "output"))
+                    concept_references.append((bare_code, source, "output"))
 
                 # Parse inputs
                 if pipe_spec.inputs:
@@ -135,7 +137,7 @@ class BuilderLoop:
                         input_concept = input_parse.concept_ref_or_code
                         if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
                             bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
-                            concept_references.append((bare_code, pipe_code, f"input '{input_name}'"))
+                            concept_references.append((bare_code, source, f"input '{input_name}'"))
 
                 # Parse PipeParallel combined_output
                 if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
@@ -143,7 +145,35 @@ class BuilderLoop:
                     combined_concept = combined_parse.concept_ref_or_code
                     if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
                         bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
-                        concept_references.append((bare_code, pipe_code, "combined_output"))
+                        concept_references.append((bare_code, source, "combined_output"))
+
+        # Collect concept references from concept definitions (refines, structure concept_ref, item_concept_ref)
+        if pipelex_bundle_spec.concept:
+            for concept_code, concept_spec_or_name in pipelex_bundle_spec.concept.items():
+                if not isinstance(concept_spec_or_name, ConceptSpec):
+                    continue
+                source = f"concept '{concept_code}'"
+
+                # Check refines
+                if concept_spec_or_name.refines:
+                    ref = concept_spec_or_name.refines
+                    if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                        bare_code = ref.split(".")[-1] if "." in ref else ref
+                        concept_references.append((bare_code, source, "refines"))
+
+                # Check structure fields
+                if concept_spec_or_name.structure:
+                    for field_name, field_spec in concept_spec_or_name.structure.items():
+                        if field_spec.concept_ref:
+                            ref = field_spec.concept_ref
+                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                bare_code = ref.split(".")[-1] if "." in ref else ref
+                                concept_references.append((bare_code, source, f"structure.{field_name}.concept_ref"))
+                        if field_spec.item_concept_ref:
+                            ref = field_spec.item_concept_ref
+                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                bare_code = ref.split(".")[-1] if "." in ref else ref
+                                concept_references.append((bare_code, source, f"structure.{field_name}.item_concept_ref"))
 
         # Step 2: Determine which are undeclared
         declared_concepts: set[str] = set()
@@ -153,10 +183,10 @@ class BuilderLoop:
 
         undeclared: set[str] = set()
         undeclared_refs: list[tuple[str, str, str]] = []
-        for concept_code, pipe_code, field_context in concept_references:
-            if concept_code not in declared_concepts and concept_code not in native_concept_codes:
-                undeclared.add(concept_code)
-                undeclared_refs.append((concept_code, pipe_code, field_context))
+        for ref_code, source_desc, field_context in concept_references:
+            if ref_code not in declared_concepts and ref_code not in native_concept_codes:
+                undeclared.add(ref_code)
+                undeclared_refs.append((ref_code, source_desc, field_context))
 
         if not undeclared:
             return pipelex_bundle_spec
@@ -199,9 +229,9 @@ class BuilderLoop:
         if undeclared:
             # Build context for the LLM
             lines: list[str] = ["Missing concepts that need to be defined:\n"]
-            for concept_code, pipe_code, field_context in undeclared_refs:
-                if concept_code in undeclared:
-                    lines.append(f"- '{concept_code}' referenced in pipe '{pipe_code}' ({field_context})")
+            for ref_code, source_desc, field_context in undeclared_refs:
+                if ref_code in undeclared:
+                    lines.append(f"- '{ref_code}' referenced in {source_desc} ({field_context})")
 
             lines.append("\nExisting declared concepts for context:")
             if pipelex_bundle_spec.concept:
