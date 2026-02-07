@@ -284,7 +284,8 @@ def run_cmd(
                     raise typer.Exit(1) from json_type_error_exc
 
         # Execute pipeline
-        typer.secho(f"\n🚀 Executing {source_description}...\n", fg=typer.colors.GREEN, bold=True)
+        inputs_description = f" with inputs '{inputs}'" if inputs and not inputs.startswith("{") else ""
+        typer.secho(f"\n🚀 Executing {source_description}{inputs_description}...\n", fg=typer.colors.GREEN, bold=True)
 
         # Determine pipe run mode
         pipe_run_mode = PipeRunMode.DRY if dry_run else None
