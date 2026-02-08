@@ -36,6 +36,7 @@ outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 [gpt-4o]
@@ -44,6 +45,7 @@ outputs = ["text", "structured"]
 costs = { input = 2.5, output = 10.0 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 ["gpt-4.1-nano"]
@@ -52,6 +54,7 @@ outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 ["gpt-4.1-mini"]
@@ -60,6 +63,7 @@ outputs = ["text", "structured"]
 costs = { input = 0.4, output = 1.6 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 ["gpt-4.1"]
@@ -68,6 +72,7 @@ outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 [o1]
@@ -77,6 +82,7 @@ costs = { input = 15.0, output = 60.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [o3-mini]
@@ -86,6 +92,7 @@ costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [o3]
@@ -95,6 +102,7 @@ costs = { input = 2, output = 8 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [o4-mini]
@@ -104,6 +112,7 @@ costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [gpt-5-nano]
@@ -113,6 +122,7 @@ costs = { input = 0.05, output = 0.4 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [gpt-5-mini]
@@ -122,6 +132,7 @@ costs = { input = 0.25, output = 2.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [gpt-5]
@@ -131,6 +142,7 @@ costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 ["gpt-5.1"]
@@ -140,6 +152,7 @@ costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 ["gpt-5.1-codex"]
@@ -149,6 +162,7 @@ costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 # --- Claude LLMs --------------------------------------------------------------

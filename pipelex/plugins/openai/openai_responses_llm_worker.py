@@ -4,11 +4,15 @@ from typing import TYPE_CHECKING, Any, cast
 
 import openai
 from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
+from openai.types.shared_params import Reasoning
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex import log
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.config import get_config
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
 
@@ -20,6 +24,14 @@ if TYPE_CHECKING:
     from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
     from pipelex.reporting.reporting_protocol import ReportingProtocol
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+_EFFORT_TO_OPENAI_EFFORT: dict[ReasoningEffort, str] = {
+    ReasoningEffort.NONE: "none",
+    ReasoningEffort.LOW: "low",
+    ReasoningEffort.MEDIUM: "medium",
+    ReasoningEffort.HIGH: "high",
+    ReasoningEffort.MAX: "xhigh",
+}
 
 
 class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
@@ -63,6 +75,45 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         pass
 
     #########################################################
+    # Reasoning helpers
+    #########################################################
+
+    def _resolve_reasoning(self, job_params: LLMJobParams) -> Reasoning | None:
+        """Resolve reasoning parameters to an OpenAI Responses API reasoning dict.
+
+        Args:
+            job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
+
+        Returns:
+            A Reasoning dict for the OpenAI Responses API, or None if reasoning is not requested.
+
+        """
+        thinking_mode = self.inference_model.thinking_mode
+
+        if job_params.reasoning_effort is not None:
+            effort = job_params.reasoning_effort
+            match thinking_mode:
+                case ThinkingMode.MANUAL:
+                    openai_effort = _EFFORT_TO_OPENAI_EFFORT[effort]
+                    log.verbose(f"OpenAI Responses reasoning effort={openai_effort}")
+                    return Reasoning(effort=openai_effort)  # type: ignore[typeddict-item]
+                case ThinkingMode.ADAPTIVE:
+                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported for OpenAI models"
+                    raise LLMCapabilityError(msg)
+                case ThinkingMode.NONE:
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    raise LLMCapabilityError(msg)
+                case None:
+                    msg = f"Model '{self.inference_model.desc}' has no thinking_mode configured, cannot use reasoning_effort"
+                    raise LLMCapabilityError(msg)
+
+        if job_params.reasoning_budget is not None:
+            msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
+            raise LLMCapabilityError(msg)
+
+        return None
+
+    #########################################################
     @override
     async def _gen_text(
         self,
@@ -70,6 +121,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
+
+        openai_reasoning = self._resolve_reasoning(job_params=job_params)
+
         try:
             extra_headers, extra_body = self.openai_responses_factory.make_extras(
                 inference_model=self.inference_model, inference_job=llm_job, output_desc=InferenceOutputType.TEXT
@@ -77,9 +131,10 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
-                temperature=job_params.temperature,
+                temperature=omit if openai_reasoning is not None else job_params.temperature,
                 max_output_tokens=job_params.max_tokens or omit,
                 input=input_items,
+                reasoning=openai_reasoning or omit,
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
