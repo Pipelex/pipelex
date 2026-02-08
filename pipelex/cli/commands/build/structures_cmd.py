@@ -94,6 +94,7 @@ def generate_structures_from_blueprints(
     output_directory: Path,
     target_path: Path | None = None,
     skip_existing_check: bool = False,
+    quiet: bool = False,
 ) -> list[tuple[str, str]]:
     """Generate Python structure files from blueprint concept definitions.
 
@@ -102,6 +103,7 @@ def generate_structures_from_blueprints(
         output_directory: Directory where structure files will be generated
         target_path: Optional path to scan for manually-created structure classes
         skip_existing_check: If True, always generate structures without checking if they exist
+        quiet: If True, suppress progress output (use log.verbose instead of typer.echo/secho)
 
     Returns:
         List of (domain, concept_code) tuples for generated files
@@ -117,7 +119,10 @@ def generate_structures_from_blueprints(
 
     generated_files: list[tuple[str, str]] = []
 
-    typer.echo(f"\n📝 Generating structures in: {output_directory}")
+    if quiet:
+        log.verbose(f"Generating structures in: {output_directory}")
+    else:
+        typer.echo(f"\n📝 Generating structures in: {output_directory}")
 
     for blueprint in blueprints:
         if blueprint.domain == "native":
@@ -161,7 +166,10 @@ def generate_structures_from_blueprints(
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
                 output_file.write_text(generated_code)
                 generated_files.append((blueprint.domain, concept_code))
-                typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
+                if not quiet:
+                    typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
+                else:
+                    log.verbose(f"Generated {output_file.name}")
                 continue
 
             # Handle concepts with explicit structure definition
@@ -189,7 +197,10 @@ def generate_structures_from_blueprints(
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
                 output_file.write_text(generated_code)
                 generated_files.append((blueprint.domain, concept_code))
-                typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
+                if not quiet:
+                    typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
+                else:
+                    log.verbose(f"Generated {output_file.name}")
 
             # Handle concepts with refines
             elif concept_blueprint.refines:
@@ -235,7 +246,10 @@ def generate_structures_from_blueprints(
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
                 output_file.write_text(generated_code)
                 generated_files.append((blueprint.domain, concept_code))
-                typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
+                if not quiet:
+                    typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
+                else:
+                    log.verbose(f"Generated {output_file.name}")
 
             # Handle concepts with neither structure nor refines - defaults to TextContent
             else:
@@ -259,13 +273,19 @@ def generate_structures_from_blueprints(
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
                 output_file.write_text(generated_code)
                 generated_files.append((blueprint.domain, concept_code))
-                typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
+                if not quiet:
+                    typer.secho(f"  ✅ Generated {output_file.name}", fg=typer.colors.GREEN)
+                else:
+                    log.verbose(f"Generated {output_file.name}")
 
     # Generate empty __init__.py to make structures importable
     if generated_files:
         init_file = output_directory / "__init__.py"
         init_file.write_text("")
-        typer.secho("  ✅ Generated __init__.py", fg=typer.colors.GREEN)
+        if not quiet:
+            typer.secho("  ✅ Generated __init__.py", fg=typer.colors.GREEN)
+        else:
+            log.verbose("Generated __init__.py")
 
     return generated_files
 
