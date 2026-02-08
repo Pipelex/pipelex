@@ -274,8 +274,8 @@ def pipe_cmd(
                 spec_data = json.load(the_file)
         else:
             spec_data = json.loads(spec)  # type: ignore[arg-type]
-    except FileNotFoundError:
-        agent_error(f"Spec file not found: {spec_file}", "FileNotFoundError")
+    except FileNotFoundError as exc:
+        agent_error(f"Spec file not found: {spec_file}", "FileNotFoundError", cause=exc)
     except json.JSONDecodeError as exc:
         agent_error(f"Invalid JSON: {exc.msg}", "JSONDecodeError", cause=exc)
 

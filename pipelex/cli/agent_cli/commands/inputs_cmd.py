@@ -163,8 +163,8 @@ def inputs_cmd(
             "PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
-            model_type=exc.model_type,
-            model_choice=exc.model_choice,
+            model_type=str(exc.model_type),
+            model_choice=str(exc.model_choice),
         )
 
     except PipeOperatorModelAvailabilityError as exc:

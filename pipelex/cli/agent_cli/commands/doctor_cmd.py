@@ -1,6 +1,5 @@
 """Agent CLI doctor command -- JSON health report with no interactive prompts."""
 
-import re
 from typing import Any
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
@@ -10,18 +9,6 @@ from pipelex.cli.commands.doctor_cmd import (
     check_models,
     check_telemetry_config,
 )
-
-
-def _strip_rich_markup(text: str) -> str:
-    """Remove Rich markup tags from a string.
-
-    Args:
-        text: String that may contain Rich tags like ``[cyan]...[/cyan]``.
-
-    Returns:
-        Plain text with all Rich tags removed.
-    """
-    return re.sub(r"\[/?[a-z_ ]+\]", "", text)
 
 
 def agent_doctor_cmd() -> None:
@@ -76,7 +63,7 @@ def agent_doctor_cmd() -> None:
     if not config_healthy and config_missing_count == 0:
         recommended_actions.append("Fix validation errors in .pipelex/pipelex.toml or run 'pipelex init config --reset'")
     if not telemetry_healthy:
-        recommended_actions.append(_strip_rich_markup(f"Run 'pipelex init telemetry' to fix telemetry: {telemetry_message}"))
+        recommended_actions.append(f"Run 'pipelex init telemetry' to fix telemetry: {telemetry_message}")
     if not backends_healthy:
         for report in backend_credential_reports.values():
             if report.missing_vars:
@@ -98,21 +85,21 @@ def agent_doctor_cmd() -> None:
         "checks": {
             "config_files": {
                 "healthy": config_healthy,
-                "message": _strip_rich_markup(config_message),
+                "message": config_message,
                 "missing_count": config_missing_count,
             },
             "telemetry": {
                 "healthy": telemetry_healthy,
-                "message": _strip_rich_markup(telemetry_message),
+                "message": telemetry_message,
             },
             "backend_credentials": {
                 "healthy": backends_healthy,
-                "message": _strip_rich_markup(backends_message),
+                "message": backends_message,
                 "backends": backends_list,
             },
             "models": {
                 "healthy": models_healthy,
-                "message": _strip_rich_markup(models_message),
+                "message": models_message,
                 "backend_files": backend_files_list,
             },
         },

@@ -57,3 +57,10 @@ def make_pipelex_for_agent_cli(library_dirs: list[str] | list[Path] | None = Non
             model_handle=exc.model_handle,
             enabled_backends=sorted(exc.enabled_backends),
         )
+    except Exception as exc:
+        agent_error(
+            f"Pipelex initialization failed: {exc}",
+            type(exc).__name__,
+            cause=exc,
+            hint="Initialization failed. Run 'pipelex-agent doctor' to diagnose, or 'pipelex init config' to reset configuration",
+        )

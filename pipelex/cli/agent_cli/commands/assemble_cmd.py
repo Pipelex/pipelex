@@ -123,8 +123,8 @@ def assemble_cmd(
                 try:
                     concept_content = _load_toml_content(concept_source)
                     _merge_toml_sections(doc, "concept", concept_content)
-                except FileNotFoundError:
-                    agent_error(f"Concept file not found: {concept_source}", "FileNotFoundError")
+                except FileNotFoundError as exc:
+                    agent_error(f"Concept file not found: {concept_source}", "FileNotFoundError", cause=exc)
                 except Exception as exc:
                     agent_error(f"Failed to load concepts from '{concept_source}': {exc}", "ConceptLoadError", cause=exc)
 
@@ -134,8 +134,8 @@ def assemble_cmd(
                 try:
                     pipe_content = _load_toml_content(pipe_source)
                     _merge_toml_sections(doc, "pipe", pipe_content)
-                except FileNotFoundError:
-                    agent_error(f"Pipe file not found: {pipe_source}", "FileNotFoundError")
+                except FileNotFoundError as exc:
+                    agent_error(f"Pipe file not found: {pipe_source}", "FileNotFoundError", cause=exc)
                 except Exception as exc:
                     agent_error(f"Failed to load pipes from '{pipe_source}': {exc}", "PipeLoadError", cause=exc)
 

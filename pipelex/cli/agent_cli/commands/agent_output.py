@@ -38,6 +38,16 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "RemoteConfigValidationError": (
         "This is a server-side issue; report it on Discord/GitHub. Disable pipelex_gateway in backends.toml as a workaround"
     ),
+    # Graph errors
+    "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
+    # Builder/assembler errors
+    "ConceptLoadError": "Check TOML syntax in the concept source file or inline string",
+    "PipeLoadError": "Check TOML syntax in the pipe source file or inline string",
+    # Input/type errors
+    "JsonTypeError": "Input file must be a JSON object {...}, not an array or scalar value",
+    "BundleError": "Bundle must declare a 'main_pipe' or use the --pipe flag to specify which pipe to run",
+    "ValidationError": "Check that spec fields match the expected schema for the given type",
+    "ValueError": "Check that the provided value is valid for the parameter (e.g., --type must be a valid pipe type)",
     # Unknown command
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }

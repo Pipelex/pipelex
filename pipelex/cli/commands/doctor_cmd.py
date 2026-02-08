@@ -111,8 +111,8 @@ def check_telemetry_config() -> tuple[bool, str]:
     except ValidationError:
         # Check if this looks like the old config format (has telemetry_mode at root level)
         if "custom_posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
-            return False, "Config format has changed - run [cyan]pipelex init telemetry[/cyan] to update"
-        return False, "Invalid configuration - run [cyan]pipelex init telemetry --reset[/cyan] to fix"
+            return False, "Config format has changed - run 'pipelex init telemetry' to update"
+        return False, "Invalid configuration - run 'pipelex init telemetry --reset' to fix"
 
 
 def check_backend_credentials() -> tuple[bool, dict[str, BackendCredentialsReport], str]:

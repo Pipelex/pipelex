@@ -7,6 +7,15 @@ description: Generate synthetic test inputs for Pipelex workflows. Use when user
 
 Generate realistic synthetic inputs for testing Pipelex workflows. Uses the agent CLI to extract input schemas, then populates them with appropriate test data.
 
+## Prerequisites
+
+Check CLI availability:
+1. Try `pipelex-agent --version`
+2. If not found, try `uv run pipelex-agent --version`
+3. If neither works, guide install: `pip install pipelex` or `uv add pipelex`
+
+Use whichever method works for all subsequent commands.
+
 ## Workflow
 
 ### Step 1: Get Input Schema
@@ -34,6 +43,18 @@ pipelex-agent inputs <bundle.plx> [--pipe specific_pipe]
   }
 }
 ```
+
+**Error handling for `pipelex-agent inputs`:**
+
+| Error Type | Recovery |
+|------------|----------|
+| `ValidateBundleError` | Fix the .plx file — check `validation_errors` array for specific issues |
+| `PipeOperatorModelChoiceError` | Run `pipelex-agent doctor` — model preset doesn't resolve |
+| `PipeOperatorModelAvailabilityError` | Run `pipelex-agent doctor` — API key or service issue |
+| `FileNotFoundError` | Check that the bundle file path is correct |
+| `ArgumentError` | Check command flags — provide either a pipe code or a .plx file |
+
+For model/config issues, always try `pipelex-agent doctor` first.
 
 ### Step 2: Identify Input Types
 
@@ -139,6 +160,18 @@ pipelex-agent run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs
 ```
 
 **Output**: The pipeline saves the generated image to `pipelex-wip/test-files/` and returns the file path.
+
+**Error handling for image synthesis (`pipelex-agent run`):**
+
+| Error Type | Recovery |
+|------------|----------|
+| `PipelineExecutionError` | Check `pipe_code` and `pipe_stack` for which pipe failed; the image generation model may be unavailable |
+| `PipeOperatorModelChoiceError` | Run `pipelex-agent doctor` — image generation model preset doesn't resolve |
+| `PipeOperatorModelAvailabilityError` | Run `pipelex-agent doctor` — API key or service issue for the image generation backend |
+| `FileNotFoundError` | Check that the synthesize_image.plx bundle path and input file path are correct |
+| `JSONDecodeError` | Fix the JSON syntax in the input file |
+
+For any model or configuration error, run `pipelex-agent doctor` to diagnose and follow its recommended actions.
 
 ---
 

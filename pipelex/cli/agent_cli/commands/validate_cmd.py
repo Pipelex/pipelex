@@ -202,14 +202,12 @@ def validate_cmd(
             result = asyncio.run(_validate_all_core(library_dirs=library_dirs))
             agent_success(result)
 
-        except PipeOperatorModelAvailabilityError as exc:
-            agent_error(
-                str(exc),
-                "PipeOperatorModelAvailabilityError",
-                cause=exc,
-                pipe_code=exc.pipe_code,
-                model_handle=exc.model_handle,
-            )
+        except ValidateBundleError as exc:
+            validation_errors = extract_validation_errors(exc)
+            validate_all_extra: dict[str, Any] = {"validation_errors": validation_errors}
+            if exc.dry_run_error_message:
+                validate_all_extra["dry_run_error"] = exc.dry_run_error_message
+            agent_error(exc.message, "ValidateBundleError", cause=exc, **validate_all_extra)
 
         except PipeOperatorModelChoiceError as exc:
             agent_error(
@@ -219,6 +217,15 @@ def validate_cmd(
                 pipe_code=exc.pipe_code,
                 model_type=str(exc.model_type),
                 model_choice=str(exc.model_choice),
+            )
+
+        except PipeOperatorModelAvailabilityError as exc:
+            agent_error(
+                str(exc),
+                "PipeOperatorModelAvailabilityError",
+                cause=exc,
+                pipe_code=exc.pipe_code,
+                model_handle=exc.model_handle,
             )
 
         except Exception as exc:

@@ -52,7 +52,7 @@ class TestAgentDoctorCmd:
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_telemetry_config",
-            return_value=(False, "Config format has changed - run [cyan]pipelex init telemetry[/cyan] to update"),
+            return_value=(False, "Config format has changed - run 'pipelex init telemetry' to update"),
         )
         mocker.patch(
             "pipelex.cli.agent_cli.commands.doctor_cmd.check_backend_credentials",
