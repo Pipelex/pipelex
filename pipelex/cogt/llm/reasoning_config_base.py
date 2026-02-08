@@ -1,12 +1,17 @@
 from pipelex.cogt.llm.llm_job_components import ReasoningEffort
 from pipelex.system.exceptions import ConfigValidationError
+from pipelex.types import StrEnum
 
 EffortToLevelMap = dict[str, str]
 DISABLED_LEVEL = "disabled"
 
 
-def validate_effort_to_level_map(effort_to_level_map: EffortToLevelMap, config_name: str) -> EffortToLevelMap:
-    """Check all ReasoningEffort values are present as keys."""
+def validate_effort_to_level_map(
+    effort_to_level_map: EffortToLevelMap,
+    config_name: str,
+    level_type: type[StrEnum] | None = None,
+) -> EffortToLevelMap:
+    """Check all ReasoningEffort values are present as keys, and optionally validate level values."""
     valid_efforts = {effort.value for effort in ReasoningEffort}
     missing_efforts = valid_efforts - set(effort_to_level_map.keys())
     invalid_efforts = set(effort_to_level_map.keys()) - valid_efforts
@@ -19,6 +24,15 @@ def validate_effort_to_level_map(effort_to_level_map: EffortToLevelMap, config_n
     if invalid_efforts:
         msg = f"Invalid reasoning effort levels in {config_name}: {invalid_efforts}"
         raise ConfigValidationError(msg)
+    if level_type is not None:
+        for effort_key, level_value in effort_to_level_map.items():
+            if level_value != DISABLED_LEVEL:
+                try:
+                    level_type(level_value)
+                except ValueError as exc:
+                    valid_values = [member.value for member in level_type]
+                    msg = f"Invalid level value '{level_value}' for effort '{effort_key}' in {config_name}. Valid levels: {valid_values}"
+                    raise ConfigValidationError(msg) from exc
     return effort_to_level_map
 
 

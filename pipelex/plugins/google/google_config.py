@@ -6,11 +6,18 @@ from pydantic import field_validator
 
 from pipelex.cogt.llm.reasoning_config_base import EffortToLevelMap, get_reasoning_level_str, validate_effort_to_level_map
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from google.genai import types as genai_types
 
     from pipelex.cogt.llm.llm_job_components import ReasoningEffort
+
+
+class GoogleThinkingLevel(StrEnum):
+    LOW = "low"
+    MEDIUM = "medium"
+    HIGH = "high"
 
 
 class GoogleConfig(ConfigModel):
@@ -19,7 +26,7 @@ class GoogleConfig(ConfigModel):
     @field_validator("effort_to_level_map")
     @classmethod
     def validate_effort_map(cls, value: EffortToLevelMap) -> EffortToLevelMap:
-        return validate_effort_to_level_map(value, "google_config")
+        return validate_effort_to_level_map(value, "google_config", level_type=GoogleThinkingLevel)
 
     def get_reasoning_level(self, effort: ReasoningEffort) -> genai_types.ThinkingLevel | None:
         """Resolve a ReasoningEffort to a Google ThinkingLevel enum value.

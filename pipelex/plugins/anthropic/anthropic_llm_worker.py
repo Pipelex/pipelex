@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any
 
 from anthropic import APIConnectionError, AsyncAnthropic, AsyncAnthropicBedrock, AuthenticationError, BadRequestError, omit
 from anthropic.types import OutputConfigParam, ThinkingConfigParam
+from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
 
 if TYPE_CHECKING:
@@ -32,18 +33,13 @@ from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
+@pydantic_dataclass
 class _ThinkingParams:
     """Container for thinking-related SDK parameters."""
 
-    def __init__(
-        self,
-        thinking: ThinkingConfigParam | None,
-        output_config: OutputConfigParam | None,
-        suppress_temperature: bool,
-    ):
-        self.thinking = thinking
-        self.output_config = output_config
-        self.suppress_temperature = suppress_temperature
+    thinking: ThinkingConfigParam | None
+    output_config: OutputConfigParam | None
+    suppress_temperature: bool
 
 
 class AnthropicCredentialsError(CredentialsError):
@@ -154,7 +150,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                     )
                 log.verbose(f"Anthropic adaptive thinking with effort={anthropic_effort}")
                 thinking_config: ThinkingConfigParam = {"type": "adaptive"}
-                output_config = OutputConfigParam(effort=anthropic_effort)
+                output_config = OutputConfigParam(effort=anthropic_effort)  # type: ignore[typeddict-item]  # pyright: ignore[reportArgumentType]
                 return _ThinkingParams(
                     thinking=thinking_config,
                     output_config=output_config,

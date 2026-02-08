@@ -46,7 +46,13 @@ _DEFAULT_MISTRAL_LEVEL_MAP: dict[str, str] = {
 }
 
 
-def _make_llm_config(effort_to_budget_maps: dict[str, dict[str, int]] | None = None) -> LLMConfig:
+def _make_llm_config(
+    effort_to_budget_maps: dict[str, dict[str, int]] | None = None,
+    openai_level_map: dict[str, str] | None = None,
+    anthropic_level_map: dict[str, str] | None = None,
+    google_level_map: dict[str, str] | None = None,
+    mistral_level_map: dict[str, str] | None = None,
+) -> LLMConfig:
     """Helper to build a minimal LLMConfig for testing."""
     maps: dict[str, dict[str, int]] = _DEFAULT_EFFORT_TO_BUDGET_MAPS if effort_to_budget_maps is None else effort_to_budget_maps
     return LLMConfig(
@@ -55,13 +61,13 @@ def _make_llm_config(effort_to_budget_maps: dict[str, dict[str, int]] | None = N
             "is_dump_response_enabled": False,
             "is_dump_error_enabled": False,
         },
-        openai_config={"effort_to_level_map": _DEFAULT_OPENAI_LEVEL_MAP},  # type: ignore[arg-type]
+        openai_config={"effort_to_level_map": openai_level_map or _DEFAULT_OPENAI_LEVEL_MAP},  # type: ignore[arg-type]
         anthropic_config={  # type: ignore[arg-type]
             "structured_output_timeout_seconds": 1200,
-            "effort_to_level_map": _DEFAULT_ANTHROPIC_LEVEL_MAP,
+            "effort_to_level_map": anthropic_level_map or _DEFAULT_ANTHROPIC_LEVEL_MAP,
         },
-        google_config={"effort_to_level_map": _DEFAULT_GOOGLE_LEVEL_MAP},  # type: ignore[arg-type]
-        mistral_config={"effort_to_level_map": _DEFAULT_MISTRAL_LEVEL_MAP},  # type: ignore[arg-type]
+        google_config={"effort_to_level_map": google_level_map or _DEFAULT_GOOGLE_LEVEL_MAP},  # type: ignore[arg-type]
+        mistral_config={"effort_to_level_map": mistral_level_map or _DEFAULT_MISTRAL_LEVEL_MAP},  # type: ignore[arg-type]
         llm_job_config=LLMJobConfig(max_retries=3),
         is_structure_prompt_enabled=True,
         default_max_images=100,
@@ -239,3 +245,48 @@ class TestLLMConfigReasoning:
                 generic_templates={},
                 effort_to_budget_maps={},
             )
+
+    # --- level value validation tests ---
+
+    def test_openai_invalid_level_value_rejected(self):
+        """OpenAI map with an invalid level value (not in OpenAIReasoningLevel) should raise."""
+        bad_map = {**_DEFAULT_OPENAI_LEVEL_MAP, "max": "turbo"}
+        with pytest.raises(ConfigValidationError, match="Invalid level value 'turbo'"):
+            _make_llm_config(openai_level_map=bad_map)
+
+    def test_anthropic_invalid_level_value_rejected(self):
+        """Anthropic map with an invalid level value (not in AnthropicEffortLevel) should raise."""
+        bad_map = {**_DEFAULT_ANTHROPIC_LEVEL_MAP, "high": "extreme"}
+        with pytest.raises(ConfigValidationError, match="Invalid level value 'extreme'"):
+            _make_llm_config(anthropic_level_map=bad_map)
+
+    def test_google_invalid_level_value_rejected(self):
+        """Google map with an invalid level value (not in GoogleThinkingLevel) should raise."""
+        bad_map = {**_DEFAULT_GOOGLE_LEVEL_MAP, "max": "ultra"}
+        with pytest.raises(ConfigValidationError, match="Invalid level value 'ultra'"):
+            _make_llm_config(google_level_map=bad_map)
+
+    def test_mistral_invalid_level_value_rejected(self):
+        """Mistral map with an invalid level value (not in MistralReasoningLevel) should raise."""
+        bad_map = {**_DEFAULT_MISTRAL_LEVEL_MAP, "high": "thinking"}
+        with pytest.raises(ConfigValidationError, match="Invalid level value 'thinking'"):
+            _make_llm_config(mistral_level_map=bad_map)
+
+    def test_disabled_level_value_always_accepted(self):
+        """The 'disabled' value should be accepted by all providers without raising."""
+        all_disabled_map: dict[str, str] = {
+            "none": "disabled",
+            "minimal": "disabled",
+            "low": "disabled",
+            "medium": "disabled",
+            "high": "disabled",
+            "max": "disabled",
+        }
+        config = _make_llm_config(
+            anthropic_level_map=all_disabled_map,
+            google_level_map=all_disabled_map,
+            mistral_level_map=all_disabled_map,
+        )
+        assert config.anthropic_config.get_reasoning_level(ReasoningEffort.HIGH) is None
+        assert config.google_config.get_reasoning_level(ReasoningEffort.HIGH) is None
+        assert config.mistral_config.get_reasoning_level(ReasoningEffort.HIGH) is None

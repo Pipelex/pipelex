@@ -53,7 +53,7 @@ flowchart TD
 
     C -->|OpenAI Completions| D["_resolve_reasoning_effort()<br/>→ effort string"]
     C -->|OpenAI Responses| D2["_resolve_reasoning()<br/>→ Reasoning dict"]
-    C -->|Anthropic| E["_build_thinking_params()<br/>→ ThinkingConfigParam"]
+    C -->|Anthropic| E["_build_thinking_params()<br/>→ _ThinkingParams"]
     C -->|Google| F["_build_thinking_config()<br/>→ ThinkingConfig"]
     C -->|Mistral| G["_resolve_prompt_mode()<br/>→ prompt_mode"]
     C -->|Bedrock (aioboto3)| H["_validate_no_reasoning_params()<br/>→ LLMCapabilityError if set"]
@@ -167,6 +167,9 @@ If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is dis
 | `MAX` | `65536` |
 
 **`reasoning_budget`** (explicit) passes through directly as `thinking_budget`. When `max_tokens` is known, the budget is capped to `min(budget, max_tokens - 1)`.
+
+!!! note
+    An explicit `reasoning_budget` always produces a `thinking_budget`-based config, even when the model uses `thinking_mode = "adaptive"`. This overrides the `thinking_level` approach that adaptive mode normally uses.
 
 Temperature is passed normally to the Google API regardless of reasoning mode.
 
