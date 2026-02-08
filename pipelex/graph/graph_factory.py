@@ -22,6 +22,8 @@ from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.string_utils import snake_to_title_case
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pipelex.graph.graph_config import GraphConfig
     from pipelex.graph.graphspec import GraphSpec
 
@@ -49,9 +51,11 @@ class GraphOutputs(BaseModel):
 async def generate_graph_outputs(
     graph_spec: GraphSpec,
     graph_config: GraphConfig,
-    pipe_code: str,
     *,
+    pipe_code: str = "",
+    title: str | None = None,
     direction: FlowchartDirection = FlowchartDirection.TOP_DOWN,
+    include_subgraphs: bool = True,
 ) -> GraphOutputs:
     """Generate graph outputs from a GraphSpec based on configuration.
 
@@ -66,12 +70,15 @@ async def generate_graph_outputs(
     Args:
         graph_spec: The GraphSpec to render.
         graph_config: Configuration controlling which outputs to generate and data inclusion.
-        pipe_code: The pipe code for use in titles.
+        pipe_code: The pipe code, used to derive the HTML page title when title is not provided.
+        title: Explicit HTML page title. When provided, overrides the auto-derived title from pipe_code.
         direction: Flowchart direction for Mermaid diagrams.
+        include_subgraphs: Whether to render controller hierarchy as subgraphs in Mermaid output.
 
     Returns:
         GraphOutputs containing generated content as strings (None for disabled outputs).
     """
+    page_title = title or f"Pipeline: {snake_to_title_case(pipe_code)}"
     inclusion = graph_config.graphs_inclusion
 
     graphspec_json: str | None = None
@@ -90,7 +97,7 @@ async def generate_graph_outputs(
 
     # Generate mermaidflow view
     if inclusion.mermaidflow_mmd or inclusion.mermaidflow_html:
-        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=direction)
+        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=direction, include_subgraphs=include_subgraphs)
         if inclusion.mermaidflow_mmd:
             mermaidflow_mmd = mermaidflow.mermaid_code
         if inclusion.mermaidflow_html:
@@ -103,13 +110,11 @@ async def generate_graph_outputs(
                     stuff_data_html=mermaidflow.stuff_data_html,
                     stuff_metadata=mermaidflow.stuff_metadata,
                     stuff_content_type=mermaidflow.stuff_content_type,
-                    title=f"Pipeline: {snake_to_title_case(pipe_code)}",
+                    title=page_title,
                     theme=mermaid_theme,
                 )
             else:
-                mermaidflow_html = await render_mermaid_html_async(
-                    mermaidflow.mermaid_code, title=f"Pipeline: {snake_to_title_case(pipe_code)}", theme=mermaid_theme
-                )
+                mermaidflow_html = await render_mermaid_html_async(mermaidflow.mermaid_code, title=page_title, theme=mermaid_theme)
 
     # Generate ReactFlow outputs
     if inclusion.reactflow_viewspec or inclusion.reactflow_html:
@@ -130,10 +135,10 @@ async def generate_graph_outputs(
             rf_stuff_data_text: dict[str, str] | None = None
             rf_stuff_data_html: dict[str, str] | None = None
             if graph_config.data_inclusion.stuff_text_content:
-                log.debug("collecting stuff data text for graph_spec")
+                log.verbose("Collecting stuff data text for graph_spec")
                 rf_stuff_data_text = collect_stuff_data_text(graph_spec)
             else:
-                log.debug("no stuff data text to collect for graph_spec")
+                log.verbose("No stuff data text to collect for graph_spec")
             if graph_config.data_inclusion.stuff_html_content:
                 rf_stuff_data_html = collect_stuff_data_html(graph_spec)
 
@@ -143,7 +148,7 @@ async def generate_graph_outputs(
                 graphspec=graph_spec,
                 stuff_data_text=rf_stuff_data_text,
                 stuff_data_html=rf_stuff_data_html,
-                title=f"Pipeline: {snake_to_title_case(pipe_code)}",
+                title=page_title,
             )
 
     return GraphOutputs(
@@ -153,3 +158,57 @@ async def generate_graph_outputs(
         reactflow_viewspec=reactflow_viewspec,
         reactflow_html=reactflow_html,
     )
+
+
+def save_graph_outputs_to_dir(
+    graph_outputs: GraphOutputs,
+    output_dir: Path,
+) -> dict[str, Path]:
+    """Save graph outputs to a directory.
+
+    Only outputs that are not None will be saved. Each output is written to a
+    standard filename within the output directory.
+
+    Args:
+        graph_outputs: The generated graph outputs to save.
+        output_dir: Directory where graph files will be saved (created if needed).
+
+    Returns:
+        Dictionary mapping output type keys to the saved file paths.
+        Keys match GraphOutputs field names (e.g. "graphspec_json", "mermaidflow_html").
+    """
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    saved_files: dict[str, Path] = {}
+
+    if graph_outputs.graphspec_json is not None:
+        file_path = output_dir / "graphspec.json"
+        file_path.write_text(graph_outputs.graphspec_json, encoding="utf-8")
+        saved_files["graphspec_json"] = file_path
+        log.verbose(f"GraphSpec JSON saved to: {file_path}")
+
+    if graph_outputs.mermaidflow_mmd is not None:
+        file_path = output_dir / "mermaidflow.mmd"
+        file_path.write_text(graph_outputs.mermaidflow_mmd, encoding="utf-8")
+        saved_files["mermaidflow_mmd"] = file_path
+        log.verbose(f"Mermaidflow MMD saved to: {file_path}")
+
+    if graph_outputs.mermaidflow_html is not None:
+        file_path = output_dir / "mermaidflow.html"
+        file_path.write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
+        saved_files["mermaidflow_html"] = file_path
+        log.verbose(f"Mermaidflow HTML saved to: {file_path}")
+
+    if graph_outputs.reactflow_viewspec is not None:
+        file_path = output_dir / "viewspec.json"
+        file_path.write_text(graph_outputs.reactflow_viewspec, encoding="utf-8")
+        saved_files["reactflow_viewspec"] = file_path
+        log.verbose(f"ReactFlow ViewSpec saved to: {file_path}")
+
+    if graph_outputs.reactflow_html is not None:
+        file_path = output_dir / "reactflow.html"
+        file_path.write_text(graph_outputs.reactflow_html, encoding="utf-8")
+        saved_files["reactflow_html"] = file_path
+        log.verbose(f"ReactFlow HTML saved to: {file_path}")
+
+    return saved_files

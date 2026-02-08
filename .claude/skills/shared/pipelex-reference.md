@@ -396,10 +396,10 @@ When a bundle references pipes/concepts from other domains, use `--library-dir` 
 
 ```bash
 # Single file won't resolve cross-domain references
-pipelex --no-logo validate my_bundle.plx  # May fail
+pipelex-agent validate my_bundle.plx  # May fail
 
 # Load entire directory to resolve references
-pipelex --no-logo validate my_bundle.plx --library-dir path/to/bundles/
+pipelex-agent validate my_bundle.plx --library-dir path/to/bundles/
 ```
 
 ## Model Configuration
@@ -416,31 +416,54 @@ model = "$writing-creative"
 
 ## CLI Commands
 
-**Before running commands**, check pipelex availability:
-1. Try `pipelex --version` (works if globally installed or venv is activated)
-2. If not found, try `uv run pipelex --version` (works with project venv + uv)
+**Before running commands**, check CLI availability:
+1. Try `pipelex-agent --version`
+2. If not found, try `uv run pipelex-agent --version`
 3. If neither works: "Pipelex CLI not found. Install with `pip install pipelex` or `uv add pipelex`"
 
-Use whichever method works. Prefix all subsequent commands the same way (either bare `pipelex` or `uv run pipelex`).
+Use whichever method works. Prefix all subsequent commands the same way.
 
-**Always use `--no-logo`** to avoid wasting tokens on ASCII art output.
+Agents must use `pipelex-agent` exclusively. It outputs structured JSON (stdout=success, stderr=error). There is also a `pipelex` CLI for human use — agents should not call it themselves, but can suggest it to the user (e.g., `pipelex doctor` for interactive config diagnostics, `pipelex show <name>` to visually inspect a pipe or concept).
 
 ```bash
-# Generate example input JSON
-pipelex --no-logo build inputs my_bundle.plx
-pipelex --no-logo build inputs my_bundle.plx --pipe specific_pipe
-
 # Validate a bundle
-pipelex --no-logo validate my_bundle.plx
+pipelex-agent validate my_bundle.plx
+pipelex-agent validate my_bundle.plx --library-dir path/to/bundles/
+
+# Generate example input JSON
+pipelex-agent inputs my_bundle.plx
+pipelex-agent inputs my_bundle.plx --pipe specific_pipe
+
+# Run with inputs (file path or inline JSON)
+pipelex-agent run my_bundle.plx --inputs inputs.json
+pipelex-agent run my_bundle.plx --inputs '{"theme": {"concept": "native.Text", "content": {"text": "nature"}}}'
+pipelex-agent run my_bundle.plx --pipe specific_pipe --inputs inputs.json
 
 # Dry run (no API calls, validates logic)
-pipelex --no-logo run my_bundle.plx --dry-run
-pipelex --no-logo run my_bundle.plx --dry-run --mock-inputs
+pipelex-agent run my_bundle.plx --dry-run --mock-inputs
 
-# Run with inputs
-pipelex --no-logo run my_bundle.plx --inputs inputs.json
-pipelex --no-logo run my_bundle.plx --pipe specific_pipe --inputs inputs.json
+# Run with execution graph generation
+pipelex-agent run my_bundle.plx --inputs data.json --graph
+
+# Build a pipeline from a prompt
+pipelex-agent build "Given a theme, write a Haiku"
+
+# Render a graphspec.json to HTML visualizations
+pipelex-agent graph graphspec.json
+pipelex-agent graph graphspec.json --format mermaidflow -o ./output/
+
+# Structure concepts and pipes from JSON specs
+pipelex-agent concept --spec '{"the_concept_code": "Summary", "description": "A text summary", "refines": "Text"}'
+pipelex-agent pipe --type PipeLLM --spec '{"pipe_code": "summarize", "description": "Summarize text", "inputs": {"text": "Text"}, "output": "Summary", "llm_talent": "creative-writer", "prompt": "@text"}'
+
+# Assemble a bundle from TOML parts
+pipelex-agent assemble --domain my_domain --main-pipe main_workflow --output bundle.plx --concepts concepts.toml --pipes pipes.toml
+
+# Check configuration health
+pipelex-agent doctor
 ```
+
+The `--inputs` flag accepts both file paths and inline JSON. If the value starts with `{`, it is parsed as JSON directly — no file creation needed for simple inputs.
 
 ## Common Errors
 

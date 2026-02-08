@@ -92,7 +92,7 @@ First, create an input file (e.g., `pipelex-wip/inputs/image_request.json`):
 
 Then run:
 ```bash
-pipelex run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs pipelex-wip/inputs/image_request.json
+pipelex-agent run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs pipelex-wip/inputs/image_request.json
 ```
 
 **Image Categories:**
@@ -279,10 +279,10 @@ Test the synthetic inputs:
 
 ```bash
 # Dry run with the generated inputs
-pipelex-agent run <bundle.plx> --dry-run --input-file pipelex-wip/inputs/test_input.json
+pipelex-agent run <bundle.plx> --dry-run --inputs pipelex-wip/inputs/test_input.json
 
 # Full run (uses actual AI/extraction models)
-pipelex-agent run <bundle.plx> --input-file pipelex-wip/inputs/test_input.json
+pipelex-agent run <bundle.plx> --inputs pipelex-wip/inputs/test_input.json
 ```
 
 ---
@@ -371,7 +371,7 @@ Create `pipelex-wip/inputs/city_image.json`:
 
 Run:
 ```bash
-pipelex run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs pipelex-wip/inputs/city_image.json
+pipelex-agent run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs pipelex-wip/inputs/city_image.json
 ```
 
 **Step 4**: Assemble input file
@@ -396,11 +396,12 @@ pipelex run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs pipel
 
 **Step 5**: Test
 ```bash
-pipelex-agent run image_analyzer.plx --input-file pipelex-wip/inputs/city_analysis_input.json
+pipelex-agent run image_analyzer.plx --inputs pipelex-wip/inputs/city_analysis_input.json
 ```
 
 ---
 
 ## Reference
 
-See [Pipelex Language Reference](../shared/pipelex-reference.md) for concept definitions and syntax.
+- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) for CLI philosophy and error type reference
+- [Pipelex Language Reference](../shared/pipelex-reference.md) for concept definitions and syntax

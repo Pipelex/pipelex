@@ -3,7 +3,6 @@
 # pyright: reportUnknownMemberType=false
 
 import json
-import sys
 from typing import Annotated, Any
 
 import tomlkit
@@ -11,6 +10,7 @@ import typer
 from pydantic import ValidationError
 
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 
@@ -158,26 +158,12 @@ def concept_cmd(
         pipelex-agent concept --spec '{"the_concept_code": "Invoice", "description": "A commercial invoice", "refines": "Text"}'
         pipelex-agent concept --spec-file concept.json
     """
-    error_json: dict[str, Any]
-
     # Validate that exactly one of spec or spec_file is provided
     if spec is None and spec_file is None:
-        error_json = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "Either --spec or --spec-file must be provided",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("Either --spec or --spec-file must be provided", "ArgumentError")
 
     if spec is not None and spec_file is not None:
-        error_json = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "Cannot use both --spec and --spec-file",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("Cannot use both --spec and --spec-file", "ArgumentError")
 
     # Load spec data
     spec_data: dict[str, Any]
@@ -188,48 +174,25 @@ def concept_cmd(
         else:
             spec_data = json.loads(spec)  # type: ignore[arg-type]
     except FileNotFoundError:
-        error_json = {
-            "error": True,
-            "error_type": "FileNotFoundError",
-            "message": f"Spec file not found: {spec_file}",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from None
+        agent_error(f"Spec file not found: {spec_file}", "FileNotFoundError")
     except json.JSONDecodeError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "JSONDecodeError",
-            "message": f"Invalid JSON: {exc.msg}",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(f"Invalid JSON: {exc.msg}", "JSONDecodeError", cause=exc)
 
     # Validate and convert spec
     try:
         concept_spec = _parse_concept_spec_from_json(spec_data)
         toml_content = _concept_spec_to_toml(concept_spec)
 
-        result = {
-            "success": True,
-            "concept_code": concept_spec.the_concept_code,
-            "toml": toml_content,
-        }
-        print(json.dumps(result, indent=2))
+        agent_success(
+            {
+                "success": True,
+                "concept_code": concept_spec.the_concept_code,
+                "toml": toml_content,
+            }
+        )
 
     except ValidationError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "ValidationError",
-            "message": format_pydantic_validation_error(exc),
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(format_pydantic_validation_error(exc), "ValidationError", cause=exc)
 
     except Exception as exc:
-        error_json = {
-            "error": True,
-            "error_type": type(exc).__name__,
-            "message": str(exc),
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(str(exc), type(exc).__name__, cause=exc)

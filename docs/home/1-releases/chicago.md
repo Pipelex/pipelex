@@ -102,7 +102,7 @@ Broad support for open-source AI:
 ## Getting Started
 
 ```bash
-pip install pipelex
+pip install pipelex --pre
 ```
 
 Then run `pipelex init` to configure your environment and obtain your Gateway API key at [app.pipelex.com](https://app.pipelex.com/).

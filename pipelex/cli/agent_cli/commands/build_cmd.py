@@ -1,12 +1,11 @@
 """Agent CLI build command - simplified pipe building with JSON output."""
 
 import asyncio
-import json
-import sys
 from typing import Annotated
 
 import typer
 
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.cli.agent_cli.commands.build_core import BuildPipeError, build_pipe_core
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
@@ -56,28 +55,16 @@ def build_cmd(
 
     try:
         result = asyncio.run(run_build())
-        # Output JSON to stdout on success
-        print(json.dumps(result.to_agent_json(), indent=2))
+        agent_success(result.to_agent_json())
 
     except BuildPipeError as exc:
-        # Output JSON to stderr on error
-        error_json = {
-            "error": True,
-            "message": exc.message,
-        }
+        extra: dict[str, str] = {}
         if exc.failure_memory_path:
-            error_json["failure_memory_path"] = str(exc.failure_memory_path)
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+            extra["failure_memory_path"] = str(exc.failure_memory_path)
+        agent_error(exc.message, "BuildPipeError", cause=exc, **extra)
 
     except Exception as exc:
-        # Handle unexpected errors
-        error_json = {
-            "error": True,
-            "message": f"Build failed: {exc}",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(f"Build failed: {exc}", type(exc).__name__, cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

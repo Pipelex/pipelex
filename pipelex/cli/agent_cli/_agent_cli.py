@@ -10,6 +10,7 @@ from typing_extensions import override
 from pipelex.cli.agent_cli.commands.assemble_cmd import assemble_cmd
 from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
+from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat, graph_cmd
 from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run_cmd import run_cmd
@@ -24,7 +25,7 @@ class PipelexAgentCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["build", "run", "validate", "inputs", "concept", "pipe", "assemble", "doctor"]
+        return ["build", "run", "validate", "inputs", "concept", "pipe", "assemble", "graph", "doctor"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -112,6 +113,10 @@ def run_command(
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
     ] = False,
+    graph: Annotated[
+        bool,
+        typer.Option("--graph", help="Generate execution graph visualizations (saved alongside output)"),
+    ] = False,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
@@ -125,6 +130,7 @@ def run_command(
         inputs=inputs,
         dry_run=dry_run,
         mock_inputs=mock_inputs,
+        graph=graph,
         library_dir=library_dir,
     )
 
@@ -260,6 +266,25 @@ def assemble_command(
         concepts=concepts,
         pipes=pipes,
     )
+
+
+@app.command(name="graph", help="Render a graphspec.json to HTML visualizations")
+def graph_command(
+    graphspec_file: Annotated[
+        str,
+        typer.Argument(help="Path to a graphspec.json file"),
+    ],
+    out: Annotated[
+        str | None,
+        typer.Option("--out", "-o", help="Output directory (default: same directory as input file)"),
+    ] = None,
+    graph_format: Annotated[
+        GraphFormat,
+        typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
+    ] = GraphFormat.BOTH,
+) -> None:
+    """Render a graphspec.json file to HTML visualizations."""
+    graph_cmd(graphspec_file=graphspec_file, out=out, graph_format=graph_format)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")
