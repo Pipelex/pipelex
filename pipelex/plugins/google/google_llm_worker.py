@@ -23,14 +23,6 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
 
-_EFFORT_TO_GOOGLE_THINKING_LEVEL: dict[ReasoningEffort, genai_types.ThinkingLevel] = {
-    ReasoningEffort.MINIMAL: genai_types.ThinkingLevel.LOW,
-    ReasoningEffort.LOW: genai_types.ThinkingLevel.LOW,
-    ReasoningEffort.MEDIUM: genai_types.ThinkingLevel.MEDIUM,
-    ReasoningEffort.HIGH: genai_types.ThinkingLevel.HIGH,
-    ReasoningEffort.MAX: genai_types.ThinkingLevel.HIGH,
-}
-
 
 class GoogleLLMWorkerError(PipelexError):
     """Base exception for Google LLM Worker errors."""
@@ -109,11 +101,12 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     # Reasoning helpers
     #########################################################
 
-    def _build_thinking_config(self, job_params: LLMJobParams) -> genai_types.ThinkingConfig | None:
+    def _build_thinking_config(self, job_params: LLMJobParams, max_tokens: int | None) -> genai_types.ThinkingConfig | None:
         """Build thinking config from job params and model spec.
 
         Args:
             job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
+            max_tokens: The effective max_tokens for this request, used to cap the thinking budget.
 
         Returns:
             A ThinkingConfig for the Google GenAI SDK, or None if reasoning is not requested.
@@ -123,11 +116,11 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
 
         # Case 1: reasoning_effort is set
         if job_params.reasoning_effort is not None:
-            return self._build_thinking_config_for_effort(thinking_mode=thinking_mode, effort=job_params.reasoning_effort)
+            return self._build_thinking_config_for_effort(thinking_mode=thinking_mode, effort=job_params.reasoning_effort, max_tokens=max_tokens)
 
         # Case 2: reasoning_budget is set
         if job_params.reasoning_budget is not None:
-            return self._build_thinking_config_for_budget(thinking_mode=thinking_mode, budget=job_params.reasoning_budget)
+            return self._build_thinking_config_for_budget(thinking_mode=thinking_mode, budget=job_params.reasoning_budget, max_tokens=max_tokens)
 
         # Case 3: neither reasoning_effort nor reasoning_budget is set
         return None
@@ -136,6 +129,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         self,
         thinking_mode: ThinkingMode | None,
         effort: ReasoningEffort,
+        max_tokens: int | None,
     ) -> genai_types.ThinkingConfig:
         """Build thinking config when reasoning_effort is specified."""
         match thinking_mode:
@@ -151,13 +145,15 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                     prompting_target=prompting_target,
                     effort=effort,
                 )
+                if max_tokens is not None:
+                    budget = min(budget, max_tokens - 1)
                 log.verbose(f"Google manual thinking with thinking_budget={budget} (from effort={effort})")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.ADAPTIVE:
-                if effort == ReasoningEffort.NONE:
+                thinking_level = get_config().cogt.llm_config.google_config.get_reasoning_level(effort=effort)
+                if thinking_level is None:
                     log.verbose("Google adaptive thinking disabled (effort=NONE)")
                     return genai_types.ThinkingConfig(thinking_budget=0)
-                thinking_level = _EFFORT_TO_GOOGLE_THINKING_LEVEL[effort]
                 log.verbose(f"Google adaptive thinking with thinking_level={thinking_level}")
                 return genai_types.ThinkingConfig(thinking_budget=-1, thinking_level=thinking_level)
             case ThinkingMode.NONE:
@@ -171,10 +167,13 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
         self,
         thinking_mode: ThinkingMode | None,
         budget: int,
+        max_tokens: int | None,
     ) -> genai_types.ThinkingConfig:
         """Build thinking config when reasoning_budget is specified."""
         match thinking_mode:
             case ThinkingMode.MANUAL | ThinkingMode.ADAPTIVE:
+                if max_tokens is not None:
+                    budget = min(budget, max_tokens - 1)
                 log.verbose(f"Google thinking with explicit thinking_budget={budget}")
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.NONE:
@@ -196,7 +195,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
 
         contents = await GoogleFactory.prepare_user_contents(llm_prompt=llm_job.llm_prompt)
 
-        thinking_config = self._build_thinking_config(job_params=job_params)
+        thinking_config = self._build_thinking_config(job_params=job_params, max_tokens=job_params.max_tokens)
 
         # Build generation config
         generation_config = genai_types.GenerateContentConfig(
@@ -234,6 +233,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
     ) -> BaseModelTypeVar:
         """Generate structured output using Google Gemini API with instructor."""
         job_params = llm_job.applied_job_params or llm_job.job_params
+        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         contents = await GoogleFactory.prepare_user_contents(llm_job.llm_prompt)
 
         # Build generation config

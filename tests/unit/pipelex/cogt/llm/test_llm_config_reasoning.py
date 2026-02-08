@@ -9,6 +9,42 @@ _DEFAULT_EFFORT_TO_BUDGET_MAPS: dict[str, dict[str, int]] = {
     "gemini": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "max": 65536},
 }
 
+_DEFAULT_OPENAI_LEVEL_MAP: dict[str, str] = {
+    "none": "none",
+    "minimal": "minimal",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "max": "xhigh",
+}
+
+_DEFAULT_ANTHROPIC_LEVEL_MAP: dict[str, str] = {
+    "none": "disabled",
+    "minimal": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "max": "max",
+}
+
+_DEFAULT_GOOGLE_LEVEL_MAP: dict[str, str] = {
+    "none": "disabled",
+    "minimal": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "max": "high",
+}
+
+_DEFAULT_MISTRAL_LEVEL_MAP: dict[str, str] = {
+    "none": "disabled",
+    "minimal": "reasoning",
+    "low": "reasoning",
+    "medium": "reasoning",
+    "high": "reasoning",
+    "max": "reasoning",
+}
+
 
 def _make_llm_config(effort_to_budget_maps: dict[str, dict[str, int]] | None = None) -> LLMConfig:
     """Helper to build a minimal LLMConfig for testing."""
@@ -19,7 +55,13 @@ def _make_llm_config(effort_to_budget_maps: dict[str, dict[str, int]] | None = N
             "is_dump_response_enabled": False,
             "is_dump_error_enabled": False,
         },
-        anthropic_config={"structured_output_timeout_seconds": 1200},  # type: ignore[arg-type]
+        openai_config={"effort_to_level_map": _DEFAULT_OPENAI_LEVEL_MAP},  # type: ignore[arg-type]
+        anthropic_config={  # type: ignore[arg-type]
+            "structured_output_timeout_seconds": 1200,
+            "effort_to_level_map": _DEFAULT_ANTHROPIC_LEVEL_MAP,
+        },
+        google_config={"effort_to_level_map": _DEFAULT_GOOGLE_LEVEL_MAP},  # type: ignore[arg-type]
+        mistral_config={"effort_to_level_map": _DEFAULT_MISTRAL_LEVEL_MAP},  # type: ignore[arg-type]
         llm_job_config=LLMJobConfig(max_retries=3),
         is_structure_prompt_enabled=True,
         default_max_images=100,
@@ -31,7 +73,7 @@ def _make_llm_config(effort_to_budget_maps: dict[str, dict[str, int]] | None = N
 
 
 class TestLLMConfigReasoning:
-    """Tests for effort_to_budget_maps validation and get_reasoning_budget."""
+    """Tests for effort_to_budget_maps validation, get_reasoning_budget, and effort_to_level_map get_reasoning_level."""
 
     def test_get_reasoning_budget_valid(self):
         config = _make_llm_config()
@@ -94,3 +136,106 @@ class TestLLMConfigReasoning:
         budget = config.get_reasoning_budget("anthropic", effort)
         assert isinstance(budget, int)
         assert budget >= 0
+
+    # --- effort_to_level_map tests ---
+
+    def test_get_reasoning_level_openai_high(self):
+        """OpenAI HIGH maps to 'high'."""
+        config = _make_llm_config()
+        assert config.openai_config.get_reasoning_level(ReasoningEffort.HIGH) == "high"
+
+    def test_get_reasoning_level_openai_none_returns_string(self):
+        """OpenAI NONE returns 'none' (a valid API value), not None."""
+        config = _make_llm_config()
+        result = config.openai_config.get_reasoning_level(ReasoningEffort.NONE)
+        assert result == "none"
+
+    def test_get_reasoning_level_openai_max_returns_xhigh(self):
+        """OpenAI MAX maps to 'xhigh'."""
+        config = _make_llm_config()
+        assert config.openai_config.get_reasoning_level(ReasoningEffort.MAX) == "xhigh"
+
+    def test_get_reasoning_level_anthropic_disabled(self):
+        """Anthropic NONE returns None (disabled)."""
+        config = _make_llm_config()
+        assert config.anthropic_config.get_reasoning_level(ReasoningEffort.NONE) is None
+
+    def test_get_reasoning_level_anthropic_high(self):
+        """Anthropic HIGH maps to 'high'."""
+        config = _make_llm_config()
+        assert config.anthropic_config.get_reasoning_level(ReasoningEffort.HIGH) == "high"
+
+    def test_get_reasoning_level_google_disabled(self):
+        """Google NONE returns None (disabled)."""
+        config = _make_llm_config()
+        assert config.google_config.get_reasoning_level(ReasoningEffort.NONE) is None
+
+    def test_get_reasoning_level_mistral_reasoning(self):
+        """Mistral HIGH maps to 'reasoning'."""
+        config = _make_llm_config()
+        assert config.mistral_config.get_reasoning_level(ReasoningEffort.HIGH) == "reasoning"
+
+    def test_get_reasoning_level_mistral_disabled(self):
+        """Mistral NONE returns None (disabled)."""
+        config = _make_llm_config()
+        assert config.mistral_config.get_reasoning_level(ReasoningEffort.NONE) is None
+
+    def test_level_validator_missing_effort_raises(self):
+        """Level map missing some effort keys should raise ConfigValidationError."""
+        incomplete_level_map = {"none": "none", "low": "low", "medium": "medium"}
+        with pytest.raises(ConfigValidationError, match="Missing reasoning effort levels"):
+            LLMConfig(
+                instructor_config={  # type: ignore[arg-type]
+                    "is_dump_kwargs_enabled": False,
+                    "is_dump_response_enabled": False,
+                    "is_dump_error_enabled": False,
+                },
+                openai_config={"effort_to_level_map": incomplete_level_map},  # type: ignore[arg-type]
+                anthropic_config={  # type: ignore[arg-type]
+                    "structured_output_timeout_seconds": 1200,
+                    "effort_to_level_map": _DEFAULT_ANTHROPIC_LEVEL_MAP,
+                },
+                google_config={"effort_to_level_map": _DEFAULT_GOOGLE_LEVEL_MAP},  # type: ignore[arg-type]
+                mistral_config={"effort_to_level_map": _DEFAULT_MISTRAL_LEVEL_MAP},  # type: ignore[arg-type]
+                llm_job_config=LLMJobConfig(max_retries=3),
+                is_structure_prompt_enabled=True,
+                default_max_images=100,
+                is_dump_text_prompts_enabled=False,
+                is_dump_response_text_enabled=False,
+                generic_templates={},
+                effort_to_budget_maps={},
+            )
+
+    def test_level_validator_invalid_effort_raises(self):
+        """Level map with unknown effort keys should raise ConfigValidationError."""
+        invalid_level_map = {
+            "none": "none",
+            "minimal": "minimal",
+            "low": "low",
+            "medium": "medium",
+            "high": "high",
+            "max": "xhigh",
+            "ultra": "super",
+        }
+        with pytest.raises(ConfigValidationError, match="Invalid reasoning effort levels"):
+            LLMConfig(
+                instructor_config={  # type: ignore[arg-type]
+                    "is_dump_kwargs_enabled": False,
+                    "is_dump_response_enabled": False,
+                    "is_dump_error_enabled": False,
+                },
+                openai_config={"effort_to_level_map": invalid_level_map},  # type: ignore[arg-type]
+                anthropic_config={  # type: ignore[arg-type]
+                    "structured_output_timeout_seconds": 1200,
+                    "effort_to_level_map": _DEFAULT_ANTHROPIC_LEVEL_MAP,
+                },
+                google_config={"effort_to_level_map": _DEFAULT_GOOGLE_LEVEL_MAP},  # type: ignore[arg-type]
+                mistral_config={"effort_to_level_map": _DEFAULT_MISTRAL_LEVEL_MAP},  # type: ignore[arg-type]
+                llm_job_config=LLMJobConfig(max_retries=3),
+                is_structure_prompt_enabled=True,
+                default_max_images=100,
+                is_dump_text_prompts_enabled=False,
+                is_dump_response_text_enabled=False,
+                generic_templates={},
+                effort_to_budget_maps={},
+            )

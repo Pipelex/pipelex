@@ -51,7 +51,8 @@ flowchart TD
     A["LLMSetting<br/>(PLX talent or API)"] -->|make_llm_job_params| B["LLMJobParams<br/>reasoning_effort / reasoning_budget"]
     B --> C{Provider Worker}
 
-    C -->|OpenAI| D["_resolve_reasoning_effort()<br/>→ effort string"]
+    C -->|OpenAI Completions| D["_resolve_reasoning_effort()<br/>→ effort string"]
+    C -->|OpenAI Responses| D2["_resolve_reasoning()<br/>→ Reasoning dict"]
     C -->|Anthropic| E["_build_thinking_params()<br/>→ ThinkingConfigParam"]
     C -->|Google| F["_build_thinking_config()<br/>→ ThinkingConfig"]
     C -->|Mistral| G["_resolve_prompt_mode()<br/>→ prompt_mode"]
@@ -62,9 +63,21 @@ flowchart TD
 
 ## Provider Mappings
 
+Each provider has an `effort_to_level_map` configured in its provider subconfig within `pipelex.toml`. These maps translate `ReasoningEffort` values to provider-specific level strings. The special value `"disabled"` means reasoning should be skipped entirely (the accessor returns `None`).
+
 ### OpenAI (Completions & Responses)
 
-OpenAI models use `thinking_mode = "manual"` and map `ReasoningEffort` to the `reasoning_effort` parameter:
+OpenAI models use `thinking_mode = "manual"` and map `ReasoningEffort` to the `reasoning_effort` parameter via `openai_config.effort_to_level_map`:
+
+```toml
+[cogt.llm_config.openai_config.effort_to_level_map]
+none = "none"
+minimal = "minimal"
+low = "low"
+medium = "medium"
+high = "high"
+max = "xhigh"
+```
 
 | ReasoningEffort | OpenAI value |
 |-----------------|-------------|
@@ -75,15 +88,26 @@ OpenAI models use `thinking_mode = "manual"` and map `ReasoningEffort` to the `r
 | `HIGH` | `"high"` |
 | `MAX` | `"xhigh"` |
 
+!!! note
+    OpenAI's `"none"` is a valid API value (sent to the SDK), not disabled. This is different from the `"disabled"` convention used by other providers.
+
 OpenAI does not support `reasoning_budget` or `thinking_mode = "adaptive"`. Both raise `LLMCapabilityError`.
 
 When reasoning is active, `temperature` is omitted from the SDK call (OpenAI requires this).
 
 ### Anthropic
 
-Anthropic supports both `manual` and `adaptive` thinking modes.
+Anthropic supports both `manual` and `adaptive` thinking modes. The effort mapping is configured via `anthropic_config.effort_to_level_map`:
 
-**Effort mapping** (`ReasoningEffort` to Anthropic effort level):
+```toml
+[cogt.llm_config.anthropic_config.effort_to_level_map]
+none = "disabled"
+minimal = "low"
+low = "low"
+medium = "medium"
+high = "high"
+max = "max"
+```
 
 | ReasoningEffort | Anthropic level |
 |-----------------|----------------|
@@ -96,15 +120,25 @@ Anthropic supports both `manual` and `adaptive` thinking modes.
 
 **ADAPTIVE mode** uses `{"type": "adaptive"}` with an `OutputConfigParam(effort=...)`.
 
-**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config, then sends `{"type": "enabled", "budget_tokens": N}`.
+**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config, then sends `{"type": "enabled", "budget_tokens": N}`. The budget is capped to `min(budget, max_tokens - 1)` to satisfy Anthropic's API constraint.
 
-**`reasoning_budget`** (explicit) always uses `{"type": "enabled", "budget_tokens": N}` regardless of thinking mode.
+**`reasoning_budget`** (explicit) always uses `{"type": "enabled", "budget_tokens": N}` regardless of thinking mode. The same `min(budget, max_tokens - 1)` cap is applied.
 
 When thinking is active, `temperature` is suppressed (Anthropic requires `temperature=1` or omission with thinking).
 
 ### Google Gemini
 
-Google supports both `manual` and `adaptive` thinking modes.
+Google supports both `manual` and `adaptive` thinking modes. The ADAPTIVE mode effort mapping is configured via `google_config.effort_to_level_map`:
+
+```toml
+[cogt.llm_config.google_config.effort_to_level_map]
+none = "disabled"
+minimal = "low"
+low = "low"
+medium = "medium"
+high = "high"
+max = "high"
+```
 
 **MANUAL mode** resolves effort to a `thinking_budget` (token count) via the `effort_to_budget_maps` config:
 
@@ -128,11 +162,26 @@ Google supports both `manual` and `adaptive` thinking modes.
 | `HIGH` | `HIGH` |
 | `MAX` | `HIGH` |
 
-**`reasoning_budget`** (explicit) passes through directly as `thinking_budget`.
+!!! note
+    Values in the TOML are lowercase (e.g., `"low"`). The `GoogleConfig.get_reasoning_level()` method uppercases them before constructing the `ThinkingLevel` enum.
+
+**`reasoning_budget`** (explicit) passes through directly as `thinking_budget`. When `max_tokens` is known, the budget is capped to `min(budget, max_tokens - 1)`.
+
+Temperature is passed normally to the Google API regardless of reasoning mode.
 
 ### Mistral
 
-Mistral models use `thinking_mode = "manual"`. The only reasoning control is `prompt_mode`:
+Mistral models use `thinking_mode = "manual"`. The effort mapping is configured via `mistral_config.effort_to_level_map`:
+
+```toml
+[cogt.llm_config.mistral_config.effort_to_level_map]
+none = "disabled"
+minimal = "reasoning"
+low = "reasoning"
+medium = "reasoning"
+high = "reasoning"
+max = "reasoning"
+```
 
 | ReasoningEffort | Mistral behavior |
 |-----------------|-----------------|
@@ -140,6 +189,8 @@ Mistral models use `thinking_mode = "manual"`. The only reasoning control is `pr
 | `MINIMAL` through `MAX` | `prompt_mode = "reasoning"` |
 
 Mistral does not support `reasoning_budget` or `thinking_mode = "adaptive"`. Both raise `LLMCapabilityError`.
+
+Temperature is passed normally to the Mistral API regardless of reasoning mode.
 
 ### Bedrock (native models)
 
@@ -149,6 +200,14 @@ Bedrock native models (non-Anthropic SDKs like `bedrock_aioboto3`) do not suppor
     Claude models accessed through Bedrock use the `bedrock_anthropic` SDK variant and go through the Anthropic worker, which does support reasoning.
 
 ---
+
+## Effort-to-Level Configuration
+
+Each provider has an `effort_to_level_map` in its subconfig within `pipelex.toml` that maps `ReasoningEffort` values to provider-specific level strings. All six `ReasoningEffort` keys must be present in each map (enforced by a validator).
+
+The special value `"disabled"` causes the accessor to return `None`, signaling that reasoning should be skipped. OpenAI uses `"none"` as a valid API value instead (not `"disabled"`).
+
+The level is resolved at runtime via `<ProviderConfig>.get_reasoning_level()` in each plugin's config module (e.g., `pipelex/plugins/openai/openai_config.py`). Each config class returns the provider's native SDK type.
 
 ## Effort-to-Budget Configuration
 
@@ -174,7 +233,7 @@ max = 65536
 
 The map is keyed by `prompting_target` (from the model spec). A validated mapping must contain entries for all `ReasoningEffort` values.
 
-The budget is resolved at runtime via `LLMConfig.get_reasoning_budget()` (`pipelex/cogt/config_cogt.py:90`).
+The budget is resolved at runtime via `LLMConfig.get_reasoning_budget()` (`pipelex/cogt/config_cogt.py`).
 
 ---
 
@@ -205,6 +264,24 @@ thinking_mode = "none"
 
 ---
 
+## Structured Generation
+
+Reasoning parameters (`reasoning_effort` and `reasoning_budget`) are not supported for structured generation (`_gen_object`). If either parameter is set when calling structured generation, an `LLMCapabilityError` is raised with the message "does not support reasoning parameters for structured generation".
+
+This applies to all providers (OpenAI, Anthropic, Google, Mistral). Bedrock native models already reject all reasoning parameters before reaching `_gen_object`.
+
+## NONE Semantics
+
+The behavior of `ReasoningEffort.NONE` varies by provider:
+
+- **OpenAI**: Sends `reasoning_effort="none"` to the API, which is a valid API value that minimizes reasoning.
+- **Anthropic**: Disables thinking entirely (no `thinking` parameter is sent).
+- **Google MANUAL**: Sets `thinking_budget=0` (thinking disabled).
+- **Google ADAPTIVE**: Sets `thinking_budget=0` (thinking disabled).
+- **Mistral**: Omits `prompt_mode` (no reasoning).
+
+---
+
 ## Error Handling
 
 All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.py`):
@@ -216,6 +293,7 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `reasoning_budget` on a provider that doesn't support it | "does not support reasoning_budget" |
 | `thinking_mode = "adaptive"` on OpenAI or Mistral | "adaptive ... not supported" |
 | Any reasoning param on Bedrock native models | "does not support reasoning parameters" |
+| Reasoning params during structured generation | "does not support reasoning parameters for structured generation" |
 | Both `reasoning_effort` and `reasoning_budget` set | `ValidationError` (mutual exclusivity) |
 
 ---
@@ -226,8 +304,13 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 |------|---------|
 | `pipelex/cogt/llm/llm_job_components.py` | `ReasoningEffort` enum, `LLMJobParams` with mutual exclusivity validator |
 | `pipelex/cogt/llm/thinking_mode.py` | `ThinkingMode` enum |
+| `pipelex/cogt/llm/reasoning_config_base.py` | Shared helpers: `EffortToLevelMap`, `validate_effort_to_level_map()`, `get_reasoning_level_str()` |
 | `pipelex/cogt/llm/llm_setting.py` | `LLMSetting` with reasoning fields and `make_llm_job_params()` |
-| `pipelex/cogt/config_cogt.py` | `LLMConfig.get_reasoning_budget()` and effort map validation |
+| `pipelex/cogt/config_cogt.py` | `LLMConfig` with `get_reasoning_budget()` and effort-to-budget map validation |
+| `pipelex/plugins/openai/openai_config.py` | `OpenAIConfig` with `get_reasoning_level()` returning `ChatCompletionReasoningEffort` |
+| `pipelex/plugins/anthropic/anthropic_config.py` | `AnthropicConfig` with `get_reasoning_level()` returning `AnthropicEffortLevel` |
+| `pipelex/plugins/google/google_config.py` | `GoogleConfig` with `get_reasoning_level()` returning `genai_types.ThinkingLevel` |
+| `pipelex/plugins/mistral/mistral_config.py` | `MistralConfig` with `get_reasoning_level()` returning `MistralPromptMode` |
 | `pipelex/cogt/model_backends/model_spec.py` | `InferenceModelSpec.thinking_mode` field |
 | `pipelex/plugins/openai/openai_completions_llm_worker.py` | OpenAI Completions reasoning resolution |
 | `pipelex/plugins/openai/openai_responses_llm_worker.py` | OpenAI Responses reasoning resolution |
@@ -235,7 +318,7 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | `pipelex/plugins/google/google_llm_worker.py` | Google thinking config builder |
 | `pipelex/plugins/mistral/mistral_llm_worker.py` | Mistral prompt mode resolution |
 | `pipelex/plugins/bedrock/bedrock_llm_worker.py` | Bedrock reasoning validation |
-| `pipelex/pipelex.toml` | Default effort-to-budget maps |
+| `pipelex/pipelex.toml` | Default effort-to-budget maps and effort-to-level maps |
 
 ---
 

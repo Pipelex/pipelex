@@ -6,6 +6,15 @@ from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.plugins.openai.openai_completions_llm_worker import OpenAICompletionsLLMWorker
 
+_OPENAI_LEVEL_MAP: dict[str, str] = {
+    "none": "none",
+    "minimal": "minimal",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "max": "xhigh",
+}
+
 
 def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode | None) -> OpenAICompletionsLLMWorker:
     """Create a minimal OpenAICompletionsLLMWorker with a mocked inference_model."""
@@ -15,6 +24,23 @@ def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode | None) -> O
     mock_model.desc = "test-model"
     worker.inference_model = mock_model
     return worker
+
+
+def _mock_config(mocker: MockerFixture) -> None:
+    """Mock get_config() to return an openai_config with the effort_to_level_map."""
+    from pipelex.plugins.openai.openai_config import OpenAIConfig  # noqa: PLC0415
+
+    openai_config = OpenAIConfig(effort_to_level_map=_OPENAI_LEVEL_MAP)
+    mocker.patch(
+        "pipelex.plugins.openai.openai_completions_llm_worker.get_config",
+        return_value=mocker.MagicMock(
+            cogt=mocker.MagicMock(
+                llm_config=mocker.MagicMock(
+                    openai_config=openai_config,
+                ),
+            ),
+        ),
+    )
 
 
 class TestOpenAICompletionsReasoning:
@@ -39,6 +65,7 @@ class TestOpenAICompletionsReasoning:
     ):
         """Each ReasoningEffort value maps to the correct OpenAI effort string."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        _mock_config(mocker)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
         result = worker._resolve_reasoning_effort(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         assert result == expected_openai_effort

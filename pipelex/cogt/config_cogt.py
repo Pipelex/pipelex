@@ -4,6 +4,10 @@ from pipelex.cogt.exceptions import LLMConfigError
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams, ImgGenJobParamsDefaults, Quality
 from pipelex.cogt.llm.llm_job_components import LLMJobConfig, ReasoningEffort
 from pipelex.cogt.models.model_deck_config import ModelDeckConfig
+from pipelex.plugins.anthropic.anthropic_config import AnthropicConfig
+from pipelex.plugins.google.google_config import GoogleConfig
+from pipelex.plugins.mistral.mistral_config import MistralConfig
+from pipelex.plugins.openai.openai_config import OpenAIConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 
@@ -62,16 +66,15 @@ class InstructorConfig(ConfigModel):
     is_dump_error_enabled: bool
 
 
-class AnthropicConfig(ConfigModel):
-    structured_output_timeout_seconds: int
-
-
 EffortToBudgetMap = dict[str, int]
 
 
 class LLMConfig(ConfigModel):
     instructor_config: InstructorConfig
+    openai_config: OpenAIConfig
     anthropic_config: AnthropicConfig
+    google_config: GoogleConfig
+    mistral_config: MistralConfig
     llm_job_config: LLMJobConfig
     is_structure_prompt_enabled: bool
     default_max_images: int

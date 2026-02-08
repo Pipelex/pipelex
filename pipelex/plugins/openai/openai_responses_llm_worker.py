@@ -9,7 +9,6 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
-from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
@@ -20,19 +19,11 @@ if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
 
     from pipelex.cogt.llm.llm_job import LLMJob
+    from pipelex.cogt.llm.llm_job_components import LLMJobParams
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
     from pipelex.reporting.reporting_protocol import ReportingProtocol
     from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-
-_EFFORT_TO_OPENAI_EFFORT: dict[ReasoningEffort, str] = {
-    ReasoningEffort.NONE: "none",
-    ReasoningEffort.MINIMAL: "minimal",
-    ReasoningEffort.LOW: "low",
-    ReasoningEffort.MEDIUM: "medium",
-    ReasoningEffort.HIGH: "high",
-    ReasoningEffort.MAX: "xhigh",
-}
 
 
 class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
@@ -95,7 +86,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             effort = job_params.reasoning_effort
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    openai_effort = _EFFORT_TO_OPENAI_EFFORT[effort]
+                    openai_effort = get_config().cogt.llm_config.openai_config.get_reasoning_level(effort=effort)
                     log.verbose(f"OpenAI Responses reasoning effort={openai_effort}")
                     return Reasoning(effort=openai_effort)  # type: ignore[typeddict-item]
                 case ThinkingMode.ADAPTIVE:
@@ -169,6 +160,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
+        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
 
         try:

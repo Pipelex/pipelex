@@ -8,7 +8,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
+from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
@@ -21,15 +21,6 @@ from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
-
-_EFFORT_TO_OPENAI_EFFORT: dict[ReasoningEffort, ChatCompletionReasoningEffort] = {
-    ReasoningEffort.NONE: "none",
-    ReasoningEffort.MINIMAL: "minimal",
-    ReasoningEffort.LOW: "low",
-    ReasoningEffort.MEDIUM: "medium",
-    ReasoningEffort.HIGH: "high",
-    ReasoningEffort.MAX: "xhigh",
-}
 
 
 class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
@@ -96,7 +87,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
             effort = job_params.reasoning_effort
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    openai_effort = _EFFORT_TO_OPENAI_EFFORT[effort]
+                    openai_effort = get_config().cogt.llm_config.openai_config.get_reasoning_level(effort=effort)
                     log.verbose(f"OpenAI Chat Completions reasoning_effort={openai_effort}")
                     return openai_effort
                 case ThinkingMode.ADAPTIVE:
@@ -175,6 +166,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
+        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await self.openai_completions_factory.make_simple_messages(llm_job=llm_job)
         from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
 

@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 from anthropic import APIConnectionError, AsyncAnthropic, AsyncAnthropicBedrock, AuthenticationError, BadRequestError, omit
 from anthropic.types import OutputConfigParam, ThinkingConfigParam
@@ -30,17 +30,6 @@ from pipelex.plugins.anthropic.anthropic_factory import (
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
-
-AnthropicEffortLevel = Literal["low", "medium", "high", "max"]
-
-_EFFORT_TO_ANTHROPIC_EFFORT: dict[ReasoningEffort, AnthropicEffortLevel | None] = {
-    ReasoningEffort.NONE: None,
-    ReasoningEffort.MINIMAL: "low",
-    ReasoningEffort.LOW: "low",
-    ReasoningEffort.MEDIUM: "medium",
-    ReasoningEffort.HIGH: "high",
-    ReasoningEffort.MAX: "max",
-}
 
 
 class _ThinkingParams:
@@ -155,7 +144,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         """Build thinking params when reasoning_effort is specified."""
         match thinking_mode:
             case ThinkingMode.ADAPTIVE:
-                anthropic_effort = _EFFORT_TO_ANTHROPIC_EFFORT[effort]
+                anthropic_effort = get_config().cogt.llm_config.anthropic_config.get_reasoning_level(effort=effort)
                 if anthropic_effort is None:
                     # NONE effort means don't enable thinking at all
                     return _ThinkingParams(
@@ -172,7 +161,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                     suppress_temperature=True,
                 )
             case ThinkingMode.MANUAL:
-                anthropic_effort = _EFFORT_TO_ANTHROPIC_EFFORT[effort]
+                anthropic_effort = get_config().cogt.llm_config.anthropic_config.get_reasoning_level(effort=effort)
                 if anthropic_effort is None:
                     # NONE effort means don't enable thinking
                     return _ThinkingParams(
@@ -301,6 +290,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
+        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await AnthropicFactory.make_simple_messages(llm_job=llm_job)
 
         # Get Anthropic-specific config for structured output

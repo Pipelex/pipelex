@@ -12,10 +12,11 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
+from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.config import get_config
 from pipelex.plugins.mistral.mistral_exceptions import MistralWorkerConfigurationError
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -74,13 +75,12 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             effort = job_params.reasoning_effort
             match thinking_mode:
                 case ThinkingMode.MANUAL:
-                    match effort:
-                        case ReasoningEffort.NONE:
-                            log.verbose("Mistral prompt_mode omitted (reasoning disabled)")
-                            return UNSET
-                        case ReasoningEffort.MINIMAL | ReasoningEffort.LOW | ReasoningEffort.MEDIUM | ReasoningEffort.HIGH | ReasoningEffort.MAX:
-                            log.verbose("Mistral prompt_mode=reasoning")
-                            return "reasoning"
+                    prompt_mode = get_config().cogt.llm_config.mistral_config.get_reasoning_level(effort=effort)
+                    if prompt_mode is None:
+                        log.verbose("Mistral prompt_mode omitted (reasoning disabled)")
+                        return UNSET
+                    log.verbose(f"Mistral prompt_mode={prompt_mode}")
+                    return prompt_mode
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
                     raise LLMCapabilityError(msg)
@@ -150,6 +150,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
+        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
         result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
             response_model=schema,
