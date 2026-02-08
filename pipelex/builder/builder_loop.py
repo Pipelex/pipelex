@@ -222,6 +222,13 @@ class BuilderLoop:
                         log.info(f"🔧 Setting output of PipeParallel '{pipe_code}' to 'Anything'")
                         pipe_spec.output = "Anything"
 
+        # Recompute undeclared: some concepts may no longer be referenced after PipeParallel fixes
+        still_referenced = self._collect_local_bare_concept_codes(pipelex_bundle_spec=pipelex_bundle_spec)
+        no_longer_referenced = undeclared - still_referenced
+        if no_longer_referenced:
+            log.info(f"🔧 Concepts no longer referenced after PipeParallel fixes: {', '.join(sorted(no_longer_referenced))}")
+            undeclared -= no_longer_referenced
+
         # Step 4: Create remaining undeclared concepts via pipeline
         if undeclared:
             # Build context for the LLM
@@ -387,6 +394,53 @@ class BuilderLoop:
                 log.info(f"🧹 Removed unused concept '{concept_code}'")
 
         return pipelex_bundle_spec
+
+    @staticmethod
+    def _collect_local_bare_concept_codes(pipelex_bundle_spec: PipelexBundleSpec) -> set[str]:
+        """Collect bare concept codes referenced locally from pipe specs and concept definitions.
+
+        Only includes references whose domain prefix is absent or matches the bundle domain.
+        This is used to determine which concepts are still actively referenced after spec mutations.
+
+        Args:
+            pipelex_bundle_spec: The bundle spec to scan
+
+        Returns:
+            Set of bare concept codes (without domain prefix) that are referenced
+        """
+        domain = pipelex_bundle_spec.domain
+        referenced: set[str] = set()
+
+        def _add_if_local(concept_ref_or_code: str) -> None:
+            if "." not in concept_ref_or_code or concept_ref_or_code.split(".", maxsplit=1)[0] == domain:
+                bare_code = concept_ref_or_code.rsplit(".", maxsplit=1)[-1] if "." in concept_ref_or_code else concept_ref_or_code
+                referenced.add(bare_code)
+
+        # Scan pipe specs
+        if pipelex_bundle_spec.pipe:
+            for pipe_spec in pipelex_bundle_spec.pipe.values():
+                _add_if_local(parse_concept_with_multiplicity(pipe_spec.output).concept_ref_or_code)
+                if pipe_spec.inputs:
+                    for input_concept_str in pipe_spec.inputs.values():
+                        _add_if_local(parse_concept_with_multiplicity(input_concept_str).concept_ref_or_code)
+                if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
+                    _add_if_local(parse_concept_with_multiplicity(pipe_spec.combined_output).concept_ref_or_code)
+
+        # Scan concept definitions
+        if pipelex_bundle_spec.concept:
+            for concept_spec_or_name in pipelex_bundle_spec.concept.values():
+                if not isinstance(concept_spec_or_name, ConceptSpec):
+                    continue
+                if concept_spec_or_name.refines:
+                    _add_if_local(concept_spec_or_name.refines)
+                if concept_spec_or_name.structure:
+                    for field_spec in concept_spec_or_name.structure.values():
+                        if field_spec.concept_ref:
+                            _add_if_local(field_spec.concept_ref)
+                        if field_spec.item_concept_ref:
+                            _add_if_local(field_spec.item_concept_ref)
+
+        return referenced
 
     def _fix_bundle_validation_error(
         self,
