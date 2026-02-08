@@ -75,24 +75,31 @@ async def _save_graph_outputs_to_dir(
     if graph_outputs.graphspec_json is not None:
         (output_dir / "graphspec.json").write_text(graph_outputs.graphspec_json, encoding="utf-8")
         log.verbose(f"GraphSpec JSON saved to: {output_dir / 'graphspec.json'}")
+        saved_formats.append("graphspec")
 
     if graph_outputs.mermaidflow_mmd is not None:
         (output_dir / "mermaidflow.mmd").write_text(graph_outputs.mermaidflow_mmd, encoding="utf-8")
         log.verbose(f"Mermaidflow Mermaid saved to: {output_dir / 'mermaidflow.mmd'}")
+        if "mermaidflow" not in saved_formats:
+            saved_formats.append("mermaidflow")
 
     if graph_outputs.mermaidflow_html is not None:
         (output_dir / "mermaidflow.html").write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
         log.verbose(f"Mermaidflow HTML saved to: {output_dir / 'mermaidflow.html'}")
-        saved_formats.append("mermaidflow")
+        if "mermaidflow" not in saved_formats:
+            saved_formats.append("mermaidflow")
 
     if graph_outputs.reactflow_viewspec is not None:
         (output_dir / "viewspec.json").write_text(graph_outputs.reactflow_viewspec, encoding="utf-8")
         log.verbose(f"ReactFlow ViewSpec saved to: {output_dir / 'viewspec.json'}")
+        if "reactflow" not in saved_formats:
+            saved_formats.append("reactflow")
 
     if graph_outputs.reactflow_html is not None:
         (output_dir / "reactflow.html").write_text(graph_outputs.reactflow_html, encoding="utf-8")
         log.verbose(f"ReactFlow HTML saved to: {output_dir / 'reactflow.html'}")
-        saved_formats.append("reactflow")
+        if "reactflow" not in saved_formats:
+            saved_formats.append("reactflow")
 
     return saved_formats
 
