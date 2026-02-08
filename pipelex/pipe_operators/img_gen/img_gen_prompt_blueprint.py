@@ -117,7 +117,7 @@ class ImgGenPromptBlueprint(BaseModel):
         ############################################################
         # Prepare extra_params with image placeholders
         ############################################################
-        extra_params = extra_params or {}
+        extra_params = dict(extra_params) if extra_params else {}
         if image_registry_indices:
             # Collect list variable paths for exclusion from direct substitution
             list_variable_paths = {list_ref.variable_path for list_ref in list_image_refs}

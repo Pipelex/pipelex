@@ -23,8 +23,8 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_model_deck, get_native_concept
-from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenRunError
-from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
+from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError, PipeImgGenRunError
+from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint, ImgGenPromptBlueprintValueError
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams, output_multiplicity_to_apply
@@ -141,6 +141,12 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
         except StuffContentTypeError as stuff_content_type_error:
             msg = f"While runnning the PipeImgGen '{self.code}' some inputs are not of the right type: {stuff_content_type_error}"
             raise PipeImgGenRunError(message=msg) from stuff_content_type_error
+        except ImgGenPromptBlueprintValueError as blueprint_error:
+            msg = f"While running the PipeImgGen '{self.code}' image extraction failed: {blueprint_error}"
+            raise PipeImgGenRunError(message=msg) from blueprint_error
+        except PipeImgGenFactoryError as factory_error:
+            msg = f"While running the PipeImgGen '{self.code}' prompt construction failed: {factory_error}"
+            raise PipeImgGenRunError(message=msg) from factory_error
 
         # Process one-time settings
         seed_setting = self.seed or img_gen_param_defaults.seed
