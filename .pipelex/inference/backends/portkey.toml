@@ -263,6 +263,8 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 1.25, output = 10.0 }
+thinking_mode = "manual"
+prompting_target = "gemini"
 x-portkey-provider = "@google"
 
 ["gemini-2.5-flash"]
@@ -270,6 +272,8 @@ model_id = "gemini-2.5-flash"
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.30, output = 2.50 }
+thinking_mode = "manual"
+prompting_target = "gemini"
 x-portkey-provider = "@google"
 
 ["gemini-2.5-flash-lite"]
@@ -277,6 +281,8 @@ model_id = "gemini-2.5-flash-lite"
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.10, output = 0.40 }
+thinking_mode = "manual"
+prompting_target = "gemini"
 x-portkey-provider = "@google"
 
 ["gemini-3.0-pro"]
@@ -285,4 +291,6 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
+thinking_mode = "manual"
+prompting_target = "gemini"
 x-portkey-provider = "@google"

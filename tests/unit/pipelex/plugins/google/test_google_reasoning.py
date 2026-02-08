@@ -1,0 +1,138 @@
+import pytest
+from google.genai import types as genai_types
+from pytest_mock import MockerFixture
+
+from pipelex.cogt.exceptions import LLMCapabilityError
+from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
+from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker
+
+
+def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode | None, prompting_target: str = "gemini") -> GoogleLLMWorker:
+    """Create a minimal GoogleLLMWorker with a mocked inference_model."""
+    worker = object.__new__(GoogleLLMWorker)
+    mock_model = mocker.MagicMock()
+    mock_model.thinking_mode = thinking_mode
+    mock_model.prompting_target = prompting_target
+    mock_model.desc = "test-model"
+    worker.inference_model = mock_model
+    return worker
+
+
+class TestGoogleReasoning:
+    """Tests for _build_thinking_config on GoogleLLMWorker."""
+
+    @pytest.mark.parametrize(
+        ("effort", "expected_budget"),
+        [
+            (ReasoningEffort.NONE, 0),
+            (ReasoningEffort.LOW, 1024),
+            (ReasoningEffort.MEDIUM, 5000),
+            (ReasoningEffort.HIGH, 16384),
+            (ReasoningEffort.MAX, 65536),
+        ],
+    )
+    def test_manual_mode_effort_maps_to_budget(
+        self,
+        mocker: MockerFixture,
+        effort: ReasoningEffort,
+        expected_budget: int,
+    ):
+        """MANUAL mode maps each ReasoningEffort to the correct thinking_budget."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        mocker.patch(
+            "pipelex.plugins.google.google_llm_worker.get_config",
+            return_value=mocker.MagicMock(
+                cogt=mocker.MagicMock(
+                    llm_config=mocker.MagicMock(
+                        get_reasoning_budget=mocker.MagicMock(return_value=expected_budget),
+                    ),
+                ),
+            ),
+        )
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
+        result = worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert result is not None
+        assert result.thinking_budget == expected_budget
+
+    @pytest.mark.parametrize(
+        ("effort", "expected_level"),
+        [
+            (ReasoningEffort.LOW, genai_types.ThinkingLevel.LOW),
+            (ReasoningEffort.MEDIUM, genai_types.ThinkingLevel.MEDIUM),
+            (ReasoningEffort.HIGH, genai_types.ThinkingLevel.HIGH),
+            (ReasoningEffort.MAX, genai_types.ThinkingLevel.HIGH),
+        ],
+    )
+    def test_adaptive_mode_effort_maps_to_thinking_level(
+        self,
+        mocker: MockerFixture,
+        effort: ReasoningEffort,
+        expected_level: genai_types.ThinkingLevel,
+    ):
+        """ADAPTIVE mode maps each ReasoningEffort to the correct ThinkingLevel with auto budget."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.ADAPTIVE)
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
+        result = worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert result is not None
+        assert result.thinking_budget == -1
+        assert result.thinking_level == expected_level
+
+    def test_adaptive_mode_effort_none_disables_thinking(self, mocker: MockerFixture):
+        """ADAPTIVE mode with NONE effort disables thinking with budget=0."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.ADAPTIVE)
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.NONE)
+        result = worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert result is not None
+        assert result.thinking_budget == 0
+
+    @pytest.mark.parametrize(
+        "thinking_mode",
+        [ThinkingMode.MANUAL, ThinkingMode.ADAPTIVE],
+    )
+    def test_explicit_budget_passes_through(
+        self,
+        mocker: MockerFixture,
+        thinking_mode: ThinkingMode,
+    ):
+        """Explicit reasoning_budget passes through directly as thinking_budget."""
+        worker = _make_worker(mocker, thinking_mode=thinking_mode)
+        job_params = LLMJobParams(temperature=0.5, reasoning_budget=8192)
+        result = worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert result is not None
+        assert result.thinking_budget == 8192
+
+    def test_no_reasoning_params_returns_none(self, mocker: MockerFixture):
+        """When neither reasoning_effort nor reasoning_budget is set, returns None."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        job_params = LLMJobParams(temperature=0.5)
+        result = worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert result is None
+
+    def test_thinking_mode_none_raises_capability_error(self, mocker: MockerFixture):
+        """Models with thinking_mode=none should raise LLMCapabilityError."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
+        with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
+            worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+    def test_thinking_mode_unconfigured_raises_capability_error(self, mocker: MockerFixture):
+        """Models with no thinking_mode should raise LLMCapabilityError."""
+        worker = _make_worker(mocker, thinking_mode=None)
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
+        with pytest.raises(LLMCapabilityError, match="no thinking_mode configured"):
+            worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+    def test_reasoning_budget_with_thinking_mode_none_raises(self, mocker: MockerFixture):
+        """reasoning_budget with thinking_mode=none should raise LLMCapabilityError."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
+        job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
+        with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
+            worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+    def test_reasoning_budget_with_unconfigured_thinking_mode_raises(self, mocker: MockerFixture):
+        """reasoning_budget with no thinking_mode should raise LLMCapabilityError."""
+        worker = _make_worker(mocker, thinking_mode=None)
+        job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
+        with pytest.raises(LLMCapabilityError, match="no thinking_mode configured"):
+            worker._build_thinking_config(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
