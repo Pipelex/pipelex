@@ -1,6 +1,6 @@
 ---
 name: run
-description: Run Pipelex workflows and interpret results. Use when executing a pipeline, user says "run this workflow", "execute the pipeline", "test this .plx file", or wants to see pipeline output.
+description: Run Pipelex workflows and interpret results. Use when user says "run this pipeline", "execute the workflow", "test this .plx file", "try it out", "see the output", "dry run", or wants to execute any Pipelex pipeline and see its output.
 ---
 
 # Run Pipelex Workflow
@@ -9,16 +9,9 @@ Execute Pipelex pipelines and interpret their JSON output.
 
 ## Workflow
 
-**Prerequisite**: Check CLI availability:
-1. Try `pipelex-agent --version`
-2. If not found, try `uv run pipelex-agent --version`
-3. If neither works, guide install: `pip install pipelex` or `uv add pipelex`
-
-Use whichever method works for all subsequent commands.
+**Prerequisite**: See [CLI Prerequisites](../shared/prerequisites.md)
 
 ### Step 1: Identify the Target
-
-Determine what to run:
 
 | Target | Command |
 |--------|---------|
@@ -65,11 +58,6 @@ Fill in the `content` fields with actual values. For complex inputs, use the /sy
 | **Full run inline** | `pipelex-agent run bundle.plx --inputs '{"theme": ...}'` | Quick execution without creating an input file |
 | **Full run + graph** | `pipelex-agent run bundle.plx --inputs data.json --graph` | Execute and generate execution graph HTML visualizations |
 
-**Cross-domain runs** — when the bundle references pipes from other bundles:
-```bash
-pipelex-agent run bundle.plx --inputs data.json -L ./shared_pipes/
-```
-
 ### Inline JSON for Inputs
 
 The `--inputs` flag accepts both file paths and inline JSON. The CLI auto-detects: if the value starts with `{`, it is parsed as JSON directly. This is the fastest path — no file creation needed for simple inputs.
@@ -107,28 +95,7 @@ Key fields:
 
 ### Step 5: Handle Errors
 
-**Error output:**
-```json
-{
-  "error": true,
-  "error_type": "PipelineExecutionError",
-  "message": "Pipeline failed at pipe 'analyze_document'",
-  "pipe_code": "analyze_document",
-  "pipe_stack": ["process_all", "analyze_document"]
-}
-```
-
-| Error Type | Recovery |
-|------------|----------|
-| `ValidateBundleError` | Fix the .plx file — use /fix skill, check `validation_errors` array |
-| `PipeOperatorModelChoiceError` | Run `pipelex-agent doctor` — model preset doesn't resolve |
-| `PipeOperatorModelAvailabilityError` | Run `pipelex-agent doctor` — API key or service issue |
-| `PipelineExecutionError` | Check `pipe_code` and `pipe_stack` for which pipe failed |
-| `FileNotFoundError` | Check that the bundle file and input file paths are correct |
-| `JSONDecodeError` | Fix the JSON syntax in your inline inputs or input file |
-| `ArgumentError` | Check command flags — e.g., `--mock-inputs` requires `--dry-run` |
-
-For model/config issues, always try `pipelex-agent doctor` first.
+For all error types and recovery strategies, see [Error Handling Reference](../shared/error-handling.md).
 
 ### Execution Graphs
 
@@ -153,7 +120,7 @@ When `--graph` is set, the success JSON includes a `graph_files` field with path
 }
 ```
 
-To re-render an existing `graphspec.json` later (e.g., with different format options):
+To re-render an existing `graphspec.json` later:
 
 ```bash
 pipelex-agent graph graphspec.json
@@ -162,5 +129,7 @@ pipelex-agent graph graphspec.json --format mermaidflow -o ./output/
 
 ## Reference
 
-- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) for CLI philosophy and error type reference
-- [Pipelex Language Reference](../shared/pipelex-reference.md) for .plx syntax documentation
+- [CLI Prerequisites](../shared/prerequisites.md) — read at skill start to check CLI availability
+- [Error Handling](../shared/error-handling.md) — read when CLI returns an error to determine recovery
+- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) — read for CLI command syntax or output format details
+- [Pipelex Language Reference](../shared/pipelex-reference.md) — read for .plx syntax documentation

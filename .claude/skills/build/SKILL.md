@@ -1,6 +1,6 @@
 ---
 name: build
-description: Build new Pipelex workflow bundles (.plx files). Use when creating a new workflow, user says "create a pipeline", "build a method", "new workflow", "build a .plx file". Supports interactive requirements gathering and direct creation.
+description: Build new Pipelex workflow bundles (.plx files). Use when user says "create a pipeline", "build a workflow", "new .plx file", "make a method", "design a pipe", or wants to create any new Pipelex workflow from scratch. Supports both automated CLI build and guided 9-phase manual construction.
 ---
 
 # Build Pipelex Workflow (Agentic)
@@ -34,52 +34,19 @@ pipelex-agent build "Given a theme, write a Haiku"
 }
 ```
 
-Key output fields:
-- `plx_file` — path to the generated .plx bundle
-- `pipe_inputs` — maps input variable names to their concept types
-- `pipe_output` — the output concept type
-
 **When to use which:**
 - **Automated** — simple to moderate workflows, fast iteration, starting point for refinement
 - **Manual (below)** — complex workflows, custom controller logic, precise prompt engineering, full control
 
 Recommended approach: start with `pipelex-agent build`, then refine with /edit and /fix skills.
 
-### Build Error Handling
-
-**JSON output on error:**
-```json
-{
-  "error": true,
-  "error_type": "BuildPipeError",
-  "error_domain": "runtime",
-  "message": "Build failed: ...",
-  "hint": "Check 'failure_memory_path' for builder loop failure diagnostics if present",
-  "failure_memory_path": "pipelex-wip/pipeline_01/failure_memory.json",
-  "cause_type": "PipelineExecutionError",
-  "cause_message": "Pipeline execution failed in pipe 'pipe_builder'"
-}
-```
-
-**Error recovery:**
-
-| Error Type | Domain | Action |
-|------------|--------|--------|
-| `BuildPipeError` | runtime | Read `failure_memory_path` if present for diagnostics; check `cause_type`/`cause_message` for root cause |
-| `ValidateBundleError` | input | Check `validation_errors` array; fix .plx issues then re-validate |
-| `PipeOperatorModelAvailabilityError` | config | Run `pipelex-agent doctor`; check `fallback_list` for models that were tried |
-| `PipeOperatorModelChoiceError` | config | Run `pipelex-agent doctor`; check model routing configuration |
-
-When `failure_memory_path` is present, read that file to understand the builder loop's last state and what went wrong.
+For build error handling, see [Error Handling Reference](../shared/error-handling.md).
 
 ---
 
 ## Prerequisites
 
-Check CLI availability:
-1. Try `pipelex-agent --version`
-2. If not found, try `uv run pipelex-agent --version`
-3. Use whichever works for all subsequent commands
+See [CLI Prerequisites](../shared/prerequisites.md)
 
 ---
 
@@ -113,20 +80,7 @@ Draft a plan in markdown that describes:
 - Use plural names for lists (e.g., `documents`), singular for items (e.g., `document`)
 - Don't detail types yet - focus on the flow
 
-**Show ASCII Overview**:
-```
-┌─────────────────────────────────────────────────────┐
-│                   workflow_name                      │
-│  Domain: my_domain                                   │
-├─────────────────────────────────────────────────────┤
-│                                                      │
-│   [Input1]  ──────►  ┌──────────────┐               │
-│   [Input2]  ──────►  │  main_pipe   │  ──────►  [Output]
-│                      │  (Sequence)  │               │
-│                      └──────────────┘               │
-│                                                      │
-└─────────────────────────────────────────────────────┘
-```
+**Show ASCII Overview** — see [Manual Build Phases](references/manual-build-phases.md#phase-2-ascii-overview-diagram) for the diagram template.
 
 **Output**: Plan draft (markdown)
 
@@ -136,18 +90,14 @@ Draft a plan in markdown that describes:
 
 **Goal**: Identify all data types needed in the workflow.
 
-From the plan, identify:
-- Input concepts
-- Intermediate concepts
-- Output concepts
+From the plan, identify input, intermediate, and output concepts.
 
 For each concept, draft:
 - **Name**: PascalCase, singular noun (e.g., `Invoice` not `Invoices`)
 - **Description**: What it represents
 - **Type**: Either `refines: NativeConcept` OR `structure: {...}`
 
-**Native concepts** (use directly without defining):
-`Text`, `Image`, `Document`, `TextAndImages`, `Number`, `Page`, `JSON`, `ImgGenPrompt`, `Html`, `Anything`, `Dynamic`
+**Native concepts** (built-in, no definition needed): See [Pipelex Reference — Native Concepts](../shared/pipelex-reference.md#native-concepts)
 
 > **Note**: `Document` is the native concept for any document (PDF, Word, etc.). `Image` is for any image format (JPEG, PNG, etc.). File formats like "PDF" or "JPEG" are not concepts.
 
@@ -164,9 +114,7 @@ For each concept, draft:
 
 **Goal**: Convert concept drafts to validated TOML using the CLI.
 
-Prepare JSON specs for all concepts, then convert them **in parallel** by making multiple concurrent tool calls:
-
-**Important**: Call all `pipelex-agent concept` commands in a single response using parallel tool calls. Do not wait for one to complete before starting the next.
+Prepare JSON specs for all concepts, then convert them **in parallel** by making multiple concurrent tool calls.
 
 **Example** (3 concepts converted in parallel):
 ```bash
@@ -180,28 +128,18 @@ pipelex-agent concept --spec '{"the_concept_code": "Summary", "description": "A 
 
 **Choices (enum-like constrained values)**:
 ```toml
-# Use choices instead of type when the field has a fixed set of allowed values
 status = {choices = ["pending", "processing", "completed"], description = "Order status", required = true}
-priority = {choices = ["low", "medium", "high"], description = "Priority level"}
 ```
-
-This generates type-safe `Literal` types in Python. Use choices when:
-- A field should only accept specific string values
-- You want to route with PipeCondition based on the field value
-- Input validation should reject invalid values
 
 **Nested concept references** in structures:
 ```toml
-# Single concept reference - needs full domain path
 field = {type = "concept", concept_ref = "my_domain.OtherConcept", description = "...", required = true}
-
-# List of concepts - different syntax
-field = {type = "list", item_type = "concept", item_concept_ref = "my_domain.OtherConcept", description = "...", required = true}
+items = {type = "list", item_type = "concept", item_concept_ref = "my_domain.OtherConcept", description = "..."}
 ```
 
 **Output**: Validated concept TOML fragments
 
-> **Partial failures**: If some concept commands fail while others succeed, fix the failing specs using the error JSON (`error_domain: "input"` means the spec is wrong; `error_domain: "config"` means a model/config issue). Re-run only the failed commands.
+> **Partial failures**: If some commands fail, fix the failing specs using the error JSON (`error_domain: "input"` means the spec is wrong). Re-run only the failed commands.
 
 ---
 
@@ -228,66 +166,9 @@ field = {type = "list", item_type = "concept", item_concept_ref = "my_domain.Oth
 | **PipeImgGen** | Generate images from text prompts |
 | **PipeFunc** | Custom Python logic |
 
-> **Note**: `Page[]` outputs from PipeExtract automatically convert to text when inserted into prompts using `@variable`. No explicit conversion step is needed when passing extracted pages to PipeLLM.
+> **Note**: `Page[]` outputs from PipeExtract automatically convert to text when inserted into prompts using `@variable`.
 
-**Show detailed ASCII flow**:
-
-**Sequence Flow**:
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   Step 1    │────►│   Step 2    │────►│   Step 3    │
-│  (PipeLLM)  │     │  (PipeLLM)  │     │ (Compose)   │
-└─────────────┘     └─────────────┘     └─────────────┘
-     │                   │                   │
-     ▼                   ▼                   ▼
- [analysis]         [refined]           [output]
-```
-
-**Batch Flow** (map operation):
-```
-                ┌─────────────────────────┐
-                │       PipeBatch         │
-                │   input_list: items     │
-                │   branch: process_item  │
-                └───────────┬─────────────┘
-                            │
-         ┌──────────────────┼──────────────────┐
-         ▼                  ▼                  ▼
-    ┌─────────┐        ┌─────────┐        ┌─────────┐
-    │ item[0] │        │ item[1] │        │ item[2] │
-    │ branch  │        │ branch  │        │ branch  │
-    └────┬────┘        └────┬────┘        └────┬────┘
-         │                  │                  │
-         └──────────────────┼──────────────────┘
-                            ▼
-                      [results[]]
-```
-
-**Parallel Flow**:
-```
-                    ┌─────────────┐
-               ┌───►│  Branch A   │───┐
-               │    └─────────────┘   │
-┌─────────┐    │    ┌─────────────┐   │    ┌─────────┐
-│  Input  │────┼───►│  Branch B   │───┼───►│ Combined│
-└─────────┘    │    └─────────────┘   │    └─────────┘
-               │    ┌─────────────┐   │
-               └───►│  Branch C   │───┘
-                    └─────────────┘
-```
-
-**Condition Flow**:
-```
-                         ┌─────────────┐
-                    ┌───►│  Case: "A"  │
-                    │    └─────────────┘
-┌─────────┐    ┌────┴────┐
-│  Input  │───►│ expr=?  │───►  Case: "B"
-└─────────┘    └────┬────┘
-                    │    ┌─────────────┐
-                    └───►│  default    │
-                         └─────────────┘
-```
+**Show detailed ASCII flow** — see [Manual Build Phases](references/manual-build-phases.md#phase-5-controller-flow-diagrams) for all controller flow diagrams.
 
 **Output**: Flow draft with pipe contracts (markdown)
 
@@ -313,164 +194,15 @@ Check:
 
 **Goal**: Convert pipe drafts to validated TOML using the CLI.
 
-Prepare JSON specs for all pipes, then convert them **in parallel** by making multiple concurrent tool calls:
+Prepare JSON specs for all pipes, then convert them **in parallel** by making multiple concurrent tool calls.
 
-**Important**: Call all `pipelex-agent pipe` commands in a single response using parallel tool calls. Do not wait for one to complete before starting the next.
+For detailed CLI examples for each pipe type (PipeLLM, PipeSequence, PipeBatch, PipeCondition, PipeCompose, PipeParallel, PipeExtract, PipeImgGen), see [Manual Build Phases](references/manual-build-phases.md#phase-7-pipe-type-cli-examples).
 
-### PipeLLM
-```bash
-pipelex-agent pipe --type PipeLLM --spec '{
-  "pipe_code": "summarize_document",
-  "description": "Summarize document content",
-  "inputs": {"document": "Document"},
-  "output": "Summary",
-  "llm_talent": "CREATIVE_WRITER",
-  "prompt": "Summarize this document:\n\n@document"
-}'
-```
-
-### PipeSequence
-```bash
-pipelex-agent pipe --type PipeSequence --spec '{
-  "pipe_code": "process_invoice",
-  "description": "Full invoice processing",
-  "inputs": {"document": "Document"},
-  "output": "InvoiceData",
-  "steps": [
-    {"pipe": "extract_text", "result": "pages"},
-    {"pipe": "analyze_invoice", "result": "invoice_data"}
-  ]
-}'
-```
-
-### PipeBatch
-```bash
-pipelex-agent pipe --type PipeBatch --spec '{
-  "pipe_code": "process_all_items",
-  "description": "Process each item in list",
-  "inputs": {"items": "Item[]", "context": "Context"},
-  "output": "Result[]",
-  "branch_pipe_code": "process_single_item",
-  "input_list_name": "items",
-  "input_item_name": "item"
-}'
-```
-
-### PipeCondition
-```bash
-pipelex-agent pipe --type PipeCondition --spec '{
-  "pipe_code": "route_by_type",
-  "description": "Route based on document type",
-  "inputs": {"document": "ClassifiedDocument"},
-  "output": "ProcessedDocument",
-  "expression": "document.doc_type",
-  "outcomes": {"invoice": "process_invoice", "receipt": "process_receipt"},
-  "default_outcome": "process_generic"
-}'
-```
-
-### PipeCompose
-
-PipeCompose has **two modes** - use the CLI for template mode only, write directly for construct mode:
-
-**Template mode** (via CLI) - generates Text or Html:
-```bash
-pipelex-agent pipe --type PipeCompose --spec '{
-  "pipe_code": "format_report",
-  "description": "Format final report",
-  "inputs": {"summary": "Summary", "details": "Details"},
-  "output": "Text",
-  "target_format": "markdown",
-  "template": "# Report\n\n$summary\n\n## Details\n\n@details"
-}'
-```
-
-**Construct mode** (write directly to .plx) - builds structured objects:
-```toml
-[pipe.build_output]
-type = "PipeCompose"
-description = "Assemble final output"
-inputs = {analysis = "Analysis", items = "Item[]"}
-output = "FinalOutput"
-
-[pipe.build_output.construct]
-summary = {from = "analysis.summary"}
-score = {from = "analysis.score"}
-items = {from = "items"}
-label = {template = "Analysis for $analysis.name"}
-version = "1.0"  # Static value
-```
-
-**Construct field methods:**
-- `{from = "variable.path"}` - Reference input or nested field
-- `{template = "text with $var"}` - String interpolation
-- `"value"` or `123` - Static/fixed values
-
-### PipeParallel
-
-Run multiple pipes concurrently on the same inputs:
-```bash
-pipelex-agent pipe --type PipeParallel --spec '{
-  "pipe_code": "analyze_all",
-  "description": "Run analyses in parallel",
-  "inputs": {"document": "Document"},
-  "output": "CombinedAnalysis",
-  "parallels": [
-    {"pipe": "analyze_sentiment", "result": "sentiment"},
-    {"pipe": "extract_topics", "result": "topics"}
-  ],
-  "add_each_output": true,
-  "combined_output": "CombinedAnalysis"
-}'
-```
-
-**Required**: Must set either `add_each_output: true` OR `combined_output` (or both).
-
----
-
-### Talents vs Model Presets
-
-The agent CLI uses human-friendly "talent" names that map to model presets. This shields you from needing to know specific model names.
-
-**LLM Talents** (CLI) → **Model Presets** (.plx):
-| Talent | Model Preset |
-|--------|--------------|
-| `data-retrieval` | `$retrieval` |
-| `hr-expert` | `$writing-factual` |
-| `accounting-expert` | `$writing-factual` |
-| `creative-writer` | `$writing-creative` |
-| `engineer` | `$engineering-structured` |
-| `coder` | `$engineering-code` |
-| `code-analyzer` | `$engineering-codebase-analysis` |
-| `vision-language-model` | `$vision` |
-| `visual-designer` | `$img-gen-prompting` |
-
-**Extract Talents** → **Model Presets**:
-| Talent | Model Preset |
-|--------|--------------|
-| `pdf-basic-text-extractor` | `@default-text-from-pdf` |
-| `image-text-extractor` | `@default-extract-image` |
-| `full-document-extractor` | `@default-extract-document` |
-
-**Image Generation Talents** → **Model Presets**:
-| Talent | Model Preset |
-|--------|--------------|
-| `gen-image` | `$gen-image` |
-| `gen-image-fast` | `$gen-image-fast` |
-| `gen-image-high-quality` | `$gen-image-high-quality` |
-
-**Parallel Conversion Example** (converting 4 pipes at once):
-```bash
-# Call all pipe commands in parallel (single response, multiple tool calls):
-pipelex-agent pipe --type PipeLLM --spec '{"pipe_code": "summarize", "description": "Summarize document", "inputs": {"document": "Document"}, "output": "Summary", "llm_talent": "creative-writer", "prompt": "Summarize:\n\n@document"}'
-pipelex-agent pipe --type PipeExtract --spec '{"pipe_code": "extract_pages", "description": "Extract text from document", "inputs": {"document": "Document"}, "output": "Page[]", "extract_talent": "pdf-basic-text-extractor"}'
-pipelex-agent pipe --type PipeLLM --spec '{"pipe_code": "analyze", "description": "Analyze content", "inputs": {"pages": "Page[]"}, "output": "Analysis", "llm_talent": "engineer", "prompt": "Analyze:\n\n@pages"}'
-pipelex-agent pipe --type PipeSequence --spec '{"pipe_code": "main_workflow", "description": "Main orchestration", "inputs": {"document": "Document"}, "output": "Analysis", "steps": [{"pipe": "extract_pages", "result": "pages"}, {"pipe": "analyze", "result": "analysis"}]}'
-```
+For talent-to-model-preset mapping tables, see [Talents and Presets](references/talents-and-presets.md).
 
 **Output**: Validated pipe TOML fragments
 
-> **Partial failures**: If some pipe commands fail while others succeed, fix the failing specs using the error JSON (`error_domain: "input"` means the spec is wrong; `error_domain: "config"` means a model/config issue). Re-run only the failed commands.
+> **Partial failures**: Fix failing specs using the error JSON. Re-run only the failed commands.
 
 ---
 
@@ -480,56 +212,7 @@ pipelex-agent pipe --type PipeSequence --spec '{"pipe_code": "main_workflow", "d
 
 **Save location**: Always save workflow bundles to `pipelex-wip/`. Do not ask the user for the save location.
 
-Save concept and pipe TOML to temporary files, then:
-
-```bash
-pipelex-agent assemble \
-  --domain my_domain \
-  --main-pipe main_workflow \
-  --description "Description of the workflow" \
-  --concepts concepts.toml \
-  --pipes pipes.toml \
-  --output pipelex-wip/bundle.plx
-```
-
-Or write the .plx file directly following this structure:
-
-```toml
-domain = "my_domain"
-description = "What this workflow does"
-main_pipe = "main_workflow"
-
-[concept]
-MyInput = "Description of input"
-MyOutput = "Description of output"
-
-[concept.StructuredConcept]
-description = "A concept with fields"
-
-[concept.StructuredConcept.structure]
-field_name = "Field description"
-typed_field = { type = "number", description = "...", required = true }
-
-[pipe.main_workflow]
-type = "PipeSequence"
-description = "Main orchestration"
-inputs = { input = "MyInput" }
-output = "MyOutput"
-steps = [
-    { pipe = "step_one", result = "intermediate" },
-    { pipe = "step_two", result = "final" }
-]
-
-[pipe.step_one]
-type = "PipeLLM"
-description = "First step"
-inputs = { input = "MyInput" }
-output = "Intermediate"
-model = "$engineering-structured"
-prompt = "@input"
-```
-
-> **Note**: In .plx files, use `model` with preset references (e.g., `$writing-factual`). The agent CLI uses `llm_talent` names which it converts to model presets automatically.
+For the assemble CLI command and direct .plx writing examples, see [Manual Build Phases](references/manual-build-phases.md#phase-8-assemble-bundle).
 
 ---
 
@@ -570,25 +253,13 @@ Fix any validation errors and re-validate.
 - **Pipes**: `snake_case`
 - **Variables**: `snake_case`
 
-### Common Errors
-
-**`missing_input_variable`**: Add missing input to parent pipe's `inputs`.
-
-**Inputs on one line**:
-```toml
-# CORRECT
-inputs = { a = "A", b = "B" }
-
-# WRONG
-inputs = {
-    a = "A",
-    b = "B"
-}
-```
-
 ---
 
 ## Reference
 
-- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) for CLI philosophy and error type reference
-- [Pipelex Language Reference](../shared/pipelex-reference.md) for complete syntax documentation
+- [CLI Prerequisites](../shared/prerequisites.md) — read at skill start to check CLI availability
+- [Error Handling](../shared/error-handling.md) — read when CLI returns an error to determine recovery
+- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) — read for CLI command syntax or output format details
+- [Pipelex Language Reference](../shared/pipelex-reference.md) — read when writing or modifying .plx TOML syntax
+- [Manual Build Phases](references/manual-build-phases.md) — read for detailed ASCII diagrams and CLI examples per phase
+- [Talents and Presets](references/talents-and-presets.md) — read when selecting model talents for pipe structuring

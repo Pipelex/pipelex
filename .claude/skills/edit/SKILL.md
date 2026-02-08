@@ -1,6 +1,6 @@
 ---
 name: edit
-description: Edit existing Pipelex workflow bundles (.plx files). Use when modifying an existing .plx file, adding/removing/changing pipes or concepts, refactoring workflow structure.
+description: Edit existing Pipelex workflow bundles (.plx files). Use when user says "change this pipe", "update the prompt", "rename this concept", "add a step", "remove this pipe", "modify the workflow", "refactor this pipeline", or wants any modification to an existing .plx file.
 ---
 
 # Edit Pipelex Workflow
@@ -9,14 +9,9 @@ Modify existing Pipelex workflow bundles.
 
 ## Workflow
 
-**Prerequisite**: Check CLI availability:
-1. Try `pipelex-agent --version`
-2. If not found, try `uv run pipelex-agent --version`
-3. If neither works, guide install: `pip install pipelex` or `uv add pipelex`
+**Prerequisite**: See [CLI Prerequisites](../shared/prerequisites.md)
 
-Use whichever method works for all subsequent commands.
-
-1. **Read the existing .plx file** - Understand current structure before making changes
+1. **Read the existing .plx file** — Understand current structure before making changes
 
 2. **Understand requested changes**:
    - What pipes need to be added, removed, or modified?
@@ -31,42 +26,18 @@ Use whichever method works for all subsequent commands.
    - Maintain POSIX standard (empty line at end, no trailing whitespace)
 
 4. **Validate after editing**:
-   - Run `pipelex-agent validate <file>.plx`
-   - Fix any errors introduced by changes
-
-   **Validation error example:**
-   ```json
-   {
-     "error": true,
-     "error_type": "ValidateBundleError",
-     "error_domain": "input",
-     "message": "Bundle validation failed",
-     "hint": "Check the 'validation_errors' array for specific issues to fix",
-     "validation_errors": [
-       {"error_type": "missing_input_variable", "pipe_code": "my_pipe", "message": "..."}
-     ]
-   }
+   ```bash
+   pipelex-agent validate <file>.plx
    ```
-
-   **Error recovery:**
-
-   | Error Domain | Error Types | Action |
-   |-------------|-------------|--------|
-   | `input` | `ValidateBundleError`, `PLXDecodeError`, `PipelexInterpreterError` | Fix the .plx file based on `validation_errors` or `message`; use /fix skill |
-   | `config` | `PipeOperatorModelChoiceError`, `PipeOperatorModelAvailabilityError` | Run `pipelex-agent doctor`; this is not a .plx issue |
+   If errors, see [Error Handling Reference](../shared/error-handling.md) for recovery strategies by error domain. Use /fix skill for automatic error resolution.
 
 5. **Regenerate inputs if needed**:
    - If inputs changed, run `pipelex-agent inputs <file>.plx`
    - Update existing inputs.json if present
 
-## Native Concepts
-
-These are built-in and do NOT need definitions:
-`Text`, `Image`, `PDF`, `Document`, `TextAndImages`, `Number`, `Page`, `JSON`, `ImgGenPrompt`, `Html`
-
 ## Common Edit Operations
 
-- **Add a pipe**: Define concept if needed (unless using native concepts above), add pipe in correct order
+- **Add a pipe**: Define concept if needed, add pipe in correct order
 - **Modify a prompt**: Update prompt text, check variable references
 - **Change inputs/outputs**: Update type, regenerate inputs
 - **Add batch processing**: Add `batch_over` and `batch_as` to step
@@ -74,5 +45,7 @@ These are built-in and do NOT need definitions:
 
 ## Reference
 
-- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) for CLI philosophy and error type reference
-- [Pipelex Language Reference](../shared/pipelex-reference.md) for complete syntax documentation
+- [CLI Prerequisites](../shared/prerequisites.md) — read at skill start to check CLI availability
+- [Error Handling](../shared/error-handling.md) — read when CLI returns an error to determine recovery
+- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) — read for CLI command syntax or output format details
+- [Pipelex Language Reference](../shared/pipelex-reference.md) — read when writing or modifying .plx TOML syntax

@@ -6,16 +6,7 @@ Strategy and reference for agents working with Pipelex programmatically.
 
 Agents must use `pipelex-agent` exclusively. It outputs structured JSON (stdout=success, stderr=error with exit code 1).
 
-There is also a `pipelex` CLI for human use — agents should not call it themselves, but can suggest it to the user when helpful:
-
-- `pipelex doctor` — interactive config diagnostics (richer than `pipelex-agent doctor`)
-- `pipelex show <pipe_or_concept>` — visual inspection of a pipe or concept
-- `pipelex init config` — interactive first-time setup
-
-**CLI availability check:**
-1. Try `pipelex-agent --version`
-2. If not found, try `uv run pipelex-agent --version`
-3. Use whichever works for all subsequent commands (either bare `pipelex-agent` or `uv run pipelex-agent`)
+**Prerequisite**: See [CLI Prerequisites](prerequisites.md)
 
 ## Two Approaches to Building
 
@@ -98,79 +89,9 @@ All `pipelex-agent` commands output JSON to **stdout** on success:
 }
 ```
 
-### Error Format
+### Error Handling
 
-On failure, JSON is printed to **stderr** and the process exits with code 1:
-
-```json
-{
-  "error": true,
-  "error_type": "ValidateBundleError",
-  "message": "Human-readable error description",
-  "hint": "Run 'pipelex-agent doctor' to check available models and routing configuration",
-  ...error-specific fields...
-}
-```
-
-Fields:
-- `error_type` — error class name for programmatic matching
-- `message` — human-readable description
-- `hint` — (optional) suggested recovery action, auto-added for known error types
-- `error_domain` — (optional) classifies the error source: `input` (agent can fix: bad .plx, wrong args, bad JSON), `config` (environment/config changes needed), or `runtime` (execution failure)
-- `retryable` — (optional, boolean) when `true`, the error may succeed on retry without changes (e.g., transient network issues)
-- Additional fields vary by error type (e.g., `validation_errors`, `pipe_code`, `model_handle`, `fallback_list`, `pipe_stack`)
-
-## Validation Error Structure
-
-When `pipelex-agent validate` reports a `ValidateBundleError`, the JSON includes a `validation_errors` array:
-
-```json
-{
-  "error": true,
-  "error_type": "ValidateBundleError",
-  "message": "Bundle validation failed",
-  "hint": "Check the 'validation_errors' array for specific issues to fix",
-  "validation_errors": [
-    {
-      "error_type": "missing_input_variable",
-      "pipe_code": "summarize_document",
-      "message": "Missing input variable(s): context."
-    }
-  ]
-}
-```
-
-Each item in `validation_errors` has:
-- `error_type` — one of the validation error types below
-- `pipe_code` — which pipe has the issue (may be null for bundle-level errors)
-- `message` — description of the specific problem
-
-## Error Type Reference
-
-### Validation Error Types (in .plx files)
-
-| Error Type | Meaning | Fix Strategy |
-|------------|---------|--------------|
-| `missing_input_variable` | A pipe's prompt references a variable not declared in its `inputs` | Add the missing variable to the pipe's `inputs` line |
-| `extraneous_input_variable` | A pipe declares an input that is never referenced in its prompt or sub-pipes | Remove the unused variable from `inputs` |
-| `input_stuff_spec_mismatch` | Input concept type doesn't match what the sub-pipe expects | Correct the concept type in `inputs` |
-| `inadequate_output_concept` | Output concept doesn't match what connected pipes expect | Fix the `output` field to the correct concept |
-| `inadequate_output_multiplicity` | Output multiplicity (single vs list) doesn't match | Add/remove `[]` from the output concept |
-| `circular_dependency_error` | Pipe references create a cycle | Restructure the workflow to break the cycle |
-| `llm_output_cannot_be_image` | PipeLLM cannot output Image type directly | Use PipeImgGen for image generation instead |
-| `img_gen_input_not_text_compatible` | PipeImgGen input must be text-compatible | Ensure the input to PipeImgGen is text-based (use ImgGenPrompt) |
-| `invalid_pipe_code_syntax` | Pipe code doesn't follow snake_case convention | Rename the pipe to valid snake_case |
-| `unknown_concept` | A concept referenced in a pipe is not defined in the bundle | Add the concept definition to the bundle, or fix the typo |
-| `unknown_validation_error` | Uncategorized validation issue | Read the `message` field for details |
-
-### Runtime Error Types (when running pipelines)
-
-| Error Type | Meaning | Fix Strategy |
-|------------|---------|--------------|
-| `PipeOperatorModelChoiceError` | The model preset in the pipe doesn't resolve to an available model | Run `pipelex-agent doctor` — check routing configuration |
-| `PipeOperatorModelAvailabilityError` | The resolved model is not available (missing API key, service down) | Run `pipelex-agent doctor` — verify API keys and model availability |
-| `PipelineExecutionError` | Pipeline failed during execution | Check `pipe_code` and `pipe_stack` in the error JSON for context |
-| `BuildPipeError` | Automated build failed | Check `failure_memory_path` in error JSON for debugging details |
+For all error types, recovery strategies, and error domains, see [Error Handling Reference](error-handling.md).
 
 ## Inline JSON for Inputs
 
@@ -201,21 +122,6 @@ pipelex-wip/
   test-files/           # Generated test files (images, PDFs)
     photo.jpg
 ```
-
-## Using the Doctor Command
-
-When you encounter model-related errors (`PipeOperatorModelChoiceError`, `PipeOperatorModelAvailabilityError`), run the doctor:
-
-```bash
-pipelex-agent doctor
-```
-
-The doctor checks:
-- Configuration health
-- Available models and routing
-- API key validity
-
-It auto-fixes issues when possible. Run it before debugging model errors manually.
 
 ## Generating Visualizations
 

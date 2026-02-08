@@ -1,6 +1,6 @@
 ---
 name: synthesize-inputs
-description: Generate synthetic test inputs for Pipelex workflows. Use when user asks to "create test data", "generate inputs", "synthesize inputs", "mock inputs", or wants to test a .plx workflow with realistic data. Analyzes workflow input requirements and produces complete JSON input files with realistic content.
+description: Generate synthetic test inputs for Pipelex workflows. Use when user says "create test data", "generate inputs", "synthesize inputs", "mock inputs", "I need test files", "make sample data for this workflow", or wants realistic data for testing a .plx pipeline. Handles text, images, documents, and structured data.
 ---
 
 # Synthesize Inputs
@@ -9,12 +9,7 @@ Generate realistic synthetic inputs for testing Pipelex workflows. Uses the agen
 
 ## Prerequisites
 
-Check CLI availability:
-1. Try `pipelex-agent --version`
-2. If not found, try `uv run pipelex-agent --version`
-3. If neither works, guide install: `pip install pipelex` or `uv add pipelex`
-
-Use whichever method works for all subsequent commands.
+See [CLI Prerequisites](../shared/prerequisites.md)
 
 ## Workflow
 
@@ -44,17 +39,7 @@ pipelex-agent inputs <bundle.plx> [--pipe specific_pipe]
 }
 ```
 
-**Error handling for `pipelex-agent inputs`:**
-
-| Error Type | Recovery |
-|------------|----------|
-| `ValidateBundleError` | Fix the .plx file — check `validation_errors` array for specific issues |
-| `PipeOperatorModelChoiceError` | Run `pipelex-agent doctor` — model preset doesn't resolve |
-| `PipeOperatorModelAvailabilityError` | Run `pipelex-agent doctor` — API key or service issue |
-| `FileNotFoundError` | Check that the bundle file path is correct |
-| `ArgumentError` | Check command flags — provide either a pipe code or a .plx file |
-
-For model/config issues, always try `pipelex-agent doctor` first.
+For error handling, see [Error Handling Reference](../shared/error-handling.md).
 
 ### Step 2: Identify Input Types
 
@@ -161,17 +146,7 @@ pipelex-agent run pipelex/builder/synthetic_inputs/synthesize_image.plx --inputs
 
 **Output**: The pipeline saves the generated image to `pipelex-wip/test-files/` and returns the file path.
 
-**Error handling for image synthesis (`pipelex-agent run`):**
-
-| Error Type | Recovery |
-|------------|----------|
-| `PipelineExecutionError` | Check `pipe_code` and `pipe_stack` for which pipe failed; the image generation model may be unavailable |
-| `PipeOperatorModelChoiceError` | Run `pipelex-agent doctor` — image generation model preset doesn't resolve |
-| `PipeOperatorModelAvailabilityError` | Run `pipelex-agent doctor` — API key or service issue for the image generation backend |
-| `FileNotFoundError` | Check that the synthesize_image.plx bundle path and input file path are correct |
-| `JSONDecodeError` | Fix the JSON syntax in the input file |
-
-For any model or configuration error, run `pipelex-agent doctor` to diagnose and follow its recommended actions.
+For image synthesis error handling, see [Error Handling Reference](../shared/error-handling.md).
 
 ---
 
@@ -436,5 +411,7 @@ pipelex-agent run image_analyzer.plx --inputs pipelex-wip/inputs/city_analysis_i
 
 ## Reference
 
-- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) for CLI philosophy and error type reference
-- [Pipelex Language Reference](../shared/pipelex-reference.md) for concept definitions and syntax
+- [CLI Prerequisites](../shared/prerequisites.md) — read at skill start to check CLI availability
+- [Error Handling](../shared/error-handling.md) — read when CLI returns an error to determine recovery
+- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) — read for CLI command syntax or output format details
+- [Pipelex Language Reference](../shared/pipelex-reference.md) — read for concept definitions and syntax
