@@ -10,11 +10,11 @@ Modify existing Pipelex workflow bundles.
 ## Workflow
 
 **Prerequisite**: Check CLI availability:
-1. Try `pipelex --version`
-2. If not found, try `uv run pipelex --version`
+1. Try `pipelex-agent --version`
+2. If not found, try `uv run pipelex-agent --version`
 3. If neither works, guide install: `pip install pipelex` or `uv add pipelex`
 
-Use whichever method works. Always add `--no-logo` to commands.
+Use whichever method works for all subsequent commands.
 
 1. **Read the existing .plx file** - Understand current structure before making changes
 
@@ -31,11 +31,11 @@ Use whichever method works. Always add `--no-logo` to commands.
    - Maintain POSIX standard (empty line at end, no trailing whitespace)
 
 4. **Validate after editing**:
-   - Run `pipelex --no-logo validate <file>.plx`
+   - Run `pipelex-agent validate <file>.plx`
    - Fix any errors introduced by changes
 
 5. **Regenerate inputs if needed**:
-   - If inputs changed, run `pipelex --no-logo build inputs <file>.plx`
+   - If inputs changed, run `pipelex-agent inputs <file>.plx`
    - Update existing inputs.json if present
 
 ## Native Concepts
@@ -53,4 +53,5 @@ These are built-in and do NOT need definitions:
 
 ## Reference
 
-See [Pipelex Language Reference](../shared/pipelex-reference.md) for complete syntax documentation.
+- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) for CLI philosophy and error type reference
+- [Pipelex Language Reference](../shared/pipelex-reference.md) for complete syntax documentation

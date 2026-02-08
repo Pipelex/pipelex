@@ -14,6 +14,39 @@ Create new Pipelex workflow bundles through an adaptive, phase-based approach. T
 3. **Visualization**: Present ASCII graphs at overview and detail levels
 4. **Iterative**: Refine at each phase before proceeding
 
+## Automated Alternative
+
+Before starting the manual 9-phase process, consider the automated build:
+
+```bash
+pipelex-agent build "Given a theme, write a Haiku"
+```
+
+**JSON output on success:**
+```json
+{
+  "output_dir": "pipelex-wip/pipeline_01",
+  "plx_file": "pipelex-wip/pipeline_01/bundle.plx",
+  "main_pipe_code": "write_haiku",
+  "domain": "haiku_writing",
+  "pipe_inputs": {"theme": "Text"},
+  "pipe_output": "Haiku"
+}
+```
+
+Key output fields:
+- `plx_file` — path to the generated .plx bundle
+- `pipe_inputs` — maps input variable names to their concept types
+- `pipe_output` — the output concept type
+
+**When to use which:**
+- **Automated** — simple to moderate workflows, fast iteration, starting point for refinement
+- **Manual (below)** — complex workflows, custom controller logic, precise prompt engineering, full control
+
+Recommended approach: start with `pipelex-agent build`, then refine with /edit and /fix skills.
+
+---
+
 ## Prerequisites
 
 Check CLI availability:
@@ -526,4 +559,5 @@ inputs = {
 
 ## Reference
 
-See [Pipelex Language Reference](../shared/pipelex-reference.md) for complete syntax documentation.
+- [Pipelex Agent Guide](../shared/pipelex-agent-guide.md) for CLI philosophy and error type reference
+- [Pipelex Language Reference](../shared/pipelex-reference.md) for complete syntax documentation

@@ -15,6 +15,7 @@ from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDeco
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
@@ -31,6 +32,7 @@ async def _run_pipeline_core(
     dry_run: bool = False,
     mock_inputs: bool = False,
     library_dirs: list[str] | None = None,
+    graph: bool = False,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -42,6 +44,7 @@ async def _run_pipeline_core(
         dry_run: Whether to run in dry mode (no actual inference).
         mock_inputs: Whether to generate mock data for missing inputs.
         library_dirs: List of library directories to search for pipe definitions.
+        graph: Whether to generate execution graph visualizations.
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -52,7 +55,7 @@ async def _run_pipeline_core(
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
-        generate_graph=False,
+        generate_graph=graph,
         mock_inputs=mock_inputs or None,
     )
 
@@ -75,13 +78,71 @@ async def _run_pipeline_core(
             "html": await main_stuff.content.rendered_html_async(),
         }
 
-    return {
+    result: dict[str, Any] = {
         "success": True,
         "pipe_code": pipe_code,
         "dry_run": dry_run,
         "main_stuff": main_stuff_json,
         "working_memory": pipe_output.working_memory.smart_dump(),
     }
+
+    # Generate and save graph visualizations if requested
+    if graph and pipe_output.graph_spec:
+        graph_config = execution_config.graph_config
+        # Enable HTML outputs and data inclusion for the render
+        render_graph_config = graph_config.model_copy(
+            update={
+                "data_inclusion": graph_config.data_inclusion.model_copy(
+                    update={
+                        "stuff_json_content": True,
+                        "stuff_text_content": True,
+                        "stuff_html_content": True,
+                    }
+                ),
+                "graphs_inclusion": graph_config.graphs_inclusion.model_copy(
+                    update={
+                        "graphspec_json": True,
+                        "mermaidflow_html": True,
+                        "reactflow_html": True,
+                    }
+                ),
+            }
+        )
+
+        graph_outputs = await generate_graph_outputs(
+            graph_spec=pipe_output.graph_spec,
+            graph_config=render_graph_config,
+            pipe_code=pipe_code,
+        )
+
+        # Determine output directory from bundle path or current directory
+        output_dir: Path
+        if bundle_uri:
+            output_dir = Path(bundle_uri).parent / "pipelex-wip"
+        else:
+            output_dir = Path("pipelex-wip")
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        graph_files: dict[str, str] = {}
+
+        if graph_outputs.graphspec_json is not None:
+            graphspec_path = output_dir / "graphspec.json"
+            graphspec_path.write_text(graph_outputs.graphspec_json, encoding="utf-8")
+            graph_files["graphspec_json"] = str(graphspec_path)
+
+        if graph_outputs.mermaidflow_html is not None:
+            mermaidflow_path = output_dir / "mermaidflow.html"
+            mermaidflow_path.write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
+            graph_files["mermaidflow_html"] = str(mermaidflow_path)
+
+        if graph_outputs.reactflow_html is not None:
+            reactflow_path = output_dir / "reactflow.html"
+            reactflow_path.write_text(graph_outputs.reactflow_html, encoding="utf-8")
+            graph_files["reactflow_html"] = str(reactflow_path)
+
+        result["graph_files"] = graph_files
+
+    return result
 
 
 def run_cmd(
@@ -109,6 +170,10 @@ def run_cmd(
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
     ] = False,
+    graph: Annotated[
+        bool,
+        typer.Option("--graph", help="Generate execution graph visualizations (saved alongside output)"),
+    ] = False,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
@@ -122,6 +187,7 @@ def run_cmd(
         pipelex-agent run my_pipe --inputs data.json
         pipelex-agent run my_bundle.plx --pipe my_pipe
         pipelex-agent run my_pipe --dry-run --mock-inputs
+        pipelex-agent run my_bundle.plx --graph
     """
     # Validate that at least one target is provided
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -202,6 +268,7 @@ def run_cmd(
                 dry_run=dry_run,
                 mock_inputs=mock_inputs,
                 library_dirs=library_dir,
+                graph=graph,
             )
         )
         agent_success(result)
