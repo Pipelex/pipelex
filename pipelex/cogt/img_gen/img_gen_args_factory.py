@@ -428,6 +428,10 @@ class ImgGenArgsFactory:
         if not input_images:
             return {}
 
+        if input_images_taxonomy == InputImagesTaxonomy.NONE:
+            msg = "Model does not support image inputs, but input images were provided"
+            raise ImgGenParameterError(msg)
+
         match input_images_taxonomy:
             case InputImagesTaxonomy.GPT_IMAGE:
                 # OpenAI /images/edits format: "image" accepts array of base64 data URLs
@@ -441,6 +445,9 @@ class ImgGenArgsFactory:
                     elif isinstance(prepped, PreparedFileHttpUrl):
                         # GPT Image API requires base64 data URLs, not HTTP URLs
                         msg = "GPT Image API requires base64 data URLs, but got HTTP URL"
+                        raise ImgGenParameterError(msg)
+                    else:
+                        msg = f"Unexpected PreparedFile type for GPT Image API: {type(prepped).__name__}"
                         raise ImgGenParameterError(msg)
                 return {"image": image_data_urls}
 
@@ -456,8 +463,7 @@ class ImgGenArgsFactory:
                         args[key] = prepped.as_data_url()
                     elif isinstance(prepped, PreparedFileHttpUrl):
                         args[key] = prepped.url
+                    else:
+                        msg = f"Unexpected PreparedFile type for Flux 2 API: {type(prepped).__name__}"
+                        raise ImgGenParameterError(msg)
                 return args
-
-            case InputImagesTaxonomy.NONE:
-                # Model does not support image inputs
-                return {}

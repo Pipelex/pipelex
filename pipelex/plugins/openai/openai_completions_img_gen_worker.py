@@ -170,6 +170,9 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                         "image_url": {"url": prepped_image.url},
                     }
                 )
+            else:
+                msg = f"Unexpected PreparedFile type: {type(prepped_image).__name__}"
+                raise ImgGenParameterError(msg)
 
         return [{"role": "user", "content": user_contents}]
 
