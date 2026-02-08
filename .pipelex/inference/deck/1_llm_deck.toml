@@ -72,6 +72,10 @@ vision-table = { model = "@default-premium-vision", temperature = 0.3 }
 img-gen-prompting = { model = "@default-premium", temperature = 0.5 }
 img-gen-prompting-cheap = { model = "@default-small", temperature = 0.5 }
 
+# Reasoning
+deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high" }
+quick-reasoning = { model = "@default-premium", temperature = 0.3, reasoning_effort = "low" }
+
 # Testing
 testing-text = { model = "@default-small", temperature = 0.5 }
 testing-structured = { model = "@default-small-structured", temperature = 0.1 }

@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "openai"
 structure_method = "instructor/openai_tools"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -35,73 +36,100 @@ model_id = "blackboxai/anthropic/claude-sonnet-4.5"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3.00, output = 15.00 }
+thinking_mode = "manual"
 
 ["claude-4.5-haiku"]
 model_id = "blackboxai/anthropic/claude-haiku-4.5"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.00, output = 5.00 }
+thinking_mode = "manual"
 
 [claude-4-sonnet]
 model_id = "blackboxai/anthropic/claude-sonnet-4"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 3.00, output = 15.00 }
+thinking_mode = "manual"
 
 ["claude-4.5-opus"]
 model_id = "blackboxai/anthropic/claude-opus-4.5"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 5.00, output = 25.00 }
+thinking_mode = "manual"
+
+["claude-4.6-opus"]
+model_id = "blackboxai/anthropic/claude-opus-4.6"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 5.00, output = 25.00 }
+thinking_mode = "adaptive"
 
 # --- OpenAI GPT-5 Models ------------------------------------------------------
-["gpt-5.2"]
-model_id = "blackboxai/openai/gpt-5.2"
+[gpt-5-mini]
+model_id = "blackboxai/openai/gpt-5-mini"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
-costs = { input = 1.75, output = 14.00 }
-
-["gpt-5.2-pro"]
-model_id = "blackboxai/openai/gpt-5.2-pro"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 2.00, output = 16.00 }
-
-["gpt-5.1-codex"]
-model_id = "blackboxai/openai/gpt-5.1-codex"
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 1.25, output = 10.00 }
-
-["gpt-5.1"]
-model_id = "blackboxai/openai/gpt-5.1"
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-costs = { input = 1.25, output = 10.00 }
-
-[gpt-5-codex]
-model_id = "blackboxai/openai/gpt-5-codex"
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 1.25, output = 10.00 }
+costs = { input = 0.25, output = 2.00 }
+thinking_mode = "manual"
+sdk = "openai_responses"
 
 [gpt-5]
 model_id = "blackboxai/openai/gpt-5"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.00 }
+thinking_mode = "manual"
+sdk = "openai_responses"
 
 [gpt-5-pro]
 model_id = "blackboxai/openai/gpt-5-pro"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 15.00, output = 120.00 }
+thinking_mode = "manual"
+sdk = "openai_responses"
 
-[gpt-5-mini]
-model_id = "blackboxai/openai/gpt-5-mini"
+[gpt-5-codex]
+model_id = "blackboxai/openai/gpt-5-codex"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.00 }
+thinking_mode = "manual"
+sdk = "openai_responses"
+
+["gpt-5.1"]
+model_id = "blackboxai/openai/gpt-5.1"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
-costs = { input = 0.25, output = 2.00 }
+costs = { input = 1.25, output = 10.00 }
+thinking_mode = "manual"
+sdk = "openai_responses"
+
+["gpt-5.1-codex"]
+model_id = "blackboxai/openai/gpt-5.1-codex"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.00 }
+thinking_mode = "manual"
+sdk = "openai_responses"
+
+["gpt-5.2"]
+model_id = "blackboxai/openai/gpt-5.2"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.00 }
+thinking_mode = "manual"
+sdk = "openai_responses"
+
+["gpt-5.2-pro"]
+model_id = "blackboxai/openai/gpt-5.2-pro"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.00, output = 16.00 }
+thinking_mode = "manual"
+sdk = "openai_responses"
 
 # --- Google Gemini Models -----------------------------------------------------
 ["gemini-2.5-pro"]
@@ -109,12 +137,14 @@ model_id = "blackboxai/google/gemini-2.5-pro"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.00 }
+thinking_mode = "none"
 
 ["gemini-2.5-flash"]
 model_id = "blackboxai/google/gemini-2.5-flash"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.30, output = 2.50 }
+thinking_mode = "none"
 
 # --- MiniMax Models -----------------------------------------------------------
 [minimax-m2]

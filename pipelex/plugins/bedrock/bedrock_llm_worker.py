@@ -5,6 +5,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError, LLMCapabilityError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
+from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtocol
@@ -41,12 +42,22 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
             raise BedrockWorkerConfigurationError(msg)
         self.bedrock_client_for_text = sdk_instance
 
+    def _validate_no_reasoning_params(self, job_params: LLMJobParams) -> None:
+        """Validate that no reasoning parameters are set for Bedrock native models."""
+        if job_params.reasoning_effort is not None or job_params.reasoning_budget is not None:
+            msg = (
+                f"Model '{self.inference_model.desc}' does not support reasoning parameters; "
+                "Bedrock native models do not support reasoning_effort or reasoning_budget"
+            )
+            raise LLMCapabilityError(msg)
+
     @override
     async def _gen_text(
         self,
         llm_job: LLMJob,
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
+        self._validate_no_reasoning_params(job_params=job_params)
         message = BedrockFactory.make_simple_message(llm_job=llm_job)
 
         log.verbose(self.inference_model.model_id)

@@ -204,6 +204,7 @@ nav:
     - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
     - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
     - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
+    - Reasoning Controls: under-the-hood/reasoning-controls.md
     - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
     - Test Profile Configuration: under-the-hood/test-profile-configuration.md
   - API: https://pipelex.github.io/pipelex-api/
