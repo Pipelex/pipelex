@@ -185,6 +185,11 @@ class ImgGenArgsFactory:
         """Map prompt parameters to provider-specific format."""
         match prompt_taxonomy:
             case PromptTaxonomy.POSITIVE_ONLY:
+                if negative_text:
+                    log.warning(
+                        f"A negative prompt was provided but the model's prompt taxonomy is '{PromptTaxonomy.POSITIVE_ONLY}', "
+                        "which does not support negative prompts. The negative prompt will be silently ignored."
+                    )
                 return {"prompt": positive_text}
             case PromptTaxonomy.WITH_NEGATIVE:
                 args_dict: dict[str, Any] = {"prompt": positive_text}
