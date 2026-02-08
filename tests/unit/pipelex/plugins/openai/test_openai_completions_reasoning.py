@@ -97,3 +97,10 @@ class TestOpenAICompletionsReasoning:
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         with pytest.raises(LLMCapabilityError, match="adaptive"):
             worker._resolve_reasoning_effort(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+
+    def test_reasoning_budget_with_thinking_mode_none_raises(self, mocker: MockerFixture):
+        """reasoning_budget with thinking_mode=none gives an accurate 'does not support reasoning' error."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
+        job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
+        with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
+            worker._resolve_reasoning_effort(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]

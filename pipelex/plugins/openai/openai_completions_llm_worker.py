@@ -91,15 +91,23 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                     log.verbose(f"OpenAI Chat Completions reasoning_effort={openai_effort}")
                     return openai_effort
                 case ThinkingMode.ADAPTIVE:
-                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported for OpenAI models"
+                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
                     raise LLMCapabilityError(msg)
                 case ThinkingMode.NONE:
                     msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
                     raise LLMCapabilityError(msg)
 
         if job_params.reasoning_budget is not None:
-            msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
-            raise LLMCapabilityError(msg)
+            match thinking_mode:
+                case ThinkingMode.MANUAL:
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
+                    raise LLMCapabilityError(msg)
+                case ThinkingMode.ADAPTIVE:
+                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Chat Completions API"
+                    raise LLMCapabilityError(msg)
+                case ThinkingMode.NONE:
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    raise LLMCapabilityError(msg)
 
         return None
 

@@ -36,4 +36,5 @@ class MistralConfig(ConfigModel):
         level_str = get_reasoning_level_str(self.effort_to_level_map, effort)
         if level_str is None:
             return None
-        return cast("MistralPromptMode", level_str)
+        mistral_level = MistralReasoningLevel(level_str)
+        return cast("MistralPromptMode", mistral_level)

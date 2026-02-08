@@ -124,7 +124,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **kimi-k2-thinking**
   - inputs: text
   - outputs: text, structured
-- **mistral-large-3**
+- **mistral-large**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **o1**
@@ -190,6 +190,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-02-08T02:33:26Z
+> Last updated: 2026-02-08T16:49:47Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

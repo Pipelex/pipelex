@@ -40,4 +40,11 @@ class GoogleConfig(ConfigModel):
         level_str = get_reasoning_level_str(self.effort_to_level_map, effort)
         if level_str is None:
             return None
-        return genai_types.ThinkingLevel(level_str.upper())
+        google_level = GoogleThinkingLevel(level_str)
+        match google_level:
+            case GoogleThinkingLevel.LOW:
+                return genai_types.ThinkingLevel.LOW
+            case GoogleThinkingLevel.MEDIUM:
+                return genai_types.ThinkingLevel.MEDIUM
+            case GoogleThinkingLevel.HIGH:
+                return genai_types.ThinkingLevel.HIGH

@@ -109,7 +109,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
             max_tokens: The effective max_tokens for this request.
 
         Returns:
-            A _ThinkingParams container with thinking, temperature, output_config, and suppress_temperature.
+            A _ThinkingParams container with thinking, output_config, and suppress_temperature.
 
         """
         thinking_mode = self.inference_model.thinking_mode

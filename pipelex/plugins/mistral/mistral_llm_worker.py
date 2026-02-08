@@ -68,8 +68,16 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         thinking_mode = self.inference_model.thinking_mode
 
         if job_params.reasoning_budget is not None:
-            msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; Mistral uses prompt_mode instead"
-            raise LLMCapabilityError(msg)
+            match thinking_mode:
+                case ThinkingMode.MANUAL:
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; Mistral uses prompt_mode instead"
+                    raise LLMCapabilityError(msg)
+                case ThinkingMode.ADAPTIVE:
+                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported for Mistral models"
+                    raise LLMCapabilityError(msg)
+                case ThinkingMode.NONE:
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    raise LLMCapabilityError(msg)
 
         if job_params.reasoning_effort is not None:
             effort = job_params.reasoning_effort
