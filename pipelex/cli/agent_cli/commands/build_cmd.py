@@ -63,6 +63,9 @@ def build_cmd(
         build_extra: dict[str, Any] = {}
         if exc.failure_memory_path:
             build_extra["failure_memory_path"] = str(exc.failure_memory_path)
+        if exc.__cause__:
+            build_extra["cause_type"] = type(exc.__cause__).__name__
+            build_extra["cause_message"] = str(exc.__cause__)
         agent_error(exc.message, "BuildPipeError", cause=exc, **build_extra)
 
     except ValidateBundleError as exc:
@@ -83,13 +86,15 @@ def build_cmd(
         )
 
     except PipeOperatorModelAvailabilityError as exc:
-        agent_error(
-            str(exc),
-            "PipeOperatorModelAvailabilityError",
-            cause=exc,
-            pipe_code=exc.pipe_code,
-            model_handle=exc.model_handle,
-        )
+        availability_extra: dict[str, Any] = {
+            "pipe_code": exc.pipe_code,
+            "model_handle": exc.model_handle,
+        }
+        if exc.fallback_list:
+            availability_extra["fallback_list"] = exc.fallback_list
+        if exc.pipe_stack:
+            availability_extra["pipe_stack"] = exc.pipe_stack
+        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
     except Exception as exc:
         agent_error(f"Build failed: {exc}", type(exc).__name__, cause=exc)

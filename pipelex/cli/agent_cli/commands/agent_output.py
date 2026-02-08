@@ -52,6 +52,43 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }
 
+RETRYABLE_ERROR_TYPES: set[str] = {
+    "RemoteConfigFetchError",
+    "PipeOperatorModelAvailabilityError",
+}
+
+AGENT_ERROR_DOMAINS: dict[str, str] = {
+    # input = agent can fix (bad .plx, wrong args, bad JSON)
+    "ValidateBundleError": "input",
+    "PipeValidationError": "input",
+    "FileNotFoundError": "input",
+    "JSONDecodeError": "input",
+    "JsonTypeError": "input",
+    "ArgumentError": "input",
+    "PLXDecodeError": "input",
+    "PipelexInterpreterError": "input",
+    "ValidationError": "input",
+    "ValueError": "input",
+    "BundleError": "input",
+    "GraphSpecParseError": "input",
+    "ConceptLoadError": "input",
+    "PipeLoadError": "input",
+    "UnknownCommandError": "input",
+    # config = environment/config changes needed
+    "PipeOperatorModelChoiceError": "config",
+    "PipeOperatorModelAvailabilityError": "config",
+    "ModelDeckPresetValidatonError": "config",
+    "TelemetryConfigValidationError": "config",
+    "GatewayTermsNotAcceptedError": "config",
+    "GatewayApiKeyMissingError": "config",
+    "GatewayDoNotTrackConflictError": "config",
+    "RemoteConfigFetchError": "config",
+    "RemoteConfigValidationError": "config",
+    # runtime = execution failure
+    "PipelineExecutionError": "runtime",
+    "BuildPipeError": "runtime",
+}
+
 
 def agent_error(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
     """Print a structured JSON error to stderr and exit with code 1.
@@ -71,6 +108,11 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     hint = AGENT_ERROR_HINTS.get(error_type)
     if hint:
         error_json["hint"] = hint
+    if error_type in RETRYABLE_ERROR_TYPES:
+        error_json["retryable"] = True
+    domain = AGENT_ERROR_DOMAINS.get(error_type)
+    if domain:
+        error_json["error_domain"] = domain
     error_json.update(extra)
     print(json.dumps(error_json, indent=2), file=sys.stderr)
     raise typer.Exit(1) from cause

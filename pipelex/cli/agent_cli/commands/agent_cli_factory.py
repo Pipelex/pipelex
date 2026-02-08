@@ -36,17 +36,17 @@ def make_pipelex_for_agent_cli(library_dirs: list[str] | list[Path] | None = Non
     try:
         return Pipelex.make(integration_mode=IntegrationMode.CLI, library_dirs=library_dirs)
     except TelemetryConfigValidationError as exc:
-        agent_error(str(exc), "TelemetryConfigValidationError", cause=exc)
+        agent_error(exc.message, "TelemetryConfigValidationError", cause=exc)
     except GatewayTermsNotAcceptedError as exc:
-        agent_error(str(exc), "GatewayTermsNotAcceptedError", cause=exc)
+        agent_error(exc.message, "GatewayTermsNotAcceptedError", cause=exc)
     except GatewayApiKeyMissingError as exc:
-        agent_error(str(exc), "GatewayApiKeyMissingError", cause=exc)
+        agent_error(exc.message, "GatewayApiKeyMissingError", cause=exc)
     except GatewayDoNotTrackConflictError as exc:
-        agent_error(str(exc), "GatewayDoNotTrackConflictError", cause=exc)
+        agent_error(exc.message, "GatewayDoNotTrackConflictError", cause=exc)
     except RemoteConfigFetchError as exc:
-        agent_error(str(exc), "RemoteConfigFetchError", cause=exc)
+        agent_error(exc.message, "RemoteConfigFetchError", cause=exc)
     except RemoteConfigValidationError as exc:
-        agent_error(str(exc), "RemoteConfigValidationError", cause=exc)
+        agent_error(exc.message, "RemoteConfigValidationError", cause=exc)
     except ModelDeckPresetValidatonError as exc:
         agent_error(
             exc.message,

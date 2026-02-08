@@ -300,13 +300,15 @@ def validate_cmd(
         )
 
     except PipeOperatorModelAvailabilityError as exc:
-        agent_error(
-            str(exc),
-            "PipeOperatorModelAvailabilityError",
-            cause=exc,
-            pipe_code=exc.pipe_code,
-            model_handle=exc.model_handle,
-        )
+        availability_extra: dict[str, Any] = {
+            "pipe_code": exc.pipe_code,
+            "model_handle": exc.model_handle,
+        }
+        if exc.fallback_list:
+            availability_extra["fallback_list"] = exc.fallback_list
+        if exc.pipe_stack:
+            availability_extra["pipe_stack"] = exc.pipe_stack
+        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
     except Exception as exc:
         agent_error(str(exc), type(exc).__name__, cause=exc)

@@ -116,7 +116,9 @@ Fields:
 - `error_type` — error class name for programmatic matching
 - `message` — human-readable description
 - `hint` — (optional) suggested recovery action, auto-added for known error types
-- Additional fields vary by error type (e.g., `validation_errors`, `pipe_code`, `model_handle`)
+- `error_domain` — (optional) classifies the error source: `input` (agent can fix: bad .plx, wrong args, bad JSON), `config` (environment/config changes needed), or `runtime` (execution failure)
+- `retryable` — (optional, boolean) when `true`, the error may succeed on retry without changes (e.g., transient network issues)
+- Additional fields vary by error type (e.g., `validation_errors`, `pipe_code`, `model_handle`, `fallback_list`, `pipe_stack`)
 
 ## Validation Error Structure
 

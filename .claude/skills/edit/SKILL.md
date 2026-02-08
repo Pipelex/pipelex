@@ -34,6 +34,27 @@ Use whichever method works for all subsequent commands.
    - Run `pipelex-agent validate <file>.plx`
    - Fix any errors introduced by changes
 
+   **Validation error example:**
+   ```json
+   {
+     "error": true,
+     "error_type": "ValidateBundleError",
+     "error_domain": "input",
+     "message": "Bundle validation failed",
+     "hint": "Check the 'validation_errors' array for specific issues to fix",
+     "validation_errors": [
+       {"error_type": "missing_input_variable", "pipe_code": "my_pipe", "message": "..."}
+     ]
+   }
+   ```
+
+   **Error recovery:**
+
+   | Error Domain | Error Types | Action |
+   |-------------|-------------|--------|
+   | `input` | `ValidateBundleError`, `PLXDecodeError`, `PipelexInterpreterError` | Fix the .plx file based on `validation_errors` or `message`; use /fix skill |
+   | `config` | `PipeOperatorModelChoiceError`, `PipeOperatorModelAvailabilityError` | Run `pipelex-agent doctor`; this is not a .plx issue |
+
 5. **Regenerate inputs if needed**:
    - If inputs changed, run `pipelex-agent inputs <file>.plx`
    - Update existing inputs.json if present

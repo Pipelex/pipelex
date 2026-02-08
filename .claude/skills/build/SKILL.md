@@ -45,6 +45,33 @@ Key output fields:
 
 Recommended approach: start with `pipelex-agent build`, then refine with /edit and /fix skills.
 
+### Build Error Handling
+
+**JSON output on error:**
+```json
+{
+  "error": true,
+  "error_type": "BuildPipeError",
+  "error_domain": "runtime",
+  "message": "Build failed: ...",
+  "hint": "Check 'failure_memory_path' for builder loop failure diagnostics if present",
+  "failure_memory_path": "pipelex-wip/pipeline_01/failure_memory.json",
+  "cause_type": "PipelineExecutionError",
+  "cause_message": "Pipeline execution failed in pipe 'pipe_builder'"
+}
+```
+
+**Error recovery:**
+
+| Error Type | Domain | Action |
+|------------|--------|--------|
+| `BuildPipeError` | runtime | Read `failure_memory_path` if present for diagnostics; check `cause_type`/`cause_message` for root cause |
+| `ValidateBundleError` | input | Check `validation_errors` array; fix .plx issues then re-validate |
+| `PipeOperatorModelAvailabilityError` | config | Run `pipelex-agent doctor`; check `fallback_list` for models that were tried |
+| `PipeOperatorModelChoiceError` | config | Run `pipelex-agent doctor`; check model routing configuration |
+
+When `failure_memory_path` is present, read that file to understand the builder loop's last state and what went wrong.
+
 ---
 
 ## Prerequisites
@@ -173,6 +200,8 @@ field = {type = "list", item_type = "concept", item_concept_ref = "my_domain.Oth
 ```
 
 **Output**: Validated concept TOML fragments
+
+> **Partial failures**: If some concept commands fail while others succeed, fix the failing specs using the error JSON (`error_domain: "input"` means the spec is wrong; `error_domain: "config"` means a model/config issue). Re-run only the failed commands.
 
 ---
 
@@ -440,6 +469,8 @@ pipelex-agent pipe --type PipeSequence --spec '{"pipe_code": "main_workflow", "d
 ```
 
 **Output**: Validated pipe TOML fragments
+
+> **Partial failures**: If some pipe commands fail while others succeed, fix the failing specs using the error JSON (`error_domain: "input"` means the spec is wrong; `error_domain: "config"` means a model/config issue). Re-run only the failed commands.
 
 ---
 
