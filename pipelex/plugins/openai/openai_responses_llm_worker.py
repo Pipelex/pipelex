@@ -88,7 +88,7 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 case ThinkingMode.MANUAL:
                     openai_effort = get_config().cogt.llm_config.openai_config.get_reasoning_level(effort=effort)
                     log.verbose(f"OpenAI Responses reasoning effort={openai_effort}")
-                    return Reasoning(effort=openai_effort)  # type: ignore[typeddict-item]
+                    return Reasoning(effort=openai_effort)
                 case ThinkingMode.ADAPTIVE:
                     msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
                     raise LLMCapabilityError(msg)
