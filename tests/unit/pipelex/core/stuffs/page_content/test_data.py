@@ -42,5 +42,5 @@ class TestData:
     # Expected outputs for render methods
     EXPECTED_RENDERED_MARKDOWN = "# text_and_images\n\n## text: ### text: Page content text\n\n## images: None\n\n# page_view: None"
     EXPECTED_RENDERED_FOR_PROMPT = "# text_and_images\n\n## text: ### text: Page content text\n\n## images: None\n\n# page_view: None"
-    # TextAndImagesContent.rendered_html returns the text content
-    EXPECTED_RENDERED_HTML = "<dl><dt>text_and_images</dt><dd>Page content text</dd><dt>page_view</dt><dd><em>None</em></dd></dl>"
+    # TextAndImagesContent.rendered_html returns the text content (table format, skips None values)
+    EXPECTED_RENDERED_HTML = "<table><tr><th>text_and_images</th><td>Page content text</td></tr></table>"

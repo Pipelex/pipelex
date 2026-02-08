@@ -136,6 +136,20 @@ class TestGenerateFieldValueBasicTypes:
         result = generator.generate_field_value(bool, "active")
         assert result is False
 
+    def test_int_or_float_union_field(self) -> None:
+        """Int | float union field generates a numeric value (1), not a string placeholder."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_field_value(int | float, "number")
+        assert isinstance(result, (int, float)), f"Expected int or float, got {type(result)}: {result}"
+        assert result == 1
+
+    def test_float_or_int_union_field(self) -> None:
+        """Float | int union field generates a numeric value (1), not a string placeholder."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_field_value(float | int, "amount")
+        assert isinstance(result, (int, float)), f"Expected int or float, got {type(result)}: {result}"
+        assert result == 1
+
 
 # =============================================================================
 # Tests for generate_field_value - complex types
@@ -558,3 +572,40 @@ class TestSchemaRepresentationWithMultiple:
         items_schema = result["content"]["items"]
         assert items_schema["type"] == "object"
         assert "properties" in items_schema
+
+
+# =============================================================================
+# Tests for NumberContent (native Number concept)
+# =============================================================================
+
+
+class TestNumberContentRepresentation:
+    """Test that NumberContent generates proper numeric values, not string placeholders.
+
+    NumberContent has a field 'number: int | float' which is a union type.
+    The generator should produce a numeric value (1), not 'number_int | float'.
+    """
+
+    def test_number_content_json_representation(self) -> None:
+        """NumberContent generates proper numeric value in JSON format."""
+        from pipelex.core.stuffs.number_content import NumberContent  # noqa: PLC0415
+
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_class_representation(NumberContent)
+
+        assert isinstance(result, dict)
+        assert "number" in result
+        assert isinstance(result["number"], (int, float)), f"Expected numeric value, got {type(result['number'])}: {result['number']}"
+        assert result["number"] == 1
+
+    def test_number_content_python_representation(self) -> None:
+        """NumberContent generates proper numeric value in Python format."""
+        from pipelex.core.stuffs.number_content import NumberContent  # noqa: PLC0415
+
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
+        result = generator.generate_class_representation(NumberContent)
+
+        # Should be "NumberContent(number=1)" not "NumberContent(number=\"number_int | float\")"
+        assert isinstance(result, str)
+        assert "number=1" in result, f"Expected 'number=1' in result, got: {result}"
+        assert "number_int" not in result, f"Should not contain string placeholder: {result}"

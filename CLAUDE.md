@@ -1,4 +1,3 @@
-<!-- BEGIN_PIPELEX_RULES -->
 # Pipelex Coding Rules
 
 ## Commands
@@ -30,12 +29,12 @@
 
 ### Running Tests
 
-   After you're finished making code changes, you must always run tests using `make test-xdist`.
+   After you're finished making code changes, you must always run tests using `make agent-test`.
 
    ```bash
-   make test-xdist
-   # If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
-   # If some test failes, re-run it with `-s -vv` to see more details
+   make agent-test
+   # If the current system doesn't have the `make` command, lookup the "agent-test" target in the Makefile and run the command manually.
+   # Zero output on success; full output on failure.
    ```
 
 ### Running Tests with Prints
@@ -83,19 +82,6 @@
 
    For standard installations, the virtual environment is named `.venv`. Always check this first. On Windows, the path is `.venv\Scripts\` instead of `.venv/bin/`.
 
-### Pipelex CLI Commands
-
-   To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.
-
-   ```bash
-   .venv/bin/pipelex --help
-   .venv/bin/pipelex build --help --no-logo
-   .venv/bin/pipelex run --help --no-logo
-   .venv/bin/pipelex validate --help --no-logo
-   .venv/bin/pipelex doctor --help --no-logo
-   .venv/bin/pipelex init --help --no-logo
-   ```
-
 ## Coding Standards & Best Practices for Python Code
 
 This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
@@ -111,7 +97,7 @@ This document outlines the core coding standards, best practices, and quality co
 
     - When defining enums related to string values, always inherit from `StrEnum`
     - When you need the enum value as a string, don't use `str(enum_var)` or `enum_var.value`, just use `enum_var` itself, that is the point of using StrEnum!
-    - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
+    - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add @property methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
     - As our match/case constructs over enums are always exhaustive, NEVER add a default `case _: ...`. Otherwise, you won't pass linting.
     - `StrEnum` must be imported from `pipelex.types` (handles python retrocompatibility):
     ```python
@@ -358,4 +344,3 @@ This document outlines our test-driven development (TDD) process and the tools a
 4. **Validate tests**
 
 Remember: The key to TDD is writing the test first and letting it drive your implementation. Then, always run the full test suite and quality checks before considering a feature complete.
-<!-- END_PIPELEX_RULES -->

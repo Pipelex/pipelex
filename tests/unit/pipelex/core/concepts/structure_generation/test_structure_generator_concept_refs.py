@@ -293,32 +293,62 @@ class ComplexEntity(StructuredContent):
         assert generated_code == expected_code
         assert issubclass(generated_class, StructuredContent)
 
-    def test_native_concept_ref_uses_forward_reference(self):
-        """Test generation with native concept references uses forward reference."""
+    def test_native_concept_ref_generates_import_and_uses_content_class(self):
+        """Test generation with native concept references (e.g., native.Html) generates proper import."""
         structure_blueprint = {
-            "text_content": ConceptStructureBlueprint(
-                description="Text content reference",
+            "html_report": ConceptStructureBlueprint(
+                description="HTML report content",
                 type=ConceptStructureBlueprintFieldType.CONCEPT,
-                concept_ref="native.TextContent",
+                concept_ref="native.Html",
                 required=True,
             ),
         }
 
         generator = StructureGenerator()
-        generated_code, generated_class = generator.generate_from_structure_blueprint("Wrapper", structure_blueprint)
+        generated_code, generated_class = generator.generate_from_structure_blueprint("ReportWrapper", structure_blueprint)
 
-        expected_code = (
-            AUTOGEN_HEADER
-            + STANDARD_IMPORTS
-            + '''
+        # Native concepts should generate imports and use the Content class name
+        assert "from pipelex.core.stuffs.html_content import HtmlContent" in generated_code
+        assert "html_report: HtmlContent = Field(...," in generated_code
+        assert issubclass(generated_class, StructuredContent)
 
-class Wrapper(StructuredContent):
-    """Generated Wrapper class"""
+    def test_native_text_concept_ref_generates_import(self):
+        """Test generation with native.Text concept reference generates proper import."""
+        structure_blueprint = {
+            "text_content": ConceptStructureBlueprint(
+                description="Text content reference",
+                type=ConceptStructureBlueprintFieldType.CONCEPT,
+                concept_ref="native.Text",
+                required=True,
+            ),
+        }
 
-    text_content: "TextContent" = Field(..., description="Text content reference")
-'''
-        )
-        assert generated_code == expected_code
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint("TextWrapper", structure_blueprint)
+
+        # Native concepts should generate imports and use the Content class name
+        assert "from pipelex.core.stuffs.text_content import TextContent" in generated_code
+        assert "text_content: TextContent = Field(...," in generated_code
+        assert issubclass(generated_class, StructuredContent)
+
+    def test_list_of_native_concepts_generates_import(self):
+        """Test generation with list of native concept references generates proper import."""
+        structure_blueprint = {
+            "images": ConceptStructureBlueprint(
+                description="List of images",
+                type=ConceptStructureBlueprintFieldType.LIST,
+                item_type="concept",
+                item_concept_ref="native.Image",
+                required=True,
+            ),
+        }
+
+        generator = StructureGenerator()
+        generated_code, generated_class = generator.generate_from_structure_blueprint("ImageGallery", structure_blueprint)
+
+        # Native concepts in lists should also generate imports
+        assert "from pipelex.core.stuffs.image_content import ImageContent" in generated_code
+        assert "images: List[ImageContent] = Field(...," in generated_code
         assert issubclass(generated_class, StructuredContent)
 
     def test_concept_ref_with_module_path_generates_import(self):

@@ -27,12 +27,12 @@
 
 ## Running Tests
 
-   After you're finished making code changes, you must always run tests using `make test-xdist`.
+   After you're finished making code changes, you must always run tests using `make agent-test`.
 
    ```bash
-   make test-xdist
-   # If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
-   # If some test failes, re-run it with `-s -vv` to see more details
+   make agent-test
+   # If the current system doesn't have the `make` command, lookup the "agent-test" target in the Makefile and run the command manually.
+   # Zero output on success; full output on failure.
    ```
 
 ## Running Tests with Prints
@@ -79,16 +79,3 @@
    ```
 
    For standard installations, the virtual environment is named `.venv`. Always check this first. On Windows, the path is `.venv\Scripts\` instead of `.venv/bin/`.
-
-## Pipelex CLI Commands
-
-   To run the Pipelex CLI commands without the logo, you can use the `--no-logo` flag, this will avoid useless tokens in the console output.
-
-   ```bash
-   .venv/bin/pipelex --help
-   .venv/bin/pipelex build --help --no-logo
-   .venv/bin/pipelex run --help --no-logo
-   .venv/bin/pipelex validate --help --no-logo
-   .venv/bin/pipelex doctor --help --no-logo
-   .venv/bin/pipelex init --help --no-logo
-   ```

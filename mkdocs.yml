@@ -179,12 +179,13 @@ nav:
         - Validate: home/9-tools/cli/validate.md
         - Run: home/9-tools/cli/run.md
         - Show: home/9-tools/cli/show.md
-        - Kit: home/9-tools/cli/kit.md
         - Build:
           - Overview: home/9-tools/cli/build/index.md
           - Pipe: home/9-tools/cli/build/pipe.md
           - Runner: home/9-tools/cli/build/runner.md
           - Structures: home/9-tools/cli/build/structures.md
+          - Inputs: home/9-tools/cli/build/inputs.md
+          - Output: home/9-tools/cli/build/output.md
       - Pipe Builder: home/9-tools/pipe-builder.md
       - Logging: home/9-tools/logging.md
     - Advanced Customizations:
@@ -200,6 +201,7 @@ nav:
   - Under the Hood:
     - Overview: under-the-hood/index.md
     - Architecture Overview: under-the-hood/architecture-overview.md
+    - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
     - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
     - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
     - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md

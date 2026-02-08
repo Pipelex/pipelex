@@ -1,3 +1,4 @@
+import inspect
 import types
 from typing import Any, Union, cast, get_args, get_origin
 
@@ -19,6 +20,7 @@ from pipelex.pipe_operators.compose.exceptions import (
     StructuredContentComposerValidationError,
     StructuredContentComposerValueError,
 )
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.tools.typing.class_utils import are_classes_equivalent
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -39,6 +41,7 @@ class StructuredContentComposer:
         runtime_params: Additional runtime parameters for template context (from PipeRunParams.params)
         extra_context: Extra context values for template rendering (from PipeCompose.extra_context)
         content_generator: The content generator to use for template rendering (supports dry run mode)
+        pipe_run_params: The pipe run parameters (used to check if we're in dry run mode)
     """
 
     def __init__(
@@ -49,6 +52,7 @@ class StructuredContentComposer:
         runtime_params: dict[str, Any] | None = None,
         extra_context: dict[str, Any] | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
+        pipe_run_params: PipeRunParams | None = None,
     ):
         self.construct_blueprint = construct_blueprint
         self.working_memory = working_memory
@@ -56,6 +60,7 @@ class StructuredContentComposer:
         self.runtime_params = runtime_params or {}
         self.extra_context = extra_context or {}
         self.content_generator = content_generator or get_content_generator()
+        self.pipe_run_params = pipe_run_params
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -118,6 +123,9 @@ class StructuredContentComposer:
         - ListContent -> list[X]: extract items as dicts
         - ListContent -> ListContent: keep object
 
+        If list_to_dict_keyed_by is set, converts the list to a dict using the specified
+        attribute as the key.
+
         Args:
             field_blueprint: The field blueprint with from_path
             field_name: The name of the target field (for type lookup)
@@ -134,9 +142,74 @@ class StructuredContentComposer:
         log.verbose(f"_resolve_from_var: resolving path '{path}' for field '{field_name}' (expected: {expected_type})")
 
         if "." in path:
-            return self._resolve_dotted_path(path=path, expected_type=expected_type)
+            resolved_value = self._resolve_dotted_path(path=path, expected_type=expected_type)
         else:
-            return self._resolve_from_stuff_name(name=path, expected_type=expected_type)
+            resolved_value = self._resolve_from_stuff_name(name=path, expected_type=expected_type)
+
+        # If list_to_dict_keyed_by is set, convert list to dict
+        if field_blueprint.list_to_dict_keyed_by:
+            return self._convert_list_to_dict_keyed_by(
+                value=resolved_value,
+                key_attr=field_blueprint.list_to_dict_keyed_by,
+            )
+
+        return resolved_value
+
+    def _convert_list_to_dict_keyed_by(self, value: Any, key_attr: str) -> dict[str, Any]:
+        """Convert a ListContent or list to a dict keyed by a specified attribute.
+
+        Items are converted to dicts to allow Pydantic's discriminated union validation
+        to work properly when the target field uses union types with discriminators.
+
+        Args:
+            value: The value to convert (must be ListContent or list)
+            key_attr: The attribute name to use as the dict key
+
+        Returns:
+            A dict mapping the key_attr values to the items (converted to dicts)
+
+        Raises:
+            StructuredContentComposerTypeError: If value is not a ListContent or list
+            StructuredContentComposerValueError: If an item doesn't have the key_attr
+        """
+        # Extract items from ListContent if needed
+        items: list[Any]
+        if isinstance(value, ListContent):
+            list_content = cast("ListContent[StuffContent]", value)
+            items = list_content.items
+        elif isinstance(value, list):
+            items = cast("list[Any]", value)
+        else:
+            msg = f"list_to_dict_keyed_by requires ListContent or list, got {type(value).__name__}"
+            raise StructuredContentComposerTypeError(msg)
+
+        log.verbose(f"  Converting list of {len(items)} items to dict keyed by '{key_attr}'")
+
+        result: dict[str, Any] = {}
+        for idx, item in enumerate(items):
+            # Try to get the key attribute
+            if hasattr(item, key_attr):
+                key = getattr(item, key_attr)
+            elif isinstance(item, dict) and key_attr in item:
+                key = item[key_attr]  # pyright: ignore[reportUnknownVariableType]
+            else:
+                msg = f"Item at index {idx} does not have attribute '{key_attr}'"
+                raise StructuredContentComposerValueError(msg)
+
+            if not isinstance(key, str):
+                msg = f"Key attribute '{key_attr}' at index {idx} must be a string, got {type(key).__name__}"  # pyright: ignore[reportUnknownArgumentType]
+                raise StructuredContentComposerTypeError(msg)
+
+            # Convert StuffContent items to dicts for proper discriminated union validation
+            if isinstance(item, StuffContent):
+                result[key] = item.model_dump(exclude_none=False, serialize_as_any=True)
+            elif isinstance(item, dict):
+                result[key] = item
+            else:
+                result[key] = item  # pyright: ignore[reportUnknownVariableType]
+
+        log.verbose(f"  Converted to dict with keys: {list(result.keys())}")
+        return result
 
     def _resolve_dotted_path(self, path: str, expected_type: type[Any] | None) -> Any:
         """Resolve a dotted path by navigating through object attributes.
@@ -462,20 +535,28 @@ class StructuredContentComposer:
             ValueError: If the item cannot be converted to the expected type
         """
         actual_type = type(item)
+        expected_type_name = getattr(expected_type, "__name__", str(expected_type))
 
         # Case 1: Exact match or subclass - OK
-        if isinstance(item, expected_type):
-            log.verbose(f"     Item[{idx}]: {actual_type.__name__} is compatible with {expected_type.__name__}")
-            return
+        # Note: isinstance() only works with actual classes, not ForwardRef, GenericAlias, or strings
+        # We use inspect.isclass() to check if expected_type is a valid class for isinstance()
+        if inspect.isclass(expected_type):
+            try:
+                if isinstance(item, expected_type):
+                    log.verbose(f"     Item[{idx}]: {actual_type.__name__} is compatible with {expected_type_name}")
+                    return
+            except TypeError:
+                # isinstance() failed - expected_type is not a valid type for this check
+                pass
 
         # Case 2: Check structural equivalence - OK
         if hasattr(actual_type, "model_fields") and hasattr(expected_type, "model_fields"):
             if are_classes_equivalent(class_1=actual_type, class_2=expected_type):
-                log.verbose(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent to {expected_type.__name__}")
+                log.verbose(f"     Item[{idx}]: {actual_type.__name__} is structurally equivalent to {expected_type_name}")
                 return
 
         # Case 3: Try to validate via dict
-        log.verbose(f"     Item[{idx}]: Validating conversion {actual_type.__name__} -> {expected_type.__name__}")
+        log.verbose(f"     Item[{idx}]: Validating conversion {actual_type.__name__} -> {expected_type_name}")
         item_dict = item.model_dump(exclude_none=False, serialize_as_any=True)
 
         if hasattr(expected_type, "model_validate"):
@@ -483,7 +564,7 @@ class StructuredContentComposer:
                 expected_type.model_validate(item_dict)
             except ValidationError as exc:
                 formatted_error = format_pydantic_validation_error(exc)
-                msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type.__name__}: {formatted_error}"
+                msg = f"Cannot convert item[{idx}] from {actual_type.__name__} to {expected_type_name}: {formatted_error}"
                 raise StructuredContentComposerTypeError(msg) from exc
 
     def _convert_single_item_as_object(self, item: StuffContent, expected_type: type[Any], idx: int) -> StuffContent:
@@ -569,7 +650,7 @@ class StructuredContentComposer:
         # Get the field type from the output class to determine nested class
         nested_class: type[StuffContent] = self._get_nested_field_class(field_name=field_name)
 
-        # Create a new composer for the nested structure, passing through runtime params, extra context, and content generator
+        # Create a new composer for the nested structure, passing through all context
         nested_composer = StructuredContentComposer(
             construct_blueprint=field_blueprint.nested,
             working_memory=self.working_memory,
@@ -577,6 +658,7 @@ class StructuredContentComposer:
             runtime_params=self.runtime_params,
             extra_context=self.extra_context,
             content_generator=self.content_generator,
+            pipe_run_params=self.pipe_run_params,
         )
 
         return await nested_composer.compose()

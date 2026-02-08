@@ -70,16 +70,15 @@ function buildDataflowAnalysis(graphspec) {
     // Controller IDs are nodes that have children
     const controllerNodeIds = new Set(Object.keys(containmentTree));
 
-    // Process nodes for stuff extraction
+    // Process all nodes to register stuffs
+    // Two passes: first register all stuffs, then build producer/consumer maps for operators only
     for (const node of graphspec.nodes) {
-        // Skip controllers - they don't directly transform data
-        if (controllerNodeIds.has(node.node_id)) continue;
-
         const nodeIo = node.node_io || {};
+        const isController = controllerNodeIds.has(node.node_id);
 
-        // Collect outputs (this node produces these stuffs)
+        // Register outputs to stuffRegistry from ALL nodes (including controllers for batch aggregates)
         for (const output of (nodeIo.outputs || [])) {
-            if (output.digest) {
+            if (output.digest && !stuffRegistry[output.digest]) {
                 stuffRegistry[output.digest] = {
                     name: output.name,
                     concept: output.concept,
@@ -88,24 +87,27 @@ function buildDataflowAnalysis(graphspec) {
                     dataText: output.data_text,
                     dataHtml: output.data_html,
                 };
+            }
+            // Only track operators as producers for data flow edges (not controllers)
+            if (output.digest && !isController) {
                 stuffProducers[output.digest] = node.node_id;
             }
         }
 
-        // Collect inputs (this node consumes these stuffs)
+        // Register inputs to stuffRegistry (pipeline inputs may not have producers)
         for (const input of (nodeIo.inputs || [])) {
-            if (input.digest) {
-                // Register stuff even if we don't know the producer (pipeline input)
-                if (!stuffRegistry[input.digest]) {
-                    stuffRegistry[input.digest] = {
-                        name: input.name,
-                        concept: input.concept,
-                        contentType: input.content_type,
-                        data: input.data,
-                        dataText: input.data_text,
-                        dataHtml: input.data_html,
-                    };
-                }
+            if (input.digest && !stuffRegistry[input.digest]) {
+                stuffRegistry[input.digest] = {
+                    name: input.name,
+                    concept: input.concept,
+                    contentType: input.content_type,
+                    data: input.data,
+                    dataText: input.data_text,
+                    dataHtml: input.data_html,
+                };
+            }
+            // Only track operators as consumers for data flow edges (not controllers)
+            if (input.digest && !isController) {
                 if (!stuffConsumers[input.digest]) stuffConsumers[input.digest] = [];
                 stuffConsumers[input.digest].push(node.node_id);
             }
@@ -195,6 +197,11 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
 
     dagre.layout(g);
 
+    // Determine handle positions based on layout direction
+    const isHorizontal = direction === 'LR' || direction === 'RL';
+    const sourcePosition = isHorizontal ? 'right' : 'bottom';
+    const targetPosition = isHorizontal ? 'left' : 'top';
+
     const layoutedNodes = nodes.map((node) => {
         const nodeWithPosition = g.node(node.id);
         const nodeData = node.data || {};
@@ -206,6 +213,8 @@ function getLayoutedElements(nodes, edges, direction = 'TB') {
                 x: nodeWithPosition.x - width / 2,
                 y: nodeWithPosition.y - 30,
             },
+            sourcePosition,
+            targetPosition,
         };
     });
 
@@ -233,6 +242,37 @@ function buildDataflowGraph(graphspec, analysis) {
     for (const consumers of Object.values(analysis.stuffConsumers)) {
         for (const consumer of consumers) {
             participatingPipes.add(consumer);
+        }
+    }
+
+    // In controller-centric mode, include batch controllers as participating pipes
+    // so they appear in the graph as hub nodes for batch edges
+    const showBatchController = {{ show_batch_controller | default(false) | tojson }};
+    if (showBatchController) {
+        for (const edge of graphspec.edges) {
+            if (edge.kind === 'batch_item') {
+                // For batch_item edges, edge.source is the batch controller
+                participatingPipes.add(edge.source);
+            } else if (edge.kind === 'batch_aggregate') {
+                // For batch_aggregate edges, edge.target is the batch controller
+                participatingPipes.add(edge.target);
+            }
+        }
+    }
+
+    // Build batch index map: stuff_digest -> index label (e.g., "[0]", "[1]")
+    // This is used to add index suffixes to batch item node labels
+    const showBatchItemIndex = {{ show_batch_item_index | default(false) | tojson }};
+    const batchItemIndexMap = {};  // stuff_digest -> index string
+    if (showBatchItemIndex) {
+        for (const edge of graphspec.edges) {
+            if (edge.kind === 'batch_item' && edge.label && edge.target_stuff_digest) {
+                // batch_item edge: target is the item, label contains the index
+                batchItemIndexMap[edge.target_stuff_digest] = edge.label;
+            } else if (edge.kind === 'batch_aggregate' && edge.label && edge.source_stuff_digest) {
+                // batch_aggregate edge: source is the item, label contains the index
+                batchItemIndexMap[edge.source_stuff_digest] = edge.label;
+            }
         }
     }
 
@@ -286,7 +326,12 @@ function buildDataflowGraph(graphspec, analysis) {
     // Create stuff nodes
     for (const [digest, stuffInfo] of Object.entries(analysis.stuffRegistry)) {
         const stuffId = `stuff_${digest}`;
-        const label = stuffInfo.name;
+        const baseName = stuffInfo.name;
+        // Append batch index to label if available (e.g., "topic" -> "topic[0]")
+        // But only if the name doesn't already end with an index like [0], [1], etc.
+        const batchIndex = batchItemIndexMap[digest] || '';
+        const alreadyHasIndex = /\[\d+\]$/.test(baseName);
+        const label = alreadyHasIndex ? baseName : baseName + batchIndex;
         const concept = stuffInfo.concept || '';
         // For pill shape, need extra padding. ~7px per char (12px font) + side padding (48px)
         const textWidth = Math.max(label.length, concept.length) * 7 + 48;
@@ -380,6 +425,72 @@ function buildDataflowGraph(graphspec, analysis) {
                 },
             });
         }
+    }
+
+    // Create batch edges (BATCH_ITEM and BATCH_AGGREGATE) from GraphSpec
+    // Two modes:
+    // - Data-centric (showBatchController=false): edges connect stuff nodes directly
+    //   batch_item: stuff_list → stuff_item, batch_aggregate: stuff_item → stuff_list
+    // - Controller-centric (showBatchController=true): batch controller is the hub
+    //   batch_item: batch_controller → stuff_item, batch_aggregate: stuff_item → batch_controller
+    // (showBatchController is declared earlier in the function)
+
+    for (const edge of graphspec.edges) {
+        if (edge.kind !== 'batch_item' && edge.kind !== 'batch_aggregate') {
+            continue;
+        }
+
+        const isBatchItem = edge.kind === 'batch_item';
+        let sourceId, targetId;
+
+        if (showBatchController) {
+            // Controller-centric mode: batch controller is the hub for fan-out/fan-in
+            if (isBatchItem) {
+                // batch_item: batch_controller → stuff_item
+                // edge.source is the batch controller, edge.target_stuff_digest is the item
+                if (!edge.target_stuff_digest) continue;
+                sourceId = edge.source;
+                targetId = `stuff_${edge.target_stuff_digest}`;
+            } else {
+                // batch_aggregate: stuff_item → batch_controller
+                // edge.source_stuff_digest is the item, edge.target is the batch controller
+                if (!edge.source_stuff_digest) continue;
+                sourceId = `stuff_${edge.source_stuff_digest}`;
+                targetId = edge.target;
+            }
+        } else {
+            // Data-centric mode: edges connect stuff nodes directly
+            if (!edge.source_stuff_digest || !edge.target_stuff_digest) continue;
+            sourceId = `stuff_${edge.source_stuff_digest}`;
+            targetId = `stuff_${edge.target_stuff_digest}`;
+        }
+
+        edges.push({
+            id: edge.edge_id,
+            source: sourceId,
+            target: targetId,
+            type: {{ edge_type | tojson }},
+            animated: false,
+            label: edge.label || '',
+            labelStyle: {
+                fontSize: '10px',
+                fontFamily: "'JetBrains Mono', monospace",
+                fill: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+            },
+            labelBgStyle: {
+                fill: 'var(--color-bg)',
+                fillOpacity: 0.9,
+            },
+            style: {
+                stroke: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+                strokeWidth: 2,
+                strokeDasharray: '5,5',
+            },
+            markerEnd: {
+                type: MarkerType?.ArrowClosed || 'arrowclosed',
+                color: isBatchItem ? 'var(--color-batch-item)' : 'var(--color-batch-aggregate)',
+            },
+        });
     }
 
     return { nodes, edges };

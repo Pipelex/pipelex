@@ -15,6 +15,10 @@ from pipelex.pipe_operators.compose.construct_blueprint import (
     ConstructFieldBlueprint,
     ConstructFieldMethod,
 )
+from pipelex.pipe_operators.compose.exceptions import (
+    ConstructFieldBlueprintTypeError,
+    ConstructFieldBlueprintValueError,
+)
 
 
 class ConstructFieldBlueprintTestData:
@@ -135,6 +139,23 @@ class ConstructFieldBlueprintTestData:
         NESTED_DEEP,
     ]
 
+    # Fixed list value case
+    FIXED_LIST: ClassVar[tuple[str, Any, ConstructFieldMethod, Any]] = (
+        "fixed_list",
+        ["item1", "item2", "item3"],
+        ConstructFieldMethod.FIXED,
+        ["item1", "item2", "item3"],
+    )
+
+    # Variable reference with list_to_dict_keyed_by modifier
+    VAR_REF_LIST_TO_DICT: ClassVar[tuple[str, dict[str, Any], ConstructFieldMethod, str, str]] = (
+        "var_ref_list_to_dict",
+        {"from": "items", "list_to_dict_keyed_by": "id"},
+        ConstructFieldMethod.FROM_VAR,
+        "items",
+        "id",
+    )
+
 
 class TestConstructFieldBlueprint:
     """Tests for ConstructFieldBlueprint parsing and method detection."""
@@ -243,6 +264,26 @@ class TestConstructFieldBlueprint:
         assert blueprint.nested.fields["country"].method == ConstructFieldMethod.TEMPLATE
         assert blueprint.nested.fields["country"].template == "Country: $loc.country"
 
+    def test_fixed_list_value_detection(self):
+        """Test that list values are correctly detected as FIXED method."""
+        test_id, raw_input, expected_method, expected_value = ConstructFieldBlueprintTestData.FIXED_LIST
+        blueprint = ConstructFieldBlueprint.make_from_raw(raw_input)
+
+        assert blueprint.method == expected_method, f"Failed for {test_id}"
+        assert blueprint.fixed_value == expected_value, f"Failed for {test_id}"
+        assert blueprint.from_path is None
+        assert blueprint.template is None
+        assert blueprint.nested is None
+
+    def test_from_with_list_to_dict_keyed_by(self):
+        """Test variable reference with list_to_dict_keyed_by modifier."""
+        test_id, raw_input, expected_method, expected_path, expected_key_attr = ConstructFieldBlueprintTestData.VAR_REF_LIST_TO_DICT
+        blueprint = ConstructFieldBlueprint.make_from_raw(raw_input)
+
+        assert blueprint.method == expected_method, f"Failed for {test_id}"
+        assert blueprint.from_path == expected_path, f"Failed for {test_id}"
+        assert blueprint.list_to_dict_keyed_by == expected_key_attr, f"Failed for {test_id}"
+
 
 class TestConstructFieldBlueprintValidation:
     """Tests for ConstructFieldBlueprint validation."""
@@ -264,5 +305,50 @@ class TestConstructFieldBlueprintValidation:
 
     def test_none_value_raises_error(self):
         """None value should raise an error."""
-        with pytest.raises(ValueError, match="None"):
+        with pytest.raises(ConstructFieldBlueprintValueError, match="None"):
             ConstructFieldBlueprint.make_from_raw(None)
+
+    def test_from_with_extra_keys_raises_error(self):
+        """Dict with 'from' and unexpected keys should raise error."""
+        with pytest.raises(ConstructFieldBlueprintValueError, match="unexpected keys"):
+            ConstructFieldBlueprint.make_from_raw(
+                {
+                    "from": "deal.name",
+                    "invalid_key": "value",
+                }
+            )
+
+    def test_from_value_not_string_raises_type_error(self):
+        """'from' value must be a string path."""
+        with pytest.raises(ConstructFieldBlueprintTypeError, match="string path"):
+            ConstructFieldBlueprint.make_from_raw({"from": 123})
+
+    def test_list_to_dict_keyed_by_not_string_raises_type_error(self):
+        """'list_to_dict_keyed_by' value must be a string."""
+        with pytest.raises(ConstructFieldBlueprintTypeError, match="string attribute name"):
+            ConstructFieldBlueprint.make_from_raw(
+                {
+                    "from": "items",
+                    "list_to_dict_keyed_by": 123,
+                }
+            )
+
+    def test_template_with_extra_keys_raises_error(self):
+        """Dict with 'template' and extra keys should raise error."""
+        with pytest.raises(ConstructFieldBlueprintValueError, match="only have the 'template' key"):
+            ConstructFieldBlueprint.make_from_raw(
+                {
+                    "template": "Hello $name",
+                    "extra": "not allowed",
+                }
+            )
+
+    def test_template_value_not_string_raises_type_error(self):
+        """'template' value must be a string."""
+        with pytest.raises(ConstructFieldBlueprintTypeError, match="string"):
+            ConstructFieldBlueprint.make_from_raw({"template": 123})
+
+    def test_unsupported_type_raises_type_error(self):
+        """Unsupported types should raise TypeError."""
+        with pytest.raises(ConstructFieldBlueprintTypeError, match="Unsupported"):
+            ConstructFieldBlueprint.make_from_raw(object())

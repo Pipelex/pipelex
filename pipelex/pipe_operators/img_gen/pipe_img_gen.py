@@ -198,7 +198,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             )
             subclass_content_items: list[ImageContent] = []
             for image_content in image_content_list:
-                subclass_content = image_content_subclass.model_validate(image_content)
+                subclass_content = image_content_subclass.model_validate(image_content.smart_dump())
                 subclass_content_items.append(subclass_content)
             the_content = ListContent(
                 items=subclass_content_items,
@@ -213,7 +213,7 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
                 img_gen_job_config=img_gen_config.img_gen_job_config,
             )
 
-            the_content = image_content_subclass.model_validate(image_content)
+            the_content = image_content_subclass.model_validate(image_content.smart_dump())
             log.verbose(the_content, title=f"output stuff content of PipeImg {self.code}")
 
         output_stuff = StuffFactory.make_stuff(

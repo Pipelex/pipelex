@@ -33,9 +33,13 @@ class PipeLLMSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeLLM"]] = "PipeLLM"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    llm_talent: LLMTalent | str = Field(description="Select the simplest LLM talent corresponding to the task to be performed.")
+    llm_talent: LLMTalent | str = Field(
+        description="Select the simplest LLM talent corresponding to the task to be performed.",
+        examples=list(LLMTalent),
+    )
     system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
     prompt: str | None = Field(
+        default=None,
         description="""A template for the user prompt:
 Use `$` prefix for inline variables (e.g., `$topic`) and `@` prefix to insert content as a block with delimiters
 For example, `@extracted_text` will generate this:
@@ -51,7 +55,7 @@ Or you can mention them by their number in order in the inputs section, starting
 Example: `Only analyze the colors from $image_1 and the shapes from $image_2.
 • If we are generating a structured concept, DO NOT detail the structure in the prompt: we will add the schema later.
 So, don't have to write a bullet-list of all the attributes definitions yourself.
-"""
+""",
     )
 
     @field_validator("llm_talent", mode="before")
