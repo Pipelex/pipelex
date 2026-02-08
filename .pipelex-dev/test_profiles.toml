@@ -121,7 +121,7 @@ mistralai = [
     "pixtral-12b",
     "pixtral-large",
     "pixtral-large-2411",
-    "mistral-large-3",
+    "mistral-large",
 ]
 
 # --- Moonshot AI Models ---
