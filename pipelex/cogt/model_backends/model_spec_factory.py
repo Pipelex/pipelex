@@ -26,7 +26,7 @@ class InferenceModelSpecBlueprint(ConfigModel):
     outputs: list[str] = Field(default_factory=list)
     costs: CostsByCategoryDict | None = Field(default=None, strict=False)
     structure_method: StructureMethod | None = Field(default=None, strict=False)
-    thinking_mode: ThinkingMode | None = Field(default=None, strict=False)
+    thinking_mode: ThinkingMode = Field(default=ThinkingMode.NONE, strict=False)
     max_tokens: int | None = None
     max_prompt_images: int | None = None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)

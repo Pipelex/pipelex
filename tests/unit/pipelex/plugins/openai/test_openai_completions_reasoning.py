@@ -16,7 +16,7 @@ _OPENAI_LEVEL_MAP: dict[str, str] = {
 }
 
 
-def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode | None) -> OpenAICompletionsLLMWorker:
+def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode) -> OpenAICompletionsLLMWorker:
     """Create a minimal OpenAICompletionsLLMWorker with a mocked inference_model."""
     worker = object.__new__(OpenAICompletionsLLMWorker)
     mock_model = mocker.MagicMock()
@@ -89,13 +89,6 @@ class TestOpenAICompletionsReasoning:
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._resolve_reasoning_effort(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
-    def test_thinking_mode_unconfigured_raises_capability_error(self, mocker: MockerFixture):
-        """Models with no thinking_mode should raise LLMCapabilityError."""
-        worker = _make_worker(mocker, thinking_mode=None)
-        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
-        with pytest.raises(LLMCapabilityError, match="no thinking_mode configured"):
             worker._resolve_reasoning_effort(job_params=job_params)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     def test_thinking_mode_adaptive_raises_capability_error(self, mocker: MockerFixture):

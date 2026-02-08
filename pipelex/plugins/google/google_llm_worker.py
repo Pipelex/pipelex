@@ -127,15 +127,16 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
 
     def _build_thinking_config_for_effort(
         self,
-        thinking_mode: ThinkingMode | None,
+        thinking_mode: ThinkingMode,
         effort: ReasoningEffort,
         max_tokens: int | None,
     ) -> genai_types.ThinkingConfig:
         """Build thinking config when reasoning_effort is specified."""
         match thinking_mode:
             case ThinkingMode.MANUAL:
-                if effort == ReasoningEffort.NONE:
-                    log.verbose("Google manual thinking disabled (effort=NONE)")
+                google_level = get_config().cogt.llm_config.google_config.get_reasoning_level(effort=effort)
+                if google_level is None:
+                    log.verbose("Google manual thinking disabled (effort mapped to disabled)")
                     return genai_types.ThinkingConfig(thinking_budget=0)
                 prompting_target = self.inference_model.prompting_target
                 if prompting_target is None:
@@ -159,13 +160,10 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             case ThinkingMode.NONE:
                 msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
-            case None:
-                msg = f"Model '{self.inference_model.desc}' has no thinking_mode configured, cannot use reasoning_effort"
-                raise LLMCapabilityError(msg)
 
     def _build_thinking_config_for_budget(
         self,
-        thinking_mode: ThinkingMode | None,
+        thinking_mode: ThinkingMode,
         budget: int,
         max_tokens: int | None,
     ) -> genai_types.ThinkingConfig:
@@ -178,9 +176,6 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                 return genai_types.ThinkingConfig(thinking_budget=budget)
             case ThinkingMode.NONE:
                 msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
-                raise LLMCapabilityError(msg)
-            case None:
-                msg = f"Model '{self.inference_model.desc}' has no thinking_mode configured, cannot use reasoning_budget"
                 raise LLMCapabilityError(msg)
 
     #########################################################

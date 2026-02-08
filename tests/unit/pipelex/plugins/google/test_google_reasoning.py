@@ -18,7 +18,7 @@ _GOOGLE_LEVEL_MAP: dict[str, str] = {
 }
 
 
-def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode | None, prompting_target: str = "gemini") -> GoogleLLMWorker:
+def _make_worker(mocker: MockerFixture, thinking_mode: ThinkingMode, prompting_target: str = "gemini") -> GoogleLLMWorker:
     """Create a minimal GoogleLLMWorker with a mocked inference_model."""
     worker = object.__new__(GoogleLLMWorker)
     mock_model = mocker.MagicMock()
@@ -50,7 +50,6 @@ class TestGoogleReasoning:
     @pytest.mark.parametrize(
         ("effort", "expected_budget"),
         [
-            (ReasoningEffort.NONE, 0),
             (ReasoningEffort.MINIMAL, 512),
             (ReasoningEffort.LOW, 1024),
             (ReasoningEffort.MEDIUM, 5000),
@@ -64,14 +63,16 @@ class TestGoogleReasoning:
         effort: ReasoningEffort,
         expected_budget: int,
     ):
-        """MANUAL mode maps each ReasoningEffort to the correct thinking_budget."""
+        """MANUAL mode maps each non-NONE ReasoningEffort to the correct thinking_budget."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        google_config = GoogleConfig(effort_to_level_map=_GOOGLE_LEVEL_MAP)
         mocker.patch(
             "pipelex.plugins.google.google_llm_worker.get_config",
             return_value=mocker.MagicMock(
                 cogt=mocker.MagicMock(
                     llm_config=mocker.MagicMock(
                         get_reasoning_budget=mocker.MagicMock(return_value=expected_budget),
+                        google_config=google_config,
                     ),
                 ),
             ),
@@ -105,6 +106,25 @@ class TestGoogleReasoning:
         assert result is not None
         assert result.thinking_budget == -1
         assert result.thinking_level == expected_level
+
+    def test_manual_mode_effort_none_disables_thinking(self, mocker: MockerFixture):
+        """MANUAL mode with NONE effort disables thinking with budget=0 via config-driven gate."""
+        worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        google_config = GoogleConfig(effort_to_level_map=_GOOGLE_LEVEL_MAP)
+        mocker.patch(
+            "pipelex.plugins.google.google_llm_worker.get_config",
+            return_value=mocker.MagicMock(
+                cogt=mocker.MagicMock(
+                    llm_config=mocker.MagicMock(
+                        google_config=google_config,
+                    ),
+                ),
+            ),
+        )
+        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.NONE)
+        result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        assert result is not None
+        assert result.thinking_budget == 0
 
     def test_adaptive_mode_effort_none_disables_thinking(self, mocker: MockerFixture):
         """ADAPTIVE mode with NONE effort disables thinking with budget=0."""
@@ -145,25 +165,11 @@ class TestGoogleReasoning:
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
             worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
-    def test_thinking_mode_unconfigured_raises_capability_error(self, mocker: MockerFixture):
-        """Models with no thinking_mode should raise LLMCapabilityError."""
-        worker = _make_worker(mocker, thinking_mode=None)
-        job_params = LLMJobParams(temperature=0.5, reasoning_effort=ReasoningEffort.HIGH)
-        with pytest.raises(LLMCapabilityError, match="no thinking_mode configured"):
-            worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
     def test_reasoning_budget_with_thinking_mode_none_raises(self, mocker: MockerFixture):
         """reasoning_budget with thinking_mode=none should raise LLMCapabilityError."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.NONE)
         job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
         with pytest.raises(LLMCapabilityError, match="does not support reasoning"):
-            worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
-
-    def test_reasoning_budget_with_unconfigured_thinking_mode_raises(self, mocker: MockerFixture):
-        """reasoning_budget with no thinking_mode should raise LLMCapabilityError."""
-        worker = _make_worker(mocker, thinking_mode=None)
-        job_params = LLMJobParams(temperature=0.5, reasoning_budget=4096)
-        with pytest.raises(LLMCapabilityError, match="no thinking_mode configured"):
             worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
 
     def test_explicit_budget_capped_by_max_tokens(self, mocker: MockerFixture):
@@ -177,12 +183,14 @@ class TestGoogleReasoning:
     def test_effort_budget_capped_by_max_tokens(self, mocker: MockerFixture):
         """Effort-resolved budget is capped to max_tokens - 1 when max_tokens is small."""
         worker = _make_worker(mocker, thinking_mode=ThinkingMode.MANUAL)
+        google_config = GoogleConfig(effort_to_level_map=_GOOGLE_LEVEL_MAP)
         mocker.patch(
             "pipelex.plugins.google.google_llm_worker.get_config",
             return_value=mocker.MagicMock(
                 cogt=mocker.MagicMock(
                     llm_config=mocker.MagicMock(
                         get_reasoning_budget=mocker.MagicMock(return_value=16384),
+                        google_config=google_config,
                     ),
                 ),
             ),

@@ -24,6 +24,7 @@ model_type = "llm"
 sdk = "portkey_completions"
 structure_method = "instructor/openai_tools"
 prompting_target = "anthropic"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS

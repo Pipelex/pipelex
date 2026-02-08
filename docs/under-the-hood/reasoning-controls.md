@@ -31,9 +31,9 @@ The `ThinkingMode` enum (`pipelex/cogt/llm/thinking_mode.py`) defines how a mode
 |------|---------|
 | `none` | Model does not support reasoning. Attempting to use reasoning params raises `LLMCapabilityError`. |
 | `manual` | Pipelex translates effort to a provider-specific value (token budget, effort string, or prompt mode). |
-| `adaptive` | The provider's SDK dynamically adjusts reasoning depth. Only Anthropic and Google support this. |
+| `adaptive` | The provider's SDK dynamically adjusts reasoning depth. Only Anthropic supports this today. |
 
-Each model spec in the backend TOML files declares a `thinking_mode`. Models without reasoning capabilities set `thinking_mode = "none"` (or inherit it from `[defaults]`).
+Each model spec in the backend TOML files declares a `thinking_mode`. This is a required field on `InferenceModelSpec` — models without reasoning capabilities set `thinking_mode = "none"` (or inherit it from `[defaults]`).
 
 ### Mutual Exclusivity
 
@@ -56,7 +56,7 @@ flowchart TD
     C -->|Anthropic| E["_build_thinking_params()<br/>→ ThinkingConfigParam"]
     C -->|Google| F["_build_thinking_config()<br/>→ ThinkingConfig"]
     C -->|Mistral| G["_resolve_prompt_mode()<br/>→ prompt_mode"]
-    C -->|Bedrock native| H["_validate_no_reasoning_params()<br/>→ LLMCapabilityError if set"]
+    C -->|Bedrock (aioboto3)| H["_validate_no_reasoning_params()<br/>→ LLMCapabilityError if set"]
 ```
 
 ---
@@ -118,17 +118,22 @@ max = "max"
 | `HIGH` | `"high"` |
 | `MAX` | `"max"` |
 
-**ADAPTIVE mode** uses `{"type": "adaptive"}` with an `OutputConfigParam(effort=...)`.
+Both modes first check `anthropic_config.effort_to_level_map` to gate reasoning. If the map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled entirely — no `thinking` parameter is sent to the SDK.
 
-**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config, then sends `{"type": "enabled", "budget_tokens": N}`. The budget is capped to `min(budget, max_tokens - 1)` to satisfy Anthropic's API constraint.
+**ADAPTIVE mode** uses `{"type": "adaptive"}` with an `OutputConfigParam(effort=...)` where the effort value comes from the level map.
+
+**MANUAL mode** resolves effort to a token budget via the `effort_to_budget_maps` config (keyed by `prompting_target`), then sends `{"type": "enabled", "budget_tokens": N}`. The budget is capped to `min(budget, max_tokens - 1)` to satisfy Anthropic's API constraint.
 
 **`reasoning_budget`** (explicit) always uses `{"type": "enabled", "budget_tokens": N}` regardless of thinking mode. The same `min(budget, max_tokens - 1)` cap is applied.
+
+!!! note
+    `MINIMAL` and `LOW` both map to `"low"` in the level map. In ADAPTIVE mode they produce identical behavior. In MANUAL mode they are differentiated by the budget map (512 vs 1024 tokens). This matches the granularity that each mode supports.
 
 When thinking is active, `temperature` is suppressed (Anthropic requires `temperature=1` or omission with thinking).
 
 ### Google Gemini
 
-Google supports both `manual` and `adaptive` thinking modes. The ADAPTIVE mode effort mapping is configured via `google_config.effort_to_level_map`:
+Google models currently use `thinking_mode = "manual"`. The effort mapping is configured via `google_config.effort_to_level_map`:
 
 ```toml
 [cogt.llm_config.google_config.effort_to_level_map]
@@ -140,32 +145,20 @@ high = "high"
 max = "high"
 ```
 
-**MANUAL mode** resolves effort to a `thinking_budget` (token count) via the `effort_to_budget_maps` config:
+The level map serves as a gate: if it returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled with `thinking_budget=0`. Otherwise, effort is resolved to a `thinking_budget` (token count) via the `effort_to_budget_maps` config:
 
 | ReasoningEffort | thinking_budget |
 |-----------------|----------------|
-| `NONE` | `0` |
+| `NONE` | `0` (disabled via level map) |
 | `MINIMAL` | `512` |
 | `LOW` | `1024` |
 | `MEDIUM` | `5000` |
 | `HIGH` | `16384` |
 | `MAX` | `65536` |
 
-**ADAPTIVE mode** maps effort to a `ThinkingLevel` enum with `thinking_budget = -1` (auto):
-
-| ReasoningEffort | ThinkingLevel |
-|-----------------|--------------|
-| `NONE` | budget=0 (disabled) |
-| `MINIMAL` | `LOW` |
-| `LOW` | `LOW` |
-| `MEDIUM` | `MEDIUM` |
-| `HIGH` | `HIGH` |
-| `MAX` | `HIGH` |
-
-!!! note
-    Values in the TOML are lowercase (e.g., `"low"`). The `GoogleConfig.get_reasoning_level()` method uppercases them before constructing the `ThinkingLevel` enum.
-
 **`reasoning_budget`** (explicit) passes through directly as `thinking_budget`. When `max_tokens` is known, the budget is capped to `min(budget, max_tokens - 1)`.
+
+Google does not support `thinking_mode = "adaptive"`. Both raise `LLMCapabilityError`.
 
 Temperature is passed normally to the Google API regardless of reasoning mode.
 
@@ -192,9 +185,9 @@ Mistral does not support `reasoning_budget` or `thinking_mode = "adaptive"`. Bot
 
 Temperature is passed normally to the Mistral API regardless of reasoning mode.
 
-### Bedrock (native models)
+### Bedrock (aioboto3 native models)
 
-Bedrock native models (non-Anthropic SDKs like `bedrock_aioboto3`) do not support reasoning parameters. Any `reasoning_effort` or `reasoning_budget` raises `LLMCapabilityError`.
+Bedrock native models using the `bedrock_aioboto3` SDK do not support reasoning parameters. Any `reasoning_effort` or `reasoning_budget` raises `LLMCapabilityError`.
 
 !!! note
     Claude models accessed through Bedrock use the `bedrock_anthropic` SDK variant and go through the Anthropic worker, which does support reasoning.
@@ -231,7 +224,7 @@ high = 16384
 max = 65536
 ```
 
-The map is keyed by `prompting_target` (from the model spec). A validated mapping must contain entries for all `ReasoningEffort` values.
+The map is keyed by `prompting_target` (from the model spec). A validated mapping must contain entries for all `ReasoningEffort` values (including `none`, even though it is unreachable at runtime — the level map gates `NONE` as disabled before the budget lookup).
 
 The budget is resolved at runtime via `LLMConfig.get_reasoning_budget()` (`pipelex/cogt/config_cogt.py`).
 
@@ -275,9 +268,8 @@ This applies to all providers (OpenAI, Anthropic, Google, Mistral). Bedrock nati
 The behavior of `ReasoningEffort.NONE` varies by provider:
 
 - **OpenAI**: Sends `reasoning_effort="none"` to the API, which is a valid API value that minimizes reasoning.
-- **Anthropic**: Disables thinking entirely (no `thinking` parameter is sent).
-- **Google MANUAL**: Sets `thinking_budget=0` (thinking disabled).
-- **Google ADAPTIVE**: Sets `thinking_budget=0` (thinking disabled).
+- **Anthropic**: Disabled via `effort_to_level_map` gate — no `thinking` parameter is sent.
+- **Google**: Disabled via `effort_to_level_map` gate, sets `thinking_budget=0`.
 - **Mistral**: Omits `prompt_mode` (no reasoning).
 
 ---
@@ -289,12 +281,11 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 | Scenario | Error |
 |----------|-------|
 | `reasoning_effort` on a `thinking_mode = "none"` model | "does not support reasoning" |
-| `reasoning_effort` on a model with no `thinking_mode` | "no thinking_mode configured" |
 | `reasoning_budget` on a provider that doesn't support it | "does not support reasoning_budget" |
-| `thinking_mode = "adaptive"` on OpenAI or Mistral | "adaptive ... not supported" |
-| Any reasoning param on Bedrock native models | "does not support reasoning parameters" |
+| `thinking_mode = "adaptive"` on OpenAI, Google, or Mistral | "adaptive ... not supported" |
+| Any reasoning param on Bedrock (aioboto3) models | "does not support reasoning parameters" |
 | Reasoning params during structured generation | "does not support reasoning parameters for structured generation" |
-| Both `reasoning_effort` and `reasoning_budget` set | `ValidationError` (mutual exclusivity) |
+| Both `reasoning_effort` and `reasoning_budget` set | `ValueError` / `LLMSettingValueError` (mutual exclusivity) |
 
 ---
 

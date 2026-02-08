@@ -96,9 +96,6 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 case ThinkingMode.NONE:
                     msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
                     raise LLMCapabilityError(msg)
-                case None:
-                    msg = f"Model '{self.inference_model.desc}' has no thinking_mode configured, cannot use reasoning_effort"
-                    raise LLMCapabilityError(msg)
 
         if job_params.reasoning_budget is not None:
             msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
@@ -128,7 +125,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 max_tokens=job_params.max_tokens or omit,
                 seed=job_params.seed,
                 messages=messages,
-                reasoning_effort=openai_reasoning_effort or omit,
+                reasoning_effort=openai_reasoning_effort if openai_reasoning_effort is not None else omit,
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
