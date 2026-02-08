@@ -155,6 +155,15 @@ class ImgGenArgsFactory:
                     )
                     args_dict.update(input_images_args)
 
+        # Validate that input_images were processed if provided
+        if img_gen_job.img_gen_prompt.input_images:
+            if ImgGenArgTopic.INPUT_IMAGES not in model_rules:
+                msg = (
+                    "Input images were provided but the model does not have 'input_images' rules configured. "
+                    "This model may not support image-to-image generation, or the configuration is incomplete."
+                )
+                raise ImgGenParameterError(msg)
+
         return args_dict
 
     @classmethod
