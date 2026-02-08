@@ -7,9 +7,8 @@ from typing import Annotated, Any
 
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
-from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.error_handlers import ErrorContext
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
@@ -131,7 +130,7 @@ def inputs_cmd(
         agent_error("No pipe code or bundle file specified", "ArgumentError")
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS, library_dirs=library_dirs)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs)
 
     try:
         result = asyncio.run(_inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs))
@@ -141,7 +140,11 @@ def inputs_cmd(
         agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        agent_error(exc.message, "ValidateBundleError", cause=exc)
+        validation_errors = extract_validation_errors(exc)
+        extra: dict[str, Any] = {"validation_errors": validation_errors}
+        if exc.dry_run_error_message:
+            extra["dry_run_error"] = exc.dry_run_error_message
+        agent_error(exc.message, "ValidateBundleError", cause=exc, **extra)
 
     except NoInputsRequiredError as exc:
         # Not really an error - just a pipe with no inputs

@@ -7,9 +7,8 @@ from typing import Annotated, Any
 
 import typer
 
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
-from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
 from pipelex.core.interpreter.helpers import is_pipelex_file
@@ -239,7 +238,7 @@ def run_cmd(
             except JsonTypeError as exc:
                 agent_error(f"Input file must be a valid JSON dictionary: {inputs}", "JsonTypeError", cause=exc)
 
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
+    make_pipelex_for_agent_cli()
 
     try:
         result = asyncio.run(
@@ -257,7 +256,14 @@ def run_cmd(
         agent_success(result)
 
     except PipelineExecutionError as exc:
-        agent_error(exc.message, "PipelineExecutionError", cause=exc, pipe_code=exc.pipe_code, pipe_stack=exc.pipe_stack)
+        extra_fields: dict[str, Any] = {
+            "pipe_code": exc.pipe_code,
+            "pipe_stack": exc.pipe_stack,
+        }
+        if exc.__cause__:
+            extra_fields["cause_type"] = type(exc.__cause__).__name__
+            extra_fields["cause_message"] = str(exc.__cause__)
+        agent_error(exc.message, "PipelineExecutionError", cause=exc, **extra_fields)
 
     except PipeOperatorModelChoiceError as exc:
         agent_error(
@@ -265,8 +271,8 @@ def run_cmd(
             "PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
-            model_type=exc.model_type,
-            model_choice=exc.model_choice,
+            model_type=str(exc.model_type),
+            model_choice=str(exc.model_choice),
         )
 
     except PipeOperatorModelAvailabilityError as exc:

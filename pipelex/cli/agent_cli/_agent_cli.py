@@ -10,12 +10,12 @@ from typing_extensions import override
 from pipelex.cli.agent_cli.commands.assemble_cmd import assemble_cmd
 from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
+from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat, graph_cmd
 from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run_cmd import run_cmd
 from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
-from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -32,9 +32,14 @@ class PipelexAgentCLI(TyperGroup):
         """Get command by name."""
         cmd = super().get_command(ctx, cmd_name)
         if cmd is None:
-            typer.echo(f"Unknown command: {cmd_name}")
-            typer.echo(ctx.get_help())
-            ctx.exit(1)
+            from pipelex.cli.agent_cli.commands.agent_output import agent_error  # noqa: PLC0415
+
+            valid_commands = super().list_commands(ctx)
+            agent_error(
+                f"Unknown command: {cmd_name}",
+                "UnknownCommandError",
+                valid_commands=valid_commands,
+            )
         return cmd
 
 
@@ -289,5 +294,5 @@ def graph_command(
 
 @app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")
 def doctor_command() -> None:
-    """Check Pipelex configuration health with auto-fix enabled."""
-    doctor_cmd(fix=True)
+    """Check Pipelex configuration health and output JSON report."""
+    agent_doctor_cmd()

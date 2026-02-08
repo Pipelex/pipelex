@@ -6,9 +6,8 @@ from typing import Annotated
 
 import typer
 
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
-from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
@@ -76,7 +75,7 @@ def graph_cmd(
         output_dir = input_path.parent
 
     # Initialize Pipelex (needed for config access)
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION)
+    make_pipelex_for_agent_cli()
 
     try:
         base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config

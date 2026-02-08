@@ -6,9 +6,8 @@ from typing import Annotated, Any
 
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
-from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.error_handlers import ErrorContext
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.hub import (
@@ -197,7 +196,7 @@ def validate_cmd(
         if target or pipe or bundle:
             agent_error("--all cannot be used with a target, --pipe, or --bundle", "ArgumentError")
 
-        make_pipelex_for_cli(context=ErrorContext.VALIDATION, library_dirs=library_dirs)
+        make_pipelex_for_agent_cli(library_dirs=library_dirs)
 
         try:
             result = asyncio.run(_validate_all_core(library_dirs=library_dirs))
@@ -218,8 +217,8 @@ def validate_cmd(
                 "PipeOperatorModelChoiceError",
                 cause=exc,
                 pipe_code=exc.pipe_code,
-                model_type=exc.model_type,
-                model_choice=exc.model_choice,
+                model_type=str(exc.model_type),
+                model_choice=str(exc.model_choice),
             )
 
         except Exception as exc:
@@ -258,7 +257,7 @@ def validate_cmd(
     if not pipe_code and not bundle_path:
         agent_error("No pipe code or bundle file specified", "ArgumentError")
 
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION)
+    make_pipelex_for_agent_cli()
 
     try:
         if bundle_path and pipe_code:
@@ -277,28 +276,10 @@ def validate_cmd(
         agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        validation_errors: list[dict[str, Any]] = []
-        for blueprint_error in exc.pipelex_bundle_blueprint_validation_errors:
-            validation_errors.append(
-                {
-                    "error_type": blueprint_error.error_type,
-                    "pipe_code": blueprint_error.pipe_code,
-                    "message": blueprint_error.message,
-                }
-            )
-        for pipe_error in exc.pipe_validation_error_data:
-            validation_errors.append(
-                {
-                    "error_type": pipe_error.error_type,
-                    "pipe_code": pipe_error.pipe_code,
-                    "message": pipe_error.message,
-                }
-            )
-
+        validation_errors = extract_validation_errors(exc)
         extra: dict[str, Any] = {"validation_errors": validation_errors}
         if exc.dry_run_error_message:
             extra["dry_run_error"] = exc.dry_run_error_message
-
         agent_error(exc.message, "ValidateBundleError", cause=exc, **extra)
 
     except PipeOperatorModelChoiceError as exc:
@@ -307,8 +288,8 @@ def validate_cmd(
             "PipeOperatorModelChoiceError",
             cause=exc,
             pipe_code=exc.pipe_code,
-            model_type=exc.model_type,
-            model_choice=exc.model_choice,
+            model_type=str(exc.model_type),
+            model_choice=str(exc.model_choice),
         )
 
     except PipeOperatorModelAvailabilityError as exc:
