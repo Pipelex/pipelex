@@ -30,6 +30,8 @@ class BuildPipeResult(BaseModel):
     inputs_file: Path | None = None
     main_pipe_code: str
     domain: str
+    pipe_inputs: dict[str, str] | None = None
+    pipe_output: str | None = None
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -47,6 +49,10 @@ class BuildPipeResult(BaseModel):
         }
         if self.inputs_file:
             result["inputs_file"] = str(self.inputs_file)
+        if self.pipe_inputs is not None:
+            result["pipe_inputs"] = self.pipe_inputs
+        if self.pipe_output is not None:
+            result["pipe_output"] = self.pipe_output
         return result
 
 
@@ -137,16 +143,22 @@ async def build_pipe_core(
     domain = pipelex_bundle_spec.domain or ""
 
     inputs_file_path: Path | None = None
+    pipe_inputs: dict[str, str] | None = None
+    pipe_output: str | None = None
 
-    # Generate inputs.json if requested and main_pipe_code exists
-    if generate_inputs and main_pipe_code:
+    # Load pipe metadata (inputs/output) and optionally generate inputs.json
+    if main_pipe_code:
         try:
             pipe = get_required_pipe(pipe_code=main_pipe_code)
-            inputs_json_str = pipe.inputs.render_inputs(indent=2)
-            inputs_file_path = Path(extras_output_dir) / DEFAULT_INPUTS_FILE_NAME
-            save_text_to_path(text=inputs_json_str, path=str(inputs_file_path))
+            pipe_inputs = {name: stuff_spec.to_bundle_representation() for name, stuff_spec in pipe.inputs.items}
+            pipe_output = pipe.output.to_bundle_representation()
+
+            if generate_inputs:
+                inputs_json_str = pipe.inputs.render_inputs(indent=2)
+                inputs_file_path = Path(extras_output_dir) / DEFAULT_INPUTS_FILE_NAME
+                save_text_to_path(text=inputs_json_str, path=str(inputs_file_path))
         except Exception as exc:
-            log.warning(f"Could not generate inputs.json: {exc}")
+            log.warning(f"Could not load pipe metadata: {exc}")
 
     return BuildPipeResult(
         output_dir=Path(extras_output_dir),
@@ -154,4 +166,6 @@ async def build_pipe_core(
         inputs_file=inputs_file_path,
         main_pipe_code=main_pipe_code,
         domain=domain,
+        pipe_inputs=pipe_inputs,
+        pipe_output=pipe_output,
     )
