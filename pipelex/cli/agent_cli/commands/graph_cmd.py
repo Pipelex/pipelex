@@ -10,10 +10,11 @@ from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_succe
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
-from pipelex.graph.graph_factory import generate_graph_outputs
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipelex import Pipelex
 from pipelex.tools.misc.file_utils import load_text_from_path
+from pipelex.tools.misc.string_utils import snake_to_title_case
 from pipelex.types import StrEnum
 
 
@@ -74,14 +75,14 @@ def graph_cmd(
     else:
         output_dir = input_path.parent
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     # Initialize Pipelex (needed for config access)
     make_pipelex_for_cli(context=ErrorContext.VALIDATION)
 
     try:
-        # Build graph config with data inclusion and format selection
         base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+
+        # Enable all content formats (JSON, text, HTML) so the interactive HTML
+        # viewers can display data panels alongside the graph visualization
         new_data_inclusion = base_graph_config.data_inclusion.model_copy(
             update={
                 "stuff_json_content": True,
@@ -103,6 +104,9 @@ def graph_cmd(
                 include_mermaidflow = True
                 include_reactflow = True
 
+        # Only generate the final HTML files requested — skip intermediate formats
+        # (graphspec JSON, Mermaid .mmd source, ReactFlow viewspec JSON) that are
+        # only useful during pipeline execution, not for standalone rendering
         new_graphs_inclusion = base_graph_config.graphs_inclusion.model_copy(
             update={
                 "graphspec_json": False,
@@ -120,37 +124,22 @@ def graph_cmd(
             }
         )
 
-        # Derive a pipe code from the graphspec file name for the HTML title
-        pipe_code = input_path.stem.replace("graphspec", "").strip("_.- ")
-        if not pipe_code:
-            pipe_code = "pipeline"
-
         graph_outputs = asyncio.run(
             generate_graph_outputs(
                 graph_spec=graph_spec,
                 graph_config=graph_config,
-                pipe_code=pipe_code,
+                title=snake_to_title_case(input_path.stem),
             )
         )
 
         # Save generated files
-        files: dict[str, str] = {}
-
-        if graph_outputs.mermaidflow_html is not None:
-            mermaidflow_path = output_dir / "mermaidflow.html"
-            mermaidflow_path.write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
-            files["mermaidflow_html"] = str(mermaidflow_path)
-
-        if graph_outputs.reactflow_html is not None:
-            reactflow_path = output_dir / "reactflow.html"
-            reactflow_path.write_text(graph_outputs.reactflow_html, encoding="utf-8")
-            files["reactflow_html"] = str(reactflow_path)
+        saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
 
         agent_success(
             {
                 "success": True,
                 "output_dir": str(output_dir),
-                "files": files,
+                "files": {key: str(path) for key, path in saved_files.items()},
                 "node_count": len(graph_spec.nodes),
             }
         )

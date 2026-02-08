@@ -22,9 +22,7 @@ from pipelex.cli.error_handlers import (
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.graph.graph_config import GraphConfig
-from pipelex.graph.graph_factory import generate_graph_outputs
-from pipelex.graph.graphspec import GraphSpec
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.hub import get_console, get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -44,64 +42,6 @@ from pipelex.tools.misc.pretty import PrettyPrinter
 
 COMMAND = "build"
 SUB_COMMAND_PIPE = "pipe"
-
-
-async def _save_graph_outputs_to_dir(
-    graph_spec: GraphSpec,
-    graph_config: GraphConfig,
-    pipe_code: str,
-    output_dir: Path,
-) -> list[str]:
-    """Save graph outputs to a directory.
-
-    Args:
-        graph_spec: The graph specification to render.
-        graph_config: Configuration for graph generation.
-        pipe_code: The pipe code for use in titles.
-        output_dir: Directory where graph files will be saved.
-
-    Returns:
-        List of saved graph format names (e.g., "mermaidflow", "reactflow").
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    graph_outputs = await generate_graph_outputs(
-        graph_spec=graph_spec,
-        graph_config=graph_config,
-        pipe_code=pipe_code,
-    )
-
-    saved_formats: list[str] = []
-    if graph_outputs.graphspec_json is not None:
-        (output_dir / "graphspec.json").write_text(graph_outputs.graphspec_json, encoding="utf-8")
-        log.verbose(f"GraphSpec JSON saved to: {output_dir / 'graphspec.json'}")
-        saved_formats.append("graphspec")
-
-    if graph_outputs.mermaidflow_mmd is not None:
-        (output_dir / "mermaidflow.mmd").write_text(graph_outputs.mermaidflow_mmd, encoding="utf-8")
-        log.verbose(f"Mermaidflow Mermaid saved to: {output_dir / 'mermaidflow.mmd'}")
-        if "mermaidflow" not in saved_formats:
-            saved_formats.append("mermaidflow")
-
-    if graph_outputs.mermaidflow_html is not None:
-        (output_dir / "mermaidflow.html").write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
-        log.verbose(f"Mermaidflow HTML saved to: {output_dir / 'mermaidflow.html'}")
-        if "mermaidflow" not in saved_formats:
-            saved_formats.append("mermaidflow")
-
-    if graph_outputs.reactflow_viewspec is not None:
-        (output_dir / "viewspec.json").write_text(graph_outputs.reactflow_viewspec, encoding="utf-8")
-        log.verbose(f"ReactFlow ViewSpec saved to: {output_dir / 'viewspec.json'}")
-        if "reactflow" not in saved_formats:
-            saved_formats.append("reactflow")
-
-    if graph_outputs.reactflow_html is not None:
-        (output_dir / "reactflow.html").write_text(graph_outputs.reactflow_html, encoding="utf-8")
-        log.verbose(f"ReactFlow HTML saved to: {output_dir / 'reactflow.html'}")
-        if "reactflow" not in saved_formats:
-            saved_formats.append("reactflow")
-
-    return saved_formats
 
 
 """
@@ -328,14 +268,15 @@ def build_pipe_cmd(
                     # Save builder pipeline graph in graphs/ subfolder
                     graphs_dir = Path(extras_output_dir) / "graphs"
                     builder_graph_dir = graphs_dir / "builder_graph"
-                    builder_graph_formats = await _save_graph_outputs_to_dir(
+                    builder_graph_outputs = await generate_graph_outputs(
                         graph_spec=builder_graph_spec,
                         graph_config=execution_config.graph_config,
                         pipe_code=builder_pipe,
-                        output_dir=builder_graph_dir,
                     )
-                    if builder_graph_formats:
-                        saved_graph_sections.append(("builder", builder_graph_formats))
+                    builder_saved = save_graph_outputs_to_dir(graph_outputs=builder_graph_outputs, output_dir=builder_graph_dir)
+                    if builder_saved:
+                        builder_formats = list(dict.fromkeys(key.split("_")[0] for key in builder_saved))
+                        saved_graph_sections.append(("builder", builder_formats))
 
                     # Run built pipeline in dry-run mode to generate its graph
                     try:
@@ -352,14 +293,15 @@ def build_pipe_cmd(
                         if built_pipe_output.graph_spec:
                             pipeline_graph_dir = graphs_dir / "pipeline_graph"
                             log.verbose(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
-                            pipeline_graph_formats = await _save_graph_outputs_to_dir(
+                            pipeline_graph_outputs = await generate_graph_outputs(
                                 graph_spec=built_pipe_output.graph_spec,
                                 graph_config=execution_config.graph_config,
                                 pipe_code=main_pipe_code,
-                                output_dir=pipeline_graph_dir,
                             )
-                            if pipeline_graph_formats:
-                                saved_graph_sections.append(("pipeline", pipeline_graph_formats))
+                            pipeline_saved = save_graph_outputs_to_dir(graph_outputs=pipeline_graph_outputs, output_dir=pipeline_graph_dir)
+                            if pipeline_saved:
+                                pipeline_formats = list(dict.fromkeys(key.split("_")[0] for key in pipeline_saved))
+                                saved_graph_sections.append(("pipeline", pipeline_formats))
                     except Exception as graph_exc:
                         typer.secho(f"⚠️  Warning: Could not generate built pipeline graph: {graph_exc}", fg=typer.colors.YELLOW)
 

@@ -15,7 +15,7 @@ from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDeco
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.graph.graph_factory import generate_graph_outputs
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
@@ -121,26 +121,9 @@ async def _run_pipeline_core(
             output_dir = Path(bundle_uri).parent / "pipelex-wip"
         else:
             output_dir = Path("pipelex-wip")
-        output_dir.mkdir(parents=True, exist_ok=True)
 
-        graph_files: dict[str, str] = {}
-
-        if graph_outputs.graphspec_json is not None:
-            graphspec_path = output_dir / "graphspec.json"
-            graphspec_path.write_text(graph_outputs.graphspec_json, encoding="utf-8")
-            graph_files["graphspec_json"] = str(graphspec_path)
-
-        if graph_outputs.mermaidflow_html is not None:
-            mermaidflow_path = output_dir / "mermaidflow.html"
-            mermaidflow_path.write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
-            graph_files["mermaidflow_html"] = str(mermaidflow_path)
-
-        if graph_outputs.reactflow_html is not None:
-            reactflow_path = output_dir / "reactflow.html"
-            reactflow_path.write_text(graph_outputs.reactflow_html, encoding="utf-8")
-            graph_files["reactflow_html"] = str(reactflow_path)
-
-        result["graph_files"] = graph_files
+        saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
+        result["graph_files"] = {key: str(path) for key, path in saved_files.items()}
 
     return result
 

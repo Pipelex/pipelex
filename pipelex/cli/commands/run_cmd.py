@@ -23,7 +23,7 @@ from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
-from pipelex.graph.graph_factory import generate_graph_outputs
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -340,34 +340,12 @@ def run_cmd(
                 pipe_code=pipe_code,
             )
 
-            # Save outputs to files (only those that were generated)
-            if graph_outputs.graphspec_json is not None:
-                graphspec_path = output_path / "graphspec.json"
-                graphspec_path.write_text(graph_outputs.graphspec_json, encoding="utf-8")
-                log.verbose(f"GraphSpec JSON saved to: {graphspec_path}")
-
-            if graph_outputs.mermaidflow_mmd is not None:
-                mermaidflow_mmd_path = output_path / "mermaidflow.mmd"
-                mermaidflow_mmd_path.write_text(graph_outputs.mermaidflow_mmd, encoding="utf-8")
-                log.verbose(f"Mermaidflow MMD saved to: {mermaidflow_mmd_path}")
-
-            if graph_outputs.mermaidflow_html is not None:
-                mermaidflow_html_path = output_path / "mermaidflow.html"
-                mermaidflow_html_path.write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
-                log.verbose(f"Mermaidflow HTML saved to: {mermaidflow_html_path}")
-                if "mermaidflow" not in saved_graphs:
+            # Save outputs to files
+            saved_graph_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_path)
+            for output_type in saved_graph_files:
+                if "mermaidflow" in output_type and "mermaidflow" not in saved_graphs:
                     saved_graphs.append("mermaidflow")
-
-            if graph_outputs.reactflow_viewspec is not None:
-                viewspec_path = output_path / "viewspec.json"
-                viewspec_path.write_text(graph_outputs.reactflow_viewspec, encoding="utf-8")
-                log.verbose(f"ReactFlow ViewSpec saved to: {viewspec_path}")
-
-            if graph_outputs.reactflow_html is not None:
-                reactflow_html_path = output_path / "reactflow.html"
-                reactflow_html_path.write_text(graph_outputs.reactflow_html, encoding="utf-8")
-                log.verbose(f"ReactFlow HTML saved to: {reactflow_html_path}")
-                if "reactflow" not in saved_graphs:
+                elif "reactflow" in output_type and "reactflow" not in saved_graphs:
                     saved_graphs.append("reactflow")
 
         # Save main_stuff files if enabled
