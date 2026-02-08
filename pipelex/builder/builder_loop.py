@@ -11,6 +11,7 @@ from pipelex.builder.builder import (
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpecFieldType
 from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
+from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
@@ -24,6 +25,7 @@ from pipelex.core.pipes.variable_multiplicity import format_concept_with_multipl
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.configuration.configs import PipelineExecutionConfig
@@ -194,7 +196,6 @@ class BuilderLoop:
         log.info(f"🔍 Found {len(undeclared)} undeclared concept(s): {', '.join(sorted(undeclared))}")
 
         # Step 3: Fix PipeParallel combined_output deterministically (no pipeline needed)
-        fixed_pipe_parallel_concepts: set[str] = set()
         if pipelex_bundle_spec.pipe:
             for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
                 if not isinstance(pipe_spec, PipeParallelSpec):
@@ -212,7 +213,6 @@ class BuilderLoop:
                 if pipe_spec.add_each_output:
                     log.info(f"🔧 Removing undeclared combined_output '{pipe_spec.combined_output}' from PipeParallel '{pipe_code}'")
                     pipe_spec.combined_output = None
-                    fixed_pipe_parallel_concepts.add(bare_combined)
 
                     # Also fix output if it references an undeclared concept
                     output_parse = parse_concept_with_multiplicity(pipe_spec.output)
@@ -221,9 +221,6 @@ class BuilderLoop:
                     if bare_output in undeclared:
                         log.info(f"🔧 Setting output of PipeParallel '{pipe_code}' to 'Anything'")
                         pipe_spec.output = "Anything"
-                        fixed_pipe_parallel_concepts.add(bare_output)
-
-        undeclared -= fixed_pipe_parallel_concepts
 
         # Step 4: Create remaining undeclared concepts via pipeline
         if undeclared:
@@ -263,6 +260,131 @@ class BuilderLoop:
             for concept_spec in generated_concepts_list.items:
                 pipelex_bundle_spec.concept[concept_spec.the_concept_code] = concept_spec
                 log.info(f"🔧 Added generated concept '{concept_spec.the_concept_code}' to bundle")
+
+        return self._prune_unreachable_specs(pipelex_bundle_spec=pipelex_bundle_spec)
+
+    def _prune_unreachable_specs(self, pipelex_bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
+        """Remove unreachable pipes and unused concepts from the bundle spec.
+
+        Walks the call graph from main_pipe to find all reachable pipes, removes
+        unreachable ones, then collects all concept references from reachable pipes
+        and concept definitions (transitively) to remove unused concepts.
+
+        Args:
+            pipelex_bundle_spec: The bundle spec to prune (modified in place)
+
+        Returns:
+            The pruned bundle spec
+        """
+        if not pipelex_bundle_spec.pipe:
+            return pipelex_bundle_spec
+
+        # Step A: Find all reachable pipes by walking the call graph from main_pipe
+        reachable_pipes: set[str] = set()
+        to_visit: list[str] = [pipelex_bundle_spec.main_pipe]
+        special_outcome_values = SpecialOutcome.value_list()
+
+        while to_visit:
+            pipe_code = to_visit.pop()
+            if pipe_code in reachable_pipes:
+                continue
+            reachable_pipes.add(pipe_code)
+
+            pipe_spec = pipelex_bundle_spec.pipe.get(pipe_code)
+            if pipe_spec is None:
+                continue
+
+            sub_pipe_codes: list[str] = []
+            if isinstance(pipe_spec, PipeSequenceSpec):
+                sub_pipe_codes = [step.pipe_code for step in pipe_spec.steps]
+            elif isinstance(pipe_spec, PipeParallelSpec):
+                sub_pipe_codes = [parallel.pipe_code for parallel in pipe_spec.parallels]
+            elif isinstance(pipe_spec, PipeBatchSpec):
+                sub_pipe_codes = [pipe_spec.branch_pipe_code]
+            elif isinstance(pipe_spec, PipeConditionSpec):
+                for outcome_value in pipe_spec.outcomes.values():
+                    if outcome_value not in special_outcome_values:
+                        sub_pipe_codes.append(outcome_value)
+                if pipe_spec.default_outcome not in special_outcome_values:
+                    sub_pipe_codes.append(pipe_spec.default_outcome)
+
+            to_visit.extend(sub_pipe_codes)
+
+        # Step B: Remove unreachable pipes
+        unreachable = set(pipelex_bundle_spec.pipe.keys()) - reachable_pipes
+        for pipe_code in unreachable:
+            del pipelex_bundle_spec.pipe[pipe_code]
+            log.info(f"🧹 Removed unreachable pipe '{pipe_code}'")
+
+        # Step C: Collect all concept references from reachable pipes
+        referenced_concepts: set[str] = set()
+        for pipe_code in reachable_pipes:
+            pipe_spec = pipelex_bundle_spec.pipe.get(pipe_code)
+            if pipe_spec is None:
+                continue
+
+            # Output
+            output_parse = parse_concept_with_multiplicity(pipe_spec.output)
+            output_concept = output_parse.concept_ref_or_code
+            bare_output = output_concept.split(".")[-1] if "." in output_concept else output_concept
+            referenced_concepts.add(bare_output)
+
+            # Inputs
+            if pipe_spec.inputs:
+                for input_concept_str in pipe_spec.inputs.values():
+                    input_parse = parse_concept_with_multiplicity(input_concept_str)
+                    input_concept = input_parse.concept_ref_or_code
+                    bare_input = input_concept.split(".")[-1] if "." in input_concept else input_concept
+                    referenced_concepts.add(bare_input)
+
+            # PipeParallel combined_output
+            if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
+                combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
+                combined_concept = combined_parse.concept_ref_or_code
+                bare_combined = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
+                referenced_concepts.add(bare_combined)
+
+        # Step D: Collect transitive concept references from concept definitions
+        if pipelex_bundle_spec.concept:
+            changed = True
+            while changed:
+                changed = False
+                for concept_code in list(referenced_concepts):
+                    concept_spec_or_name = pipelex_bundle_spec.concept.get(concept_code)
+                    if not isinstance(concept_spec_or_name, ConceptSpec):
+                        continue
+
+                    # Check refines
+                    if concept_spec_or_name.refines:
+                        bare_ref = (
+                            concept_spec_or_name.refines.split(".")[-1] if "." in concept_spec_or_name.refines else concept_spec_or_name.refines
+                        )
+                        if bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
+                            referenced_concepts.add(bare_ref)
+                            changed = True
+
+                    # Check structure fields
+                    if concept_spec_or_name.structure:
+                        for field_spec in concept_spec_or_name.structure.values():
+                            if field_spec.concept_ref:
+                                bare_ref = field_spec.concept_ref.split(".")[-1] if "." in field_spec.concept_ref else field_spec.concept_ref
+                                if bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
+                                    referenced_concepts.add(bare_ref)
+                                    changed = True
+                            if field_spec.item_concept_ref:
+                                bare_ref = (
+                                    field_spec.item_concept_ref.split(".")[-1] if "." in field_spec.item_concept_ref else field_spec.item_concept_ref
+                                )
+                                if bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
+                                    referenced_concepts.add(bare_ref)
+                                    changed = True
+
+        # Step E: Remove unused concepts
+        if pipelex_bundle_spec.concept:
+            unused = set(pipelex_bundle_spec.concept.keys()) - referenced_concepts
+            for concept_code in unused:
+                del pipelex_bundle_spec.concept[concept_code]
+                log.info(f"🧹 Removed unused concept '{concept_code}'")
 
         return pipelex_bundle_spec
 
