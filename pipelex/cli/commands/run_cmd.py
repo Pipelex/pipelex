@@ -418,7 +418,7 @@ def run_cmd(
         console = get_console()
         console.print("\n[green]✓[/green] [bold]Pipeline execution completed successfully[/bold]")
         if output_path:
-            console.print(f"  Output saved to {output_path}:")
+            console.print(f"  Output saved to [bold magenta]{output_path}[/bold magenta]:")
             if saved_graphs:
                 console.print(f"    [green]✓[/green] graphs: {', '.join(saved_graphs)}")
             if saved_main_stuff_formats:

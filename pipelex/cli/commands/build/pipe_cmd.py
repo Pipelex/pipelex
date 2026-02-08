@@ -361,12 +361,13 @@ def build_pipe_cmd(
                     end_time = time.time()
                     console = get_console()
                     console.print(f"\n[green]✓[/green] [bold]Pipeline built successfully ({end_time - start_time:.1f}s)[/bold]")
-                    console.print(f"  Output saved to {extras_output_dir}:")
-                    console.print(f"    [green]✓[/green] bundle.plx (domain: {domain_code}, main: {main_pipe_code})")
+                    console.print(f"  Output saved to [bold magenta]{extras_output_dir}[/bold magenta]:")
+                    console.print(f"    [green]✓[/green] bundle.plx → {domain_code} → main pipe [red]{main_pipe_code}[/red]")
                     if saved_bundle_view_formats:
                         console.print(f"    [green]✓[/green] bundle_view: {', '.join(saved_bundle_view_formats)}")
                     if saved_structure_names:
-                        console.print(f"    [green]✓[/green] structures: {', '.join(saved_structure_names)}")
+                        colored_structures = ", ".join(f"[green]{name}[/green]" for name in saved_structure_names)
+                        console.print(f"    [green]✓[/green] structures: {colored_structures}")
                     if has_inputs:
                         console.print(f"    [green]✓[/green] {DEFAULT_INPUTS_FILE_NAME}")
                     console.print(f"    [green]✓[/green] run_{main_pipe_code}.py")
