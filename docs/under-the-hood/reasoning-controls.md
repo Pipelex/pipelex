@@ -31,7 +31,7 @@ The `ThinkingMode` enum (`pipelex/cogt/llm/thinking_mode.py`) defines how a mode
 |------|---------|
 | `none` | Model does not support reasoning. Attempting to use reasoning params raises `LLMCapabilityError`. |
 | `manual` | Pipelex translates effort to a provider-specific value (token budget, effort string, or prompt mode). |
-| `adaptive` | The provider's SDK dynamically adjusts reasoning depth. Only Anthropic supports this today. |
+| `adaptive` | The provider's SDK dynamically adjusts reasoning depth. Only Anthropic and Google (Gemini 3) support this today. |
 
 Each model spec in the backend TOML files declares a `thinking_mode`. This is a required field on `InferenceModelSpec` — models without reasoning capabilities set `thinking_mode = "none"` (or inherit it from `[defaults]`).
 
@@ -133,7 +133,7 @@ When thinking is active, `temperature` is suppressed (Anthropic requires `temper
 
 ### Google Gemini
 
-Google models currently use `thinking_mode = "manual"`. The effort mapping is configured via `google_config.effort_to_level_map`:
+Google models use either `thinking_mode = "manual"` (Gemini 2.5 series) or `thinking_mode = "adaptive"` (Gemini 3 series). Both modes use `google_config.effort_to_level_map` as a gate:
 
 ```toml
 [cogt.llm_config.google_config.effort_to_level_map]
@@ -145,7 +145,11 @@ high = "high"
 max = "high"
 ```
 
-The level map serves as a gate: if it returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled with `thinking_budget=0`. Otherwise, effort is resolved to a `thinking_budget` (token count) via the `effort_to_budget_maps` config:
+If the level map returns `"disabled"` (e.g., for `NONE` effort), thinking is disabled with `thinking_budget=0` regardless of mode.
+
+**ADAPTIVE mode** (Gemini 3) sends a `thinking_level` value (e.g., `THINKING_LOW`, `THINKING_MEDIUM`, `THINKING_HIGH`) mapped from the `effort_to_level_map`. The Google SDK dynamically adjusts reasoning depth based on this level. No `thinking_budget` is set in adaptive mode.
+
+**MANUAL mode** (Gemini 2.5) resolves effort to a `thinking_budget` (token count) via the `effort_to_budget_maps` config:
 
 | ReasoningEffort | thinking_budget |
 |-----------------|----------------|
@@ -157,8 +161,6 @@ The level map serves as a gate: if it returns `"disabled"` (e.g., for `NONE` eff
 | `MAX` | `65536` |
 
 **`reasoning_budget`** (explicit) passes through directly as `thinking_budget`. When `max_tokens` is known, the budget is capped to `min(budget, max_tokens - 1)`.
-
-Google does not support `thinking_mode = "adaptive"`. Both raise `LLMCapabilityError`.
 
 Temperature is passed normally to the Google API regardless of reasoning mode.
 
@@ -243,6 +245,10 @@ thinking_mode = "manual"
 ["claude-4.6-opus"]
 thinking_mode = "adaptive"
 
+# Google Gemini 3 with adaptive reasoning
+["gemini-3.0-pro"]
+thinking_mode = "adaptive"
+
 # Model without reasoning (or inherited from defaults)
 [gpt-4o-mini]
 thinking_mode = "none"
@@ -282,7 +288,7 @@ All reasoning-related errors use `LLMCapabilityError` (`pipelex/cogt/exceptions.
 |----------|-------|
 | `reasoning_effort` on a `thinking_mode = "none"` model | "does not support reasoning" |
 | `reasoning_budget` on a provider that doesn't support it | "does not support reasoning_budget" |
-| `thinking_mode = "adaptive"` on OpenAI, Google, or Mistral | "adaptive ... not supported" |
+| `thinking_mode = "adaptive"` on OpenAI or Mistral | "adaptive ... not supported" |
 | Any reasoning param on Bedrock (aioboto3) models | "does not support reasoning parameters" |
 | Reasoning params during structured generation | "does not support reasoning parameters for structured generation" |
 | Both `reasoning_effort` and `reasoning_budget` set | `ValueError` / `LLMSettingValueError` (mutual exclusivity) |

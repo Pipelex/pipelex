@@ -104,7 +104,6 @@ class TestGoogleReasoning:
         job_params = LLMJobParams(temperature=0.5, reasoning_effort=effort)
         result = worker._build_thinking_config(job_params=job_params, max_tokens=100000)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
         assert result is not None
-        assert result.thinking_budget == -1
         assert result.thinking_level == expected_level
 
     def test_manual_mode_effort_none_disables_thinking(self, mocker: MockerFixture):

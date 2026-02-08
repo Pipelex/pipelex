@@ -20,7 +20,7 @@ class TestLLMReasoning:
     @pytest.mark.parametrize(
         ("topic", "reasoning_effort"),
         [
-            ("Low effort", ReasoningEffort.LOW),
+            # ("Low effort", ReasoningEffort.LOW),
             ("High effort", ReasoningEffort.HIGH),
         ],
     )

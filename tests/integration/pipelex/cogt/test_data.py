@@ -238,9 +238,9 @@ class LLMReasoningTestCases:
     """Test cases for LLM reasoning/thinking integration tests."""
 
     PROMPTS: ClassVar[list[tuple[str, str]]] = [  # topic, prompt_text
-        # ("Comparison", "Which is larger: 0.9 or 0.11?"),
+        ("Comparison", "Which is larger: 0.9 or 0.11?"),
         ("Letter counting", "How many Rs are in the word 'Strawberry'?"),
-        # ("Multiplication", "What is 317 * 723?"),
+        ("Multiplication", "What is 317 * 723?"),
         # ("Huge multiplication", "What is 9738317 * 723837893?"),
         # (
         #     "Tricky growth",

@@ -156,7 +156,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                     log.verbose("Google adaptive thinking disabled (effort=NONE)")
                     return genai_types.ThinkingConfig(thinking_budget=0)
                 log.verbose(f"Google adaptive thinking with thinking_level={thinking_level}")
-                return genai_types.ThinkingConfig(thinking_budget=-1, thinking_level=thinking_level)
+                return genai_types.ThinkingConfig(thinking_level=thinking_level)
             case ThinkingMode.NONE:
                 msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
                 raise LLMCapabilityError(msg)
