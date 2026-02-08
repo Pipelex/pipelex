@@ -150,34 +150,38 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.5, output = 1.5 }
 
-# --- Magistral Series -------------------------------------------------------
+# --- Magistral Series (reasoning models) ------------------------------------
 [magistral-small-2509]
 model_id = "magistral-small-2509"
 max_tokens = 128000
-inputs = ["text", "images", "pdf"]
-outputs = ["text", "structured"]
+inputs = ["text", "pdf"]
+outputs = ["text"]
 costs = { input = 0.5, output = 1.5 }
+thinking_mode = "manual"
 
 [magistral-small]
 model_id = "magistral-small-latest"
 max_tokens = 128000
-inputs = ["text", "images", "pdf"]
-outputs = ["text", "structured"]
+inputs = ["text", "pdf"]
+outputs = ["text"]
 costs = { input = 0.5, output = 1.5 }
+thinking_mode = "manual"
 
 [magistral-medium-2509]
 model_id = "magistral-medium-2509"
 max_tokens = 128000
-inputs = ["text", "images", "pdf"]
-outputs = ["text", "structured"]
+inputs = ["text", "pdf"]
+outputs = ["text"]
 costs = { input = 2, output = 5 }
+thinking_mode = "manual"
 
 [magistral-medium]
 model_id = "magistral-medium-latest"
 max_tokens = 128000
-inputs = ["text", "images", "pdf"]
-outputs = ["text", "structured"]
+inputs = ["text", "pdf"]
+outputs = ["text"]
 costs = { input = 2, output = 5 }
+thinking_mode = "manual"
 
 ################################################################################
 # EXTRACTION MODELS
