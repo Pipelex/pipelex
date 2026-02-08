@@ -151,6 +151,10 @@ def build_pipe_cmd(
         bool,
         typer.Option("--no-extras", help="Skip generating inputs.json and runner.py, only generate the PLX file"),
     ] = False,
+    bundle_view: Annotated[
+        bool,
+        typer.Option("--bundle-view/--no-bundle-view", help="Generate bundle view HTML and SVG files"),
+    ] = False,
     graph: Annotated[
         bool | None,
         typer.Option("--graph/--no-graph", help="Generate execution graphs for both build process and built pipeline"),
@@ -248,26 +252,28 @@ def build_pipe_cmd(
         # Generate extras (inputs and runner)
         if not no_extras:
             main_pipe_code = pipelex_bundle_spec.main_pipe
+            domain_code = pipelex_bundle_spec.domain
             if main_pipe_code:
                 saved_bundle_view_formats: list[str] = []
                 saved_structure_names: list[str] = []
                 saved_graph_sections: list[tuple[str, list[str]]] = []
 
                 try:
-                    pretty = pipelex_bundle_spec.rendered_pretty()
-                    # Generate pretty HTML
-                    pretty_html = PrettyPrinter.pretty_html(pretty=pretty)
-                    html_path = os.path.join(extras_output_dir, "bundle_view.html")
-                    save_text_to_path(text=pretty_html, path=html_path)
-                    log.verbose(f"Pretty HTML saved to: {html_path}")
-                    saved_bundle_view_formats.append("html")
+                    if bundle_view:
+                        pretty = pipelex_bundle_spec.rendered_pretty()
+                        # Generate pretty HTML
+                        pretty_html = PrettyPrinter.pretty_html(pretty=pretty)
+                        html_path = os.path.join(extras_output_dir, "bundle_view.html")
+                        save_text_to_path(text=pretty_html, path=html_path)
+                        log.verbose(f"Pretty HTML saved to: {html_path}")
+                        saved_bundle_view_formats.append("html")
 
-                    # Generate pretty SVG
-                    pretty_svg = PrettyPrinter.pretty_svg(pretty=pretty)
-                    svg_path = os.path.join(extras_output_dir, "bundle_view.svg")
-                    save_text_to_path(text=pretty_svg, path=svg_path)
-                    log.verbose(f"Pretty SVG saved to: {svg_path}")
-                    saved_bundle_view_formats.append("svg")
+                        # Generate pretty SVG
+                        pretty_svg = PrettyPrinter.pretty_svg(pretty=pretty)
+                        svg_path = os.path.join(extras_output_dir, "bundle_view.svg")
+                        save_text_to_path(text=pretty_svg, path=svg_path)
+                        log.verbose(f"Pretty SVG saved to: {svg_path}")
+                        saved_bundle_view_formats.append("svg")
 
                     pipe = get_required_pipe(pipe_code=main_pipe_code)
 
@@ -283,11 +289,13 @@ def build_pipe_cmd(
                         saved_structure_names = [concept_code for _, concept_code in generated_structures]
                         log.verbose(f"Generated {len(generated_structures)} structure(s) in: {structures_output_dir}")
 
-                    # Generate inputs.json
-                    inputs_json_str = pipe.inputs.render_inputs(indent=2)
-                    inputs_json_path = os.path.join(extras_output_dir, DEFAULT_INPUTS_FILE_NAME)
-                    save_text_to_path(text=inputs_json_str, path=inputs_json_path)
-                    log.verbose(f"Inputs template saved to: {inputs_json_path}")
+                    # Generate inputs.json (only if the pipe has inputs)
+                    has_inputs = not pipe.inputs.is_empty
+                    if has_inputs:
+                        inputs_json_str = pipe.inputs.render_inputs(indent=2)
+                        inputs_json_path = os.path.join(extras_output_dir, DEFAULT_INPUTS_FILE_NAME)
+                        save_text_to_path(text=inputs_json_str, path=inputs_json_path)
+                        log.verbose(f"Inputs template saved to: {inputs_json_path}")
 
                     # Determine if output is a list from the bundle spec
                     main_pipe_spec = pipelex_bundle_spec.pipe[main_pipe_code] if pipelex_bundle_spec.pipe else None
@@ -337,7 +345,7 @@ def build_pipe_cmd(
                             )
                             if built_pipe_output.graph_spec:
                                 pipeline_graph_dir = graphs_dir / "pipeline_graph"
-                                log.dev(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
+                                log.verbose(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
                                 pipeline_graph_formats = await _save_graph_outputs_to_dir(
                                     graph_spec=built_pipe_output.graph_spec,
                                     graph_config=execution_config.graph_config,
@@ -354,16 +362,21 @@ def build_pipe_cmd(
                     console = get_console()
                     console.print(f"\n[green]✓[/green] [bold]Pipeline built successfully ({end_time - start_time:.1f}s)[/bold]")
                     console.print(f"  Output saved to {extras_output_dir}:")
-                    console.print("    [green]✓[/green] bundle.plx")
+                    console.print(f"    [green]✓[/green] bundle.plx (domain: {domain_code}, main: {main_pipe_code})")
                     if saved_bundle_view_formats:
                         console.print(f"    [green]✓[/green] bundle_view: {', '.join(saved_bundle_view_formats)}")
                     if saved_structure_names:
                         console.print(f"    [green]✓[/green] structures: {', '.join(saved_structure_names)}")
-                    console.print(f"    [green]✓[/green] {DEFAULT_INPUTS_FILE_NAME}")
+                    if has_inputs:
+                        console.print(f"    [green]✓[/green] {DEFAULT_INPUTS_FILE_NAME}")
                     console.print(f"    [green]✓[/green] run_{main_pipe_code}.py")
                     for graph_label, graph_formats in saved_graph_sections:
                         console.print(f"    [green]✓[/green] graphs/{graph_label}: {', '.join(graph_formats)}")
-                    console.print(f"\n  To run: [cyan]pipelex run {extras_output_dir}[/cyan]")
+                    if has_inputs:
+                        console.print(f"\n  [yellow]Note:[/yellow] Fill {DEFAULT_INPUTS_FILE_NAME} with actual data before running.")
+                        console.print(f"  To run: [cyan]pipelex run {extras_output_dir}[/cyan]")
+                    else:
+                        console.print(f"\n  To run: [cyan]pipelex run {extras_output_dir}[/cyan]")
 
                 except Exception as exc:
                     typer.secho(f"⚠️  Warning: Could not generate extras: {exc}", fg=typer.colors.YELLOW)

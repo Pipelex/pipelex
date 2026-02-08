@@ -322,7 +322,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             and self.telemetry_config.pipelex_gateway.portkey
             and self.telemetry_config.pipelex_gateway.portkey.force_debug_enabled
         ):
-            log.dev(
+            log.verbose(
                 "Force-enabling Portkey logging (debug mode) because pipelex_gateway.portkey.force_debug_enabled is set in telemetry configuration"
             )
             is_debug = True
