@@ -87,6 +87,8 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             match thinking_mode:
                 case ThinkingMode.MANUAL:
                     openai_effort = get_config().cogt.llm_config.openai_config.get_reasoning_level(effort=effort)
+                    if openai_effort is None:
+                        return None
                     log.verbose(f"OpenAI Responses reasoning effort={openai_effort}")
                     return Reasoning(effort=openai_effort)
                 case ThinkingMode.ADAPTIVE:
