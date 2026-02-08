@@ -5,8 +5,8 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, ReasoningEffort
 from pipelex.system.exceptions import ConfigValidationError
 
 _DEFAULT_EFFORT_TO_BUDGET_MAPS: dict[str, dict[str, int]] = {
-    "anthropic": {"none": 0, "low": 1024, "medium": 5000, "high": 16384, "max": 65536},
-    "gemini": {"none": 0, "low": 1024, "medium": 5000, "high": 16384, "max": 65536},
+    "anthropic": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "max": 65536},
+    "gemini": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "max": 65536},
 }
 
 
@@ -53,14 +53,14 @@ class TestLLMConfigReasoning:
     def test_validator_missing_effort_level_raises(self):
         incomplete_maps = {
             "anthropic": {"none": 0, "low": 1024, "medium": 5000, "high": 16384},
-            # missing "max"
+            # missing "minimal" and "max"
         }
         with pytest.raises(ConfigValidationError, match="Missing reasoning effort levels"):
             _make_llm_config(effort_to_budget_maps=incomplete_maps)
 
     def test_validator_invalid_effort_level_raises(self):
         invalid_maps = {
-            "anthropic": {"none": 0, "low": 1024, "medium": 5000, "high": 16384, "max": 65536, "ultra": 999999},
+            "anthropic": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "max": 65536, "ultra": 999999},
         }
         with pytest.raises(ConfigValidationError, match="Invalid reasoning effort levels"):
             _make_llm_config(effort_to_budget_maps=invalid_maps)
@@ -68,7 +68,7 @@ class TestLLMConfigReasoning:
     def test_validator_missing_and_invalid_effort_levels_raises(self):
         bad_maps = {
             "anthropic": {"none": 0, "low": 1024, "medium": 5000, "high": 16384, "ultra": 999999},
-            # missing "max", invalid "ultra"
+            # missing "minimal" and "max", invalid "ultra"
         }
         with pytest.raises(ConfigValidationError, match=r"Missing.*and invalid"):
             _make_llm_config(effort_to_budget_maps=bad_maps)
@@ -82,6 +82,7 @@ class TestLLMConfigReasoning:
         "effort",
         [
             ReasoningEffort.NONE,
+            ReasoningEffort.MINIMAL,
             ReasoningEffort.LOW,
             ReasoningEffort.MEDIUM,
             ReasoningEffort.HIGH,

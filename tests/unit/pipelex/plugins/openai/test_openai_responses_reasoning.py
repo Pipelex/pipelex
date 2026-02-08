@@ -24,6 +24,7 @@ class TestOpenAIResponsesReasoning:
         ("effort", "expected_openai_effort"),
         [
             (ReasoningEffort.NONE, "none"),
+            (ReasoningEffort.MINIMAL, "minimal"),
             (ReasoningEffort.LOW, "low"),
             (ReasoningEffort.MEDIUM, "medium"),
             (ReasoningEffort.HIGH, "high"),

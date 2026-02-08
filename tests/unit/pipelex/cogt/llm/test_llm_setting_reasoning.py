@@ -47,6 +47,7 @@ class TestLLMSettingReasoning:
         "effort",
         [
             ReasoningEffort.NONE,
+            ReasoningEffort.MINIMAL,
             ReasoningEffort.LOW,
             ReasoningEffort.MEDIUM,
             ReasoningEffort.HIGH,

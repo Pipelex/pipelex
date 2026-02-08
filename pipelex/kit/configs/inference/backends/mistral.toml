@@ -25,6 +25,7 @@ model_type = "llm"
 sdk = "mistral"
 prompting_target = "mistral"
 structure_method = "instructor/mistral_tools"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS

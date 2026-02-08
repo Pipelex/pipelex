@@ -78,7 +78,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
                         case ReasoningEffort.NONE:
                             log.verbose("Mistral prompt_mode omitted (reasoning disabled)")
                             return UNSET
-                        case ReasoningEffort.LOW | ReasoningEffort.MEDIUM | ReasoningEffort.HIGH | ReasoningEffort.MAX:
+                        case ReasoningEffort.MINIMAL | ReasoningEffort.LOW | ReasoningEffort.MEDIUM | ReasoningEffort.HIGH | ReasoningEffort.MAX:
                             log.verbose("Mistral prompt_mode=reasoning")
                             return "reasoning"
                 case ThinkingMode.ADAPTIVE:

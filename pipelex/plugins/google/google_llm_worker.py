@@ -24,6 +24,7 @@ if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
 
 _EFFORT_TO_GOOGLE_THINKING_LEVEL: dict[ReasoningEffort, genai_types.ThinkingLevel] = {
+    ReasoningEffort.MINIMAL: genai_types.ThinkingLevel.LOW,
     ReasoningEffort.LOW: genai_types.ThinkingLevel.LOW,
     ReasoningEffort.MEDIUM: genai_types.ThinkingLevel.MEDIUM,
     ReasoningEffort.HIGH: genai_types.ThinkingLevel.HIGH,

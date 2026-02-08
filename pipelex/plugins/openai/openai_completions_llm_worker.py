@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 _EFFORT_TO_OPENAI_EFFORT: dict[ReasoningEffort, ChatCompletionReasoningEffort] = {
     ReasoningEffort.NONE: "none",
+    ReasoningEffort.MINIMAL: "minimal",
     ReasoningEffort.LOW: "low",
     ReasoningEffort.MEDIUM: "medium",
     ReasoningEffort.HIGH: "high",

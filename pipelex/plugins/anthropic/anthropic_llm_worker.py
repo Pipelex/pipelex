@@ -35,6 +35,7 @@ AnthropicEffortLevel = Literal["low", "medium", "high", "max"]
 
 _EFFORT_TO_ANTHROPIC_EFFORT: dict[ReasoningEffort, AnthropicEffortLevel | None] = {
     ReasoningEffort.NONE: None,
+    ReasoningEffort.MINIMAL: "low",
     ReasoningEffort.LOW: "low",
     ReasoningEffort.MEDIUM: "medium",
     ReasoningEffort.HIGH: "high",
@@ -48,12 +49,10 @@ class _ThinkingParams:
     def __init__(
         self,
         thinking: ThinkingConfigParam | None,
-        temperature: float,
         output_config: OutputConfigParam | None,
         suppress_temperature: bool,
     ):
         self.thinking = thinking
-        self.temperature = temperature
         self.output_config = output_config
         self.suppress_temperature = suppress_temperature
 
@@ -143,7 +142,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         # Case 3: neither reasoning_effort nor reasoning_budget is set
         return _ThinkingParams(
             thinking=None,
-            temperature=job_params.temperature,
             output_config=None,
             suppress_temperature=False,
         )
@@ -162,7 +160,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                     # NONE effort means don't enable thinking at all
                     return _ThinkingParams(
                         thinking=None,
-                        temperature=0.0,
                         output_config=None,
                         suppress_temperature=False,
                     )
@@ -171,7 +168,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 output_config = OutputConfigParam(effort=anthropic_effort)
                 return _ThinkingParams(
                     thinking=thinking_config,
-                    temperature=0.0,
                     output_config=output_config,
                     suppress_temperature=True,
                 )
@@ -181,7 +177,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                     # NONE effort means don't enable thinking
                     return _ThinkingParams(
                         thinking=None,
-                        temperature=0.0,
                         output_config=None,
                         suppress_temperature=False,
                     )
@@ -198,7 +193,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 thinking_config = {"type": "enabled", "budget_tokens": safe_budget}
                 return _ThinkingParams(
                     thinking=thinking_config,
-                    temperature=0.0,
                     output_config=None,
                     suppress_temperature=True,
                 )
@@ -223,7 +217,6 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 thinking_config: ThinkingConfigParam = {"type": "enabled", "budget_tokens": safe_budget}
                 return _ThinkingParams(
                     thinking=thinking_config,
-                    temperature=0.0,
                     output_config=None,
                     suppress_temperature=True,
                 )

@@ -7,6 +7,7 @@ from pipelex.types import Self, StrEnum
 
 class ReasoningEffort(StrEnum):
     NONE = "none"
+    MINIMAL = "minimal"
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"

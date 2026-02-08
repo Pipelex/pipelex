@@ -26,6 +26,7 @@ class TestGoogleReasoning:
         ("effort", "expected_budget"),
         [
             (ReasoningEffort.NONE, 0),
+            (ReasoningEffort.MINIMAL, 512),
             (ReasoningEffort.LOW, 1024),
             (ReasoningEffort.MEDIUM, 5000),
             (ReasoningEffort.HIGH, 16384),
@@ -58,6 +59,7 @@ class TestGoogleReasoning:
     @pytest.mark.parametrize(
         ("effort", "expected_level"),
         [
+            (ReasoningEffort.MINIMAL, genai_types.ThinkingLevel.LOW),
             (ReasoningEffort.LOW, genai_types.ThinkingLevel.LOW),
             (ReasoningEffort.MEDIUM, genai_types.ThinkingLevel.MEDIUM),
             (ReasoningEffort.HIGH, genai_types.ThinkingLevel.HIGH),

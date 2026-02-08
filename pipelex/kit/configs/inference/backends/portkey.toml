@@ -253,7 +253,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
-thinking_mode = "adaptive"
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 # --- Gemini LLMs --------------------------------------------------------------
