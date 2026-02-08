@@ -18,7 +18,6 @@ from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, c
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.reactflow.viewspec import LayoutSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
-from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.string_utils import snake_to_title_case
 
 if TYPE_CHECKING:
@@ -26,6 +25,7 @@ if TYPE_CHECKING:
 
     from pipelex.graph.graph_config import GraphConfig
     from pipelex.graph.graphspec import GraphSpec
+    from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
 class GraphOutputs(BaseModel):
@@ -54,7 +54,7 @@ async def generate_graph_outputs(
     *,
     pipe_code: str = "",
     title: str | None = None,
-    direction: FlowchartDirection = FlowchartDirection.TOP_DOWN,
+    direction: FlowchartDirection | None = None,
     include_subgraphs: bool = True,
 ) -> GraphOutputs:
     """Generate graph outputs from a GraphSpec based on configuration.
@@ -72,7 +72,7 @@ async def generate_graph_outputs(
         graph_config: Configuration controlling which outputs to generate and data inclusion.
         pipe_code: The pipe code, used to derive the HTML page title when title is not provided.
         title: Explicit HTML page title. When provided, overrides the auto-derived title from pipe_code.
-        direction: Flowchart direction for Mermaid diagrams.
+        direction: Flowchart direction for Mermaid diagrams. When None, uses graph_config.mermaid_config.direction.
         include_subgraphs: Whether to render controller hierarchy as subgraphs in Mermaid output.
 
     Returns:
@@ -95,9 +95,14 @@ async def generate_graph_outputs(
     # Get the mermaid theme from config
     mermaid_theme = graph_config.mermaid_config.style.theme
 
+    # Resolve mermaid direction: explicit override takes priority, then config
+    effective_direction = direction or graph_config.mermaid_config.direction
+
     # Generate mermaidflow view
     if inclusion.mermaidflow_mmd or inclusion.mermaidflow_html:
-        mermaidflow = MermaidflowFactory.make_from_graphspec(graph_spec, graph_config, direction=direction, include_subgraphs=include_subgraphs)
+        mermaidflow = MermaidflowFactory.make_from_graphspec(
+            graph_spec, graph_config, direction=effective_direction, include_subgraphs=include_subgraphs
+        )
         if inclusion.mermaidflow_mmd:
             mermaidflow_mmd = mermaidflow.mermaid_code
         if inclusion.mermaidflow_html:
@@ -120,8 +125,9 @@ async def generate_graph_outputs(
     if inclusion.reactflow_viewspec or inclusion.reactflow_html:
         analysis = GraphAnalysis.from_graphspec(graph_spec)
         rf_config = graph_config.reactflow_config
+        effective_rf_direction = direction or rf_config.layout_direction
         layout = LayoutSpec(
-            direction=rf_config.layout_direction,
+            direction=effective_rf_direction,
             nodesep=rf_config.nodesep,
             ranksep=rf_config.ranksep,
         )

@@ -343,7 +343,7 @@ reactflow_viewspec = true
 reactflow_html = true
 
 [pipelex.pipeline_execution_config.graph_config.mermaid_config]
-direction = "top_down"
+direction = "left_to_right"
 is_include_data_edges = true
 is_include_contains_edges = false
 is_include_selected_outcome_edges = true
