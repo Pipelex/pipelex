@@ -7,13 +7,14 @@ from pipelex.builder.bundle_spec import PipelexBundleSpec
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec, ConceptStructureSpecFieldType
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
 
 
 def _make_bundle_for_prune(
     domain: str = "my_domain",
     main_pipe: str = "main_sequence",
-    pipes: dict[str, PipeLLMSpec | PipeSequenceSpec] | None = None,
+    pipes: dict[str, PipeSpecUnion] | None = None,
     concepts: dict[str, ConceptSpec | str] | None = None,
 ) -> PipelexBundleSpec:
     """Create a minimal PipelexBundleSpec for testing _prune_unreachable_specs."""
@@ -60,7 +61,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Main",
                     type="PipeSequence",
                     pipe_category="PipeController",
-                    inputs=None,
+                    inputs={},
                     output="Text",
                     steps=[SubPipeSpec(pipe_code="generate_text", result="text_output")],
                 ),
@@ -103,7 +104,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Generate report",
                     type="PipeLLM",
                     pipe_category="PipeOperator",
-                    inputs=None,
+                    inputs={},
                     output="my_domain.Report",
                     llm_talent="data-retrieval",
                     prompt="Generate a report",
@@ -137,7 +138,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Generate summary",
                     type="PipeLLM",
                     pipe_category="PipeOperator",
-                    inputs=None,
+                    inputs={},
                     output="Summary",
                     llm_talent="data-retrieval",
                     prompt="Generate a summary",
@@ -170,7 +171,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Generate result",
                     type="PipeLLM",
                     pipe_category="PipeOperator",
-                    inputs=None,
+                    inputs={},
                     output="Result",
                     llm_talent="data-retrieval",
                     prompt="Generate a result",
@@ -211,7 +212,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Generate derived",
                     type="PipeLLM",
                     pipe_category="PipeOperator",
-                    inputs=None,
+                    inputs={},
                     output="Derived",
                     llm_talent="data-retrieval",
                     prompt="Generate derived content",
@@ -250,7 +251,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Generate container",
                     type="PipeLLM",
                     pipe_category="PipeOperator",
-                    inputs=None,
+                    inputs={},
                     output="Container",
                     llm_talent="data-retrieval",
                     prompt="Generate container",
@@ -300,7 +301,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Main",
                     type="PipeSequence",
                     pipe_category="PipeController",
-                    inputs=None,
+                    inputs={},
                     output="Text",
                     steps=[
                         SubPipeSpec(pipe_code="existing_pipe", result="result"),
@@ -312,7 +313,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Existing pipe",
                     type="PipeLLM",
                     pipe_category="PipeOperator",
-                    inputs=None,
+                    inputs={},
                     output="Text",
                     llm_talent="data-retrieval",
                     prompt="Generate text",
@@ -339,7 +340,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Main",
                     type="PipeSequence",
                     pipe_category="PipeController",
-                    inputs=None,
+                    inputs={},
                     output="Text",
                     steps=[SubPipeSpec(pipe_code="missing_pipe", result="result")],
                 ),
@@ -348,7 +349,7 @@ class TestBuilderLoopPruneUnreachableSpecs:
                     description="Orphan pipe",
                     type="PipeLLM",
                     pipe_category="PipeOperator",
-                    inputs=None,
+                    inputs={},
                     output="Text",
                     llm_talent="data-retrieval",
                     prompt="Orphan",
