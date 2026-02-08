@@ -286,6 +286,8 @@ class BuilderLoop:
         if not pipelex_bundle_spec.pipe:
             return pipelex_bundle_spec
 
+        domain = pipelex_bundle_spec.domain
+
         # Step A: Find all reachable pipes by walking the call graph from main_pipe
         reachable_pipes: set[str] = set()
         to_visit: list[str] = [pipelex_bundle_spec.main_pipe]
@@ -295,11 +297,12 @@ class BuilderLoop:
             pipe_code = to_visit.pop()
             if pipe_code in reachable_pipes:
                 continue
-            reachable_pipes.add(pipe_code)
 
             pipe_spec = pipelex_bundle_spec.pipe.get(pipe_code)
             if pipe_spec is None:
+                log.warning(f"Pipe '{pipe_code}' is referenced but not found in bundle spec pipes")
                 continue
+            reachable_pipes.add(pipe_code)
 
             sub_pipe_codes: list[str] = []
             if isinstance(pipe_spec, PipeSequenceSpec):
@@ -332,24 +335,24 @@ class BuilderLoop:
 
             # Output
             output_parse = parse_concept_with_multiplicity(pipe_spec.output)
-            output_concept = output_parse.concept_ref_or_code
-            bare_output = output_concept.split(".")[-1] if "." in output_concept else output_concept
-            referenced_concepts.add(bare_output)
+            bare_output = self._extract_local_bare_code(concept_ref_or_code=output_parse.concept_ref_or_code, domain=domain)
+            if bare_output is not None:
+                referenced_concepts.add(bare_output)
 
             # Inputs
             if pipe_spec.inputs:
                 for input_concept_str in pipe_spec.inputs.values():
                     input_parse = parse_concept_with_multiplicity(input_concept_str)
-                    input_concept = input_parse.concept_ref_or_code
-                    bare_input = input_concept.split(".")[-1] if "." in input_concept else input_concept
-                    referenced_concepts.add(bare_input)
+                    bare_input = self._extract_local_bare_code(concept_ref_or_code=input_parse.concept_ref_or_code, domain=domain)
+                    if bare_input is not None:
+                        referenced_concepts.add(bare_input)
 
             # PipeParallel combined_output
             if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
                 combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
-                combined_concept = combined_parse.concept_ref_or_code
-                bare_combined = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
-                referenced_concepts.add(bare_combined)
+                bare_combined = self._extract_local_bare_code(concept_ref_or_code=combined_parse.concept_ref_or_code, domain=domain)
+                if bare_combined is not None:
+                    referenced_concepts.add(bare_combined)
 
         # Step D: Collect transitive concept references from concept definitions
         if pipelex_bundle_spec.concept:
@@ -363,10 +366,8 @@ class BuilderLoop:
 
                     # Check refines
                     if concept_spec_or_name.refines:
-                        bare_ref = (
-                            concept_spec_or_name.refines.split(".")[-1] if "." in concept_spec_or_name.refines else concept_spec_or_name.refines
-                        )
-                        if bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
+                        bare_ref = self._extract_local_bare_code(concept_ref_or_code=concept_spec_or_name.refines, domain=domain)
+                        if bare_ref is not None and bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
                             referenced_concepts.add(bare_ref)
                             changed = True
 
@@ -374,15 +375,13 @@ class BuilderLoop:
                     if concept_spec_or_name.structure:
                         for field_spec in concept_spec_or_name.structure.values():
                             if field_spec.concept_ref:
-                                bare_ref = field_spec.concept_ref.split(".")[-1] if "." in field_spec.concept_ref else field_spec.concept_ref
-                                if bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
+                                bare_ref = self._extract_local_bare_code(concept_ref_or_code=field_spec.concept_ref, domain=domain)
+                                if bare_ref is not None and bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
                                     referenced_concepts.add(bare_ref)
                                     changed = True
                             if field_spec.item_concept_ref:
-                                bare_ref = (
-                                    field_spec.item_concept_ref.split(".")[-1] if "." in field_spec.item_concept_ref else field_spec.item_concept_ref
-                                )
-                                if bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
+                                bare_ref = self._extract_local_bare_code(concept_ref_or_code=field_spec.item_concept_ref, domain=domain)
+                                if bare_ref is not None and bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
                                     referenced_concepts.add(bare_ref)
                                     changed = True
 
@@ -394,6 +393,27 @@ class BuilderLoop:
                 log.info(f"🧹 Removed unused concept '{concept_code}'")
 
         return pipelex_bundle_spec
+
+    @staticmethod
+    def _extract_local_bare_code(concept_ref_or_code: str, domain: str) -> str | None:
+        """Extract a bare concept code only if the reference is local.
+
+        A reference is considered local if it has no domain prefix or if
+        its domain prefix matches the bundle domain.
+
+        Args:
+            concept_ref_or_code: A concept reference like "Document", "my_domain.Document", or "external.Document"
+            domain: The bundle's domain
+
+        Returns:
+            The bare concept code if local, or None if external
+        """
+        if "." not in concept_ref_or_code:
+            return concept_ref_or_code
+        prefix, bare_code = concept_ref_or_code.rsplit(".", maxsplit=1)
+        if prefix == domain:
+            return bare_code
+        return None
 
     @staticmethod
     def _collect_local_bare_concept_codes(pipelex_bundle_spec: PipelexBundleSpec) -> set[str]:
@@ -412,8 +432,8 @@ class BuilderLoop:
         referenced: set[str] = set()
 
         def _add_if_local(concept_ref_or_code: str) -> None:
-            if "." not in concept_ref_or_code or concept_ref_or_code.split(".", maxsplit=1)[0] == domain:
-                bare_code = concept_ref_or_code.rsplit(".", maxsplit=1)[-1] if "." in concept_ref_or_code else concept_ref_or_code
+            bare_code = BuilderLoop._extract_local_bare_code(concept_ref_or_code=concept_ref_or_code, domain=domain)
+            if bare_code is not None:
                 referenced.add(bare_code)
 
         # Scan pipe specs
