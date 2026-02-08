@@ -73,6 +73,11 @@ class InferenceModelSpec(ConfigModel):
         """Check if any document type is supported for LLM input."""
         return bool(self.supported_document_types)
 
+    @property
+    def is_img2img_supported(self) -> bool:
+        """Check if this model supports image-to-image generation (input images)."""
+        return "images" in self.inputs
+
     def get_instructor_mode(self) -> "InstructorMode | None":
         if self.structure_method:
             return self.structure_method.as_instructor_mode()
