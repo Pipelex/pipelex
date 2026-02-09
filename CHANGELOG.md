@@ -4,9 +4,15 @@
 
 **Highlights:**
 
-  - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
+ - **Agent CLI (`pipelex-agent`)**: New machine-first CLI for AI agents with structured JSON output for all commands (`build`, `run`, `validate`, `inputs`, `concept`, `pipe`, `assemble`, `graph`, `models`, `doctor`).
+ - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
+ - **Image-to-Image Generation**: `PipeImgGen` now supports input images via `input_images` field, with `InputImagesTaxonomy` for provider-specific handling and variable reference detection (`{{ var }}`, `$var`, `@var`) in prompts.
+ - **PipeCompose "Construct" Mode**: New `construct` mode for building structured objects (dictionaries/Pydantic models) directly from variables.
+ - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
 
 ### Added
+ - **Builder Auto-Repair**: Self-healing capabilities including auto-generation of undeclared concepts, multiplicity mismatch fixes, and pruning of unreachable pipes/unused concepts.
+ - **Concept Field Features**: Added `choices` support (compiles to `Literal` types/Enums) and explicit `list` type with `item_type`/`item_concept_ref`.
  - **PipeFunc Execution Error Context**: When a `@pipe_func` function fails during execution, the error message now includes detailed context: the function name, actual input values from working memory, expected output type, and the original error with its type. This makes debugging PipeFunc errors much easier.
  - **`pipelex build output` CLI Command**: New command to generate example output JSON for a pipe, complementing the existing `pipelex build inputs` command. Shows the expected output structure based on the pipe's output concept type, with multiplicity support. For pipes with `native.Anything` output (e.g., `PipeCondition` with different mapped pipe outputs), displays all possible outputs from mapped pipes.
  - **Telemetry System**: Introduced anonymous usage tracking and exception capture for CLI commands (`graph render`), reporting to both user-configured and Pipelex analytics endpoints.
@@ -15,6 +21,10 @@
  - **PipeFunc Return Type Validation**: Added validation to ensure that a `PipeFunc` function's return type matches the output concept's structure class.
 
 ### Changed
+ - **Model Deck Updates**: Default premium model now `claude-4.6-opus`; added Mistral models (`mistral-small-3.2`, `mistral-large`, `magistral` series) and `gpt-5` placeholders.
+ - **Jinja2 Rendering**: Image objects now replaced with placeholders (e.g., `[Image 1]`) during text generation; async filters only registered in async environments.
+ - **Backend Configurations**: Added `effort_to_level_map` and `effort_to_budget_maps` for reasoning translation; disabled Google Vertex AI by default.
+ - **Dependencies**: Updated `pypdfium2`, `anthropic`, and `mistralai` version constraints.
  - **`pipelex run --dry-run`**: No longer pretty prints the main_stuff output, matching the expected behavior for dry runs where no actual inference occurs.
  - **`pipelex build structures` Command**: Now uses a lightweight loading mechanism that only processes domains and concepts, skipping pipe loading and validation entirely. This fixes the chicken-and-egg problem where structure generation would fail due to pipe validation errors before the structures were even created. Added `--force` / `-f` flag to regenerate all structures without checking if classes already exist.
  - **Test Profile System**: Refactored integration tests to use a new configuration system (`.pipelex/test_profiles.toml`) with `dev`, `ci`, and `full` profiles for controlling which AI models are used in parametrized tests, replacing runtime filtering and hardcoded model lists.
