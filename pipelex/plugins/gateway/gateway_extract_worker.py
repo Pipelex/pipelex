@@ -15,6 +15,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
+from pipelex.hub import get_storage_provider
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
@@ -84,8 +85,10 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         max_nb_images = extract_job.job_params.max_nb_images
         should_include_images = max_nb_images is None or max_nb_images > 0
 
+        storage = get_storage_provider()
+
         if image_uri := extract_job.extract_input.image_uri:
-            base64_url = await make_base64_url_from_any_uri(uri=image_uri)
+            base64_url = await make_base64_url_from_any_uri(uri=image_uri, storage_provider=storage)
             # Images (as input) don't have embedded images to extract
             extract_output = await self._extract_base64_url(
                 extract_job=extract_job,
@@ -98,7 +101,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             if extract_job.job_params.should_caption_images and not self.inference_model.is_caption_supported_for_extract:
                 msg = f"Captioning is not supported by '{self.inference_model.tag}'."
                 raise ExtractCapabilityError(msg)
-            base64_url = await make_base64_url_from_any_uri(uri=document_uri)
+            base64_url = await make_base64_url_from_any_uri(uri=document_uri, storage_provider=storage)
             extract_output = await self._extract_base64_url(
                 extract_job=extract_job,
                 base64_url=base64_url,

@@ -1,8 +1,8 @@
-"""Normalize pipeline inputs by converting data URLs to pipelex-storage:// URIs.
+"""Normalize pipeline inputs by converting data URLs and local file paths to pipelex-storage:// URIs.
 
 This module provides functions to scan WorkingMemory and convert any ImageContent
-or DocumentContent with data URLs (data:...;base64,...) to pipelex-storage:// URIs
-for more efficient pipeline processing.
+or DocumentContent with data URLs (data:...;base64,...) or local file paths to
+pipelex-storage:// URIs for more efficient pipeline processing.
 """
 
 import base64
@@ -10,15 +10,17 @@ from typing import Any, cast
 
 import shortuuid
 
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_storage_provider
+from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl
+from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedLocalPath
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
 # Type alias for content types that can have their URLs normalized
@@ -192,20 +194,36 @@ async def _normalize_url_content(
     """
     resolved_uri = resolve_uri(content.url)
 
-    if not isinstance(resolved_uri, ResolvedBase64DataUrl):
-        # Not a data URL, we can keep the original content without any changes
+    if isinstance(resolved_uri, ResolvedBase64DataUrl):
+        # Decode base64 data and store
+        raw_bytes = base64.b64decode(resolved_uri.base64_data)
+        file_type = detect_file_type_from_bytes(raw_bytes)
+        key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
+        storage_uri = await storage.store(data=raw_bytes, key=key)
+
+        # Use model_copy to preserve all type-specific fields
+        return content.model_copy(
+            update={
+                "url": storage_uri,
+                "mime_type": resolved_uri.mime_type or content.mime_type,
+            }
+        )
+    elif isinstance(resolved_uri, ResolvedLocalPath):
+        if not get_config().pipelex.storage_config.is_upload_local_content_enabled:
+            return content
+
+        # Read local file, detect type, upload to storage
+        raw_bytes = await load_binary_async(resolved_uri.path)
+        file_type = detect_file_type_from_bytes(raw_bytes)
+        key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
+        storage_uri = await storage.store(data=raw_bytes, key=key)
+
+        return content.model_copy(
+            update={
+                "url": storage_uri,
+                "mime_type": file_type.mime,
+            }
+        )
+    else:
+        # Other URI types (HTTP URLs, pipelex-storage://) are kept unchanged
         return content
-
-    # Decode base64 data and store
-    raw_bytes = base64.b64decode(resolved_uri.base64_data)
-    file_type = detect_file_type_from_bytes(raw_bytes)
-    key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
-    storage_uri = await storage.store(data=raw_bytes, key=key)
-
-    # Use model_copy to preserve all type-specific fields
-    return content.model_copy(
-        update={
-            "url": storage_uri,
-            "mime_type": resolved_uri.mime_type or content.mime_type,
-        }
-    )

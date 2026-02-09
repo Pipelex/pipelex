@@ -101,6 +101,7 @@ class StorageGcpConfig(ConfigModel):
 
 class StorageConfig(ConfigModel):
     is_fetch_remote_content_enabled: bool
+    is_upload_local_content_enabled: bool
     method: StorageMethod = Field(strict=False)
     local: StorageLocalConfig | None = None
     in_memory: StorageInMemoryConfig | None = None

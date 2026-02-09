@@ -120,3 +120,66 @@ class TestUserProvidedImageStorage:
         normalized_stuff = normalized_memory.get_stuff("remote_image")
         assert isinstance(normalized_stuff.content, ImageContent)
         assert normalized_stuff.content.url == http_url
+
+    @pytest.mark.usefixtures("mock_upload_local_content_enabled")
+    async def test_user_image_local_file_to_storage_when_upload_enabled(self) -> None:
+        """Test that local file paths are uploaded to storage when upload is enabled.
+
+        When is_upload_local_content_enabled=True, local file paths should be read,
+        uploaded to storage, and replaced with pipelex-storage:// URIs.
+        """
+        local_path = ImageTestCases.IMAGE_FILE_PATH_LOGO_TINY
+        image_content = ImageContent(url=local_path)
+        stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
+            content=image_content,
+            name="local_image",
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+
+        # Normalize - should upload the local file to storage
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
+
+        # Verify the URL was converted to pipelex-storage://
+        normalized_stuff = normalized_memory.get_stuff("local_image")
+        assert isinstance(normalized_stuff.content, ImageContent)
+        assert normalized_stuff.content.url.startswith(PIPELEX_STORAGE_SCHEME)
+        assert normalized_stuff.content.mime_type == "image/png"
+
+        # Verify roundtrip: storage -> PreparedImage
+        prompt_image = PromptImageFactory.make_prompt_image(uri=normalized_stuff.content.url)
+        assert isinstance(prompt_image, PromptImageUri)
+
+        prepared = await prepare_prompt_image(
+            prompt_image=prompt_image,
+            is_http_url_enabled=False,
+        )
+
+        assert isinstance(prepared, PreparedFileBase64)
+        # Verify the data can be decoded and is non-empty
+        decoded = base64.b64decode(prepared.base64_data)
+        assert len(decoded) > 0
+
+    @pytest.mark.usefixtures("mock_upload_local_content_disabled")
+    async def test_user_image_local_file_passthrough_when_upload_disabled(self) -> None:
+        """Test that local file paths are passed through when upload is disabled.
+
+        When is_upload_local_content_enabled=False, local file paths should not be
+        uploaded to storage. They should be passed through unchanged.
+        """
+        local_path = ImageTestCases.IMAGE_FILE_PATH_LOGO_TINY
+        image_content = ImageContent(url=local_path)
+        stuff = StuffFactory.make_stuff(
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
+            content=image_content,
+            name="local_image",
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+
+        # Normalize (should not change local paths when upload is disabled)
+        normalized_memory = await normalize_data_urls_to_storage(working_memory)
+
+        # Verify URL was NOT changed
+        normalized_stuff = normalized_memory.get_stuff("local_image")
+        assert isinstance(normalized_stuff.content, ImageContent)
+        assert normalized_stuff.content.url == local_path
