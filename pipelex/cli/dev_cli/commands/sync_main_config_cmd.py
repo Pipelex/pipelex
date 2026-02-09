@@ -162,9 +162,9 @@ def sync_main_config_cmd(
         if dry_run:
             if total_updated > 0:
                 dry_run_msg = (
-                    f"[yellow]Dry run complete[/yellow]\n\n"
+                    "[yellow]Dry run complete[/yellow]\n\n"
                     f"{total_updated} key(s) would be updated.\n"
-                    f"[dim]Run without --dry-run to apply changes.[/dim]"
+                    "[dim]Run without --dry-run to apply changes.[/dim]"
                 )
                 panel = Panel(
                     dry_run_msg,
