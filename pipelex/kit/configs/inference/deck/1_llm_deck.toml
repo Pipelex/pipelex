@@ -34,9 +34,9 @@ best-mistral = "mistral-large"
 
 # Default aliases (first choice from waterfalls)
 default-general = "claude-4.5-sonnet"
-default-premium = "claude-4.5-opus"
-default-premium-vision = "claude-4.5-opus"
-default-premium-structured = "claude-4.5-opus"
+default-premium = "claude-4.6-opus"
+default-premium-vision = "claude-4.6-opus"
+default-premium-structured = "claude-4.6-opus"
 default-large-context-code = "gemini-3.0-pro"
 default-large-context-text = "gemini-2.5-flash"
 default-small = "gpt-4o-mini"
@@ -77,8 +77,8 @@ deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effor
 quick-reasoning = { model = "@default-premium", temperature = 0.3, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
 
 # Builder (isolated presets for the pipeline builder)
-pipe-builder-engineering = { model = "@default-premium-structured", temperature = 0.2, description = "Builder: structured engineering output" }
-pipe-builder-img-gen-prompting = { model = "@default-premium", temperature = 0.5, description = "Builder: crafting image generation prompts" }
+pipe-builder-engineering = { model = "claude-4.6-opus", temperature = 0.2, description = "Builder: structured engineering output" }
+pipe-builder-img-gen-prompting = { model = "claude-4.5-sonnet", temperature = 0.7, description = "Builder: crafting image generation prompts" }
 
 # Testing
 testing-text = { model = "@default-small", temperature = 0.5, description = "Testing preset for text generation" }
