@@ -75,6 +75,8 @@ def graph_cmd(
                 "BundleError",
             )
         pipe_code: str = main_pipe_code
+    except (OSError, UnicodeDecodeError) as exc:
+        agent_error(f"Failed to read bundle file '{target}': {exc}", type(exc).__name__, cause=exc)
     except (PipelexInterpreterError, PLXDecodeError) as exc:
         agent_error(f"Failed to parse bundle '{target}': {exc}", type(exc).__name__, cause=exc)
 

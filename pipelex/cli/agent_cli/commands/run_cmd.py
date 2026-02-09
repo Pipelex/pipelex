@@ -219,6 +219,8 @@ def run_cmd(
                 pipe_code = main_pipe_code
         except FileNotFoundError as exc:
             agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
+        except (OSError, UnicodeDecodeError) as exc:
+            agent_error(f"Failed to read bundle file '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
         except (PipelexInterpreterError, PLXDecodeError) as exc:
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
 
