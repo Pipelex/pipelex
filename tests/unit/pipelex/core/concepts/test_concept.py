@@ -25,6 +25,7 @@ class NestedImageInfo(StructuredContent):
     caption: str | None = None
     mime_type: str | None = None
     size: ImageSize | None = None
+    filename: str | None = None
 
 
 class DocumentWithNestedImage(StructuredContent):

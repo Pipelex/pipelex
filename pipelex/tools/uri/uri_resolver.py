@@ -1,4 +1,5 @@
 import urllib.parse
+from pathlib import Path
 
 from pipelex.tools.misc.base64_utils import (
     make_base64_url_from_http_url,
@@ -16,6 +17,28 @@ from pipelex.tools.uri.resolved_uri import (
 # Base64 data URL markers
 BASE64_DATA_URL_PREFIX = "data:"
 BASE64_DATA_URL_MARKER = ";base64,"
+
+
+def extract_filename_from_uri(uri: str) -> str | None:
+    """Extract a filename from a URI, only for local file paths.
+
+    Args:
+        uri: The URI string to extract the filename from.
+
+    Returns:
+        The filename if the URI is a local file path, None otherwise.
+    """
+    resolved = resolve_uri(uri)
+    match resolved:
+        case ResolvedLocalPath():
+            name = Path(resolved.path).name
+            return name or None
+        case ResolvedHttpUrl():
+            return None
+        case ResolvedBase64DataUrl():
+            return None
+        case ResolvedPipelexStorage():
+            return None
 
 
 def describe_uri(uri: str) -> str:
