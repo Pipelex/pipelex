@@ -6,6 +6,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.urls import URLs
 from tests.cases.documents import DocumentTestCases
 from tests.cases.images import ImageTestCases
 
@@ -29,8 +30,8 @@ class TestFilenameHtmlE2E:
         assert document_content.filename == "Job-Offer.pdf"
 
         # Verify filename is NOT set for HTTP URLs
-        assert ImageContent(url="https://example.com/image.png").filename is None
-        assert DocumentContent(url="https://example.com/doc.pdf").filename is None
+        assert ImageContent(url=URLs.png_example_1).filename is None
+        assert DocumentContent(url=URLs.pdf_example_1).filename is None
 
         pipe_output = await execute_pipeline(
             pipe_code="describe_with_filenames_e2e",

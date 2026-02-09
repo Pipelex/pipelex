@@ -14,6 +14,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from tests.cases.images import ImageTestCases
 from tests.unit.pipelex.core.memory.conftest import TestWorkingMemoryData
 
 
@@ -202,7 +203,7 @@ class TestWorkingMemoryTypedAccess:
         assert document_result.text == TestWorkingMemoryData.SAMPLE_TEXT
 
         assert isinstance(diagram_result, ImageContent)
-        assert diagram_result.url == TestWorkingMemoryData.SAMPLE_IMAGE_URL
+        assert diagram_result.url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
 
     def test_alias_access(self, memory_with_aliases: WorkingMemory):
         """Test accessing content through alias."""

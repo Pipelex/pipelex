@@ -17,6 +17,8 @@ from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from tests.cases.documents import DocumentTestCases
+from tests.cases.images import ImageTestCases
 
 
 # Test data constants
@@ -33,10 +35,6 @@ class TestWorkingMemoryData:
     networks, capable of speeds exceeding 350 mph, promises to render certain short-haul
     flights obsolete while dramatically reducing carbon emissions.
     """
-
-    # Sample PDF and image URLs
-    SAMPLE_PDF_URL = "assets/extract_dpe/dpe_single_page.pdf"
-    SAMPLE_IMAGE_URL = "assets/gantt_charts/sample_gantt.png"
 
     # Test cases for different content types
     SINGLE_TEXT_CASE = "single_text"
@@ -84,7 +82,7 @@ def single_image_memory() -> WorkingMemory:
         stuff=StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
             name="sample_image",
-            content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
+            content=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
         ),
     )
 
@@ -96,7 +94,7 @@ def single_document_memory() -> WorkingMemory:
         stuff=StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
             name="document_file",
-            content=DocumentContent(url=TestWorkingMemoryData.SAMPLE_PDF_URL),
+            content=DocumentContent(url=DocumentTestCases.PDF_FILE_URL_1),
         ),
     )
 
@@ -119,7 +117,7 @@ def multiple_stuff_memory() -> WorkingMemory:
     image_stuff = StuffFactory.make_stuff(
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
         name="diagram",
-        content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
+        content=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
     )
 
     return WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[text_stuff, document_stuff, image_stuff], main_name="document")
@@ -153,7 +151,7 @@ def complex_list_memory() -> WorkingMemory:
     complex_content: ListContent[TextContent | ImageContent | NumberContent] = ListContent(
         items=[
             TextContent(text="The quick brown fox jumps over the lazy dog"),
-            ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
+            ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
             NumberContent(number=42.5),
         ],
     )
@@ -174,7 +172,7 @@ def text_and_images_memory() -> WorkingMemory:
     """Create WorkingMemory with text and images content."""
     text_and_images_content = TextAndImagesContent(
         text=TextContent(text="Project overview with diagrams"),
-        images=[ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL), ImageContent(url="assets/diagrams/architecture.png")],
+        images=[ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1), ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_2)],
     )
 
     stuff = StuffFactory.make_stuff(

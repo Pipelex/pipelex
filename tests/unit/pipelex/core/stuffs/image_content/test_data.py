@@ -47,7 +47,8 @@ class TestData:
     "source_negative_prompt": null,
     "caption": null,
     "mime_type": null,
-    "size": null
+    "size": null,
+    "filename": null
 }}"""
     EXPECTED_RENDERED_JSON_WITH_PROMPT = f"""{{
     "url": "{URLs.png_example_1}",
@@ -56,7 +57,8 @@ class TestData:
     "source_negative_prompt": null,
     "caption": null,
     "mime_type": null,
-    "size": null
+    "size": null,
+    "filename": null
 }}"""
     # rendered_for_prompt returns just the URL for images
     EXPECTED_RENDERED_FOR_PROMPT = URLs.png_example_1
