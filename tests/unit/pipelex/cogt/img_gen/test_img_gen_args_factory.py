@@ -4,10 +4,14 @@ Verifies that input images are properly validated when the model rules
 don't include INPUT_IMAGES topic - preventing silent degradation to text-to-image.
 """
 
-from typing import cast
-from unittest.mock import AsyncMock, patch
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, cast
 
 import pytest
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
@@ -91,7 +95,7 @@ class TestImgGenArgsFactory:
         assert "not" in error_message.lower()
 
     @pytest.mark.asyncio
-    async def test_input_images_provided_with_rules_succeeds(self) -> None:
+    async def test_input_images_provided_with_rules_succeeds(self, mocker: MockerFixture) -> None:
         """When input_images are provided AND INPUT_IMAGES IS in model rules, no error is raised."""
         input_images = cast("list[PromptImage]", [PromptImageUri(uri="https://example.com/image.png")])
         job = self._make_test_job(input_images=input_images)
@@ -104,18 +108,18 @@ class TestImgGenArgsFactory:
                 file_type=FileType(extension="png", mime="image/png"),
             )
         ]
-        with patch(
+        mocker.patch(
             "pipelex.cogt.img_gen.img_gen_args_factory.prep_prompt_images",
-            new_callable=AsyncMock,
+            new_callable=mocker.AsyncMock,
             return_value=mock_prepped,
-        ):
-            # Should not raise - validation passes
-            result = await ImgGenArgsFactory.make_args_for_model(
-                model_rules=rules,
-                img_gen_job=job,
-                nb_images=1,
-                model_id="test-model",
-            )
+        )
+        # Should not raise - validation passes
+        result = await ImgGenArgsFactory.make_args_for_model(
+            model_rules=rules,
+            img_gen_job=job,
+            nb_images=1,
+            model_id="test-model",
+        )
 
         assert isinstance(result, dict)
         assert "image" in result  # GPT_IMAGE taxonomy creates "image" key

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
 
 import pytest
 import typer
@@ -30,7 +29,7 @@ class TestMakePipelexForAgentCli:
 
     def test_successful_initialization(self, mocker: MockerFixture) -> None:
         """Should return the Pipelex instance when make() succeeds."""
-        mock_pipelex = MagicMock()
+        mock_pipelex = mocker.MagicMock()
         mocker.patch("pipelex.cli.agent_cli.commands.agent_cli_factory.Pipelex.make", return_value=mock_pipelex)
         result = make_pipelex_for_agent_cli()
         assert result is mock_pipelex
