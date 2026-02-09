@@ -10,11 +10,13 @@ from typing_extensions import override
 from pipelex.cli.agent_cli.commands.assemble_cmd import assemble_cmd
 from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
+from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
+from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat, graph_cmd
 from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
+from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run_cmd import run_cmd
 from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
-from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -24,16 +26,21 @@ class PipelexAgentCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["build", "run", "validate", "inputs", "concept", "pipe", "assemble", "doctor"]
+        return ["build", "run", "validate", "inputs", "concept", "pipe", "assemble", "graph", "models", "doctor"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
         """Get command by name."""
         cmd = super().get_command(ctx, cmd_name)
         if cmd is None:
-            typer.echo(f"Unknown command: {cmd_name}")
-            typer.echo(ctx.get_help())
-            ctx.exit(1)
+            from pipelex.cli.agent_cli.commands.agent_output import agent_error  # noqa: PLC0415
+
+            valid_commands = super().list_commands(ctx)
+            agent_error(
+                f"Unknown command: {cmd_name}",
+                "UnknownCommandError",
+                valid_commands=valid_commands,
+            )
         return cmd
 
 
@@ -112,6 +119,10 @@ def run_command(
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry)"),
     ] = False,
+    graph: Annotated[
+        bool,
+        typer.Option("--graph", help="Generate execution graph visualizations (saved alongside output)"),
+    ] = False,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
@@ -125,6 +136,7 @@ def run_command(
         inputs=inputs,
         dry_run=dry_run,
         mock_inputs=mock_inputs,
+        graph=graph,
         library_dir=library_dir,
     )
 
@@ -262,7 +274,32 @@ def assemble_command(
     )
 
 
+@app.command(name="graph", help="Generate graph visualization from a .plx bundle")
+def graph_command(
+    target: Annotated[
+        str,
+        typer.Argument(help="Path to a .plx bundle file"),
+    ],
+    graph_format: Annotated[
+        GraphFormat,
+        typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
+    ] = GraphFormat.REACTFLOW,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+    ] = None,
+) -> None:
+    """Generate graph visualization from a .plx bundle."""
+    graph_cmd(target=target, graph_format=graph_format, library_dir=library_dir)
+
+
+@app.command(name="models", help="List available model presets, aliases, and talent mappings")
+def models_command() -> None:
+    """List available model presets, aliases, waterfalls, and talent mappings as JSON."""
+    agent_models_cmd()
+
+
 @app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")
 def doctor_command() -> None:
-    """Check Pipelex configuration health with auto-fix enabled."""
-    doctor_cmd(fix=True)
+    """Check Pipelex configuration health and output JSON report."""
+    agent_doctor_cmd()

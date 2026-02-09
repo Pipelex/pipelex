@@ -1,7 +1,7 @@
 """Protocol for types that can render with tagging support.
 
 This module defines the TagRenderable protocol, which enables the `tag`
-Jinja2 filter to work with any type that implements the `render_for_tag` method
+Jinja2 filter to work with any type that implements the `render_for_tag_async` method
 and `default_tag_name` property.
 
 The protocol uses `@runtime_checkable` to allow isinstance() checks at runtime,
@@ -19,14 +19,14 @@ class TagRenderable(Protocol):
     """Protocol for types that can provide rendering and default tag name.
 
     Types implementing this protocol can be used with the `tag` filter.
-    The filter will call `render_for_tag()` to get the plain text content,
+    The filter will call `render_for_tag_async()` to get the plain text content,
     and `default_tag_name` to get the suggested tag name.
 
     Implementations:
-    - StuffArtefact: renders via rendered_plain(), uses stuff_name as default tag
+    - StuffArtefact: renders via rendered_for_template_async(PLAIN), uses stuff_name as default tag
     """
 
-    def render_for_tag(self) -> str:
+    async def render_for_tag_async(self) -> str:
         """Render content as plain string for tagging.
 
         Returns:

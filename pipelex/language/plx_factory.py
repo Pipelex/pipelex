@@ -23,6 +23,7 @@ class SectionKey(StrEnum):
 
 CONCEPT_STRUCTURE_FIELD_KEY = "structure"
 PIPE_TEMPLATE_FIELD_KEY = "template"
+PIPE_CONSTRUCT_FIELD_KEY = "construct"
 PIPE_CATEGORY_FIELD_KEY = "pipe_category"
 
 
@@ -62,6 +63,10 @@ class PlxFactory:
                 for key in field_ordering:
                     if key in value:
                         inline_table_obj[key] = cls.convert_dicts_to_inline_tables(value=value[key])
+                # Add any remaining fields not in the ordering
+                for key, value_item in value.items():
+                    if key not in field_ordering:
+                        inline_table_obj[key] = cls.convert_dicts_to_inline_tables(value=value_item)
             else:
                 for key, value_item in value.items():
                     inline_table_obj[key] = cls.convert_dicts_to_inline_tables(value=value_item)
@@ -107,10 +112,13 @@ class PlxFactory:
                 if field_key in mapping and field_key != PIPE_CATEGORY_FIELD_KEY:  # Skip category field (pipe metadata)
                     field_value = mapping[field_key]
                     if isinstance(field_value, Mapping):
+                        field_value = cast("Mapping[str, Any]", field_value)
                         # Special handling for template field - create nested table instead of inline
                         if field_key == PIPE_TEMPLATE_FIELD_KEY:
-                            field_value = cast("Mapping[str, Any]", field_value)
                             tbl.add(field_key, cls.make_template_table(template_value=field_value))
+                        # Special handling for construct field - create nested table instead of inline
+                        elif field_key == PIPE_CONSTRUCT_FIELD_KEY:
+                            tbl.add(field_key, cls.make_construct_table(construct_value=field_value))
                         else:
                             # Third-level mapping -> inline table
                             tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
@@ -121,10 +129,13 @@ class PlxFactory:
             for field_key, field_value in mapping.items():
                 if field_key not in field_ordering and field_key != PIPE_CATEGORY_FIELD_KEY:
                     if isinstance(field_value, Mapping):
+                        field_value = cast("Mapping[str, Any]", field_value)
                         # Special handling for template field - create nested table instead of inline
                         if field_key == PIPE_TEMPLATE_FIELD_KEY:
-                            field_value = cast("Mapping[str, Any]", field_value)
                             tbl.add(field_key, cls.make_template_table(template_value=field_value))
+                        # Special handling for construct field - create nested table instead of inline
+                        elif field_key == PIPE_CONSTRUCT_FIELD_KEY:
+                            tbl.add(field_key, cls.make_construct_table(construct_value=field_value))
                         else:
                             # Third-level mapping -> inline table
                             tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
@@ -138,10 +149,13 @@ class PlxFactory:
                     continue
 
                 if isinstance(field_value, Mapping):
+                    field_value = cast("Mapping[str, Any]", field_value)
                     # Special handling for template field - create nested table instead of inline
                     if field_key == PIPE_TEMPLATE_FIELD_KEY:
-                        field_value = cast("Mapping[str, Any]", field_value)
                         tbl.add(field_key, cls.make_template_table(template_value=field_value))
+                    # Special handling for construct field - create nested table instead of inline
+                    elif field_key == PIPE_CONSTRUCT_FIELD_KEY:
+                        tbl.add(field_key, cls.make_construct_table(construct_value=field_value))
                     else:
                         # Third-level mapping -> inline table
                         tbl.add(field_key, cls.convert_dicts_to_inline_tables(field_value))
@@ -223,6 +237,18 @@ class PlxFactory:
         # which has a different meaning than the pipe's category field
         for template_field_key, template_field_value in template_value.items():
             tbl.add(template_field_key, cls.convert_dicts_to_inline_tables(template_field_value))
+        return tbl
+
+    @classmethod
+    def make_construct_table(cls, construct_value: Mapping[str, Any]) -> Any:
+        """Create a nested table for construct section in PLX format.
+
+        The construct_value should already be in PLX format (from ConstructBlueprint.to_plx_dict())
+        with field names at the root, not wrapped in a 'fields' key.
+        """
+        tbl = table()
+        for field_name, field_def in construct_value.items():
+            tbl.add(field_name, cls.convert_dicts_to_inline_tables(field_def))
         return tbl
 
     @classmethod
@@ -335,6 +361,10 @@ class PlxFactory:
 
     @classmethod
     def make_plx_content(cls, blueprint: PipelexBundleBlueprint) -> str:
-        blueprint_dict = blueprint.model_dump(serialize_as_any=True)
-        # blueprint_dict = cls._remove_pipe_category_from_pipes(blueprint_dict)
+        # Use context to signal PLX format serialization to ConstructBlueprint
+        blueprint_dict = blueprint.model_dump(
+            serialize_as_any=True,
+            by_alias=True,
+            context={"format": "plx"},
+        )
         return cls.dict_to_plx_styled_toml(data=blueprint_dict)

@@ -19,7 +19,7 @@ from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_native_concept, get_pipe_router
-from pipelex.pipe_operators.compose.exceptions import StructuredContentComposerTypeError
+from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_operators.compose.pipe_compose import PipeCompose
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -319,5 +319,5 @@ class TestPipeComposeStructuredCompatibility:
         )
 
         # The composition should fail because Location cannot be converted to Person
-        with pytest.raises(StructuredContentComposerTypeError, match="Cannot convert"):
+        with pytest.raises(PipeComposeError, match="Cannot convert"):
             await get_pipe_router().run(pipe_job=pipe_job)

@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator
+from pydantic import Field, model_validator, field_validator
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
@@ -12,7 +12,8 @@ from pipelex.tools.jinja2.image_registry import ImageRegistry
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
 from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.tools.uri.uri_resolver import describe_uri
+from pipelex.tools.uri.uri_resolver import describe_uri, extract_filename_from_uri
+from pipelex.types import Self
 
 
 class ImageContent(StuffContent):
@@ -30,6 +31,14 @@ class ImageContent(StuffContent):
     caption: str | None = Field(default=None, description="The caption of the image")
     mime_type: str | None = Field(default=None, description="The MIME type of the image")
     size: ImageSize | None = Field(default=None, description="The size in pixels (width and height) of the image")
+    filename: str | None = Field(default=None, description="The original filename of the image")
+
+    @model_validator(mode="after")
+    def _auto_populate_filename(self) -> Self:
+        """Auto-populate filename from url when it is a local file path."""
+        if self.filename is None:
+            self.filename = extract_filename_from_uri(self.url)
+        return self
 
     @property
     @override

@@ -14,6 +14,7 @@ class TestData:
         "url": URLs.pdf_example_1,
         "mime_type": None,
         "public_url": None,
+        "filename": None,
     }
 
     # Expected outputs for smart_dump (with optional fields)
@@ -21,6 +22,7 @@ class TestData:
         "url": URLs.pdf_example_1,
         "mime_type": "application/pdf",
         "public_url": "Report.pdf",
+        "filename": None,
     }
 
     # Expected outputs for render methods

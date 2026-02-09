@@ -146,7 +146,10 @@ class PipeAbstract(ABC, BaseModel):
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
             if not is_variable_satisfied_by_inputs(required_variable_path, input_names):
-                msg = f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+                msg = (
+                    f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. "
+                    f"Current inputs: {self.inputs.format_for_display()}"
+                )
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
@@ -163,7 +166,7 @@ class PipeAbstract(ABC, BaseModel):
             var_name = named_stuff_spec.variable_name
 
             if var_name not in self.inputs.variables:
-                msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+                msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs.format_for_display()}"
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,

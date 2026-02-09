@@ -8,6 +8,8 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
+from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.config import get_config
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
@@ -29,6 +31,8 @@ class BuildPipeResult(BaseModel):
     inputs_file: Path | None = None
     main_pipe_code: str
     domain: str
+    pipe_inputs: dict[str, str] | None = None
+    pipe_output: str | None = None
 
     model_config = {"arbitrary_types_allowed": True}
 
@@ -46,6 +50,10 @@ class BuildPipeResult(BaseModel):
         }
         if self.inputs_file:
             result["inputs_file"] = str(self.inputs_file)
+        if self.pipe_inputs is not None:
+            result["pipe_inputs"] = self.pipe_inputs
+        if self.pipe_output is not None:
+            result["pipe_output"] = self.pipe_output
         return result
 
 
@@ -129,23 +137,33 @@ async def build_pipe_core(
 
     # Save the PLX file
     ensure_directory_for_file_path(file_path=str(plx_file_path))
-    plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+    try:
+        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+    except PipelexBundleSpecBlueprintError as exc:
+        msg = f"Failed to convert bundle spec to blueprint: {exc}"
+        raise BuildPipeError(message=msg) from exc
     save_text_to_path(text=plx_content, path=str(plx_file_path))
 
     main_pipe_code = pipelex_bundle_spec.main_pipe or ""
     domain = pipelex_bundle_spec.domain or ""
 
     inputs_file_path: Path | None = None
+    pipe_inputs: dict[str, str] | None = None
+    pipe_output: str | None = None
 
-    # Generate inputs.json if requested and main_pipe_code exists
-    if generate_inputs and main_pipe_code:
+    # Load pipe metadata (inputs/output) and optionally generate inputs.json
+    if main_pipe_code:
         try:
             pipe = get_required_pipe(pipe_code=main_pipe_code)
-            inputs_json_str = pipe.inputs.render_inputs(indent=2)
-            inputs_file_path = Path(extras_output_dir) / "inputs.json"
-            save_text_to_path(text=inputs_json_str, path=str(inputs_file_path))
+            pipe_inputs = {name: stuff_spec.to_bundle_representation() for name, stuff_spec in pipe.inputs.items}
+            pipe_output = pipe.output.to_bundle_representation()
+
+            if generate_inputs:
+                inputs_json_str = pipe.inputs.render_inputs(indent=2)
+                inputs_file_path = Path(extras_output_dir) / DEFAULT_INPUTS_FILE_NAME
+                save_text_to_path(text=inputs_json_str, path=str(inputs_file_path))
         except Exception as exc:
-            log.warning(f"Could not generate inputs.json: {exc}")
+            log.warning(f"Could not load pipe metadata: {exc}")
 
     return BuildPipeResult(
         output_dir=Path(extras_output_dir),
@@ -153,4 +171,6 @@ async def build_pipe_core(
         inputs_file=inputs_file_path,
         main_pipe_code=main_pipe_code,
         domain=domain,
+        pipe_inputs=pipe_inputs,
+        pipe_output=pipe_output,
     )

@@ -31,42 +31,41 @@ for_object = "disabled"
 
 ####################################################################################################
 # Waterfalls — ordered lists of models resolved at configuration time by backend availability
-####################################################################################################
-
+#
 # Example (uncomment to use):
-[llm.waterfalls]
-premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2", "grok-4"]
-premium-llm-vision = [
-    "claude-4.5-opus",
-    "gemini-3.0-pro",
-    "gpt-5.2",
-    "grok-4-fast-reasoning",
-]
-premium-llm-structured = [
-    "claude-4.5-opus",
-    "gemini-3.0-pro",
-    "gpt-5.2",
-    "grok-4",
-]
-large-context-llm-code = [
-    "gemini-3.0-pro",
-    "claude-4.5-opus",
-    "gpt-5.2",
-    "grok-4-fast-reasoning",
-]
-large-context-llm-text = ["gemini-2.5-flash", "claude-4.5-sonnet"]
-small-llm = [
-    "gemini-2.5-flash-lite",
-    "gpt-4o-mini",
-    "claude-3-haiku",
-    "phi-4",
-    "grok-3-mini",
-]
-small-llm-structured = [
-    "gemini-2.5-flash-lite",
-    "gpt-4o-mini",
-    "claude-3-haiku",
-]
-small-llm-vision = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
-small-llm-creative = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
+# [llm.waterfalls]
+# premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2", "grok-4"]
+# premium-llm-vision = [
+#     "claude-4.5-opus",
+#     "gemini-3.0-pro",
+#     "gpt-5.2",
+#     "grok-4-fast-reasoning",
+# ]
+# premium-llm-structured = [
+#     "claude-4.5-opus",
+#     "gemini-3.0-pro",
+#     "gpt-5.2",
+#     "grok-4",
+# ]
+# large-context-llm-code = [
+#     "gemini-3.0-pro",
+#     "claude-4.5-opus",
+#     "gpt-5.2",
+#     "grok-4-fast-reasoning",
+# ]
+# large-context-llm-text = ["gemini-2.5-flash", "claude-4.5-sonnet"]
+# small-llm = [
+#     "gemini-2.5-flash-lite",
+#     "gpt-4o-mini",
+#     "claude-3-haiku",
+#     "phi-4",
+#     "grok-3-mini",
+# ]
+# small-llm-structured = [
+#     "gemini-2.5-flash-lite",
+#     "gpt-4o-mini",
+#     "claude-3-haiku",
+# ]
+# small-llm-vision = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
+# small-llm-creative = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 ####################################################################################################

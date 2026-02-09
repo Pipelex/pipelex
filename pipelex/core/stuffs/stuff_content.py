@@ -13,6 +13,10 @@ StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 
 class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
+    @override
+    def __str__(self) -> str:
+        return self.rendered_plain()
+
     @property
     def content_type(self) -> str | None:
         """Return the MIME type of the content, or None if not applicable."""
@@ -81,7 +85,7 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     # -------------------------------------------------------------------------------------
 
     @final
-    async def rendered_for_prompt_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    async def rendered_for_template_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return await self.rendered_plain_async()

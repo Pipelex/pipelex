@@ -24,6 +24,7 @@
 model_type = "llm"
 sdk = "bedrock_aioboto3"
 prompting_target = "anthropic"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -64,6 +65,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 
 [claude-4-sonnet]
 sdk = "bedrock_anthropic"
@@ -73,6 +75,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 
 [claude-4-opus]
 sdk = "bedrock_anthropic"
@@ -82,6 +85,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 
 ["claude-4.1-opus"]
 sdk = "bedrock_anthropic"
@@ -91,6 +95,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 
 ["claude-4.5-sonnet"]
 sdk = "bedrock_anthropic"
@@ -100,6 +105,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 
 ["claude-4.5-haiku"]
 sdk = "bedrock_anthropic"
@@ -109,6 +115,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
+thinking_mode = "manual"
 
 ["claude-4.5-opus"]
 sdk = "bedrock_anthropic"
@@ -118,3 +125,14 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+thinking_mode = "manual"
+
+["claude-4.6-opus"]
+sdk = "bedrock_anthropic"
+model_id = "global.anthropic.claude-opus-4-6-v1"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"

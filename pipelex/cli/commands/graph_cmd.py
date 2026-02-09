@@ -19,14 +19,8 @@ from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
-from pipelex.graph.graph_analysis import GraphAnalysis
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
-from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
-from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
-from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
-from pipelex.graph.reactflow.viewspec import LayoutSpec
-from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
@@ -65,23 +59,19 @@ def _do_graph_render(
     else:
         output_dir = input_file.parent
 
-    output_dir.mkdir(parents=True, exist_ok=True)
-
     # Determine what to generate:
     # - Default (no flags): both mermaidflow.html + reactflow.html
     # - --mermaidflow: mermaidflow.html only
     # - --reactflow: reactflow.html only
-    generate_mermaidflow = mermaidflow or (not mermaidflow and not reactflow)
-    generate_reactflow = reactflow or (not mermaidflow and not reactflow)
+    include_mermaidflow = mermaidflow or (not mermaidflow and not reactflow)
+    include_reactflow = reactflow or (not mermaidflow and not reactflow)
 
-    generated_files: list[Path] = []
-
-    async def render_views() -> None:
-        """Inner async function to render views with async HTML generation."""
-        nonlocal generated_files
-
-        # Get graph config with data inclusion enabled for interactive views
+    async def render_and_save() -> dict[str, Path]:
+        """Generate graph outputs and save to directory."""
         base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+
+        # Enable all content formats (JSON, text, HTML) so the interactive HTML
+        # viewers can display data panels alongside the graph visualization
         new_data_inclusion = base_graph_config.data_inclusion.model_copy(
             update={
                 "stuff_json_content": True,
@@ -89,86 +79,54 @@ def _do_graph_render(
                 "stuff_html_content": True,
             }
         )
-        graph_config = base_graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
 
-        # Get the mermaid theme from config
-        mermaid_theme = graph_config.mermaid_config.style.theme
+        # Only generate the final HTML files requested by the user — skip intermediate
+        # formats (graphspec JSON, Mermaid .mmd source, ReactFlow viewspec JSON) that
+        # are only useful during pipeline execution, not for standalone rendering
+        new_graphs_inclusion = base_graph_config.graphs_inclusion.model_copy(
+            update={
+                "graphspec_json": False,
+                "mermaidflow_mmd": False,
+                "mermaidflow_html": include_mermaidflow,
+                "reactflow_viewspec": False,
+                "reactflow_html": include_reactflow,
+            }
+        )
+        graph_config = base_graph_config.model_copy(
+            update={
+                "data_inclusion": new_data_inclusion,
+                "graphs_inclusion": new_graphs_inclusion,
+            }
+        )
 
         flow_direction = direction or FlowchartDirection.TOP_DOWN
 
-        # Generate mermaidflow view (default + --mermaidflow)
-        if generate_mermaidflow:
-            the_mermaidflow = MermaidflowFactory.make_from_graphspec(
-                graph_spec,
-                graph_config,
-                direction=flow_direction,
-                include_subgraphs=subgraphs,
-            )
-            if the_mermaidflow.stuff_data:
-                mermaidflow_html = await render_mermaid_html_with_data_async(
-                    the_mermaidflow.mermaid_code,
-                    stuff_data=the_mermaidflow.stuff_data,
-                    stuff_data_text=the_mermaidflow.stuff_data_text,
-                    stuff_data_html=the_mermaidflow.stuff_data_html,
-                    stuff_metadata=the_mermaidflow.stuff_metadata,
-                    stuff_content_type=the_mermaidflow.stuff_content_type,
-                    title=f"Pipeline: {snake_to_title_case(input_file.stem)}",
-                    theme=mermaid_theme,
-                )
-            else:
-                mermaidflow_html = await render_mermaid_html_async(
-                    the_mermaidflow.mermaid_code,
-                    title=f"Pipeline: {snake_to_title_case(input_file.stem)}",
-                    theme=mermaid_theme,
-                )
-            mermaidflow_html_path = output_dir / "mermaidflow.html"
-            mermaidflow_html_path.write_text(mermaidflow_html, encoding="utf-8")
-            generated_files.append(mermaidflow_html_path)
-            typer.secho("✅ mermaidflow.html", fg=typer.colors.GREEN, err=True)
+        graph_outputs = await generate_graph_outputs(
+            graph_spec=graph_spec,
+            graph_config=graph_config,
+            title=snake_to_title_case(input_file.stem),
+            direction=flow_direction,
+            include_subgraphs=subgraphs,
+        )
 
-        # Generate ReactFlow view (default + --reactflow)
-        if generate_reactflow:
-            # Create ViewSpec from GraphSpec
-            analysis = GraphAnalysis.from_graphspec(graph_spec)
-            rf_config = graph_config.reactflow_config
-            layout = LayoutSpec(
-                direction=rf_config.layout_direction,
-                nodesep=rf_config.nodesep,
-                ranksep=rf_config.ranksep,
-            )
-            viewspec = graphspec_to_viewspec(graph_spec, analysis, layout=layout)
+        return save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
 
-            # Collect stuff data in alternate formats
-            rf_stuff_data_text = collect_stuff_data_text(graph_spec) if graph_config.data_inclusion.stuff_text_content else None
-            rf_stuff_data_html = collect_stuff_data_html(graph_spec) if graph_config.data_inclusion.stuff_html_content else None
+    saved_files = asyncio.run(render_and_save())
 
-            # Generate ReactFlow HTML
-            reactflow_html = await generate_reactflow_html_async(
-                viewspec,
-                graph_config.reactflow_config,
-                graphspec=graph_spec,
-                stuff_data_text=rf_stuff_data_text,
-                stuff_data_html=rf_stuff_data_html,
-                title=f"Pipeline: {snake_to_title_case(input_file.stem)}",
-            )
-            reactflow_path = output_dir / "reactflow.html"
-            reactflow_path.write_text(reactflow_html, encoding="utf-8")
-            generated_files.append(reactflow_path)
-            typer.secho("✅ reactflow.html", fg=typer.colors.GREEN, err=True)
-
-    asyncio.run(render_views())
+    # Report saved files
+    for file_path in saved_files.values():
+        typer.secho(f"✅ {file_path.name}", fg=typer.colors.GREEN, err=True)
 
     typer.secho(f"\n📊 Saved to: {output_dir}", fg=typer.colors.CYAN, bold=True, err=True)
 
     # Open in browser if requested
-    if open_browser and generated_files:
-        if len(generated_files) == 1:
-            # Open the single generated file
-            file_to_open = generated_files[0]
+    if open_browser and saved_files:
+        saved_paths = list(saved_files.values())
+        if len(saved_paths) == 1:
+            file_to_open = saved_paths[0]
             webbrowser.open(f"file://{file_to_open.absolute()}")
             typer.secho(f"🌐 Opened {file_to_open.name} in browser", fg=typer.colors.BLUE, err=True)
         else:
-            # Open the output directory so user can see all files
             webbrowser.open(f"file://{output_dir.absolute()}")
             typer.secho("🌐 Opened output directory in browser", fg=typer.colors.BLUE, err=True)
 

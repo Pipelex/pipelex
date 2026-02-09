@@ -42,6 +42,7 @@ class TemplateCategory(StrEnum):
                 return {
                     Jinja2FilterName.FORMAT: text_format,
                     Jinja2FilterName.TAG: tag,
+                    Jinja2FilterName.WITH_IMAGES: with_images,
                 }
             case TemplateCategory.MERMAID:
                 return {}

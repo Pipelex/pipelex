@@ -2,14 +2,13 @@
 
 import asyncio
 import json
-import sys
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
-from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.error_handlers import ErrorContext
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
@@ -103,13 +102,7 @@ def inputs_cmd(
     """
     # Validate that at least one target is provided
     if target is None and pipe is None:
-        error_json: dict[str, Any] = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "No pipe code or bundle file specified",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("No pipe code or bundle file specified", "ArgumentError")
 
     # Determine pipe_code and bundle_path from arguments
     pipe_code: str | None = None
@@ -118,105 +111,75 @@ def inputs_cmd(
     if target:
         target_path = Path(target)
         if target_path.is_dir():
-            error_json = {
-                "error": True,
-                "error_type": "ArgumentError",
-                "message": f"'{target}' is a directory. The inputs command requires a .plx file or a pipe code.",
-            }
-            print(json.dumps(error_json, indent=2), file=sys.stderr)
-            raise typer.Exit(1)
+            agent_error(
+                f"'{target}' is a directory. The inputs command requires a .plx file or a pipe code.",
+                "ArgumentError",
+            )
 
         if is_pipelex_file(target_path):
             bundle_path = target_path
         else:
             pipe_code = target
             if pipe:
-                error_json = {
-                    "error": True,
-                    "error_type": "ArgumentError",
-                    "message": "Cannot use --pipe if already passing a pipe code as positional argument",
-                }
-                print(json.dumps(error_json, indent=2), file=sys.stderr)
-                raise typer.Exit(1)
+                agent_error("Cannot use --pipe if already passing a pipe code as positional argument", "ArgumentError")
 
     if pipe:
         pipe_code = pipe
 
     if not pipe_code and not bundle_path:
-        error_json = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "No pipe code or bundle file specified",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("No pipe code or bundle file specified", "ArgumentError")
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS, library_dirs=library_dirs)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs)
 
     try:
         result = asyncio.run(_inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs))
-        print(json.dumps(result, indent=2))
+        agent_success(result)
 
     except FileNotFoundError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "FileNotFoundError",
-            "message": f"Bundle file not found: {bundle_path}",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "ValidateBundleError",
-            "message": exc.message,
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        validation_errors = extract_validation_errors(exc)
+        extra: dict[str, Any] = {"validation_errors": validation_errors}
+        if exc.dry_run_error_message:
+            extra["dry_run_error"] = exc.dry_run_error_message
+        agent_error(exc.message, "ValidateBundleError", cause=exc, **extra)
 
     except NoInputsRequiredError as exc:
         # Not really an error - just a pipe with no inputs
-        result_json: dict[str, Any] = {
-            "success": True,
-            "pipe_code": pipe_code,
-            "inputs": {},
-            "message": str(exc),
-        }
-        print(json.dumps(result_json, indent=2))
+        agent_success(
+            {
+                "success": True,
+                "pipe_code": pipe_code,
+                "inputs": {},
+                "message": str(exc),
+            }
+        )
 
     except PipeOperatorModelChoiceError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "PipeOperatorModelChoiceError",
-            "message": exc.message,
-            "pipe_code": exc.pipe_code,
-            "model_type": exc.model_type,
-            "model_choice": exc.model_choice,
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(
+            exc.message,
+            "PipeOperatorModelChoiceError",
+            cause=exc,
+            pipe_code=exc.pipe_code,
+            model_type=str(exc.model_type),
+            model_choice=str(exc.model_choice),
+        )
 
     except PipeOperatorModelAvailabilityError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "PipeOperatorModelAvailabilityError",
-            "message": str(exc),
+        availability_extra: dict[str, Any] = {
             "pipe_code": exc.pipe_code,
             "model_handle": exc.model_handle,
         }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        if exc.fallback_list:
+            availability_extra["fallback_list"] = exc.fallback_list
+        if exc.pipe_stack:
+            availability_extra["pipe_stack"] = exc.pipe_stack
+        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
     except Exception as exc:
-        error_json = {
-            "error": True,
-            "error_type": type(exc).__name__,
-            "message": str(exc),
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

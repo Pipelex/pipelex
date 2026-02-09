@@ -4,6 +4,7 @@ This module is kept separate to avoid circular imports.
 The ImageContent type is referenced using Any to prevent import cycles.
 """
 
+from collections.abc import Callable
 from typing import Any
 
 
@@ -58,6 +59,26 @@ class ImageRegistry:
             if existing.url == image.url:
                 return f"[Image {index + 1}]"
         return None
+
+    def make_finalize(self) -> Callable[[Any], Any]:
+        """Create a Jinja2 finalize function that converts registered images to placeholders.
+
+        The returned function is called by Jinja2 on every expression output,
+        before str() conversion. If the value is a registered image, it returns
+        the placeholder string (e.g., "[Image 1]") instead.
+
+        Returns:
+            A callable suitable for use as the Jinja2 Environment finalize parameter.
+        """
+
+        def finalize(value: Any) -> Any:
+            if hasattr(value, "url"):
+                placeholder = self.get_image_placeholder(value)
+                if placeholder is not None:
+                    return placeholder
+            return value
+
+        return finalize
 
     @property
     def images(self) -> list[Any]:

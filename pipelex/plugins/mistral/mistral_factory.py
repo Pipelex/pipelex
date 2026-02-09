@@ -166,8 +166,8 @@ class MistralFactory:
 
     def make_nb_tokens_by_category(self, usage: UsageInfo) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            TokenCategory.INPUT: usage.prompt_tokens,
-            TokenCategory.OUTPUT: usage.completion_tokens,
+            TokenCategory.INPUT: usage.prompt_tokens or 0,
+            TokenCategory.OUTPUT: usage.completion_tokens or 0,
         }
         return nb_tokens_by_category
 

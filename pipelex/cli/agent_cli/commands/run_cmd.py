@@ -2,19 +2,19 @@
 
 import asyncio
 import json
-import sys
 from pathlib import Path
 from typing import Annotated, Any
 
 import typer
 
-from pipelex.cli.cli_factory import make_pipelex_for_cli
-from pipelex.cli.error_handlers import ErrorContext
+from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
@@ -31,6 +31,7 @@ async def _run_pipeline_core(
     dry_run: bool = False,
     mock_inputs: bool = False,
     library_dirs: list[str] | None = None,
+    graph: bool = False,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -42,6 +43,7 @@ async def _run_pipeline_core(
         dry_run: Whether to run in dry mode (no actual inference).
         mock_inputs: Whether to generate mock data for missing inputs.
         library_dirs: List of library directories to search for pipe definitions.
+        graph: Whether to generate execution graph visualizations.
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -52,7 +54,7 @@ async def _run_pipeline_core(
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
-        generate_graph=False,
+        generate_graph=graph,
         mock_inputs=mock_inputs or None,
     )
 
@@ -75,13 +77,54 @@ async def _run_pipeline_core(
             "html": await main_stuff.content.rendered_html_async(),
         }
 
-    return {
+    result: dict[str, Any] = {
         "success": True,
         "pipe_code": pipe_code,
         "dry_run": dry_run,
         "main_stuff": main_stuff_json,
         "working_memory": pipe_output.working_memory.smart_dump(),
     }
+
+    # Generate and save graph visualizations if requested
+    if graph and pipe_output.graph_spec:
+        graph_config = execution_config.graph_config
+        # Enable HTML outputs and data inclusion for the render
+        render_graph_config = graph_config.model_copy(
+            update={
+                "data_inclusion": graph_config.data_inclusion.model_copy(
+                    update={
+                        "stuff_json_content": True,
+                        "stuff_text_content": True,
+                        "stuff_html_content": True,
+                    }
+                ),
+                "graphs_inclusion": graph_config.graphs_inclusion.model_copy(
+                    update={
+                        "graphspec_json": False,
+                        "mermaidflow_html": True,
+                        "reactflow_html": True,
+                    }
+                ),
+            }
+        )
+
+        graph_outputs = await generate_graph_outputs(
+            graph_spec=pipe_output.graph_spec,
+            graph_config=render_graph_config,
+            pipe_code=pipe_code,
+        )
+
+        # Determine output directory from bundle path or current directory
+        output_dir: Path
+        if bundle_uri:
+            output_dir = Path(bundle_uri).parent / "graph"
+        else:
+            output_dir = Path("pipelex-wip") / "graph"
+
+        saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
+        result["graph_files"] = {key: str(path) for key, path in saved_files.items()}
+
+    return result
 
 
 def run_cmd(
@@ -109,6 +152,10 @@ def run_cmd(
         bool,
         typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry)"),
     ] = False,
+    graph: Annotated[
+        bool,
+        typer.Option("--graph", help="Generate execution graph visualizations (saved alongside output)"),
+    ] = False,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
@@ -122,27 +169,16 @@ def run_cmd(
         pipelex-agent run my_pipe --inputs data.json
         pipelex-agent run my_bundle.plx --pipe my_pipe
         pipelex-agent run my_pipe --dry --mock-inputs
+        pipelex-agent run my_bundle.plx --graph
     """
     # Validate that at least one target is provided
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
     if provided_options == 0:
-        error_json: dict[str, Any] = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "No pipe code or bundle file specified",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("No pipe code or bundle file specified", "ArgumentError")
 
     # Validate --mock-inputs requires --dry
     if mock_inputs and not dry_run:
-        error_json = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "--mock-inputs requires --dry",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("--mock-inputs requires --dry", "ArgumentError")
 
     # Determine pipe_code and bundle_path from arguments
     pipe_code: str | None = None
@@ -152,23 +188,11 @@ def run_cmd(
         if is_pipelex_file(Path(target)):
             bundle_path = target
             if bundle:
-                error_json = {
-                    "error": True,
-                    "error_type": "ArgumentError",
-                    "message": "Cannot use --bundle if already passing a bundle file as positional argument",
-                }
-                print(json.dumps(error_json, indent=2), file=sys.stderr)
-                raise typer.Exit(1)
+                agent_error("Cannot use --bundle if already passing a bundle file as positional argument", "ArgumentError")
         else:
             pipe_code = target
             if pipe:
-                error_json = {
-                    "error": True,
-                    "error_type": "ArgumentError",
-                    "message": "Cannot use --pipe if already passing a pipe code as positional argument",
-                }
-                print(json.dumps(error_json, indent=2), file=sys.stderr)
-                raise typer.Exit(1)
+                agent_error("Cannot use --pipe if already passing a pipe code as positional argument", "ArgumentError")
 
     if bundle:
         bundle_path = bundle
@@ -177,13 +201,7 @@ def run_cmd(
         pipe_code = pipe
 
     if not pipe_code and not bundle_path:
-        error_json = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "No pipe code or bundle file specified",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("No pipe code or bundle file specified", "ArgumentError")
 
     # Load plx content from bundle if provided
     plx_content: str | None = None
@@ -194,30 +212,17 @@ def run_cmd(
                 bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
-                    error_json = {
-                        "error": True,
-                        "error_type": "BundleError",
-                        "message": f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe.",
-                    }
-                    print(json.dumps(error_json, indent=2), file=sys.stderr)
-                    raise typer.Exit(1)
+                    agent_error(
+                        f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe.",
+                        "BundleError",
+                    )
                 pipe_code = main_pipe_code
         except FileNotFoundError as exc:
-            error_json = {
-                "error": True,
-                "error_type": "FileNotFoundError",
-                "message": f"Bundle file not found: {bundle_path}",
-            }
-            print(json.dumps(error_json, indent=2), file=sys.stderr)
-            raise typer.Exit(1) from exc
+            agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
+        except (OSError, UnicodeDecodeError) as exc:
+            agent_error(f"Failed to read bundle file '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
         except (PipelexInterpreterError, PLXDecodeError) as exc:
-            error_json = {
-                "error": True,
-                "error_type": type(exc).__name__,
-                "message": f"Failed to parse bundle '{bundle_path}': {exc}",
-            }
-            print(json.dumps(error_json, indent=2), file=sys.stderr)
-            raise typer.Exit(1) from exc
+            agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
 
     # Load inputs if provided
     pipeline_inputs: dict[str, Any] | None = None
@@ -226,34 +231,16 @@ def run_cmd(
             try:
                 pipeline_inputs = json.loads(inputs)
             except json.JSONDecodeError as exc:
-                error_json = {
-                    "error": True,
-                    "error_type": "JSONDecodeError",
-                    "message": f"Failed to parse inline JSON inputs: {exc}",
-                }
-                print(json.dumps(error_json, indent=2), file=sys.stderr)
-                raise typer.Exit(1) from exc
+                agent_error(f"Failed to parse inline JSON inputs: {exc}", "JSONDecodeError", cause=exc)
         else:
             try:
                 pipeline_inputs = load_json_dict_from_path(inputs)
             except FileNotFoundError as exc:
-                error_json = {
-                    "error": True,
-                    "error_type": "FileNotFoundError",
-                    "message": f"Input file not found: {inputs}",
-                }
-                print(json.dumps(error_json, indent=2), file=sys.stderr)
-                raise typer.Exit(1) from exc
+                agent_error(f"Input file not found: {inputs}", "FileNotFoundError", cause=exc)
             except JsonTypeError as exc:
-                error_json = {
-                    "error": True,
-                    "error_type": "JsonTypeError",
-                    "message": f"Input file must be a valid JSON dictionary: {inputs}",
-                }
-                print(json.dumps(error_json, indent=2), file=sys.stderr)
-                raise typer.Exit(1) from exc
+                agent_error(f"Input file must be a valid JSON dictionary: {inputs}", "JsonTypeError", cause=exc)
 
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
+    make_pipelex_for_agent_cli()
 
     try:
         result = asyncio.run(
@@ -265,52 +252,44 @@ def run_cmd(
                 dry_run=dry_run,
                 mock_inputs=mock_inputs,
                 library_dirs=library_dir,
+                graph=graph,
             )
         )
-        print(json.dumps(result, indent=2))
+        agent_success(result)
 
     except PipelineExecutionError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "PipelineExecutionError",
-            "message": exc.message,
+        extra_fields: dict[str, Any] = {
             "pipe_code": exc.pipe_code,
             "pipe_stack": exc.pipe_stack,
         }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        if exc.__cause__:
+            extra_fields["cause_type"] = type(exc.__cause__).__name__
+            extra_fields["cause_message"] = str(exc.__cause__)
+        agent_error(exc.message, "PipelineExecutionError", cause=exc, **extra_fields)
 
     except PipeOperatorModelChoiceError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "PipeOperatorModelChoiceError",
-            "message": exc.message,
-            "pipe_code": exc.pipe_code,
-            "model_type": exc.model_type,
-            "model_choice": exc.model_choice,
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(
+            exc.message,
+            "PipeOperatorModelChoiceError",
+            cause=exc,
+            pipe_code=exc.pipe_code,
+            model_type=str(exc.model_type),
+            model_choice=str(exc.model_choice),
+        )
 
     except PipeOperatorModelAvailabilityError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "PipeOperatorModelAvailabilityError",
-            "message": str(exc),
+        availability_extra: dict[str, Any] = {
             "pipe_code": exc.pipe_code,
             "model_handle": exc.model_handle,
         }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        if exc.fallback_list:
+            availability_extra["fallback_list"] = exc.fallback_list
+        if exc.pipe_stack:
+            availability_extra["pipe_stack"] = exc.pipe_stack
+        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
     except Exception as exc:
-        error_json = {
-            "error": True,
-            "error_type": type(exc).__name__,
-            "message": str(exc),
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(str(exc), type(exc).__name__, cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()

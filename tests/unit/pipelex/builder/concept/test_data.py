@@ -1,4 +1,4 @@
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec, ConceptStructureSpecFieldType
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint, ConceptStructureBlueprint
@@ -196,6 +196,119 @@ class ConceptBlueprintTestCases:
         CONCEPT_WITH_INTEGER_FIELD,
         CONCEPT_WITH_MULTIPLE_FIELDS,
         CONCEPT_WITH_CONCEPT_REF,
+    ]
+
+
+class ConceptStructureSpecChoicesTestCases:
+    """Test cases for choices field behavior in ConceptStructureSpec."""
+
+    # choices without type -> defaults to text
+    CHOICES_NO_TYPE = (
+        "choices_no_type",
+        {
+            "the_field_name": "status",
+            "description": "Order status",
+            "choices": ["pending", "processing", "completed"],
+            "required": True,
+        },
+        ConceptStructureSpecFieldType.TEXT,
+        ["pending", "processing", "completed"],
+    )
+
+    # choices with explicit text type
+    CHOICES_TEXT_TYPE = (
+        "choices_text_type",
+        {
+            "the_field_name": "priority",
+            "description": "Priority level",
+            "type": "text",
+            "choices": ["low", "medium", "high"],
+        },
+        ConceptStructureSpecFieldType.TEXT,
+        ["low", "medium", "high"],
+    )
+
+    # choices with integer type
+    CHOICES_INTEGER_TYPE = (
+        "choices_integer_type",
+        {
+            "the_field_name": "rating",
+            "description": "Star rating",
+            "type": "integer",
+            "choices": ["1", "2", "3", "4", "5"],
+        },
+        ConceptStructureSpecFieldType.INTEGER,
+        ["1", "2", "3", "4", "5"],
+    )
+
+    # choices with number type
+    CHOICES_NUMBER_TYPE = (
+        "choices_number_type",
+        {
+            "the_field_name": "score",
+            "description": "Score on a half-point scale",
+            "type": "number",
+            "choices": ["0", "0.5", "1", "1.5", "2"],
+        },
+        ConceptStructureSpecFieldType.NUMBER,
+        ["0", "0.5", "1", "1.5", "2"],
+    )
+
+    VALID_CASES: ClassVar[list[tuple[str, dict[str, Any], ConceptStructureSpecFieldType, list[str]]]] = [
+        CHOICES_NO_TYPE,
+        CHOICES_TEXT_TYPE,
+        CHOICES_INTEGER_TYPE,
+        CHOICES_NUMBER_TYPE,
+    ]
+
+    # Incompatible types for choices
+    CHOICES_BOOLEAN_TYPE = (
+        "choices_boolean_type",
+        {
+            "the_field_name": "flag",
+            "description": "A flag",
+            "type": "boolean",
+            "choices": ["true", "false"],
+        },
+    )
+
+    CHOICES_DATE_TYPE = (
+        "choices_date_type",
+        {
+            "the_field_name": "date_field",
+            "description": "A date",
+            "type": "date",
+            "choices": ["2024-01-01", "2024-06-01"],
+        },
+    )
+
+    CHOICES_CONCEPT_TYPE = (
+        "choices_concept_type",
+        {
+            "the_field_name": "ref_field",
+            "description": "A reference",
+            "type": "concept",
+            "concept_ref": "myapp.Customer",
+            "choices": ["a", "b"],
+        },
+    )
+
+    CHOICES_LIST_TYPE = (
+        "choices_list_type",
+        {
+            "the_field_name": "list_field",
+            "description": "A list",
+            "type": "list",
+            "item_type": "text",
+            "choices": ["a", "b"],
+        },
+    )
+
+    INCOMPATIBLE_CASES: ClassVar[list[tuple[str, dict[str, Any]]]] = [
+        CHOICES_BOOLEAN_TYPE,
+        CHOICES_DATE_TYPE,
+        CHOICES_CONCEPT_TYPE,
+        CHOICES_LIST_TYPE,
     ]
 
 

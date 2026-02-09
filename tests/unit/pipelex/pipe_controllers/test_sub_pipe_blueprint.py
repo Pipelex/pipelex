@@ -55,3 +55,13 @@ class TestSubPipeBlueprint:
                 batch_as="item",
             )
         assert "When 'batch_as' is specified, 'batch_over' must also be provided" in str(exc_info.value)
+
+    def test_rejects_batch_over_same_as_batch_as(self):
+        """SubPipeBlueprint rejects batch_as == batch_over."""
+        with pytest.raises(ValidationError, match="batch_as"):
+            SubPipeBlueprint(
+                pipe="process_item",
+                result="processed",
+                batch_over="items",
+                batch_as="items",
+            )

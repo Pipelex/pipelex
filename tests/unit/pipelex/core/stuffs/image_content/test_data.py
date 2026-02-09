@@ -20,6 +20,7 @@ class TestData:
         "caption": None,
         "mime_type": None,
         "size": None,
+        "filename": None,
     }
 
     # Expected outputs for smart_dump (with optional fields)
@@ -31,6 +32,7 @@ class TestData:
         "caption": "A beautiful sunset",
         "mime_type": "image/png",
         "size": None,
+        "filename": None,
     }
 
     # Expected outputs for render methods

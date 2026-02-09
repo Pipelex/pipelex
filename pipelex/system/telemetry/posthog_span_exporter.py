@@ -325,6 +325,14 @@ class PostHogSpanExporter(SpanExporter):
 
     @override
     def export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
+        try:
+            return self._do_export(spans)
+        except RuntimeError:
+            # Gracefully handle the case where the logging/config system has already
+            # been torn down (e.g. OTel background thread firing after Pipelex teardown).
+            return SpanExportResult.SUCCESS
+
+    def _do_export(self, spans: Sequence[ReadableSpan]) -> SpanExportResult:
         log.verbose(f"[OTel->PostHog] export() called with {len(spans)} span(s)")
 
         for span in spans:

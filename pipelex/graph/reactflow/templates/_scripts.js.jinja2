@@ -644,7 +644,7 @@ function GraphViewer() {
     // Apply layout
     const needsLayout = initialData.nodes.some(n => !n.position || (n.position.x === 0 && n.position.y === 0));
     const layouted = needsLayout
-        ? getLayoutedElements(initialData.nodes, initialData.edges, viewspec.layout?.direction || 'TB')
+        ? getLayoutedElements(initialData.nodes, initialData.edges, '{{ layout_direction }}')
         : initialData;
 
     const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);

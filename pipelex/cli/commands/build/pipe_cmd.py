@@ -10,26 +10,28 @@ from posthog import tag
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
 from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
+from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.runner_code import generate_runner_code
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.commands.build.structures_cmd import generate_structures_from_blueprints
 from pipelex.cli.error_handlers import (
     ErrorContext,
+    handle_build_validation_failure,
     handle_model_availability_error,
     handle_model_choice_error,
 )
 from pipelex.config import get_config
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
-from pipelex.graph.graph_config import GraphConfig
-from pipelex.graph.graph_factory import generate_graph_outputs
-from pipelex.graph.graphspec import GraphSpec
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.hub import get_console, get_report_delegate, get_required_pipe, get_telemetry_manager
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
 from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import (
@@ -43,60 +45,6 @@ from pipelex.tools.misc.pretty import PrettyPrinter
 
 COMMAND = "build"
 SUB_COMMAND_PIPE = "pipe"
-
-
-async def _save_graph_outputs_to_dir(
-    graph_spec: GraphSpec,
-    graph_config: GraphConfig,
-    pipe_code: str,
-    output_dir: Path,
-) -> int:
-    """Save graph outputs to a directory.
-
-    Args:
-        graph_spec: The graph specification to render.
-        graph_config: Configuration for graph generation.
-        pipe_code: The pipe code for use in titles.
-        output_dir: Directory where graph files will be saved.
-
-    Returns:
-        Count of saved files.
-    """
-    output_dir.mkdir(parents=True, exist_ok=True)
-
-    graph_outputs = await generate_graph_outputs(
-        graph_spec=graph_spec,
-        graph_config=graph_config,
-        pipe_code=pipe_code,
-    )
-
-    saved_count = 0
-    if graph_outputs.graphspec_json is not None:
-        (output_dir / "graphspec.json").write_text(graph_outputs.graphspec_json, encoding="utf-8")
-        typer.secho(f"✅ GraphSpec JSON saved to: {output_dir / 'graphspec.json'}", fg=typer.colors.GREEN)
-        saved_count += 1
-
-    if graph_outputs.mermaidflow_mmd is not None:
-        (output_dir / "mermaidflow.mmd").write_text(graph_outputs.mermaidflow_mmd, encoding="utf-8")
-        typer.secho(f"✅ Mermaidflow Mermaid saved to: {output_dir / 'mermaidflow.mmd'}", fg=typer.colors.GREEN)
-        saved_count += 1
-
-    if graph_outputs.mermaidflow_html is not None:
-        (output_dir / "mermaidflow.html").write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
-        typer.secho(f"✅ Mermaidflow HTML saved to: {output_dir / 'mermaidflow.html'}", fg=typer.colors.GREEN)
-        saved_count += 1
-
-    if graph_outputs.reactflow_viewspec is not None:
-        (output_dir / "viewspec.json").write_text(graph_outputs.reactflow_viewspec, encoding="utf-8")
-        typer.secho(f"✅ ReactFlow ViewSpec saved to: {output_dir / 'viewspec.json'}", fg=typer.colors.GREEN)
-        saved_count += 1
-
-    if graph_outputs.reactflow_html is not None:
-        (output_dir / "reactflow.html").write_text(graph_outputs.reactflow_html, encoding="utf-8")
-        typer.secho(f"✅ ReactFlow HTML saved to: {output_dir / 'reactflow.html'}", fg=typer.colors.GREEN)
-        saved_count += 1
-
-    return saved_count
 
 
 """
@@ -153,6 +101,10 @@ def build_pipe_cmd(
         bool,
         typer.Option("--no-extras", help="Skip generating inputs.json and runner.py, only generate the PLX file"),
     ] = False,
+    bundle_view: Annotated[
+        bool,
+        typer.Option("--bundle-view/--no-bundle-view", help="Generate bundle view HTML and SVG files"),
+    ] = False,
     graph: Annotated[
         bool | None,
         typer.Option("--graph/--no-graph", help="Generate execution graphs for both build process and built pipeline"),
@@ -167,7 +119,7 @@ def build_pipe_cmd(
 ) -> None:
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_PIPE)
 
-    typer.secho("🔥 Starting pipe builder... 🚀\n", fg=typer.colors.GREEN)
+    typer.secho("Building pipeline...\n", fg=typer.colors.GREEN, bold=True)
 
     async def run_pipeline():
         start_time = time.time()
@@ -205,6 +157,8 @@ def build_pipe_cmd(
                 typer.secho(f"❌ {msg}", fg=typer.colors.RED)
                 typer.secho("❌ No failure memory available", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
+        except ValidateBundleError as exc:
+            handle_build_validation_failure(exc)
 
         # Return early if no output requested
         if no_output:
@@ -236,124 +190,154 @@ def build_pipe_cmd(
 
         # Save the PLX file
         ensure_directory_for_file_path(file_path=str(plx_file_path))
-        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+        try:
+            plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+        except PipelexBundleSpecBlueprintError as exc:
+            typer.secho(f"❌ Failed to convert bundle spec to blueprint: {exc}", fg=typer.colors.RED)
+            raise typer.Exit(1) from exc
         save_text_to_path(text=plx_content, path=str(plx_file_path))
-        typer.secho(f"✅ Pipelex bundle saved to: {plx_file_path}", fg=typer.colors.GREEN)
+        log.verbose(f"Pipelex bundle saved to: {plx_file_path}")
 
-        # Generate extras (inputs and runner) if requested
-        if not no_extras:
-            main_pipe_code = pipelex_bundle_spec.main_pipe
-            if main_pipe_code:
-                try:
+        if no_extras:
+            end_time = time.time()
+            console = get_console()
+            console.print(f"\n[green]✓[/green] [bold]Pipeline built successfully ({end_time - start_time:.1f}s)[/bold]")
+            console.print(f"  Output: {plx_file_path}")
+            return
+
+        # Generate extras (inputs and runner)
+        main_pipe_code = pipelex_bundle_spec.main_pipe
+        domain_code = pipelex_bundle_spec.domain
+        if main_pipe_code:
+            saved_bundle_view_formats: list[str] = []
+            saved_structure_names: list[str] = []
+            saved_graph_sections: list[tuple[str, list[str]]] = []
+
+            try:
+                if bundle_view:
                     pretty = pipelex_bundle_spec.rendered_pretty()
                     # Generate pretty HTML
                     pretty_html = PrettyPrinter.pretty_html(pretty=pretty)
                     html_path = os.path.join(extras_output_dir, "bundle_view.html")
                     save_text_to_path(text=pretty_html, path=html_path)
-                    typer.secho(f"✅ Pretty HTML saved to: {html_path}", fg=typer.colors.GREEN)
+                    log.verbose(f"Pretty HTML saved to: {html_path}")
+                    saved_bundle_view_formats.append("html")
 
                     # Generate pretty SVG
                     pretty_svg = PrettyPrinter.pretty_svg(pretty=pretty)
                     svg_path = os.path.join(extras_output_dir, "bundle_view.svg")
                     save_text_to_path(text=pretty_svg, path=svg_path)
-                    typer.secho(f"✅ Pretty SVG saved to: {svg_path}", fg=typer.colors.GREEN)
+                    log.verbose(f"Pretty SVG saved to: {svg_path}")
+                    saved_bundle_view_formats.append("svg")
 
-                    pipe = get_required_pipe(pipe_code=main_pipe_code)
+                pipe = get_required_pipe(pipe_code=main_pipe_code)
 
-                    # Generate structures folder FIRST (before runner, since runner imports from structures)
-                    structures_output_dir = Path(extras_output_dir) / "structures"
-                    generated_structures = generate_structures_from_blueprints(
-                        blueprints=[pipelex_bundle_spec.to_blueprint()],
-                        output_directory=structures_output_dir,
-                        skip_existing_check=True,
-                    )
-                    if generated_structures:
-                        typer.secho(f"✅ Generated {len(generated_structures)} structure(s) in: {structures_output_dir}", fg=typer.colors.GREEN)
+                # Generate structures folder FIRST (before runner, since runner imports from structures)
+                structures_output_dir = Path(extras_output_dir) / "structures"
+                generated_structures = generate_structures_from_blueprints(
+                    blueprints=[pipelex_bundle_spec.to_blueprint()],
+                    output_directory=structures_output_dir,
+                    skip_existing_check=True,
+                    quiet=True,
+                )
+                if generated_structures:
+                    saved_structure_names = [concept_code for _, concept_code in generated_structures]
+                    log.verbose(f"Generated {len(generated_structures)} structure(s) in: {structures_output_dir}")
 
-                    # Generate inputs.json
+                # Generate inputs.json (only if the pipe has inputs)
+                has_inputs = not pipe.inputs.is_empty
+                if has_inputs:
                     inputs_json_str = pipe.inputs.render_inputs(indent=2)
-                    inputs_json_path = os.path.join(extras_output_dir, "inputs.json")
+                    inputs_json_path = os.path.join(extras_output_dir, DEFAULT_INPUTS_FILE_NAME)
                     save_text_to_path(text=inputs_json_str, path=inputs_json_path)
-                    typer.secho(f"✅ Inputs template saved to: {inputs_json_path}", fg=typer.colors.GREEN)
+                    log.verbose(f"Inputs template saved to: {inputs_json_path}")
 
-                    # Determine if output is a list from the bundle spec
-                    main_pipe_spec = pipelex_bundle_spec.pipe[main_pipe_code] if pipelex_bundle_spec.pipe else None
-                    output_is_list = False
-                    if main_pipe_spec:
-                        output_parse = parse_concept_with_multiplicity(main_pipe_spec.output)
-                        output_is_list = output_parse.multiplicity is not None
+                # Determine if output is a list from the bundle spec
+                main_pipe_spec = pipelex_bundle_spec.pipe[main_pipe_code] if pipelex_bundle_spec.pipe else None
+                output_is_list = False
+                if main_pipe_spec:
+                    output_parse = parse_concept_with_multiplicity(main_pipe_spec.output)
+                    output_is_list = output_parse.multiplicity is not None
 
-                    # Generate runner.py (after structures are generated)
-                    runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list, library_dir=extras_output_dir)
-                    runner_path = os.path.join(extras_output_dir, f"run_{main_pipe_code}.py")
-                    save_text_to_path(text=runner_code, path=runner_path)
-                    typer.secho(f"✅ Python runner script saved to: {runner_path}", fg=typer.colors.GREEN)
+                # Generate runner.py (after structures are generated)
+                runner_code = generate_runner_code(pipe, output_multiplicity=output_is_list, library_dir=extras_output_dir)
+                runner_path = os.path.join(extras_output_dir, f"run_{main_pipe_code}.py")
+                save_text_to_path(text=runner_code, path=runner_path)
+                log.verbose(f"Python runner script saved to: {runner_path}")
 
-                    # Generate empty __init__.py to make it a proper Python package
-                    init_path = os.path.join(extras_output_dir, "__init__.py")
-                    save_text_to_path(text="", path=init_path)
-                    typer.secho(f"✅ Package init file saved to: {init_path}", fg=typer.colors.GREEN)
+                # Generate empty __init__.py to make it a proper Python package
+                init_path = os.path.join(extras_output_dir, "__init__.py")
+                save_text_to_path(text="", path=init_path)
+                log.verbose(f"Package init file saved to: {init_path}")
 
-                    get_report_delegate().generate_report()
+                get_report_delegate().generate_report()
 
-                    # Generate graphs if it was tracked during the build process
-                    if builder_graph_spec:
-                        typer.secho("\n📊 Generating graphs...", fg=typer.colors.CYAN)
-
-                        # Save builder pipeline graph in graphs/ subfolder
-                        graphs_dir = Path(extras_output_dir) / "graphs"
-                        builder_graph_dir = graphs_dir / "builder_graph"
-                        builder_graph_count = await _save_graph_outputs_to_dir(
-                            graph_spec=builder_graph_spec,
-                            graph_config=execution_config.graph_config,
-                            pipe_code=builder_pipe,
-                            output_dir=builder_graph_dir,
-                        )
-                        if builder_graph_count > 0:
-                            typer.secho(f"📊 {builder_graph_count} builder graph outputs saved to: {builder_graph_dir}", fg=typer.colors.CYAN)
-
-                        # Run built pipeline in dry-run mode to generate its graph
-                        try:
-                            built_pipe_execution_config = execution_config.with_graph_config_overrides(mock_inputs=True)
-
-                            # pass empty library_dirs to avoid loading any libraries set at env var or instance level:
-                            # we don't want any other pipeline to interfere with the pipeline we just built
-                            built_pipe_output = await execute_pipeline(
-                                plx_content=plx_content,
-                                pipe_run_mode=PipeRunMode.DRY,
-                                execution_config=built_pipe_execution_config,
-                                library_dirs=[],
-                            )
-                            if built_pipe_output.graph_spec:
-                                pipeline_graph_dir = graphs_dir / "pipeline_graph"
-                                log.dev(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
-                                pipeline_graph_count = await _save_graph_outputs_to_dir(
-                                    graph_spec=built_pipe_output.graph_spec,
-                                    graph_config=execution_config.graph_config,
-                                    pipe_code=main_pipe_code,
-                                    output_dir=pipeline_graph_dir,
-                                )
-                                if pipeline_graph_count > 0:
-                                    typer.secho(
-                                        f"📊 {pipeline_graph_count} built pipeline graph outputs saved to: {pipeline_graph_dir}",
-                                        fg=typer.colors.CYAN,
-                                    )
-                        except Exception as graph_exc:
-                            typer.secho(f"⚠️  Warning: Could not generate built pipeline graph: {graph_exc}", fg=typer.colors.YELLOW)
-
-                    end_time = time.time()
-                    typer.secho(f"\n✅ Pipeline built in {end_time - start_time:.2f} seconds\n", fg=typer.colors.WHITE)
-
-                    # Show how to run the pipe
-                    console = get_console()
-                    console.print("\n📋 [cyan]To run your pipeline:[/cyan]")
-                    console.print(f"   [cyan]• Execute the runner:[/cyan] python {runner_path}")
-                    console.print(
-                        f"   [cyan]• Or use CLI:[/cyan] pipelex run {main_pipe_code} --inputs {inputs_json_path} --library-dir {extras_output_dir}\n"
+                # Generate graphs if it was tracked during the build process
+                if builder_graph_spec:
+                    # Save builder pipeline graph in graphs/ subfolder
+                    graphs_dir = Path(extras_output_dir) / "graphs"
+                    builder_graph_dir = graphs_dir / "builder_graph"
+                    builder_graph_outputs = await generate_graph_outputs(
+                        graph_spec=builder_graph_spec,
+                        graph_config=execution_config.graph_config,
+                        pipe_code=builder_pipe,
                     )
+                    builder_saved = save_graph_outputs_to_dir(graph_outputs=builder_graph_outputs, output_dir=builder_graph_dir)
+                    if builder_saved:
+                        builder_formats = list(dict.fromkeys(key.split("_")[0] for key in builder_saved))
+                        saved_graph_sections.append(("builder", builder_formats))
 
-                except Exception as exc:
-                    typer.secho(f"⚠️  Warning: Could not generate extras: {exc}", fg=typer.colors.YELLOW)
+                    # Run built pipeline in dry-run mode to generate its graph
+                    try:
+                        built_pipe_execution_config = execution_config.with_graph_config_overrides(mock_inputs=True)
+
+                        # pass empty library_dirs to avoid loading any libraries set at env var or instance level:
+                        # we don't want any other pipeline to interfere with the pipeline we just built
+                        built_pipe_output = await execute_pipeline(
+                            plx_content=plx_content,
+                            pipe_run_mode=PipeRunMode.DRY,
+                            execution_config=built_pipe_execution_config,
+                            library_dirs=[],
+                        )
+                        if built_pipe_output.graph_spec:
+                            pipeline_graph_dir = graphs_dir / "pipeline_graph"
+                            log.verbose(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
+                            pipeline_graph_outputs = await generate_graph_outputs(
+                                graph_spec=built_pipe_output.graph_spec,
+                                graph_config=execution_config.graph_config,
+                                pipe_code=main_pipe_code,
+                            )
+                            pipeline_saved = save_graph_outputs_to_dir(graph_outputs=pipeline_graph_outputs, output_dir=pipeline_graph_dir)
+                            if pipeline_saved:
+                                pipeline_formats = list(dict.fromkeys(key.split("_")[0] for key in pipeline_saved))
+                                saved_graph_sections.append(("pipeline", pipeline_formats))
+                    except Exception as graph_exc:
+                        typer.secho(f"⚠️  Warning: Could not generate built pipeline graph: {graph_exc}", fg=typer.colors.YELLOW)
+
+                # Print completion recap
+                end_time = time.time()
+                console = get_console()
+                console.print(f"\n[green]✓[/green] [bold]Pipeline built successfully ({end_time - start_time:.1f}s)[/bold]")
+                console.print(f"  Output saved to [bold magenta]{extras_output_dir}[/bold magenta]:")
+                console.print(f"    [green]✓[/green] bundle.plx → {domain_code} → main pipe [red]{main_pipe_code}[/red]")
+                if saved_bundle_view_formats:
+                    console.print(f"    [green]✓[/green] bundle_view: {', '.join(saved_bundle_view_formats)}")
+                if saved_structure_names:
+                    colored_structures = ", ".join(f"[green]{name}[/green]" for name in saved_structure_names)
+                    console.print(f"    [green]✓[/green] structures: {colored_structures}")
+                if has_inputs:
+                    console.print(f"    [green]✓[/green] {DEFAULT_INPUTS_FILE_NAME}")
+                console.print(f"    [green]✓[/green] run_{main_pipe_code}.py")
+                for graph_label, graph_formats in saved_graph_sections:
+                    console.print(f"    [green]✓[/green] graphs/{graph_label}: {', '.join(graph_formats)}")
+                if has_inputs:
+                    console.print(f"\n  [yellow]Note:[/yellow] Fill {DEFAULT_INPUTS_FILE_NAME} with actual data before running.")
+                    console.print(f"  To run: [cyan]pipelex run {extras_output_dir}[/cyan]")
+                else:
+                    console.print(f"\n  To run: [cyan]pipelex run {extras_output_dir}[/cyan]")
+
+            except Exception as exc:
+                typer.secho(f"⚠️  Warning: Could not generate extras: {exc}", fg=typer.colors.YELLOW)
 
     try:
         with get_telemetry_manager().telemetry_context():

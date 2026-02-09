@@ -25,6 +25,7 @@
 model_type = "llm"
 sdk = "openai"
 structure_method = "instructor/json"
+thinking_mode = "none"
 
 ################################################################################
 # PRODUCTION TEXT MODELS

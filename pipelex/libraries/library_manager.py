@@ -186,10 +186,10 @@ class LibraryManager(LibraryManagerAbstract):
         num_registered = ClassRegistryUtils.auto_register_all_subclasses(
             base_class=StructuredContent,
         )
-        log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
+        log.verbose(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
         # Load PLX files into the specific library
-        log.debug(f"Loading plx files from: {[str(p) for p in valid_plx_paths]}")
+        log.verbose(f"Loading plx files from: {[str(p) for p in valid_plx_paths]}")
         return self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
 
     @override

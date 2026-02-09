@@ -58,14 +58,23 @@ def _fast_telemetry_teardown(self: TelemetryManager) -> None:
     """Skip expensive OTel/PostHog shutdown during tests (~0.49s per call).
 
     Preserves exception capture cleanup (restores sys.excepthook) and
-    singleton clearing. Skips TracerProvider.shutdown() and PostHog
-    client.shutdown() which flush queues and join threads.
+    singleton clearing. Skips PostHog client.shutdown() which flushes
+    queues and joins threads.
+
+    We still shutdown the TracerProvider to stop the BatchSpanProcessor
+    background thread, otherwise it may try to export spans after the
+    logging system has been torn down, causing RuntimeError.
     """
     if self._exception_capture:  # pyright: ignore[reportPrivateUsage]
         try:
             self._exception_capture.close()  # pyright: ignore[reportPrivateUsage]
         except Exception as exc:
             log.debug(f"Error closing exception capture: {exc}")
+    if self._tracer_provider:  # pyright: ignore[reportPrivateUsage]
+        try:
+            self._tracer_provider.shutdown()  # pyright: ignore[reportPrivateUsage]
+        except Exception:  # noqa: S110
+            pass  # Suppress all shutdown errors; logging may already be torn down
     TelemetryManagerAbstract.clear_instance()
 
 

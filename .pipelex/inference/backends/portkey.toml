@@ -24,6 +24,7 @@ model_type = "llm"
 sdk = "portkey_completions"
 structure_method = "instructor/openai_tools"
 prompting_target = "anthropic"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -36,6 +37,7 @@ outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 [gpt-4o]
@@ -44,6 +46,7 @@ outputs = ["text", "structured"]
 costs = { input = 2.5, output = 10.0 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 ["gpt-4.1-nano"]
@@ -52,6 +55,7 @@ outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 ["gpt-4.1-mini"]
@@ -60,6 +64,7 @@ outputs = ["text", "structured"]
 costs = { input = 0.4, output = 1.6 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 ["gpt-4.1"]
@@ -68,6 +73,7 @@ outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 x-portkey-provider = "@openai"
 
 [o1]
@@ -77,6 +83,7 @@ costs = { input = 15.0, output = 60.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [o3-mini]
@@ -86,6 +93,7 @@ costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [o3]
@@ -95,6 +103,7 @@ costs = { input = 2, output = 8 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [o4-mini]
@@ -104,6 +113,7 @@ costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [gpt-5-nano]
@@ -113,6 +123,7 @@ costs = { input = 0.05, output = 0.4 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [gpt-5-mini]
@@ -122,6 +133,7 @@ costs = { input = 0.25, output = 2.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 [gpt-5]
@@ -131,6 +143,7 @@ costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 ["gpt-5.1"]
@@ -140,6 +153,7 @@ costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 ["gpt-5.1-codex"]
@@ -149,6 +163,7 @@ costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 sdk = "portkey_responses"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "manual"
 x-portkey-provider = "@openai"
 
 # --- Claude LLMs --------------------------------------------------------------
@@ -159,6 +174,7 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 0.25, output = 1.25 }
+thinking_mode = "none"
 x-portkey-provider = "@anthropic"
 
 ["claude-3.7-sonnet"]
@@ -168,6 +184,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 [claude-4-sonnet]
@@ -177,6 +194,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 [claude-4-opus]
@@ -186,6 +204,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.1-opus"]
@@ -195,6 +214,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-sonnet"]
@@ -204,6 +224,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-haiku"]
@@ -213,6 +234,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
+thinking_mode = "manual"
 x-portkey-provider = "@anthropic"
 
 ["claude-4.5-opus"]
@@ -222,6 +244,17 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+thinking_mode = "manual"
+x-portkey-provider = "@anthropic"
+
+["claude-4.6-opus"]
+model_id = "claude-opus-4-6"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"
 x-portkey-provider = "@anthropic"
 
 # --- Gemini LLMs --------------------------------------------------------------
@@ -231,6 +264,8 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 1.25, output = 10.0 }
+thinking_mode = "manual"
+prompting_target = "gemini"
 x-portkey-provider = "@google"
 
 ["gemini-2.5-flash"]
@@ -238,6 +273,8 @@ model_id = "gemini-2.5-flash"
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.30, output = 2.50 }
+thinking_mode = "manual"
+prompting_target = "gemini"
 x-portkey-provider = "@google"
 
 ["gemini-2.5-flash-lite"]
@@ -245,6 +282,8 @@ model_id = "gemini-2.5-flash-lite"
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.10, output = 0.40 }
+thinking_mode = "manual"
+prompting_target = "gemini"
 x-portkey-provider = "@google"
 
 ["gemini-3.0-pro"]
@@ -253,4 +292,16 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 3000
 costs = { input = 2, output = 12.0 }
+thinking_mode = "adaptive"
+prompting_target = "gemini"
+x-portkey-provider = "@google"
+
+["gemini-3.0-flash-preview"]
+model_id = "gemini-3-flash-preview"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 3000
+costs = { input = 0.5, output = 3.0 }
+thinking_mode = "adaptive"
+prompting_target = "gemini"
 x-portkey-provider = "@google"

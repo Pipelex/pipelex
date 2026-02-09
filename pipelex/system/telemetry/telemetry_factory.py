@@ -69,7 +69,7 @@ class TelemetryFactory:
                             pipelex_telemetry_enabled=True,
                             gateway_api_key=gateway_api_key,
                         )
-                        log.debug("Custom telemetry is off, but Pipelex Gateway telemetry is enabled")
+                        log.verbose("Custom telemetry is off, but Pipelex Gateway telemetry is enabled")
                     else:
                         chosen_telemetry_manager = TelemetryManagerNoOp()
                         log.debug("Telemetry is disabled because posthog.mode is set to 'off'")

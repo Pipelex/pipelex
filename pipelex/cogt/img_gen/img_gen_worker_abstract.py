@@ -29,6 +29,11 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     def desc(self) -> str:
         return f"ImgGen-Worker:{self.inference_model.tag}"
 
+    @property
+    def is_img2img_supported(self) -> bool:
+        """Check if this worker supports image-to-image generation (input images)."""
+        return self.inference_model.is_img2img_supported
+
     def _check_can_perform_job(self, img_gen_job: ImgGenJob):
         # This can be overridden by subclasses for specific checks
         pass

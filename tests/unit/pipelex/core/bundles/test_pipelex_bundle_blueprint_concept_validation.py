@@ -246,7 +246,7 @@ class TestPipelexBundleBlueprintConceptValidation:
         error_message = str(exc_info.value)
         assert "UndeclaredConcept" in error_message
         assert "pipe.my_pipe.output" in error_message
-        assert "not declared in bundle" in error_message
+        assert "not declared in domain" in error_message
 
     def test_invalid_undeclared_local_concept_in_pipe_input(self):
         """Undeclared local concept in pipe input should raise error."""

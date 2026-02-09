@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -7,22 +8,30 @@ from pipelex.builder.builder import (
     PipeSpecUnion,
     reconstruct_bundle_with_pipe_fixes,
 )
-from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.builder_errors import PipeBuilderError
+from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpecFieldType
+from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
+from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
+from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
+from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
-from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity
+from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
 from pipelex.tools.misc.json_utils import save_as_json_to_path
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
     from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
@@ -56,31 +65,40 @@ class BuilderLoop:
             save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=str(working_memory_path), create_directory=True)
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
-        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+        pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
 
         if is_save_first_iteration_enabled:
-            first_iteration_path = get_incremental_file_path(
-                base_path=output_dir or "results/pipe-builder",
-                base_name="generated_pipeline_1st_iteration",
-                extension="plx",
-            )
-            save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
+            try:
+                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                first_iteration_path = get_incremental_file_path(
+                    base_path=output_dir or "results/pipe-builder",
+                    base_name="generated_pipeline_1st_iteration",
+                    extension="plx",
+                )
+                save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
+            except PipelexBundleSpecBlueprintError as exc:
+                log.warning(f"Could not save first iteration PLX: {exc}")
 
-        bundle_blueprint = pipelex_bundle_spec.to_blueprint()
         max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts
         for attempt in range(1, max_attempts + 1):
+            # Phase 1: Create blueprint from spec
             try:
-                if attempt == 1:
-                    await validate_bundle(blueprints=[bundle_blueprint])
-                else:
-                    log.info(f"Validating bundle after fixes (attempt {attempt}/{max_attempts})...")
-                    fixed_bundle_blueprint = pipelex_bundle_spec.to_blueprint()
-                    await validate_bundle(blueprints=[fixed_bundle_blueprint])
+                bundle_blueprint = pipelex_bundle_spec.to_blueprint()
+            except PipelexBundleSpecBlueprintError as exc:
+                if attempt < max_attempts:
+                    log.info(f"⚠️ Blueprint creation failed on attempt {attempt}/{max_attempts}, fixing undeclared concepts...")
+                    pipelex_bundle_spec = await self._fix_undeclared_concept_references(pipelex_bundle_spec=pipelex_bundle_spec)
+                    pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
+                    continue
+                msg = f"Failed to create bundle blueprint after {max_attempts} attempts: {exc}"
+                raise PipeBuilderError(msg) from exc
 
+            # Phase 2: Validate the bundle
+            try:
+                await validate_bundle(blueprints=[bundle_blueprint])
                 if attempt > 1:
                     log.info(f"✅ Bundle validation passed after fixes (attempt {attempt}/{max_attempts})")
-                break  # Validation passed, exit the loop
-
+                break  # Validation passed
             except ValidateBundleError as exc:
                 if attempt < max_attempts:
                     log.info(f"⚠️ Validation failed on attempt {attempt}/{max_attempts}, attempting fixes...")
@@ -88,11 +106,400 @@ class BuilderLoop:
                         bundle_error=exc, pipelex_bundle_spec=pipelex_bundle_spec, is_save_second_iteration_enabled=is_save_second_iteration_enabled
                     )
                 else:
-                    # Final attempt failed, re-raise the error
                     log.error(f"❌ Validation failed after {max_attempts} attempts, raising error")
                     raise
 
         return pipelex_bundle_spec, pipe_output.graph_spec
+
+    async def _fix_undeclared_concept_references(
+        self,
+        pipelex_bundle_spec: PipelexBundleSpec,
+    ) -> PipelexBundleSpec:
+        """Fix undeclared concept references in pipe and concept specs.
+
+        Collects all concept references from pipe specs and concept definitions (refines,
+        structure concept_ref, item_concept_ref), determines which are undeclared,
+        fixes PipeParallel combined_output references deterministically, and generates
+        ConceptSpec definitions for any remaining undeclared concepts via an LLM pipeline.
+        """
+        # Step 1: Collect all local concept references from pipe specs and concept definitions
+        concept_references: list[tuple[str, str, str]] = []  # (bare_concept_code, source_description, field_context)
+        if pipelex_bundle_spec.pipe:
+            for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
+                source = f"pipe '{pipe_code}'"
+                # Parse output
+                output_parse = parse_concept_with_multiplicity(pipe_spec.output)
+                output_concept = output_parse.concept_ref_or_code
+                if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                    bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
+                    concept_references.append((bare_code, source, "output"))
+
+                # Parse inputs
+                if pipe_spec.inputs:
+                    for input_name, input_concept_str in pipe_spec.inputs.items():
+                        input_parse = parse_concept_with_multiplicity(input_concept_str)
+                        input_concept = input_parse.concept_ref_or_code
+                        if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                            bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
+                            concept_references.append((bare_code, source, f"input '{input_name}'"))
+
+                # Parse PipeParallel combined_output
+                if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
+                    combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
+                    combined_concept = combined_parse.concept_ref_or_code
+                    if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                        bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
+                        concept_references.append((bare_code, source, "combined_output"))
+
+        # Collect concept references from concept definitions (refines, structure concept_ref, item_concept_ref)
+        if pipelex_bundle_spec.concept:
+            for concept_code, concept_spec_or_name in pipelex_bundle_spec.concept.items():
+                if not isinstance(concept_spec_or_name, ConceptSpec):
+                    continue
+                source = f"concept '{concept_code}'"
+
+                # Check refines
+                if concept_spec_or_name.refines:
+                    ref = concept_spec_or_name.refines
+                    if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                        bare_code = ref.split(".")[-1] if "." in ref else ref
+                        concept_references.append((bare_code, source, "refines"))
+
+                # Check structure fields
+                if concept_spec_or_name.structure:
+                    for field_name, field_spec in concept_spec_or_name.structure.items():
+                        if field_spec.concept_ref:
+                            ref = field_spec.concept_ref
+                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                bare_code = ref.split(".")[-1] if "." in ref else ref
+                                concept_references.append((bare_code, source, f"structure.{field_name}.concept_ref"))
+                        if field_spec.item_concept_ref:
+                            ref = field_spec.item_concept_ref
+                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                bare_code = ref.split(".")[-1] if "." in ref else ref
+                                concept_references.append((bare_code, source, f"structure.{field_name}.item_concept_ref"))
+
+        # Step 2: Determine which are undeclared
+        declared_concepts: set[str] = set()
+        if pipelex_bundle_spec.concept:
+            declared_concepts = set(pipelex_bundle_spec.concept.keys())
+        native_concept_codes = {native.value for native in NativeConceptCode.values_list()}
+
+        undeclared: set[str] = set()
+        undeclared_refs: list[tuple[str, str, str]] = []
+        for ref_code, source_desc, field_context in concept_references:
+            if ref_code not in declared_concepts and ref_code not in native_concept_codes:
+                undeclared.add(ref_code)
+                undeclared_refs.append((ref_code, source_desc, field_context))
+
+        if not undeclared:
+            return pipelex_bundle_spec
+
+        log.info(f"🔍 Found {len(undeclared)} undeclared concept(s): {', '.join(sorted(undeclared))}")
+
+        # Step 3: Fix PipeParallel combined_output deterministically (no pipeline needed)
+        if pipelex_bundle_spec.pipe:
+            for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
+                if not isinstance(pipe_spec, PipeParallelSpec):
+                    continue
+                if not pipe_spec.combined_output:
+                    continue
+
+                combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
+                combined_concept = combined_parse.concept_ref_or_code
+                bare_combined = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
+
+                if bare_combined not in undeclared:
+                    continue
+
+                if pipe_spec.add_each_output:
+                    log.info(f"🔧 Removing undeclared combined_output '{pipe_spec.combined_output}' from PipeParallel '{pipe_code}'")
+                    pipe_spec.combined_output = None
+
+                    # Also fix output if it references an undeclared concept
+                    output_parse = parse_concept_with_multiplicity(pipe_spec.output)
+                    output_concept = output_parse.concept_ref_or_code
+                    bare_output = output_concept.split(".")[-1] if "." in output_concept else output_concept
+                    if bare_output in undeclared:
+                        log.info(f"🔧 Setting output of PipeParallel '{pipe_code}' to 'Anything'")
+                        pipe_spec.output = "Anything"
+
+        # Recompute undeclared: some concepts may no longer be referenced after PipeParallel fixes
+        still_referenced = self._collect_local_bare_concept_codes(pipelex_bundle_spec=pipelex_bundle_spec)
+        no_longer_referenced = undeclared - still_referenced
+        if no_longer_referenced:
+            log.info(f"🔧 Concepts no longer referenced after PipeParallel fixes: {', '.join(sorted(no_longer_referenced))}")
+            undeclared -= no_longer_referenced
+
+        # Step 4: Create remaining undeclared concepts via pipeline
+        if undeclared:
+            # Build context for the LLM
+            lines: list[str] = ["Missing concepts that need to be defined:\n"]
+            for ref_code, source_desc, field_context in undeclared_refs:
+                if ref_code in undeclared:
+                    lines.append(f"- '{ref_code}' referenced in {source_desc} ({field_context})")
+
+            lines.append("\nExisting declared concepts for context:")
+            if pipelex_bundle_spec.concept:
+                for concept_code, concept_spec_or_name in pipelex_bundle_spec.concept.items():
+                    if isinstance(concept_spec_or_name, ConceptSpec):
+                        lines.append(f"- {concept_code}: {concept_spec_or_name.description}")
+                    else:
+                        lines.append(f"- {concept_code}: {concept_spec_or_name}")
+            else:
+                lines.append("- (none)")
+
+            undeclared_concepts = "\n".join(lines)
+            log.info(f"🤖 Generating ConceptSpec definitions for {len(undeclared)} undeclared concept(s) via LLM...")
+
+            concept_fixer_output = await execute_pipeline(
+                pipe_code="generate_missing_concepts",
+                library_dirs=[str(Path(builder.__file__).parent / "concept")],
+                inputs={"undeclared_concepts": undeclared_concepts},
+            )
+
+            generated_concepts_list = concept_fixer_output.working_memory.get_stuff_as_list(
+                name="generate_missing_concepts",
+                item_type=ConceptSpec,
+            )
+
+            if pipelex_bundle_spec.concept is None:
+                pipelex_bundle_spec.concept = {}
+
+            for concept_spec in generated_concepts_list.items:
+                pipelex_bundle_spec.concept[concept_spec.the_concept_code] = concept_spec
+                log.info(f"🔧 Added generated concept '{concept_spec.the_concept_code}' to bundle")
+
+        return self._prune_unreachable_specs(pipelex_bundle_spec=pipelex_bundle_spec)
+
+    def _prune_unreachable_specs(self, pipelex_bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
+        """Remove unreachable pipes and unused concepts from the bundle spec.
+
+        Walks the call graph from main_pipe to find all reachable pipes, removes
+        unreachable ones, then collects all concept references from reachable pipes
+        and concept definitions (transitively) to remove unused concepts.
+
+        Args:
+            pipelex_bundle_spec: The bundle spec to prune (modified in place)
+
+        Returns:
+            The pruned bundle spec
+        """
+        if not pipelex_bundle_spec.pipe:
+            return pipelex_bundle_spec
+
+        domain = pipelex_bundle_spec.domain
+
+        # Step A: Find all reachable pipes by walking the call graph from main_pipe
+        reachable_pipes: set[str] = set()
+        to_visit: list[str] = [pipelex_bundle_spec.main_pipe]
+        special_outcome_values = SpecialOutcome.value_list()
+
+        while to_visit:
+            pipe_code = to_visit.pop()
+            if pipe_code in reachable_pipes:
+                continue
+
+            pipe_spec = pipelex_bundle_spec.pipe.get(pipe_code)
+            if pipe_spec is None:
+                log.warning(f"Pipe '{pipe_code}' is referenced but not found in bundle spec pipes")
+                continue
+            reachable_pipes.add(pipe_code)
+
+            sub_pipe_codes: list[str] = []
+            if isinstance(pipe_spec, PipeSequenceSpec):
+                sub_pipe_codes = [step.pipe_code for step in pipe_spec.steps]
+            elif isinstance(pipe_spec, PipeParallelSpec):
+                sub_pipe_codes = [parallel.pipe_code for parallel in pipe_spec.parallels]
+            elif isinstance(pipe_spec, PipeBatchSpec):
+                sub_pipe_codes = [pipe_spec.branch_pipe_code]
+            elif isinstance(pipe_spec, PipeConditionSpec):
+                for outcome_value in pipe_spec.outcomes.values():
+                    if outcome_value not in special_outcome_values:
+                        sub_pipe_codes.append(outcome_value)
+                if pipe_spec.default_outcome not in special_outcome_values:
+                    sub_pipe_codes.append(pipe_spec.default_outcome)
+
+            to_visit.extend(sub_pipe_codes)
+
+        # Step B: Remove unreachable pipes
+        unreachable = set(pipelex_bundle_spec.pipe.keys()) - reachable_pipes
+        for pipe_code in unreachable:
+            del pipelex_bundle_spec.pipe[pipe_code]
+            log.info(f"🧹 Removed unreachable pipe '{pipe_code}'")
+
+        # Step C: Collect all concept references from reachable pipes
+        referenced_concepts: set[str] = set()
+        for pipe_code in reachable_pipes:
+            pipe_spec = pipelex_bundle_spec.pipe.get(pipe_code)
+            if pipe_spec is None:
+                continue
+            referenced_concepts.update(self._collect_concept_refs_from_pipe_spec(pipe_spec=pipe_spec, domain=domain))
+
+        # Step D: Collect transitive concept references from concept definitions
+        if pipelex_bundle_spec.concept:
+            changed = True
+            while changed:
+                changed = False
+                for concept_code in list(referenced_concepts):
+                    concept_spec_or_name = pipelex_bundle_spec.concept.get(concept_code)
+                    if not isinstance(concept_spec_or_name, ConceptSpec):
+                        continue
+                    new_refs = self._collect_concept_refs_from_concept_spec(concept_spec=concept_spec_or_name, domain=domain)
+                    for bare_ref in new_refs:
+                        if bare_ref not in referenced_concepts and bare_ref in pipelex_bundle_spec.concept:
+                            referenced_concepts.add(bare_ref)
+                            changed = True
+
+        # Step E: Remove unused concepts
+        if pipelex_bundle_spec.concept:
+            unused = set(pipelex_bundle_spec.concept.keys()) - referenced_concepts
+            for concept_code in unused:
+                del pipelex_bundle_spec.concept[concept_code]
+                log.info(f"🧹 Removed unused concept '{concept_code}'")
+
+        return pipelex_bundle_spec
+
+    @staticmethod
+    def _extract_local_bare_code(concept_ref_or_code: str, domain: str) -> str | None:
+        """Extract a bare concept code only if the reference is local.
+
+        A reference is considered local if it has no domain prefix or if
+        its domain prefix matches the bundle domain.
+
+        Args:
+            concept_ref_or_code: A concept reference like "Document", "my_domain.Document", or "external.Document"
+            domain: The bundle's domain
+
+        Returns:
+            The bare concept code if local, or None if external
+        """
+        if "." not in concept_ref_or_code:
+            return concept_ref_or_code
+        prefix, bare_code = concept_ref_or_code.rsplit(".", maxsplit=1)
+        if prefix == domain:
+            return bare_code
+        return None
+
+    @staticmethod
+    def _collect_concept_refs_from_pipe_spec(pipe_spec: PipeSpecUnion, domain: str) -> set[str]:
+        """Collect local bare concept codes referenced by a single pipe spec.
+
+        Scans output, inputs, and (for PipeParallelSpec) combined_output.
+
+        Args:
+            pipe_spec: The pipe spec to scan
+            domain: The bundle's domain for locality filtering
+
+        Returns:
+            Set of bare concept codes referenced by this pipe spec
+        """
+        refs: set[str] = set()
+
+        # Output
+        output_parse = parse_concept_with_multiplicity(pipe_spec.output)
+        bare_output = BuilderLoop._extract_local_bare_code(concept_ref_or_code=output_parse.concept_ref_or_code, domain=domain)
+        if bare_output is not None:
+            refs.add(bare_output)
+
+        # Inputs
+        if pipe_spec.inputs:
+            for input_concept_str in pipe_spec.inputs.values():
+                input_parse = parse_concept_with_multiplicity(input_concept_str)
+                bare_input = BuilderLoop._extract_local_bare_code(concept_ref_or_code=input_parse.concept_ref_or_code, domain=domain)
+                if bare_input is not None:
+                    refs.add(bare_input)
+
+        # PipeParallel combined_output
+        if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
+            combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
+            bare_combined = BuilderLoop._extract_local_bare_code(concept_ref_or_code=combined_parse.concept_ref_or_code, domain=domain)
+            if bare_combined is not None:
+                refs.add(bare_combined)
+
+        return refs
+
+    @staticmethod
+    def _collect_concept_refs_from_concept_spec(concept_spec: ConceptSpec, domain: str) -> set[str]:
+        """Collect local bare concept codes referenced by a single concept spec.
+
+        Scans refines, and structure fields' concept_ref and item_concept_ref.
+
+        Args:
+            concept_spec: The concept spec to scan
+            domain: The bundle's domain for locality filtering
+
+        Returns:
+            Set of bare concept codes referenced by this concept spec
+        """
+        refs: set[str] = set()
+
+        # Refines
+        if concept_spec.refines:
+            bare_ref = BuilderLoop._extract_local_bare_code(concept_ref_or_code=concept_spec.refines, domain=domain)
+            if bare_ref is not None:
+                refs.add(bare_ref)
+
+        # Structure fields
+        if concept_spec.structure:
+            for field_spec in concept_spec.structure.values():
+                if field_spec.concept_ref:
+                    bare_ref = BuilderLoop._extract_local_bare_code(concept_ref_or_code=field_spec.concept_ref, domain=domain)
+                    if bare_ref is not None:
+                        refs.add(bare_ref)
+                if field_spec.item_concept_ref:
+                    bare_ref = BuilderLoop._extract_local_bare_code(concept_ref_or_code=field_spec.item_concept_ref, domain=domain)
+                    if bare_ref is not None:
+                        refs.add(bare_ref)
+
+        return refs
+
+    @staticmethod
+    def _collect_local_bare_concept_codes(pipelex_bundle_spec: PipelexBundleSpec) -> set[str]:
+        """Collect bare concept codes referenced locally from pipe specs and concept definitions.
+
+        Only includes references whose domain prefix is absent or matches the bundle domain.
+        This is used to determine which concepts are still actively referenced after spec mutations.
+
+        Args:
+            pipelex_bundle_spec: The bundle spec to scan
+
+        Returns:
+            Set of bare concept codes (without domain prefix) that are referenced
+        """
+        domain = pipelex_bundle_spec.domain
+        referenced: set[str] = set()
+
+        # Scan pipe specs
+        if pipelex_bundle_spec.pipe:
+            for pipe_spec in pipelex_bundle_spec.pipe.values():
+                referenced.update(BuilderLoop._collect_concept_refs_from_pipe_spec(pipe_spec=pipe_spec, domain=domain))
+
+        # Scan concept definitions
+        if pipelex_bundle_spec.concept:
+            for concept_spec_or_name in pipelex_bundle_spec.concept.values():
+                if not isinstance(concept_spec_or_name, ConceptSpec):
+                    continue
+                referenced.update(BuilderLoop._collect_concept_refs_from_concept_spec(concept_spec=concept_spec_or_name, domain=domain))
+
+        return referenced
+
+    @staticmethod
+    def _strip_native_concept_declarations(pipelex_bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
+        """Remove any concept declarations that collide with native concept codes.
+
+        Native concepts are built-in and must not be redeclared in a bundle.
+        This is a safety net for when the builder LLM ignores the instruction
+        not to redefine them.
+        """
+        if not pipelex_bundle_spec.concept:
+            return pipelex_bundle_spec
+        native_codes = {native.value for native in NativeConceptCode.values_list()}
+        to_remove = [code for code in pipelex_bundle_spec.concept if code in native_codes]
+        for code in to_remove:
+            del pipelex_bundle_spec.concept[code]
+            log.info(f"Stripped native concept declaration '{code}' (native concepts are built-in)")
+        return pipelex_bundle_spec
 
     def _fix_bundle_validation_error(
         self,
@@ -102,7 +509,6 @@ class BuilderLoop:
     ) -> PipelexBundleSpec:
         fixed_pipes: list[PipeSpecUnion] = []
         added_concepts: list[str] = []
-        # TODO: Auto remove the creation of native concept by the pipe builder
         # Handle pipe factory errors (e.g., missing output concepts)
         for factory_error in bundle_error.pipe_factory_errors:
             match factory_error.error_type:
@@ -167,8 +573,8 @@ class BuilderLoop:
                                 new_inputs[variable_name] = concept_code_with_multiplicity
                                 # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
                                 log.info(
-                                    f"🔧 Fixed input requirement mismatch for pipe '{val_error.pipe_code}': input '{variable_name}' \
-                                        changed from '{old_value}' → '{concept_code_with_multiplicity}'"
+                                    f"🔧 Fixed input requirement mismatch for pipe '{val_error.pipe_code}': input '{variable_name}' "
+                                    f"changed from '{old_value}' → '{concept_code_with_multiplicity}'"
                                 )
                                 break
 
@@ -197,10 +603,11 @@ class BuilderLoop:
                         fixed_pipes.append(pipe_spec)
                         log.info(f"🔧 Fixed input variables for pipe '{val_error.pipe_code}': BEFORE={old_inputs} → AFTER={fixed_inputs}")
                     else:
+                        variable_names_str = ", ".join(val_error.variable_names) if val_error.variable_names else "unknown"
                         log.warning(
-                            f"⚠️ Cannot auto-fix MISSING_INPUT_VARIABLE for pipe '{val_error.pipe_code}': needed_inputs() \
-                                doesn't include the missing variable '{val_error.variable_names}'. \
-                                    This might be an intermediate variable that shouldn't be in inputs."
+                            f"⚠️ Cannot auto-fix {val_error.error_type.replace('_', ' ')} for pipe '{val_error.pipe_code}': needed_inputs() "
+                            f"doesn't include the missing variable '{variable_names_str}'. "
+                            f"This might be an intermediate variable that shouldn't be in inputs."
                         )
 
                 case PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT | PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY:
@@ -223,8 +630,8 @@ class BuilderLoop:
                         # TODO: return a structured report of what was done, let the caller decide if they want to print it or act on it
                         error_kind = "concept" if val_error.error_type == PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT else "multiplicity"
                         log.info(
-                            f"🔧 Fixed output {error_kind} for pipe '{val_error.pipe_code}': output changed from '{old_output}' → \
-                                '{new_output}' (matching last step '{last_step_pipe_code}')"
+                            f"🔧 Fixed output {error_kind} for pipe '{val_error.pipe_code}': output changed from '{old_output}' → "
+                            f"'{new_output}' (matching last step '{last_step_pipe_code}')"
                         )
 
                     # Fix output concept for PipeCondition by checking mapped pipes' outputs
@@ -263,8 +670,17 @@ class BuilderLoop:
                     | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                     | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
                     | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                    | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
                 ):
                     continue
+
+        # Handle dry run errors (e.g., PipeCompose multiplicity mismatches)
+        if bundle_error.dry_run_error_message:
+            dry_run_fixed_pipes = self._fix_dry_run_compose_multiplicity_mismatch(
+                dry_run_error_message=bundle_error.dry_run_error_message,
+                pipelex_bundle_spec=pipelex_bundle_spec,
+            )
+            fixed_pipes.extend(dry_run_fixed_pipes)
 
         # Reconstruct bundle if we made pipe changes
         if fixed_pipes:
@@ -272,12 +688,221 @@ class BuilderLoop:
 
         # Save second iteration if we made any changes (pipes or concepts)
         if (fixed_pipes or added_concepts) and is_save_second_iteration_enabled:
-            plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
-            second_iteration_path = get_incremental_file_path(
-                base_path="results",
-                base_name="generated_pipeline_2nd_iteration",
-                extension="plx",
-            )
-            save_text_to_path(text=plx_content, path=str(second_iteration_path))
+            try:
+                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                second_iteration_path = get_incremental_file_path(
+                    base_path="results",
+                    base_name="generated_pipeline_2nd_iteration",
+                    extension="plx",
+                )
+                save_text_to_path(text=plx_content, path=str(second_iteration_path))
+            except PipelexBundleSpecBlueprintError as exc:
+                log.warning(f"Could not save second iteration PLX: {exc}")
 
         return pipelex_bundle_spec
+
+    # --- Dry run multiplicity mismatch fix ---
+
+    def _fix_dry_run_compose_multiplicity_mismatch(
+        self,
+        dry_run_error_message: str,
+        pipelex_bundle_spec: PipelexBundleSpec,
+    ) -> list[PipeSpecUnion]:
+        """Fix multiplicity mismatches detected in PipeCompose dry run errors.
+
+        Parses dry run error messages to identify cases where a PipeCompose field
+        receives ListContent but the concept structure expects a scalar type (e.g., str).
+        Fixes by adding [] to the pipe input and changing the concept structure field to list type.
+
+        Args:
+            dry_run_error_message: The error message from dry run failure
+            pipelex_bundle_spec: The bundle spec to fix (modified in place for concept structure)
+
+        Returns:
+            List of fixed pipe specs to include in bundle reconstruction
+        """
+        fixed_pipes: list[PipeSpecUnion] = []
+
+        if not pipelex_bundle_spec.pipe:
+            return fixed_pipes
+
+        # Extract compose pipe code and output concept from error message
+        # Pattern: "In pipe 'compose_pipe_code' (output: OutputConcept)"
+        pipe_match = re.search(r"In pipe '(\w+)' \(output: (\w+)\)", dry_run_error_message)
+        if not pipe_match:
+            return fixed_pipes
+
+        compose_pipe_code = pipe_match.group(1)
+        output_concept_code = pipe_match.group(2)
+
+        # Find all multiplicity mismatches: "field_name: ListContent (expected str) <-- MISMATCH"
+        mismatch_matches = re.findall(r"(\w+): ListContent \(expected (\w+)\) <-- MISMATCH", dry_run_error_message)
+        if not mismatch_matches:
+            return fixed_pipes
+
+        # Get the PipeComposeSpec
+        pipe_spec = pipelex_bundle_spec.pipe.get(compose_pipe_code)
+        if not isinstance(pipe_spec, PipeComposeSpec):
+            return fixed_pipes
+
+        any_fix_applied = False
+        for field_name, _expected_type in mismatch_matches:
+            fix_applied = self._fix_single_multiplicity_mismatch(
+                pipe_spec=pipe_spec,
+                pipelex_bundle_spec=pipelex_bundle_spec,
+                compose_pipe_code=compose_pipe_code,
+                output_concept_code=output_concept_code,
+                field_name=field_name,
+            )
+            if fix_applied:
+                any_fix_applied = True
+
+        if any_fix_applied:
+            fixed_pipes.append(pipe_spec)
+
+        return fixed_pipes
+
+    def _fix_single_multiplicity_mismatch(
+        self,
+        pipe_spec: PipeComposeSpec,
+        pipelex_bundle_spec: PipelexBundleSpec,
+        compose_pipe_code: str,
+        output_concept_code: str,
+        field_name: str,
+    ) -> bool:
+        """Fix a single field's multiplicity mismatch in a PipeCompose.
+
+        Adds [] to the pipe input concept ref and changes the concept structure
+        field from its current scalar type to a list type.
+
+        Returns:
+            True if a fix was applied, False otherwise
+        """
+        # Find which input variable maps to this field via construct spec
+        input_variable = self._find_input_for_construct_field(
+            pipe_spec=pipe_spec,
+            field_name=field_name,
+        )
+        if not input_variable:
+            log.warning(f"Could not find input variable for field '{field_name}' in compose pipe '{compose_pipe_code}'")
+            return False
+
+        # Get the input's concept ref
+        if not pipe_spec.inputs or input_variable not in pipe_spec.inputs:
+            log.warning(f"Input variable '{input_variable}' not found in inputs of '{compose_pipe_code}'")
+            return False
+
+        old_input_concept = pipe_spec.inputs[input_variable]
+        parse_result = parse_concept_with_multiplicity(old_input_concept)
+
+        any_fix_applied = False
+
+        # Fix 1: Add [] to the input concept (skip if already has multiplicity)
+        if parse_result.multiplicity is None:
+            new_input_concept = format_concept_with_multiplicity(
+                concept_code_or_string=parse_result.concept_ref_or_code,
+                multiplicity=True,
+            )
+            pipe_spec.inputs[input_variable] = new_input_concept
+            any_fix_applied = True
+            log.info(
+                f"🔧 Fixed input multiplicity in '{compose_pipe_code}': "
+                f"input '{input_variable}' changed from '{old_input_concept}' → '{new_input_concept}'"
+            )
+
+        # Fix 2: Update the output concept's structure field to LIST type
+        concept_fixed = self._fix_concept_field_to_list(
+            pipelex_bundle_spec=pipelex_bundle_spec,
+            concept_code=output_concept_code,
+            field_name=field_name,
+            item_concept_ref=parse_result.concept_ref_or_code,
+        )
+        if concept_fixed:
+            any_fix_applied = True
+            log.info(f"🔧 Fixed concept field '{output_concept_code}.{field_name}' changed to list[concept[{parse_result.concept_ref_or_code}]]")
+
+        return any_fix_applied
+
+    def _find_input_for_construct_field(
+        self,
+        pipe_spec: PipeComposeSpec,
+        field_name: str,
+    ) -> str | None:
+        """Find the input variable that maps to a construct field.
+
+        Examines the construct_spec to find which input variable is used
+        for a given field, looking for {"from": "variable_name"} patterns.
+
+        Args:
+            pipe_spec: The PipeComposeSpec to examine
+            field_name: The field name to look up
+
+        Returns:
+            The input variable name, or None if not found
+        """
+        if not pipe_spec.construct_spec:
+            return None
+
+        field_spec = pipe_spec.construct_spec.get(field_name)
+        if not field_spec:
+            return None
+
+        # Check if it's a {"from": "variable_name"} pattern
+        if isinstance(field_spec, dict):
+            from_dict = cast("dict[str, str]", field_spec)
+            from_value = from_dict.get("from")
+            if isinstance(from_value, str):
+                # Handle dotted paths like "deal.customer" -> "deal"
+                return get_root_from_dotted_path(from_value)
+
+        return None
+
+    def _fix_concept_field_to_list(
+        self,
+        pipelex_bundle_spec: PipelexBundleSpec,
+        concept_code: str,
+        field_name: str,
+        item_concept_ref: str,
+    ) -> bool:
+        """Fix a concept's structure field type from scalar to list[concept[X]].
+
+        Args:
+            pipelex_bundle_spec: The bundle spec containing concepts
+            concept_code: The concept code whose structure field to modify
+            field_name: The field name within the concept's structure
+            item_concept_ref: The concept reference for list items
+
+        Returns:
+            True if the fix was applied, False otherwise
+        """
+        if not pipelex_bundle_spec.concept:
+            return False
+
+        concept_spec = pipelex_bundle_spec.concept.get(concept_code)
+        if not isinstance(concept_spec, ConceptSpec):
+            return False
+
+        if not concept_spec.structure:
+            return False
+
+        field_spec = concept_spec.structure.get(field_name)
+        if not field_spec:
+            return False
+
+        # Skip if the field is already correctly typed as LIST with the right item_concept_ref
+        if (
+            field_spec.type == ConceptStructureSpecFieldType.LIST
+            and field_spec.item_type == "concept"
+            and field_spec.item_concept_ref == item_concept_ref
+        ):
+            return False
+
+        # Update the field to LIST type and clear fields that are invalid for LIST
+        field_spec.type = ConceptStructureSpecFieldType.LIST
+        field_spec.item_type = "concept"
+        field_spec.item_concept_ref = item_concept_ref
+        field_spec.default_value = None
+        field_spec.concept_ref = None
+        field_spec.choices = None
+
+        return True

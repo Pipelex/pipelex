@@ -56,6 +56,18 @@ retrieval = {
 }
 ```
 
+### Reasoning Presets
+
+LLM Settings support `reasoning_effort` and `reasoning_budget` parameters for enabling extended reasoning (chain-of-thought / thinking). Here are the built-in reasoning presets:
+
+```toml
+[llm.presets]
+deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
+quick-reasoning = { model = "@default-premium", temperature = 0.3, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
+```
+
+`reasoning_effort` accepts values from `"none"` to `"max"`. For an explicit token budget, use `reasoning_budget` instead (mutually exclusive with `reasoning_effort`). For provider-specific behavior and model examples, see [Reasoning Controls](../../under-the-hood/reasoning-controls.md).
+
 ### Using LLM Settings in Pipelines
 
 Here's how to use these configurations in your pipelines:
