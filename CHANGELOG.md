@@ -19,6 +19,9 @@
  - **PipeExtract Operator Validation**: Added strict input validation that raises configuration errors for incompatible input types or when document-specific parameters are used with image inputs.
  - **PipeCondition Output Auto-Fix in Builder Loop**: The pipe builder now automatically fixes `PipeCondition` output concept errors during validation. If all mapped pipes have the same output, the `PipeCondition` output is set to that concept; otherwise it's set to `native.Anything`.
  - **PipeFunc Return Type Validation**: Added validation to ensure that a `PipeFunc` function's return type matches the output concept's structure class.
+ - **Content Filenames:** Added `filename` field to `ImageContent` and `DocumentContent`, with auto-population from local file paths via new `extract_filename_from_uri` helper.
+ - **Batch Validation Error Type:** Introduced `PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION` for naming conflicts in batch operations.
+ - **Documentation:** Added naming convention rules to `builder.plx` and `pipe_design.plx` (batch input lists should be plural, item names singular).
 
 ### Changed
  - **Model Deck Updates**: Default premium model now `claude-4.6-opus`; added Mistral models (`mistral-small-3.2`, `mistral-large`, `magistral` series) and `gpt-5` placeholders.
@@ -35,6 +38,7 @@
  - Change the output validation of `PipeCondition`: If all mapped pipes have the same output concept, `PipeCondition`'s output MUST be that same concept. If mapped pipes have different output concepts, `PipeCondition`'s output MUST be the native concept `Anything`.
  - **CLI**: Changed `pipelex validate all` to `pipelex validate --all` (or `-a`).
  - **StructuredContent.rendered_html()**: Now recursively calls `rendered_html()` on nested `StuffContent` fields instead of using json2html conversion. Also skips `None` values and uses HTML table format.
+ - **Batch Pipe Validation:** Enforced stricter naming rules for batch specs—`input_item_name` must differ from `input_list_name` and not shadow existing input keys, with clearer error messages suggesting plural/singular conventions.
 
 ### Fixed
  - **Helpful Error for `get_stuff_as(ListContent[T])`**: When users incorrectly call `get_stuff_as("name", ListContent[Something])` instead of `get_stuff_as_list("name", Something)`, the error message now explicitly suggests using `get_stuff_as_list()`.
