@@ -30,6 +30,7 @@ class PipeBatchBlueprint(PipeBlueprint):
         if not self.input_item_name:
             msg = "Empty input item name is not allowed"
             raise ValueError(msg)
+        # Specialization: catch the most common mistake (item name == list name) with a targeted message
         if self.input_item_name == self.input_list_name:
             msg = (
                 f"Input item name '{self.input_item_name}' must not be the same as "
@@ -41,6 +42,8 @@ class PipeBatchBlueprint(PipeBlueprint):
                 message=msg,
                 error_type=PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION,
             )
+        # General guard: item name must not collide with any other input key either
+        # (e.g. a batch pipe with inputs {"items": "Item[]", "context": "Text"} must not use "context" as item name)
         if self.input_item_name in self.inputs:
             msg = (
                 f"Input item name '{self.input_item_name}' must not be the same as any key in inputs: "
