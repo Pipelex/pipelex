@@ -273,9 +273,19 @@ class PipeAbstract(ABC, BaseModel):
         # Skipped in dry-run mode because inputs are mock-generated with fake URLs.
         if not pipe_run_params.run_mode.is_dry:
             for named_stuff_spec in self.needed_inputs().named_stuff_specs:
-                stuff = working_memory.get_optional_stuff(named_stuff_spec.variable_name)
+                variable_name = named_stuff_spec.variable_name
+                stuff = working_memory.get_optional_stuff(variable_name)
                 if stuff is not None:
-                    stuff.content.validate_resources()
+                    try:
+                        stuff.content.validate_resources()
+                    except ValueError as exc:
+                        msg = f"Input '{variable_name}' of pipe '{self.code}' references an invalid resource: {exc}"
+                        raise PipeRunInputsError(
+                            message=msg,
+                            run_mode=pipe_run_params.run_mode,
+                            pipe_code=self.code,
+                            variable_name=variable_name,
+                        ) from exc
 
         # Specific pipe validation function
         await self._validate_before_run(
