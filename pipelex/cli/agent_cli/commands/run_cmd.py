@@ -117,9 +117,9 @@ async def _run_pipeline_core(
         # Determine output directory from bundle path or current directory
         output_dir: Path
         if bundle_uri:
-            output_dir = Path(bundle_uri).parent / "pipelex-wip"
+            output_dir = Path(bundle_uri).parent / "graph"
         else:
-            output_dir = Path("pipelex-wip")
+            output_dir = Path("pipelex-wip") / "graph"
 
         saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
         result["graph_files"] = {key: str(path) for key, path in saved_files.items()}
