@@ -118,6 +118,10 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
             step_inline = tomlkit.inline_table()
             step_inline.append("pipe", step.pipe_code)
             step_inline.append("result", step.result)
+            if step.batch_over is not None:
+                step_inline.append("batch_over", step.batch_over)
+            if step.batch_as is not None:
+                step_inline.append("batch_as", step.batch_as)
             steps_array.append(step_inline)
         pipe_table.add("steps", steps_array)
 
