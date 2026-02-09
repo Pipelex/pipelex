@@ -1,6 +1,7 @@
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.urls import URLs
 from tests.unit.pipelex.core.stuffs.text_and_images_content.test_data import TestData
 
 
@@ -19,8 +20,8 @@ class TestTextAndImagesContentSmartDump:
         # Create fresh instances to avoid test data mutation issues
         text = TextContent(text="Hello World")
         images = [
-            ImageContent(url="https://example.com/image1.png"),
-            ImageContent(url="https://example.com/image2.png"),
+            ImageContent(url=URLs.png_example),
+            ImageContent(url=URLs.png_example),
         ]
         content = TextAndImagesContent(text=text, images=images)
         result = content.smart_dump()

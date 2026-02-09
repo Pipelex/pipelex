@@ -6,6 +6,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.misc.pretty import pretty_print
+from pipelex.urls import URLs
 
 
 def remove_ansi_escape_codes(text: str) -> str:
@@ -33,8 +34,8 @@ class TestTextAndImagesContentRendering:
         content = TextAndImagesContent(
             text=TextContent(text="Document content"),
             images=[
-                ImageContent(url="https://example.com/image1.png"),
-                ImageContent(url="https://example.com/image2.png", caption="Second image"),
+                ImageContent(url=URLs.png_example),
+                ImageContent(url=URLs.png_example, caption="Second image"),
             ],
         )
         pretty_print(content.rendered_pretty())
@@ -52,14 +53,14 @@ class TestTextAndImagesContentRendering:
         """Test rendering images without text."""
         content = TextAndImagesContent(
             text=None,
-            images=[ImageContent(url="https://example.com/photo.jpg")],
+            images=[ImageContent(url=URLs.jpg_example_1)],
         )
         pretty_print(content.rendered_pretty())
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
 
-        assert "photo.jpg" in output
+        assert URLs.jpg_example_1 in output
 
     def test_empty_text_and_images(self, capsys: CaptureFixture[str]):
         """Test rendering empty text and images."""

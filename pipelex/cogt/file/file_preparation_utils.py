@@ -37,12 +37,12 @@ async def prepare_file_from_uri(
 
     Example:
         >>> # Convert HTTP URL to base64
-        >>> prepared = await prepare_file_from_uri("https://example.com/file.pdf")
+        >>> prepared = await prepare_file_from_uri("https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/Job-Offer-Scan.pdf")
         >>> isinstance(prepared, PreparedFileBase64)
         True
 
         >>> # Keep HTTP URL as-is
-        >>> prepared = await prepare_file_from_uri("https://example.com/file.pdf", keep_http_url=True)
+        >>> prepared = await prepare_file_from_uri("https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/Job-Offer-Scan.pdf", keep_http_url=True)
         >>> isinstance(prepared, PreparedFileHttpUrl)
         True
 

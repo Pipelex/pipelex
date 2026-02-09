@@ -2,6 +2,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.urls import URLs
 from tests.unit.pipelex.core.stuffs.page_content.test_data import TestData
 
 
@@ -25,7 +26,7 @@ class TestPageContentSmartDump:
             text=TextContent(text="Page content text"),
             images=None,
         )
-        page_view = ImageContent(url="https://example.com/page-view.png")
+        page_view = ImageContent(url=URLs.png_example)
         content = PageContent(text_and_images=text_and_images, page_view=page_view)
         result = content.smart_dump()
         assert result == TestData.EXPECTED_SMART_DUMP_FULL

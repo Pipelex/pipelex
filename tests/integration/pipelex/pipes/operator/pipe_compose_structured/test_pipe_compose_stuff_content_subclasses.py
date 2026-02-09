@@ -35,6 +35,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.urls import URLs
 from tests.integration.pipelex.pipes.operator.pipe_compose_structured.test_data import StuffContentSubclassTestData
 
 
@@ -59,7 +60,7 @@ class TestPipeComposeStuffContentSubclasses:
         load_test_library(test_library_path)
 
         cover_image = ImageContent(
-            url="https://example.com/images/cover.jpg",
+            url=URLs.jpg_example_1,
             caption="Cover photo",
             mime_type="image/jpeg",
         )
@@ -102,7 +103,7 @@ class TestPipeComposeStuffContentSubclasses:
         gallery = main_stuff.content
         assert gallery.gallery_name == "Simple Gallery"  # type: ignore[attr-defined]
         assert isinstance(gallery.cover_image, ImageContent)  # type: ignore[attr-defined]
-        assert gallery.cover_image.url == "https://example.com/images/cover.jpg"  # type: ignore[attr-defined]
+        assert gallery.cover_image.url == URLs.jpg_example_1  # type: ignore[attr-defined]
         assert gallery.cover_image.caption == "Cover photo"  # type: ignore[attr-defined]
 
     async def test_compose_image_content_multiple(
@@ -116,11 +117,11 @@ class TestPipeComposeStuffContentSubclasses:
         load_test_library(test_library_path)
 
         cover_image = ImageContent(
-            url="https://example.com/images/cover.jpg",
+            url=URLs.jpg_example_1,
             caption="Cover photo",
         )
         featured_image = ImageContent(
-            url="https://example.com/images/featured.png",
+            url=URLs.png_example,
             caption="Featured image",
             source_prompt="A beautiful landscape",
         )
@@ -171,8 +172,8 @@ class TestPipeComposeStuffContentSubclasses:
 
         gallery = main_stuff.content
         assert gallery.gallery_name == "Nature Gallery"  # type: ignore[attr-defined]
-        assert gallery.cover_image.url == "https://example.com/images/cover.jpg"  # type: ignore[attr-defined]
-        assert gallery.featured_image.url == "https://example.com/images/featured.png"  # type: ignore[attr-defined]
+        assert gallery.cover_image.url == URLs.jpg_example_1  # type: ignore[attr-defined]
+        assert gallery.featured_image.url == URLs.png_example  # type: ignore[attr-defined]
         assert gallery.featured_image.source_prompt == "A beautiful landscape"  # type: ignore[attr-defined]
 
         pretty_print(gallery, title="ImageGallery - Multiple ImageContent")
@@ -187,8 +188,8 @@ class TestPipeComposeStuffContentSubclasses:
         """Test composing a StructuredContent with DocumentContent fields."""
         load_test_library(test_library_path)
 
-        main_pdf = DocumentContent(url="https://example.com/docs/contract.pdf")
-        supplement_pdf = DocumentContent(url="https://example.com/docs/appendix.pdf")
+        main_pdf = DocumentContent(url=URLs.pdf_example_1)
+        supplement_pdf = DocumentContent(url=URLs.pdf_example_2)
 
         working_memory = WorkingMemory()
         working_memory.add_new_stuff(
@@ -237,8 +238,8 @@ class TestPipeComposeStuffContentSubclasses:
         archive = main_stuff.content
         assert archive.archive_name == "Legal Documents Archive"  # type: ignore[attr-defined]
         assert isinstance(archive.main_document, DocumentContent)  # type: ignore[attr-defined]
-        assert archive.main_document.url == "https://example.com/docs/contract.pdf"  # type: ignore[attr-defined]
-        assert archive.supplementary_doc.url == "https://example.com/docs/appendix.pdf"  # type: ignore[attr-defined]
+        assert archive.main_document.url == URLs.pdf_example_1  # type: ignore[attr-defined]
+        assert archive.supplementary_doc.url == URLs.pdf_example_2  # type: ignore[attr-defined]
 
         pretty_print(archive, title="DocumentArchive - DocumentContent")
 
@@ -496,8 +497,8 @@ class TestPipeComposeStuffContentSubclasses:
         """Test composing a StructuredContent with multiple different StuffContent types."""
         load_test_library(test_library_path)
 
-        cover_image = ImageContent(url="https://example.com/cover.jpg", caption="Report Cover")
-        main_pdf = DocumentContent(url="https://example.com/report.pdf")
+        cover_image = ImageContent(url=URLs.jpg_example_1, caption="Report Cover")
+        main_pdf = DocumentContent(url=URLs.pdf_example_1)
         view_count = NumberContent(number=1500)
 
         working_memory = WorkingMemory()
@@ -557,8 +558,8 @@ class TestPipeComposeStuffContentSubclasses:
         assert isinstance(report.cover_image, ImageContent)  # type: ignore[attr-defined]
         assert isinstance(report.document, DocumentContent)  # type: ignore[attr-defined]
         assert isinstance(report.view_count, NumberContent)  # type: ignore[attr-defined]
-        assert report.cover_image.url == "https://example.com/cover.jpg"  # type: ignore[attr-defined]
-        assert report.document.url == "https://example.com/report.pdf"  # type: ignore[attr-defined]
+        assert report.cover_image.url == URLs.jpg_example_1  # type: ignore[attr-defined]
+        assert report.document.url == URLs.pdf_example_1  # type: ignore[attr-defined]
         assert report.view_count.number == 1500  # type: ignore[attr-defined]
 
         pretty_print(report, title="MixedMediaReport - Multiple StuffContent types")
@@ -575,9 +576,9 @@ class TestPipeComposeStuffContentSubclasses:
 
         image_list = ListContent[ImageContent](
             items=[
-                ImageContent(url="https://example.com/img1.jpg", caption="Image 1"),
-                ImageContent(url="https://example.com/img2.jpg", caption="Image 2"),
-                ImageContent(url="https://example.com/img3.jpg", caption="Image 3"),
+                ImageContent(url=URLs.jpg_example_1, caption="Image 1"),
+                ImageContent(url=URLs.jpg_example_2, caption="Image 2"),
+                ImageContent(url=URLs.jpg_example_3, caption="Image 3"),
             ]
         )
 
@@ -621,7 +622,7 @@ class TestPipeComposeStuffContentSubclasses:
         assert gallery.gallery_name == "Photo Collection"  # type: ignore[attr-defined]
         assert isinstance(gallery.images, list)  # type: ignore[attr-defined]
         assert len(gallery.images) == 3  # type: ignore[attr-defined]
-        assert gallery.images[0].url == "https://example.com/img1.jpg"  # type: ignore[attr-defined]
+        assert gallery.images[0].url == URLs.jpg_example_1  # type: ignore[attr-defined]
         assert gallery.images[1].caption == "Image 2"  # type: ignore[attr-defined]
 
         pretty_print(gallery, title="ImageListGallery - List of ImageContent")
@@ -638,8 +639,8 @@ class TestPipeComposeStuffContentSubclasses:
 
         pdf_list = ListContent[DocumentContent](
             items=[
-                DocumentContent(url="https://example.com/doc1.pdf"),
-                DocumentContent(url="https://example.com/doc2.pdf"),
+                DocumentContent(url=URLs.pdf_example_1),
+                DocumentContent(url=URLs.pdf_example_2),
             ]
         )
 
@@ -683,6 +684,6 @@ class TestPipeComposeStuffContentSubclasses:
         assert bundle.bundle_name == "Contract Bundle"  # type: ignore[attr-defined]
         assert isinstance(bundle.documents, list)  # type: ignore[attr-defined]
         assert len(bundle.documents) == 2  # type: ignore[attr-defined]
-        assert bundle.documents[0].url == "https://example.com/doc1.pdf"  # type: ignore[attr-defined]
+        assert bundle.documents[0].url == URLs.pdf_example_1  # type: ignore[attr-defined]
 
         pretty_print(bundle, title="DocumentBundle - List of DocumentContent")

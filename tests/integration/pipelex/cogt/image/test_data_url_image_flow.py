@@ -18,6 +18,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
 from pipelex.tools.uri.prepared_file import PreparedFileBase64
+from pipelex.urls import URLs
 from tests.cases import ImageTestCases
 
 
@@ -183,7 +184,7 @@ class TestDataUrlImageFlow:
         mocker.patch("pipelex.pipeline.input_normalizer.get_storage_provider", return_value=provider)
 
         # Create ImageContent with HTTP URL
-        http_url = "https://example.com/image.png"
+        http_url = URLs.png_example
         image_content = ImageContent(url=http_url)
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),

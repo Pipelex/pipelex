@@ -16,6 +16,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.urls import URLs
 
 
 class MySubClass(StructuredContent):
@@ -692,13 +693,13 @@ class RenderedHtmlTestData:
     HTML_CSS_CLASS = 'report-content x" onclick="alert(1)'
     HTML_EXPECTED = f'<div class="{escape(HTML_CSS_CLASS)!s}">{HTML_INNER_HTML}</div>'
 
-    IMAGE_URL = 'https://example.com/image.png?x=1&y="2"'
+    IMAGE_URL = URLs.png_example
     IMAGE_EXPECTED = f'<img src="{escape(IMAGE_URL)!s}" class="msg-img">'
 
     MERMAID_CODE = 'graph TD; A-- "<b>&</b>" -->B'
     MERMAID_EXPECTED = f'<div class="mermaid">{escape(MERMAID_CODE)!s}</div>'
 
-    DOCUMENT_URL = "https://example.com/doc.pdf?x=1&y=2"
+    DOCUMENT_URL = URLs.pdf_example_1
     DOCUMENT_EXPECTED = f'<a href="{escape(DOCUMENT_URL)!s}" class="msg-document">{escape(DOCUMENT_URL)!s}</a>'
 
     RENDERED_HTML_TEST_CASES: ClassVar[list[tuple[StuffContent, str]]] = [
@@ -716,7 +717,7 @@ class RenderedHtmlTestData:
         (
             MermaidContent(
                 mermaid_code=MERMAID_CODE,
-                mermaid_url="https://example.com/diagram.svg",
+                mermaid_url=URLs.svg_example,
             ),
             MERMAID_EXPECTED,
         ),
@@ -751,8 +752,8 @@ class StuffViewerTestData:
         inner_html="<p>Test paragraph</p>",
         css_class="test-class",
     )
-    IMAGE_CONTENT: ClassVar[ImageContent] = ImageContent(url="https://example.com/image.png", mime_type="image/png")
-    PDF_CONTENT: ClassVar[DocumentContent] = DocumentContent(url="https://example.com/doc.pdf")
+    IMAGE_CONTENT: ClassVar[ImageContent] = ImageContent(url=URLs.png_example, mime_type="image/png")
+    PDF_CONTENT: ClassVar[DocumentContent] = DocumentContent(url=URLs.pdf_example_1)
     MERMAID_CONTENT: ClassVar[MermaidContent] = MermaidContent(
         mermaid_code="graph TD; A-->B",
         mermaid_url="https://mermaid.live/view#abc",

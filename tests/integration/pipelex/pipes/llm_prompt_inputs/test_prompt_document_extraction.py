@@ -15,6 +15,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_native_concept
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.urls import URLs
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -41,7 +42,7 @@ class TestPromptDocumentExtraction:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.DOCUMENT),
-                content=DocumentContent(url="https://example.com/doc.pdf"),
+                content=DocumentContent(url=URLs.pdf_example_1),
                 name="document",
             ),
         )
@@ -73,9 +74,9 @@ class TestPromptDocumentExtraction:
 
         doc_list = ListContent[DocumentContent](
             items=[
-                DocumentContent(url="https://example.com/doc1.pdf"),
-                DocumentContent(url="https://example.com/doc2.pdf"),
-                DocumentContent(url="https://example.com/doc3.pdf"),
+                DocumentContent(url=URLs.pdf_example_1),
+                DocumentContent(url=URLs.pdf_example_2),
+                DocumentContent(url=URLs.pdf_example_3),
             ]
         )
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
@@ -115,12 +116,12 @@ class TestPromptDocumentExtraction:
             stuff_list=[
                 StuffFactory.make_stuff(
                     concept=get_native_concept(NativeConceptCode.DOCUMENT),
-                    content=DocumentContent(url="https://example.com/doc.pdf"),
+                    content=DocumentContent(url=URLs.pdf_example_1),
                     name="doc",
                 ),
                 StuffFactory.make_stuff(
                     concept=get_native_concept(NativeConceptCode.IMAGE),
-                    content=ImageContent(url="https://example.com/image.png"),
+                    content=ImageContent(url=URLs.png_example),
                     name="image",
                 ),
             ],
@@ -162,7 +163,7 @@ class TestPromptDocumentExtraction:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.DOCUMENT),
-                content=DocumentContent(url="https://example.com/doc.pdf"),
+                content=DocumentContent(url=URLs.pdf_example_1),
                 name="document",
             ),
         )

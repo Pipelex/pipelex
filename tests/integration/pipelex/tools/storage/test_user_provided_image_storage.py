@@ -21,6 +21,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 from pipelex.tools.uri.prepared_file import PreparedFileBase64
+from pipelex.urls import URLs
 from tests.cases import ImageTestCases
 
 
@@ -104,7 +105,7 @@ class TestUserProvidedImageStorage:
         fetched and stored. They should be passed through unchanged.
         """
         # Create ImageContent with HTTP URL
-        http_url = "https://example.com/test_image.png"
+        http_url = URLs.png_example
         image_content = ImageContent(url=http_url)
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
