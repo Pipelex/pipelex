@@ -1,12 +1,12 @@
 """Helpers for structured JSON output in agent CLI commands."""
 
-import json
 import sys
 from typing import Any, NoReturn
 
 import typer
 
 from pipelex.pipeline.validate_bundle import ValidateBundleError
+from pipelex.tools.misc.json_utils import clean_json_dumps
 
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
@@ -114,7 +114,7 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     if domain:
         error_json["error_domain"] = domain
     error_json.update(extra)
-    print(json.dumps(error_json, indent=2), file=sys.stderr)
+    print(clean_json_dumps(error_json, indent=2), file=sys.stderr)
     raise typer.Exit(1) from cause
 
 
@@ -124,7 +124,7 @@ def agent_success(result: dict[str, Any]) -> None:
     Args:
         result: Dictionary to serialize as JSON.
     """
-    print(json.dumps(result, indent=2))
+    print(clean_json_dumps(result, indent=2))
 
 
 def extract_validation_errors(exc: ValidateBundleError) -> list[dict[str, Any]]:

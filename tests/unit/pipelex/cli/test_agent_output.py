@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime
 import json
 
 import pytest
@@ -136,6 +137,65 @@ class TestAgentOutput:
         # Check blueprint entry has variable_names
         blueprint_entry = next(entry for entry in result if entry["category"] == "blueprint_validation")
         assert blueprint_entry["variable_names"] == ["x"]
+
+    # -------------------------------------------------------------------------
+    # Datetime serialization tests (regression for "Object of type datetime is
+    # not JSON serializable" bug in dry-run output)
+    # -------------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        ("label", "value", "expected_iso"),
+        [
+            ("date", datetime.date(2026, 1, 15), "2026-01-15"),
+            ("datetime", datetime.datetime(2026, 1, 15, 10, 30, 0), "2026-01-15T10:30:00"),
+            ("time", datetime.time(10, 30, 0), "10:30:00"),
+        ],
+    )
+    def test_agent_success_handles_datetime_types(
+        self,
+        capsys: pytest.CaptureFixture[str],
+        label: str,
+        value: datetime.date | datetime.datetime | datetime.time,
+        expected_iso: str,
+    ) -> None:
+        """agent_success must serialize datetime/date/time values without raising."""
+        agent_success({"success": True, "field": value})
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["success"] is True
+        assert parsed["field"] == expected_iso, f"Expected ISO format for {label}"
+
+    def test_agent_success_handles_nested_datetime(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_success must handle datetime objects nested in dicts and lists."""
+        result = {
+            "success": True,
+            "working_memory": {
+                "report_data": {
+                    "report_date": datetime.date(2026, 3, 1),
+                    "items": [
+                        {"timestamp": datetime.datetime(2026, 3, 1, 9, 0, 0)},
+                    ],
+                },
+            },
+        }
+        agent_success(result)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert parsed["working_memory"]["report_data"]["report_date"] == "2026-03-01"
+        assert parsed["working_memory"]["report_data"]["items"][0]["timestamp"] == "2026-03-01T09:00:00"
+
+    def test_agent_error_handles_datetime_in_extras(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error must serialize datetime values passed via **extra kwargs."""
+        with pytest.raises(typer.Exit):
+            agent_error(
+                "pipeline failed",
+                "PipelineExecutionError",
+                failed_at=datetime.datetime(2026, 2, 9, 14, 0, 0),
+            )
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error"] is True
+        assert parsed["failed_at"] == "2026-02-09T14:00:00"
 
     def test_extract_validation_errors_empty(self) -> None:
         """extract_validation_errors should return empty list when no errors."""

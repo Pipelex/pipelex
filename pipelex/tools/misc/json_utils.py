@@ -1,5 +1,9 @@
+import datetime
 import json
 from collections.abc import Mapping
+from decimal import Decimal
+from enum import Enum
+from pathlib import Path
 from typing import Any, Union, cast
 
 from kajson import kajson
@@ -18,6 +22,71 @@ class ArgumentTypeError(ToolError):
 
 class JsonTypeError(ToolError):
     pass
+
+
+CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__")
+
+
+def clean_json_content(content: Any) -> Any:
+    """Recursively clean content for standard JSON serialization.
+
+    Removes kajson metadata fields (``__class__``, ``__module__``) and converts
+    non-JSON-native types to their JSON-safe equivalents:
+
+    - ``datetime.datetime`` / ``datetime.date`` / ``datetime.time`` -> ISO-format string
+    - ``Enum`` -> its ``.value``
+    - ``Decimal`` -> ``float``
+    - ``Path`` -> ``str``
+
+    Args:
+        content: The data structure to clean (dict, list, or scalar value).
+
+    Returns:
+        A cleaned copy of *content* that ``json.dumps`` can serialize directly.
+    """
+    if isinstance(content, dict):
+        cleaned: dict[str, Any] = {}
+        content_dict = cast("dict[str, Any]", content)
+        for key in content_dict:
+            if key in CLEAN_JSON_FIELDS_TO_SKIP:
+                continue
+            cleaned[key] = clean_json_content(content_dict[key])
+        return cleaned
+    elif isinstance(content, list):
+        content_list = cast("list[Any]", content)
+        return [clean_json_content(item) for item in content_list]
+    elif isinstance(content, (datetime.datetime, datetime.date, datetime.time)):
+        return content.isoformat()
+    elif isinstance(content, Enum):
+        return content.value
+    elif isinstance(content, Decimal):
+        return float(content)
+    elif isinstance(content, Path):
+        return str(content)
+    else:
+        return content
+
+
+# TODO: make this more powerful using kajson
+def clean_json_dumps(data: Any, indent: int | None = None) -> str:
+    """Serialize data to a JSON string, producing clean output without metadata.
+
+    Unlike kajson.dumps (which adds ``__class__``/``__module__`` metadata for
+    round-tripping), this function produces standard JSON suitable for external
+    consumers such as the agent CLI.
+
+    The data is first recursively cleaned via :func:`clean_json_content`
+    (datetime -> ISO string, Enum -> value, Decimal -> float, Path -> str,
+    kajson metadata removed) and then serialized with ``json.dumps``.
+
+    Args:
+        data: The data to serialize (dict, list, or any JSON-compatible structure).
+        indent: Number of spaces for indentation. Defaults to None (compact).
+
+    Returns:
+        A JSON string.
+    """
+    return json.dumps(clean_json_content(data), indent=indent)
 
 
 def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False) -> str:

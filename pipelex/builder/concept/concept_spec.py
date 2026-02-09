@@ -90,6 +90,14 @@ class ConceptStructureSpec(StructuredContent):
         json_schema_extra={"mock_format": MockFormat.CONCEPT_REF},
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def default_type_for_choices(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Default type to TEXT when choices is present but type is omitted."""
+        if values.get("choices") and not values.get("type"):
+            values["type"] = "text"
+        return values
+
     @field_validator("type", mode="before")
     @classmethod
     def validate_type(cls, type_value: str) -> ConceptStructureSpecFieldType:
@@ -142,6 +150,20 @@ class ConceptStructureSpec(StructuredContent):
         if self.item_concept_ref and self.type != ConceptStructureSpecFieldType.LIST:
             msg = f"'item_concept_ref' can only be set when type is 'list'. Actual type: {self.type}"
             raise ValueError(msg)
+
+        # Validate choices is only compatible with text, integer, and number types
+        if self.choices:
+            match self.type:
+                case ConceptStructureSpecFieldType.TEXT | ConceptStructureSpecFieldType.INTEGER | ConceptStructureSpecFieldType.NUMBER:
+                    pass
+                case (
+                    ConceptStructureSpecFieldType.BOOLEAN
+                    | ConceptStructureSpecFieldType.DATE
+                    | ConceptStructureSpecFieldType.CONCEPT
+                    | ConceptStructureSpecFieldType.LIST
+                ):
+                    msg = f"'choices' cannot be used with type '{self.type}'. Only text, integer, and number types support choices."
+                    raise ValueError(msg)
 
         # Check default_value type is the same as type
         if self.default_value is not None:
