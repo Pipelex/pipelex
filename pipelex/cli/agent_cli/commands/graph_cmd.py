@@ -1,19 +1,24 @@
-"""Agent CLI graph command - render graphspec.json to HTML visualizations with JSON output."""
+"""Agent CLI graph command - generate graph HTML from a .plx bundle via dry-run."""
 
 import asyncio
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.config import get_config
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.helpers import is_pipelex_file
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
-from pipelex.graph.graphspec import GraphSpec
+from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
-from pipelex.tools.misc.file_utils import load_text_from_path
-from pipelex.tools.misc.string_utils import snake_to_title_case
+from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.types import StrEnum
 
 
@@ -26,69 +31,81 @@ class GraphFormat(StrEnum):
 
 
 def graph_cmd(
-    graphspec_file: Annotated[
+    target: Annotated[
         str,
-        typer.Argument(help="Path to a graphspec.json file"),
+        typer.Argument(help="Path to a .plx bundle file"),
     ],
-    out: Annotated[
-        str | None,
-        typer.Option("--out", "-o", help="Output directory (default: same directory as input file)"),
-    ] = None,
     graph_format: Annotated[
         GraphFormat,
         typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
-    ] = GraphFormat.BOTH,
+    ] = GraphFormat.REACTFLOW,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+    ] = None,
 ) -> None:
-    """Render a graphspec.json file to HTML visualizations.
+    """Generate graph visualization from a .plx bundle.
+
+    Performs a dry-run of the pipeline with mock inputs to produce the execution
+    graph, then renders it as HTML.
 
     Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
 
     Examples:
-        pipelex-agent graph graphspec.json
-        pipelex-agent graph graphspec.json --format mermaidflow
-        pipelex-agent graph graphspec.json -o ./output/ --format reactflow
+        pipelex-agent graph bundle.plx
+        pipelex-agent graph bundle.plx --format mermaidflow
+        pipelex-agent graph bundle.plx -L ./my_pipes/
     """
-    input_path = Path(graphspec_file)
+    input_path = Path(target)
 
     if not input_path.exists():
-        agent_error(f"File not found: {graphspec_file}", "FileNotFoundError")
+        agent_error(f"File not found: {target}", "FileNotFoundError")
 
-    if input_path.suffix != ".json":
-        agent_error(f"Expected .json file, got: {input_path.name}", "ArgumentError")
+    if not is_pipelex_file(input_path):
+        agent_error(f"Expected a .plx bundle file, got: {input_path.name}", "ArgumentError")
 
-    # Load and parse the GraphSpec
+    # Read PLX content and extract main pipe
     try:
-        json_str = load_text_from_path(str(input_path))
-    except Exception as exc:
-        agent_error(f"Failed to read file: {exc}", type(exc).__name__, cause=exc)
+        plx_content = input_path.read_text(encoding="utf-8")
+        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
+        main_pipe_code = bundle_blueprint.main_pipe
+        if not main_pipe_code:
+            agent_error(
+                f"Bundle '{target}' does not declare a main_pipe.",
+                "BundleError",
+            )
+        pipe_code: str = main_pipe_code
+    except (PipelexInterpreterError, PLXDecodeError) as exc:
+        agent_error(f"Failed to parse bundle '{target}': {exc}", type(exc).__name__, cause=exc)
 
-    try:
-        graph_spec = GraphSpec.model_validate_json(json_str)
-    except Exception as exc:
-        agent_error(f"Invalid graphspec JSON: {exc}", "GraphSpecParseError", cause=exc)
-
-    # Determine output directory
-    output_dir: Path
-    if out:
-        output_dir = Path(out)
-    else:
-        output_dir = input_path.parent
-
-    # Initialize Pipelex (needed for config access)
-    make_pipelex_for_agent_cli()
+    # Initialize Pipelex
+    make_pipelex_for_agent_cli(library_dirs=library_dir)
 
     try:
-        base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
-
-        # Enable all content formats (JSON, text, HTML) so the interactive HTML
-        # viewers can display data panels alongside the graph visualization
-        new_data_inclusion = base_graph_config.data_inclusion.model_copy(
-            update={
-                "stuff_json_content": True,
-                "stuff_text_content": True,
-                "stuff_html_content": True,
-            }
+        # Configure execution for dry-run with graph generation
+        execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+            generate_graph=True,
+            mock_inputs=True,
         )
+
+        pipe_output = asyncio.run(
+            execute_pipeline(
+                pipe_code=pipe_code,
+                plx_content=plx_content,
+                bundle_uri=target,
+                pipe_run_mode=PipeRunMode.DRY,
+                execution_config=execution_config,
+                library_dirs=library_dir,
+            )
+        )
+
+        if not pipe_output.graph_spec:
+            agent_error("Pipeline execution did not produce a graph spec", "GraphSpecMissingError")
+
+        graph_spec = pipe_output.graph_spec
+
+        # Build render config with format selection
+        base_graph_config = execution_config.graph_config
 
         include_mermaidflow: bool
         include_reactflow: bool
@@ -103,35 +120,37 @@ def graph_cmd(
                 include_mermaidflow = True
                 include_reactflow = True
 
-        # Only generate the final HTML files requested — skip intermediate formats
-        # (graphspec JSON, Mermaid .mmd source, ReactFlow viewspec JSON) that are
-        # only useful during pipeline execution, not for standalone rendering
-        new_graphs_inclusion = base_graph_config.graphs_inclusion.model_copy(
+        render_graph_config = base_graph_config.model_copy(
             update={
-                "graphspec_json": False,
-                "mermaidflow_mmd": False,
-                "mermaidflow_html": include_mermaidflow,
-                "reactflow_viewspec": False,
-                "reactflow_html": include_reactflow,
-            }
-        )
-
-        graph_config = base_graph_config.model_copy(
-            update={
-                "data_inclusion": new_data_inclusion,
-                "graphs_inclusion": new_graphs_inclusion,
+                "data_inclusion": base_graph_config.data_inclusion.model_copy(
+                    update={
+                        "stuff_json_content": True,
+                        "stuff_text_content": True,
+                        "stuff_html_content": True,
+                    }
+                ),
+                "graphs_inclusion": base_graph_config.graphs_inclusion.model_copy(
+                    update={
+                        "graphspec_json": False,
+                        "mermaidflow_mmd": False,
+                        "mermaidflow_html": include_mermaidflow,
+                        "reactflow_viewspec": False,
+                        "reactflow_html": include_reactflow,
+                    }
+                ),
             }
         )
 
         graph_outputs = asyncio.run(
             generate_graph_outputs(
                 graph_spec=graph_spec,
-                graph_config=graph_config,
-                title=snake_to_title_case(input_path.stem),
+                graph_config=render_graph_config,
+                pipe_code=pipe_code,
             )
         )
 
-        # Save generated files
+        # Save to <bundle_dir>/graph/
+        output_dir = input_path.parent / "graph"
         saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
 
         agent_success(
@@ -139,12 +158,46 @@ def graph_cmd(
                 "success": True,
                 "output_dir": str(output_dir),
                 "files": {key: str(path) for key, path in saved_files.items()},
-                "node_count": len(graph_spec.nodes),
+                "pipe_code": pipe_code,
             }
         )
 
+    except PipelineExecutionError as exc:
+        extra_fields: dict[str, Any] = {
+            "pipe_code": exc.pipe_code,
+            "pipe_stack": exc.pipe_stack,
+        }
+        if exc.__cause__:
+            extra_fields["cause_type"] = type(exc.__cause__).__name__
+            extra_fields["cause_message"] = str(exc.__cause__)
+        agent_error(exc.message, "PipelineExecutionError", cause=exc, **extra_fields)
+
+    except PipeOperatorModelChoiceError as exc:
+        agent_error(
+            exc.message,
+            "PipeOperatorModelChoiceError",
+            cause=exc,
+            pipe_code=exc.pipe_code,
+            model_type=str(exc.model_type),
+            model_choice=str(exc.model_choice),
+        )
+
+    except PipeOperatorModelAvailabilityError as exc:
+        availability_extra: dict[str, Any] = {
+            "pipe_code": exc.pipe_code,
+            "model_handle": exc.model_handle,
+        }
+        if exc.fallback_list:
+            availability_extra["fallback_list"] = exc.fallback_list
+        if exc.pipe_stack:
+            availability_extra["pipe_stack"] = exc.pipe_stack
+        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+
+    except typer.Exit:
+        raise
+
     except Exception as exc:
-        agent_error(f"Failed to render graph: {exc}", type(exc).__name__, cause=exc)
+        agent_error(f"Failed to generate graph: {exc}", type(exc).__name__, cause=exc)
 
     finally:
         Pipelex.teardown_if_needed()
