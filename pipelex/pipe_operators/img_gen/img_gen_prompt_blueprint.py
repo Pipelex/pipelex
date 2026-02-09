@@ -17,8 +17,8 @@ if TYPE_CHECKING:
     from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.img_gen.exceptions import PipeImgGenFactoryError
 from pipelex.pipe_operators.shared.image_reference import ImageReference, ImageReferenceKind
 from pipelex.tools.jinja2.image_registry import ImageRegistry
@@ -127,7 +127,7 @@ class ImgGenPromptBlueprint(BaseModel):
                 # Skip list item references (e.g., "images[1]")
                 if "[" in image_name:
                     continue
-                # Skip dotted paths (e.g., "page.page_view") - handled by tag filter
+                # Skip dotted paths (e.g., "page.page_view") - handled by finalize/filter at render time
                 if "." in image_name:
                     continue
                 # Skip list variable references (handled separately below)
@@ -276,13 +276,16 @@ class ImgGenPromptBlueprint(BaseModel):
         if template_blueprint.extra_context:
             context.update(**template_blueprint.extra_context)
 
-        # Add image registry to context for | with_images filter
+        # Add image registry to context for | with_images and | format filters
         if image_registry is not None:
             context[Jinja2ContextKey.IMAGE_REGISTRY] = image_registry
 
-        return await get_content_generator().make_templated_text(
-            context=context,
+        finalize = image_registry.make_finalize() if image_registry and image_registry.images else None
+
+        return await render_template(
             template=template_blueprint.template,
+            category=template_blueprint.category,
+            context=context,
             templating_style=template_blueprint.templating_style,
-            template_category=template_blueprint.category,
+            finalize=finalize,
         )
