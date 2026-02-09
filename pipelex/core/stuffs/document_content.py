@@ -4,12 +4,14 @@ from typing_extensions import override
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.misc.http_utils import validate_url_resource_exists
 from pipelex.tools.uri.uri_resolver import extract_filename_from_uri, resolve_uri
 from pipelex.types import Self
 
 
 class DocumentContent(StuffContent):
     url: str = Field(..., description="The document URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
+
     public_url: str | None = Field(default=None, description="The public HTTPS URL of the document")
     mime_type: str | None = Field(default=None, description="The MIME type of the document")
     filename: str | None = Field(default=None, description="The original filename of the document")
@@ -20,6 +22,10 @@ class DocumentContent(StuffContent):
         if self.filename is None:
             self.filename = extract_filename_from_uri(self.url)
         return self
+
+    @override
+    def validate_resources(self) -> None:
+        validate_url_resource_exists(self.url)
 
     @property
     @override

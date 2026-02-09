@@ -2,14 +2,15 @@ from typing import Any, ClassVar
 
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.urls import URLs
 
 
 class TestData:
     # Input content
     SAMPLE_TEXT = TextContent(text="Hello World")
     SAMPLE_IMAGES: ClassVar[list[ImageContent]] = [
-        ImageContent(url="https://example.com/image1.png"),
-        ImageContent(url="https://example.com/image2.png"),
+        ImageContent(url=URLs.png_example_1),
+        ImageContent(url=URLs.jpg_example_1),
     ]
 
     # Expected outputs for smart_dump (text only)
@@ -23,7 +24,7 @@ class TestData:
         "text": {"text": "Hello World"},
         "images": [
             {
-                "url": "https://example.com/image1.png",
+                "url": URLs.png_example_1,
                 "public_url": None,
                 "source_prompt": None,
                 "source_negative_prompt": None,
@@ -33,7 +34,7 @@ class TestData:
                 "filename": None,
             },
             {
-                "url": "https://example.com/image2.png",
+                "url": URLs.png_example_2,
                 "public_url": None,
                 "source_prompt": None,
                 "source_negative_prompt": None,

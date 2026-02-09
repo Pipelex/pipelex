@@ -19,6 +19,13 @@
  - **PipeExtract Operator Validation**: Added strict input validation that raises configuration errors for incompatible input types or when document-specific parameters are used with image inputs.
  - **PipeCondition Output Auto-Fix in Builder Loop**: The pipe builder now automatically fixes `PipeCondition` output concept errors during validation. If all mapped pipes have the same output, the `PipeCondition` output is set to that concept; otherwise it's set to `native.Anything`.
  - **PipeFunc Return Type Validation**: Added validation to ensure that a `PipeFunc` function's return type matches the output concept's structure class.
+ - **URL Validation on `ImageContent` and `DocumentContent`**: Both models validate external resources (HTTP/HTTPS URLs via HEAD request, local file paths via existence check) through a `validate_resources()` method called during pipeline execution (`validate_before_run`) rather than at model instantiation. Internal URIs (`data:`, `pipelex-storage://`) skip validation entirely. Validation is skipped in dry-run mode where inputs use mock URLs.
+ - **Literal Type Support in Dry Run Mocks**: `DryRunFactory` now detects `Literal` type annotations (including `Optional[Literal[...]]`) and generates valid mock values by randomly picking from the allowed choices instead of producing invalid random strings.
+ - **Literal Type Support in `pipelex build inputs`/`pipelex build output`**: The concept representation generator now handles `Literal` fields by picking a random value from the allowed choices, and generates mock URL patterns for `url` fields.
+ - **Literal Error Handling in Validation Messages**: Pydantic validation error formatting now recognizes `literal_error` types and displays them as "Invalid choice errors" with the actual value and expected options.
+ - **`PipeRunError` Catching in Bundle Validation**: `validate_bundle` now catches `PipeRunError` during dry run and wraps it in `ValidateBundleError` with a clear message.
+ - **`ValidationError` Catching in Pipeline Execution**: `execute_pipeline` now catches Pydantic `ValidationError` from input construction, formats the errors, and raises a `PipeExecutionError` with a clear message.
+ - **Broader Error Handling in CLI `pipelex run`**: The CLI run command now catches `PipelexError` in addition to `PipelineExecutionError`, providing better error messages for failures that occur outside the pipeline execution itself.
  - **Content Filenames:** Added `filename` field to `ImageContent` and `DocumentContent`, with auto-population from local file paths via new `extract_filename_from_uri` helper.
  - **Batch Validation Error Type:** Introduced `PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION` for naming conflicts in batch operations.
  - **Documentation:** Added naming convention rules to `builder.plx` and `pipe_design.plx` (batch input lists should be plural, item names singular).
@@ -50,6 +57,7 @@
  - Fixed the Pipelex CLI for generating structures, inputs, runner files.
  - Fixed `@pipe_func` decorated functions showing "function not found" instead of explaining why the function is ineligible (e.g., missing return type annotation).
  - Fixed PipeLLM with list output (e.g., `output = "Item[]"`) not producing `ListContent` when run inside a nested PipeSequence with `batch_over`.
+ - **Duplicate Pipe Error Message**: When a pipe code is declared in multiple `.plx` files (or twice in the same file), the error message now shows which bundle file(s) contain the conflicting declarations instead of a misleading message about "running the same pipe twice in the same pipeline".
  - Fixed `pipelex build runner` and `pipelex build inputs` generating string placeholders (e.g., `"number_int | float"`) instead of numeric values for Number concepts with `int | float` union type fields.
  - Fixed structure generation failing with `PydanticUserError` when a concept structure references native concepts (e.g., `native.Html`). The generator now properly resolves native concept refs to their content classes (e.g., `HtmlContent`) with correct imports.
 

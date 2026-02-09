@@ -117,25 +117,25 @@ class TextAndImagesContent(StuffContent):
                 border_style="dim",
             )
             table.add_column("Index")
-            table.add_column("URL", width=36)
+            table.add_column("URL")
             if has_public_urls:
                 table.add_column("")
             if has_captions:
                 table.add_column("Caption", style="yellow italic")
 
-            for idx, image in enumerate(self.images):
+            for idx, image_content in enumerate(self.images):
                 index_text = Text.from_markup(f"[dim]img-[/dim][yellow]{idx}[/yellow]")
-                display_url = f"{image.url[:35]}…" if len(image.url) > 36 else image.url
-                url_markdown = Markdown(f"[{display_url}]({image.url})")
-                link = image.public_url
+                display_url = f"{image_content.url[:35]}…" if len(image_content.url) > 2500 else image_content.url
+                url_markdown = Markdown(f"[{display_url}]({image_content.url})")
+                link = image_content.public_url
                 if link is not None:
                     link_text = Text("Display", style=f"cyan link {link}")
                 else:
                     link_text = Text()
                 if has_captions and has_public_urls:
-                    table.add_row(index_text, url_markdown, link_text, image.caption or "/")
+                    table.add_row(index_text, url_markdown, link_text, image_content.caption or "/")
                 elif has_captions:
-                    table.add_row(index_text, url_markdown, image.caption or "/")
+                    table.add_row(index_text, url_markdown, image_content.caption or "/")
                 elif has_public_urls:
                     table.add_row(index_text, url_markdown, link_text)
                 else:
