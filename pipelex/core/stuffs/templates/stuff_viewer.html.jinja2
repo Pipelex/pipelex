@@ -169,7 +169,7 @@
             if (contentType === 'application/pdf') {
                 const url = extractUrl(stuffData);
                 if (url) {
-                    container.innerHTML = `<div class="stuff-content-pdf"><iframe src="${escapeHtml(url)}"></iframe></div>`;
+                    container.innerHTML = `<div class="stuff-content-pdf"><embed src="${escapeHtml(url)}" type="application/pdf"></div>`;
                 } else {
                     container.innerHTML = '<div class="stuff-content-text">PDF content (no URL available)</div>';
                 }

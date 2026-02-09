@@ -198,14 +198,17 @@ async def _normalize_url_content(
         # Decode base64 data and store
         raw_bytes = base64.b64decode(resolved_uri.base64_data)
         file_type = detect_file_type_from_bytes(raw_bytes)
+        mime_type = resolved_uri.mime_type or content.mime_type
         key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
-        storage_uri = await storage.store(data=raw_bytes, key=key)
+        storage_uri = await storage.store(data=raw_bytes, key=key, content_type=mime_type)
+        public_url = await storage.public_url(uri=storage_uri)
 
         # Use model_copy to preserve all type-specific fields
         return content.model_copy(
             update={
                 "url": storage_uri,
-                "mime_type": resolved_uri.mime_type or content.mime_type,
+                "public_url": public_url,
+                "mime_type": mime_type,
             }
         )
     elif isinstance(resolved_uri, ResolvedLocalPath):
@@ -216,11 +219,13 @@ async def _normalize_url_content(
         raw_bytes = await load_binary_async(resolved_uri.path)
         file_type = detect_file_type_from_bytes(raw_bytes)
         key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
-        storage_uri = await storage.store(data=raw_bytes, key=key)
+        storage_uri = await storage.store(data=raw_bytes, key=key, content_type=file_type.mime)
+        public_url = await storage.public_url(uri=storage_uri)
 
         return content.model_copy(
             update={
                 "url": storage_uri,
+                "public_url": public_url,
                 "mime_type": file_type.mime,
             }
         )

@@ -1024,16 +1024,17 @@ function renderStuffContent(format) {
     const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
     const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
 
-    // Handle PDF content type with iframe viewer
+    // Handle PDF content type with embedded viewer
     if (format === 'html' && contentType === 'application/pdf') {
         const pdfUrl = extractUrl(jsonData);
         if (pdfUrl) {
             container.className = 'inspector-pdf-content';
             container.innerHTML = '';
-            const iframe = document.createElement('iframe');
-            iframe.src = pdfUrl;
-            iframe.style.cssText = 'width:100%; height:100%; border:none;';
-            container.appendChild(iframe);
+            const embed = document.createElement('embed');
+            embed.src = pdfUrl;
+            embed.type = 'application/pdf';
+            embed.style.cssText = 'width:100%; height:100%; border:none;';
+            container.appendChild(embed);
             updateOpenExternalButton();
             return;
         }
@@ -1346,16 +1347,17 @@ function renderStuffContentFullscreen(format) {
     const textData = window.currentStuffDataText || (stuffMermaidId && stuffDataText[stuffMermaidId]);
     const htmlData = window.currentStuffDataHtml || (stuffMermaidId && stuffDataHtml[stuffMermaidId]);
 
-    // Handle PDF content type with iframe viewer
+    // Handle PDF content type with embedded viewer
     if (format === 'html' && contentType === 'application/pdf') {
         const pdfUrl = extractUrl(jsonData);
         if (pdfUrl) {
             container.className = 'fullscreen-content inspector-pdf-content';
             container.innerHTML = '';
-            const iframe = document.createElement('iframe');
-            iframe.src = pdfUrl;
-            iframe.style.cssText = 'width:100%; height:100%; border:none;';
-            container.appendChild(iframe);
+            const embed = document.createElement('embed');
+            embed.src = pdfUrl;
+            embed.type = 'application/pdf';
+            embed.style.cssText = 'width:100%; height:100%; border:none;';
+            container.appendChild(embed);
             updateOpenExternalButton();
             return;
         }

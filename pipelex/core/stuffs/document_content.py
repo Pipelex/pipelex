@@ -44,7 +44,7 @@ class DocumentContent(StuffContent):
             template_source=template_source,
             template_category=TemplateCategory.HTML,
             templating_context={
-                "url": self.url,
+                "url": self.public_url or self.url,
                 "display_text": self.public_url or self.url,
             },
         )
