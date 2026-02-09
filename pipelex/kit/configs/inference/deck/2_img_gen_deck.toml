@@ -48,7 +48,6 @@ gen-image-high-quality = { model = "@default-premium", quality = "high", descrip
 # Testing
 gen-image-testing = { model = "@default-small", quality = "low", description = "Testing preset for image generation" }
 gen-image-testing-img2img = { model = "nano-banana-pro", description = "Testing preset for image-to-image" }
-gen-image-testing-negative-prompt = { model = "qwen-image", description = "Testing preset for negative prompts" }
 synthesize-photo = { model = "@default-small", quality = "low", description = "Synthesize realistic photos for testing" }
 synthesize-ui = { model = "nano-banana-pro", description = "Synthesize UI screenshots for testing" }
 synthesize-chart = { model = "nano-banana-pro", description = "Synthesize charts and graphs for testing" }

@@ -8,6 +8,101 @@ Pipelex provides a unified abstraction for controlling LLM reasoning (chain-of-t
 
 ---
 
+## How to Use Reasoning
+
+There are two ways to enable reasoning on a `PipeLLM` pipe: set `reasoning_effort` (a symbolic level) or `reasoning_budget` (an explicit token count). They are mutually exclusive — see [Mutual Exclusivity](#mutual-exclusivity) for details.
+
+### Inline LLM Setting
+
+Add reasoning directly in the `model` table of a pipe definition:
+
+```toml
+[pipe.analyze_contract]
+type = "PipeLLM"
+model = { model = "claude-4.5-sonnet", temperature = 0.1, reasoning_effort = "high" }
+```
+
+### LLM Preset
+
+Define a reusable preset in your LLM deck, then reference it with the `$` prefix:
+
+```toml
+# In .pipelex/inference/deck/1_llm_deck.toml
+[llm.presets]
+deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high" }
+```
+
+```toml
+# In a .plx file
+[pipe.analyze_contract]
+type = "PipeLLM"
+model = "$deep-analysis"
+```
+
+### Using reasoning_budget
+
+Instead of a symbolic effort level, you can specify an explicit token budget:
+
+```toml
+model = { model = "claude-4.5-sonnet", temperature = 0.1, reasoning_budget = 16384 }
+```
+
+`reasoning_budget` is supported by Anthropic and Google. OpenAI and Mistral raise `LLMCapabilityError`.
+
+### Model-Specific Examples
+
+Different models use different thinking modes under the hood. Pipelex handles the translation automatically — you always use `reasoning_effort` or `reasoning_budget`.
+
+**Claude 4.6 Opus — adaptive mode**
+
+The provider's SDK dynamically adjusts reasoning depth. `reasoning_effort` controls how aggressively it reasons:
+
+```toml
+# Adaptive: the SDK decides how many tokens to spend on reasoning
+model = { model = "claude-4.6-opus", temperature = 0.1, reasoning_effort = "high" }
+```
+
+You can also override with an explicit budget, which forces `enabled` mode:
+
+```toml
+model = { model = "claude-4.6-opus", temperature = 0.1, reasoning_budget = 16384 }
+```
+
+**Gemini 2.5 Pro — manual mode**
+
+Effort is translated to a `thinking_budget` token count:
+
+```toml
+# Manual: effort "medium" -> thinking_budget = 5000 tokens
+model = { model = "gemini-2.5-pro", temperature = 0.3, reasoning_effort = "medium" }
+```
+
+**Gemini 3.0 Pro — adaptive mode**
+
+Effort maps to a `ThinkingLevel` enum sent to the Google SDK:
+
+```toml
+# Adaptive: effort "high" -> ThinkingLevel.HIGH
+model = { model = "gemini-3.0-pro", temperature = 0.3, reasoning_effort = "high" }
+```
+
+**GPT-5.2 — manual mode**
+
+Effort maps directly to OpenAI's `reasoning_effort` parameter:
+
+```toml
+# Manual: effort "max" -> reasoning_effort = "xhigh" in the SDK call
+model = { model = "gpt-5.2", temperature = 0.1, reasoning_effort = "max" }
+```
+
+!!! note "Structured Generation"
+    Reasoning parameters are not supported for structured generation. See [Structured Generation](#structured-generation) for details.
+
+!!! tip "Test Coverage"
+    These examples are exercised in `tests/integration/pipelex/cogt/test_llm_reasoning.py`.
+
+---
+
 ## Core Concepts
 
 ### ReasoningEffort
@@ -47,16 +142,21 @@ Each model spec in the backend TOML files declares a `thinking_mode`. This is a 
 ## Data Flow
 
 ```mermaid
-flowchart TD
-    A["LLMSetting<br/>(PLX talent or API)"] -->|make_llm_job_params| B["LLMJobParams<br/>reasoning_effort / reasoning_budget"]
+---
+config:
+  layout: dagre
+  theme: base
+---
+flowchart TB
+    A["LLMSetting<br>(PLX talent or API)"] -->|make_llm_job_params| B["LLMJobParams<br>reasoning_effort / reasoning_budget"]
     B --> C{Provider Worker}
 
-    C -->|OpenAI Completions| D["_resolve_reasoning_effort()<br/>→ effort string"]
-    C -->|OpenAI Responses| D2["_resolve_reasoning()<br/>→ Reasoning dict"]
-    C -->|Anthropic| E["_build_thinking_params()<br/>→ _ThinkingParams"]
-    C -->|Google| F["_build_thinking_config()<br/>→ ThinkingConfig"]
-    C -->|Mistral| G["_resolve_prompt_mode()<br/>→ prompt_mode"]
-    C -->|Bedrock (aioboto3)| H["_validate_no_reasoning_params()<br/>→ LLMCapabilityError if set"]
+    C -->|OpenAI Completions| D["_resolve_reasoning_effort()<br>-> effort string"]
+    C -->|OpenAI Responses| D2["_resolve_reasoning()<br>-> Reasoning dict"]
+    C -->|Anthropic| E["_build_thinking_params()<br>-> _ThinkingParams"]
+    C -->|Google| F["_build_thinking_config()<br>-> ThinkingConfig"]
+    C -->|Mistral| G["_resolve_prompt_mode()<br>-> prompt_mode"]
+    C -->|Bedrock (aioboto3)| H["_validate_no_reasoning_params()<br>-> LLMCapabilityError if set"]
 ```
 
 ---
