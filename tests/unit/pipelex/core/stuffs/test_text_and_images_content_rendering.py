@@ -35,10 +35,10 @@ class TestTextAndImagesContentRendering:
             text=TextContent(text="Document content"),
             images=[
                 ImageContent(url=URLs.png_example_1),
-                ImageContent(url=URLs.png_example_2, caption="Second image"),
+                ImageContent(url=URLs.png_example_2, public_url=URLs.png_example_2, caption="Second image"),
             ],
         )
-        pretty_print(content.rendered_pretty())
+        pretty_print(content.rendered_pretty(), console_width=200)
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
@@ -55,12 +55,12 @@ class TestTextAndImagesContentRendering:
             text=None,
             images=[ImageContent(url=URLs.jpg_example_1)],
         )
-        pretty_print(content.rendered_pretty())
+        pretty_print(content.rendered_pretty(), console_width=200)
 
         captured = capsys.readouterr()
         output = remove_ansi_escape_codes(captured.out)
 
-        assert URLs.jpg_example_1 in output
+        assert "jpg_example_1.jpg" in output
 
     def test_empty_text_and_images(self, capsys: CaptureFixture[str]):
         """Test rendering empty text and images."""
