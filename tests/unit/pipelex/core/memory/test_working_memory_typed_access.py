@@ -25,11 +25,11 @@ def nested_content_memory() -> WorkingMemory:
         text_and_images=TextAndImagesContent(
             text=TextContent(text="Sample page text"),
             images=[
-                ImageContent(url="assets/image1.png"),
-                ImageContent(url="assets/image2.png"),
+                ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
+                ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_2),
             ],
         ),
-        page_view=ImageContent(url="assets/page_view.png"),
+        page_view=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_3),
     )
 
     stuff = StuffFactory.make_stuff(
@@ -122,15 +122,15 @@ class TestWorkingMemoryTypedAccess:
         images = cast("list[ImageContent]", result)
         assert len(images) == 2
         assert all(isinstance(img, ImageContent) for img in images)
-        assert images[0].url == "assets/image1.png"
-        assert images[1].url == "assets/image2.png"
+        assert images[0].url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
+        assert images[1].url == ImageTestCases.IMAGE_FILE_PATH_PNG_2
 
     def test_nested_attribute_optional_field(self, nested_content_memory: WorkingMemory):
         """Test retrieving optional nested field."""
         result = nested_content_memory.get_typed_object_or_attribute("sample_page.page_view")
 
         assert isinstance(result, ImageContent)
-        assert result.url == "assets/page_view.png"
+        assert result.url == ImageTestCases.IMAGE_FILE_PATH_PNG_3
 
     def test_nested_attribute_with_type_validation(self, nested_content_memory: WorkingMemory):
         """Test retrieving nested attribute with type validation."""
