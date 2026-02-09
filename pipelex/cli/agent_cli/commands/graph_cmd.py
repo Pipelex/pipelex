@@ -151,8 +151,8 @@ def graph_cmd(
             )
         )
 
-        # Save to <bundle_dir>/graph/
-        output_dir = input_path.parent / "graph"
+        # Save graph files alongside the bundle
+        output_dir = input_path.parent
         saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
 
         agent_success(
