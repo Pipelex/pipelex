@@ -21,7 +21,7 @@ class TestTextAndImagesContentSmartDump:
         text = TextContent(text="Hello World")
         images = [
             ImageContent(url=URLs.png_example_1),
-            ImageContent(url=URLs.png_example_1),
+            ImageContent(url=URLs.png_example_2),
         ]
         content = TextAndImagesContent(text=text, images=images)
         result = content.smart_dump()

@@ -35,7 +35,7 @@ class TestTextAndImagesContentRendering:
             text=TextContent(text="Document content"),
             images=[
                 ImageContent(url=URLs.png_example_1),
-                ImageContent(url=URLs.png_example_1, caption="Second image"),
+                ImageContent(url=URLs.png_example_2, caption="Second image"),
             ],
         )
         pretty_print(content.rendered_pretty())
@@ -45,8 +45,8 @@ class TestTextAndImagesContentRendering:
 
         assert "Document content" in output
         assert "Images" in output
-        assert "image1.png" in output
-        assert "image2.png" in output
+        assert "png_example_1.png" in output
+        assert "png_example_2.png" in output
         assert "Second image" in output
 
     def test_images_only(self, capsys: CaptureFixture[str]):

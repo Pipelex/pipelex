@@ -33,7 +33,7 @@ class TestData:
                 "size": None,
             },
             {
-                "url": URLs.jpg_example_1,
+                "url": URLs.png_example_2,
                 "public_url": None,
                 "source_prompt": None,
                 "source_negative_prompt": None,
