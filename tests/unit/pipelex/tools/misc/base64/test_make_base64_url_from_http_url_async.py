@@ -25,7 +25,7 @@ class TestMakeBase64UrlFromHttpUrlAsync:
             return_value=png_bytes,
         )
 
-        result = await make_base64_url_from_http_url(url=URLs.png_example)
+        result = await make_base64_url_from_http_url(url=URLs.png_example_1)
 
         assert result.startswith("data:image/png;base64,")
         # Verify the base64 part decodes to original PNG bytes
@@ -59,13 +59,13 @@ class TestMakeBase64UrlFromHttpUrlAsync:
             "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message="404 Not Found",
-                request=httpx.Request("GET", URLs.png_example),
+                request=httpx.Request("GET", URLs.png_example_1),
                 response=httpx.Response(404),
             ),
         )
 
         with pytest.raises(httpx.HTTPStatusError) as exc_info:
-            await make_base64_url_from_http_url(url=URLs.png_example)
+            await make_base64_url_from_http_url(url=URLs.png_example_1)
 
         assert exc_info.value.response.status_code == 404
 
@@ -75,13 +75,13 @@ class TestMakeBase64UrlFromHttpUrlAsync:
             "pipelex.tools.misc.base64_utils.fetch_file_from_url_httpx",
             side_effect=httpx.HTTPStatusError(
                 message="500 Internal Server Error",
-                request=httpx.Request("GET", URLs.png_example),
+                request=httpx.Request("GET", URLs.png_example_1),
                 response=httpx.Response(500),
             ),
         )
 
         with pytest.raises(httpx.HTTPStatusError) as exc_info:
-            await make_base64_url_from_http_url(url=URLs.png_example)
+            await make_base64_url_from_http_url(url=URLs.png_example_1)
 
         assert exc_info.value.response.status_code == 500
 

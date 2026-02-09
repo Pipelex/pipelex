@@ -22,7 +22,7 @@ class ImageTestCases:
 
     # Remote URLs
     IMAGE_URL_JPG = URLs.jpg_example_1
-    IMAGE_URL_PNG = URLs.png_example
+    IMAGE_URL_PNG = URLs.png_example_1
 
     # File path collections
     IMAGE_FILE_PATHS: ClassVar[list[str]] = [

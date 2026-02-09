@@ -12,7 +12,7 @@ class TestData:
         text=TextContent(text="Page content text"),
         images=None,
     )
-    SAMPLE_PAGE_VIEW = ImageContent(url=URLs.png_example)
+    SAMPLE_PAGE_VIEW = ImageContent(url=URLs.png_example_1)
 
     # Expected outputs for smart_dump (minimal - without page_view)
     EXPECTED_SMART_DUMP_MINIMAL: ClassVar[dict[str, Any]] = {
@@ -30,7 +30,7 @@ class TestData:
             "images": None,
         },
         "page_view": {
-            "url": URLs.png_example,
+            "url": URLs.png_example_1,
             "public_url": None,
             "source_prompt": None,
             "source_negative_prompt": None,

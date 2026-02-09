@@ -693,7 +693,7 @@ class RenderedHtmlTestData:
     HTML_CSS_CLASS = 'report-content x" onclick="alert(1)'
     HTML_EXPECTED = f'<div class="{escape(HTML_CSS_CLASS)!s}">{HTML_INNER_HTML}</div>'
 
-    IMAGE_URL = URLs.png_example
+    IMAGE_URL = URLs.png_example_1
     IMAGE_EXPECTED = f'<img src="{escape(IMAGE_URL)!s}" class="msg-img">'
 
     MERMAID_CODE = 'graph TD; A-- "<b>&</b>" -->B'
@@ -752,7 +752,7 @@ class StuffViewerTestData:
         inner_html="<p>Test paragraph</p>",
         css_class="test-class",
     )
-    IMAGE_CONTENT: ClassVar[ImageContent] = ImageContent(url=URLs.png_example, mime_type="image/png")
+    IMAGE_CONTENT: ClassVar[ImageContent] = ImageContent(url=URLs.png_example_1, mime_type="image/png")
     PDF_CONTENT: ClassVar[DocumentContent] = DocumentContent(url=URLs.pdf_example_1)
     MERMAID_CONTENT: ClassVar[MermaidContent] = MermaidContent(
         mermaid_code="graph TD; A-->B",

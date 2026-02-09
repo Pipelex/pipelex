@@ -34,8 +34,8 @@ class TestTextAndImagesContentRendering:
         content = TextAndImagesContent(
             text=TextContent(text="Document content"),
             images=[
-                ImageContent(url=URLs.png_example),
-                ImageContent(url=URLs.png_example, caption="Second image"),
+                ImageContent(url=URLs.png_example_1),
+                ImageContent(url=URLs.png_example_1, caption="Second image"),
             ],
         )
         pretty_print(content.rendered_pretty())

@@ -121,7 +121,7 @@ class TestPipeComposeStuffContentSubclasses:
             caption="Cover photo",
         )
         featured_image = ImageContent(
-            url=URLs.png_example,
+            url=URLs.png_example_1,
             caption="Featured image",
             source_prompt="A beautiful landscape",
         )
@@ -173,7 +173,7 @@ class TestPipeComposeStuffContentSubclasses:
         gallery = main_stuff.content
         assert gallery.gallery_name == "Nature Gallery"  # type: ignore[attr-defined]
         assert gallery.cover_image.url == URLs.jpg_example_1  # type: ignore[attr-defined]
-        assert gallery.featured_image.url == URLs.png_example  # type: ignore[attr-defined]
+        assert gallery.featured_image.url == URLs.png_example_1  # type: ignore[attr-defined]
         assert gallery.featured_image.source_prompt == "A beautiful landscape"  # type: ignore[attr-defined]
 
         pretty_print(gallery, title="ImageGallery - Multiple ImageContent")

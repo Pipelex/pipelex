@@ -184,7 +184,7 @@ class TestDataUrlImageFlow:
         mocker.patch("pipelex.pipeline.input_normalizer.get_storage_provider", return_value=provider)
 
         # Create ImageContent with HTTP URL
-        http_url = URLs.png_example
+        http_url = URLs.png_example_1
         image_content = ImageContent(url=http_url)
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),

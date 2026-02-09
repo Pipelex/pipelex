@@ -9,7 +9,7 @@ class TestData:
     # Input content
     SAMPLE_TEXT = TextContent(text="Hello World")
     SAMPLE_IMAGES: ClassVar[list[ImageContent]] = [
-        ImageContent(url=URLs.png_example),
+        ImageContent(url=URLs.png_example_1),
         ImageContent(url=URLs.jpg_example_1),
     ]
 
@@ -24,7 +24,7 @@ class TestData:
         "text": {"text": "Hello World"},
         "images": [
             {
-                "url": URLs.png_example,
+                "url": URLs.png_example_1,
                 "public_url": None,
                 "source_prompt": None,
                 "source_negative_prompt": None,

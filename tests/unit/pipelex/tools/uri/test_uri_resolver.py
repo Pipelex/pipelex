@@ -20,7 +20,7 @@ class TestResolveUriHttpUrls:
 
     def test_resolve_https_url(self) -> None:
         """Test that HTTPS URLs are resolved_uri to ResolvedHttpUrl."""
-        uri = URLs.png_example
+        uri = URLs.png_example_1
 
         resolved_uri = resolve_uri(uri)
 

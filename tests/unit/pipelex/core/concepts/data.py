@@ -143,7 +143,7 @@ class TestData:
     SAMPLE_TEXT: ClassVar[TextContent] = TextContent(text="John Doe")
     SAMPLE_BIO: ClassVar[TextContent] = TextContent(text="Software engineer")
     COMPANY_NAME: ClassVar[TextContent] = TextContent(text="Tech Corp")
-    LOGO_IMAGE: ClassVar[ImageContent] = ImageContent(url=URLs.png_example)
+    LOGO_IMAGE: ClassVar[ImageContent] = ImageContent(url=URLs.png_example_1)
     TITLE_TEXT: ClassVar[TextContent] = TextContent(text="Company Profile")
 
     # Test cases for image field search: (concept_code, expected_image_paths)

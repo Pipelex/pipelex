@@ -105,7 +105,7 @@ class TestUserProvidedImageStorage:
         fetched and stored. They should be passed through unchanged.
         """
         # Create ImageContent with HTTP URL
-        http_url = URLs.png_example
+        http_url = URLs.png_example_1
         image_content = ImageContent(url=http_url)
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),

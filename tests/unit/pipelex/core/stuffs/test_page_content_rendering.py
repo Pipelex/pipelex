@@ -43,7 +43,7 @@ class TestPageContentRendering:
                 text=TextContent(text="Page text"),
                 images=None,
             ),
-            page_view=ImageContent(url=URLs.png_example),
+            page_view=ImageContent(url=URLs.png_example_1),
         )
         pretty_print(page.rendered_pretty())
 
@@ -52,4 +52,4 @@ class TestPageContentRendering:
 
         assert "Page text" in output
         assert "Page View" in output
-        assert "page_screenshot.png" in output
+        assert "png_example_1.png" in output

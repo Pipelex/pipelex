@@ -107,7 +107,7 @@ class TestBase64Utils:
     @pytest.mark.parametrize(
         "url",
         [
-            URLs.png_example,
+            URLs.png_example_1,
             URLs.jpg_example_1,
             "/path/to/file.png",
             "relative/path.jpg",
@@ -188,7 +188,7 @@ class TestBase64Utils:
 
     def test_returns_none_for_non_data_url(self) -> None:
         """Test that non-data URLs return None."""
-        url = URLs.png_example
+        url = URLs.png_example_1
 
         result = extract_base64_str_from_base64_url_if_possible(url)
 

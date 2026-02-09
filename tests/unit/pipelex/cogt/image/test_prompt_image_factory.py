@@ -49,7 +49,7 @@ class TestPromptImageFactoryDataUrl:
     @pytest.mark.parametrize(
         ("_topic", "uri"),
         [
-            ("http_url", URLs.png_example),
+            ("http_url", URLs.png_example_1),
             ("https_url", URLs.jpg_example_1),
             ("local_absolute_path", "/path/to/image.png"),
             ("local_relative_path", "images/photo.jpg"),

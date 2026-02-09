@@ -121,7 +121,7 @@ class TestPromptDocumentExtraction:
                 ),
                 StuffFactory.make_stuff(
                     concept=get_native_concept(NativeConceptCode.IMAGE),
-                    content=ImageContent(url=URLs.png_example),
+                    content=ImageContent(url=URLs.png_example_1),
                     name="image",
                 ),
             ],

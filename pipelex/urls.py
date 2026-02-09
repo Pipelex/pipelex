@@ -24,6 +24,8 @@ class URLs:
 
     svg_example = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/svg_example.svg"
 
-    png_example = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example.png"
+    png_example_1 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example_1.png"
+    png_example_2 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example_2.png"
+    png_example_3 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example_3.png"
 
     txt_example = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/txt_example.txt"
