@@ -12,10 +12,10 @@ if TYPE_CHECKING:
 
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.hub import get_content_generator
 from pipelex.pipe_operators.llm.document_reference import DocumentReference, DocumentReferenceKind
 from pipelex.pipe_operators.llm.exceptions import LLMPromptBlueprintValueError
 from pipelex.pipe_operators.llm.image_reference import ImageReference, ImageReferenceKind
@@ -190,7 +190,7 @@ class LLMPromptBlueprint(BaseModel):
                 # Skip list item references (e.g., "images[1]")
                 if "[" in image_name:
                     continue
-                # Skip dotted paths (e.g., "page.page_view") - handled by tag filter
+                # Skip dotted paths (e.g., "page.page_view") - handled by finalize/filter at render time
                 if "." in image_name:
                     continue
                 # Skip list variable references (handled separately below)
@@ -365,15 +365,18 @@ class LLMPromptBlueprint(BaseModel):
         if jinja2_blueprint.extra_context:
             context.update(**jinja2_blueprint.extra_context)
 
-        # Add image registry to context for | with_images filter
+        # Add image registry to context for | with_images and | format filters
         if image_registry is not None:
             context[Jinja2ContextKey.IMAGE_REGISTRY] = image_registry
 
-        return await get_content_generator().make_templated_text(
-            context=context,
+        finalize = image_registry.make_finalize() if image_registry and image_registry.images else None
+
+        return await render_template(
             template=jinja2_blueprint.template,
+            category=jinja2_blueprint.category,
+            context=context,
             templating_style=self.templating_style,
-            template_category=jinja2_blueprint.category,
+            finalize=finalize,
         )
 
     def _extract_direct_document(

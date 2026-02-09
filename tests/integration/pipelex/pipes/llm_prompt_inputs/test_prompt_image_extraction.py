@@ -628,3 +628,107 @@ class TestPromptImageExtraction:
                 pipe_code="test_with_images_single",
                 blueprint=pipe_llm_blueprint,
             )
+
+    async def test_dotted_path_bare_jinja2_produces_placeholder(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that bare {{ page.page_view }} syntax produces [Image N] for registered images.
+
+        When a dotted path references a nested image field on a structured content
+        like PageContent, the Jinja2 finalize callback should intercept the
+        ImageContent before str() conversion and replace it with [Image N].
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test bare Jinja2 dotted path image",
+            inputs={"page.page_view": "Image", "page": "Page"},
+            output="Text",
+            prompt="Describe this image: {{ page.page_view }}",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_bare_jinja2_dotted_image",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        page_content = PageContent(
+            text_and_images=TextAndImagesContent(
+                text=TextContent(text="Some text content"),
+                images=[],
+            ),
+            page_view=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PAGE),
+                content=page_content,
+                name="page",
+            ),
+        )
+
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # The nested image should be extracted to user_images
+        assert llm_prompt.user_images is not None
+        assert len(llm_prompt.user_images) == 1
+
+        # The prompt text should contain [Image 1] placeholder, NOT the raw URL
+        assert llm_prompt.user_text is not None
+        assert "[Image 1]" in llm_prompt.user_text, f"Expected '[Image 1]' in prompt, got: {llm_prompt.user_text}"
+        assert ImageTestCases.IMAGE_FILE_PATH_PNG_1 not in llm_prompt.user_text, f"URL should not appear in prompt text: {llm_prompt.user_text}"
+        pretty_print(llm_prompt.user_text, title="Bare {{ page.page_view }} - should show [Image 1]")
+
+    async def test_dotted_path_dollar_syntax_produces_placeholder(self, load_test_library: Callable[[list[Path]], None]) -> None:
+        """Test that $page.page_view syntax produces [Image N] for registered images.
+
+        The $ syntax becomes {{ page.page_view|format() }}. The format filter should
+        detect the registered image via the ImageRegistry and return the placeholder
+        instead of calling rendered_plain() which would produce the URL.
+        """
+        load_test_library([Path("tests/integration/pipelex/pipes/pipelines")])
+
+        pipe_llm_blueprint = PipeLLMBlueprint(
+            description="Test dollar dotted path image",
+            inputs={"page.page_view": "Image", "page": "Page"},
+            output="Text",
+            prompt="Describe this image: $page.page_view",
+        )
+
+        pipe_llm = PipeFactory[PipeLLM].make_from_blueprint(
+            domain_code="test_pipes",
+            pipe_code="test_dollar_dotted_image",
+            blueprint=pipe_llm_blueprint,
+        )
+
+        page_content = PageContent(
+            text_and_images=TextAndImagesContent(
+                text=TextContent(text="Some text content"),
+                images=[],
+            ),
+            page_view=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
+        )
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PAGE),
+                content=page_content,
+                name="page",
+            ),
+        )
+
+        llm_prompt = await pipe_llm.llm_prompt_spec.make_llm_prompt(
+            output_concept_ref="Text",
+            context_provider=working_memory,
+        )
+
+        # The nested image should be extracted to user_images
+        assert llm_prompt.user_images is not None
+        assert len(llm_prompt.user_images) == 1
+
+        # The prompt text should contain [Image 1] placeholder, NOT the raw URL
+        assert llm_prompt.user_text is not None
+        assert "[Image 1]" in llm_prompt.user_text, f"Expected '[Image 1]' in prompt, got: {llm_prompt.user_text}"
+        assert ImageTestCases.IMAGE_FILE_PATH_PNG_1 not in llm_prompt.user_text, f"URL should not appear in prompt text: {llm_prompt.user_text}"
+        pretty_print(llm_prompt.user_text, title="$page.page_view - should show [Image 1]")

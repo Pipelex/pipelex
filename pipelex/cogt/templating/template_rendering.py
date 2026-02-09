@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -11,6 +12,7 @@ async def render_template(
     category: TemplateCategory,
     context: dict[str, Any],
     templating_style: TemplatingStyle | None = None,
+    finalize: Callable[[Any], Any] | None = None,
 ) -> str:
     template_source = preprocess_template(template)
 
@@ -19,4 +21,5 @@ async def render_template(
         template_category=category,
         templating_context=context,
         templating_style=templating_style,
+        finalize=finalize,
     )

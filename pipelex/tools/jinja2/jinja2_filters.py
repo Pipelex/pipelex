@@ -23,6 +23,14 @@ ALLOWED_FILTERS = ["tag", "format", "default", "escape_script_tag", "with_images
 # Filter to format some Stuff or any object with the appropriate text formatting methods
 @pass_context
 async def text_format(context: Context, value: Any, text_format: TextFormat | None = None) -> Any:
+    # Check if this is a registered image - use placeholder instead of rendering as text
+    # This handles $page.page_view syntax where the format filter would otherwise call rendered_plain() → URL
+    registry = context.get(Jinja2ContextKey.IMAGE_REGISTRY)
+    if isinstance(registry, ImageRegistry) and hasattr(value, "url"):
+        placeholder = registry.get_image_placeholder(value)
+        if placeholder is not None:
+            return placeholder
+
     if text_format:
         if isinstance(text_format, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             applied_text_format = TextFormat(text_format)
