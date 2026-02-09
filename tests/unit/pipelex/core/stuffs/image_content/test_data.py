@@ -18,6 +18,7 @@ class TestData:
         "caption": None,
         "mime_type": None,
         "size": None,
+        "filename": None,
     }
 
     # Expected outputs for smart_dump (with optional fields)
@@ -29,6 +30,7 @@ class TestData:
         "caption": "A beautiful sunset",
         "mime_type": "image/png",
         "size": None,
+        "filename": None,
     }
 
     # Expected outputs for render methods
@@ -43,7 +45,8 @@ class TestData:
     "source_negative_prompt": null,
     "caption": null,
     "mime_type": null,
-    "size": null
+    "size": null,
+    "filename": null
 }"""
     EXPECTED_RENDERED_JSON_WITH_PROMPT = """{
     "url": "https://example.com/image.png",
@@ -52,7 +55,8 @@ class TestData:
     "source_negative_prompt": null,
     "caption": null,
     "mime_type": null,
-    "size": null
+    "size": null,
+    "filename": null
 }"""
     # rendered_for_prompt returns just the URL for images
     EXPECTED_RENDERED_FOR_PROMPT = "https://example.com/image.png"

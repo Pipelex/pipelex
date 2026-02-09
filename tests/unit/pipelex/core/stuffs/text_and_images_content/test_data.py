@@ -30,6 +30,7 @@ class TestData:
                 "caption": None,
                 "mime_type": None,
                 "size": None,
+                "filename": None,
             },
             {
                 "url": "https://example.com/image2.png",
@@ -39,6 +40,7 @@ class TestData:
                 "caption": None,
                 "mime_type": None,
                 "size": None,
+                "filename": None,
             },
         ],
     }

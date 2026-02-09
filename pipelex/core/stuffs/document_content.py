@@ -1,16 +1,25 @@
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
-from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.tools.uri.uri_resolver import extract_filename_from_uri, resolve_uri
+from pipelex.types import Self
 
 
 class DocumentContent(StuffContent):
     url: str = Field(..., description="The document URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
     public_url: str | None = Field(default=None, description="The public HTTPS URL of the document")
     mime_type: str | None = Field(default=None, description="The MIME type of the document")
+    filename: str | None = Field(default=None, description="The original filename of the document")
+
+    @model_validator(mode="after")
+    def _auto_populate_filename(self) -> Self:
+        """Auto-populate filename from url when it is a local file path."""
+        if self.filename is None:
+            self.filename = extract_filename_from_uri(self.url)
+        return self
 
     @property
     @override

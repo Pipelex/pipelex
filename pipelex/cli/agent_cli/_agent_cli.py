@@ -274,23 +274,23 @@ def assemble_command(
     )
 
 
-@app.command(name="graph", help="Render a graphspec.json to HTML visualizations")
+@app.command(name="graph", help="Generate graph visualization from a .plx bundle")
 def graph_command(
-    graphspec_file: Annotated[
+    target: Annotated[
         str,
-        typer.Argument(help="Path to a graphspec.json file"),
+        typer.Argument(help="Path to a .plx bundle file"),
     ],
-    out: Annotated[
-        str | None,
-        typer.Option("--out", "-o", help="Output directory (default: same directory as input file)"),
-    ] = None,
     graph_format: Annotated[
         GraphFormat,
         typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
-    ] = GraphFormat.BOTH,
+    ] = GraphFormat.REACTFLOW,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+    ] = None,
 ) -> None:
-    """Render a graphspec.json file to HTML visualizations."""
-    graph_cmd(graphspec_file=graphspec_file, out=out, graph_format=graph_format)
+    """Generate graph visualization from a .plx bundle."""
+    graph_cmd(target=target, graph_format=graph_format, library_dir=library_dir)
 
 
 @app.command(name="models", help="List available model presets, aliases, and talent mappings")

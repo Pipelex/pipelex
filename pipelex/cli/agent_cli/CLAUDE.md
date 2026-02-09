@@ -45,7 +45,7 @@ commands/
 | `concept` | Converts a JSON concept spec into TOML |
 | `pipe` | Converts a JSON pipe spec (typed) into TOML |
 | `assemble` | Merges concept + pipe TOML sections into a complete `.plx` file |
-| `graph` | Renders a graphspec.json into MermaidFlow/ReactFlow HTML |
+| `graph` | Generates graph visualization (HTML) from a .plx bundle via dry-run |
 | `models` | Lists available model presets, aliases, waterfalls, and talent mappings |
 | `doctor` | Checks config, credentials, models health |
 

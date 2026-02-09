@@ -100,7 +100,7 @@ async def _run_pipeline_core(
                 ),
                 "graphs_inclusion": graph_config.graphs_inclusion.model_copy(
                     update={
-                        "graphspec_json": True,
+                        "graphspec_json": False,
                         "mermaidflow_html": True,
                         "reactflow_html": True,
                     }
