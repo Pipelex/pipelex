@@ -45,7 +45,6 @@
  - Change the output validation of `PipeCondition`: If all mapped pipes have the same output concept, `PipeCondition`'s output MUST be that same concept. If mapped pipes have different output concepts, `PipeCondition`'s output MUST be the native concept `Anything`.
  - **CLI**: Changed `pipelex validate all` to `pipelex validate --all` (or `-a`).
  - **StructuredContent.rendered_html()**: Now recursively calls `rendered_html()` on nested `StuffContent` fields instead of using json2html conversion. Also skips `None` values and uses HTML table format.
- - **CLI**: Renamed `pipelex run --dry-run` to `pipelex run --dry`.
  - **Batch Pipe Validation:** Enforced stricter naming rules for batch specs—`input_item_name` must differ from `input_list_name` and not shadow existing input keys, with clearer error messages suggesting plural/singular conventions.
 
 ### Fixed

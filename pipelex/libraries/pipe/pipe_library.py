@@ -39,7 +39,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         if pipe.code in self.root:
             msg = (
                 f"Pipe '{pipe.code}' already exists in the library. "
-                "It is likely declared in two different bundle files within the same library, or twice in the same bundle. "
+                "It is likely declared in two different bundle files within the same library."
                 "Please remove one of the declarations or rename one of the pipes."
             )
             raise PipeLibraryError(msg)

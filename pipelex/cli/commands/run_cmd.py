@@ -93,11 +93,11 @@ def run_cmd(
     ] = "results",
     dry_run: Annotated[
         bool,
-        typer.Option("--dry", help="Run pipeline in dry mode (no actual inference calls)"),
+        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
     mock_inputs: Annotated[
         bool,
-        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry)"),
+        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
     ] = False,
     library_dir: Annotated[
         list[str] | None,
@@ -122,8 +122,8 @@ def run_cmd(
         pipelex run my_pipe --no-graph                  # Disable graph generation
         pipelex run my_pipe --graph-full-data           # Force include full data in graph
         pipelex run my_pipe --graph-no-data             # Force exclude full data from graph
-        pipelex run my_pipe --dry
-        pipelex run my_pipe --dry --mock-inputs
+        pipelex run my_pipe --dry-run
+        pipelex run my_pipe --dry-run --mock-inputs
     """
     # Validate mutual exclusivity
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -132,10 +132,10 @@ def run_cmd(
         typer.echo(ctx.get_help())
         raise typer.Exit(0)
 
-    # Validate --mock-inputs requires --dry
+    # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
         typer.secho(
-            "Failed to run: --mock-inputs requires --dry",
+            "Failed to run: --mock-inputs requires --dry-run",
             fg=typer.colors.RED,
             err=True,
         )

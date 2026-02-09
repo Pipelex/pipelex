@@ -299,7 +299,7 @@ smc: sync-main-config
 
 smc-dry: env
 	$(call PRINT_TITLE,Previewing main config sync - dry run)
-	$(VENV_PIPELEX_DEV) sync-main-config --dry
+	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
 
 # Support PROF as shorthand for TEST_PROFILE
 ifdef PROF

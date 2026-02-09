@@ -146,11 +146,11 @@ def run_cmd(
     ] = None,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry", help="Run pipeline in dry mode (no actual inference calls)"),
+        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
     mock_inputs: Annotated[
         bool,
-        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry)"),
+        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
     ] = False,
     graph: Annotated[
         bool,
@@ -168,7 +168,7 @@ def run_cmd(
     Examples:
         pipelex-agent run my_pipe --inputs data.json
         pipelex-agent run my_bundle.plx --pipe my_pipe
-        pipelex-agent run my_pipe --dry --mock-inputs
+        pipelex-agent run my_pipe --dry-run --mock-inputs
         pipelex-agent run my_bundle.plx --graph
     """
     # Validate that at least one target is provided
@@ -176,9 +176,9 @@ def run_cmd(
     if provided_options == 0:
         agent_error("No pipe code or bundle file specified", "ArgumentError")
 
-    # Validate --mock-inputs requires --dry
+    # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
-        agent_error("--mock-inputs requires --dry", "ArgumentError")
+        agent_error("--mock-inputs requires --dry-run", "ArgumentError")
 
     # Determine pipe_code and bundle_path from arguments
     pipe_code: str | None = None

@@ -113,11 +113,11 @@ def run_command(
     ] = None,
     dry_run: Annotated[
         bool,
-        typer.Option("--dry", help="Run pipeline in dry mode (no actual inference calls)"),
+        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
     ] = False,
     mock_inputs: Annotated[
         bool,
-        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry)"),
+        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
     ] = False,
     graph: Annotated[
         bool,
