@@ -64,6 +64,7 @@ anthropic = [
     "claude-4.5-haiku",
     "claude-4.5-sonnet",
     "claude-4.5-opus",
+    "claude-4.6-opus",
 ]
 
 # --- DeepSeek Models ---
@@ -112,16 +113,21 @@ mistralai = [
     "mistral-7b-2312",
     "mistral-8x7b-2312",
     "mistral-codestral-2405",
-    "mistral-large",
-    "mistral-large-2402",
-    "mistral-medium",
-    "mistral-medium-2508",
-    "mistral-small",
-    "mistral-small-2402",
     "pixtral-12b",
     "pixtral-large",
-    "pixtral-large-2411",
+    "mistral-small-2506",
+    "mistral-small-3.2",
+    "mistral-small",
+    "mistral-medium-2508",
+    "mistral-medium-3.1",
+    "mistral-medium",
+    "mistral-large-2512",
+    "mistral-large-3",
     "mistral-large",
+    "magistral-small-2509",
+    "magistral-small",
+    "magistral-medium-2509",
+    "magistral-medium",
 ]
 
 # --- Moonshot AI Models ---
