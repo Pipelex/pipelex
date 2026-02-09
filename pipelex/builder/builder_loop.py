@@ -65,6 +65,7 @@ class BuilderLoop:
             save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=str(working_memory_path), create_directory=True)
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+        pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
 
         if is_save_first_iteration_enabled:
             try:
@@ -87,6 +88,7 @@ class BuilderLoop:
                 if attempt < max_attempts:
                     log.info(f"⚠️ Blueprint creation failed on attempt {attempt}/{max_attempts}, fixing undeclared concepts...")
                     pipelex_bundle_spec = await self._fix_undeclared_concept_references(pipelex_bundle_spec=pipelex_bundle_spec)
+                    pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
                     continue
                 msg = f"Failed to create bundle blueprint after {max_attempts} attempts: {exc}"
                 raise PipeBuilderError(msg) from exc
@@ -482,6 +484,23 @@ class BuilderLoop:
 
         return referenced
 
+    @staticmethod
+    def _strip_native_concept_declarations(pipelex_bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
+        """Remove any concept declarations that collide with native concept codes.
+
+        Native concepts are built-in and must not be redeclared in a bundle.
+        This is a safety net for when the builder LLM ignores the instruction
+        not to redefine them.
+        """
+        if not pipelex_bundle_spec.concept:
+            return pipelex_bundle_spec
+        native_codes = {native.value for native in NativeConceptCode.values_list()}
+        to_remove = [code for code in pipelex_bundle_spec.concept if code in native_codes]
+        for code in to_remove:
+            del pipelex_bundle_spec.concept[code]
+            log.info(f"Stripped native concept declaration '{code}' (native concepts are built-in)")
+        return pipelex_bundle_spec
+
     def _fix_bundle_validation_error(
         self,
         bundle_error: ValidateBundleError,
@@ -490,7 +509,6 @@ class BuilderLoop:
     ) -> PipelexBundleSpec:
         fixed_pipes: list[PipeSpecUnion] = []
         added_concepts: list[str] = []
-        # TODO: Auto remove the creation of native concept by the pipe builder
         # Handle pipe factory errors (e.g., missing output concepts)
         for factory_error in bundle_error.pipe_factory_errors:
             match factory_error.error_type:

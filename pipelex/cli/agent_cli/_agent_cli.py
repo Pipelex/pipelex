@@ -13,6 +13,7 @@ from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat, graph_cmd
 from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
+from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run_cmd import run_cmd
 from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
@@ -25,7 +26,7 @@ class PipelexAgentCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["build", "run", "validate", "inputs", "concept", "pipe", "assemble", "graph", "doctor"]
+        return ["build", "run", "validate", "inputs", "concept", "pipe", "assemble", "graph", "models", "doctor"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -290,6 +291,12 @@ def graph_command(
 ) -> None:
     """Render a graphspec.json file to HTML visualizations."""
     graph_cmd(graphspec_file=graphspec_file, out=out, graph_format=graph_format)
+
+
+@app.command(name="models", help="List available model presets, aliases, and talent mappings")
+def models_command() -> None:
+    """List available model presets, aliases, waterfalls, and talent mappings as JSON."""
+    agent_models_cmd()
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")

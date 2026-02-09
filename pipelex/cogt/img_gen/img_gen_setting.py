@@ -19,6 +19,7 @@ class ImgGenSetting(ConfigModel):
     guidance_scale: float | None = Field(default=None, gt=0)
     is_moderated: bool = False
     safety_tolerance: int | None = Field(default=None, ge=1, le=6)
+    description: str | None = None
 
     @model_validator(mode="after")
     def validate_quality_or_nb_steps(self) -> Self:

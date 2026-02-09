@@ -30,6 +30,7 @@ commands/
   pipe_cmd.py                  # pipe — JSON spec → pipe TOML
   assemble_cmd.py              # assemble — combine TOML parts into .plx
   graph_cmd.py                 # graph — render execution graph HTML
+  models_cmd.py                # models — list presets, aliases, talent mappings
   doctor_cmd.py                # doctor — config health check
 ```
 
@@ -45,6 +46,7 @@ commands/
 | `pipe` | Converts a JSON pipe spec (typed) into TOML |
 | `assemble` | Merges concept + pipe TOML sections into a complete `.plx` file |
 | `graph` | Renders a graphspec.json into MermaidFlow/ReactFlow HTML |
+| `models` | Lists available model presets, aliases, waterfalls, and talent mappings |
 | `doctor` | Checks config, credentials, models health |
 
 ## Key Patterns

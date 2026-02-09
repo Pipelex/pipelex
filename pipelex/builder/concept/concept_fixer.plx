@@ -42,5 +42,5 @@ When building composite/aggregate concepts that combine multiple other concepts:
 - Use type=concept with concept_ref to reference the other structured concepts
 - This allows proper object composition rather than flattening structured data into text
 
-DO NOT redefine native concepts such as: Text, Html, Image, Document, Number, Page.
+DO NOT redefine native concepts: Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic. They are built-in and must NOT be redeclared.
 """

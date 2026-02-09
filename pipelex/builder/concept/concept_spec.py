@@ -228,10 +228,11 @@ class ConceptSpec(StructuredContent):
     refines: str | None = Field(
         default=None,
         description=(
-            "If applicable: the native concept this concept extends (Text, Image, Document, TextAndImages, Number, Page) "
+            "If applicable: the native concept this concept extends "
+            "(Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic) "
             "in PascalCase format. Cannot be used together with 'structure'."
         ),
-        examples=["Text", "Image", "Document", "TextAndImages", "Number", "Page"],
+        examples=["Text", "Html", "Image", "Document", "Number", "Page", "TextAndImages", "ImgGenPrompt", "JSON"],
     )
 
     @field_validator("the_concept_code", mode="before")

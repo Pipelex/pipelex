@@ -147,7 +147,7 @@ When building composite/aggregate concepts that combine multiple other concepts:
 
 @plan_draft
 
-DO NOT redefine native concepts such as: Text, Html, Image, Document, Number, Page. if you need one of these, they already exist so you should NOT REDEFINE THEM.
+DO NOT redefine native concepts: Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic. They are built-in and must NOT be redeclared.
 
 Do not write any intro or outro, do not mention the brief or the plan draft, just write the concept drafts.
 List the concept drafts in Markdown format with a heading 3 for each, e.g. `### Concept FooBar`.
@@ -186,9 +186,9 @@ prompt = """
 {% if concept_specs %}
 We have already defined the concepts you must use for the inputs and outputs of the pipes:
 @concept_specs
-And of course you still have the native concepts if required: Text, Html, Image, Document, Number, Page.
+And of course you still have the native concepts if required: Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic.
 {% else %}
-You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Html, Image, Document, Number, Page.
+You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic.
 {% endif %}
 
 ## For PipeOperators:

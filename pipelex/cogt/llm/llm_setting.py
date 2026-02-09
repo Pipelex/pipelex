@@ -22,6 +22,7 @@ class LLMSetting(ConfigModel):
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
     reasoning_effort: ReasoningEffort | None = Field(default=None, strict=False)
     reasoning_budget: int | None = Field(default=None, gt=0)
+    description: str | None = None
 
     @field_validator("max_tokens", mode="before")
     @classmethod
