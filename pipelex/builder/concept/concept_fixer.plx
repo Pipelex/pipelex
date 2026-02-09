@@ -11,7 +11,7 @@ type = "PipeLLM"
 description = "Generate structured ConceptSpec definitions for each missing concept referenced in a pipeline."
 inputs = { undeclared_concepts = "UndeclaredConcepts" }
 output = "builder.ConceptSpec[]"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 system_prompt = """
 You are an expert at defining data concepts for AI pipelines.
 """

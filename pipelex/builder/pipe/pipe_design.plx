@@ -45,7 +45,7 @@ type = "PipeLLM"
 description = "Build a PipeSequenceSpec from the signature (children referenced by code)."
 inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeSequenceSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 # Orchestrate a sequence of pipe steps that will run one after the other.
 
@@ -69,7 +69,7 @@ type = "PipeLLM"
 description = "Build a PipeParallelSpec from the signature."
 inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeParallelSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 Orchestrate a set of independent pipes that will run concurrently.
 
@@ -95,7 +95,7 @@ type = "PipeLLM"
 description = "Build a PipeConditionSpec from the signature (provide expression/outcome consistent with children)."
 inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeConditionSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeConditionSpec to route to the correct pipe based on a conditional expression.
 
@@ -116,7 +116,7 @@ type = "PipeLLM"
 description = "Build a PipeBatchSpec from the signature."
 inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeBatchSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeBatchSpec to run a pipe in batch.
 Whatever it's really going to do has already been decided as part of this plan:
@@ -141,7 +141,7 @@ type = "PipeLLM"
 description = "Build a PipeLLMSpec from the signature."
 inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeLLMSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeLLMSpec to use an LLM to generate a text, or a structured object using different kinds of inputs.
 Whatever it's really going to do has already been decided as part of this plan:
@@ -168,7 +168,7 @@ type = "PipeLLM"
 description = "Build a PipeExtractSpec from the signature."
 inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeExtractSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeExtractSpec to extract text from an image or a pdf.
 Whatever it's really going to do has already been decided as part of this plan:
@@ -189,7 +189,7 @@ type = "PipeLLM"
 description = "Build a PipeImgGenSpec from the signature."
 inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeImgGenSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 Your job is to design a PipeImgGenSpec to generate an image from a text prompt.
 Whatever it's really going to do has already been decided as part of this plan:
@@ -213,7 +213,7 @@ type = "PipeLLM"
 description = "Build a PipeComposeSpec from the signature."
 inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeComposeSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeComposeSpec to compose content from working memory variables.
 Whatever it's really going to do has already been decided as part of this plan:
