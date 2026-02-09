@@ -1,4 +1,4 @@
-from pydantic import Field, model_validator, field_validator
+from pydantic import Field, field_validator, model_validator
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text

@@ -10,6 +10,7 @@ import typer
 from posthog import tag
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (

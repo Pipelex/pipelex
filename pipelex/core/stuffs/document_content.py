@@ -1,4 +1,4 @@
-from pydantic import Field, model_validator, field_validator
+from pydantic import Field, field_validator, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
