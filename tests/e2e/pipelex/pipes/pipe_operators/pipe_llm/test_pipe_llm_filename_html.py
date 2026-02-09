@@ -2,7 +2,6 @@
 
 import pytest
 
-from pipelex import pretty_print
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
