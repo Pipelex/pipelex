@@ -39,8 +39,9 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         if pipe.code in self.root:
             msg = (
                 f"Pipe '{pipe.code}' already exists in the library. "
-                "It is likely declared in two different bundle files within the same library."
-                "Please remove one of the declarations or rename one of the pipes."
+                "It is likely declared in two different bundle files loaded into the same library. "
+                "Check your library configuration: PIPELEXPATH environment variable, "
+                "library_dirs passed to Pipelex.make(), or the --library-dir / -L CLI option."
             )
             raise PipeLibraryError(msg)
         self.root[pipe.code] = pipe

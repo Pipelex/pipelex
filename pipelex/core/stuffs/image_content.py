@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 from rich.console import Group
 from rich.markdown import Markdown
 from rich.text import Text
@@ -19,12 +19,6 @@ from pipelex.types import Self
 class ImageContent(StuffContent):
     url: str = Field(..., description="The image URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
 
-    @field_validator("url", mode="after")
-    @classmethod
-    def validate_url_reachable(cls, url: str) -> str:
-        validate_url_resource_exists(url)
-        return url
-
     public_url: str | None = Field(default=None, description="The public URL of the image")
     source_prompt: str | None = Field(default=None, description="The source prompt of the image")
     source_negative_prompt: str | None = Field(default=None, description="The source negative prompt of the image")
@@ -39,6 +33,10 @@ class ImageContent(StuffContent):
         if self.filename is None:
             self.filename = extract_filename_from_uri(self.url)
         return self
+
+    @override
+    def validate_resources(self) -> None:
+        validate_url_resource_exists(self.url)
 
     @property
     @override

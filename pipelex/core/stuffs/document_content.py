@@ -1,4 +1,4 @@
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -12,12 +12,6 @@ from pipelex.types import Self
 class DocumentContent(StuffContent):
     url: str = Field(..., description="The document URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
 
-    @field_validator("url", mode="after")
-    @classmethod
-    def validate_url_reachable(cls, url: str) -> str:
-        validate_url_resource_exists(url)
-        return url
-
     public_url: str | None = Field(default=None, description="The public HTTPS URL of the document")
     mime_type: str | None = Field(default=None, description="The MIME type of the document")
     filename: str | None = Field(default=None, description="The original filename of the document")
@@ -28,6 +22,10 @@ class DocumentContent(StuffContent):
         if self.filename is None:
             self.filename = extract_filename_from_uri(self.url)
         return self
+
+    @override
+    def validate_resources(self) -> None:
+        validate_url_resource_exists(self.url)
 
     @property
     @override

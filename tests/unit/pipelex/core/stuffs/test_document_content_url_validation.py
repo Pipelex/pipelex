@@ -1,42 +1,41 @@
 """Unit tests for URL validation in DocumentContent."""
 
 import pytest
-from pydantic import ValidationError
 
 from pipelex.core.stuffs.document_content import DocumentContent
 
 
 class TestDocumentContentUrlValidation:
-    """Test that DocumentContent validates URLs on construction."""
+    """Test that DocumentContent.validate_resources() validates URLs correctly."""
 
-    def test_valid_remote_url_passes(self) -> None:
-        """A well-known reachable HTTP URL passes validation."""
-        doc = DocumentContent(url="https://www.google.com/robots.txt")
-        assert doc.url == "https://www.google.com/robots.txt"
+    def test_construction_does_not_validate_url(self) -> None:
+        """Construction with any URL succeeds without validation."""
+        doc = DocumentContent(url="https://this-domain-cannot-exist.invalid/file.pdf")
+        assert doc.url == "https://this-domain-cannot-exist.invalid/file.pdf"
 
-    def test_unreachable_remote_url_raises_validation_error(self) -> None:
-        """An HTTP URL on a non-existent domain raises a ValidationError."""
-        with pytest.raises(ValidationError, match="could not be reached"):
-            DocumentContent(url="https://this-domain-cannot-exist.invalid/file.pdf")
+    def test_validate_resources_unreachable_remote_url(self) -> None:
+        """validate_resources() raises ValueError for an unreachable HTTP URL."""
+        doc = DocumentContent(url="https://this-domain-cannot-exist.invalid/file.pdf")
+        with pytest.raises(ValueError, match="could not be reached"):
+            doc.validate_resources()
 
-    def test_existing_local_file_passes(self) -> None:
-        """A local file path that exists passes validation."""
+    def test_validate_resources_nonexistent_local_file(self) -> None:
+        """validate_resources() raises ValueError for a non-existent local file."""
+        doc = DocumentContent(url="/nonexistent/path/to/document.pdf")
+        with pytest.raises(ValueError, match="does not exist"):
+            doc.validate_resources()
+
+    def test_validate_resources_existing_local_file(self) -> None:
+        """validate_resources() passes for an existing local file."""
         doc = DocumentContent(url="pyproject.toml")
-        assert doc.url == "pyproject.toml"
+        doc.validate_resources()
 
-    def test_nonexistent_local_file_raises_validation_error(self) -> None:
-        """A local file path that does not exist raises a ValidationError."""
-        with pytest.raises(ValidationError, match="does not exist"):
-            DocumentContent(url="/nonexistent/path/to/document.pdf")
+    def test_validate_resources_base64_data_url_skips(self) -> None:
+        """validate_resources() skips validation for base64 data URLs."""
+        doc = DocumentContent(url="data:application/pdf;base64,abc123")
+        doc.validate_resources()
 
-    def test_base64_data_url_skips_validation(self) -> None:
-        """A base64 data URL is accepted without any check."""
-        data_url = "data:application/pdf;base64,abc123"
-        doc = DocumentContent(url=data_url)
-        assert doc.url == data_url
-
-    def test_pipelex_storage_url_skips_validation(self) -> None:
-        """A pipelex-storage URI is accepted without any check."""
-        storage_url = "pipelex-storage://bucket/file.pdf"
-        doc = DocumentContent(url=storage_url)
-        assert doc.url == storage_url
+    def test_validate_resources_pipelex_storage_url_skips(self) -> None:
+        """validate_resources() skips validation for pipelex-storage URIs."""
+        doc = DocumentContent(url="pipelex-storage://bucket/file.pdf")
+        doc.validate_resources()
