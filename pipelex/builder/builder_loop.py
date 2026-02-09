@@ -670,6 +670,7 @@ class BuilderLoop:
                     | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                     | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
                     | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
+                    | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
                 ):
                     continue
 

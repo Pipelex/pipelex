@@ -130,6 +130,17 @@ You must pick the relevant concepts for inputs and outputs from the following po
 Based on the pipe signature, build the PipeBatchSpec.
 
 @pipe_signature
+
+CRITICAL NAMING RULES for PipeBatch:
+- input_list_name should be a PLURAL noun (e.g., "reports", "items", "images")
+- input_item_name should be the SINGULAR form (e.g., "report", "item", "image")
+- input_item_name must be DIFFERENT from input_list_name
+- input_item_name must NOT match any key in the inputs dict
+Examples:
+  - input_list_name = "reports", input_item_name = "report" ✓
+  - input_list_name = "report_data", input_item_name = "single_report_data" ✓
+  - input_list_name = "reports", input_item_name = "reports" ✗ (same as list name!)
+  - input_list_name = "report_data", input_item_name = "report_data" ✗ (same as inputs key!)
 """
 
 # ────────────────────────────────────────────────────────────────────────────────

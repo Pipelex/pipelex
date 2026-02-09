@@ -234,6 +234,10 @@ Shape of the contract for PipeOperator is:
   i.e. something like "Ideas[]" or "Images[]".
 - input_list_name: List variable to iterate over (snake_case, plural).
 - input_item_name: Name for individual items in each branch (snake_case, singular).
+- IMPORTANT: input_list_name should be a PLURAL noun, and input_item_name should be the
+  SINGULAR form. They must be DIFFERENT from each other, and input_item_name must not match
+  any key in the batch pipe's inputs dict.
+  Examples: list "items" → item "item", list "report_data" → item "single_report_data".
 
 **PipeCondition:**
 - jinja2_expression_template: Jinja2 expression to evaluate.
