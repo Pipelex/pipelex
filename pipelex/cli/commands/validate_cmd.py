@@ -154,6 +154,13 @@ def validate_cmd(
                 )
                 raise typer.Exit(1)
         else:
+            if target == "all":
+                typer.secho(
+                    "Failed to validate: 'all' is not a pipe code. Did you mean 'pipelex validate --all'?",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
             pipe_code = target
             if pipe:
                 typer.secho(

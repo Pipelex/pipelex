@@ -251,6 +251,11 @@ def validate_cmd(
             if bundle:
                 agent_error("Cannot use --bundle if already passing a bundle file as positional argument", "ArgumentError")
         else:
+            if target == "all":
+                agent_error(
+                    "'all' is not a pipe code. Did you mean '--all'?",
+                    "ArgumentError",
+                )
             pipe_code = target
             if pipe:
                 agent_error("Cannot use --pipe if already passing a pipe code as positional argument", "ArgumentError")
