@@ -30,7 +30,7 @@ class TestDocumentContentRenders:
     def test_rendered_html_with_public_url(self):
         """Verify rendered_html uses public_url when available."""
         content = DocumentContent(url=TestData.SAMPLE_URL, public_url=TestData.SAMPLE_PUBLIC_URL)
-        assert content.rendered_html() == TestData.EXPECTED_RENDERED_HTML_WITH_DISPLAY_LINK
+        assert content.rendered_html() == TestData.EXPECTED_RENDERED_HTML_WITH_PUBLIC_URL
 
     def test_rendered_for_prompt(self):
         """Verify rendered_for_prompt returns markdown format."""

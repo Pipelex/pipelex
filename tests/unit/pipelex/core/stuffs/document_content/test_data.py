@@ -30,6 +30,6 @@ class TestData:
     EXPECTED_RENDERED_MARKDOWN = f"[{URLs.pdf_example_1}]({URLs.pdf_example_1})"
     EXPECTED_RENDERED_MARKDOWN_WITH_DISPLAY_LINK = f"[Report.pdf]({URLs.pdf_example_1})"
     EXPECTED_RENDERED_HTML = f'<a href="{URLs.pdf_example_1}" class="msg-document">{URLs.pdf_example_1}</a>'
-    EXPECTED_RENDERED_HTML_WITH_DISPLAY_LINK = f'<a href="{URLs.pdf_example_1}" class="msg-document">Report.pdf</a>'
+    EXPECTED_RENDERED_HTML_WITH_PUBLIC_URL = '<a href="Report.pdf" class="msg-document">Report.pdf</a>'
     # rendered_for_prompt returns just the URL for documents
     EXPECTED_RENDERED_FOR_PROMPT = URLs.pdf_example_1
