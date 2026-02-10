@@ -425,8 +425,9 @@ class TestIncludeOptionalParameter:
         """With include_optional=False, optional fields are excluded (JSON)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
-        expected = {"url": "url_value"}
-        assert result == expected
+        assert isinstance(result, dict)
+        assert "url" in result
+        assert result["url"].startswith("https://mock-")
         # Verify optional fields are NOT present
         assert "source_prompt" not in result
         assert "caption" not in result
@@ -436,8 +437,9 @@ class TestIncludeOptionalParameter:
         """With include_optional=False, optional fields are excluded (Python)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
-        expected = 'ContentWithRequiredAndOptional(url="url_value")'
-        assert result == expected
+        assert isinstance(result, str)
+        assert result.startswith('ContentWithRequiredAndOptional(url="https://mock-')
+        assert result.endswith('")')
 
     def test_includes_optional_fields_by_default(self) -> None:
         """By default, optional fields ARE included (backward compatibility)."""
@@ -469,8 +471,9 @@ class TestIncludeOptionalParameter:
 
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_class_representation(ImageContent, include_optional=False)
-        expected = {"url": "url_value"}
-        assert result == expected
+        assert isinstance(result, dict)
+        assert "url" in result
+        assert result["url"].startswith("https://mock-")
         # Verify optional fields are NOT present
         assert "source_prompt" not in result
         assert "caption" not in result

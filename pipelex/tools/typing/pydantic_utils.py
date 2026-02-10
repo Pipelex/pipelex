@@ -53,6 +53,7 @@ class PydanticValidationErrorAnalysis(BaseModel):
     type_errors: list[str]
     value_errors: list[str]
     enum_errors: list[str]
+    literal_errors: list[str]
     union_tag_errors: list[str]
     model_type_errors: list[str]
 
@@ -77,6 +78,14 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
     enum_errors = [
         f"'{'.'.join(map(str, err['loc']))}': invalid enum value '{err.get('input', 'unknown')}'" for err in exc.errors() if err["type"] == "enum"
     ]
+    literal_errors: list[str] = []
+    for err in exc.errors():
+        if err["type"] == "literal_error":
+            field_path = ".".join(map(str, err["loc"]))
+            actual_input = err.get("input", "unknown")
+            expected = err.get("ctx", {}).get("expected", "unknown")
+            literal_errors.append(f"'{field_path}': got '{actual_input}', expected one of {expected}")
+
     union_tag_errors: list[str] = []
     for err in exc.errors():
         if err["type"] == "union_tag_not_found":
@@ -106,13 +115,15 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
         error_msg += f"\n\nValue errors: {', '.join(value_errors)}"
     if enum_errors:
         error_msg += f"\n\nEnum errors: {', '.join(enum_errors)}"
+    if literal_errors:
+        error_msg += f"\n\nInvalid choice errors: {', '.join(literal_errors)}"
     if union_tag_errors:
         error_msg += f"\n\nUnion discriminator errors: {', '.join(union_tag_errors)}"
     if model_type_errors:
         error_msg += f"\n\nModel type errors: {', '.join(model_type_errors)}"
 
     # If none of the specific error types were found, add the raw error messages
-    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, union_tag_errors, model_type_errors]):
+    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, literal_errors, union_tag_errors, model_type_errors]):
         error_msg += "\n\nOther validation errors:"
         for err in exc.errors():
             error_msg += f"\n{'.'.join(map(str, err['loc']))}: {err['type']}: {err['msg']}"
@@ -124,6 +135,7 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
         type_errors=type_errors,
         value_errors=value_errors,
         enum_errors=enum_errors,
+        literal_errors=literal_errors,
         union_tag_errors=union_tag_errors,
         model_type_errors=model_type_errors,
     )

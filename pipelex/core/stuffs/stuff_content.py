@@ -17,6 +17,13 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     def __str__(self) -> str:
         return self.rendered_plain()
 
+    def validate_resources(self) -> None:
+        """Validate that external resources (URLs, file paths) referenced by this content exist.
+
+        Override in subclasses that reference external resources (e.g., ImageContent, DocumentContent).
+        Called during pipeline execution (both live and dry-run) rather than at model instantiation.
+        """
+
     @property
     def content_type(self) -> str | None:
         """Return the MIME type of the content, or None if not applicable."""

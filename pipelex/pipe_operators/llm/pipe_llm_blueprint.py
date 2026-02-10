@@ -87,7 +87,7 @@ class PipeLLMBlueprint(PipeBlueprint):
         if unused_inputs:
             unused_vars_str = ", ".join(sorted(unused_inputs))
             msg = (
-                f"Unused input variable(s): {unused_vars_str}. "
+                f"Unused input variable(s): '{unused_vars_str}'. "
                 "These variables are declared in inputs but not referenced in the prompt or system_prompt."
             )
             raise ValueError(msg)

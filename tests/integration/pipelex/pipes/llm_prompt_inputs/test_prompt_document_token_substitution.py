@@ -14,6 +14,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_native_concept
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.urls import URLs
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -37,7 +38,7 @@ class TestPromptDocumentTokenSubstitution:
             blueprint=pipe_llm_blueprint,
         )
 
-        doc_url = "https://example.com/report.pdf"
+        doc_url = URLs.pdf_example_1
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.DOCUMENT),
@@ -71,7 +72,7 @@ class TestPromptDocumentTokenSubstitution:
             blueprint=pipe_llm_blueprint,
         )
 
-        doc_url = "https://example.com/secret_report.pdf"
+        doc_url = URLs.pdf_example_1
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.DOCUMENT),
@@ -106,7 +107,7 @@ class TestPromptDocumentTokenSubstitution:
             blueprint=pipe_llm_blueprint,
         )
 
-        doc_urls = ["https://example.com/report1.pdf", "https://example.com/report2.pdf"]
+        doc_urls = [URLs.pdf_example_1, URLs.pdf_example_2]
         doc_list = ListContent[DocumentContent](items=[DocumentContent(url=url) for url in doc_urls])
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
@@ -144,14 +145,14 @@ class TestPromptDocumentTokenSubstitution:
 
         docs_a = ListContent[DocumentContent](
             items=[
-                DocumentContent(url="https://example.com/a1.pdf"),
-                DocumentContent(url="https://example.com/a2.pdf"),
+                DocumentContent(url=URLs.pdf_example_1),
+                DocumentContent(url=URLs.pdf_example_2),
             ]
         )
         docs_b = ListContent[DocumentContent](
             items=[
-                DocumentContent(url="https://example.com/b1.pdf"),
-                DocumentContent(url="https://example.com/b2.pdf"),
+                DocumentContent(url=URLs.pdf_example_1),
+                DocumentContent(url=URLs.pdf_example_2),
             ]
         )
 

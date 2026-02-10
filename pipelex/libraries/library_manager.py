@@ -32,6 +32,7 @@ from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
     get_pipelex_plx_files_from_dirs,
 )
+from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 
@@ -315,11 +316,29 @@ class LibraryManager(LibraryManagerAbstract):
         # Detect cycles in concept references (A -> B -> A is forbidden)
         self._detect_concept_cycles(all_concepts)
 
-        # Load all pipes
+        # Load all pipes, detecting duplicate declarations across bundles in this library
+        pipe_source_in_this_load: dict[str, Path | None] = {}
         for blueprint in blueprints:
             pipes: list[PipeAbstract] = []
+            new_source = Path(blueprint.source) if blueprint.source else None
             if blueprint.pipe is not None:
                 for pipe_code, pipe_blueprint in blueprint.pipe.items():
+                    # Detect duplicate pipe declarations across different bundles in the same library
+                    if pipe_code in pipe_source_in_this_load:
+                        existing_source = pipe_source_in_this_load[pipe_code]
+                        if existing_source == new_source:
+                            msg = (
+                                f"Pipe '{pipe_code}' is declared twice in the same bundle file: '{existing_source}'. "
+                                "Please remove the duplicate declaration."
+                            )
+                        else:
+                            msg = (
+                                f"Pipe '{pipe_code}' is declared in two different bundle files: "
+                                f"'{existing_source}' and '{new_source}'. "
+                                "Please remove one of the declarations or rename one of the pipes."
+                            )
+                        raise PipeLibraryError(msg)
+                    pipe_source_in_this_load[pipe_code] = new_source
                     pipe = PipeFactory[PipeAbstract].make_from_blueprint(
                         domain_code=blueprint.domain,
                         pipe_code=pipe_code,
@@ -327,9 +346,9 @@ class LibraryManager(LibraryManagerAbstract):
                         concept_codes_from_the_same_domain=[the_concept.code for the_concept in all_concepts],
                     )
                     pipes.append(pipe)
-                    # Track source file for this pipe
-                    if blueprint.source:
-                        self._pipe_source_map[pipe_code] = Path(blueprint.source)
+                    # Track source file for this pipe (used by get_pipe_source)
+                    if new_source:
+                        self._pipe_source_map[pipe_code] = new_source
             all_pipes.extend(pipes)
 
         library.pipe_library.add_pipes(pipes=all_pipes)

@@ -74,11 +74,11 @@ def resolve_uri(uri: str) -> ResolvedUri:
         A ResolvedUri variant with the parsed URI information.
 
     Example:
-        >>> resolved_uri = resolve_uri("https://example.com/image.png")
+        >>> resolved_uri = resolve_uri("https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example.png")
         >>> resolved_uri.kind
         UriKind.HTTP_URL
         >>> resolved_uri.url
-        'https://example.com/image.png'
+        'https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example.png'
 
         >>> resolved_uri = resolve_uri("pipelex-storage://images/photo.png")
         >>> resolved_uri.kind

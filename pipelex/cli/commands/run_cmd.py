@@ -10,6 +10,7 @@ import typer
 from posthog import tag
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import (
@@ -308,7 +309,10 @@ def run_cmd(
                 library_dirs=library_dir,
             )
         except PipelineExecutionError as exc:
-            typer.secho(f"Failed to execute pipeline: {exc}", fg=typer.colors.RED, err=True)
+            typer.secho(f"Failed to execute pipeline '{exc.pipe_code}': {exc}", fg=typer.colors.RED, err=True)
+            raise typer.Exit(1) from exc
+        except PipelexError as exc:
+            typer.secho(f"Failed to execute pipeline '{pipe_code or bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
 
         # Pretty print main_stuff unless disabled or in dry run mode
