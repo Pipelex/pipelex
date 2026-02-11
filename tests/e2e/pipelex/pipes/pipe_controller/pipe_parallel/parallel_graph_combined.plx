@@ -1,6 +1,6 @@
 domain = "test_parallel_graph_combined"
-description = "Test PipeParallel with combined_output for graph edge verification"
-main_pipe = "pgc_parallel_analysis"
+description = "Test PipeParallel with combined_output wrapped in PipeSequence with follow-up consumer"
+main_pipe = "pgc_analysis_then_summarize"
 
 [concept.PgcToneResult]
 description = "Result of tone analysis"
@@ -12,6 +12,16 @@ refines = "Text"
 
 [concept.PgcCombinedResult]
 description = "Combined results from parallel analysis"
+
+[pipe.pgc_analysis_then_summarize]
+type = "PipeSequence"
+description = "Run parallel analysis then summarize the combined result"
+inputs = { input_text = "Text" }
+output = "Text"
+steps = [
+    { pipe = "pgc_parallel_analysis", result = "pgc_combined_result" },
+    { pipe = "pgc_summarize_combined" },
+]
 
 [pipe.pgc_parallel_analysis]
 type = "PipeParallel"
@@ -40,3 +50,11 @@ inputs = { input_text = "Text" }
 output = "PgcLengthResult"
 model = "$testing-text"
 prompt = "Describe the length characteristics of: @input_text.text"
+
+[pipe.pgc_summarize_combined]
+type = "PipeLLM"
+description = "Summarize the combined parallel analysis result"
+inputs = { pgc_combined_result = "PgcCombinedResult" }
+output = "Text"
+model = "$testing-text"
+prompt = "Summarize the following analysis: @pgc_combined_result"

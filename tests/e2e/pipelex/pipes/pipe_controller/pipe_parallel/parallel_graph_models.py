@@ -9,3 +9,11 @@ class PgcCombinedResult(StructuredContent):
 
     tone_result: TextContent = Field(..., description="Result of tone analysis")
     length_result: TextContent = Field(..., description="Result of length analysis")
+
+
+class Pg3CombinedResult(StructuredContent):
+    """Combined results from 3-branch parallel analysis."""
+
+    tone_result: TextContent = Field(..., description="Result of tone analysis")
+    length_result: TextContent = Field(..., description="Result of length analysis")
+    style_result: TextContent = Field(..., description="Result of style analysis")

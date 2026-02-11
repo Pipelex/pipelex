@@ -15,8 +15,10 @@ from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.conftest import TEST_OUTPUTS_DIR
 from tests.e2e.pipelex.pipes.pipe_controller.pipe_parallel.test_data import (
+    Parallel3BranchGraphExpectations,
     ParallelAddEachGraphExpectations,
     ParallelCombinedGraphExpectations,
+    ParallelCombinedGraphExpectationsBase,
 )
 
 
@@ -168,11 +170,24 @@ class TestPipeParallelGraph:
 
         log.info("Structural validation passed: DATA edges correctly source from PipeParallel")
 
-    async def test_parallel_combined_output_graph(self, pipe_run_mode: PipeRunMode):
+    @pytest.mark.parametrize(
+        ("pipe_code", "expectations_class"),
+        [
+            ("pgc_analysis_then_summarize", ParallelCombinedGraphExpectations),
+            ("pg3_sequence", Parallel3BranchGraphExpectations),
+        ],
+    )
+    async def test_parallel_combined_output_graph(
+        self,
+        pipe_run_mode: PipeRunMode,
+        pipe_code: str,
+        expectations_class: type[ParallelCombinedGraphExpectationsBase],
+    ):
         """Verify PipeParallel with combined_output generates correct graph structure.
 
-        This test runs a PipeParallel with both add_each_output and combined_output.
-        Expected: PipeParallel node has branch outputs + combined output in its output specs.
+        Parametrized with:
+        - pgc_analysis_then_summarize: 2-branch PipeParallel wrapped in PipeSequence with follow-up consumer
+        - pg3_sequence: 3-branch PipeParallel with selective downstream consumption (1 branch unused)
         """
         # Build config with graph tracing
         base_config = get_config().pipelex.pipeline_execution_config
@@ -194,7 +209,7 @@ class TestPipeParallelGraph:
 
         # Run pipeline
         pipe_output = await execute_pipeline(
-            pipe_code="pgc_parallel_analysis",
+            pipe_code=pipe_code,
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_parallel"],
             inputs={"input_text": TextContent(text="Hello world, this is a test document for parallel analysis.")},
             pipe_run_mode=pipe_run_mode,
@@ -209,7 +224,7 @@ class TestPipeParallelGraph:
         assert graph_spec is not None
         assert isinstance(graph_spec, GraphSpec)
 
-        log.info(f"Parallel combined graph: {len(graph_spec.nodes)} nodes, {len(graph_spec.edges)} edges")
+        log.info(f"Parallel combined graph ({pipe_code}): {len(graph_spec.nodes)} nodes, {len(graph_spec.edges)} edges")
 
         # Build node lookup
         nodes_by_pipe_code: dict[str, list[NodeSpec]] = {}
@@ -219,33 +234,29 @@ class TestPipeParallelGraph:
 
         # 1. Verify all expected pipe_codes exist
         actual_pipe_codes = set(nodes_by_pipe_code.keys())
-        assert actual_pipe_codes == ParallelCombinedGraphExpectations.EXPECTED_PIPE_CODES, (
-            f"Unexpected pipe codes. Expected: {ParallelCombinedGraphExpectations.EXPECTED_PIPE_CODES}, Got: {actual_pipe_codes}"
+        assert actual_pipe_codes == expectations_class.EXPECTED_PIPE_CODES, (
+            f"Unexpected pipe codes. Expected: {expectations_class.EXPECTED_PIPE_CODES}, Got: {actual_pipe_codes}"
         )
 
         # 2. Verify node counts per pipe_code
-        for pipe_code, expected_count in ParallelCombinedGraphExpectations.EXPECTED_NODE_COUNTS.items():
-            actual_count = len(nodes_by_pipe_code.get(pipe_code, []))
-            assert actual_count == expected_count, f"Expected {expected_count} nodes for pipe_code '{pipe_code}', got {actual_count}"
+        for node_pipe_code, expected_count in expectations_class.EXPECTED_NODE_COUNTS.items():
+            actual_count = len(nodes_by_pipe_code.get(node_pipe_code, []))
+            assert actual_count == expected_count, f"Expected {expected_count} nodes for pipe_code '{node_pipe_code}', got {actual_count}"
 
         # 3. Verify edge counts by kind
         actual_edge_counts = Counter(str(edge.kind) for edge in graph_spec.edges)
-        for kind, expected_count in ParallelCombinedGraphExpectations.EXPECTED_EDGE_COUNTS.items():
+        for kind, expected_count in expectations_class.EXPECTED_EDGE_COUNTS.items():
             actual_count = actual_edge_counts.get(kind, 0)
             assert actual_count == expected_count, f"Expected {expected_count} edges of kind '{kind}', got {actual_count}"
 
-        # 4. Verify PipeParallel node has outputs (branch outputs + combined output)
-        parallel_node = nodes_by_pipe_code["pgc_parallel_analysis"][0]
-        assert len(parallel_node.node_io.outputs) >= 2, (
-            f"PipeParallel with combined_output should have at least 2 output specs (branch outputs), got {len(parallel_node.node_io.outputs)}"
-        )
-        output_names = {output.name for output in parallel_node.node_io.outputs}
-        assert "tone_result" in output_names, "PipeParallel should have 'tone_result' output"
-        assert "length_result" in output_names, "PipeParallel should have 'length_result' output"
-
-        # 5. Verify PARALLEL_COMBINE edges connect branch producers to the PipeParallel node
+        # 4. Verify PARALLEL_COMBINE edges connect branch producers to the PipeParallel node
+        parallel_pipe_code = expectations_class.PARALLEL_PIPE_CODE
+        parallel_node = nodes_by_pipe_code[parallel_pipe_code][0]
         parallel_combine_edges = [edge for edge in graph_spec.edges if edge.kind.is_parallel_combine]
-        assert len(parallel_combine_edges) == 2, f"Expected 2 PARALLEL_COMBINE edges (one per branch), got {len(parallel_combine_edges)}"
+        expected_combine_count = expectations_class.EXPECTED_EDGE_COUNTS.get("parallel_combine", 0)
+        assert len(parallel_combine_edges) == expected_combine_count, (
+            f"Expected {expected_combine_count} PARALLEL_COMBINE edges, got {len(parallel_combine_edges)}"
+        )
         for edge in parallel_combine_edges:
             assert edge.target == parallel_node.node_id, (
                 f"PARALLEL_COMBINE edge target should be PipeParallel '{parallel_node.node_id}', got '{edge.target}'"
@@ -257,10 +268,10 @@ class TestPipeParallelGraph:
         graph_outputs = await generate_graph_outputs(
             graph_spec=graph_spec,
             graph_config=graph_config,
-            pipe_code="pgc_parallel_analysis",
+            pipe_code=pipe_code,
         )
 
-        output_dir = _get_next_output_folder("combined")
+        output_dir = _get_next_output_folder(pipe_code)
         if graph_outputs.graphspec_json:
             save_text_to_path(graph_outputs.graphspec_json, str(output_dir / "graph.json"))
         if graph_outputs.reactflow_html:
@@ -275,7 +286,7 @@ class TestPipeParallelGraph:
                 "parallel_outputs": [output.name for output in parallel_node.node_io.outputs],
                 "output_dir": str(output_dir),
             },
-            title="Parallel Combined Graph Outputs",
+            title=f"Parallel Combined Graph Outputs ({pipe_code})",
         )
 
-        log.info("Structural validation passed: PipeParallel combined_output graph is correct")
+        log.info(f"Structural validation passed: {pipe_code} combined_output graph is correct")

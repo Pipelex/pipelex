@@ -3,6 +3,15 @@
 from typing import ClassVar
 
 
+class ParallelCombinedGraphExpectationsBase:
+    """Base class for PipeParallel graph expectations with combined_output."""
+
+    PARALLEL_PIPE_CODE: ClassVar[str]
+    EXPECTED_PIPE_CODES: ClassVar[set[str]]
+    EXPECTED_NODE_COUNTS: ClassVar[dict[str, int]]
+    EXPECTED_EDGE_COUNTS: ClassVar[dict[str, int]]
+
+
 class ParallelAddEachGraphExpectations:
     """Expected structure for the parallel_graph_add_each graph."""
 
@@ -31,25 +40,67 @@ class ParallelAddEachGraphExpectations:
     }
 
 
-class ParallelCombinedGraphExpectations:
-    """Expected structure for the parallel_graph_combined graph."""
+class ParallelCombinedGraphExpectations(ParallelCombinedGraphExpectationsBase):
+    """Expected structure for the parallel_graph_combined graph (PipeSequence wrapping PipeParallel with combined_output)."""
+
+    PARALLEL_PIPE_CODE: ClassVar[str] = "pgc_parallel_analysis"
 
     # Expected node pipe_codes
     EXPECTED_PIPE_CODES: ClassVar[set[str]] = {
+        "pgc_analysis_then_summarize",  # PipeSequence (outer controller)
         "pgc_parallel_analysis",  # PipeParallel (parallel controller with combined_output)
         "pgc_analyze_tone",  # PipeLLM (branch 1)
         "pgc_analyze_length",  # PipeLLM (branch 2)
+        "pgc_summarize_combined",  # PipeLLM (downstream consumer of combined result)
     }
 
     # Expected number of nodes per pipe_code
     EXPECTED_NODE_COUNTS: ClassVar[dict[str, int]] = {
+        "pgc_analysis_then_summarize": 1,
         "pgc_parallel_analysis": 1,
         "pgc_analyze_tone": 1,
         "pgc_analyze_length": 1,
+        "pgc_summarize_combined": 1,
     }
 
     # Expected number of edges by kind
     EXPECTED_EDGE_COUNTS: ClassVar[dict[str, int]] = {
-        "contains": 2,  # parallel->tone, parallel->length
+        "contains": 4,  # sequence->parallel, sequence->summarize_combined, parallel->tone, parallel->length
         "parallel_combine": 2,  # tone_result->combined, length_result->combined
+        "data": 1,  # parallel->summarize_combined (combined result)
+    }
+
+
+class Parallel3BranchGraphExpectations(ParallelCombinedGraphExpectationsBase):
+    """Expected structure for the parallel_graph_3branch graph (3-branch PipeParallel with selective consumption)."""
+
+    PARALLEL_PIPE_CODE: ClassVar[str] = "pg3_parallel"
+
+    # Expected node pipe_codes
+    EXPECTED_PIPE_CODES: ClassVar[set[str]] = {
+        "pg3_sequence",  # PipeSequence (outer controller)
+        "pg3_parallel",  # PipeParallel (3-branch parallel with combined_output)
+        "pg3_analyze_tone",  # PipeLLM (branch 1)
+        "pg3_analyze_length",  # PipeLLM (branch 2)
+        "pg3_analyze_style",  # PipeLLM (branch 3 - unused downstream)
+        "pg3_refine_tone",  # PipeLLM (consumes tone_result)
+        "pg3_refine_length",  # PipeLLM (consumes length_result)
+    }
+
+    # Expected number of nodes per pipe_code
+    EXPECTED_NODE_COUNTS: ClassVar[dict[str, int]] = {
+        "pg3_sequence": 1,
+        "pg3_parallel": 1,
+        "pg3_analyze_tone": 1,
+        "pg3_analyze_length": 1,
+        "pg3_analyze_style": 1,
+        "pg3_refine_tone": 1,
+        "pg3_refine_length": 1,
+    }
+
+    # Expected number of edges by kind
+    EXPECTED_EDGE_COUNTS: ClassVar[dict[str, int]] = {
+        "contains": 6,  # sequence->parallel, sequence->refine_tone, sequence->refine_length, parallel->tone, parallel->length, parallel->style
+        "parallel_combine": 3,  # tone->combined, length->combined, style->combined
+        "data": 2,  # parallel->refine_tone (tone_result), parallel->refine_length (length_result)
     }
