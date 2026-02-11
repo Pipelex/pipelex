@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import NamedTuple
 
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError
+
 PIPELEX_STORAGE_SCHEME = "pipelex-storage://"
 
 
@@ -35,8 +37,6 @@ class StorageProviderAbstract(ABC):
         Raises:
             StorageFileNotFoundError: If URI doesn't start with the expected scheme.
         """
-        from pipelex.tools.storage.exceptions import StorageFileNotFoundError  # noqa: PLC0415
-
         if not uri.startswith(PIPELEX_STORAGE_SCHEME):
             msg = f"Invalid URI '{uri}': must start with '{PIPELEX_STORAGE_SCHEME}'"
             raise StorageFileNotFoundError(msg)
@@ -54,8 +54,6 @@ class StorageProviderAbstract(ABC):
         Raises:
             StorageInvalidKeyError: If key already contains the scheme prefix.
         """
-        from pipelex.tools.storage.exceptions import StorageInvalidKeyError  # noqa: PLC0415
-
         if key.startswith(PIPELEX_STORAGE_SCHEME):
             msg = f"Key should not include scheme prefix: '{key}'"
             raise StorageInvalidKeyError(msg)
