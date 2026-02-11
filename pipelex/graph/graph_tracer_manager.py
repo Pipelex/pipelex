@@ -298,6 +298,27 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             label=label,
         )
 
+    def register_controller_output(
+        self,
+        graph_id: str,
+        node_id: str,
+        output_spec: IOSpec,
+    ) -> None:
+        """Register an additional output for a controller node.
+
+        Args:
+            graph_id: The graph identifier.
+            node_id: The controller node ID.
+            output_spec: The IOSpec describing the output.
+        """
+        tracer = self._get_tracer(graph_id)
+        if tracer is None:
+            return
+        tracer.register_controller_output(
+            node_id=node_id,
+            output_spec=output_spec,
+        )
+
     def register_batch_item_extraction(
         self,
         graph_id: str,

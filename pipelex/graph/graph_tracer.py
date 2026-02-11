@@ -47,7 +47,7 @@ class _MutableNodeData:
         self.metrics: dict[str, float] = {}
         self.error: ErrorSpec | None = None
         self.input_specs: list[IOSpec] = input_specs or []
-        self.output_spec: IOSpec | None = None
+        self.output_specs: list[IOSpec] = []
 
     def to_node_spec(self) -> NodeSpec:
         """Convert to immutable NodeSpec."""
@@ -59,9 +59,7 @@ class _MutableNodeData:
         )
 
         # Build NodeIOSpec from captured input/output specs
-        outputs: list[IOSpec] = []
-        if self.output_spec is not None:
-            outputs = [self.output_spec]
+        outputs = list(self.output_specs)
 
         node_io = NodeIOSpec(
             inputs=self.input_specs,
@@ -422,10 +420,45 @@ class GraphTracer(GraphTracerProtocol):
 
         # Store output spec and register in producer map for data flow tracking
         if output_spec is not None:
-            node_data.output_spec = output_spec
-            # Register this node as the producer of this stuff_code (digest)
-            if output_spec.digest:
-                self._stuff_producer_map[output_spec.digest] = node_id
+            # Skip pass-through outputs: if the output digest matches one of the node's
+            # input digests, the output is just the unchanged input flowing through
+            # (e.g., PipeParallel with add_each_output where main_stuff is the original input)
+            input_digests = {spec.digest for spec in node_data.input_specs if spec.digest is not None}
+            if output_spec.digest in input_digests:
+                # Pass-through: don't register as output or producer
+                pass
+            else:
+                node_data.output_specs.append(output_spec)
+                # Register this node as the producer of this stuff_code (digest)
+                if output_spec.digest:
+                    self._stuff_producer_map[output_spec.digest] = node_id
+
+    @override
+    def register_controller_output(
+        self,
+        node_id: str,
+        output_spec: IOSpec,
+    ) -> None:
+        """Register an additional output for a controller node.
+
+        This allows controllers like PipeParallel to explicitly register their
+        branch outputs, overriding sub-pipe registrations in _stuff_producer_map
+        so that DATA edges flow from the controller to downstream consumers.
+
+        Args:
+            node_id: The controller node ID.
+            output_spec: The IOSpec describing the output.
+        """
+        if not self._is_active:
+            return
+
+        node_data = self._nodes.get(node_id)
+        if node_data is None:
+            return
+
+        node_data.output_specs.append(output_spec)
+        if output_spec.digest:
+            self._stuff_producer_map[output_spec.digest] = node_id
 
     @override
     def on_pipe_end_error(

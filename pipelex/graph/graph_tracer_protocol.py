@@ -126,6 +126,22 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def register_controller_output(
+        self,
+        node_id: str,
+        output_spec: IOSpec,
+    ) -> None:
+        """Register an additional output for a controller node.
+
+        This allows controllers like PipeParallel to explicitly register their
+        branch outputs so that DATA edges flow from the controller to downstream consumers.
+
+        Args:
+            node_id: The controller node ID.
+            output_spec: The IOSpec describing the output.
+        """
+        ...
+
     def register_batch_item_extraction(
         self,
         list_stuff_code: str,
@@ -232,6 +248,14 @@ class GraphTracerNoOp(GraphTracerProtocol):
         label: str | None = None,
         source_stuff_digest: str | None = None,
         target_stuff_digest: str | None = None,
+    ) -> None:
+        pass
+
+    @override
+    def register_controller_output(
+        self,
+        node_id: str,
+        output_spec: IOSpec,
     ) -> None:
         pass
 
