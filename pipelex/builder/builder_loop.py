@@ -24,7 +24,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
-from pipelex.language.plx_factory import PlxFactory
+from pipelex.language.mthds_factory import MthdsFactory
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
@@ -69,15 +69,15 @@ class BuilderLoop:
 
         if is_save_first_iteration_enabled:
             try:
-                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                plx_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 first_iteration_path = get_incremental_file_path(
                     base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_1st_iteration",
-                    extension="plx",
+                    extension="mthds",
                 )
                 save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
             except PipelexBundleSpecBlueprintError as exc:
-                log.warning(f"Could not save first iteration PLX: {exc}")
+                log.warning(f"Could not save first iteration MTHDS: {exc}")
 
         max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts
         for attempt in range(1, max_attempts + 1):
@@ -693,15 +693,15 @@ class BuilderLoop:
         # Save second iteration if we made any changes (pipes or concepts)
         if (fixed_pipes or added_concepts) and is_save_second_iteration_enabled:
             try:
-                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                plx_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 second_iteration_path = get_incremental_file_path(
                     base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_2nd_iteration",
-                    extension="plx",
+                    extension="mthds",
                 )
                 save_text_to_path(text=plx_content, path=str(second_iteration_path))
             except PipelexBundleSpecBlueprintError as exc:
-                log.warning(f"Could not save second iteration PLX: {exc}")
+                log.warning(f"Could not save second iteration MTHDS: {exc}")
 
         return pipelex_bundle_spec
 

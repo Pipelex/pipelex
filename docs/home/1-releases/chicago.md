@@ -4,7 +4,7 @@ title: "Chicago Release"
 
 # Pipelex v0.18.0 "Chicago"
 
-**The AI workflow framework that just works.**
+**The AI method framework that just works.**
 
 ## Why Pipelex
 
@@ -12,19 +12,19 @@ Pipelex eliminates the complexity of building AI-powered applications. Instead o
 
 - **One framework** for prompts, pipelines, and structured outputs
 - **One API key** for dozens of AI models
-- **One workflow** from prototype to production
+- **One method** from prototype to production
 
 ---
 
 ## A Major Milestone
 
-Three months after our first public launch in San Francisco, Pipelex reaches a new level of maturity with the "Chicago" release (currently in beta-test). This version delivers on our core promise: **enabling every developer to build AI workflows that are reliable, flexible, and production-ready**.
+Three months after our first public launch in San Francisco, Pipelex reaches a new level of maturity with the "Chicago" release (currently in beta-test). This version delivers on our core promise: **enabling every developer to build AI methods that are reliable, flexible, and production-ready**.
 
 Version 0.18.0 represents our most significant release to date, addressing the three priorities that emerged from real-world usage:
 
 - **Universal model access** — one API key for all leading AI models
 - **State-of-the-art document extraction** — deployable anywhere
-- **Visual pipeline inspection** — full transparency into your workflows
+- **Visual pipeline inspection** — full transparency into your methods
 
 ---
 
@@ -91,7 +91,7 @@ Broad support for open-source AI:
 
 ### Developer Experience
 
-- **Pure PLX Workflows** — Inline concept structures now support nested concepts, making Pipelex fully usable with just `.plx` files and the CLI—no Python code required
+- **Pure MTHDS Methods** — Inline concept structures now support nested concepts, making Pipelex fully usable with just `.mthds` files and the CLI—no Python code required
 - **Deep Integration Options** — Generate Pydantic BaseModels from your declarative concepts for full IDE autocomplete, type checking, and validation (TypeScript Zod structures coming soon)
 - **PipeCompose Construct Mode** — Build `StructuredContent` objects deterministically without an LLM, composing outputs from working memory variables, fixed values, templates, and nested structures
 - **Cloud Storage for Artifacts** — Store generated images and extracted pages on AWS S3 or Google Cloud Storage with public or signed URLs
@@ -112,7 +112,7 @@ Then run `pipelex init` to configure your environment and obtain your Gateway AP
 
 ---
 
-*Ready to build AI workflows that just work?*
+*Ready to build AI methods that just work?*
 
 [Join the Waitlist](https://go.pipelex.com/waitlist){ .md-button .md-button--primary }
 [Documentation](https://docs.pipelex.com/pre-release){ .md-button }

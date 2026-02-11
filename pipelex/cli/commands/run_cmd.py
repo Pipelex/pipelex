@@ -20,7 +20,7 @@ from pipelex.cli.error_handlers import (
 )
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
-from pipelex.core.interpreter.helpers import is_pipelex_file
+from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.stuffs.stuff_viewer import render_stuff_viewer
@@ -43,15 +43,15 @@ COMMAND = "run"
 def run_cmd(
     target: Annotated[
         str | None,
-        typer.Argument(help="Pipe code, bundle file path (.plx), or pipeline directory (auto-detected)"),
+        typer.Argument(help="Pipe code, bundle file path (.mthds), or pipeline directory (auto-detected)"),
     ] = None,
     pipe: Annotated[
         str | None,
-        typer.Option("--pipe", help="Pipe code to run, can be omitted if you specify a bundle (.plx) that declares a main pipe"),
+        typer.Option("--pipe", help="Pipe code to run, can be omitted if you specify a bundle (.mthds) that declares a main pipe"),
     ] = None,
     bundle: Annotated[
         str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx) - runs its main_pipe unless you specify a pipe code"),
+        typer.Option("--bundle", help="Bundle file path (.mthds) - runs its main_pipe unless you specify a pipe code"),
     ] = None,
     inputs: Annotated[
         str | None,
@@ -101,20 +101,20 @@ def run_cmd(
     ] = False,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files). Can be specified multiple times."),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times."),
     ] = None,
 ) -> None:
     """Execute a pipeline from a specific bundle file (or not), specifying its pipe code or not.
     If the bundle is provided, it will run its main pipe unless you specify a pipe code.
     If the pipe code is provided, you don't need to provide a bundle file if it's already part of the imported packages.
-    If a directory is provided, it auto-detects bundle.plx and inputs.json inside it.
+    If a directory is provided, it auto-detects bundle.mthds and inputs.json inside it.
 
     Examples:
         pipelex run my_pipe
-        pipelex run --bundle my_bundle.plx
-        pipelex run --bundle my_bundle.plx --pipe my_pipe
+        pipelex run --bundle my_bundle.mthds
+        pipelex run --bundle my_bundle.mthds --pipe my_pipe
         pipelex run --pipe my_pipe --inputs data.json
-        pipelex run my_bundle.plx --inputs data.json
+        pipelex run my_bundle.mthds --inputs data.json
         pipelex run pipeline_01/
         pipelex run pipeline_01/ --pipe my_pipe
         pipelex run my_pipe --working-memory-path results.json --no-pretty-print
@@ -158,30 +158,30 @@ def run_cmd(
                 )
                 raise typer.Exit(1)
 
-            # Find .plx: try default name first, then fall back to single .plx
+            # Find .mthds: try default name first, then fall back to single .mthds
             bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
             if bundle_file.is_file():
                 bundle_path = str(bundle_file)
             else:
-                plx_files = list(target_path.glob("*.plx"))
-                if len(plx_files) == 0:
+                mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
+                if len(mthds_files) == 0:
                     typer.secho(
-                        f"Failed to run: no .plx bundle file found in directory '{target}'",
+                        f"Failed to run: no .mthds bundle file found in directory '{target}'",
                         fg=typer.colors.RED,
                         err=True,
                     )
                     raise typer.Exit(1)
-                if len(plx_files) > 1:
-                    plx_names = ", ".join(plx_file.name for plx_file in plx_files)
+                if len(mthds_files) > 1:
+                    mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
                     typer.secho(
-                        f"Failed to run: multiple .plx files found in '{target}' ({plx_names}) "
+                        f"Failed to run: multiple .mthds files found in '{target}' ({mthds_names}) "
                         f"and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
-                        f"Pass the .plx file directly, e.g.: pipelex run {target_path / plx_files[0].name}",
+                        f"Pass the .mthds file directly, e.g.: pipelex run {target_path / mthds_files[0].name}",
                         fg=typer.colors.RED,
                         err=True,
                     )
                     raise typer.Exit(1)
-                bundle_path = str(plx_files[0])
+                bundle_path = str(mthds_files[0])
 
             # Auto-detect inputs if --inputs not explicitly provided
             inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
@@ -207,7 +207,7 @@ def run_cmd(
             bundle_path = target
             if bundle:
                 typer.secho(
-                    "Failed to run: cannot use option --bundle if you're already passing a bundle file (.plx) as positional argument",
+                    "Failed to run: cannot use option --bundle if you're already passing a bundle file (.mthds) as positional argument",
                     fg=typer.colors.RED,
                     err=True,
                 )

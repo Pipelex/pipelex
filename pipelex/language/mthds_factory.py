@@ -13,7 +13,7 @@ from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-    from pipelex.system.configuration.configs import PlxConfig
+    from pipelex.system.configuration.configs import MthdsConfig
 
 
 class SectionKey(StrEnum):
@@ -27,10 +27,10 @@ PIPE_CONSTRUCT_FIELD_KEY = "construct"
 PIPE_CATEGORY_FIELD_KEY = "pipe_category"
 
 
-class PlxFactory:
+class MthdsFactory:
     @classmethod
-    def _plx_config(cls) -> PlxConfig:
-        return get_config().pipelex.plx_config
+    def _mthds_config(cls) -> MthdsConfig:
+        return get_config().pipelex.mthds_config
 
     @classmethod
     def format_tomlkit_string(cls, text: str) -> Any:  # Can't type this because of tomlkit
@@ -39,7 +39,7 @@ class PlxFactory:
         - When multiline, `ensure_trailing_newline` puts the closing quotes on their own line.
         - When multiline, `ensure_leading_blank_line` inserts a real blank line at the start of the string.
         """
-        strings_config = cls._plx_config().strings
+        strings_config = cls._mthds_config().strings
 
         needs_multiline = strings_config.force_multiline or ("\n" in text) or len(text) > strings_config.length_limit_to_multiline
         normalized = text
@@ -144,7 +144,7 @@ class PlxFactory:
         else:
             # No field ordering provided, use original logic
             for field_key, field_value in mapping.items():
-                # Skip the category field as it's not needed in PLX output (pipe metadata)
+                # Skip the category field as it's not needed in MTHDS output (pipe metadata)
                 if field_key == PIPE_CATEGORY_FIELD_KEY:
                     continue
 
@@ -241,9 +241,9 @@ class PlxFactory:
 
     @classmethod
     def make_construct_table(cls, construct_value: Mapping[str, Any]) -> Any:
-        """Create a nested table for construct section in PLX format.
+        """Create a nested table for construct section in MTHDS format.
 
-        The construct_value should already be in PLX format (from ConstructBlueprint.to_plx_dict())
+        The construct_value should already be in MTHDS format (from ConstructBlueprint.to_plx_dict())
         with field names at the root, not wrapped in a 'fields' key.
         """
         tbl = table()
@@ -265,7 +265,7 @@ class PlxFactory:
             log.verbose(f"Field is a mapping: key = {field_key}, value = {field_value}")
             field_value = cast("Mapping[str, Any]", field_value)
             # Convert pipe configuration to table (handles template field specially)
-            table_obj.add(field_key, cls.convert_mapping_to_table(field_value, field_ordering=cls._plx_config().pipes.field_ordering))
+            table_obj.add(field_key, cls.convert_mapping_to_table(field_value, field_ordering=cls._mthds_config().pipes.field_ordering))
         return table_obj
 
     @classmethod
@@ -314,7 +314,7 @@ class PlxFactory:
                         structure_table_obj.add(
                             structure_field_key,
                             cls.convert_dicts_to_inline_tables(
-                                value=filtered_value, field_ordering=cls._plx_config().concepts.structure_field_ordering
+                                value=filtered_value, field_ordering=cls._mthds_config().concepts.structure_field_ordering
                             ),
                         )
                     concept_table_obj.add("structure", structure_table_obj)
@@ -326,7 +326,7 @@ class PlxFactory:
         return table_obj
 
     @classmethod
-    def dict_to_plx_styled_toml(cls, data: Mapping[str, Any]) -> str:
+    def dict_to_mthds_styled_toml(cls, data: Mapping[str, Any]) -> str:
         """Top-level keys become tables; second-level mappings become tables; inline tables start at third level."""
         log.verbose("=" * 100)
         data = remove_none_values_from_dict(data=data)
@@ -355,16 +355,16 @@ class PlxFactory:
                     document_root.add(section_key, table_obj_for_concept)
 
         toml_output = tomlkit.dumps(document_root)  # pyright: ignore[reportUnknownMemberType]
-        if cls._plx_config().inline_tables.spaces_inside_curly_braces:
+        if cls._mthds_config().inline_tables.spaces_inside_curly_braces:
             return cls.add_spaces_to_inline_tables(toml_output)
         return toml_output
 
     @classmethod
-    def make_plx_content(cls, blueprint: PipelexBundleBlueprint) -> str:
-        # Use context to signal PLX format serialization to ConstructBlueprint
+    def make_mthds_content(cls, blueprint: PipelexBundleBlueprint) -> str:
+        # Use context to signal MTHDS format serialization to ConstructBlueprint
         blueprint_dict = blueprint.model_dump(
             serialize_as_any=True,
             by_alias=True,
-            context={"format": "plx"},
+            context={"format": "mthds"},
         )
-        return cls.dict_to_plx_styled_toml(data=blueprint_dict)
+        return cls.dict_to_mthds_styled_toml(data=blueprint_dict)

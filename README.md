@@ -11,8 +11,8 @@
   <br/>
   <br/>
 
-  <h2 align="center">AI Workflows That Agents Build & Run</h2>
-  <p align="center">Pipelex is developing the open standard for repeatable AI workflows.<br/>
+  <h2 align="center">AI Methods That Agents Build & Run</h2>
+  <p align="center">Pipelex is developing the open standard for repeatable AI methods.<br/>
 Write business logic, not API calls.</p>
 
   <div>
@@ -76,17 +76,17 @@ Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Co
 <!-- PRERELEASE_LINK -->
 Run models locally with Ollama, vLLM, LM Studio, or llama.cpp - no API keys required. See [Configure AI Providers](https://docs.pipelex.com/pre-release/home/5-setup/configure-ai-providers/) for details.
 
-## 3. Generate Your First Workflow
+## 3. Generate Your First Method
 
-Create a complete AI workflow with a single command:
+Create a complete AI method with a single command:
 
 ```bash
-pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview" --output results/cv_match.plx
+pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview" --output results/cv_match.mthds
 ```
 
-This command generates a production-ready `.plx` file with domain definitions, concepts, and multiple processing steps that analyzes CV-job fit and prepares interview questions.
+This command generates a production-ready `.mthds` file with domain definitions, concepts, and multiple processing steps that analyzes CV-job fit and prepares interview questions.
 
-**cv_match.plx**
+**cv_match.mthds**
 ```toml
 domain = "cv_match"
 description = "Matching CVs with job offers and generating interview questions"
@@ -109,7 +109,7 @@ refines = "Text"
 [pipe.analyze_cv_job_match_and_generate_questions]
 type = "PipeSequence"
 description = """
-Main pipeline that orchestrates the complete CV-job matching and interview question generation workflow. Takes a candidate's CV and a job offer as PDF documents, extracts their content, performs a comprehensive match analysis identifying strengths, gaps, and areas to probe, and generates exactly 5 targeted interview questions based on the analysis results.
+Main pipeline that orchestrates the complete CV-job matching and interview question generation method. Takes a candidate's CV and a job offer as PDF documents, extracts their content, performs a comprehensive match analysis identifying strengths, gaps, and areas to probe, and generates exactly 5 targeted interview questions based on the analysis results.
 """
 inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
 output = "Question[5]"
@@ -255,7 +255,7 @@ flowchart TD
 
 ```bash
 # Run with input file
-pipelex run results/cv_match.plx --inputs inputs.json
+pipelex run results/cv_match.mthds --inputs inputs.json
 ```
 
 Create an `inputs.json` file with your PDF URLs:
@@ -305,13 +305,13 @@ asyncio.run(run_pipeline())
   <table align="center">
     <tr>
       <td align="center" width="50%">
-        <h3>From Whiteboard to AI Workflow in less than 5 minutes with no hands (2025-07)</h3>
+        <h3>From Whiteboard to AI Method in less than 5 minutes with no hands (2025-07)</h3>
         <a href="https://go.pipelex.com/demo">
           <img src="https://go.pipelex.com/demo-thumbnail" alt="Pipelex Demo" width="100%" style="max-width: 500px; height: auto;">
         </a>
       </td>
       <td align="center" width="50%">
-        <h3>The AI workflow that writes an AI workflow in 64 seconds (2025-09)</h3>
+        <h3>The AI method that writes an AI method in 64 seconds (2025-09)</h3>
         <a href="https://go.pipelex.com/Demo-Live">
           <img src="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_play_video_demo_live.jpg" alt="Pipelex Live Demo" width="100%" style="max-width: 500px; height: auto;">
         </a>
@@ -323,21 +323,21 @@ asyncio.run(run_pipeline())
 
 ## 💡 What is Pipelex?
 
-Pipelex is an open-source language that enables you to build and run **repeatable AI workflows**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+Pipelex is an open-source language that enables you to build and run **repeatable AI methods**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
 
-Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.plx` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
+Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.mthds` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
 
 ## 📖 Next Steps
 
 <!-- PRERELEASE_LINK -->
 **Learn More:**
 - [Design and Run Pipelines](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/pipes/) - Complete guide with examples
-- [Kick off a Pipeline Project](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project/) - Deep dive into Pipelex
+- [Kick off a Pipeline Project](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/kick-off-a-pipelex-method-project/) - Deep dive into Pipelex
 - [Configure AI Providers](https://docs.pipelex.com/pre-release/home/5-setup/configure-ai-providers/) - Set up AI providers and models
 
 ## 🔧 IDE Extension
 
-We **highly** recommend installing our extension for `.plx` files into your IDE. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too. If you're using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
+We **highly** recommend installing our extension for `.mthds` files into your IDE. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too. If you're using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
 
 ## 📚 Examples & Cookbook
 

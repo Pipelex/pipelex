@@ -282,10 +282,10 @@ class ConstructBlueprint(BaseModel):
     def serialize_with_context(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo) -> dict[str, Any]:
         """Serialize with format-aware context.
 
-        When context contains {"format": "plx"}, outputs PLX-format dict.
+        When context contains {"format": "mthds"}, outputs MTHDS-format dict.
         Otherwise, uses default Pydantic serialization.
         """
-        if info.context and info.context.get("format") == "plx":
+        if info.context and info.context.get("format") == "mthds":
             return self.to_plx_dict()
         result = handler(self)
         return dict(result)  # Ensure dict return type

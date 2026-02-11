@@ -19,10 +19,10 @@ from tests.unit.pipelex.core.test_data.pipes.operators.llm.pipe_llm import PIPE_
 
 
 class InterpreterTestCases:
-    """Test cases for PipelexInterpreter with PLX content and expected blueprints."""
+    """Test cases for PipelexInterpreter with MTHDS content and expected blueprints."""
 
     # Aggregate all valid test cases from organized modules
-    VALID_TEST_CASES: ClassVar[list[tuple[str, str, PipelexBundleBlueprint]]] = [  # test_name,plx_content,blueprint
+    VALID_TEST_CASES: ClassVar[list[tuple[str, str, PipelexBundleBlueprint]]] = [  # test_name,mthds_content,blueprint
         # Domain tests
         *DOMAIN_TEST_CASES,
         # Concept tests

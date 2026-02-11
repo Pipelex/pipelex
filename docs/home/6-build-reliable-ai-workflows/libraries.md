@@ -10,7 +10,7 @@ A Library is composed of three core components:
 - **ConceptLibrary**: Manages all concept definitions across domains
 - **PipeLibrary**: Manages all pipe definitions
 
-These three components together form what we call a **Pipelex Bundle** (the content you define in `.plx` files). Learn more about bundle structure and syntax in the [Pipelex Bundle Specification](./pipelex-bundle-specification.md).
+These three components together form what we call a **Pipelex Bundle** (the content you define in `.mthds` files). Learn more about bundle structure and syntax in the [Pipelex Bundle Specification](./pipelex-bundle-specification.md).
 
 ## Understanding Library Scope
 
@@ -18,7 +18,7 @@ When you execute pipelines using `execute_pipeline` or `start_pipeline`, a libra
 
 - Contains the pipes and concepts available for execution
 - Provides isolation between different pipeline runs when using different library IDs
-- Can be loaded from local directories or from PLX content strings
+- Can be loaded from local directories or from MTHDS content strings
 
 ## Uniqueness Rules
 
@@ -41,7 +41,7 @@ Libraries enforce specific uniqueness constraints to maintain consistency:
 Currently, all libraries are **local**, meaning they are loaded from:
 
 - Directories on your filesystem (using `library_dirs` parameter)
-- PLX content strings (using `plx_content` parameter)
+- MTHDS content strings (using `plx_content` parameter)
 - The current working directory (default behavior)
 
 ```python
@@ -90,7 +90,7 @@ The library is populated based on the parameters you provide:
 **Option A: Loading from directories**
 
 ```python
-# Loads all .plx files from specified directories
+# Loads all .mthds files from specified directories
 pipe_output = await execute_pipeline(
     pipe_code="my_pipe",
     library_dirs=["./pipelines"],
@@ -98,10 +98,10 @@ pipe_output = await execute_pipeline(
 )
 ```
 
-**Option B: Loading from PLX content**
+**Option B: Loading from MTHDS content**
 
 ```python
-# Loads only the provided PLX content
+# Loads only the provided MTHDS content
 plx_content = """
 domain = "marketing"
 
@@ -165,12 +165,12 @@ pipe_output = await execute_pipeline(
 )
 ```
 
-### 2. Use PLX Content for Dynamic Pipelines
+### 2. Use MTHDS Content for Dynamic Pipelines
 
 When generating or modifying pipelines dynamically, use `plx_content`:
 
 ```python
-# Generate PLX content dynamically
+# Generate MTHDS content dynamically
 plx_content = generate_custom_pipeline(user_requirements)
 
 pipe_output = await execute_pipeline(
@@ -208,7 +208,7 @@ output2 = await execute_pipeline(
 ## Related Documentation
 
 - [Executing Pipelines](pipes/executing-pipelines.md) - Learn how to execute pipelines with different library configurations
-- [Pipelex Bundle Specification](./pipelex-bundle-specification.md) - Understand the structure of PLX files
+- [Pipelex Bundle Specification](./pipelex-bundle-specification.md) - Understand the structure of MTHDS files
 - [Domains](./domain.md) - Learn about organizing pipes into domains
 - [Concepts](./concepts/define_your_concepts.md) - Understand how concepts work within libraries
 

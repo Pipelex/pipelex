@@ -10,7 +10,7 @@ The pipe can be configured to generate a single image or a list of images.
 
 ## Configuration
 
-`PipeImgGen` is configured in your pipeline's `.plx` file.
+`PipeImgGen` is configured in your pipeline's `.mthds` file.
 
 ### The `prompt` Field is Required
 
@@ -55,7 +55,7 @@ Common image generation model handles:
 
 Image generation presets are defined in your model deck configuration and can include parameters like `quality`, `guidance_scale`, and `safety_tolerance`.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter               | Type            | Description                                                                                                                   | Required |
 | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- |

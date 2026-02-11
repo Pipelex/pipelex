@@ -20,7 +20,7 @@ from pipelex.core.pipes.handle_pipe_errors import (
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library
-from pipelex.libraries.library_utils import get_pipelex_plx_files_from_dirs
+from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
 from pipelex.pipe_run.exceptions import PipeRunError
 
@@ -133,7 +133,7 @@ async def validate_bundle(
             blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file_path)
             loaded_blueprints = [blueprint]
 
-            if plx_file_path.resolve() not in library.loaded_plx_paths:
+            if plx_file_path.resolve() not in library.loaded_mthds_paths:
                 # File not yet loaded - load it from the blueprint
                 loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
             else:
@@ -163,7 +163,7 @@ async def validate_bundle(
         ) from pipe_error
     except ValidationError as validation_error:
         pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
         msg = f"Could not load blueprints because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,
@@ -182,15 +182,15 @@ async def validate_bundle(
 
 
 async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResult:
-    plx_files = get_pipelex_plx_files_from_dirs(dirs={directory})
+    mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
     all_blueprints: list[PipelexBundleBlueprint] = []
 
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
     try:
-        for plx_file in plx_files:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file)
+        for mthds_file in mthds_files:
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
             all_blueprints.append(blueprint)
 
         loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
@@ -214,7 +214,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
         ) from pipe_error
     except ValidationError as validation_error:
         pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
         msg = f"Could not load blueprints because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,
@@ -234,7 +234,7 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
 
 
 class LoadConceptsOnlyResult(BaseModel):
-    """Result of loading PLX files with concepts only (no pipes)."""
+    """Result of loading MTHDS files with concepts only (no pipes)."""
 
     blueprints: list[PipelexBundleBlueprint]
     concepts: list[Concept]
@@ -246,17 +246,17 @@ def load_concepts_only(
     blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
 ) -> LoadConceptsOnlyResult:
-    """Load PLX files processing only domains and concepts, skipping pipes.
+    """Load MTHDS files processing only domains and concepts, skipping pipes.
 
     This is a lightweight alternative to validate_bundle() that only processes
     domains and concepts. It does not load pipes, does not perform pipe validation,
     and does not run dry runs.
 
     Args:
-        plx_file_path: Path to a single PLX file to load (mutually exclusive with others)
-        plx_content: PLX content string to load (mutually exclusive with others)
+        plx_file_path: Path to a single MTHDS file to load (mutually exclusive with others)
+        plx_content: MTHDS content string to load (mutually exclusive with others)
         blueprints: Pre-parsed blueprints to load (mutually exclusive with others)
-        library_dirs: Optional directories containing additional PLX library files
+        library_dirs: Optional directories containing additional MTHDS library files
 
     Returns:
         LoadConceptsOnlyResult with blueprints and loaded concepts
@@ -307,7 +307,7 @@ def load_concepts_only(
             blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file_path)
             loaded_blueprints = [blueprint]
 
-            if plx_file_path.resolve() not in library.loaded_plx_paths:
+            if plx_file_path.resolve() not in library.loaded_mthds_paths:
                 # File not yet loaded - load it from the blueprint
                 loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
             else:
@@ -324,7 +324,7 @@ def load_concepts_only(
         ) from interpreter_error
     except ValidationError as validation_error:
         pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
         msg = f"Could not load blueprints because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,
@@ -333,14 +333,14 @@ def load_concepts_only(
 
 
 def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult:
-    """Load PLX files from a directory, processing only domains and concepts, skipping pipes.
+    """Load MTHDS files from a directory, processing only domains and concepts, skipping pipes.
 
     This is a lightweight alternative to validate_bundles_from_directory() that only
     processes domains and concepts. It does not load pipes, does not perform pipe
     validation, and does not run dry runs.
 
     Args:
-        directory: Directory containing PLX files to load
+        directory: Directory containing MTHDS files to load
 
     Returns:
         LoadConceptsOnlyResult with blueprints and loaded concepts
@@ -348,15 +348,15 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
     Raises:
         ValidateBundleError: If loading fails due to interpreter or validation errors
     """
-    plx_files = get_pipelex_plx_files_from_dirs(dirs={directory})
+    mthds_files = get_pipelex_mthds_files_from_dirs(dirs={directory})
     all_blueprints: list[PipelexBundleBlueprint] = []
 
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
     try:
-        for plx_file in plx_files:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file)
+        for mthds_file in mthds_files:
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
             all_blueprints.append(blueprint)
 
         loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
@@ -367,7 +367,7 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
         ) from interpreter_error
     except ValidationError as validation_error:
         pipe_validation_errors = categorize_pipe_validation_error(validation_error=validation_error)
-        validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
+        validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
         msg = f"Could not load blueprints because of: {validation_error_msg}"
         raise ValidateBundleError(
             message=msg,

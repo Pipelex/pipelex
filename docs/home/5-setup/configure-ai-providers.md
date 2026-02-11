@@ -173,10 +173,10 @@ Learn more in our [Inference Backend Configuration](../../home/7-configuration/c
 Now that you have your backend configured:
 
 1. **Organize your project**: [Project Organization](./project-organization.md)
-2. **Learn the concepts**: [Writing Workflows Tutorial](../../home/2-get-started/pipe-builder.md)
+2. **Learn the concepts**: [Writing Methods Tutorial](../../home/2-get-started/pipe-builder.md)
 <!-- PRERELEASE_LINK -->
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
-4. **Deep dive**: [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md)
+4. **Deep dive**: [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md)
 
 !!! tip "Advanced Configuration"
     For detailed backend configuration options, see [Inference Backend Configuration](../../home/7-configuration/config-technical/inference-backend-config.md).

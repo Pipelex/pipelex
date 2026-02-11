@@ -1,6 +1,6 @@
 # Refining Concepts
 
-Concept refinement allows you to create more specific versions of existing concepts while inheriting their structure. This provides semantic clarity and type safety for domain-specific workflows.
+Concept refinement allows you to create more specific versions of existing concepts while inheriting their structure. This provides semantic clarity and type safety for domain-specific methods.
 
 ## What is Concept Refinement?
 
@@ -37,7 +37,7 @@ inputs = { contract = "Contract" }  # Clear what type of document is expected
 output = "ContractTerms"
 ```
 
-### 3. Domain-Specific Workflows
+### 3. Domain-Specific Methods
 
 Build pipelines tailored to specific use cases:
 
@@ -287,7 +287,7 @@ refines = "Document"
 - ✅ Your concept is semantically a specific type of an existing concept
 - ✅ The base concept's structure is sufficient for your needs
 - ✅ You want to inherit existing validation and behavior
-- ✅ You're building domain-specific workflows with clear document/content types
+- ✅ You're building domain-specific methods with clear document/content types
 - ✅ You need to create specialized versions of an existing concept
 
 **Examples:**

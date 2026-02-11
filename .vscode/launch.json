@@ -75,7 +75,7 @@
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "validate",
-                "temp/bundle.plx",
+                "temp/bundle.mthds",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -99,7 +99,7 @@
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
-                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.plx",
+                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
@@ -111,7 +111,7 @@
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
-                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.plx",
+                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds",
                 "--pipe",
                 "describe_image",
                 "--inputs",

@@ -10,7 +10,7 @@ pipelex build inputs <TARGET> [OPTIONS]
 
 **Arguments:**
 
-- `TARGET` - Either a pipe code or a bundle file path (`.plx`) - auto-detected
+- `TARGET` - Either a pipe code or a bundle file path (`.mthds`) - auto-detected
 
 **Options:**
 
@@ -23,13 +23,13 @@ pipelex build inputs <TARGET> [OPTIONS]
 **Generate inputs from a bundle (uses main_pipe):**
 
 ```bash
-pipelex build inputs my_bundle.plx
+pipelex build inputs my_bundle.mthds
 ```
 
 **Specify which pipe to use from a bundle:**
 
 ```bash
-pipelex build inputs my_bundle.plx --pipe my_pipe
+pipelex build inputs my_bundle.mthds --pipe my_pipe
 ```
 
 **Generate inputs for a pipe using a library directory:**
@@ -41,7 +41,7 @@ pipelex build inputs my_domain.my_pipe -L ./my_library/
 **Custom output path:**
 
 ```bash
-pipelex build inputs my_bundle.plx --output custom_inputs.json
+pipelex build inputs my_bundle.mthds --output custom_inputs.json
 ```
 
 ## Output Format

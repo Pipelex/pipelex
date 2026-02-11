@@ -80,17 +80,17 @@ async def pipeline_run_setup(
     pipe_code:
         Code identifying the pipe to execute. Required when ``plx_content`` is not
         provided. When both ``plx_content`` and ``pipe_code`` are provided, the
-        specified pipe from the PLX content will be executed (overriding any
+        specified pipe from the MTHDS content will be executed (overriding any
         ``main_pipe`` defined in the content).
     plx_content:
-        Complete PLX file content as a string. The pipe to execute is determined by
-        ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
+        Complete MTHDS file content as a string. The pipe to execute is determined by
+        ``pipe_code`` (if provided) or the ``main_pipe`` property in the MTHDS content.
         Can be combined with ``library_dirs`` to load additional definitions.
     bundle_uri:
         URI identifying the bundle. Used to detect if the bundle was already loaded
         from library directories (e.g., via PIPELEXPATH) to avoid duplicate domain
         registration. If provided and the resolved absolute path is already in the
-        loaded PLX paths, the ``plx_content`` loading will be skipped.
+        loaded MTHDS paths, the ``plx_content`` loading will be skipped.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -159,11 +159,11 @@ async def pipeline_run_setup(
             try:
                 resolved_bundle_uri = Path(bundle_uri).resolve()
             except (OSError, RuntimeError):
-                # Use str(Path(...)) to normalize the path (e.g., "./file.plx" -> "file.plx")
-                # to match the normalization done in library_manager._load_plx_files_into_library
+                # Use str(Path(...)) to normalize the path (e.g., "./file.mthds" -> "file.mthds")
+                # to match the normalization done in library_manager._load_mthds_files_into_library
                 resolved_bundle_uri = Path(bundle_uri)
             current_library = library_manager.get_library(library_id=library_id)
-            bundle_already_loaded = resolved_bundle_uri in current_library.loaded_plx_paths
+            bundle_already_loaded = resolved_bundle_uri in current_library.loaded_mthds_paths
             if bundle_already_loaded:
                 log.verbose(f"Bundle '{bundle_uri}' already loaded from library directories, skipping duplicate load")
 
@@ -177,7 +177,7 @@ async def pipeline_run_setup(
         elif blueprint.main_pipe:
             pipe = get_required_pipe(pipe_code=blueprint.main_pipe)
         else:
-            msg = "No pipe code or main pipe in the PLX content provided to the pipeline API."
+            msg = "No pipe code or main pipe in the MTHDS content provided to the pipeline API."
             raise PipeExecutionError(message=msg)
     elif pipe_code:
         pipe = get_required_pipe(pipe_code=pipe_code)

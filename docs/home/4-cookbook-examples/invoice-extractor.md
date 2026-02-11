@@ -9,7 +9,7 @@ This example provides a comprehensive pipeline for processing invoices. It takes
 
 ## The Pipeline Explained
 
-The `process_invoice` pipeline is a complete workflow for invoice processing.
+The `process_invoice` pipeline is a complete method for invoice processing.
 
 ```python
 async def process_invoice(pdf_url: str) -> ListContent[Invoice]:
@@ -51,9 +51,9 @@ class Invoice(StructuredContent):
     # ... other fields
 ```
 
-## The Pipeline Definition: `invoice.plx`
+## The Pipeline Definition: `invoice.mthds`
 
-The entire workflow is defined in a PLX file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.plx`:
+The entire method is defined in a MTHDS file. This declarative approach makes the pipeline easy to understand and modify. Here's a snippet from `invoice.mthds`:
 
 ```toml
 [pipe.process_invoice]
@@ -89,7 +89,7 @@ The category of this invoice is: $invoice_details.category.
 """
 ```
 
-This shows how a complex workflow, including text extraction with `PipeExtract` and LLM calls, can be defined in a simple, readable format. The `model = "$engineering-structured"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
+This shows how a complex method, including text extraction with `PipeExtract` and LLM calls, can be defined in a simple, readable format. The `model = "$engineering-structured"` line is particularly powerful, as it tells the LLM to structure its output according to the `Invoice` model. 
 
 ## The Pipeline Flowchart
 

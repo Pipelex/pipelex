@@ -27,8 +27,8 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "ArgumentError": "Check command usage with 'pipelex-agent <command> --help'",
     "JSONDecodeError": "Verify the JSON input is valid (check for trailing commas, unquoted keys, etc.)",
     # Interpreter errors
-    "PipelexInterpreterError": "Check PLX file TOML syntax and ensure all referenced concepts and pipes are defined",
-    "PLXDecodeError": "The PLX file has TOML syntax errors; validate TOML syntax before retrying",
+    "PipelexInterpreterError": "Check MTHDS file TOML syntax and ensure all referenced concepts and pipes are defined",
+    "PLXDecodeError": "The MTHDS file has TOML syntax errors; validate TOML syntax before retrying",
     # Configuration/initialization errors
     "TelemetryConfigValidationError": "Run 'pipelex init telemetry' to create a valid telemetry configuration",
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
@@ -58,7 +58,7 @@ RETRYABLE_ERROR_TYPES: set[str] = {
 }
 
 AGENT_ERROR_DOMAINS: dict[str, str] = {
-    # input = agent can fix (bad .plx, wrong args, bad JSON)
+    # input = agent can fix (bad .mthds, wrong args, bad JSON)
     "ValidateBundleError": "input",
     "PipeValidationError": "input",
     "FileNotFoundError": "input",

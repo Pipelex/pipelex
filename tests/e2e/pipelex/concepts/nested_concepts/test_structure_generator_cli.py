@@ -33,22 +33,22 @@ class TestStructureGeneratorCLI:
         """Test that generated structure files for nested concepts are importable and usable.
 
         This test:
-        1. Uses the existing nested_concepts.plx file with concept-to-concept references
+        1. Uses the existing nested_concepts.mthds file with concept-to-concept references
         2. Generates Python structure files via the CLI helper function
         3. Dynamically imports the generated modules
         4. Instantiates the generated classes
         5. Verifies nested concept references work correctly
         """
-        # Path to the PLX file with nested concepts
-        plx_file_path = Path("tests/e2e/pipelex/concepts/nested_concepts/nested_concepts.plx").resolve()
-        assert plx_file_path.exists(), f"PLX file not found: {plx_file_path}"
+        # Path to the MTHDS file with nested concepts
+        mthds_file_path = Path("tests/e2e/pipelex/concepts/nested_concepts/nested_concepts.mthds").resolve()
+        assert mthds_file_path.exists(), f"MTHDS file not found: {mthds_file_path}"
 
         # Create a temporary directory for generated structures
         with tempfile.TemporaryDirectory() as temp_dir:
             output_directory = Path(temp_dir)
 
-            # Validate the PLX file to get blueprints
-            validate_result = await validate_bundle(plx_file_path=plx_file_path)
+            # Validate the MTHDS file to get blueprints
+            validate_result = await validate_bundle(plx_file_path=mthds_file_path)
             blueprints = validate_result.blueprints
 
             # Generate structure files

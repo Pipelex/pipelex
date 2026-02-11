@@ -33,7 +33,7 @@ async def _inputs_core(
 
     Args:
         pipe_code: The pipe code to generate inputs for.
-        bundle_path: Path to the bundle file (.plx).
+        bundle_path: Path to the bundle file (.mthds).
         library_dirs: List of library directories to search for pipe definitions.
 
     Returns:
@@ -87,7 +87,7 @@ def inputs_cmd(
     ] = None,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
     """Generate example input JSON for a pipe and output JSON results.
@@ -96,8 +96,8 @@ def inputs_cmd(
 
     Examples:
         pipelex-agent inputs my_pipe
-        pipelex-agent inputs my_bundle.plx
-        pipelex-agent inputs my_bundle.plx --pipe my_pipe
+        pipelex-agent inputs my_bundle.mthds
+        pipelex-agent inputs my_bundle.mthds --pipe my_pipe
         pipelex-agent inputs my_pipe -L ./my_pipes
     """
     # Validate that at least one target is provided
@@ -112,7 +112,7 @@ def inputs_cmd(
         target_path = Path(target)
         if target_path.is_dir():
             agent_error(
-                f"'{target}' is a directory. The inputs command requires a .plx file or a pipe code.",
+                f"'{target}' is a directory. The inputs command requires a .mthds file or a pipe code.",
                 "ArgumentError",
             )
 

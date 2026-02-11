@@ -1,10 +1,10 @@
-# Kicking off a Pipelex Workflow Project
+# Kicking off a Pipelex Method Project
 
 ## Creating Your First Pipeline
 
-A pipeline in Pipelex is a collection of related concepts and pipes. Start by creating a PLX file in your project:
+A pipeline in Pipelex is a collection of related concepts and pipes. Start by creating a MTHDS file in your project:
 
-`tutorial.plx`
+`tutorial.mthds`
 ```toml
 domain = "tutorial"
 description = "My first Pipelex library"
@@ -48,20 +48,20 @@ See more about domains in [Understanding Domains](./domain.md)
 
 Consistent naming makes your pipeline code discoverable and maintainable:
 
-### PLX Files
-- Use lowercase with underscores: `legal_contracts.plx`, `customer_service.plx`
-- Match the domain name when possible: domain "legal" → `legal.plx`
-- For multi-word domains, use underscores: domain "customer_service" → `customer_service.plx`
+### MTHDS Files
+- Use lowercase with underscores: `legal_contracts.mthds`, `customer_service.mthds`
+- Match the domain name when possible: domain "legal" → `legal.mthds`
+- For multi-word domains, use underscores: domain "customer_service" → `customer_service.mthds`
 
 See more about pipelex bundle specification in [Pipelex Bundle Specification](./pipelex-bundle-specification.md)
 
 ### Python Model Files
-- It is recommended to name structure files with a `_struct.py` suffix: `legal.plx` → `legal_struct.py`
+- It is recommended to name structure files with a `_struct.py` suffix: `legal.mthds` → `legal_struct.py`
 - Pipelex will automatically discover and load structure classes from all Python files in your project (excluding common directories like `.venv`, `.git`, etc.)
 
 ## Project Structure
 
-**Key principle:** Put `.plx` files where they belong in YOUR codebase. Pipelex automatically finds them.
+**Key principle:** Put `.mthds` files where they belong in YOUR codebase. Pipelex automatically finds them.
 
 ### Recommended Patterns
 
@@ -72,11 +72,11 @@ your-project/
 │   ├── finance/
 │   │   ├── models.py
 │   │   ├── services.py
-│   │   ├── invoices.plx          # Pipeline with finance code
+│   │   ├── invoices.mthds          # Pipeline with finance code
 │   │   └── invoices_struct.py    # Structure classes
 │   └── legal/
 │       ├── models.py
-│       ├── contracts.plx         # Pipeline with legal code
+│       ├── contracts.mthds         # Pipeline with legal code
 │       └── contracts_struct.py
 ├── .pipelex/                     # Config at repo root
 │   ├── pipelex.toml
@@ -89,9 +89,9 @@ your-project/
 your-project/
 ├── my_project/
 │   ├── pipelines/              # All pipelines together
-│   │   ├── finance.plx
+│   │   ├── finance.mthds
 │   │   ├── finance_struct.py
-│   │   ├── legal.plx
+│   │   ├── legal.mthds
 │   │   └── legal_struct.py
 │   └── core/
 │       └── (your code)
@@ -102,7 +102,7 @@ your-project/
 ```
 your-project/
 ├── my_project/
-│   ├── invoice_pipeline.plx
+│   ├── invoice_pipeline.mthds
 │   ├── invoice_struct.py
 │   └── main.py
 └── .pipelex/
@@ -110,7 +110,7 @@ your-project/
 
 ### Key Points
 
-- **Flexible placement**: `.plx` files work anywhere in your project
+- **Flexible placement**: `.mthds` files work anywhere in your project
 - **Automatic discovery**: Pipelex scans and finds them automatically
 - **Configuration location**: `.pipelex/` stays at repository root
 - **Naming convention**: Use `_struct.py` suffix for structure files

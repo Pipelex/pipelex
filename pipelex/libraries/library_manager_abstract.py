@@ -42,7 +42,7 @@ class LibraryManagerAbstract(ABC):
             pipe_code: The pipe code to look up.
 
         Returns:
-            Path to the .plx file the pipe was loaded from, or None if unknown.
+            Path to the .mthds file the pipe was loaded from, or None if unknown.
         """
         return None
 
@@ -98,7 +98,7 @@ class LibraryManagerAbstract(ABC):
 
         Args:
             library_id: The ID of the library to load into
-            library_dirs: List of directories containing PLX files
+            library_dirs: List of directories containing MTHDS files
             library_file_paths: List of specific PLX file paths to load
 
         Returns:

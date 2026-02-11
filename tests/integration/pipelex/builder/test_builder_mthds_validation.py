@@ -1,6 +1,6 @@
-"""Tests for validating builder domain PLX files.
+"""Tests for validating builder domain MTHDS files.
 
-This module tests that builder.plx and agentic_builder.plx are valid and that
+This module tests that builder.mthds and agentic_builder.mthds are valid and that
 input/output types are correctly declared, especially for pipes that receive
 batched outputs (lists) from previous steps.
 """
@@ -18,21 +18,21 @@ BUILDER_DIR = Path(__file__).parent.parent.parent.parent.parent / "pipelex" / "b
 
 
 class TestData:
-    """Test data for builder PLX validation tests."""
+    """Test data for builder MTHDS validation tests."""
 
-    BUILDER_PLX_PATH: ClassVar[Path] = BUILDER_DIR / "builder.plx"
-    AGENTIC_BUILDER_PLX_PATH: ClassVar[Path] = BUILDER_DIR / "agentic_builder.plx"
-    PIPE_DESIGN_PLX_PATH: ClassVar[Path] = BUILDER_DIR / "pipe" / "pipe_design.plx"
+    BUILDER_MTHDS_PATH: ClassVar[Path] = BUILDER_DIR / "builder.mthds"
+    AGENTIC_BUILDER_MTHDS_PATH: ClassVar[Path] = BUILDER_DIR / "agentic_builder.mthds"
+    PIPE_DESIGN_MTHDS_PATH: ClassVar[Path] = BUILDER_DIR / "pipe" / "pipe_design.mthds"
 
 
-class TestBuilderPlxValidation:
-    """Tests that builder domain PLX files are valid and type-consistent."""
+class TestBuilderMthdsValidation:
+    """Tests that builder domain MTHDS files are valid and type-consistent."""
 
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_builder_plx_loads_and_validates(self):
-        """Test that builder.plx can be loaded and validated successfully."""
+    async def test_builder_mthds_loads_and_validates(self):
+        """Test that builder.mthds can be loaded and validated successfully."""
         result = await validate_bundle(
-            plx_file_path=TestData.BUILDER_PLX_PATH,
+            plx_file_path=TestData.BUILDER_MTHDS_PATH,
             library_dirs=[BUILDER_DIR, BUILDER_DIR / "pipe"],
         )
 
@@ -42,10 +42,10 @@ class TestBuilderPlxValidation:
         assert len(result.pipes) > 0
 
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_agentic_builder_plx_loads_and_validates(self):
-        """Test that agentic_builder.plx can be loaded and validated successfully."""
+    async def test_agentic_builder_mthds_loads_and_validates(self):
+        """Test that agentic_builder.mthds can be loaded and validated successfully."""
         result = await validate_bundle(
-            plx_file_path=TestData.AGENTIC_BUILDER_PLX_PATH,
+            plx_file_path=TestData.AGENTIC_BUILDER_MTHDS_PATH,
             library_dirs=[BUILDER_DIR, BUILDER_DIR / "pipe"],
         )
 
@@ -55,10 +55,10 @@ class TestBuilderPlxValidation:
         assert len(result.pipes) > 0
 
     @pytest.mark.asyncio(loop_scope="class")
-    async def test_pipe_design_plx_loads_and_validates(self):
-        """Test that pipe_design.plx can be loaded and validated successfully."""
+    async def test_pipe_design_mthds_loads_and_validates(self):
+        """Test that pipe_design.mthds can be loaded and validated successfully."""
         result = await validate_bundle(
-            plx_file_path=TestData.PIPE_DESIGN_PLX_PATH,
+            plx_file_path=TestData.PIPE_DESIGN_MTHDS_PATH,
             library_dirs=[BUILDER_DIR, BUILDER_DIR / "pipe"],
         )
 
@@ -68,15 +68,15 @@ class TestBuilderPlxValidation:
         assert len(result.pipes) > 0
 
     def test_assemble_pipelex_bundle_spec_has_list_inputs_in_builder(self):
-        """Test that assemble_pipelex_bundle_spec declares list inputs correctly in builder.plx.
+        """Test that assemble_pipelex_bundle_spec declares list inputs correctly in builder.mthds.
 
         This test catches the bug where pipe_specs was incorrectly declared as
         "pipe_design.PipeSpec" instead of "pipe_design.PipeSpec[]" when the pipe
         receives the output of a batch_over operation which produces a list.
 
-        See: builder.plx line 31 (batch_over produces list) and line 332 (input declaration)
+        See: builder.mthds line 31 (batch_over produces list) and line 332 (input declaration)
         """
-        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=TestData.BUILDER_PLX_PATH)
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=TestData.BUILDER_MTHDS_PATH)
 
         assert blueprint.pipe is not None
         assert "assemble_pipelex_bundle_spec" in blueprint.pipe
@@ -95,12 +95,12 @@ class TestBuilderPlxValidation:
         assert "[]" in concept_specs_input, f"concept_specs must be declared as a list (with []). Got: {concept_specs_input}"
 
     def test_detail_all_pipe_specs_outputs_list_in_agentic_builder(self):
-        """Test that detail_all_pipe_specs declares list output in agentic_builder.plx.
+        """Test that detail_all_pipe_specs declares list output in agentic_builder.mthds.
 
         This test verifies that the PipeBatch that generates pipe_specs correctly
         declares its output as a list, which is then consumed by assemble_pipelex_bundle_spec.
         """
-        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=TestData.AGENTIC_BUILDER_PLX_PATH)
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=TestData.AGENTIC_BUILDER_MTHDS_PATH)
 
         assert blueprint.pipe is not None
         assert "detail_all_pipe_specs" in blueprint.pipe
@@ -114,10 +114,10 @@ class TestBuilderPlxValidation:
     def test_batch_over_result_consistency_with_subsequent_inputs(self):
         """Test that batch_over results are consumed by pipes with matching list inputs.
 
-        In builder.plx, pipe_builder uses batch_over on detail_pipe_spec to produce pipe_specs.
+        In builder.mthds, pipe_builder uses batch_over on detail_pipe_spec to produce pipe_specs.
         The subsequent assemble_pipelex_bundle_spec must declare pipe_specs as a list input.
         """
-        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=TestData.BUILDER_PLX_PATH)
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=TestData.BUILDER_MTHDS_PATH)
 
         assert blueprint.pipe is not None
 

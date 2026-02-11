@@ -1,9 +1,9 @@
 from pipelex.core.interpreter.interpreter import PipelexInterpreterError, PLXDecodeError
 
-INVALID_PLX_SYNTAX = (
-    "invalid_plx_syntax",
+INVALID_MTHDS_SYNTAX = (
+    "invalid_mthds_syntax",
     """domain = "test_domain"
-description = "Domain with invalid PLX syntax"
+description = "Domain with invalid MTHDS syntax"
 
 [concept]
 InvalidConcept = "This is missing a closing quote""",
@@ -200,8 +200,8 @@ description = "Domain with invalid array syntax"
 
 # Export all error test cases
 ERROR_TEST_CASES: list[tuple[str, str, type[Exception] | tuple[type[Exception], ...]]] = [
-    # PLX Syntax Errors
-    INVALID_PLX_SYNTAX,
+    # MTHDS Syntax Errors
+    INVALID_MTHDS_SYNTAX,
     MALFORMED_SECTION,
     UNCLOSED_STRING,
     DUPLICATE_KEYS,

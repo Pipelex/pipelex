@@ -1,16 +1,16 @@
-# Writing Workflows
+# Writing Methods
 
-Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.plx` language.
+Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.mthds` language.
 
-!!! tip "Prefer Automated Workflow Generation?"
-    If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate workflows from natural language descriptions. See the [Pipe Builder guide](./pipe-builder.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write workflows manually or understand the `.plx` language in depth.
+!!! tip "Prefer Automated Method Generation?"
+    If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate methods from natural language descriptions. See the [Pipe Builder guide](./pipe-builder.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write methods manually or understand the `.mthds` language in depth.
 
 ## Write Your First Pipeline
 
 Let's build a **character generator** to understand the basics.
-Create a `.plx` file anywhere in your project (we recommend a `pipelines` directory):
+Create a `.mthds` file anywhere in your project (we recommend a `pipelines` directory):
 
-`character.plx`
+`character.mthds`
 ```toml
 domain = "characters"                    # domain of existance of your pipe
 
@@ -70,9 +70,9 @@ As you might notice, this is plain text, and nothing is structured. Now we are g
 
 Let's create a rigorously structured `Character` object instead of plain text. We need to create the concept `Character`. The concept names MUST be in PascalCase. [Learn more about defining concepts](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md)
 
-### Option 1: Define the Structure in your `.plx` file
+### Option 1: Define the Structure in your `.mthds` file
 
-Define structures directly in your `.plx` file:
+Define structures directly in your `.mthds` file:
 
 ```toml
 [concept.Character]                                 # Declare the concept by giving it a name.
@@ -89,7 +89,7 @@ description = "A description of the character"      # Fourth attribute: "descrip
 
 Specify that the output of your Pipellm is a `Character` object:
 
-`characters.plx`
+`characters.mthds`
 ```toml
 domain = "characters"
 
@@ -146,7 +146,7 @@ Learn more in [Inline Structures](../6-build-reliable-ai-workflows/concepts/inli
 
 Specify that the output of your Pipellm is a `Character` object:
 
-`characters.plx`
+`characters.mthds`
 ```toml
 domain = "characters"
 
@@ -330,7 +330,7 @@ Now that you understand the basics, explore more:
 
 **Learn more about Pipelex (domains, project structure, best practices...)**
 
-- [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md) - Deep dive into pipeline design
+- [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md) - Deep dive into pipeline design
 - [Cookbook Examples](../../home/4-cookbook-examples/index.md) - Real-world examples and patterns
 
 **Learn More about the other pipes** 

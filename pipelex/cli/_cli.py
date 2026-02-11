@@ -143,12 +143,12 @@ def doctor_command(
 
 
 app.add_typer(
-    build_app, name="build", help="Generate AI workflows from natural language requirements: pipelines in .plx format and python code to run them"
+    build_app, name="build", help="Generate AI methods from natural language requirements: pipelines in .mthds format and python code to run them"
 )
 app.command(name="validate", help="Validate pipes: static validation for syntax and dependencies, dry-run execution for logic and consistency")(
     validate_cmd
 )
-app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.plx)")(run_cmd)
+app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.mthds)")(run_cmd)
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)

@@ -30,7 +30,7 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
-    get_pipelex_plx_files_from_dirs,
+    get_pipelex_mthds_files_from_dirs,
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
@@ -46,7 +46,7 @@ class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
-        self._pipe_source_map: dict[str, Path] = {}  # pipe_code -> source .plx file
+        self._pipe_source_map: dict[str, Path] = {}  # pipe_code -> source .mthds file
 
     ############################################################
     # Manager lifecycle
@@ -122,7 +122,7 @@ class LibraryManager(LibraryManagerAbstract):
             pipe_code: The pipe code to look up.
 
         Returns:
-            Path to the .plx file the pipe was loaded from, or None if unknown.
+            Path to the .mthds file the pipe was loaded from, or None if unknown.
         """
         return self._pipe_source_map.get(pipe_code)
 
@@ -146,25 +146,25 @@ class LibraryManager(LibraryManagerAbstract):
             library_dirs = []
 
         all_dirs: list[Path] = []
-        all_plx_paths: list[Path] = []
+        all_mthds_paths: list[Path] = []
         all_dirs.extend(library_dirs)
-        all_plx_paths.extend(get_pipelex_plx_files_from_dirs(set(library_dirs)))
+        all_mthds_paths.extend(get_pipelex_mthds_files_from_dirs(set(library_dirs)))
 
         if library_file_paths:
-            all_plx_paths.extend(library_file_paths)
+            all_mthds_paths.extend(library_file_paths)
 
         # Combine and deduplicate
         seen_absolute_paths: set[str] = set()
-        valid_plx_paths: list[Path] = []
-        for plx_path in all_plx_paths:
+        valid_mthds_paths: list[Path] = []
+        for mthds_path in all_mthds_paths:
             try:
-                absolute_path = str(plx_path.resolve())
+                absolute_path = str(mthds_path.resolve())
             except (OSError, RuntimeError):
                 # For paths that can't be resolved (e.g., in zipped packages), use string representation
-                absolute_path = str(plx_path)
+                absolute_path = str(mthds_path)
 
             if absolute_path not in seen_absolute_paths:
-                valid_plx_paths.append(plx_path)
+                valid_mthds_paths.append(mthds_path)
                 seen_absolute_paths.add(absolute_path)
 
         # Import modules and register in global registries
@@ -188,9 +188,9 @@ class LibraryManager(LibraryManagerAbstract):
         )
         log.verbose(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
-        # Load PLX files into the specific library
-        log.verbose(f"Loading plx files from: {[str(p) for p in valid_plx_paths]}")
-        return self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
+        # Load MTHDS files into the specific library
+        log.verbose(f"Loading MTHDS files from: {[str(p) for p in valid_mthds_paths]}")
+        return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
 
     @override
     def load_libraries_concepts_only(
@@ -207,8 +207,8 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             library_id: The ID of the library to load into
-            library_dirs: List of directories containing PLX files
-            library_file_paths: List of specific PLX file paths to load
+            library_dirs: List of directories containing MTHDS files
+            library_file_paths: List of specific MTHDS file paths to load
 
         Returns:
             List of all concepts that were loaded
@@ -222,25 +222,25 @@ class LibraryManager(LibraryManagerAbstract):
             library_dirs = []
 
         all_dirs: list[Path] = []
-        all_plx_paths: list[Path] = []
+        all_mthds_paths: list[Path] = []
         all_dirs.extend(library_dirs)
-        all_plx_paths.extend(get_pipelex_plx_files_from_dirs(set(library_dirs)))
+        all_mthds_paths.extend(get_pipelex_mthds_files_from_dirs(set(library_dirs)))
 
         if library_file_paths:
-            all_plx_paths.extend(library_file_paths)
+            all_mthds_paths.extend(library_file_paths)
 
         # Combine and deduplicate
         seen_absolute_paths: set[str] = set()
-        valid_plx_paths: list[Path] = []
-        for plx_path in all_plx_paths:
+        valid_mthds_paths: list[Path] = []
+        for mthds_path in all_mthds_paths:
             try:
-                absolute_path = str(plx_path.resolve())
+                absolute_path = str(mthds_path.resolve())
             except (OSError, RuntimeError):
                 # For paths that can't be resolved (e.g., in zipped packages), use string representation
-                absolute_path = str(plx_path)
+                absolute_path = str(mthds_path)
 
             if absolute_path not in seen_absolute_paths:
-                valid_plx_paths.append(plx_path)
+                valid_mthds_paths.append(mthds_path)
                 seen_absolute_paths.add(absolute_path)
 
         # Import modules and register in global registries
@@ -260,19 +260,19 @@ class LibraryManager(LibraryManagerAbstract):
         )
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
-        # Load PLX files as concepts only (no pipes)
-        log.debug(f"Loading concepts only from plx files: {[str(p) for p in valid_plx_paths]}")
+        # Load MTHDS files as concepts only (no pipes)
+        log.debug(f"Loading concepts only from MTHDS files: {[str(p) for p in valid_mthds_paths]}")
         library = self.get_library(library_id=library_id)
         all_concepts: list[Concept] = []
-        for plx_path in valid_plx_paths:
+        for mthds_path in valid_mthds_paths:
             # Track loaded path (resolve if possible)
             try:
-                resolved_path = plx_path.resolve()
+                resolved_path = mthds_path.resolve()
             except (OSError, RuntimeError):
-                resolved_path = plx_path
-            library.loaded_plx_paths.append(resolved_path)
+                resolved_path = mthds_path
+            library.loaded_mthds_paths.append(resolved_path)
 
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_path)
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
             concepts = self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
             all_concepts.extend(concepts)
 
@@ -284,7 +284,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             library_id: The ID of the library to load into
-            blueprints: List of parsed PLX blueprints to load
+            blueprints: List of parsed MTHDS blueprints to load
 
         Returns:
             List of all pipes that were loaded
@@ -370,7 +370,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             library_id: The ID of the library to load into
-            blueprints: List of parsed PLX blueprints to load
+            blueprints: List of parsed MTHDS blueprints to load
 
         Returns:
             List of all concepts that were loaded
@@ -418,7 +418,7 @@ class LibraryManager(LibraryManagerAbstract):
         later by _rebuild_models_with_forward_refs().
 
         Args:
-            blueprints: List of parsed PLX blueprints to load
+            blueprints: List of parsed MTHDS blueprints to load
 
         Returns:
             List of loaded concepts
@@ -491,28 +491,28 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> list[PipeAbstract]:
-        """Load PLX files into a specific library.
+    def _load_mthds_files_into_library(self, library_id: str, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
+        """Load MTHDS files into a specific library.
 
         This method:
-        1. Parses blueprints from PLX files
+        1. Parses blueprints from MTHDS files
         2. Loads blueprints into the specified library
 
         Args:
             library_id: The ID of the library to load into
-            valid_plx_paths: List of PLX file paths to load
+            valid_mthds_paths: List of MTHDS file paths to load
         """
         blueprints: list[PipelexBundleBlueprint] = []
-        for plx_file_path in valid_plx_paths:
+        for mthds_file_path in valid_mthds_paths:
             try:
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file_path)
-                blueprint.source = str(plx_file_path)
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
+                blueprint.source = str(mthds_file_path)
             except FileNotFoundError as file_not_found_error:
-                msg = f"Could not find PLX bundle at '{plx_file_path}'"
+                msg = f"Could not find MTHDS bundle at '{mthds_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
             except PipelexInterpreterError as interpreter_error:
                 # Forward BLUEPRINT validation errors from interpreter
-                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {interpreter_error.message}"
+                msg = f"Could not load MTHDS bundle from '{mthds_file_path}' because of: {interpreter_error.message}"
                 raise LibraryLoadingError(
                     message=msg,
                     blueprint_validation_errors=interpreter_error.validation_errors,
@@ -521,18 +521,18 @@ class LibraryManager(LibraryManagerAbstract):
 
         # Store resolved absolute paths for duplicate detection in the library
         library = self.get_library(library_id=library_id)
-        for plx_file_path in valid_plx_paths:
+        for mthds_file_path in valid_mthds_paths:
             try:
-                resolved_path = plx_file_path.resolve()
+                resolved_path = mthds_file_path.resolve()
             except (OSError, RuntimeError):
-                resolved_path = plx_file_path
-            library.loaded_plx_paths.append(resolved_path)
+                resolved_path = mthds_file_path
+            library.loaded_mthds_paths.append(resolved_path)
 
         try:
             return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-            msg = f"Could not load blueprints from {[str(pth) for pth in valid_plx_paths]} because of: {validation_error_msg}"
+            validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
+            msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {validation_error_msg}"
             raise LibraryError(
                 message=msg,
             ) from validation_error

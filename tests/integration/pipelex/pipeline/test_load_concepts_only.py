@@ -1,4 +1,4 @@
-"""Integration tests for load_concepts_only functions."""
+"""Integration tests for load_concepts_only functions from MTHDS files."""
 
 import tempfile
 from collections.abc import Callable
@@ -15,12 +15,12 @@ from pipelex.pipeline.validate_bundle import (
 
 
 class TestLoadConceptsOnly:
-    """Integration tests for loading concepts only (no pipes) from PLX files."""
+    """Integration tests for loading concepts only (no pipes) from MTHDS files."""
 
     def test_load_concepts_only_single_file(self, load_empty_library: Callable[[], str]):
-        """Test loading concepts from a single PLX file."""
+        """Test loading concepts from a single MTHDS file."""
         load_empty_library()
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain"
 
@@ -33,10 +33,10 @@ email = { type = "text", description = "Customer email" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
-            result = load_concepts_only(plx_file_path=plx_path)
+            result = load_concepts_only(plx_file_path=mthds_path)
 
             assert isinstance(result, LoadConceptsOnlyResult)
             assert len(result.blueprints) == 1
@@ -46,7 +46,7 @@ email = { type = "text", description = "Customer email" }
     def test_load_concepts_only_skips_pipes(self, load_empty_library: Callable[[], str]):
         """Test that pipes are skipped when loading concepts only."""
         load_empty_library()
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with pipe"
 
@@ -65,10 +65,10 @@ prompt = "Generate a topic about @subject"
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
-            result = load_concepts_only(plx_file_path=plx_path)
+            result = load_concepts_only(plx_file_path=mthds_path)
 
             # Concepts should be loaded
             assert len(result.concepts) == 1
@@ -82,9 +82,9 @@ prompt = "Generate a topic about @subject"
             assert len(library.pipe_library.root) == 0
 
     def test_load_concepts_only_from_directory(self, load_empty_library: Callable[[], str]):
-        """Test loading concepts from a directory with multiple PLX files."""
+        """Test loading concepts from a directory with multiple MTHDS files."""
         load_empty_library()
-        plx_content_1 = """
+        mthds_content_1 = """
 domain = "crm"
 description = "CRM domain"
 
@@ -95,7 +95,7 @@ description = "A customer"
 name = { type = "text", description = "Customer name" }
 """
 
-        plx_content_2 = """
+        mthds_content_2 = """
 domain = "accounting"
 description = "Accounting domain"
 
@@ -107,8 +107,8 @@ amount = { type = "number", description = "Invoice amount" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            (Path(tmp_dir) / "crm.plx").write_text(plx_content_1, encoding="utf-8")
-            (Path(tmp_dir) / "accounting.plx").write_text(plx_content_2, encoding="utf-8")
+            (Path(tmp_dir) / "crm.mthds").write_text(mthds_content_1, encoding="utf-8")
+            (Path(tmp_dir) / "accounting.mthds").write_text(mthds_content_2, encoding="utf-8")
 
             result = load_concepts_only_from_directory(directory=Path(tmp_dir))
 
@@ -122,7 +122,7 @@ amount = { type = "number", description = "Invoice amount" }
     def test_load_concepts_only_with_concept_references(self, load_empty_library: Callable[[], str]):
         """Test loading concepts that reference other concepts."""
         load_empty_library()
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with concept references"
 
@@ -141,10 +141,10 @@ total = { type = "number", description = "Invoice total" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
-            result = load_concepts_only(plx_file_path=plx_path)
+            result = load_concepts_only(plx_file_path=mthds_path)
 
             assert len(result.concepts) == 2
 
@@ -161,7 +161,7 @@ total = { type = "number", description = "Invoice total" }
     def test_load_concepts_only_detects_cycles(self, load_empty_library: Callable[[], str]):
         """Test that cycle detection still works when loading concepts only."""
         load_empty_library()
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with cycles"
 
@@ -179,17 +179,17 @@ a_ref = { type = "concept", concept_ref = "testapp.ConceptA", description = "Ref
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             with pytest.raises(Exception, match=r"[Cc]ycle"):
-                load_concepts_only(plx_file_path=plx_path)
+                load_concepts_only(plx_file_path=mthds_path)
 
     def test_load_concepts_only_with_library_dirs(self, load_empty_library: Callable[[], str]):
         """Test loading concepts with library dependencies."""
         load_empty_library()
-        # Library PLX with shared concepts
-        library_plx = """
+        # Library MTHDS with shared concepts
+        library_mthds = """
 domain = "shared"
 description = "Shared library"
 
@@ -201,8 +201,8 @@ street = { type = "text", description = "Street" }
 city = { type = "text", description = "City" }
 """
 
-        # Main PLX that references the library concept
-        main_plx = """
+        # Main MTHDS that references the library concept
+        main_mthds = """
 domain = "main"
 description = "Main domain"
 
@@ -215,12 +215,12 @@ address = { type = "concept", concept_ref = "shared.Address", description = "The
 """
 
         with tempfile.TemporaryDirectory() as lib_dir, tempfile.TemporaryDirectory() as main_dir:
-            (Path(lib_dir) / "shared.plx").write_text(library_plx, encoding="utf-8")
-            main_plx_path = Path(main_dir) / "main.plx"
-            main_plx_path.write_text(main_plx, encoding="utf-8")
+            (Path(lib_dir) / "shared.mthds").write_text(library_mthds, encoding="utf-8")
+            main_mthds_path = Path(main_dir) / "main.mthds"
+            main_mthds_path.write_text(main_mthds, encoding="utf-8")
 
             result = load_concepts_only(
-                plx_file_path=main_plx_path,
+                plx_file_path=main_mthds_path,
                 library_dirs=[Path(lib_dir)],
             )
 
@@ -238,10 +238,10 @@ address = { type = "concept", concept_ref = "shared.Address", description = "The
             assert address is not None
             assert customer is not None
 
-    def test_load_concepts_only_with_plx_content(self, load_empty_library: Callable[[], str]):
-        """Test loading concepts from PLX content string."""
+    def test_load_concepts_only_with_mthds_content(self, load_empty_library: Callable[[], str]):
+        """Test loading concepts from MTHDS content string."""
         load_empty_library()
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain"
 
@@ -252,7 +252,7 @@ description = "An item"
 name = { type = "text", description = "Item name" }
 """
 
-        result = load_concepts_only(plx_content=plx_content)
+        result = load_concepts_only(plx_content=mthds_content)
 
         assert len(result.blueprints) == 1
         assert len(result.concepts) == 1
@@ -261,7 +261,7 @@ name = { type = "text", description = "Item name" }
     def test_load_concepts_only_with_refines(self, load_empty_library: Callable[[], str]):
         """Test loading concepts with refines relationships."""
         load_empty_library()
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with refines"
 
@@ -277,10 +277,10 @@ refines = "Customer"
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
-            result = load_concepts_only(plx_file_path=plx_path)
+            result = load_concepts_only(plx_file_path=mthds_path)
 
             assert len(result.concepts) == 2
 
@@ -291,7 +291,7 @@ refines = "Customer"
     def test_load_concepts_only_directory_skips_pipes(self, load_empty_library: Callable[[], str]):
         """Test that pipes are skipped when loading from directory."""
         load_empty_library()
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with pipe"
 
@@ -310,7 +310,7 @@ prompt = "Generate a result about @subject"
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            (Path(tmp_dir) / "test.plx").write_text(plx_content, encoding="utf-8")
+            (Path(tmp_dir) / "test.mthds").write_text(mthds_content, encoding="utf-8")
 
             result = load_concepts_only_from_directory(directory=Path(tmp_dir))
 

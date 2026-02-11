@@ -10,7 +10,7 @@ pipelex build output <TARGET> [OPTIONS]
 
 **Arguments:**
 
-- `TARGET` - Either a pipe code or a bundle file path (`.plx`) - auto-detected
+- `TARGET` - Either a pipe code or a bundle file path (`.mthds`) - auto-detected
 
 **Options:**
 
@@ -27,19 +27,19 @@ pipelex build output <TARGET> [OPTIONS]
 **Generate output from a bundle (uses main_pipe):**
 
 ```bash
-pipelex build output my_bundle.plx
+pipelex build output my_bundle.mthds
 ```
 
 **Generate JSON Schema for TypeScript/Zod integration:**
 
 ```bash
-pipelex build output my_bundle.plx --format schema
+pipelex build output my_bundle.mthds --format schema
 ```
 
 **Specify which pipe to use from a bundle:**
 
 ```bash
-pipelex build output my_bundle.plx --pipe my_pipe
+pipelex build output my_bundle.mthds --pipe my_pipe
 ```
 
 **Generate output for a pipe using a library directory:**
@@ -51,7 +51,7 @@ pipelex build output my_domain.my_pipe -L ./my_library/
 **Custom output path:**
 
 ```bash
-pipelex build output my_bundle.plx --output expected_output.json
+pipelex build output my_bundle.mthds --output expected_output.json
 ```
 
 ## Output Formats

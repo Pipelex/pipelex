@@ -138,7 +138,7 @@ def run_cmd(
     ] = None,
     bundle: Annotated[
         str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx)"),
+        typer.Option("--bundle", help="Bundle file path (.mthds)"),
     ] = None,
     inputs: Annotated[
         str | None,
@@ -158,7 +158,7 @@ def run_cmd(
     ] = False,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
     """Execute a pipeline and output JSON results.
@@ -167,9 +167,9 @@ def run_cmd(
 
     Examples:
         pipelex-agent run my_pipe --inputs data.json
-        pipelex-agent run my_bundle.plx --pipe my_pipe
+        pipelex-agent run my_bundle.mthds --pipe my_pipe
         pipelex-agent run my_pipe --dry-run --mock-inputs
-        pipelex-agent run my_bundle.plx --graph
+        pipelex-agent run my_bundle.mthds --graph
     """
     # Validate that at least one target is provided
     provided_options = sum([target is not None, pipe is not None, bundle is not None])

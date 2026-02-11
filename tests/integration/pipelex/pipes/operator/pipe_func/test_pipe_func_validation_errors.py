@@ -20,8 +20,8 @@ class TestData:
     """Test data for pipe_func validation error tests."""
 
     @staticmethod
-    def make_plx_content(function_name: str) -> str:
-        """Generate PLX content for testing a specific function."""
+    def make_mthds_content(function_name: str) -> str:
+        """Generate MTHDS content for testing a specific function."""
         return f"""
 domain = "test_pipe_func_validation"
 description = "Test bundle for pipe_func validation error reporting"
@@ -33,7 +33,7 @@ function_name = "{function_name}"
 output = "Text"
 """
 
-    PLX_CONTENT_WITH_PIPE_FUNC: ClassVar[str] = """
+    MTHDS_CONTENT_WITH_PIPE_FUNC: ClassVar[str] = """
 domain = "test_pipe_func_validation"
 description = "Test bundle for pipe_func validation error reporting"
 
@@ -195,9 +195,9 @@ class TestPipeFuncValidationErrors:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(TestData.PLX_CONTENT_WITH_PIPE_FUNC)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(TestData.MTHDS_CONTENT_WITH_PIPE_FUNC)
 
             # Create the .py file with the function (missing return type)
             py_file = temp_path / "my_funcs.py"
@@ -207,7 +207,7 @@ class TestPipeFuncValidationErrors:
             # Currently raises LibraryError, but ValidateBundleError is also acceptable
             with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=plx_file,
+                    plx_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -242,9 +242,9 @@ class TestPipeFuncValidationErrors:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(TestData.PLX_CONTENT_WITH_PIPE_FUNC)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(TestData.MTHDS_CONTENT_WITH_PIPE_FUNC)
 
             # Create the .py file with the function (WITH return type)
             py_file = temp_path / "my_funcs.py"
@@ -252,7 +252,7 @@ class TestPipeFuncValidationErrors:
 
             # Validate the bundle - should succeed
             result = await validate_bundle(
-                plx_file_path=plx_file,
+                plx_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -277,14 +277,14 @@ class TestPipeFuncValidationErrors:
             py_file = temp_path / "my_funcs.py"
             py_file.write_text(TestData.FUNC_WITH_DECORATOR_NO_RETURN_TYPE)
 
-            # Create .plx file that references the function
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(TestData.PLX_CONTENT_WITH_PIPE_FUNC)
+            # Create .mthds file that references the function
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(TestData.MTHDS_CONTENT_WITH_PIPE_FUNC)
 
             # Try to validate - should fail with informative error
             with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=plx_file,
+                    plx_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -328,9 +328,9 @@ class TestPipeFuncValidationErrors:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file referencing the function
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(TestData.make_plx_content(function_name))
+            # Create the .mthds file referencing the function
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(TestData.make_mthds_content(function_name))
 
             # Create the .py file with the ineligible function
             py_file = temp_path / "my_funcs.py"
@@ -339,7 +339,7 @@ class TestPipeFuncValidationErrors:
             # Validate the bundle - should fail with a specific error message
             with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=plx_file,
+                    plx_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -380,8 +380,8 @@ class MyStructuredContent(StructuredContent):
 async def func_wrong_structure_class(working_memory: WorkingMemory) -> MyStructuredContent:
     return MyStructuredContent(name="test")
 """
-        # PLX file that expects Text output (which uses TextContent)
-        plx_content = """
+        # MTHDS file that expects Text output (which uses TextContent)
+        mthds_content = """
 domain = "test_pipe_func_validation"
 description = "Test bundle for pipe_func return type validation"
 
@@ -394,9 +394,9 @@ output = "Text"
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(plx_content)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(mthds_content)
 
             # Create the .py file with the function
             py_file = temp_path / "my_funcs.py"
@@ -405,7 +405,7 @@ output = "Text"
             # Validate the bundle - should fail because return type doesn't match concept's structure class
             with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=plx_file,
+                    plx_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -438,8 +438,8 @@ from pipelex.system.registries.func_registry import pipe_func
 async def func_returns_list_content(working_memory: WorkingMemory) -> ListContent[TextContent]:
     return ListContent(items=[TextContent(text="test1"), TextContent(text="test2")])
 """
-        # PLX file with array output notation using built-in Text concept
-        plx_content = """
+        # MTHDS file with array output notation using built-in Text concept
+        mthds_content = """
 domain = "test_pipe_func_validation"
 description = "Test bundle for ListContent validation"
 
@@ -452,9 +452,9 @@ output = "Text[]"
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(plx_content)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(mthds_content)
 
             # Create the .py file with the function
             py_file = temp_path / "my_funcs.py"
@@ -462,7 +462,7 @@ output = "Text[]"
 
             # Validate the bundle - should succeed
             result = await validate_bundle(
-                plx_file_path=plx_file,
+                plx_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -490,8 +490,8 @@ class WrongItem(StructuredContent):
 async def func_returns_wrong_list_content(working_memory: WorkingMemory) -> ListContent[WrongItem]:
     return ListContent(items=[WrongItem(different_field=42)])
 """
-        # PLX file expects Text[] (TextContent) but function returns ListContent[WrongItem]
-        plx_content = """
+        # MTHDS file expects Text[] (TextContent) but function returns ListContent[WrongItem]
+        mthds_content = """
 domain = "test_pipe_func_validation"
 description = "Test bundle for ListContent validation error"
 
@@ -504,9 +504,9 @@ output = "Text[]"
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(plx_content)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(mthds_content)
 
             # Create the .py file with the function
             py_file = temp_path / "my_funcs.py"
@@ -515,7 +515,7 @@ output = "Text[]"
             # Validate the bundle - should fail with clear error about item type mismatch
             with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=plx_file,
+                    plx_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -548,8 +548,8 @@ from pipelex.system.registries.func_registry import pipe_func
 async def func_returns_single_instead_of_list(working_memory: WorkingMemory) -> TextContent:
     return TextContent(text="single item - should be a list!")
 """
-        # PLX file expects Text[] (array) but function returns single TextContent
-        plx_content = """
+        # MTHDS file expects Text[] (array) but function returns single TextContent
+        mthds_content = """
 domain = "test_pipe_func_validation"
 description = "Test bundle for ListContent requirement"
 
@@ -562,9 +562,9 @@ output = "Text[]"
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(plx_content)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(mthds_content)
 
             # Create the .py file with the function
             py_file = temp_path / "my_funcs.py"
@@ -573,7 +573,7 @@ output = "Text[]"
             # Validate the bundle - should fail because return type is not ListContent
             with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=plx_file,
+                    plx_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 

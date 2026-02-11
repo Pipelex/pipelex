@@ -21,7 +21,7 @@ from pipelex.pipeline.validate_bundle import validate_bundle
 class TestData:
     """Test data for pipe_sequence list output bug."""
 
-    PLX_BUNDLE: ClassVar[str] = """
+    MTHDS_BUNDLE: ClassVar[str] = """
 domain = "test_list_output"
 description = "Test bundle for list output bug"
 
@@ -85,13 +85,13 @@ class TestPipeSequenceListOutputBug:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(TestData.PLX_BUNDLE)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(TestData.MTHDS_BUNDLE)
 
             # Load the bundle
             result = await validate_bundle(
-                plx_file_path=plx_file,
+                plx_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -116,13 +116,13 @@ class TestPipeSequenceListOutputBug:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(TestData.PLX_BUNDLE)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(TestData.MTHDS_BUNDLE)
 
             # Load the bundle
             await validate_bundle(
-                plx_file_path=plx_file,
+                plx_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -143,7 +143,7 @@ class TestPipeSequenceListOutputBug:
 class TestDataNested:
     """Test data for nested pipe_sequence list output bug."""
 
-    PLX_BUNDLE: ClassVar[str] = """
+    MTHDS_BUNDLE: ClassVar[str] = """
 domain = "test_nested_list_output"
 description = "Test bundle for nested list output bug"
 
@@ -251,13 +251,13 @@ class TestNestedPipeSequenceListOutputBug:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(TestDataNested.PLX_BUNDLE)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(TestDataNested.MTHDS_BUNDLE)
 
             # Load the bundle
             result = await validate_bundle(
-                plx_file_path=plx_file,
+                plx_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -278,13 +278,13 @@ class TestNestedPipeSequenceListOutputBug:
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
 
-            # Create the .plx file
-            plx_file = temp_path / "test_bundle.plx"
-            plx_file.write_text(TestDataNested.PLX_BUNDLE)
+            # Create the .mthds file
+            mthds_file = temp_path / "test_bundle.mthds"
+            mthds_file.write_text(TestDataNested.MTHDS_BUNDLE)
 
             # Load the bundle
             await validate_bundle(
-                plx_file_path=plx_file,
+                plx_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 

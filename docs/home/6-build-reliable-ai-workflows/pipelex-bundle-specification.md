@@ -1,10 +1,10 @@
 # Pipelex Bundle Specification
 
-A **Pipelex bundle** is the fundamental unit of organization in Pipelex. It's a single `.plx` file that defines a cohesive set of concepts and pipes for a specific domain of work.
+A **Pipelex bundle** is the fundamental unit of organization in Pipelex. It's a single `.mthds` file that defines a cohesive set of concepts and pipes for a specific domain of work.
 
 ## What is a Pipelex Bundle?
 
-A Pipelex bundle (`.plx` file) brings together:
+A Pipelex bundle (`.mthds` file) brings together:
 
 - **Domain declaration** - The semantic namespace for all concepts and pipes in this bundle
 - **Concepts** - The knowledge structures that flow through your pipes (optional)
@@ -12,9 +12,9 @@ A Pipelex bundle (`.plx` file) brings together:
 
 Think of a bundle as a self-contained module that solves a specific problem domain. For example, you might have:
 
-- `invoice_processing.plx` - Bundle for invoice extraction and validation
-- `marketing.plx` - Bundle for generating marketing content
-- `document_analysis.plx` - Bundle for analyzing documents
+- `invoice_processing.mthds` - Bundle for invoice extraction and validation
+- `marketing.mthds` - Bundle for generating marketing content
+- `document_analysis.mthds` - Bundle for analyzing documents
 
 ## Bundle Structure
 
@@ -50,7 +50,7 @@ Every bundle **must** declare a domain. Only the `domain` field is mandatory; al
 ```toml
 domain = "invoice_processing"
 description = "Tools for extracting and validating invoice data"
-source = "path/to/invoice_processing.plx"
+source = "path/to/invoice_processing.mthds"
 system_prompt = "You are an expert in financial document processing."
 main_pipe = "extract_and_validate_invoice"
 ```
@@ -242,5 +242,5 @@ prompt = "..."
 - [Understanding Domains](./domain.md) - Deep dive into domain organization
 - [Designing Pipelines](./pipes/index.md) - Learn how to design and compose pipes
 - [Define Your Concepts](./concepts/define_your_concepts.md) - Complete guide to concept definitions
-- [Kick off a Pipelex Workflow Project](./kick-off-a-pipelex-workflow-project.md) - Start a new project
+- [Kick off a Pipelex Method Project](./kick-off-a-pipelex-workflow-project.md) - Start a new project
 

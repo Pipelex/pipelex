@@ -27,7 +27,7 @@ class Library(BaseModel):
     domain_library: DomainLibrary
     concept_library: ConceptLibrary
     pipe_library: PipeLibrary
-    loaded_plx_paths: list[Path] = Field(default_factory=empty_list_factory_of(Path))
+    loaded_mthds_paths: list[Path] = Field(default_factory=empty_list_factory_of(Path))
 
     def get_domain_library(self) -> DomainLibrary:
         return self.domain_library
@@ -42,7 +42,7 @@ class Library(BaseModel):
         self.pipe_library.teardown()
         self.concept_library.teardown()
         self.domain_library.teardown()
-        self.loaded_plx_paths = []
+        self.loaded_mthds_paths = []
 
     def validate_library(self) -> None:
         self.validate_domain_library_with_libraries()

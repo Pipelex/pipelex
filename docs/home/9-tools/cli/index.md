@@ -23,8 +23,8 @@ The Pipelex CLI is organized into several command groups:
 
 2. **Development Workflow**
 
-    - Write or generate pipelines in `.plx` files
-    - Validate with `pipelex validate your_pipe_code` or `pipelex validate your_bundle.plx` during development
+    - Write or generate pipelines in `.mthds` files
+    - Validate with `pipelex validate your_pipe_code` or `pipelex validate your_bundle.mthds` during development
     - Run `pipelex validate --all` before committing changes
 
 3. **Running Pipelines**

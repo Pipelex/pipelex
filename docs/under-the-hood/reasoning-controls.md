@@ -33,7 +33,7 @@ deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effor
 ```
 
 ```toml
-# In a .plx file
+# In a .mthds file
 [pipe.analyze_contract]
 type = "PipeLLM"
 model = "$deep-analysis"
@@ -148,7 +148,7 @@ config:
   theme: base
 ---
 flowchart TB
-    A["LLMSetting<br>(PLX talent or API)"] -->|make_llm_job_params| B["LLMJobParams<br>reasoning_effort / reasoning_budget"]
+    A["LLMSetting<br>(MTHDS talent or API)"] -->|make_llm_job_params| B["LLMJobParams<br>reasoning_effort / reasoning_budget"]
     B --> C{Provider Worker}
 
     C -->|OpenAI Completions| D["_resolve_reasoning_effort()<br>-> effort string"]

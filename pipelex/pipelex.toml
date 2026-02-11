@@ -391,23 +391,23 @@ image_urls = [
 ]
 
 ####################################################################################################
-# PLX config
+# MTHDS config
 ####################################################################################################
 
-[pipelex.plx_config.inline_tables]
+[pipelex.mthds_config.inline_tables]
 spaces_inside_curly_braces = true
 
-[pipelex.plx_config.strings]
+[pipelex.mthds_config.strings]
 prefer_literal = false
 force_multiline = false
 length_limit_to_multiline = 100
 ensure_trailing_newline = true
 ensure_leading_blank_line = true
 
-[pipelex.plx_config.concepts]
+[pipelex.mthds_config.concepts]
 structure_field_ordering = ["type", "concept_ref", "item_type", "item_concept_ref", "description", "choices", "required"]
 
-[pipelex.plx_config.pipes]
+[pipelex.mthds_config.pipes]
 field_ordering = ["type", "description", "inputs", "output"]
 
 ####################################################################################################
@@ -423,7 +423,7 @@ llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
 
-[migration.migration_maps.plx]
+[migration.migration_maps.mthds]
 img_gen = "model"
 ocr = "model"
 llm_handle = "model"

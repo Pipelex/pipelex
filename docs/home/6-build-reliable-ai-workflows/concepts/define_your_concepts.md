@@ -1,6 +1,6 @@
 # Defining Your Concepts
 
-Concepts are the foundation of reliable AI workflows. They define what flows through your pipes—not just as data types, but as meaningful pieces of knowledge with clear boundaries and validation rules.
+Concepts are the foundation of reliable AI methods. They define what flows through your pipes—not just as data types, but as meaningful pieces of knowledge with clear boundaries and validation rules.
 
 ## Writing Concept Definitions
 
@@ -72,7 +72,7 @@ Those concepts will be Text-based by default. If you want to use structured outp
 Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [Understanding Domains](../domain.md).
 
 ```toml
-# finance.plx
+# finance.mthds
 domain = "finance"
 description = "Financial document processing"
 
@@ -86,7 +86,7 @@ LineItem = "An individual item or service listed in a financial document"
 
 ## Get Started with Inline Structures
 
-To add structure to your concepts, the **recommended approach** is using **inline structures** directly in your `.plx` files. Inline structures support all field types including nested concepts:
+To add structure to your concepts, the **recommended approach** is using **inline structures** directly in your `.mthds` files. Inline structures support all field types including nested concepts:
 
 ```toml
 [concept.Customer]

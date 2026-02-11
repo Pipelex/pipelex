@@ -1,6 +1,6 @@
 # Understanding Domains
 
-A domain in Pipelex is a **semantic namespace** that organizes related concepts and pipes. It's declared at the top of every `.plx` file and serves as an identifier for grouping related functionality.
+A domain in Pipelex is a **semantic namespace** that organizes related concepts and pipes. It's declared at the top of every `.mthds` file and serves as an identifier for grouping related functionality.
 
 ## What is a Domain?
 
@@ -12,7 +12,7 @@ A domain is defined by three properties:
 
 ## Declaring a Domain
 
-Every `.plx` file must declare its domain at the beginning:
+Every `.mthds` file must declare its domain at the beginning:
 
 ```toml
 domain = "invoice_processing"
@@ -68,14 +68,14 @@ This creates two concepts:
 The domain code prevents naming conflicts. Multiple bundles can define concepts with the same name if they're in different domains:
 
 ```toml
-# finance.plx
+# finance.mthds
 domain = "finance"
 [concept]
 Report = "A financial report"
 ```
 
 ```toml
-# marketing.plx
+# marketing.mthds
 domain = "marketing"
 [concept]
 Report = "A marketing campaign report"
@@ -85,17 +85,17 @@ Result: Two different concepts (`finance.Report` and `marketing.Report`) with no
 
 ### Multiple Bundles, Same Domain
 
-Multiple `.plx` files can declare the same domain. They all contribute to that domain's namespace:
+Multiple `.mthds` files can declare the same domain. They all contribute to that domain's namespace:
 
 ```toml
-# finance_invoices.plx
+# finance_invoices.mthds
 domain = "finance"
 [concept]
 Invoice = "..."
 ```
 
 ```toml
-# finance_payments.plx
+# finance_payments.mthds
 domain = "finance"
 [concept]
 Payment = "..."
@@ -171,6 +171,6 @@ Individual pipes can override the domain system prompt by defining their own `sy
 ## Related Documentation
 
 - [Pipelex Bundle Specification](./pipelex-bundle-specification.md) - How domains are declared in bundles
-- [Kick off a Pipelex Workflow Project](./kick-off-a-pipelex-workflow-project.md) - Getting started
+- [Kick off a Pipelex Method Project](./kick-off-a-pipelex-workflow-project.md) - Getting started
 - [Define Your Concepts](./concepts/define_your_concepts.md) - Creating concepts within domains
 - [Designing Pipelines](./pipes/index.md) - Building pipes within domains
