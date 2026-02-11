@@ -201,7 +201,7 @@ function renderContent(stuffId, format) {
     const content = document.getElementById('modal-content');
     content.classList.remove('html-content', 'text-content', 'pdf-content', 'image-content');
 
-    // Handle PDF content type with iframe viewer
+    // Handle PDF content type with embedded viewer
     const contentType = stuffContentType?.[stuffId];
     const jsonData = stuffDataJson?.[stuffId];
 
@@ -210,10 +210,11 @@ function renderContent(stuffId, format) {
         if (pdfUrl) {
             content.classList.add('pdf-content');
             content.innerHTML = '';
-            const iframe = document.createElement('iframe');
-            iframe.src = pdfUrl;
-            iframe.style.cssText = 'width:100%; height:100%; border:none; min-height:500px;';
-            content.appendChild(iframe);
+            const embed = document.createElement('embed');
+            embed.src = pdfUrl;
+            embed.type = 'application/pdf';
+            embed.style.cssText = 'width:100%; height:100%; border:none; min-height:500px;';
+            content.appendChild(embed);
             updateOpenExternalButton(stuffId, contentType, jsonData);
             return;
         }

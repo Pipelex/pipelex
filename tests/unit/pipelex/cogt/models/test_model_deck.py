@@ -4,6 +4,7 @@ from pipelex.cogt.config_cogt import ModelDeckConfig
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError, ModelWaterfallError
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.llm.llm_setting import LLMSetting, LLMSettingChoicesDefaults
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
@@ -20,6 +21,7 @@ class TestModelDeckGetOptionalInferenceModel:
             model_type=ModelType.LLM,
             model_id=f"test_model_{name}",
             costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+            thinking_mode=ThinkingMode.NONE,
             max_tokens=1000,
             max_prompt_images=None,
         )
@@ -206,6 +208,7 @@ class TestModelDeckGetOptionalInferenceModel:
             model_type=ModelType.TEXT_EXTRACTOR,
             model_id="mistral-extractor-id",
             costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+            thinking_mode=ThinkingMode.NONE,
             max_tokens=1000,
             max_prompt_images=None,
         )
@@ -292,6 +295,7 @@ class TestModelDeckPrefixedAliasReferences:
             model_type=ModelType.LLM,
             model_id=f"test_model_{name}",
             costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+            thinking_mode=ThinkingMode.NONE,
             max_tokens=1000,
             max_prompt_images=None,
         )
@@ -444,6 +448,7 @@ class TestModelDeckGetLLMSettingWithPresets:
             model_type=ModelType.LLM,
             model_id=f"test_model_{name}",
             costs={CostCategory.INPUT: 0.001, CostCategory.OUTPUT: 0.002},
+            thinking_mode=ThinkingMode.NONE,
             max_tokens=1000,
             max_prompt_images=None,
         )

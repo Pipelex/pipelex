@@ -10,6 +10,7 @@ class ExtractSetting(ConfigModel):
     model: str
     max_nb_images: int | None = Field(default=None, ge=0)
     image_min_size: int | None = Field(default=None, ge=0)
+    description: str | None = None
 
     def desc(self) -> str:
         return f"OcrSetting(extract_handle={self.model}, max_nb_images={self.max_nb_images}, image_min_size={self.image_min_size})"

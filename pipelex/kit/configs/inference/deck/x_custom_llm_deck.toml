@@ -31,7 +31,8 @@ for_object = "disabled"
 
 ####################################################################################################
 # Waterfalls — ordered lists of models resolved at configuration time by backend availability
-#
+#####################################################################################################
+
 # Example (uncomment to use):
 # [llm.waterfalls]
 # premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2", "grok-4"]

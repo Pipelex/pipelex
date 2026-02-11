@@ -37,7 +37,7 @@ type = "PipeLLM"
 description = "Turn the brief into a pseudo-code plan describing controllers, pipes, their inputs/outputs."
 inputs = { brief = "UserBrief" }
 output = "PlanDraft"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 # Return a draft of a plan that narrates the pipeline as pseudo-steps (no code):
 - For each pipe: state the pipe's description, inputs (by name using snake_case), and the output (by name using snake_case),
@@ -48,7 +48,11 @@ DO NOT indicate the inputs or output type. Just name them.
 - We have a memory system: the outputs of each pipe are added to the memory and can be used as inputs by subsequent pipes.
 - The pipeline's initial inputs are added to the memory at the beginning.
 - You don't need to flatten lists at the end or even in intermediate steps: our system manages branching and the memory flows into each branch.
-- At the end of the pipeline, all the memory is delivered so there is not need to gather all the elements unless expressly requested by the brief.
+- At the end of the pipeline, all the memory is delivered. However, consider adding a final COMPOSE step when:
+  - The brief asks for a cohesive deliverable (report, document, result, summary, card, profile, package)
+  - Multiple related outputs should be bundled as a single structured object
+  - The user would benefit from a unified output rather than scattered variables
+- Skip the final composition only when the outputs are truly independent or when the user explicitly wants separate items.
 
 ## Available orchestration controllers:
 - SEQUENCE: execute a sequence of pipes in order. It must reference the pipes it will execute.
@@ -62,6 +66,19 @@ When describing the task of a pipe controller, be concise, don't detail all the 
 - LLM: uses a Vision/LLM to generate text or structured objects. It can generate single items or lists of items.
 - IMG_GEN: uses an AI model to generate images from a prompt that is either the result of a previous step or part of the pipeline's original inputs. As the image generation prompt MUST be a text, you can plan to use an LLM step to write it.
 - EXTRACT: extracts content from an image or a document, always outputs a list of pages (possibly a list of one page). Use it only when you need to use OCR or document extraction.
+- COMPOSE: combines variables from working memory into a new structured object using field composition (construct mode) or renders a Jinja2 template to produce Text/Html output (template mode).
+  Use COMPOSE at the end of a pipeline when the brief implies a unified deliverable. For example:
+  - A "report" combining analysis, findings, and recommendations
+  - A "product card" combining description, price, and image
+  - A "profile" combining biography, skills, and achievements
+
+---
+
+## Final output decision:
+Ask yourself: "Would the user prefer to receive one cohesive object or multiple separate pieces?"
+- If the brief mentions words like "report", "document", "card", "profile", "summary", "package", "bundle" → likely needs a final COMPOSE
+- If the brief lists multiple things that logically go together → likely needs a final COMPOSE
+- If the outputs are independent items to be used separately → no final COMPOSE needed
 
 ---
 
@@ -87,7 +104,7 @@ type = "PipeLLM"
 description = "Interpret the draft of a plan to create an AI pipeline, and define the needed concepts."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief" }
 output = "ConceptDrafts"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 We are working on writing an AI pipeline to fulfill this brief:
 @brief
@@ -109,20 +126,28 @@ For instance:
   If we need multiple items, we'll indicate it elsewhere so you don't bother with it here.
 - Provide a concise description for each concept
 
-If the concept can be expressed as a text, image, document, number, or page:
-- Name the concept, define it and just write "refines: Text", "refines: Document" (and note that PDF is a document), or "refines: Image" etc.
+If the concept can be expressed as a text, html, image, document, number, or page:
+- Name the concept, define it and just write "refines: Text", "refines: Html" (for HTML content), "refines: Document" (and note that PDF is a document), or "refines: Image" etc.
 - No need to define its structure
 Else, if you need structure for your concept, draft its structure:
 - field name in snake_case
 - description:
   - description: the description of the field, in natural language
-  - type: the type of the field (text, integer, boolean, number, date)
+  - type: the type of the field:
+    - text, integer, boolean, number, date for primitive values
+    - concept when the field should contain a previously-defined structured concept
+  - concept_ref: (only when type=concept) the name of the referenced concept (e.g., "CVAnalysis")
   - required: add required = true if the field is required (otherwise, leave it empty)
   - default_value: the default value of the field
 
+When building composite/aggregate concepts that combine multiple other concepts:
+- Use type=concept with concept_ref to reference the other structured concepts
+- Example: if ProjectReport needs to include ProjectSummary, RiskAnalysis, and BudgetBreakdown, each field should use type=concept with the appropriate concept_ref, NOT type=text
+- This allows proper object composition rather than flattening structured data into text
+
 @plan_draft
 
-DO NOT redefine native concepts such as: Text, Image, Document, Number, Page. if you need one of these, they already exist so you should NOT REDEFINE THEM.
+DO NOT redefine native concepts: Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic. They are built-in and must NOT be redeclared.
 
 Do not write any intro or outro, do not mention the brief or the plan draft, just write the concept drafts.
 List the concept drafts in Markdown format with a heading 3 for each, e.g. `### Concept FooBar`.
@@ -133,7 +158,7 @@ type = "PipeLLM"
 description = "Structure the concept definitions."
 inputs = { concept_drafts = "ConceptDrafts" }
 output = "ConceptSpec[]"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 system_prompt = """
 You are an expert at data extraction and json formatting.
 """
@@ -147,7 +172,7 @@ type = "PipeLLM"
 description = "Draft the flow of the pipeline."
 inputs = { plan_draft = "PlanDraft", brief = "UserBrief", concept_specs = "ConceptSpec[]" }
 output = "FlowDraft"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 system_prompt = """
 You are a Senior engineer.
 """
@@ -161,20 +186,26 @@ prompt = """
 {% if concept_specs %}
 We have already defined the concepts you must use for the inputs and outputs of the pipes:
 @concept_specs
-And of course you still have the native concepts if required: Text, Image, Document, Number, Page.
+And of course you still have the native concepts if required: Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic.
 {% else %}
-You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Image, Document, Number, Page.
+You can use the native concepts for the inputs and outputs of the pipes, as required: Text, Html, Image, Document, Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic.
 {% endif %}
 
 ## For PipeOperators:
 
-The flow you design must include the contracts for each of the PipeOperators to use: PipeLLM, PipeImgGen, PipeExtract.
+The flow you design must include the contracts for each of the PipeOperators to use: PipeLLM, PipeImgGen, PipeExtract, PipeCompose.
 Shape of the contract for PipeOperator is:
-- type: PipeLLM | PipeImgGen | PipeExtract
+- type: PipeLLM | PipeImgGen | PipeExtract | PipeCompose
 - description: What the pipe does (string)
 - inputs: Dictionary mapping variable names (snake_case) to concept codes (PascalCase), possibly with multiplicity brackets.
 - result: Variable name for the pipe's result (snake_case). Can be referenced in subsequent pipes.
 - output: Output concept code (PascalCase) possibly with multiplicity: 'Text' (single), 'Article[]' (list), 'Image[5]' (exactly 5).
+
+**PipeCompose** has two modes:
+- Template mode: Renders a template using variables from working memory. Output must be Text (or a concept that refines Text), or Html (or a concept that refines Html) if generating HTML content. Use for generating formatted text/documents.
+- Construct mode: Composes a StructuredContent object by mapping fields from working memory variables. Use for assembling structured objects from multiple sources.
+  - PREFER `{ from = "the_varname" }` for direct object assignment
+  - Use `{ template = "..." }` ONLY for string composition (combining prefix with a variable)
 
 ## For the PipeControllers, which really define the flow, we need a more detailed contract, related to each type of controller:
 
@@ -203,6 +234,10 @@ Shape of the contract for PipeOperator is:
   i.e. something like "Ideas[]" or "Images[]".
 - input_list_name: List variable to iterate over (snake_case, plural).
 - input_item_name: Name for individual items in each branch (snake_case, singular).
+- IMPORTANT: input_list_name should be a PLURAL noun, and input_item_name should be the
+  SINGULAR form. They must be DIFFERENT from each other, and input_item_name must not match
+  any key in the batch pipe's inputs dict.
+  Examples: list "items" → item "item", list "report_data" → item "single_report_data".
 
 **PipeCondition:**
 - jinja2_expression_template: Jinja2 expression to evaluate.
@@ -225,9 +260,12 @@ Becareful, the outputs "fail" and "continue" are special outcomes, they are not 
 ## Flow:
 - We have a memory system: the outputs of each pipe are added to the memory and can be used as inputs by subsequent pipes.
 - The pipeline's initial inputs are added to the memory at the beginning.
-- Do not bother with planning a final step that gathers all the elements unless it's clear from the brief that the user wants the pipe to do that.
 - You don't need to flatten lists at the end or even in intermediate steps: our system manages branching and the memory flows into each branch.
-- At the end of the pipeline, all the memory is delivered so there is not need to gather all the elements unless expressly requested by the brief.
+- At the end of the pipeline, all the memory is delivered. However, consider adding a final PipeCompose step when:
+  - The brief asks for a cohesive deliverable (report, document, result, summary, card, profile, package)
+  - Multiple related outputs should be bundled as a single structured object
+  - The user would benefit from a unified output rather than scattered variables
+- Skip the final composition only when the outputs are truly independent or when the user explicitly wants separate items.
 - If you have a sequence which has only one step, then don't make that a sequence, make it a single pipe. Or check if you forgot to include another step maybe.
 - If you're in a sequence and you are to apply a pipe to a previous output which is multiple, use a PipeBatch step.
 - PipeBatch is a map operator: it transforms the input list in a new list of outputs, so if you want to apply several steps to the individual items, the branch_pipe_code MUST be a PipeSequence of these steps.
@@ -246,7 +284,7 @@ type = "PipeLLM"
 description = "Review a draft flow and make it consistent."
 inputs = { flow_draft = "FlowDraft", brief = "UserBrief" }
 output = "FlowDraft"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 system_prompt = """
 You are a Senior engineer.
 """
@@ -264,6 +302,7 @@ Is the flow consistent? Issues to watch out for:
 - If the main pipe has an input which is multiple (a list), are we correctly batching over it?
 - Are there any missing variables or variable names that are not the expected names?
 - PipeImgGen must take a single input which must be a text or a concept that refines text, if it's not the case, it needs fixing. For instance if the input is some structured concept, you'll have to add a PipeLLM step to write the prompt from the structured concept.
+- Does the pipeline produce multiple related outputs that should be delivered as a single cohesive object? If the brief implies a unified deliverable (report, document, card, profile, summary), consider adding a final PipeCompose step to bundle them.
 
 If the flow is consistent, state it in a declarative sentence like "The flow has been checked and is consistent:" and then copy the flow like you received it.
 
@@ -275,7 +314,7 @@ type = "PipeLLM"
 description = "Write the pipe signatures for the plan."
 inputs = { prepared_flow = "FlowDraft", brief = "UserBrief" }
 output = "pipe_design.PipeSignature[]"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 system_prompt = """
 You are a Senior engineer.
 """
@@ -302,9 +341,8 @@ prompt = """
 ## Flow:
 - We have a memory system: the outputs of each pipe are added to the memory and can be used as inputs by subsequent pipes.
 - The pipeline's initial inputs are added to the memory at the beginning.
-- Do not bother with planning a final step that gathers all the elements unless it's clear from the brief that the user wants the pipe to do that.
 - You don't need to flatten lists at the end or even in intermediate steps: our system manages branching and the memory flows into each branch.
-- At the end of the pipeline, all the memory is delivered so there is not need to gather all the elements unless expressly requested by the brief.
+- At the end of the pipeline, all the memory is delivered. However, if the flow ends with a final PipeCompose step to bundle multiple outputs into a cohesive deliverable, ensure the pipe signatures reflect this.
 """
 
 [pipe.write_bundle_header]
@@ -312,7 +350,7 @@ type = "PipeLLM"
 description = "Write the bundle header."
 inputs = { brief = "UserBrief", pipe_signatures = "pipe_design.PipeSignature" }
 output = "BundleHeaderSpec"
-model = "$engineering-structured"
+model = "$pipe-builder-engineering"
 prompt = """
 Name and define the domain of this process:
 @brief

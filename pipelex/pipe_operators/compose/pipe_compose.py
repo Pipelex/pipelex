@@ -19,6 +19,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
+from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -246,7 +247,11 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             content_generator=content_generator,
             pipe_run_params=pipe_run_params,
         )
-        the_content = await composer.compose()
+        try:
+            the_content = await composer.compose()
+        except PipeComposeError as exc:
+            msg = f"In pipe '{self.code}' (output: {self.output.concept.code}): {exc.message}"
+            raise PipeComposeError(msg) from exc
         log.verbose(f"Composed structured content: {the_content}")
 
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)

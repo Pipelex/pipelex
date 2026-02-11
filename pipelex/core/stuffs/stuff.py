@@ -63,6 +63,16 @@ class Stuff(PrettyRenderable, CustomBaseModel):
 {self.concept.code} — {type(self.content).__name__}:
 {self.content.short_desc}"""
 
+    @property
+    def header(self) -> str:
+        """A descriptive header with stuff_code, stuff_name, and concept."""
+        name_part = f" ({self.stuff_name})" if self.stuff_name else ""
+        return f"Stuff[{self.stuff_code}{name_part}] <{self.concept.code}>"
+
+    @override
+    def __repr__(self) -> str:
+        return f"{self.header}\n{kajson.dumps(self.content.smart_dump(), indent=4)}"
+
     @override
     def __str__(self) -> str:
         return f"{self.title}\n{kajson.dumps(self.content.smart_dump(), indent=4)}"

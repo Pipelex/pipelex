@@ -60,11 +60,30 @@ class TestMakeBase64UrlFromUriAsync:
 
         assert result == original_data_url
 
-    async def test_pipelex_storage_raises_value_error(self) -> None:
-        """Test that pipelex-storage:// URIs raise ValueError."""
+    async def test_pipelex_storage_converts_to_base64_data_url(self, mocker: MockerFixture) -> None:
+        """Test that pipelex-storage:// URIs are loaded from storage and converted to base64 data URLs."""
+        # Load real PNG bytes from test file
+        with open(ImageTestCases.IMAGE_FILE_PATH_PNG_1, "rb") as file_handle:
+            png_bytes = file_handle.read()
+
+        # Mock the storage provider
+        mock_storage = mocker.AsyncMock()
+        mock_storage.load = mocker.AsyncMock(return_value=png_bytes)
+
+        storage_uri = f"{PIPELEX_STORAGE_SCHEME}images/photo.png"
+        result = await make_base64_url_from_any_uri(storage_uri, storage_provider=mock_storage)
+
+        assert result.startswith("data:image/png;base64,")
+        base64_part = result.split(",", 1)[1]
+        decoded = base64.b64decode(base64_part)
+        assert decoded == png_bytes
+        mock_storage.load.assert_called_once_with(uri=storage_uri)
+
+    async def test_pipelex_storage_raises_value_error_without_storage(self) -> None:
+        """Test that pipelex-storage:// URIs raise ValueError when no storage provider is given."""
         storage_uri = f"{PIPELEX_STORAGE_SCHEME}images/photo.png"
 
-        with pytest.raises(ValueError, match="Unsupported URI type"):
+        with pytest.raises(ValueError, match="Cannot convert pipelex-storage"):
             await make_base64_url_from_any_uri(storage_uri)
 
     async def test_http_url_converts_to_base64_data_url(self, mocker: MockerFixture) -> None:

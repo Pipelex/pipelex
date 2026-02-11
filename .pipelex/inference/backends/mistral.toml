@@ -25,6 +25,7 @@ model_type = "llm"
 sdk = "mistral"
 prompting_target = "mistral"
 structure_method = "instructor/mistral_tools"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -69,36 +70,6 @@ inputs = ["text"]
 outputs = ["text"]
 costs = { input = 1.0, output = 3.0 }
 
-# --- Mistral Large Series -----------------------------------------------------
-[mistral-large-2402]
-model_id = "mistral-large-2402"
-max_tokens = 32768
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 4.0, output = 12.0 }
-
-[mistral-large]
-model_id = "mistral-large-latest"
-max_tokens = 131072
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 4.0, output = 12.0 }
-
-# --- Mistral Small Series -----------------------------------------------------
-[mistral-small-2402]
-model_id = "mistral-small-2402"
-max_tokens = 32768
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 1.0, output = 3.0 }
-
-[mistral-small]
-model_id = "mistral-small-latest"
-max_tokens = 32768
-inputs = ["text"]
-outputs = ["text", "structured"]
-costs = { input = 1.0, output = 3.0 }
-
 # --- Pixtral Series -----------------------------------------------------------
 [pixtral-12b]
 model_id = "pixtral-12b-latest"
@@ -114,7 +85,43 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 2.0, output = 6.0 }
 
+# --- Mistral Small Series -----------------------------------------------------
+[mistral-small-2506]
+model_id = "mistral-small-2506"
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.3 }
+
+["mistral-small-3.2"]
+model_id = "mistral-small-2506"
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.3 }
+
+[mistral-small]
+model_id = "mistral-small-latest"
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.3 }
+
 # --- Mistral Medium Series ----------------------------------------------------
+[mistral-medium-2508]
+model_id = "mistral-medium-2508"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2.0 }
+
+["mistral-medium-3.1"]
+model_id = "mistral-medium-2508"
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2.0 }
+
 [mistral-medium]
 model_id = "mistral-medium-latest"
 max_tokens = 128000
@@ -122,12 +129,60 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.4, output = 2.0 }
 
-[mistral-medium-2508]
-model_id = "mistral-medium-2508"
-max_tokens = 128000
+# --- Mistral Large Series -----------------------------------------------------
+[mistral-large-2512]
+model_id = "mistral-large-2512"
+max_tokens = 256000
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
-costs = { input = 0.4, output = 2.0 }
+costs = { input = 0.5, output = 1.5 }
+
+[mistral-large-3]
+model_id = "mistral-large-2512"
+max_tokens = 256000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.5, output = 1.5 }
+
+[mistral-large]
+model_id = "mistral-large-latest"
+max_tokens = 256000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.5, output = 1.5 }
+
+# --- Magistral Series (reasoning models) ------------------------------------
+[magistral-small-2509]
+model_id = "magistral-small-2509"
+max_tokens = 128000
+inputs = ["text", "pdf"]
+outputs = ["text"]
+costs = { input = 0.5, output = 1.5 }
+thinking_mode = "manual"
+
+[magistral-small]
+model_id = "magistral-small-latest"
+max_tokens = 128000
+inputs = ["text", "pdf"]
+outputs = ["text"]
+costs = { input = 0.5, output = 1.5 }
+thinking_mode = "manual"
+
+[magistral-medium-2509]
+model_id = "magistral-medium-2509"
+max_tokens = 128000
+inputs = ["text", "pdf"]
+outputs = ["text"]
+costs = { input = 2, output = 5 }
+thinking_mode = "manual"
+
+[magistral-medium]
+model_id = "magistral-medium-latest"
+max_tokens = 128000
+inputs = ["text", "pdf"]
+outputs = ["text"]
+costs = { input = 2, output = 5 }
+thinking_mode = "manual"
 
 ################################################################################
 # EXTRACTION MODELS

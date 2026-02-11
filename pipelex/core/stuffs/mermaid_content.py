@@ -17,10 +17,6 @@ class MermaidContent(StuffContent):
         return f"some mermaid code ({len(self.mermaid_code)} chars)"
 
     @override
-    def __str__(self) -> str:
-        return self.mermaid_code
-
-    @override
     def rendered_plain(self) -> str:
         return self.mermaid_code
 

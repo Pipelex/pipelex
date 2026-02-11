@@ -25,11 +25,13 @@ class SubPipeSpec(StructuredContent):
 
     pipe_code: str = Field(json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
     result: str = Field(json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
+    batch_over: str | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
+    batch_as: str | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
 
     def to_blueprint(self) -> SubPipeBlueprint:
         return SubPipeBlueprint(
             pipe=self.pipe_code,
             result=self.result,
-            batch_over=None,
-            batch_as=None,
+            batch_over=self.batch_over,
+            batch_as=self.batch_as,
         )

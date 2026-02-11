@@ -7,7 +7,6 @@
 # mypy: disable-error-code="arg-type,no-any-return,attr-defined"
 
 import json
-import sys
 from typing import Annotated, Any
 
 import tomlkit
@@ -25,6 +24,7 @@ from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -118,6 +118,10 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
             step_inline = tomlkit.inline_table()
             step_inline.append("pipe", step.pipe_code)
             step_inline.append("result", step.result)
+            if step.batch_over is not None:
+                step_inline.append("batch_over", step.batch_over)
+            if step.batch_as is not None:
+                step_inline.append("batch_as", step.batch_as)
             steps_array.append(step_inline)
         pipe_table.add("steps", steps_array)
 
@@ -259,26 +263,12 @@ def pipe_cmd(
         pipelex-agent pipe --type PipeLLM --spec '{"pipe_code": "summarize", ...}'
         pipelex-agent pipe --type PipeSequence --spec-file pipe.json
     """
-    error_json: dict[str, Any]
-
     # Validate that exactly one of spec or spec_file is provided
     if spec is None and spec_file is None:
-        error_json = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "Either --spec or --spec-file must be provided",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("Either --spec or --spec-file must be provided", "ArgumentError")
 
     if spec is not None and spec_file is not None:
-        error_json = {
-            "error": True,
-            "error_type": "ArgumentError",
-            "message": "Cannot use both --spec and --spec-file",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1)
+        agent_error("Cannot use both --spec and --spec-file", "ArgumentError")
 
     # Load spec data
     spec_data: dict[str, Any]
@@ -288,59 +278,30 @@ def pipe_cmd(
                 spec_data = json.load(the_file)
         else:
             spec_data = json.loads(spec)  # type: ignore[arg-type]
-    except FileNotFoundError:
-        error_json = {
-            "error": True,
-            "error_type": "FileNotFoundError",
-            "message": f"Spec file not found: {spec_file}",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from None
+    except FileNotFoundError as exc:
+        agent_error(f"Spec file not found: {spec_file}", "FileNotFoundError", cause=exc)
     except json.JSONDecodeError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "JSONDecodeError",
-            "message": f"Invalid JSON: {exc.msg}",
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(f"Invalid JSON: {exc.msg}", "JSONDecodeError", cause=exc)
 
     # Validate and convert spec
     try:
         pipe_spec = _parse_pipe_spec_from_json(pipe_type, spec_data)
         toml_content = _pipe_spec_to_toml(pipe_spec)
 
-        result = {
-            "success": True,
-            "pipe_code": pipe_spec.pipe_code,
-            "pipe_type": pipe_type,
-            "toml": toml_content,
-        }
-        print(json.dumps(result, indent=2))
+        agent_success(
+            {
+                "success": True,
+                "pipe_code": pipe_spec.pipe_code,
+                "pipe_type": pipe_type,
+                "toml": toml_content,
+            }
+        )
 
     except ValueError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "ValueError",
-            "message": str(exc),
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(str(exc), "ValueError", cause=exc)
 
     except ValidationError as exc:
-        error_json = {
-            "error": True,
-            "error_type": "ValidationError",
-            "message": format_pydantic_validation_error(exc),
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(format_pydantic_validation_error(exc), "ValidationError", cause=exc)
 
     except Exception as exc:
-        error_json = {
-            "error": True,
-            "error_type": type(exc).__name__,
-            "message": str(exc),
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(str(exc), type(exc).__name__, cause=exc)

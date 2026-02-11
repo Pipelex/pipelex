@@ -5,7 +5,7 @@ from pydantic import BaseModel, ValidationError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
-from pipelex.core.interpreter.validation_error_categorizer import categorize_blueprint_validation_error
+from pipelex.core.interpreter.validation_error_categorizer import PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD, categorize_blueprint_validation_error
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_content, load_toml_from_path
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -22,6 +22,7 @@ class PipelexInterpreter(BaseModel):
         try:
             if bundle_path is not None:
                 blueprint_dict = load_toml_from_path(path=str(bundle_path))
+                blueprint_dict[PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD] = str(bundle_path)
             elif plx_content is not None:
                 blueprint_dict = load_toml_from_content(content=plx_content)
             else:

@@ -28,6 +28,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **claude-4.5-sonnet**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **claude-4.6-opus**
+  - inputs: text, images, pdf
+  - outputs: text, structured
 - **deepseek-v3.1**
   - inputs: text
   - outputs: text, structured
@@ -121,7 +124,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **kimi-k2-thinking**
   - inputs: text
   - outputs: text, structured
-- **mistral-large-3**
+- **mistral-large**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **o1**
@@ -187,6 +190,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-02-03T13:57:10Z
+> Last updated: 2026-02-08T16:30:33Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

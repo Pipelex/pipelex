@@ -41,12 +41,13 @@ default-small = "gpt-image-1-mini"
 [img_gen.presets]
 
 # General purpose
-gen-image = { model = "@default-general", quality = "medium" }
-gen-image-fast = { model = "@default-small", quality = "low" }
-gen-image-high-quality = { model = "@default-premium", quality = "high" }
+gen-image = { model = "@default-general", quality = "medium", description = "Standard image generation" }
+gen-image-fast = { model = "@default-small", quality = "low", description = "Fast image generation with lower quality" }
+gen-image-high-quality = { model = "@default-premium", quality = "high", description = "High-quality image generation" }
 
 # Testing
-gen-image-testing = { model = "@default-small", quality = "low" }
-synthesize-photo = { model = "@default-small", quality = "low" }
-synthesize-ui = { model = "nano-banana-pro" }
-synthesize-chart = { model = "nano-banana-pro" }
+gen-image-testing = { model = "@default-small", quality = "low", description = "Testing preset for image generation" }
+gen-image-testing-img2img = { model = "nano-banana-pro", description = "Testing preset for image-to-image" }
+synthesize-photo = { model = "@default-small", quality = "low", description = "Synthesize realistic photos for testing" }
+synthesize-ui = { model = "nano-banana-pro", description = "Synthesize UI screenshots for testing" }
+synthesize-chart = { model = "nano-banana-pro", description = "Synthesize charts and graphs for testing" }

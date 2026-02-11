@@ -7,6 +7,7 @@ from pipelex.cogt.document.prompt_document import (
 )
 from pipelex.cogt.document.prompt_document_factory import PromptDocumentFactory
 from pipelex.cogt.exceptions import PromptDocumentFactoryError
+from pipelex.urls import URLs
 
 
 class TestPromptDocumentFactory:
@@ -14,10 +15,10 @@ class TestPromptDocumentFactory:
 
     def test_make_from_uri(self) -> None:
         """Test creating PromptDocumentUri from a URI string."""
-        result = PromptDocumentFactory.make_prompt_document(uri="https://example.com/document.pdf")
+        result = PromptDocumentFactory.make_prompt_document(uri=URLs.pdf_example_1)
 
         assert isinstance(result, PromptDocumentUri)
-        assert result.uri == "https://example.com/document.pdf"
+        assert result.uri == URLs.pdf_example_1
 
     def test_make_from_file_path(self) -> None:
         """Test creating PromptDocumentUri from a local file path."""
@@ -58,7 +59,7 @@ class TestPromptDocumentFactory:
     def test_make_with_mime_type(self) -> None:
         """Test creating PromptDocumentUri with explicit mime_type."""
         result = PromptDocumentFactory.make_prompt_document(
-            uri="https://example.com/document",
+            uri=URLs.pdf_example_1,
             mime_type="application/pdf",
         )
 
@@ -85,7 +86,7 @@ class TestPromptDocumentFactory:
     def test_priority_base64_over_uri(self) -> None:
         """Test that base64_data takes priority over uri."""
         base64_data = "JVBERi0xLjQK"
-        uri = "https://example.com/document.pdf"
+        uri = URLs.pdf_example_1
 
         result = PromptDocumentFactory.make_prompt_document(
             base64_data=base64_data,

@@ -146,7 +146,10 @@ class PipeAbstract(ABC, BaseModel):
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
             if not is_variable_satisfied_by_inputs(required_variable_path, input_names):
-                msg = f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+                msg = (
+                    f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. "
+                    f"Current inputs: {self.inputs.format_for_display()}"
+                )
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
@@ -163,7 +166,7 @@ class PipeAbstract(ABC, BaseModel):
             var_name = named_stuff_spec.variable_name
 
             if var_name not in self.inputs.variables:
-                msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+                msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs.format_for_display()}"
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
@@ -265,6 +268,24 @@ class PipeAbstract(ABC, BaseModel):
                 pipe_code=self.code,
                 missing_inputs=missing_input_names,
             )
+
+        # Validate external resources (URLs, file paths) referenced by input contents.
+        # Skipped in dry-run mode because inputs are mock-generated with fake URLs.
+        if not pipe_run_params.run_mode.is_dry:
+            for named_stuff_spec in self.needed_inputs().named_stuff_specs:
+                variable_name = named_stuff_spec.variable_name
+                stuff = working_memory.get_optional_stuff(variable_name)
+                if stuff is not None:
+                    try:
+                        stuff.content.validate_resources()
+                    except ValueError as exc:
+                        msg = f"Input '{variable_name}' of pipe '{self.code}' references an invalid resource: {exc}"
+                        raise PipeRunInputsError(
+                            message=msg,
+                            run_mode=pipe_run_params.run_mode,
+                            pipe_code=self.code,
+                            variable_name=variable_name,
+                        ) from exc
 
         # Specific pipe validation function
         await self._validate_before_run(

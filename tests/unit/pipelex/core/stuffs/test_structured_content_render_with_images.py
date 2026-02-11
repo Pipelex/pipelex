@@ -16,6 +16,7 @@ from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_native_concept
 from pipelex.tools.jinja2.image_registry import ImageRegistry
+from pipelex.urls import URLs
 
 
 class CustomStructuredWithPlainList(StructuredContent):
@@ -59,9 +60,9 @@ class TestStructuredContentRenderWithImages:
         content = CustomStructuredWithPlainList(
             title="Test Document",
             images=[
-                ImageContent(url="https://example.com/image1.png"),
-                ImageContent(url="https://example.com/image2.png"),
-                ImageContent(url="https://example.com/image3.png"),
+                ImageContent(url=URLs.png_example_1),
+                ImageContent(url=URLs.png_example_2),
+                ImageContent(url=URLs.png_example_3),
             ],
         )
         registry = ImageRegistry()
@@ -70,17 +71,17 @@ class TestStructuredContentRenderWithImages:
 
         assert result == TestData.EXPECTED_PLAIN_LIST
         assert len(registry.images) == 3
-        assert registry.images[0].url == "https://example.com/image1.png"
-        assert registry.images[1].url == "https://example.com/image2.png"
-        assert registry.images[2].url == "https://example.com/image3.png"
+        assert registry.images[0].url == URLs.png_example_1
+        assert registry.images[1].url == URLs.png_example_2
+        assert registry.images[2].url == URLs.png_example_3
 
     def test_dict_with_image_content_values_extracts_images(self) -> None:
         """Test that dict with ImageContent values has images extracted properly."""
         content = CustomStructuredWithDict(
             title="Gallery",
             image_map={
-                "cover": ImageContent(url="https://example.com/cover.png"),
-                "background": ImageContent(url="https://example.com/bg.png"),
+                "cover": ImageContent(url=URLs.png_example_1),
+                "background": ImageContent(url=URLs.png_example_2),
             },
         )
         registry = ImageRegistry()
@@ -96,11 +97,11 @@ class TestStructuredContentRenderWithImages:
             title="Nested Gallery",
             image_groups=[
                 [
-                    ImageContent(url="https://example.com/g1-i1.png"),
-                    ImageContent(url="https://example.com/g1-i2.png"),
+                    ImageContent(url=URLs.png_example_1),
+                    ImageContent(url=URLs.png_example_2),
                 ],
                 [
-                    ImageContent(url="https://example.com/g2-i1.png"),
+                    ImageContent(url=URLs.png_example_3),
                 ],
             ],
         )
@@ -117,10 +118,10 @@ class TestStructuredContentRenderWithImages:
             text_and_images=TextAndImagesContent(
                 text=TextContent(text="Some document text"),
                 images=[
-                    ImageContent(url="https://example.com/page-image.png"),
+                    ImageContent(url=URLs.png_example_1),
                 ],
             ),
-            page_view=ImageContent(url="https://example.com/page-view.png"),
+            page_view=ImageContent(url=URLs.png_example_3),
         )
         registry = ImageRegistry()
 
@@ -135,11 +136,11 @@ class TestStructuredContentRenderWithImages:
             text_and_images=TextAndImagesContent(
                 text=TextContent(text="Page content"),
                 images=[
-                    ImageContent(url="https://example.com/embedded1.png"),
-                    ImageContent(url="https://example.com/embedded2.png"),
+                    ImageContent(url=URLs.png_example_1),
+                    ImageContent(url=URLs.png_example_2),
                 ],
             ),
-            page_view=ImageContent(url="https://example.com/page-screenshot.png"),
+            page_view=ImageContent(url=URLs.png_example_3),
         )
         registry = ImageRegistry()
 
@@ -147,9 +148,9 @@ class TestStructuredContentRenderWithImages:
 
         assert result == TestData.EXPECTED_PAGE_CONTENT_ALL
         assert len(registry.images) == 3
-        assert registry.images[0].url == "https://example.com/embedded1.png"
-        assert registry.images[1].url == "https://example.com/embedded2.png"
-        assert registry.images[2].url == "https://example.com/page-screenshot.png"
+        assert registry.images[0].url == URLs.png_example_1
+        assert registry.images[1].url == URLs.png_example_2
+        assert registry.images[2].url == URLs.png_example_3
 
     def test_empty_list_produces_no_images(self) -> None:
         """Test that empty list fields don't cause issues."""
@@ -169,7 +170,7 @@ class TestStructuredContentRenderWithImages:
         page = PageContent(
             text_and_images=TextAndImagesContent(
                 text=TextContent(text="Text only"),
-                images=[ImageContent(url="https://example.com/single.png")],
+                images=[ImageContent(url=URLs.png_example_1)],
             ),
             page_view=None,
         )

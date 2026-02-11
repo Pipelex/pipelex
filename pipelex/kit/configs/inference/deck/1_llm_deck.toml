@@ -30,13 +30,13 @@ for_object = "@default-general"
 best-gpt = "gpt-5.2"
 best-claude = "claude-4.5-opus"
 best-gemini = "gemini-3.0-pro"
-best-mistral = "mistral-large-3"
+best-mistral = "mistral-large"
 
 # Default aliases (first choice from waterfalls)
 default-general = "claude-4.5-sonnet"
-default-premium = "claude-4.5-opus"
-default-premium-vision = "claude-4.5-opus"
-default-premium-structured = "claude-4.5-opus"
+default-premium = "claude-4.6-opus"
+default-premium-vision = "claude-4.6-opus"
+default-premium-structured = "claude-4.6-opus"
 default-large-context-code = "gemini-3.0-pro"
 default-large-context-text = "gemini-2.5-flash"
 default-small = "gpt-4o-mini"
@@ -51,29 +51,37 @@ default-small-creative = "gemini-2.5-flash-lite"
 [llm.presets]
 
 # Writing
-writing-factual = { model = "@default-premium", temperature = 0.1 }
-writing-creative = { model = "@default-premium", temperature = 0.9 }
+writing-factual = { model = "@default-premium", temperature = 0.1, description = "Factual writing with high accuracy" }
+writing-creative = { model = "@default-premium", temperature = 0.9, description = "Creative writing with high variability" }
 
 # Retrieval
-retrieval = { model = "@default-large-context-text", temperature = 0.1 }
+retrieval = { model = "@default-large-context-text", temperature = 0.1, description = "Data retrieval from large text corpora" }
 
 # Engineering
-engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
-engineering-code = { model = "@default-premium", temperature = 0.1 }
-engineering-codebase-analysis = { model = "@best-gemini", temperature = 0.1 }
+engineering-structured = { model = "@default-premium-structured", temperature = 0.2, description = "Structured engineering output (JSON, schemas)" }
+engineering-code = { model = "@default-premium", temperature = 0.1, description = "Code generation and analysis" }
+engineering-codebase-analysis = { model = "@best-gemini", temperature = 0.1, description = "Large codebase analysis" }
 
 # Vision
-vision = { model = "@default-premium-vision", temperature = 0.5 }
-vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
-vision-diagram = { model = "@default-premium-vision", temperature = 0.3 }
-vision-table = { model = "@default-premium-vision", temperature = 0.3 }
+vision = { model = "@default-premium-vision", temperature = 0.5, description = "Vision language model for understanding images" }
+vision-cheap = { model = "@default-small-vision", temperature = 0.5, description = "Budget vision model for simple image tasks" }
+vision-diagram = { model = "@default-premium-vision", temperature = 0.3, description = "Diagram and chart interpretation" }
+vision-table = { model = "@default-premium-vision", temperature = 0.3, description = "Table extraction from images" }
 
 # Image generation prompting
-img-gen-prompting = { model = "@default-premium", temperature = 0.5 }
-img-gen-prompting-cheap = { model = "@default-small", temperature = 0.5 }
+img-gen-prompting = { model = "@default-premium", temperature = 0.5, description = "Crafting image generation prompts" }
+img-gen-prompting-cheap = { model = "@default-small", temperature = 0.5, description = "Budget image prompt generation" }
+
+# Reasoning
+deep-analysis = { model = "@default-premium", temperature = 0.1, reasoning_effort = "high", description = "Deep reasoning and analysis" }
+quick-reasoning = { model = "@default-premium", temperature = 0.3, reasoning_effort = "low", description = "Quick reasoning for simple tasks" }
+
+# Builder (isolated presets for the pipeline builder)
+pipe-builder-engineering = { model = "claude-4.6-opus", temperature = 0.2, description = "Builder: structured engineering output" }
+pipe-builder-img-gen-prompting = { model = "claude-4.5-sonnet", temperature = 0.7, description = "Builder: crafting image generation prompts" }
 
 # Testing
-testing-text = { model = "@default-small", temperature = 0.5 }
-testing-structured = { model = "@default-small-structured", temperature = 0.1 }
-testing-vision = { model = "@default-small-vision", temperature = 0.5 }
-testing-vision-structured = { model = "@default-small-vision", temperature = 0.5 }
+testing-text = { model = "@default-small", temperature = 0.5, description = "Testing preset for text generation" }
+testing-structured = { model = "@default-small-structured", temperature = 0.1, description = "Testing preset for structured output" }
+testing-vision = { model = "@default-small-vision", temperature = 0.5, description = "Testing preset for vision tasks" }
+testing-vision-structured = { model = "@default-small-vision", temperature = 0.5, description = "Testing preset for structured vision output" }

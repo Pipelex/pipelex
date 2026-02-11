@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from pydantic import ValidationError
+
 from pipelex.base_exceptions import PipelexError
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
@@ -16,10 +18,11 @@ from pipelex.hub import (
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import VariableMultiplicity
-from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
     from pipelex.pipe_run.pipe_job import PipeJob
@@ -168,6 +171,11 @@ async def execute_pipeline(
             output_name=pipe_job.output_name,
             pipe_stack=pipe_job.pipe_run_params.pipe_stack,
         ) from exc
+    except ValidationError as exc:
+        formatted_error = format_pydantic_validation_error(exc)
+        model_name = exc.title
+        msg = f"Input validation failed for '{model_name}': {formatted_error}"
+        raise PipeExecutionError(message=msg) from exc
     finally:
         # Close graph tracer if it was opened (capture graph even on failure)
         # pipeline_run_id may be None if pipeline_run_setup failed early

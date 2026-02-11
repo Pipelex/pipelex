@@ -27,6 +27,7 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
@@ -244,6 +245,16 @@ def validate_cmd(
                     library_dirs=library_dirs,
                 )
             )
+    except PipeNotFoundError as exc:
+        error_message = str(exc)
+        if pipe_code == "all":
+            error_message += "\nDid you mean 'pipelex validate --all'?"
+        typer.secho(
+            f"Failed to validate: {error_message}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1) from exc
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.VALIDATION)
     except PipeOperatorModelAvailabilityError as exc:

@@ -16,6 +16,7 @@ from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.jinja2.tag_renderable import TagRenderable
 
 
+@pytest.mark.asyncio(loop_scope="class")
 class TestTagFilterValidation:
     """Tests for tag filter error handling and edge cases."""
 
@@ -34,71 +35,71 @@ class TestTagFilterValidation:
 
         return context
 
-    def test_tag_raises_on_undefined(self, mocker: MockerFixture) -> None:
+    async def test_tag_raises_on_undefined(self, mocker: MockerFixture) -> None:
         """Test tag raises error for undefined value."""
         context = self._make_context(mocker)
 
         with pytest.raises(Jinja2ContextError, match="undefined"):
-            tag(context, Undefined())
+            await tag(context, Undefined())
 
-    def test_tag_raises_on_undefined_with_tag_name(self, mocker: MockerFixture) -> None:
+    async def test_tag_raises_on_undefined_with_tag_name(self, mocker: MockerFixture) -> None:
         """Test tag raises error for undefined value with tag name in message."""
         context = self._make_context(mocker)
 
         with pytest.raises(Jinja2ContextError, match="tag_name 'my_tag'"):
-            tag(context, Undefined(), tag_name="my_tag")
+            await tag(context, Undefined(), tag_name="my_tag")
 
-    def test_tag_with_string_converts_to_string(self, mocker: MockerFixture) -> None:
+    async def test_tag_with_string_converts_to_string(self, mocker: MockerFixture) -> None:
         """Test tag filter converts plain string input."""
         context = self._make_context(mocker)
 
-        result = tag(context, "hello world")
+        result = await tag(context, "hello world")
 
         assert "hello world" in result
         assert "```" in result  # Default style is TICKS
 
-    def test_tag_with_number_converts_to_string(self, mocker: MockerFixture) -> None:
+    async def test_tag_with_number_converts_to_string(self, mocker: MockerFixture) -> None:
         """Test tag filter converts number input to string."""
         context = self._make_context(mocker)
 
-        result = tag(context, 42)
+        result = await tag(context, 42)
 
         assert "42" in result
 
-    def test_tag_with_custom_name(self, mocker: MockerFixture) -> None:
+    async def test_tag_with_custom_name(self, mocker: MockerFixture) -> None:
         """Test tag filter uses provided custom tag name."""
         context = self._make_context(mocker, tag_style=TagStyle.XML)
 
-        result = tag(context, "content", tag_name="custom")
+        result = await tag(context, "content", tag_name="custom")
 
         assert "<custom>" in result
         assert "</custom>" in result
         assert "content" in result
 
-    def test_tag_with_tag_renderable(self, mocker: MockerFixture) -> None:
+    async def test_tag_with_tag_renderable(self, mocker: MockerFixture) -> None:
         """Test tag filter uses TagRenderable protocol."""
         context = self._make_context(mocker)
 
-        # Create a mock TagRenderable
+        # Create a mock TagRenderable with async method
         mock_renderable = mocker.MagicMock(spec=TagRenderable)
-        mock_renderable.render_for_tag.return_value = "rendered content"
+        mock_renderable.render_for_tag_async = mocker.AsyncMock(return_value="rendered content")
         mock_renderable.default_tag_name = "my_stuff"
 
-        result = tag(context, mock_renderable)
+        result = await tag(context, mock_renderable)
 
-        mock_renderable.render_for_tag.assert_called_once()
+        mock_renderable.render_for_tag_async.assert_called_once()
         assert "rendered content" in result
         assert "my_stuff" in result  # Uses default_tag_name
 
-    def test_tag_with_tag_renderable_custom_name_overrides(self, mocker: MockerFixture) -> None:
+    async def test_tag_with_tag_renderable_custom_name_overrides(self, mocker: MockerFixture) -> None:
         """Test custom tag name overrides TagRenderable.default_tag_name."""
         context = self._make_context(mocker, tag_style=TagStyle.XML)
 
         mock_renderable = mocker.MagicMock(spec=TagRenderable)
-        mock_renderable.render_for_tag.return_value = "content"
+        mock_renderable.render_for_tag_async = mocker.AsyncMock(return_value="content")
         mock_renderable.default_tag_name = "default_name"
 
-        result = tag(context, mock_renderable, tag_name="override_name")
+        result = await tag(context, mock_renderable, tag_name="override_name")
 
         assert "<override_name>" in result
         assert "default_name" not in result

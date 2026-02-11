@@ -1,7 +1,9 @@
 import random
 import string
+import types
+import typing
 from collections.abc import Callable
-from typing import Any, get_args, get_origin
+from typing import Any, Union, get_args, get_origin
 
 from polyfactory.factories.pydantic_factory import ModelFactory
 from polyfactory.fields import Ignore, PostGenerated, Use
@@ -134,6 +136,51 @@ class DryRunFactory:
                 result[field_name] = examples
         return result
 
+    @classmethod
+    def _get_literal_values_from_annotation(cls, annotation: Any) -> tuple[Any, ...] | None:
+        """Extract Literal values from a type annotation, handling Optional wrapping.
+
+        Args:
+            annotation: The type annotation to inspect
+
+        Returns:
+            Tuple of literal values if the annotation is a Literal type, None otherwise
+        """
+        origin = get_origin(annotation)
+        args = get_args(annotation)
+
+        # Direct Literal type: Literal["a", "b", "c"]
+        if origin is typing.Literal:
+            return args
+
+        # Optional[Literal[...]] or Literal[...] | None: unwrap and check inner type
+        if origin is Union or origin is types.UnionType:
+            non_none_args = [arg for arg in args if arg is not type(None)]
+            if len(non_none_args) == 1:
+                return cls._get_literal_values_from_annotation(non_none_args[0])
+
+        return None
+
+    @classmethod
+    def _detect_literal_fields(cls, object_class: type[BaseModel]) -> dict[str, tuple[Any, ...]]:
+        """Detect fields with Literal type annotations and return their valid values.
+
+        Args:
+            object_class: The Pydantic model class to scan
+
+        Returns:
+            Dict mapping field names to their tuple of valid Literal values
+        """
+        result: dict[str, tuple[Any, ...]] = {}
+        for field_name, field_info in object_class.model_fields.items():
+            annotation = field_info.annotation
+            if annotation is None:
+                continue
+            literal_values = cls._get_literal_values_from_annotation(annotation)
+            if literal_values:
+                result[field_name] = literal_values
+        return result
+
     @staticmethod
     def _make_example_picker(examples: list[Any]) -> Callable[[], Any]:
         """Create a closure that picks a random example from the list."""
@@ -249,6 +296,12 @@ class DryRunFactory:
             if field_name in nested_class.model_fields and field_name not in class_attrs:
                 class_attrs[field_name] = Use(cls.generate_dict_single_extract_input)
 
+        # Add Literal type providers (fields with choices)
+        literal_fields = cls._detect_literal_fields(nested_class)
+        for field_name, literal_values in literal_fields.items():
+            if field_name in nested_class.model_fields and field_name not in class_attrs:
+                class_attrs[field_name] = Use(cls._make_example_picker(list(literal_values)))
+
         # Create the factory class using ModelFactory directly
         factory: type[ModelFactory[Any]] = type(
             f"DryRunFactory_{nested_class.__name__}",
@@ -352,6 +405,12 @@ class DryRunFactory:
             if field_name in object_class.model_fields and field_name not in class_attrs:
                 # Create a closure to capture the specific examples list
                 class_attrs[field_name] = Use(cls._make_example_picker(examples))
+
+        # Add Literal type providers (fields with choices like Literal["a", "b", "c"])
+        literal_fields = cls._detect_literal_fields(object_class)
+        for field_name, literal_values in literal_fields.items():
+            if field_name in object_class.model_fields and field_name not in class_attrs:
+                class_attrs[field_name] = Use(cls._make_example_picker(list(literal_values)))
 
         # Add cross-field dependencies using PostGenerated
         # For models with main_pipe that must reference a key in pipe dict

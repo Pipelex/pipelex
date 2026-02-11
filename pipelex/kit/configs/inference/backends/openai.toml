@@ -25,6 +25,7 @@ model_type = "llm"
 sdk = "openai_responses"
 prompting_target = "openai"
 structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -91,24 +92,28 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 15.0, output = 60.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o3-mini]
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o3]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 10.0, output = 40.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o4-mini]
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 # --- GPT-5 Series -------------------------------------------------------------
 [gpt-5]
@@ -116,18 +121,21 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-mini]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-nano]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.4 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-chat]
 model_id = "gpt-5-chat-latest"
@@ -135,18 +143,21 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-codex]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 # --- GPT-5.1 Series -------------------------------------------------------------
 ["gpt-5.1"]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
+thinking_mode = "manual"
 
 ["gpt-5.1-chat"]
 model_id = "gpt-5.1-chat-latest"
@@ -154,24 +165,28 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 ["gpt-5.1-codex"]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 ["gpt-5.1-codex-max"]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 # --- GPT-5.2 Series -------------------------------------------------------------
 ["gpt-5.2"]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.75, output = 14.0 }
+thinking_mode = "manual"
 
 ["gpt-5.2-chat"]
 model_id = "gpt-5.2-chat-latest"
@@ -179,6 +194,7 @@ inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.75, output = 14.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 ################################################################################
 # IMAGE GENERATION MODELS

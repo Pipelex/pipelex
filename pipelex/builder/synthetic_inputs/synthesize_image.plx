@@ -37,7 +37,7 @@ type = "PipeLLM"
 description = "Create an image generation prompt based on category and description"
 inputs = {request = "ImageRequest"}
 output = "ImgGenPrompt"
-model = "$img-gen-prompting"
+model = "$pipe-builder-img-gen-prompting"
 prompt = """
 Create an image generation prompt based on the category and description.
 

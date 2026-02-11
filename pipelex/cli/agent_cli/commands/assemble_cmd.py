@@ -4,13 +4,13 @@
 # pyright: reportArgumentType=false
 # mypy: disable-error-code="arg-type"
 
-import json
-import sys
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated
 
 import tomlkit
 import typer
+
+from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 
 
 def _merge_toml_sections(
@@ -104,8 +104,6 @@ def assemble_cmd(
             --concepts '[concept.MyInput]' --pipes '[pipe.main]'
             --output bundle.plx
     """
-    error_json: dict[str, Any]
-
     try:
         # Create base document with domain header
         doc = tomlkit.document()
@@ -125,22 +123,10 @@ def assemble_cmd(
                 try:
                     concept_content = _load_toml_content(concept_source)
                     _merge_toml_sections(doc, "concept", concept_content)
-                except FileNotFoundError:
-                    error_json = {
-                        "error": True,
-                        "error_type": "FileNotFoundError",
-                        "message": f"Concept file not found: {concept_source}",
-                    }
-                    print(json.dumps(error_json, indent=2), file=sys.stderr)
-                    raise typer.Exit(1) from None
+                except FileNotFoundError as exc:
+                    agent_error(f"Concept file not found: {concept_source}", "FileNotFoundError", cause=exc)
                 except Exception as exc:
-                    error_json = {
-                        "error": True,
-                        "error_type": "ConceptLoadError",
-                        "message": f"Failed to load concepts from '{concept_source}': {exc}",
-                    }
-                    print(json.dumps(error_json, indent=2), file=sys.stderr)
-                    raise typer.Exit(1) from exc
+                    agent_error(f"Failed to load concepts from '{concept_source}': {exc}", "ConceptLoadError", cause=exc)
 
         # Process pipe sources
         if pipes:
@@ -148,22 +134,10 @@ def assemble_cmd(
                 try:
                     pipe_content = _load_toml_content(pipe_source)
                     _merge_toml_sections(doc, "pipe", pipe_content)
-                except FileNotFoundError:
-                    error_json = {
-                        "error": True,
-                        "error_type": "FileNotFoundError",
-                        "message": f"Pipe file not found: {pipe_source}",
-                    }
-                    print(json.dumps(error_json, indent=2), file=sys.stderr)
-                    raise typer.Exit(1) from None
+                except FileNotFoundError as exc:
+                    agent_error(f"Pipe file not found: {pipe_source}", "FileNotFoundError", cause=exc)
                 except Exception as exc:
-                    error_json = {
-                        "error": True,
-                        "error_type": "PipeLoadError",
-                        "message": f"Failed to load pipes from '{pipe_source}': {exc}",
-                    }
-                    print(json.dumps(error_json, indent=2), file=sys.stderr)
-                    raise typer.Exit(1) from exc
+                    agent_error(f"Failed to load pipes from '{pipe_source}': {exc}", "PipeLoadError", cause=exc)
 
         # Write output file
         output_path = Path(output)
@@ -176,22 +150,17 @@ def assemble_cmd(
         with open(output_path, "a", encoding="utf-8") as out_file:
             out_file.write("\n")
 
-        result = {
-            "success": True,
-            "bundle_path": str(output_path.resolve()),
-            "domain": domain,
-            "main_pipe": main_pipe,
-        }
-        print(json.dumps(result, indent=2))
+        agent_success(
+            {
+                "success": True,
+                "bundle_path": str(output_path.resolve()),
+                "domain": domain,
+                "main_pipe": main_pipe,
+            }
+        )
 
     except typer.Exit:
         raise
 
     except Exception as exc:
-        error_json = {
-            "error": True,
-            "error_type": type(exc).__name__,
-            "message": str(exc),
-        }
-        print(json.dumps(error_json, indent=2), file=sys.stderr)
-        raise typer.Exit(1) from exc
+        agent_error(str(exc), type(exc).__name__, cause=exc)

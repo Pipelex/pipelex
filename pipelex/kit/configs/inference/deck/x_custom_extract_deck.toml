@@ -23,7 +23,8 @@
 
 ####################################################################################################
 # Waterfalls — ordered lists of models resolved at configuration time by backend availability
-#
+#####################################################################################################
+
 # Example (uncomment to use):
 # [extract.waterfalls]
 # document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]

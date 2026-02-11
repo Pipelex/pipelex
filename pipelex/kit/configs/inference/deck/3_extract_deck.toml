@@ -39,4 +39,4 @@ default-no-inference = "pypdfium2-extract-pdf"
 [extract.presets]
 
 # Testing
-extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50 }
+extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50, description = "Testing preset for document extraction" }
