@@ -131,7 +131,7 @@ nav:
         - Python classes: home/6-build-reliable-ai-workflows/concepts/python-classes.md
         - Native Concepts: home/6-build-reliable-ai-workflows/concepts/native-concepts.md
         - Refining Concepts: home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
-      - Design and Run Pipelines:
+      - Design and Run Methods:
         - Overview: home/6-build-reliable-ai-workflows/pipes/index.md
         - Libraries: home/6-build-reliable-ai-workflows/libraries.md
         - Executing Pipelines: home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md

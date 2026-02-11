@@ -331,8 +331,8 @@ Each pipe processes information using **Concepts** (typing with meaning) to ensu
 
 <!-- PRERELEASE_LINK -->
 **Learn More:**
-- [Design and Run Pipelines](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/pipes/) - Complete guide with examples
-- [Kick off a Pipeline Project](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/kick-off-a-methods-project/) - Deep dive into Pipelex
+- [Design and Run Methods](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/pipes/) - Complete guide with examples
+- [Kick off a Method Project](https://docs.pipelex.com/pre-release/home/6-build-reliable-ai-workflows/kick-off-a-methods-project/) - Deep dive into Pipelex
 - [Configure AI Providers](https://docs.pipelex.com/pre-release/home/5-setup/configure-ai-providers/) - Set up AI providers and models
 
 ## 🔧 IDE Extension
