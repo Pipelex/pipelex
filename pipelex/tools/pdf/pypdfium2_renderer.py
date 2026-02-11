@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import pathlib
 from typing import TYPE_CHECKING, cast
 
@@ -11,12 +12,15 @@ from pypdfium2.raw import FPDF_PAGEOBJ_IMAGE, FPDFBitmap_BGRA
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage
 from pipelex.cogt.image.image_size import ImageSize
+from pipelex.hub import get_storage_provider
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
 from pipelex.tools.uri.resolved_uri import (
+    ResolvedBase64DataUrl,
     ResolvedHttpUrl,
     ResolvedLocalPath,
+    ResolvedPipelexStorage,
 )
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
@@ -42,17 +46,14 @@ PdfInput = str | pathlib.Path | bytes
 async def _resolve_pdf_uri_to_input(pdf_uri: str) -> PdfInput:
     """Resolve a PDF URI to PdfInput (path or bytes).
 
-    Handles HTTP URLs and local paths only. For pipelex-storage:// or base64 data URLs,
-    resolve them at the worker level before calling this.
+    Handles all URI types: HTTP URLs, local paths, pipelex-storage:// URIs,
+    and base64 data URLs.
 
     Args:
-        pdf_uri: URI string (local path or HTTP URL)
+        pdf_uri: URI string (local path, HTTP URL, pipelex-storage://, or data: URL)
 
     Returns:
-        PdfInput: file path string for local files, bytes for HTTP URLs
-
-    Raises:
-        PyPdfium2RendererError: If the URI type is not supported (storage or base64)
+        PdfInput: path string for local files, bytes for remote/storage/base64
     """
     pdf_input: PdfInput
     resolved_uri = resolve_uri(pdf_uri)
@@ -61,9 +62,11 @@ async def _resolve_pdf_uri_to_input(pdf_uri: str) -> PdfInput:
             pdf_input = await fetch_file_from_url_httpx(url=resolved_uri.url)
         case ResolvedLocalPath():
             pdf_input = resolved_uri.path
-        case _:
-            msg = f"Unsupported URI type for PDF: {type(resolved_uri).__name__}."
-            raise PyPdfium2RendererError(msg)
+        case ResolvedPipelexStorage():
+            storage = get_storage_provider()
+            pdf_input = await storage.load(uri=resolved_uri.storage_uri)
+        case ResolvedBase64DataUrl():
+            pdf_input = base64.b64decode(resolved_uri.base64_data)
     return pdf_input
 
 
