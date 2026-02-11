@@ -47,6 +47,10 @@ class TestGraphCmd:
 
         mock_graph_outputs = mocker.MagicMock()
 
+        # Patch async functions with non-async mocks so no coroutines are created (avoids "coroutine never awaited" warnings)
+        mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mocker.MagicMock())
+        mocker.patch(f"{GRAPH_CMD_MODULE}.generate_graph_outputs", new=mocker.MagicMock())
+
         # asyncio.run is called twice: first for execute_pipeline, then for generate_graph_outputs
         mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", side_effect=[mock_pipe_output, mock_graph_outputs])
 
@@ -90,6 +94,10 @@ class TestGraphCmd:
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{GRAPH_CMD_MODULE}.get_config")
+
+        # Patch async functions with non-async mocks so no coroutines are created (avoids "coroutine never awaited" warnings)
+        mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mocker.MagicMock())
+        mocker.patch(f"{GRAPH_CMD_MODULE}.generate_graph_outputs", new=mocker.MagicMock())
 
         mock_pipe_output = mocker.MagicMock()
         mock_pipe_output.graph_spec = mocker.MagicMock()
@@ -182,6 +190,9 @@ class TestGraphCmd:
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(f"{GRAPH_CMD_MODULE}.get_config")
+
+        # Patch async function with non-async mock so no coroutine is created (avoids "coroutine never awaited" warning)
+        mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mocker.MagicMock())
 
         mock_pipe_output = mocker.MagicMock()
         mock_pipe_output.graph_spec = None
