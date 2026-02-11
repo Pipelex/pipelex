@@ -374,3 +374,27 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             item_index=item_index,
             batch_controller_node_id=batch_controller_node_id,
         )
+
+    def register_parallel_combine(
+        self,
+        graph_id: str,
+        combined_stuff_code: str,
+        branch_stuff_codes: list[str],
+        parallel_controller_node_id: str,
+    ) -> None:
+        """Register that branch outputs are combined into a single output in PipeParallel.
+
+        Args:
+            graph_id: The graph identifier.
+            combined_stuff_code: The stuff_code of the combined output.
+            branch_stuff_codes: The stuff_codes of the individual branch outputs.
+            parallel_controller_node_id: The node_id of the PipeParallel controller.
+        """
+        tracer = self._get_tracer(graph_id)
+        if tracer is None:
+            return
+        tracer.register_parallel_combine(
+            combined_stuff_code=combined_stuff_code,
+            branch_stuff_codes=branch_stuff_codes,
+            parallel_controller_node_id=parallel_controller_node_id,
+        )

@@ -243,6 +243,16 @@ class TestPipeParallelGraph:
         assert "tone_result" in output_names, "PipeParallel should have 'tone_result' output"
         assert "length_result" in output_names, "PipeParallel should have 'length_result' output"
 
+        # 5. Verify PARALLEL_COMBINE edges connect branch producers to the PipeParallel node
+        parallel_combine_edges = [edge for edge in graph_spec.edges if edge.kind.is_parallel_combine]
+        assert len(parallel_combine_edges) == 2, f"Expected 2 PARALLEL_COMBINE edges (one per branch), got {len(parallel_combine_edges)}"
+        for edge in parallel_combine_edges:
+            assert edge.target == parallel_node.node_id, (
+                f"PARALLEL_COMBINE edge target should be PipeParallel '{parallel_node.node_id}', got '{edge.target}'"
+            )
+            assert edge.source_stuff_digest is not None, "PARALLEL_COMBINE edge should have source_stuff_digest"
+            assert edge.target_stuff_digest is not None, "PARALLEL_COMBINE edge should have target_stuff_digest"
+
         # Generate and save graph outputs
         graph_outputs = await generate_graph_outputs(
             graph_spec=graph_spec,

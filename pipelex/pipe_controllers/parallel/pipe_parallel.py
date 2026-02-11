@@ -180,12 +180,6 @@ class PipeParallel(PipeController):
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
             log.verbose(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
 
-        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
-        self._register_branch_outputs_with_graph_tracer(
-            job_metadata=job_metadata,
-            output_stuffs=output_stuffs,
-        )
-
         if self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
                 concept=self.combined_output,
@@ -196,6 +190,21 @@ class PipeParallel(PipeController):
                 stuff=combined_output_stuff,
                 name=output_name,
             )
+
+            # Register parallel combine edges BEFORE register_branch_outputs, because
+            # register_parallel_combine snapshots the original branch producers from
+            # _stuff_producer_map before register_controller_output overrides them
+            self._register_parallel_combine_with_graph_tracer(
+                job_metadata=job_metadata,
+                combined_stuff=combined_output_stuff,
+                branch_stuffs=output_stuffs,
+            )
+
+        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
+        self._register_branch_outputs_with_graph_tracer(
+            job_metadata=job_metadata,
+            output_stuffs=output_stuffs,
+        )
 
         return PipeOutput(
             working_memory=working_memory,
@@ -258,12 +267,6 @@ class PipeParallel(PipeController):
             output_stuffs[sub_pipe_output_name] = output_stuff
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
 
-        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
-        self._register_branch_outputs_with_graph_tracer(
-            job_metadata=job_metadata,
-            output_stuffs=output_stuffs,
-        )
-
         # 4. Handle combined output if specified
         if self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
@@ -275,6 +278,22 @@ class PipeParallel(PipeController):
                 stuff=combined_output_stuff,
                 name=output_name,
             )
+
+            # Register parallel combine edges BEFORE register_branch_outputs, because
+            # register_parallel_combine snapshots the original branch producers from
+            # _stuff_producer_map before register_controller_output overrides them
+            self._register_parallel_combine_with_graph_tracer(
+                job_metadata=job_metadata,
+                combined_stuff=combined_output_stuff,
+                branch_stuffs=output_stuffs,
+            )
+
+        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
+        self._register_branch_outputs_with_graph_tracer(
+            job_metadata=job_metadata,
+            output_stuffs=output_stuffs,
+        )
+
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -316,6 +335,36 @@ class PipeParallel(PipeController):
                 node_id=graph_context.parent_node_id,
                 output_spec=output_spec,
             )
+
+    def _register_parallel_combine_with_graph_tracer(
+        self,
+        job_metadata: JobMetadata,
+        combined_stuff: "Stuff",
+        branch_stuffs: dict[str, "Stuff"],
+    ) -> None:
+        """Register parallel combine edges (branch outputs → combined output).
+
+        Creates PARALLEL_COMBINE edges showing how individual branch results
+        are merged into the combined output.
+
+        Args:
+            job_metadata: The job metadata containing graph context.
+            combined_stuff: The combined output Stuff.
+            branch_stuffs: Mapping of output_name to the branch output Stuff.
+        """
+        graph_context = job_metadata.graph_context
+        if graph_context is None:
+            return
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is None or graph_context.parent_node_id is None:
+            return
+        branch_stuff_codes = [stuff.stuff_code for stuff in branch_stuffs.values()]
+        tracer_manager.register_parallel_combine(
+            graph_id=graph_context.graph_id,
+            combined_stuff_code=combined_stuff.stuff_code,
+            branch_stuff_codes=branch_stuff_codes,
+            parallel_controller_node_id=graph_context.parent_node_id,
+        )
 
     @override
     async def _validate_before_run(

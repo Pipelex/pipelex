@@ -108,6 +108,11 @@ class GraphTracer(GraphTracerProtocol):
         # The batch_controller_node_id is tracked to ensure BATCH_AGGREGATE edges target the correct node
         # (the PipeBatch), not a parent controller that may later register as producer of the same stuff
         self._batch_aggregate_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
+        # Maps combined_stuff_code -> (parallel_controller_node_id, [(branch_stuff_code, branch_producer_node_id)])
+        # Used to create PARALLEL_COMBINE edges from branch outputs to combined output
+        # The branch_producer_node_id is snapshotted at registration time, before register_controller_output
+        # overrides _stuff_producer_map to point branch stuff codes to the controller node
+        self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
 
     @property
     def is_active(self) -> bool:
@@ -137,6 +142,7 @@ class GraphTracer(GraphTracerProtocol):
         self._stuff_producer_map = {}
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
+        self._parallel_combine_map = {}
 
         return GraphContext(
             graph_id=graph_id,
@@ -162,6 +168,7 @@ class GraphTracer(GraphTracerProtocol):
         self._generate_data_edges()
         self._generate_batch_item_edges()
         self._generate_batch_aggregate_edges()
+        self._generate_parallel_combine_edges()
 
         self._is_active = False
 
@@ -185,6 +192,7 @@ class GraphTracer(GraphTracerProtocol):
         self._stuff_producer_map = {}
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
+        self._parallel_combine_map = {}
 
         return graph
 
@@ -292,6 +300,26 @@ class GraphTracer(GraphTracerProtocol):
                         target_stuff_digest=output_list_stuff_code,
                     )
 
+    def _generate_parallel_combine_edges(self) -> None:
+        """Generate PARALLEL_COMBINE edges from branch output stuff nodes to the combined output stuff node.
+
+        For each registered parallel combine, create edges from each branch output
+        to the combined output, showing how individual branch results are merged.
+
+        Uses snapshotted branch producer node IDs captured during register_parallel_combine,
+        before register_controller_output overrides _stuff_producer_map.
+        """
+        for combined_stuff_code, (parallel_controller_node_id, branch_entries) in self._parallel_combine_map.items():
+            for branch_stuff_code, branch_producer_id in branch_entries:
+                if branch_producer_id != parallel_controller_node_id:
+                    self.add_edge(
+                        source_node_id=branch_producer_id,
+                        target_node_id=parallel_controller_node_id,
+                        edge_kind=EdgeKind.PARALLEL_COMBINE,
+                        source_stuff_digest=branch_stuff_code,
+                        target_stuff_digest=combined_stuff_code,
+                    )
+
     @override
     def register_batch_item_extraction(
         self,
@@ -345,6 +373,32 @@ class GraphTracer(GraphTracerProtocol):
         item_list.append((item_stuff_code, item_index))
         # Note: We keep the first batch_controller_node_id registered for this output list
         # (all items for the same output list should come from the same batch controller)
+
+    @override
+    def register_parallel_combine(
+        self,
+        combined_stuff_code: str,
+        branch_stuff_codes: list[str],
+        parallel_controller_node_id: str,
+    ) -> None:
+        """Register that branch outputs are combined into a single output in PipeParallel.
+
+        Args:
+            combined_stuff_code: The stuff_code of the combined output.
+            branch_stuff_codes: The stuff_codes of the individual branch outputs.
+            parallel_controller_node_id: The node_id of the PipeParallel controller.
+        """
+        if not self._is_active:
+            return
+        # Snapshot the current branch producers from _stuff_producer_map before
+        # register_controller_output overrides them to point to the controller node.
+        # This must be called BEFORE _register_branch_outputs_with_graph_tracer.
+        branch_entries: list[tuple[str, str]] = []
+        for branch_code in branch_stuff_codes:
+            producer_id = self._stuff_producer_map.get(branch_code)
+            if producer_id:
+                branch_entries.append((branch_code, producer_id))
+        self._parallel_combine_map[combined_stuff_code] = (parallel_controller_node_id, branch_entries)
 
     @override
     def on_pipe_start(

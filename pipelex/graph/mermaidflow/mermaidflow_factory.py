@@ -241,6 +241,18 @@ class MermaidflowFactory:
                     label = edge.label or ""
                     lines.append(f'    {source_mermaid_id} -."{label}".-> {target_mermaid_id}')
 
+        # Render parallel combine edges (branch outputs → combined output) with dashed styling
+        parallel_combine_edges = [edge for edge in graph.edges if edge.kind.is_parallel_combine]
+        if parallel_combine_edges:
+            lines.append("")
+            lines.append("    %% Parallel combine edges: branch outputs → combined output")
+            for edge in parallel_combine_edges:
+                source_mermaid_id = id_mapping.get(edge.source)
+                target_mermaid_id = id_mapping.get(edge.target)
+                if source_mermaid_id and target_mermaid_id:
+                    label = edge.label or ""
+                    lines.append(f'    {source_mermaid_id} -."{label}".-> {target_mermaid_id}')
+
         # Style definitions
         lines.append("")
         lines.append("    %% Style definitions")

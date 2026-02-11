@@ -51,4 +51,5 @@ class ParallelCombinedGraphExpectations:
     # Expected number of edges by kind
     EXPECTED_EDGE_COUNTS: ClassVar[dict[str, int]] = {
         "contains": 2,  # parallel->tone, parallel->length
+        "parallel_combine": 2,  # tone_result->combined, length_result->combined
     }
