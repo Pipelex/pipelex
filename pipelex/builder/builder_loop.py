@@ -103,7 +103,10 @@ class BuilderLoop:
                 if attempt < max_attempts:
                     log.info(f"⚠️ Validation failed on attempt {attempt}/{max_attempts}, attempting fixes...")
                     pipelex_bundle_spec = self._fix_bundle_validation_error(
-                        bundle_error=exc, pipelex_bundle_spec=pipelex_bundle_spec, is_save_second_iteration_enabled=is_save_second_iteration_enabled
+                        bundle_error=exc,
+                        pipelex_bundle_spec=pipelex_bundle_spec,
+                        is_save_second_iteration_enabled=is_save_second_iteration_enabled,
+                        output_dir=output_dir,
                     )
                 else:
                     log.error(f"❌ Validation failed after {max_attempts} attempts, raising error")
@@ -506,6 +509,7 @@ class BuilderLoop:
         bundle_error: ValidateBundleError,
         pipelex_bundle_spec: PipelexBundleSpec,
         is_save_second_iteration_enabled: bool,
+        output_dir: str | None = None,
     ) -> PipelexBundleSpec:
         fixed_pipes: list[PipeSpecUnion] = []
         added_concepts: list[str] = []
@@ -691,7 +695,7 @@ class BuilderLoop:
             try:
                 plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 second_iteration_path = get_incremental_file_path(
-                    base_path="results",
+                    base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_2nd_iteration",
                     extension="plx",
                 )

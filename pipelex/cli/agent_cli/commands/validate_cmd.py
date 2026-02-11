@@ -16,6 +16,7 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
@@ -278,6 +279,12 @@ def validate_cmd(
             result = asyncio.run(_validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))  # type: ignore[arg-type]
 
         agent_success(result)
+
+    except PipeNotFoundError as exc:
+        error_message = str(exc)
+        if pipe_code == "all":
+            error_message += " Did you mean '--all'?"
+        agent_error(error_message, "PipeNotFoundError", cause=exc)
 
     except FileNotFoundError as exc:
         agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)

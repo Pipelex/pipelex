@@ -103,6 +103,9 @@ async def build_pipe_core(
             inputs={"brief": prompt},
             execution_config=execution_config,
             output_dir=output_dir,
+            is_save_first_iteration_enabled=False,
+            is_save_second_iteration_enabled=False,
+            is_save_working_memory_enabled=False,
         )
     except PipeBuilderError as exc:
         msg = f"Builder loop: Failed to execute pipeline: {exc}."
