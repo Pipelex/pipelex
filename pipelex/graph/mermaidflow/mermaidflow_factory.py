@@ -125,6 +125,25 @@ class MermaidflowFactory:
             # This allows batch item stuffs to be placed inside their consumer's subgraph
             rendered_orphan_stuffs: set[str] = set()
 
+            # Build mapping of controller node_id → {digest: (name, concept)} for parallel_combine
+            # target stuffs. These are outputs of parallel controllers and should be rendered
+            # inside the controller's subgraph rather than as orphans at top level.
+            # We collect the stuff info from controller node outputs directly, because these
+            # stuffs may not be in stuff_registry (which skips controller nodes).
+            controller_output_stuffs: dict[str, dict[str, tuple[str, str | None]]] = {}
+            controller_combine_digests: set[str] = set()
+            for edge in graph.edges:
+                if edge.kind.is_parallel_combine and edge.target_stuff_digest:
+                    controller_combine_digests.add(edge.target_stuff_digest)
+                    controller_output_stuffs.setdefault(edge.target, {})[edge.target_stuff_digest] = ("", None)
+            # Resolve names and concepts from the controller nodes' outputs
+            for controller_id, digest_map in controller_output_stuffs.items():
+                controller_node = analysis.nodes_by_id.get(controller_id)
+                if controller_node:
+                    for output_spec in controller_node.node_io.outputs:
+                        if output_spec.digest and output_spec.digest in digest_map:
+                            digest_map[output_spec.digest] = (output_spec.name, output_spec.concept)
+
             # Render pipe nodes and their produced stuff within controller subgraphs
             lines.append("")
             lines.append("    %% Pipe and stuff nodes within controller subgraphs")
@@ -141,6 +160,7 @@ class MermaidflowFactory:
                     subgraph_depths=subgraph_depths,
                     show_stuff_codes=show_stuff_codes,
                     rendered_orphan_stuffs=rendered_orphan_stuffs,
+                    controller_output_stuffs=controller_output_stuffs,
                 )
                 lines.extend(node_lines)
 
@@ -199,6 +219,15 @@ class MermaidflowFactory:
                 )
                 lines.append(stuff_line)
 
+        # Build supplementary stuff info from all nodes (including controllers)
+        # This is needed for batch_aggregate target_stuff_digest which may not be in stuff_registry
+        # (GraphAnalysis.stuff_registry skips controller outputs)
+        all_stuff_info: dict[str, tuple[str, str | None]] = {}
+        for node in graph.nodes:
+            for output_spec in node.node_io.outputs:
+                if output_spec.digest and output_spec.digest not in all_stuff_info:
+                    all_stuff_info[output_spec.digest] = (output_spec.name, output_spec.concept)
+
         # Render edges: producer -> stuff
         lines.append("")
         lines.append("    %% Data flow edges: producer -> stuff -> consumer")
@@ -220,6 +249,8 @@ class MermaidflowFactory:
                     lines.append(f"    {cons_stuff_mermaid_id} --> {consumer_mermaid_id}")
 
         # Render batch edges (BATCH_ITEM and BATCH_AGGREGATE) with dashed styling
+        # These edges connect stuff-to-stuff (not node-to-node) because their source/target
+        # are controllers rendered as Mermaid subgraphs, not nodes.
         batch_item_edges = [edge for edge in graph.edges if edge.kind.is_batch_item]
         batch_aggregate_edges = [edge for edge in graph.edges if edge.kind.is_batch_aggregate]
 
@@ -228,30 +259,121 @@ class MermaidflowFactory:
             lines.append("    %% Batch edges: list-item relationships")
 
             for edge in batch_item_edges:
-                source_mermaid_id = id_mapping.get(edge.source)
-                target_mermaid_id = id_mapping.get(edge.target)
-                if source_mermaid_id and target_mermaid_id:
+                source_sid = stuff_id_mapping.get(edge.source_stuff_digest) if edge.source_stuff_digest else None
+                target_sid = stuff_id_mapping.get(edge.target_stuff_digest) if edge.target_stuff_digest else None
+                # Render missing stuff nodes on the fly
+                if not source_sid and edge.source_stuff_digest and edge.source_stuff_digest in all_stuff_info:
+                    name, concept = all_stuff_info[edge.source_stuff_digest]
+                    lines.append(
+                        cls._render_stuff_node(
+                            digest=edge.source_stuff_digest,
+                            name=name,
+                            concept=concept,
+                            stuff_id_mapping=stuff_id_mapping,
+                            show_stuff_codes=show_stuff_codes,
+                            indent="    ",
+                        )
+                    )
+                    source_sid = stuff_id_mapping.get(edge.source_stuff_digest)
+                if not target_sid and edge.target_stuff_digest and edge.target_stuff_digest in all_stuff_info:
+                    name, concept = all_stuff_info[edge.target_stuff_digest]
+                    lines.append(
+                        cls._render_stuff_node(
+                            digest=edge.target_stuff_digest,
+                            name=name,
+                            concept=concept,
+                            stuff_id_mapping=stuff_id_mapping,
+                            show_stuff_codes=show_stuff_codes,
+                            indent="    ",
+                        )
+                    )
+                    target_sid = stuff_id_mapping.get(edge.target_stuff_digest)
+                if source_sid and target_sid:
                     label = edge.label or ""
-                    lines.append(f'    {source_mermaid_id} -."{label}".-> {target_mermaid_id}')
+                    if label:
+                        lines.append(f'    {source_sid} -."{label}".-> {target_sid}')
+                    else:
+                        lines.append(f"    {source_sid} -.-> {target_sid}")
 
             for edge in batch_aggregate_edges:
-                source_mermaid_id = id_mapping.get(edge.source)
-                target_mermaid_id = id_mapping.get(edge.target)
-                if source_mermaid_id and target_mermaid_id:
+                source_sid = stuff_id_mapping.get(edge.source_stuff_digest) if edge.source_stuff_digest else None
+                target_sid = stuff_id_mapping.get(edge.target_stuff_digest) if edge.target_stuff_digest else None
+                # Render missing stuff nodes on the fly
+                if not source_sid and edge.source_stuff_digest and edge.source_stuff_digest in all_stuff_info:
+                    name, concept = all_stuff_info[edge.source_stuff_digest]
+                    lines.append(
+                        cls._render_stuff_node(
+                            digest=edge.source_stuff_digest,
+                            name=name,
+                            concept=concept,
+                            stuff_id_mapping=stuff_id_mapping,
+                            show_stuff_codes=show_stuff_codes,
+                            indent="    ",
+                        )
+                    )
+                    source_sid = stuff_id_mapping.get(edge.source_stuff_digest)
+                if not target_sid and edge.target_stuff_digest and edge.target_stuff_digest in all_stuff_info:
+                    name, concept = all_stuff_info[edge.target_stuff_digest]
+                    lines.append(
+                        cls._render_stuff_node(
+                            digest=edge.target_stuff_digest,
+                            name=name,
+                            concept=concept,
+                            stuff_id_mapping=stuff_id_mapping,
+                            show_stuff_codes=show_stuff_codes,
+                            indent="    ",
+                        )
+                    )
+                    target_sid = stuff_id_mapping.get(edge.target_stuff_digest)
+                if source_sid and target_sid:
                     label = edge.label or ""
-                    lines.append(f'    {source_mermaid_id} -."{label}".-> {target_mermaid_id}')
+                    if label:
+                        lines.append(f'    {source_sid} -."{label}".-> {target_sid}')
+                    else:
+                        lines.append(f"    {source_sid} -.-> {target_sid}")
 
         # Render parallel combine edges (branch outputs → combined output) with dashed styling
+        # Same approach: use stuff digests to connect stuff-to-stuff.
         parallel_combine_edges = [edge for edge in graph.edges if edge.kind.is_parallel_combine]
         if parallel_combine_edges:
             lines.append("")
             lines.append("    %% Parallel combine edges: branch outputs → combined output")
             for edge in parallel_combine_edges:
-                source_mermaid_id = id_mapping.get(edge.source)
-                target_mermaid_id = id_mapping.get(edge.target)
-                if source_mermaid_id and target_mermaid_id:
+                source_sid = stuff_id_mapping.get(edge.source_stuff_digest) if edge.source_stuff_digest else None
+                target_sid = stuff_id_mapping.get(edge.target_stuff_digest) if edge.target_stuff_digest else None
+                # Render missing stuff nodes on the fly
+                if not source_sid and edge.source_stuff_digest and edge.source_stuff_digest in all_stuff_info:
+                    name, concept = all_stuff_info[edge.source_stuff_digest]
+                    lines.append(
+                        cls._render_stuff_node(
+                            digest=edge.source_stuff_digest,
+                            name=name,
+                            concept=concept,
+                            stuff_id_mapping=stuff_id_mapping,
+                            show_stuff_codes=show_stuff_codes,
+                            indent="    ",
+                        )
+                    )
+                    source_sid = stuff_id_mapping.get(edge.source_stuff_digest)
+                if not target_sid and edge.target_stuff_digest and edge.target_stuff_digest in all_stuff_info:
+                    name, concept = all_stuff_info[edge.target_stuff_digest]
+                    lines.append(
+                        cls._render_stuff_node(
+                            digest=edge.target_stuff_digest,
+                            name=name,
+                            concept=concept,
+                            stuff_id_mapping=stuff_id_mapping,
+                            show_stuff_codes=show_stuff_codes,
+                            indent="    ",
+                        )
+                    )
+                    target_sid = stuff_id_mapping.get(edge.target_stuff_digest)
+                if source_sid and target_sid:
                     label = edge.label or ""
-                    lines.append(f'    {source_mermaid_id} -."{label}".-> {target_mermaid_id}')
+                    if label:
+                        lines.append(f'    {source_sid} -."{label}".-> {target_sid}')
+                    else:
+                        lines.append(f"    {source_sid} -.-> {target_sid}")
 
         # Style definitions
         lines.append("")
@@ -407,6 +529,7 @@ class MermaidflowFactory:
         subgraph_depths: dict[str, int],
         show_stuff_codes: bool,
         rendered_orphan_stuffs: set[str],
+        controller_output_stuffs: dict[str, dict[str, tuple[str, str | None]]],
         indent_level: int = 1,
         depth: int = 0,
     ) -> list[str]:
@@ -415,6 +538,8 @@ class MermaidflowFactory:
         This renders both pipe nodes and their produced stuff nodes inside subgraphs.
         Orphan stuffs (no producer) consumed by leaf nodes are also rendered inside
         the same subgraph as their consumer, enabling proper placement of batch item stuffs.
+        Controller output stuffs (e.g., parallel_combine targets) are rendered inside
+        their controller's subgraph.
 
         Args:
             node_id: The node to render.
@@ -428,6 +553,7 @@ class MermaidflowFactory:
             subgraph_depths: Map to track subgraph IDs and their depths (mutated).
             show_stuff_codes: Whether to show digest in stuff labels.
             rendered_orphan_stuffs: Set of orphan stuff digests already rendered (mutated).
+            controller_output_stuffs: Map of controller node_id to {digest: (name, concept)} for stuffs to render inside.
             indent_level: Current indentation level.
             depth: Current depth in the subgraph hierarchy (for coloring).
 
@@ -476,10 +602,25 @@ class MermaidflowFactory:
                     subgraph_depths=subgraph_depths,
                     show_stuff_codes=show_stuff_codes,
                     rendered_orphan_stuffs=rendered_orphan_stuffs,
+                    controller_output_stuffs=controller_output_stuffs,
                     indent_level=indent_level + 1,
                     depth=depth + 1,
                 )
                 lines.extend(child_lines)
+
+            # Render controller output stuffs (e.g., parallel_combine targets) inside the subgraph
+            for digest, (name, concept) in sorted(controller_output_stuffs.get(node_id, {}).items(), key=lambda item: item[1][0]):
+                if digest not in stuff_id_mapping:
+                    stuff_line = cls._render_stuff_node(
+                        digest=digest,
+                        name=name,
+                        concept=concept,
+                        stuff_id_mapping=stuff_id_mapping,
+                        show_stuff_codes=show_stuff_codes,
+                        indent=indent + "    ",
+                    )
+                    lines.append(stuff_line)
+                    rendered_orphan_stuffs.add(digest)
 
             lines.append(f"{indent}end")
         else:
