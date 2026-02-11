@@ -15,7 +15,7 @@ inputs = { document = "DocumentInput" }
 output = "CombinedAnalysis"
 add_each_output = true
 combined_output = "CombinedAnalysis"
-parallels = [
+branches = [
     { pipe = "analyze_length", result = "length_result" },
     { pipe = "analyze_content", result = "content_result" },
 ]

@@ -313,7 +313,7 @@ class BuilderLoop:
             if isinstance(pipe_spec, PipeSequenceSpec):
                 sub_pipe_codes = [step.pipe_code for step in pipe_spec.steps]
             elif isinstance(pipe_spec, PipeParallelSpec):
-                sub_pipe_codes = [parallel.pipe_code for parallel in pipe_spec.parallels]
+                sub_pipe_codes = [branch.pipe_code for branch in pipe_spec.branches]
             elif isinstance(pipe_spec, PipeBatchSpec):
                 sub_pipe_codes = [pipe_spec.branch_pipe_code]
             elif isinstance(pipe_spec, PipeConditionSpec):

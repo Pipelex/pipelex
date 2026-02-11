@@ -32,7 +32,7 @@ class TestPipeParallelSimple:
             description="Parallel text analysis pipeline",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
                 SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
@@ -151,7 +151,7 @@ class TestPipeParallelSimple:
             description="Parallel text analysis pipeline for short text",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
                 SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),

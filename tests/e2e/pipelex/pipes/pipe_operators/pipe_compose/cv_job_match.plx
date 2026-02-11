@@ -29,7 +29,7 @@ type = "PipeParallel"
 description = "Extracts text content from both the CV and job offer PDFs concurrently"
 inputs = { cv_pdf = "Document", job_offer_pdf = "Document" }
 output = "Page[]"
-parallels = [
+branches = [
     { pipe = "extract_cv", result = "cv_pages" },
     { pipe = "extract_job_offer", result = "job_offer_pages" },
 ]
@@ -54,7 +54,7 @@ type = "PipeParallel"
 description = "Analyzes both the CV and job offer documents concurrently to extract structured information"
 inputs = { cv_pages = "Page", job_offer_pages = "Page" }
 output = "Text"
-parallels = [
+branches = [
     { pipe = "analyze_cv", result = "cv_analysis" },
     { pipe = "analyze_job_offer", result = "job_requirements" },
 ]

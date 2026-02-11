@@ -31,7 +31,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         blueprint: PipeParallelBlueprint,
     ) -> PipeParallel:
         parallel_sub_pipes: list[SubPipe] = []
-        for sub_pipe_blueprint in blueprint.parallels:
+        for sub_pipe_blueprint in blueprint.branches:
             if not sub_pipe_blueprint.result:
                 msg = f"Unexpected error in pipe '{pipe_code}': PipeParallel requires a result specified for each parallel sub pipe"
                 raise PipeParallelFactoryError(message=msg)

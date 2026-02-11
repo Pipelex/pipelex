@@ -432,6 +432,7 @@ llm_to_structure = "model_to_structure"
 llm_skill = "llm_talent"
 img_gen_skill = "img_gen_talent"
 extract_skill = "extract_talent"
+parallels = "branches"
 
 
 ####################################################################################################

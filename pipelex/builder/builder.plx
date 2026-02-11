@@ -222,7 +222,7 @@ Shape of the contract for PipeOperator is:
 - steps: List of sub-pipes to execute sequentially. Each step has: pipe (name of the pipe to execute), result (variable name).
 
 **PipeParallel:**
-- parallels: List of sub-pipes to execute concurrently.
+- branches: List of sub-pipes to execute concurrently.
 - add_each_output: Boolean - include individual outputs in combined result.
 - combined_output: Optional ConceptCode (PascalCase) for combined structure.
 

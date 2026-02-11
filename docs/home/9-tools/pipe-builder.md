@@ -15,7 +15,7 @@ And generates:
 
 - **Domain concepts** - Data structures for your workflow (e.g., `CVAnalysis`, `InterviewQuestion`)
 - **Pipe operators** - LLM calls, extractions, image generation steps
-- **Pipe controllers** - Sequences, batches, parallels, conditions to orchestrate the flow
+- **Pipe controllers** - Sequences, batches, parallel branches, conditions to orchestrate the flow
 - **A complete bundle** - Ready to validate and run
 
 ## How It Works
