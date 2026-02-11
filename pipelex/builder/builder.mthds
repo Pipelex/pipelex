@@ -28,7 +28,7 @@ steps = [
     { pipe = "review_flow", result = "prepared_flow" },
     { pipe = "design_pipe_signatures", result = "pipe_signatures" },
     { pipe = "write_bundle_header", result = "bundle_header_spec" },
-    { pipe = "detail_pipe_spec", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
+    { pipe = "pipe_design.detail_pipe_spec", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
     { pipe = "assemble_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
 ]
 

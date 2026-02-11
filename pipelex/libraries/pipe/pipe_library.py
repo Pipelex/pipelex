@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.types import Self
@@ -53,7 +54,15 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
-        return self.root.get(pipe_code)
+        # Direct lookup first (bare code or exact match)
+        pipe = self.root.get(pipe_code)
+        if pipe is not None:
+            return pipe
+        # If it's a domain-qualified ref (e.g. "scoring.compute_score"), try the local code
+        if "." in pipe_code:
+            ref = QualifiedRef.parse(pipe_code)
+            return self.root.get(ref.local_code)
+        return None
 
     @override
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:

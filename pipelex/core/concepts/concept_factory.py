@@ -16,6 +16,7 @@ from pipelex.core.concepts.structure_generation.exceptions import ConceptStructu
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
 
@@ -178,12 +179,14 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
-            natice_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
-            return DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code=natice_concept_ref.split(".")[1])
+            native_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
+            ref = QualifiedRef.parse(native_concept_ref)
+            return DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code=ref.local_code)
 
         if "." in concept_ref_or_code:
-            domain_code, concept_code = concept_ref_or_code.rsplit(".")
-            return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_code)
+            ref = QualifiedRef.parse(concept_ref_or_code)
+            assert ref.domain_path is not None
+            return DomainAndConceptCode(domain_code=ref.domain_path, concept_code=ref.local_code)
         elif domain_code:
             return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_ref_or_code)
         else:
@@ -365,7 +368,8 @@ class ConceptFactory:
         # Get the refined concept's structure class name
         # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
         # For custom concepts, the structure class name is just the concept code (e.g., Customer)
-        refined_concept_code = current_refine.split(".")[1]
+        refined_ref = QualifiedRef.parse(current_refine)
+        refined_concept_code = refined_ref.local_code
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
             refined_structure_class_name = refined_concept_code + "Content"
         else:

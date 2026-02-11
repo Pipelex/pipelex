@@ -120,7 +120,7 @@ description = "Domain should be string, not number"
 [concept]
 TestConcept = "A test concept"
 """,
-    TypeError,
+    PipelexInterpreterError,
 )
 
 WRONG_TYPE_FOR_DEFINITION = (
@@ -198,6 +198,28 @@ description = "Domain with invalid array syntax"
     MthdsDecodeError,
 )
 
+DOUBLE_DOT_DOMAIN = (
+    "double_dot_domain",
+    """domain = "legal..contracts"
+description = "Domain with double dots"
+
+[concept]
+TestConcept = "A test concept"
+""",
+    PipelexInterpreterError,
+)
+
+LEADING_DOT_DOMAIN = (
+    "leading_dot_domain",
+    """domain = ".legal"
+description = "Domain with leading dot"
+
+[concept]
+TestConcept = "A test concept"
+""",
+    PipelexInterpreterError,
+)
+
 # Export all error test cases
 ERROR_TEST_CASES: list[tuple[str, str, type[Exception] | tuple[type[Exception], ...]]] = [
     # MTHDS Syntax Errors
@@ -220,4 +242,7 @@ ERROR_TEST_CASES: list[tuple[str, str, type[Exception] | tuple[type[Exception], 
     WRONG_TYPE_FOR_CONCEPT_SECTION,
     WRONG_TYPE_FOR_PIPE_SECTION,
     INVALID_NESTED_SECTION,
+    # Hierarchical Domain Errors
+    DOUBLE_DOT_DOMAIN,
+    LEADING_DOT_DOMAIN,
 ]

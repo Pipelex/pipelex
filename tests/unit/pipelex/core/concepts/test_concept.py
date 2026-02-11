@@ -205,12 +205,9 @@ class TestConcept:
         with pytest.raises(ConceptStringError):
             validate_concept_ref(f"snake_case_domaiN.{valid_concept_code}")
 
-        # Multiple dots
-        with pytest.raises(ConceptStringError):
-            validate_concept_ref(f"domain.sub.{valid_concept_code}")
-
-        with pytest.raises(ConceptStringError):
-            validate_concept_ref(f"a.b.c.{valid_concept_code}")
+        # Hierarchical domains (multiple dots) - now valid
+        validate_concept_ref(f"domain.sub.{valid_concept_code}")
+        validate_concept_ref(f"a.b.c.{valid_concept_code}")
 
         # Invalid domain (not snake_case)
         with pytest.raises(ConceptStringError):

@@ -1,5 +1,5 @@
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptStringError
-from pipelex.core.domains.validation import is_domain_code_valid
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.tools.misc.string_utils import is_pascal_case
 
 
@@ -14,40 +14,38 @@ def validate_concept_code(concept_code: str) -> None:
 
 
 def is_concept_ref_valid(concept_ref: str) -> bool:
-    if "." not in concept_ref:
+    """Check if a concept reference (domain.ConceptCode) is valid.
+
+    Supports hierarchical domains: "legal.contracts.NonCompeteClause" is valid.
+    """
+    try:
+        ref = QualifiedRef.parse_concept_ref(concept_ref)
+    except QualifiedRefError:
         return False
-
-    if concept_ref.count(".") > 1:
-        return False
-
-    domain, concept_code = concept_ref.split(".", 1)
-
-    # Validate domain
-    if not is_domain_code_valid(code=domain):
-        return False
-
-    # Validate concept code
-    return is_concept_code_valid(concept_code=concept_code)
+    return ref.is_qualified
 
 
 def validate_concept_ref(concept_ref: str) -> None:
     if not is_concept_ref_valid(concept_ref=concept_ref):
         msg = (
             f"Concept string '{concept_ref}' is not a valid concept string. It must be in the format 'domain.ConceptCode': "
-            " - domain: a valid domain code (snake_case), "
+            " - domain: a valid domain code (snake_case, possibly hierarchical like legal.contracts), "
             " - ConceptCode: a valid concept code (PascalCase)"
         )
         raise ConceptStringError(msg)
 
 
 def is_concept_ref_or_code_valid(concept_ref_or_code: str) -> bool:
-    if concept_ref_or_code.count(".") > 1:
-        return False
+    """Check if a concept reference or bare code is valid.
 
-    if concept_ref_or_code.count(".") == 1:
+    Supports hierarchical domains: "legal.contracts.NonCompeteClause" is valid.
+    Bare codes must be PascalCase: "NonCompeteClause" is valid.
+    """
+    if not concept_ref_or_code:
+        return False
+    if "." in concept_ref_or_code:
         return is_concept_ref_valid(concept_ref=concept_ref_or_code)
-    else:
-        return is_concept_code_valid(concept_code=concept_ref_or_code)
+    return is_concept_code_valid(concept_code=concept_ref_or_code)
 
 
 def validate_concept_ref_or_code(concept_ref_or_code: str) -> None:
