@@ -110,7 +110,6 @@ class StuffFactory:
         stuff_contents: dict[str, StuffContent],
         name: str | None = None,
     ) -> Stuff:
-        # TODO: Add unit tests for this method
         """Combine a dictionary of stuffs into a single stuff."""
         the_subclass = get_class_registry().get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)
         try:
