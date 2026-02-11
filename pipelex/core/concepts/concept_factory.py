@@ -21,7 +21,7 @@ from pipelex.types import StrEnum
 
 
 class ConceptDeclarationType(StrEnum):
-    """Enum representing the 5 ways a concept can be declared in PLX files.
+    """Enum representing the 5 ways a concept can be declared in MTHDS files.
 
     Option 1: STRING - Concept is defined as a string
         Example:

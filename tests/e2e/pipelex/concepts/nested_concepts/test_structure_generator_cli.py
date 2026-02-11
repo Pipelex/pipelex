@@ -48,7 +48,7 @@ class TestStructureGeneratorCLI:
             output_directory = Path(temp_dir)
 
             # Validate the MTHDS file to get blueprints
-            validate_result = await validate_bundle(plx_file_path=mthds_file_path)
+            validate_result = await validate_bundle(mthds_file_path=mthds_file_path)
             blueprints = validate_result.blueprints
 
             # Generate structure files

@@ -325,12 +325,12 @@ Now that you understand the basics, explore more:
 
 **Learn More about the PipeLLM:**
 
-- [LLM Configuration: play with the models](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md) - Optimize cost and quality
+- [LLM Configuration: play with the models](../../home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-methods.md) - Optimize cost and quality
 - [Full configuration of the PipeLLM](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md)
 
 **Learn more about Pipelex (domains, project structure, best practices...)**
 
-- [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md) - Deep dive into pipeline design
+- [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md) - Deep dive into pipeline design
 - [Cookbook Examples](../../home/4-cookbook-examples/index.md) - Real-world examples and patterns
 
 **Learn More about the other pipes** 

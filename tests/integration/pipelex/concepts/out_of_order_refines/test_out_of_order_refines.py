@@ -27,7 +27,7 @@ class TestOutOfOrderRefines:
         # validate_bundle internally loads libraries which triggers ConceptFactory.make_from_blueprint
         # This should fail because VIPCustomer is defined before Customer
         # with pytest.raises(ConceptFactoryError) as exc_info:
-        await validate_bundle(plx_file_path=mthds_file_path)
+        await validate_bundle(mthds_file_path=mthds_file_path)
 
     async def test_multi_level_out_of_order_refines_across_files(self):
         """Test multi-level refinement chain fails when concepts are out of order across files.

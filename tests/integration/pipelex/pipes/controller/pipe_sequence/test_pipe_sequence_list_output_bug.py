@@ -91,7 +91,7 @@ class TestPipeSequenceListOutputBug:
 
             # Load the bundle
             result = await validate_bundle(
-                plx_file_path=mthds_file,
+                mthds_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -122,7 +122,7 @@ class TestPipeSequenceListOutputBug:
 
             # Load the bundle
             await validate_bundle(
-                plx_file_path=mthds_file,
+                mthds_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -257,7 +257,7 @@ class TestNestedPipeSequenceListOutputBug:
 
             # Load the bundle
             result = await validate_bundle(
-                plx_file_path=mthds_file,
+                mthds_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -284,7 +284,7 @@ class TestNestedPipeSequenceListOutputBug:
 
             # Load the bundle
             await validate_bundle(
-                plx_file_path=mthds_file,
+                mthds_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 

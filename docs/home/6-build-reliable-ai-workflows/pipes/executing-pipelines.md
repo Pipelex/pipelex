@@ -78,7 +78,7 @@ When using `execute_pipeline` or `start_pipeline`, you can control library behav
 
 - **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.mthds` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
 
-- **`plx_content`**: When provided, Pipelex will load only this MTHDS content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
+- **`mthds_content`**: When provided, Pipelex will load only this MTHDS content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
 
 !!! info "Python Structure Classes"
     If your concepts use Python `StructuredContent` classes instead of inline structures, those Python files must be in the directories specified by `library_dirs`. Pipelex auto-discovers and registers these classes during library loading. Learn more about [Python StructuredContent Classes](../concepts/python-classes.md).
@@ -182,7 +182,7 @@ Generate a catchy tagline based on the above description. The tagline should be 
 Pipelex.make()
 
 pipe_output = await execute_pipeline(
-    plx_content=my_pipe_content,
+    mthds_content=my_pipe_content,
     inputs={
         "description": {
             "concept": "ProductDescription",
@@ -193,7 +193,7 @@ pipe_output = await execute_pipeline(
 ```
 
 !!! note "Pipe Code Resolution"
-    When using `plx_content`:
+    When using `mthds_content`:
 
     - If the content has a `main_pipe` property and you don't provide `pipe_code`, the `main_pipe` is executed
     - If you provide `pipe_code`, it overrides `main_pipe`

@@ -80,14 +80,14 @@ class ConstructFieldBlueprint(BaseModel):
                     raise ValueError(msg)
         return self
 
-    def to_plx_dict(self) -> Any:
-        """Convert to PLX-format dict for serialization.
+    def to_mthds_dict(self) -> Any:
+        """Convert to MTHDS-format dict for serialization.
 
-        Returns the format expected in PLX files:
+        Returns the format expected in MTHDS files:
         - FIXED: Just the value itself
         - FROM_VAR: { from: "path" } with optional list_to_dict_keyed_by
         - TEMPLATE: { template: "..." }
-        - NESTED: The nested construct's PLX dict
+        - NESTED: The nested construct's MTHDS dict
         """
         match self.method:
             case ConstructFieldMethod.FIXED:
@@ -101,7 +101,7 @@ class ConstructFieldBlueprint(BaseModel):
                 return {"template": self.template}
             case ConstructFieldMethod.NESTED:
                 if self.nested:
-                    return self.nested.to_plx_dict()
+                    return self.nested.to_mthds_dict()
                 return {}
 
     @classmethod
@@ -197,7 +197,7 @@ class ConstructFieldBlueprint(BaseModel):
 class ConstructBlueprint(BaseModel):
     """Blueprint for composing a StructuredContent from working memory.
 
-    Parsed from `[pipe.name.construct]` section in PLX files.
+    Parsed from `[pipe.name.construct]` section in MTHDS files.
 
     Attributes:
         fields: Dictionary mapping field names to their composition blueprints
@@ -270,13 +270,13 @@ class ConstructBlueprint(BaseModel):
 
         return required
 
-    def to_plx_dict(self) -> dict[str, Any]:
-        """Convert to PLX-format dict (fields at root, no wrapper).
+    def to_mthds_dict(self) -> dict[str, Any]:
+        """Convert to MTHDS-format dict (fields at root, no wrapper).
 
-        Returns the format expected in PLX files where field names are at
+        Returns the format expected in MTHDS files where field names are at
         the root level, not wrapped in a 'fields' key.
         """
-        return {field_name: field_bp.to_plx_dict() for field_name, field_bp in self.fields.items()}
+        return {field_name: field_bp.to_mthds_dict() for field_name, field_bp in self.fields.items()}
 
     @model_serializer(mode="wrap")
     def serialize_with_context(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo) -> dict[str, Any]:
@@ -286,7 +286,7 @@ class ConstructBlueprint(BaseModel):
         Otherwise, uses default Pydantic serialization.
         """
         if info.context and info.context.get("format") == "mthds":
-            return self.to_plx_dict()
+            return self.to_mthds_dict()
         result = handler(self)
         return dict(result)  # Ensure dict return type
 

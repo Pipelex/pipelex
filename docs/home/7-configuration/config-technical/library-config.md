@@ -68,7 +68,7 @@ Pipelex resolves library directories using this priority order (highest to lowes
 | **3 (Fallback)** | `PIPELEXPATH` environment variable | System-wide or shell session default |
 
 !!! info "Empty List is Valid"
-    Passing an empty list `[]` to `library_dirs` is a valid explicit value that **disables** directory-based library loading. This is useful when using `plx_content` directly without needing files from the filesystem.
+    Passing an empty list `[]` to `library_dirs` is a valid explicit value that **disables** directory-based library loading. This is useful when using `mthds_content` directly without needing files from the filesystem.
 
 ### Using the PIPELEXPATH Environment Variable
 
@@ -176,9 +176,9 @@ output2 = await execute_pipeline(
     inputs={"input": "value"},
 )
 
-# Disable directory loading (use only plx_content)
+# Disable directory loading (use only mthds_content)
 output3 = await execute_pipeline(
-    plx_content=my_plx_string,
+    mthds_content=my_mthds_string,
     library_dirs=[],  # Empty list disables directory-based loading
     inputs={"input": "value"},
 )
@@ -237,7 +237,7 @@ output = await execute_pipeline(
 
 3. **Use per-call `library_dirs` for exceptions**: Override only when a specific execution needs different directories.
 
-4. **Use empty list `[]` for isolated execution**: When you want to execute only from `plx_content` without loading any file-based definitions.
+4. **Use empty list `[]` for isolated execution**: When you want to execute only from `mthds_content` without loading any file-based definitions.
 
 5. **Include structure class directories**: Remember that `library_dirs` must contain both `.mthds` files AND Python files defining `StructuredContent` classes.
 

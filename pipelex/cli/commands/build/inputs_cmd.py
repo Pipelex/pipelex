@@ -46,7 +46,7 @@ async def _generate_inputs_core(
     """
     if bundle_path:
         try:
-            validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
+            validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path)
             bundle_blueprint = validate_bundle_result.blueprints[0]
             if not pipe_code:
                 # No pipe code specified, use main_pipe from bundle

@@ -187,7 +187,7 @@ def validate_cmd(
     ):
         if bundle_path:
             try:
-                await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+                await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
                 typer.secho(
                     f"✅ Successfully validated bundle '{bundle_path}'",
                     fg=typer.colors.GREEN,

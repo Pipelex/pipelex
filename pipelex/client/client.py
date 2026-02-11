@@ -81,7 +81,7 @@ class PipelexClient(PipelexProtocol):
     async def execute_pipeline(
         self,
         pipe_code: str | None = None,
-        plx_content: str | None = None,
+        mthds_content: str | None = None,
         inputs: PipelineInputs | WorkingMemory | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
@@ -91,7 +91,7 @@ class PipelexClient(PipelexProtocol):
 
         Args:
             pipe_code: The code identifying the pipeline to execute
-            plx_content: Content of the pipeline bundle to execute
+            mthds_content: Content of the pipeline bundle to execute
             inputs: Inputs passed to the pipeline
             output_name: Name of the output slot to write to
             output_multiplicity: Output multiplicity setting
@@ -100,8 +100,8 @@ class PipelexClient(PipelexProtocol):
         Returns:
             Complete execution results including pipeline state and output
         """
-        if not pipe_code and not plx_content:
-            msg = "Either pipe_code or plx_content must be provided to the API execute_pipeline."
+        if not pipe_code and not mthds_content:
+            msg = "Either pipe_code or mthds_content must be provided to the API execute_pipeline."
             raise PipelineRequestError(message=msg)
 
         working_memory: WorkingMemory | None = None
@@ -114,7 +114,7 @@ class PipelexClient(PipelexProtocol):
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
             pipe_code=pipe_code,
-            plx_content=plx_content,
+            mthds_content=mthds_content,
             working_memory=working_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,
@@ -127,7 +127,7 @@ class PipelexClient(PipelexProtocol):
     async def start_pipeline(
         self,
         pipe_code: str | None = None,
-        plx_content: str | None = None,
+        mthds_content: str | None = None,
         inputs: PipelineInputs | WorkingMemory | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
@@ -137,7 +137,7 @@ class PipelexClient(PipelexProtocol):
 
         Args:
             pipe_code: The code identifying the pipeline to execute
-            plx_content: Content of the pipeline bundle to execute
+            mthds_content: Content of the pipeline bundle to execute
             inputs: Inputs passed to the pipeline
             output_name: Name of the output slot to write to
             output_multiplicity: Output multiplicity setting
@@ -146,8 +146,8 @@ class PipelexClient(PipelexProtocol):
         Returns:
             Initial response with pipeline_run_id and created_at timestamp
         """
-        if not pipe_code and not plx_content:
-            msg = "Either pipe_code or plx_content must be provided to the API start_pipeline."
+        if not pipe_code and not mthds_content:
+            msg = "Either pipe_code or mthds_content must be provided to the API start_pipeline."
             raise PipelineRequestError(message=msg)
 
         working_memory: WorkingMemory | None = None
@@ -160,7 +160,7 @@ class PipelexClient(PipelexProtocol):
 
         pipeline_request = PipelineRequestFactory.make_from_working_memory(
             pipe_code=pipe_code,
-            plx_content=plx_content,
+            mthds_content=mthds_content,
             working_memory=working_memory,
             output_name=output_name,
             output_multiplicity=output_multiplicity,

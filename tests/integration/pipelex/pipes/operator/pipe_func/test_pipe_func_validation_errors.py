@@ -207,7 +207,7 @@ class TestPipeFuncValidationErrors:
             # Currently raises LibraryError, but ValidateBundleError is also acceptable
             with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=mthds_file,
+                    mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -252,7 +252,7 @@ class TestPipeFuncValidationErrors:
 
             # Validate the bundle - should succeed
             result = await validate_bundle(
-                plx_file_path=mthds_file,
+                mthds_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -284,7 +284,7 @@ class TestPipeFuncValidationErrors:
             # Try to validate - should fail with informative error
             with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=mthds_file,
+                    mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -339,7 +339,7 @@ class TestPipeFuncValidationErrors:
             # Validate the bundle - should fail with a specific error message
             with pytest.raises((ValidateBundleError, LibraryError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=mthds_file,
+                    mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -405,7 +405,7 @@ output = "Text"
             # Validate the bundle - should fail because return type doesn't match concept's structure class
             with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=mthds_file,
+                    mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -462,7 +462,7 @@ output = "Text[]"
 
             # Validate the bundle - should succeed
             result = await validate_bundle(
-                plx_file_path=mthds_file,
+                mthds_file_path=mthds_file,
                 library_dirs=[temp_path],
             )
 
@@ -515,7 +515,7 @@ output = "Text[]"
             # Validate the bundle - should fail with clear error about item type mismatch
             with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=mthds_file,
+                    mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 
@@ -573,7 +573,7 @@ output = "Text[]"
             # Validate the bundle - should fail because return type is not ListContent
             with pytest.raises((ValidateBundleError, LibraryError, TypeError)) as exc_info:
                 await validate_bundle(
-                    plx_file_path=mthds_file,
+                    mthds_file_path=mthds_file,
                     library_dirs=[temp_path],
                 )
 

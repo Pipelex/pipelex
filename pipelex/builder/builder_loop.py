@@ -69,13 +69,13 @@ class BuilderLoop:
 
         if is_save_first_iteration_enabled:
             try:
-                plx_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 first_iteration_path = get_incremental_file_path(
                     base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_1st_iteration",
                     extension="mthds",
                 )
-                save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
+                save_text_to_path(text=mthds_content, path=str(first_iteration_path), create_directory=True)
             except PipelexBundleSpecBlueprintError as exc:
                 log.warning(f"Could not save first iteration MTHDS: {exc}")
 
@@ -693,13 +693,13 @@ class BuilderLoop:
         # Save second iteration if we made any changes (pipes or concepts)
         if (fixed_pipes or added_concepts) and is_save_second_iteration_enabled:
             try:
-                plx_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 second_iteration_path = get_incremental_file_path(
                     base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_2nd_iteration",
                     extension="mthds",
                 )
-                save_text_to_path(text=plx_content, path=str(second_iteration_path))
+                save_text_to_path(text=mthds_content, path=str(second_iteration_path))
             except PipelexBundleSpecBlueprintError as exc:
                 log.warning(f"Could not save second iteration MTHDS: {exc}")
 

@@ -243,7 +243,7 @@ class MthdsFactory:
     def make_construct_table(cls, construct_value: Mapping[str, Any]) -> Any:
         """Create a nested table for construct section in MTHDS format.
 
-        The construct_value should already be in MTHDS format (from ConstructBlueprint.to_plx_dict())
+        The construct_value should already be in MTHDS format (from ConstructBlueprint.to_mthds_dict())
         with field names at the root, not wrapped in a 'fields' key.
         """
         tbl = table()

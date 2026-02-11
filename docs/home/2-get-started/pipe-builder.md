@@ -33,7 +33,7 @@ The pipe builder generates three files in a numbered directory (e.g., `results/p
 3. **`run_{pipe_code}.py`** - Ready-to-run Python script that you can customize and execute
 
 !!! tip "Pipe Builder Requirements"
-    For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BlackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key, otherwise, you can also create the methods yourself, following our [documentation guide](./write-workflows-manually.md).
+    For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BlackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key, otherwise, you can also create the methods yourself, following our [documentation guide](./write-methods-manually.md).
 
 !!! info "Learn More"
     Want to understand how the Pipe Builder works under the hood? See [Pipe Builder Deep Dive](../9-tools/pipe-builder.md) for the full explanation of its multi-step generation process.
@@ -90,8 +90,8 @@ Now that you know how to generate methods with the Pipe Builder, explore these r
 
 **Learn how to Write Methods yourself**
 
-- [:material-pencil: Write Methods Manually](./write-workflows-manually.md){ .md-button .md-button--primary }
-- [:material-book-open-variant: Build Reliable AI Methods](../6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md){ .md-button .md-button--primary }
+- [:material-pencil: Write Methods Manually](./write-methods-manually.md){ .md-button .md-button--primary }
+- [:material-book-open-variant: Build Reliable AI Methods](../6-build-reliable-ai-workflows/kick-off-a-methods-project.md){ .md-button .md-button--primary }
 
 **Explore Examples:**
 

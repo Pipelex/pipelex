@@ -35,7 +35,7 @@ your_project/
     └── pipelex.toml
 ```
 
-Learn more in our [Project Structure documentation](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md).
+Learn more in our [Project Structure documentation](../../home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md).
 
 ---
 
@@ -54,5 +54,5 @@ Now that you understand project organization:
 2. **Learn the concepts**: [Writing Methods Tutorial](../../home/2-get-started/pipe-builder.md)
 <!-- PRERELEASE_LINK -->
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
-4. **Deep dive**: [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md)
+4. **Deep dive**: [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md)
 

@@ -349,7 +349,7 @@ def build_structures_command(
                 typer.echo(f"🔍 Loading concepts from bundle: {target_path}")
 
                 # Load concepts only (no pipes)
-                load_result = load_concepts_only(plx_file_path=target_path, library_dirs=library_dirs_paths)
+                load_result = load_concepts_only(mthds_file_path=target_path, library_dirs=library_dirs_paths)
                 # THIS IS A HACK, while waiting class/func registries to be in libraries.
                 get_class_registry().teardown()
                 get_func_registry().teardown()

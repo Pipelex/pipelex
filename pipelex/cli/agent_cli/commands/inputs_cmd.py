@@ -44,7 +44,7 @@ async def _inputs_core(
         NoInputsRequiredError: If the pipe has no inputs.
     """
     if bundle_path:
-        validate_bundle_result = await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+        validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
         bundle_blueprint = validate_bundle_result.blueprints[0]
         if not pipe_code:
             main_pipe_code = bundle_blueprint.main_pipe

@@ -295,7 +295,7 @@ def build_pipe_cmd(
                         # pass empty library_dirs to avoid loading any libraries set at env var or instance level:
                         # we don't want any other pipeline to interfere with the pipeline we just built
                         built_pipe_output = await execute_pipeline(
-                            plx_content=mthds_content,
+                            mthds_content=mthds_content,
                             pipe_run_mode=PipeRunMode.DRY,
                             execution_config=built_pipe_execution_config,
                             library_dirs=[],

@@ -41,7 +41,7 @@ Libraries enforce specific uniqueness constraints to maintain consistency:
 Currently, all libraries are **local**, meaning they are loaded from:
 
 - Directories on your filesystem (using `library_dirs` parameter)
-- MTHDS content strings (using `plx_content` parameter)
+- MTHDS content strings (using `mthds_content` parameter)
 - The current working directory (default behavior)
 
 ```python
@@ -102,7 +102,7 @@ pipe_output = await execute_pipeline(
 
 ```python
 # Loads only the provided MTHDS content
-plx_content = """
+mthds_content = """
 domain = "marketing"
 
 [concept]
@@ -116,7 +116,7 @@ prompt = "Generate a tagline for: @desc"
 """
 
 pipe_output = await execute_pipeline(
-    plx_content=plx_content,
+    mthds_content=mthds_content,
     pipe_code="my_pipe",
     inputs={...},
 )
@@ -167,14 +167,14 @@ pipe_output = await execute_pipeline(
 
 ### 2. Use MTHDS Content for Dynamic Pipelines
 
-When generating or modifying pipelines dynamically, use `plx_content`:
+When generating or modifying pipelines dynamically, use `mthds_content`:
 
 ```python
 # Generate MTHDS content dynamically
-plx_content = generate_custom_pipeline(user_requirements)
+mthds_content = generate_custom_pipeline(user_requirements)
 
 pipe_output = await execute_pipeline(
-    plx_content=plx_content,
+    mthds_content=mthds_content,
     inputs={...},
 )
 ```

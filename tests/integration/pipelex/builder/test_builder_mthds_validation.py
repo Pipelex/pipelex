@@ -32,7 +32,7 @@ class TestBuilderMthdsValidation:
     async def test_builder_mthds_loads_and_validates(self):
         """Test that builder.mthds can be loaded and validated successfully."""
         result = await validate_bundle(
-            plx_file_path=TestData.BUILDER_MTHDS_PATH,
+            mthds_file_path=TestData.BUILDER_MTHDS_PATH,
             library_dirs=[BUILDER_DIR, BUILDER_DIR / "pipe"],
         )
 
@@ -45,7 +45,7 @@ class TestBuilderMthdsValidation:
     async def test_agentic_builder_mthds_loads_and_validates(self):
         """Test that agentic_builder.mthds can be loaded and validated successfully."""
         result = await validate_bundle(
-            plx_file_path=TestData.AGENTIC_BUILDER_MTHDS_PATH,
+            mthds_file_path=TestData.AGENTIC_BUILDER_MTHDS_PATH,
             library_dirs=[BUILDER_DIR, BUILDER_DIR / "pipe"],
         )
 
@@ -58,7 +58,7 @@ class TestBuilderMthdsValidation:
     async def test_pipe_design_mthds_loads_and_validates(self):
         """Test that pipe_design.mthds can be loaded and validated successfully."""
         result = await validate_bundle(
-            plx_file_path=TestData.PIPE_DESIGN_MTHDS_PATH,
+            mthds_file_path=TestData.PIPE_DESIGN_MTHDS_PATH,
             library_dirs=[BUILDER_DIR, BUILDER_DIR / "pipe"],
         )
 

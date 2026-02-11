@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat, graph_cmd
-from pipelex.core.interpreter.exceptions import PLXDecodeError
+from pipelex.core.interpreter.exceptions import MthdsDecodeError
 
 GRAPH_CMD_MODULE = "pipelex.cli.agent_cli.commands.graph_cmd"
 
@@ -245,13 +245,13 @@ class TestGraphCmd:
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
     ) -> None:
-        """MTHDS parse error should produce a PLXDecodeError."""
+        """MTHDS parse error should produce a MthdsDecodeError."""
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text("invalid toml {{{{")
 
         mocker.patch(
             f"{GRAPH_CMD_MODULE}.PipelexInterpreter.make_pipelex_bundle_blueprint",
-            side_effect=PLXDecodeError(message="bad toml", doc="invalid toml {{{{", pos=0, lineno=1, colno=1),
+            side_effect=MthdsDecodeError(message="bad toml", doc="invalid toml {{{{", pos=0, lineno=1, colno=1),
         )
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -260,4 +260,4 @@ class TestGraphCmd:
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
-        assert parsed["error_type"] == "PLXDecodeError"
+        assert parsed["error_type"] == "MthdsDecodeError"

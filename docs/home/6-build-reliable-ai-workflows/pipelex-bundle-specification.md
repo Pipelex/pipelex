@@ -242,5 +242,5 @@ prompt = "..."
 - [Understanding Domains](./domain.md) - Deep dive into domain organization
 - [Designing Pipelines](./pipes/index.md) - Learn how to design and compose pipes
 - [Define Your Concepts](./concepts/define_your_concepts.md) - Complete guide to concept definitions
-- [Kick off a Pipelex Method Project](./kick-off-a-pipelex-workflow-project.md) - Start a new project
+- [Kick off a Pipelex Method Project](./kick-off-a-methods-project.md) - Start a new project
 

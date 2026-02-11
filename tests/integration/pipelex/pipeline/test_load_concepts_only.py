@@ -36,7 +36,7 @@ email = { type = "text", description = "Customer email" }
             mthds_path = Path(tmp_dir) / "test.mthds"
             mthds_path.write_text(mthds_content, encoding="utf-8")
 
-            result = load_concepts_only(plx_file_path=mthds_path)
+            result = load_concepts_only(mthds_file_path=mthds_path)
 
             assert isinstance(result, LoadConceptsOnlyResult)
             assert len(result.blueprints) == 1
@@ -68,7 +68,7 @@ prompt = "Generate a topic about @subject"
             mthds_path = Path(tmp_dir) / "test.mthds"
             mthds_path.write_text(mthds_content, encoding="utf-8")
 
-            result = load_concepts_only(plx_file_path=mthds_path)
+            result = load_concepts_only(mthds_file_path=mthds_path)
 
             # Concepts should be loaded
             assert len(result.concepts) == 1
@@ -144,7 +144,7 @@ total = { type = "number", description = "Invoice total" }
             mthds_path = Path(tmp_dir) / "test.mthds"
             mthds_path.write_text(mthds_content, encoding="utf-8")
 
-            result = load_concepts_only(plx_file_path=mthds_path)
+            result = load_concepts_only(mthds_file_path=mthds_path)
 
             assert len(result.concepts) == 2
 
@@ -183,7 +183,7 @@ a_ref = { type = "concept", concept_ref = "testapp.ConceptA", description = "Ref
             mthds_path.write_text(mthds_content, encoding="utf-8")
 
             with pytest.raises(Exception, match=r"[Cc]ycle"):
-                load_concepts_only(plx_file_path=mthds_path)
+                load_concepts_only(mthds_file_path=mthds_path)
 
     def test_load_concepts_only_with_library_dirs(self, load_empty_library: Callable[[], str]):
         """Test loading concepts with library dependencies."""
@@ -220,7 +220,7 @@ address = { type = "concept", concept_ref = "shared.Address", description = "The
             main_mthds_path.write_text(main_mthds, encoding="utf-8")
 
             result = load_concepts_only(
-                plx_file_path=main_mthds_path,
+                mthds_file_path=main_mthds_path,
                 library_dirs=[Path(lib_dir)],
             )
 
@@ -252,7 +252,7 @@ description = "An item"
 name = { type = "text", description = "Item name" }
 """
 
-        result = load_concepts_only(plx_content=mthds_content)
+        result = load_concepts_only(mthds_content=mthds_content)
 
         assert len(result.blueprints) == 1
         assert len(result.concepts) == 1
@@ -280,7 +280,7 @@ refines = "Customer"
             mthds_path = Path(tmp_dir) / "test.mthds"
             mthds_path.write_text(mthds_content, encoding="utf-8")
 
-            result = load_concepts_only(plx_file_path=mthds_path)
+            result = load_concepts_only(mthds_file_path=mthds_path)
 
             assert len(result.concepts) == 2
 

@@ -47,7 +47,7 @@ async def pipeline_run_setup(
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
-    plx_content: str | None = None,
+    mthds_content: str | None = None,
     bundle_uri: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
@@ -75,14 +75,14 @@ async def pipeline_run_setup(
     library_dirs:
         List of directory paths to load pipe definitions from. Combined with directories
         from the ``PIPELEXPATH`` environment variable (PIPELEXPATH directories are searched
-        first). When provided alongside ``plx_content``, definitions from both sources
+        first). When provided alongside ``mthds_content``, definitions from both sources
         are loaded into the library.
     pipe_code:
-        Code identifying the pipe to execute. Required when ``plx_content`` is not
-        provided. When both ``plx_content`` and ``pipe_code`` are provided, the
+        Code identifying the pipe to execute. Required when ``mthds_content`` is not
+        provided. When both ``mthds_content`` and ``pipe_code`` are provided, the
         specified pipe from the MTHDS content will be executed (overriding any
         ``main_pipe`` defined in the content).
-    plx_content:
+    mthds_content:
         Complete MTHDS file content as a string. The pipe to execute is determined by
         ``pipe_code`` (if provided) or the ``main_pipe`` property in the MTHDS content.
         Can be combined with ``library_dirs`` to load additional definitions.
@@ -90,7 +90,7 @@ async def pipeline_run_setup(
         URI identifying the bundle. Used to detect if the bundle was already loaded
         from library directories (e.g., via PIPELEXPATH) to avoid duplicate domain
         registration. If provided and the resolved absolute path is already in the
-        loaded MTHDS paths, the ``plx_content`` loading will be skipped.
+        loaded MTHDS paths, the ``mthds_content`` loading will be skipped.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -118,8 +118,8 @@ async def pipeline_run_setup(
 
     """
     user_id = user_id or OTelConstants.DEFAULT_USER_ID
-    if not plx_content and not pipe_code:
-        msg = "Either pipe_code or plx_content must be provided to the pipeline API."
+    if not mthds_content and not pipe_code:
+        msg = "Either pipe_code or mthds_content must be provided to the pipeline API."
         raise ValueError(msg)
 
     pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code)
@@ -148,9 +148,9 @@ async def pipeline_run_setup(
     else:
         log.verbose(f"No library directories to load ({source_label})")
 
-    # Then handle plx_content or pipe_code
-    if plx_content:
-        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
+    # Then handle MTHDS content or pipe_code
+    if mthds_content:
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
         blueprints_to_load = [blueprint]
 
         # Check if this bundle was already loaded from library directories
@@ -170,7 +170,7 @@ async def pipeline_run_setup(
         if not bundle_already_loaded:
             library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
 
-        # For now, we only support one blueprint when given a plx_content. So blueprints is of length 1.
+        # For now, we only support one blueprint when given MTHDS content. So blueprints is of length 1.
         # blueprint is already set from make_pipelex_bundle_blueprint above
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
@@ -182,7 +182,7 @@ async def pipeline_run_setup(
     elif pipe_code:
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
-        msg = "Either provide pipe_code or plx_content to the pipeline API. 'pipe_code' must be provided when 'plx_content' is None"
+        msg = "Either provide pipe_code or mthds_content to the pipeline API. 'pipe_code' must be provided when 'mthds_content' is None"
         raise PipeExecutionError(message=msg)
 
     pipe_code = pipe.code

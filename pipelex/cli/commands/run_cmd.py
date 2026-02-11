@@ -19,7 +19,7 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
 )
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -236,14 +236,14 @@ def run_cmd(
 
     async def run_pipeline(pipe_code: str | None = None, bundle_path: str | None = None):
         source_description: str
-        plx_content: str | None = None
+        mthds_content: str | None = None
         if bundle_path:
             try:
-                plx_content = Path(bundle_path).read_text(encoding="utf-8")
+                mthds_content = Path(bundle_path).read_text(encoding="utf-8")
                 # Use lightweight parsing to extract main_pipe without full validation
                 # Full validation happens later during execute_pipeline
                 if not pipe_code:
-                    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
+                    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
                     main_pipe_code = bundle_blueprint.main_pipe
                     if not main_pipe_code:
                         msg = (
@@ -259,7 +259,7 @@ def run_cmd(
             except FileNotFoundError as exc:
                 typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
-            except (PipelexInterpreterError, PLXDecodeError) as exc:
+            except (PipelexInterpreterError, MthdsDecodeError) as exc:
                 typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from exc
         elif pipe_code:
@@ -301,7 +301,7 @@ def run_cmd(
         try:
             pipe_output = await execute_pipeline(
                 pipe_code=pipe_code,
-                plx_content=plx_content,
+                mthds_content=mthds_content,
                 bundle_uri=bundle_path,
                 inputs=pipeline_inputs,
                 pipe_run_mode=pipe_run_mode,

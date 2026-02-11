@@ -49,7 +49,7 @@ async def prepare_runner(
 
     if bundle_path:
         try:
-            validate_bundle_result = await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+            validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
             all_blueprints.extend(validate_bundle_result.blueprints)
             first_blueprint = validate_bundle_result.blueprints[0]
             if not pipe_code:

@@ -91,7 +91,7 @@ The `build` command in `pipelex/cli/agent_cli/commands/build_cmd.py` calls `buil
 
 1. Runs a "builder pipe" (itself a Pipelex pipeline) that generates a `PipelexBundleSpec`
 2. Passes it to `BuilderLoop.build_and_fix()`
-3. Converts the result to MTHDS via `MthdsFactory.make_plx_content()`
+3. Converts the result to MTHDS via `MthdsFactory.make_mthds_content()`
 4. Saves to `pipelex-wip/` with incremental naming
 
 ## Talent System
