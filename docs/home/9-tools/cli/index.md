@@ -13,7 +13,6 @@ The Pipelex CLI is organized into several command groups:
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
 | [**run**](run.md) | Execute pipelines |
 | [**build**](build/index.md) | Generate pipelines, runners, and structures |
-| [**kit**](kit.md) | Manage agent rules and migration instructions |
 
 ## Usage Tips
 
@@ -21,13 +20,12 @@ The Pipelex CLI is organized into several command groups:
 
     - Run `pipelex init` to create configuration files and select your backends
     - Configure your AI providers in `.pipelex/inference/backends.toml`
-    - Install agent rules with `pipelex kit rules` if using AI assistants
 
 2. **Development Workflow**
 
     - Write or generate pipelines in `.plx` files
     - Validate with `pipelex validate your_pipe_code` or `pipelex validate your_bundle.plx` during development
-    - Run `pipelex validate all` before committing changes
+    - Run `pipelex validate --all` before committing changes
 
 3. **Running Pipelines**
 
@@ -44,7 +42,6 @@ The Pipelex CLI is organized into several command groups:
 ## Related Documentation
 
 - [Build Pipe](build/pipe.md) - Generate pipelines from natural language
-- [Kit Commands](kit.md) - Agent rules and migration management
 - [Configure AI Providers](../../5-setup/configure-ai-providers.md) - Set up LLM backends
 - [Design and Run Pipelines](../../6-build-reliable-ai-workflows/pipes/index.md) - Pipeline development guide
 

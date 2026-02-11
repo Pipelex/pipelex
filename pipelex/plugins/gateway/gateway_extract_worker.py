@@ -15,6 +15,7 @@ from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
+from pipelex.hub import get_storage_provider
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
@@ -84,11 +85,10 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         max_nb_images = extract_job.job_params.max_nb_images
         should_include_images = max_nb_images is None or max_nb_images > 0
 
+        storage = get_storage_provider()
+
         if image_uri := extract_job.extract_input.image_uri:
-            if extract_job.job_params.should_caption_images:
-                msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
-                raise NotImplementedError(msg)
-            base64_url = await make_base64_url_from_any_uri(uri=image_uri)
+            base64_url = await make_base64_url_from_any_uri(uri=image_uri, storage_provider=storage)
             # Images (as input) don't have embedded images to extract
             extract_output = await self._extract_base64_url(
                 extract_job=extract_job,
@@ -98,11 +98,10 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             )
 
         elif document_uri := extract_job.extract_input.document_uri:
-            if extract_job.job_params.should_caption_images:
-                # TODO: handle model capability and skip UT when it's not supported
-                msg = f"Captioning is not implemented by '{self.inference_model.tag}'."
+            if extract_job.job_params.should_caption_images and not self.inference_model.is_caption_supported_for_extract:
+                msg = f"Captioning is not supported by '{self.inference_model.tag}'."
                 raise ExtractCapabilityError(msg)
-            base64_url = await make_base64_url_from_any_uri(uri=document_uri)
+            base64_url = await make_base64_url_from_any_uri(uri=document_uri, storage_provider=storage)
             extract_output = await self._extract_base64_url(
                 extract_job=extract_job,
                 base64_url=base64_url,
@@ -125,6 +124,8 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
 
         doc_tag = document_type.document_tag
+        base_body: dict[str, Any] = {}
+        base_body[document_type.value] = {"type": doc_tag, doc_tag: base64_url}
         attempt_number = 0
         response: GenericResponse | None = None
         retryer = self._make_retryer()
@@ -132,13 +133,13 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             extra_headers, extra_body = GatewayFactory.make_extras(
                 inference_model=self.inference_model, inference_job=extract_job, output_desc=InferenceOutputType.PAGES
             )
+            extra_body.update(base_body)
             async for attempt in retryer:
                 with attempt:
                     attempt_number += 1
                     response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
                         "/",
                         model=self.inference_model.model_id,
-                        document={"type": doc_tag, doc_tag: base64_url},
                         headers=extra_headers,
                         **extra_body,
                     )

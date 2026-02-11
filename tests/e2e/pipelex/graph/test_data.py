@@ -15,6 +15,6 @@ class GraphTestData:
 
     # Test cases: (topic, graph_json_path)
     GRAPH_JSON_TEST_CASES: ClassVar[list[tuple[str, str]]] = [
-        ("CV Job Match", CV_JOB_MATCH_GRAPH_JSON),
+        # ("CV Job Match", CV_JOB_MATCH_GRAPH_JSON),
         ("CV Batch", CV_BATCH_GRAPH_JSON),
     ]

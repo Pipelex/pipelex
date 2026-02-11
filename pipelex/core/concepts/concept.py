@@ -11,7 +11,7 @@ from pipelex.core.concepts.concept_representation_generator import (
 )
 from pipelex.core.concepts.exceptions import ConceptCodeError, ConceptValueError
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.validation import validate_concept_code
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid, validate_concept_code
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
@@ -54,13 +54,25 @@ class Concept(BaseModel):
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None) -> str | None:
+        """Validate the refines field.
+
+        Refines can be either:
+        - A native concept ref (e.g., "native.Text", "Text")
+        - A non-native concept ref (e.g., "myapp.BaseEntity") for concept-to-concept inheritance
+
+        Non-native concept refs are allowed since dependencies are loaded in topological order,
+        ensuring the refined concept exists before the refining concept is constructed.
+        """
         if refines is None:
             return None
-        if not NativeConceptCode.is_valid_native_concept_ref(concept_ref=refines):
-            valid_native_concepts = ", ".join(native.concept_ref for native in NativeConceptCode.values_list())
-            msg = f"Refines '{refines}' is not a valid native concept string. Valid options are: {valid_native_concepts}"
-            raise ConceptValueError(msg)
-        return refines
+
+        # Check if it's a valid concept ref or code (domain.ConceptCode or ConceptCode in PascalCase)
+        if is_concept_ref_or_code_valid(concept_ref_or_code=refines):
+            return refines
+
+        # Invalid refines value
+        msg = f"Refines '{refines}' must be a valid concept ref (domain.ConceptCode) or concept code (PascalCase)"
+        raise ConceptValueError(msg)
 
     @property
     def concept_ref(self) -> str:
@@ -160,31 +172,57 @@ class Concept(BaseModel):
             raise PipelexUnexpectedError(msg)
         return search_for_nested_image_fields(content_class=structure_class)
 
-    def generate_input_representation(
+    def render_concept_representation(
         self,
         output_format: ConceptRepresentationFormat,
         is_multiple: bool = False,
     ) -> tuple[dict[str, Any], set[str]]:
-        """Generate a representation for this concept's input.
+        """Render a representation for this concept.
 
         Args:
-            output_format: The format to generate (JSON or PYTHON)
-            is_multiple: If True, wrap content in a list (only for JSON format)
+            output_format: The format to generate (JSON, PYTHON, or SCHEMA)
+            is_multiple: If True, wrap content in a list/array schema
 
         Returns:
             Tuple of (representation dict, imports_needed set)
             - For JSON: content is a dict (or list of dicts if is_multiple)
             - For Python: content is a class instantiation string (wrapping handled by caller)
+            - For SCHEMA: content is a JSON Schema dict (or array schema if is_multiple)
+        """
+        match output_format:
+            case ConceptRepresentationFormat.SCHEMA:
+                return self._render_schema_representation(is_multiple=is_multiple)
+            case ConceptRepresentationFormat.JSON | ConceptRepresentationFormat.PYTHON:
+                generator = ConceptRepresentationGenerator(output_format)
+                # For inputs, we only want required fields (not optional ones)
+                result = generator.generate_representation(self.concept_ref, self.get_structure_class(), include_optional=False)
+
+                # If multiple and JSON format, wrap content in a list
+                # For Python format, the caller handles wrapping since content is a string
+                if is_multiple and output_format == ConceptRepresentationFormat.JSON:
+                    result["content"] = [result["content"]]
+
+                return result, generator.imports_needed
+
+    def _render_schema_representation(self, is_multiple: bool = False) -> tuple[dict[str, Any], set[str]]:
+        """Render JSON Schema for this concept.
+
+        Args:
+            is_multiple: If True, wrap the schema in an array type
+
+        Returns:
+            Tuple of (representation dict with JSON Schema content, empty set)
+            The dict has "concept" and "content" keys where content is the JSON Schema.
         """
         structure_class = self.get_structure_class()
+        json_schema = structure_class.model_json_schema()
 
-        generator = ConceptRepresentationGenerator(output_format)
-        # For inputs, we only want required fields (not optional ones)
-        result = generator.generate_representation(self.concept_ref, structure_class, include_optional=False)
+        if is_multiple:
+            # Wrap the schema in an array schema
+            array_schema: dict[str, Any] = {
+                "type": "array",
+                "items": json_schema,
+            }
+            return {"concept": self.concept_ref, "content": array_schema}, set()
 
-        # If multiple and JSON format, wrap content in a list
-        # For Python format, the caller handles wrapping since content is a string
-        if is_multiple and output_format == ConceptRepresentationFormat.JSON:
-            result["content"] = [result["content"]]
-
-        return result, generator.imports_needed
+        return {"concept": self.concept_ref, "content": json_schema}, set()

@@ -86,7 +86,7 @@ api_key = "${SCALEWAY_API_KEY}"
 
 [vertexai]
 display_name = "Google Vertex AI"
-enabled = false                                            # This is the only one we disable beacuse setting it up requires internet access just to get credentials so it fails in CI sandboxes
+enabled = false                                            # This is the only one we disable because setting it up requires internet access just to get credentials so it fails in CI sandboxes
 gcp_project_id = "${GCP_PROJECT_ID}"
 gcp_location = "${GCP_LOCATION}"
 gcp_credentials_file_path = "${GCP_CREDENTIALS_FILE_PATH}"

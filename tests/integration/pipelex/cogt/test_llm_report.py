@@ -48,8 +48,8 @@ class TestLLMReport:
         nb_generations = 3
         prompt_text = LLMTestCases.USER_TEXT_HAIKU
         llm_preset_ids = [
-            "llm_for_testing_gen_text",
-            "llm_for_testing_gen_object",
+            "$testing-text",
+            "$testing-structured",
         ]
         tasks: list[asyncio.Task[str]] = []
         for llm_preset_id in llm_preset_ids:

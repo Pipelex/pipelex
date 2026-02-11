@@ -87,6 +87,12 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def items(self) -> list[tuple[str, StuffSpec]]:
         return list(self.root.items())
 
+    def get_single_stuff_spec(self) -> StuffSpec:
+        if len(self.root) != 1:
+            msg = f"Expected 1 input, but got {len(self.root)}"
+            raise ValueError(msg)
+        return next(iter(self.root.values()))
+
     @property
     def concepts(self) -> list[Concept]:
         all_concepts: list[Concept] = []
@@ -126,30 +132,34 @@ class InputStuffSpecs(RootModel[PipeInputsRoot]):
     def is_empty(self) -> bool:
         return not bool(self.root)
 
-    def generate_json_representation(self) -> dict[str, Any]:
-        """Generate a JSON representation for all inputs.
+    def format_for_display(self, indent: int = 6) -> str:
+        """Format input stuff specs as a human-readable multi-line string.
+
+        Args:
+            indent: Number of spaces to indent each input line
 
         Returns:
-            Dictionary with JSON representations for each input
+            A multi-line string with one input per line, e.g.:
+                  - cv: cv_screening.CV
+                  - scorecard: cv_screening.Scorecard
         """
-        json_inputs: dict[str, Any] = {}
-        for var_name, stuff_spec in self.root.items():
-            json_value, _ = stuff_spec.concept.generate_input_representation(
-                output_format=ConceptRepresentationFormat.JSON,
-                is_multiple=stuff_spec.is_multiple(),
-            )
-            json_inputs[var_name] = json_value
+        if not self.root:
+            return "(none)"
+        prefix = " " * indent
+        lines = [f"{prefix}- {var_name}: {stuff_spec.to_bundle_representation()}" for var_name, stuff_spec in self.root.items()]
+        return "\n" + "\n".join(lines)
 
-        return json_inputs
-
-    def generate_json_string(self, indent: int = 2) -> str:
-        """Generate a JSON representation for all inputs as a formatted string.
+    def render_inputs(self, indent: int = 2) -> str:
+        """Render a JSON representation for all stuff specs as a formatted string.
 
         Args:
             indent: Number of spaces for indentation (default: 2)
 
         Returns:
-            Formatted JSON string
+            Formatted JSON string with all inputs
         """
-        json_inputs = self.generate_json_representation()
+        json_inputs: dict[str, Any] = {}
+        for var_name, stuff_spec in self.root.items():
+            json_inputs[var_name] = stuff_spec.render_stuff_spec(ConceptRepresentationFormat.JSON)
+
         return json.dumps(json_inputs, indent=indent, ensure_ascii=False)

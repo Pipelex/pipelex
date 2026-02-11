@@ -23,6 +23,14 @@ ALLOWED_FILTERS = ["tag", "format", "default", "escape_script_tag", "with_images
 # Filter to format some Stuff or any object with the appropriate text formatting methods
 @pass_context
 async def text_format(context: Context, value: Any, text_format: TextFormat | None = None) -> Any:
+    # Check if this is a registered image - use placeholder instead of rendering as text
+    # This handles $page.page_view syntax where the format filter would otherwise call rendered_plain() → URL
+    registry = context.get(Jinja2ContextKey.IMAGE_REGISTRY)
+    if isinstance(registry, ImageRegistry) and hasattr(value, "url"):
+        placeholder = registry.get_image_placeholder(value)
+        if placeholder is not None:
+            return placeholder
+
     if text_format:
         if isinstance(text_format, str):  # pyright: ignore[reportUnnecessaryIsInstance]
             applied_text_format = TextFormat(text_format)
@@ -36,7 +44,7 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | No
 
     # Protocol-based rendering
     if isinstance(value, TextFormatRenderable):
-        return await value.rendered_str_async(text_format=applied_text_format)
+        return await value.rendered_for_template_async(text_format=applied_text_format)
     if isinstance(value, StrEnum):
         return value.value
     return value
@@ -44,7 +52,7 @@ async def text_format(context: Context, value: Any, text_format: TextFormat | No
 
 # Filter to wrap content in tags according to the tag style
 @pass_context
-def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
+async def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
     """Filter to wrap content in tags.
 
     Usage in templates:
@@ -54,7 +62,7 @@ def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
 
     Args:
         context: Jinja2 context (passed automatically via @pass_context).
-        value: The value to tag. If it implements TagRenderable, uses render_for_tag().
+        value: The value to tag. If it implements TagRenderable, uses render_for_tag_async().
         tag_name: Optional tag name override.
 
     Returns:
@@ -84,13 +92,13 @@ def tag(context: Context, value: Any, tag_name: str | None = None) -> str:
             # For registered images, use tag_name if provided, otherwise no default
             # (the placeholder already identifies the image)
         elif isinstance(value, TagRenderable):
-            rendered_value = value.render_for_tag()
+            rendered_value = await value.render_for_tag_async()
             if final_tag_name is None:
                 final_tag_name = value.default_tag_name
         else:
             rendered_value = str(value)
     elif isinstance(value, TagRenderable):
-        rendered_value = value.render_for_tag()
+        rendered_value = await value.render_for_tag_async()
         if final_tag_name is None:
             final_tag_name = value.default_tag_name
     else:

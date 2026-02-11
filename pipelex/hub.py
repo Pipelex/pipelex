@@ -37,6 +37,7 @@ from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
+from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -58,7 +59,7 @@ class PipelexHub:
         self._class_registry: ClassRegistryAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
         self._telemetry_manager: TelemetryManagerAbstract | None = None
-
+        self._func_registry: FuncRegistry | None = None
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
         self._plugin_manager: PluginManager | None = None
@@ -323,6 +324,15 @@ class PipelexHub:
         msg = "Library is not initialized"
         raise RuntimeError(msg)
 
+    def get_func_registry(self) -> FuncRegistry:
+        if self._func_registry is None:
+            msg = "FuncRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._func_registry
+
+    def set_func_registry(self, func_registry: FuncRegistry):
+        self._func_registry = func_registry
+
 
 # Shorthand functions for accessing the singleton
 
@@ -354,6 +364,10 @@ def get_storage_provider() -> StorageProviderAbstract:
 
 def get_class_registry() -> ClassRegistryAbstract:
     return get_pipelex_hub().get_required_class_registry()
+
+
+def get_func_registry() -> FuncRegistry:
+    return get_pipelex_hub().get_func_registry()
 
 
 def get_telemetry_manager() -> TelemetryManagerAbstract:

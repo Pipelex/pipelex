@@ -1,3 +1,5 @@
+import inspect
+
 from jinja2 import BaseLoader, Environment
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -52,6 +54,30 @@ def make_jinja2_env_from_loader(
     )
 
 
+def _register_filters(
+    jinja2_env: Environment,
+    template_category: TemplateCategory,
+    *,
+    enable_async: bool,
+) -> None:
+    """Register template category filters on the Jinja2 environment.
+
+    Async filters (detected via inspect.iscoroutinefunction) are only registered
+    when enable_async is True. This prevents silent corruption where async filters
+    would return coroutine objects instead of strings in sync environments.
+
+    Args:
+        jinja2_env: The Jinja2 environment to register filters on.
+        template_category: The category defining which filters to register.
+        enable_async: Whether the environment supports async rendering.
+    """
+    filters = template_category.filters
+    for filter_name, filter_function in filters.items():
+        if not enable_async and inspect.iscoroutinefunction(filter_function):
+            continue
+        jinja2_env.filters[filter_name] = filter_function  # pyright: ignore[reportArgumentType]
+
+
 def make_jinja2_env_without_loader(
     template_category: TemplateCategory,
     *,
@@ -64,9 +90,7 @@ def make_jinja2_env_without_loader(
         enable_async=enable_async,
     )
 
-    filters = template_category.filters
-    for filter_name, filter_function in filters.items():
-        jinja2_env.filters[filter_name] = filter_function  # pyright: ignore[reportArgumentType]
+    _register_filters(jinja2_env, template_category, enable_async=enable_async)
     return jinja2_env
 
 
@@ -95,7 +119,5 @@ def make_jinja2_env_from_registry(
         enable_async=enable_async,
     )
 
-    filters = template_category.filters
-    for filter_name, filter_function in filters.items():
-        jinja2_env.filters[filter_name] = filter_function  # pyright: ignore[reportArgumentType]
+    _register_filters(jinja2_env, template_category, enable_async=enable_async)
     return jinja2_env

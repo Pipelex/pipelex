@@ -1,10 +1,13 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from instructor import Mode as InstructorMode
 from pydantic import Field
+
+if TYPE_CHECKING:
+    from instructor import Mode as InstructorMode
 
 from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenModelRules
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
@@ -24,6 +27,7 @@ class InferenceModelSpec(ConfigModel):
     outputs: list[str] = Field(default_factory=list)
     costs: CostsByCategoryDict = Field(strict=False)
     structure_method: StructureMethod | None = Field(default=None, strict=False)
+    thinking_mode: ThinkingMode = Field(strict=False)
     max_tokens: int | None
     max_prompt_images: int | None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
@@ -71,7 +75,12 @@ class InferenceModelSpec(ConfigModel):
         """Check if any document type is supported for LLM input."""
         return bool(self.supported_document_types)
 
-    def get_instructor_mode(self) -> InstructorMode | None:
+    @property
+    def is_img2img_supported(self) -> bool:
+        """Check if this model supports image-to-image generation (input images)."""
+        return "images" in self.inputs
+
+    def get_instructor_mode(self) -> "InstructorMode | None":
         if self.structure_method:
             return self.structure_method.as_instructor_mode()
         else:

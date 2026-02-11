@@ -32,7 +32,7 @@ jobs:
         run: uv --version
 
       - name: Install dependencies
-        run: PYTHON_VERSION=${{ matrix.python-version }} make install
+        run: PYTHON_VERSION=${{ matrix.python-version }} TEST_PROFILE=ci make install
 
       - name: Run ruff format merge check
         run: make merge-check-ruff-format

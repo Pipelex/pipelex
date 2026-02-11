@@ -220,6 +220,22 @@ Analyze the document and explain how it relates to the context: $reference_doc
 | `prompt`           | string              | A template for the user prompt. Use `$` for inline variables (e.g., `$topic`) and `@` to insert the content of an entire input (e.g., `@text_to_summarize`). Image and document variables should also be tagged with `$` or `@`.                 | No       |
 | `structuring_method`        | string              | The method for generating structured output. Can be `direct` or `preliminary_text`. Defaults to the global configuration.                                                      | No       |
 
+### LLM Setting Fields
+
+When `model` is specified as a table (inline LLM setting), it accepts the following fields:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `model` | string | Model name or alias (e.g., `"claude-4.5-sonnet"`, `"@default-premium"`) |
+| `temperature` | float | Sampling temperature (0.0 – 1.0) |
+| `max_tokens` | integer | Maximum output tokens |
+| `reasoning_effort` | string | Reasoning depth: `"none"`, `"minimal"`, `"low"`, `"medium"`, `"high"`, `"max"`. Not supported for structured generation. |
+| `reasoning_budget` | integer | Explicit token budget for reasoning. Mutually exclusive with `reasoning_effort`. Supported by Anthropic and Google only. |
+| `description` | string | Human-readable description (for presets) |
+
+!!! tip "More on Reasoning"
+    For provider-specific behavior and model-specific examples, see [Reasoning Controls](../../../../under-the-hood/reasoning-controls.md).
+
 ### Output Multiplicity
 
 Specify output multiplicity using bracket notation in the `output` field:
@@ -255,7 +271,7 @@ This pipe takes no input and writes a poem.
 type = "PipeLLM"
 description = "Write a short poem"
 output = "Text"
-model = "llm_for_creative_writing"
+model = "$writing-creative"
 prompt = """
 Write a four-line poem about pipes.
 """
@@ -321,3 +337,37 @@ Analyze this expense report and extract the following information:
 ```
 
 In this example, `Pipelex` will instruct the LLM to return a list of objects that conform to the `Expense` structure.
+
+### Reasoning Example
+
+This pipe uses extended reasoning to analyze a complex topic in depth:
+
+```toml
+[pipe.deep_analysis]
+type = "PipeLLM"
+description = "Analyze a complex topic with extended reasoning"
+inputs = { topic = "Text" }
+output = "Analysis"
+model = { model = "claude-4.5-sonnet", temperature = 0.1, reasoning_effort = "high" }
+prompt = """
+Analyze the following topic in depth, considering multiple perspectives:
+
+@topic
+"""
+```
+
+You can also reference a reasoning preset:
+
+```toml
+[pipe.deep_analysis]
+type = "PipeLLM"
+description = "Analyze a complex topic with extended reasoning"
+inputs = { topic = "Text" }
+output = "Analysis"
+model = "$deep-analysis"
+prompt = """
+Analyze the following topic in depth, considering multiple perspectives:
+
+@topic
+"""
+```

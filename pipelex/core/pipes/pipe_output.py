@@ -18,6 +18,7 @@ from pipelex.pipeline.pipeline_models import SpecialPipelineId
 
 class DictPipeOutput(BaseModel):
     working_memory: DictWorkingMemory
+    graph_spec: GraphSpec | None = None
     pipeline_run_id: str
 
 

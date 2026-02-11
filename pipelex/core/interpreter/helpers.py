@@ -1,4 +1,18 @@
+from pathlib import Path
+
 from pipelex.types import StrEnum
+
+
+def is_pipelex_file(file_path: Path) -> bool:
+    """Check if a file is a Pipelex PLX file based on its extension.
+
+    Args:
+        file_path: Path to the file to check
+
+    Returns:
+        True if the file has .plx extension, False otherwise
+    """
+    return file_path.suffix == ".plx"
 
 
 class ValidationErrorScope(StrEnum):

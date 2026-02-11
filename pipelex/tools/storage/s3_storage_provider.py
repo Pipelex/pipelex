@@ -187,7 +187,7 @@ class S3StorageProvider(StorageProviderAbstract):
         return f"https://{self._bucket_name}.s3.{self._region}.amazonaws.com/{key}"
 
     @override
-    async def display_link(self, uri: str) -> str | None:
+    async def public_url(self, uri: str) -> str | None:
         """Return a URL for this storage URI.
 
         Args:

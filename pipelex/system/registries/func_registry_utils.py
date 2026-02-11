@@ -45,16 +45,30 @@ class FuncRegistryUtils:
             log.verbose(f"Imported {modname}")
 
             # Find @pipe_func decorated functions in this module
-            functions_to_register = cls._find_functions_in_module(module)
+            decorated_functions = cls._find_functions_in_module(module)
 
-            for func in functions_to_register:
+            for func in decorated_functions:
                 func_name = cls._get_function_registration_name(func)
-                func_registry.register_function(
-                    func=func,
-                    name=func_name,
-                )
-                functions_registered += 1
-                log.verbose(f"Registered @pipe_func: {func_name} from {modname}")
+
+                # Check if the function is eligible for registration
+                eligibility_error = func_registry.check_function_eligibility(func)
+
+                if eligibility_error is None:
+                    # Function is eligible - register it
+                    func_registry.register_function(
+                        func=func,
+                        name=func_name,
+                    )
+                    functions_registered += 1
+                    log.verbose(f"Registered @pipe_func: {func_name} from {modname}")
+                else:
+                    # Function has @pipe_func but is not eligible - track it for better error messages
+                    func_registry.register_ineligible_function(
+                        func=func,
+                        reason=eligibility_error,
+                        source_file=modname,
+                    )
+                    log.warning(f"Function '{func_name}' in '{modname}' has @pipe_func() decorator but is not eligible: {eligibility_error}")
 
         return functions_registered
 
@@ -105,6 +119,10 @@ class FuncRegistryUtils:
         Uses AST parsing to check if the file contains @pipe_func decorated functions before
         importing. Only functions marked with @pipe_func decorator are registered.
 
+        If a function has @pipe_func decorator but is not eligible (e.g., missing return type),
+        it is tracked as an ineligible function so that helpful error messages can be provided
+        when the function is later looked up.
+
         Args:
             file_path: Path to the Python file
 
@@ -119,15 +137,29 @@ class FuncRegistryUtils:
             if module is None:
                 return
 
-            # Find functions that match criteria
-            functions_to_register = cls._find_functions_in_module(module)
+            # Find functions that match criteria (have @pipe_func decorator)
+            decorated_functions = cls._find_functions_in_module(module)
 
-            for func in functions_to_register:
+            for func in decorated_functions:
                 func_name = cls._get_function_registration_name(func)
-                func_registry.register_function(
-                    func=func,
-                    name=func_name,
-                )
+
+                # Check if the function is eligible for registration
+                eligibility_error = func_registry.check_function_eligibility(func)
+
+                if eligibility_error is None:
+                    # Function is eligible - register it
+                    func_registry.register_function(
+                        func=func,
+                        name=func_name,
+                    )
+                else:
+                    # Function has @pipe_func but is not eligible - track it for better error messages
+                    func_registry.register_ineligible_function(
+                        func=func,
+                        reason=eligibility_error,
+                        source_file=file_path,
+                    )
+                    log.warning(f"Function '{func_name}' in '{file_path}' has @pipe_func() decorator but is not eligible: {eligibility_error}")
         except ModuleFileError:
             # Expected: file validation issues (directories with .py extension, etc.)
             # log.verbose(f"Skipping file {file_path}: {e}")

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import BaseModel, Field
 
 from pipelex.base_exceptions import PipelexUnexpectedError
@@ -8,6 +10,7 @@ from pipelex.libraries.exceptions import LibraryError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 from pipelex.pipe_controllers.pipe_controller import PipeController
+from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
 
 class Library(BaseModel):
@@ -24,7 +27,7 @@ class Library(BaseModel):
     domain_library: DomainLibrary
     concept_library: ConceptLibrary
     pipe_library: PipeLibrary
-    loaded_plx_paths: list[str] = Field(default_factory=list)
+    loaded_plx_paths: list[Path] = Field(default_factory=empty_list_factory_of(Path))
 
     def get_domain_library(self) -> DomainLibrary:
         return self.domain_library
@@ -42,9 +45,9 @@ class Library(BaseModel):
         self.loaded_plx_paths = []
 
     def validate_library(self) -> None:
-        self.validate_pipe_library_with_libraries()
-        self.validate_concept_library_with_libraries()
         self.validate_domain_library_with_libraries()
+        self.validate_concept_library_with_libraries()
+        self.validate_pipe_library_with_libraries()
 
     def validate_pipe_library_with_libraries(self) -> None:
         for pipe in self.pipe_library.get_pipes():

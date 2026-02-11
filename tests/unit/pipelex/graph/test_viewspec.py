@@ -11,6 +11,7 @@ from pipelex.graph.reactflow.viewspec import (
     ViewNode,
     ViewSpec,
 )
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
 class TestViewNode:
@@ -119,7 +120,7 @@ class TestLayoutSpec:
         """Test that LayoutSpec has correct defaults."""
         layout = LayoutSpec()
         assert layout.engine == "dagre"
-        assert layout.direction == "TB"
+        assert layout.direction == FlowchartDirection.TOP_DOWN
         assert layout.nodesep == 50
         assert layout.ranksep == 80
         assert layout.align is None
@@ -129,13 +130,13 @@ class TestLayoutSpec:
         """Test creating a LayoutSpec with custom values."""
         layout = LayoutSpec(
             engine="dagre",
-            direction="LR",
+            direction=FlowchartDirection.LEFT_TO_RIGHT,
             nodesep=100,
             ranksep=150,
             align="UL",
             allow_manual_positions=False,
         )
-        assert layout.direction == "LR"
+        assert layout.direction == FlowchartDirection.LEFT_TO_RIGHT
         assert layout.nodesep == 100
         assert layout.ranksep == 150
         assert layout.align == "UL"
@@ -212,7 +213,7 @@ class TestViewSpec:
         edge = ViewEdge(id="edge_1", source="node_1", target="node_2", kind="control")
         index = ViewIndex(edges_by_node={"node_1": ["edge_1"]})
         payload = PayloadSpec(mode="inline")
-        layout = LayoutSpec(direction="LR")
+        layout = LayoutSpec(direction=FlowchartDirection.LEFT_TO_RIGHT)
 
         viewspec = ViewSpec(
             created_at=datetime.now(timezone.utc),
@@ -229,7 +230,7 @@ class TestViewSpec:
         assert viewspec.graph_id == "graph_001"
         assert viewspec.source["producer"] == "pipelex 0.9.3"
         assert viewspec.options["show_data_edges"] is True
-        assert viewspec.layout.direction == "LR"
+        assert viewspec.layout.direction == FlowchartDirection.LEFT_TO_RIGHT
         assert len(viewspec.nodes) == 1
         assert len(viewspec.edges) == 1
         assert viewspec.index is not None
@@ -262,7 +263,7 @@ class TestViewSpec:
             "engine": "reactflow",
             "source": {},
             "options": {},
-            "layout": {"engine": "dagre", "direction": "TB"},
+            "layout": {"engine": "dagre", "direction": "top_down"},
             "nodes": [{"id": "node_1", "label": "Test", "kind": "operator"}],
             "edges": [],
         }
@@ -280,4 +281,4 @@ class TestViewSpec:
         )
         assert isinstance(viewspec.layout, LayoutSpec)
         assert viewspec.layout.engine == "dagre"
-        assert viewspec.layout.direction == "TB"
+        assert viewspec.layout.direction == FlowchartDirection.TOP_DOWN

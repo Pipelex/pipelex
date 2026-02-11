@@ -91,6 +91,8 @@ extra_css:
 nav:
   - Home:
     - What is Pipelex?: index.md
+    - Releases:
+      - v0.18.0 "Chicago": home/1-releases/chicago.md
     - Get Started:
       - The Pipe Builder: home/2-get-started/pipe-builder.md
       - Write Workflows Manually: home/2-get-started/write-workflows-manually.md
@@ -177,12 +179,13 @@ nav:
         - Validate: home/9-tools/cli/validate.md
         - Run: home/9-tools/cli/run.md
         - Show: home/9-tools/cli/show.md
-        - Kit: home/9-tools/cli/kit.md
         - Build:
           - Overview: home/9-tools/cli/build/index.md
           - Pipe: home/9-tools/cli/build/pipe.md
           - Runner: home/9-tools/cli/build/runner.md
           - Structures: home/9-tools/cli/build/structures.md
+          - Inputs: home/9-tools/cli/build/inputs.md
+          - Output: home/9-tools/cli/build/output.md
       - Pipe Builder: home/9-tools/pipe-builder.md
       - Logging: home/9-tools/logging.md
     - Advanced Customizations:
@@ -198,9 +201,12 @@ nav:
   - Under the Hood:
     - Overview: under-the-hood/index.md
     - Architecture Overview: under-the-hood/architecture-overview.md
+    - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
     - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
     - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
+    - Reasoning Controls: under-the-hood/reasoning-controls.md
     - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
+    - Test Profile Configuration: under-the-hood/test-profile-configuration.md
   - API: https://pipelex.github.io/pipelex-api/
   - MCP: https://pipelex.github.io/pipelex-mcp/
   - n8n: https://pipelex.github.io/n8n-nodes-pipelex/

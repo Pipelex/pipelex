@@ -78,6 +78,14 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
+<td>claude-4.6-opus</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+</tr>
+<tr>
 <td>deepseek-v3.1</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
@@ -98,14 +106,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>gemini-2.0-flash</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -334,7 +334,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
-<td>mistral-large-3</td>
+<td>mistral-large</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -415,19 +415,21 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <tr>
 <th rowspan="2">Model</th>
 <th colspan="2" style="text-align:center;background-color:rgba(33,150,243,0.15)">Inputs</th>
-<th colspan="1" style="text-align:center;background-color:rgba(76,175,80,0.15)">Outputs</th>
+<th colspan="2" style="text-align:center;background-color:rgba(76,175,80,0.15)">Outputs</th>
 </tr>
 <tr>
 <th style="text-align:center;background-color:rgba(33,150,243,0.15)">image</th>
 <th style="text-align:center;background-color:rgba(33,150,243,0.15)">pdf</th>
 <th style="text-align:center;background-color:rgba(76,175,80,0.15)">pages</th>
+<th style="text-align:center;background-color:rgba(76,175,80,0.15)">captions</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>azure-document-intelligence</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
@@ -435,12 +437,14 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">❌</td>
 </tr>
 <tr>
 <td>mistral-document-ai-2505</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(76,175,80,0.15)">❌</td>
 </tr>
 </tbody>
 </table>
@@ -454,11 +458,12 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <thead>
 <tr>
 <th rowspan="2">Model</th>
-<th colspan="1" style="text-align:center;background-color:rgba(33,150,243,0.15)">Inputs</th>
+<th colspan="2" style="text-align:center;background-color:rgba(33,150,243,0.15)">Inputs</th>
 <th colspan="1" style="text-align:center;background-color:rgba(76,175,80,0.15)">Outputs</th>
 </tr>
 <tr>
 <th style="text-align:center;background-color:rgba(33,150,243,0.15)">text</th>
+<th style="text-align:center;background-color:rgba(33,150,243,0.15)">images</th>
 <th style="text-align:center;background-color:rgba(76,175,80,0.15)">image</th>
 </tr>
 </thead>
@@ -466,30 +471,36 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <tr>
 <td>flux-2-pro</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>gpt-image-1</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>gpt-image-1-mini</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>gpt-image-1.5</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>nano-banana</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
 <td>nano-banana-pro</td>
+<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
@@ -498,6 +509,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-01-19T23:18:39Z
+> Last updated: 2026-02-08T16:30:33Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

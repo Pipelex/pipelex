@@ -14,7 +14,7 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image = "Image" }
 output = "Text"
-model = "llm_for_testing_vision"
+model = "$vision-cheap"
 prompt = """
 Describe what you see in this image in 1-2 sentences, be concise.
 $image
@@ -25,7 +25,7 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image_a = "Image", image_b = "Image" }
 output = "BasicDescriptionE2E"
-model = "llm_for_diagram_to_text"
+model = "$vision-diagram"
 prompt = """
 Describe what you see in $image_a only.
 Completely ignore $image_b.
@@ -36,7 +36,7 @@ type = "PipeLLM"
 description = "Describe what is in the image"
 inputs = { image_a = "Image", image_b = "Image" }
 output = "BasicDescriptionE2E"
-model = "llm_for_diagram_to_text"
+model = "$vision-diagram"
 prompt = """
 Describe what you see in $image_b only.
 Completely ignore $image_a.
@@ -48,7 +48,7 @@ type = "PipeLLM"
 description = "Provide detailed analysis of the image"
 inputs = { image = "PhotoE2E" }
 output = "VisionAnalysisE2E"
-model = "llm_for_diagram_to_text"
+model = "$vision-diagram"
 system_prompt = "You are an expert image analyst. Provide detailed, accurate descriptions."
 prompt = """
 Analyze this image and describe what's the main topic (be concise).

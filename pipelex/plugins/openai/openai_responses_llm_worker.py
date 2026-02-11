@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-import instructor
 import openai
-from instructor.exceptions import InstructorRetryException
 from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
+from openai.types.shared_params import Reasoning
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex import log
+from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.config import get_config
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
 
@@ -18,6 +19,7 @@ if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
 
     from pipelex.cogt.llm.llm_job import LLMJob
+    from pipelex.cogt.llm.llm_job_components import LLMJobParams
     from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
     from pipelex.plugins.openai.openai_responses_factory import OpenAIResponsesFactory
     from pipelex.reporting.reporting_protocol import ReportingProtocol
@@ -40,11 +42,12 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
 
         self.openai_client_for_responses: openai.AsyncOpenAI = sdk_instance
         self.openai_responses_factory = openai_responses_factory
+        from instructor import from_openai  # noqa: PLC0415
 
         if instructor_mode := self.inference_model.get_instructor_mode():
-            self.instructor_for_objects = instructor.from_openai(client=sdk_instance, mode=instructor_mode)
+            self.instructor_for_objects = from_openai(client=sdk_instance, mode=instructor_mode)
         else:
-            self.instructor_for_objects = instructor.from_openai(client=sdk_instance)
+            self.instructor_for_objects = from_openai(client=sdk_instance)
 
         instructor_config = get_config().cogt.llm_config.instructor_config
         if instructor_config.is_dump_kwargs_enabled:
@@ -64,6 +67,52 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         pass
 
     #########################################################
+    # Reasoning helpers
+    #########################################################
+
+    def _resolve_reasoning(self, job_params: LLMJobParams) -> Reasoning | None:
+        """Resolve reasoning parameters to an OpenAI Responses API reasoning dict.
+
+        Args:
+            job_params: The LLM job parameters containing reasoning_effort/reasoning_budget.
+
+        Returns:
+            A Reasoning dict for the OpenAI Responses API, or None if reasoning is not requested.
+
+        """
+        thinking_mode = self.inference_model.thinking_mode
+
+        if job_params.reasoning_effort is not None:
+            effort = job_params.reasoning_effort
+            match thinking_mode:
+                case ThinkingMode.MANUAL:
+                    openai_effort = get_config().cogt.llm_config.openai_config.get_reasoning_level(effort=effort)
+                    if openai_effort is None:
+                        return None
+                    log.verbose(f"OpenAI Responses reasoning effort={openai_effort}")
+                    return Reasoning(effort=openai_effort)
+                case ThinkingMode.ADAPTIVE:
+                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
+                    raise LLMCapabilityError(msg)
+                case ThinkingMode.NONE:
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    raise LLMCapabilityError(msg)
+
+        if job_params.reasoning_budget is not None:
+            match thinking_mode:
+                case ThinkingMode.MANUAL:
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning_budget; OpenAI uses reasoning_effort instead"
+                    raise LLMCapabilityError(msg)
+                case ThinkingMode.ADAPTIVE:
+                    msg = f"Model '{self.inference_model.desc}' has thinking_mode=adaptive which is not supported by the OpenAI Responses API"
+                    raise LLMCapabilityError(msg)
+                case ThinkingMode.NONE:
+                    msg = f"Model '{self.inference_model.desc}' does not support reasoning (thinking_mode=none)"
+                    raise LLMCapabilityError(msg)
+
+        return None
+
+    #########################################################
     @override
     async def _gen_text(
         self,
@@ -71,6 +120,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
     ) -> str:
         job_params = llm_job.applied_job_params or llm_job.job_params
         input_items = await self.openai_responses_factory.make_input_items(llm_job=llm_job)
+
+        openai_reasoning = self._resolve_reasoning(job_params=job_params)
+
         try:
             extra_headers, extra_body = self.openai_responses_factory.make_extras(
                 inference_model=self.inference_model, inference_job=llm_job, output_desc=InferenceOutputType.TEXT
@@ -78,9 +130,10 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             response = await self.openai_client_for_responses.responses.create(
                 model=self.inference_model.model_id,
                 instructions=llm_job.llm_prompt.system_text,
-                temperature=job_params.temperature,
+                temperature=omit if openai_reasoning is not None else job_params.temperature,
                 max_output_tokens=job_params.max_tokens or omit,
                 input=input_items,
+                reasoning=openai_reasoning if openai_reasoning is not None else omit,
                 extra_headers=extra_headers,
                 extra_body=extra_body,
             )
@@ -114,6 +167,9 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
         schema: type[BaseModelTypeVar],
     ) -> BaseModelTypeVar:
         job_params = llm_job.applied_job_params or llm_job.job_params
+        self._validate_no_reasoning_for_structured_gen(job_params=job_params)
+        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+
         try:
             if not hasattr(self.instructor_for_objects, "responses"):
                 msg = "Instructor client is not configured for the Responses API. Set a responses-capable structure_method for this model."

@@ -116,8 +116,16 @@ def sync_main_config_cmd(
     if sync_kit:
         kit_path = Path(KIT_CONFIG_PATH)
         if kit_path.exists():
-            kit_result = sync_toml_values(MAIN_CONFIG_PATH, KIT_CONFIG_PATH, dry_run=dry_run)
-            results.append(("kit", kit_result, KIT_CONFIG_PATH))
+            try:
+                kit_result = sync_toml_values(MAIN_CONFIG_PATH, KIT_CONFIG_PATH, dry_run=dry_run)
+                results.append(("kit", kit_result, KIT_CONFIG_PATH))
+            except OSError as exc:
+                # Handle race condition where file is deleted/modified after exists() check
+                if quiet:
+                    console.print(f"[red]Error:[/red] File system error syncing kit config: {exc}")
+                else:
+                    console.print(f"  [red]Error:[/red] File system error syncing kit config: {exc}")
+                sys.exit(1)
         else:
             if not quiet:
                 console.print(f"  [yellow]Skipped[/yellow] kit config: [cyan]{KIT_CONFIG_PATH}[/cyan] not found")
@@ -127,8 +135,16 @@ def sync_main_config_cmd(
     if sync_project:
         project_path = Path(PROJECT_CONFIG_PATH)
         if project_path.exists():
-            project_result = sync_toml_values(MAIN_CONFIG_PATH, PROJECT_CONFIG_PATH, dry_run=dry_run)
-            results.append(("project", project_result, PROJECT_CONFIG_PATH))
+            try:
+                project_result = sync_toml_values(MAIN_CONFIG_PATH, PROJECT_CONFIG_PATH, dry_run=dry_run)
+                results.append(("project", project_result, PROJECT_CONFIG_PATH))
+            except OSError as exc:
+                # Handle race condition where file is deleted/modified after exists() check
+                if quiet:
+                    console.print(f"[red]Error:[/red] File system error syncing project config: {exc}")
+                else:
+                    console.print(f"  [red]Error:[/red] File system error syncing project config: {exc}")
+                sys.exit(1)
         else:
             if not quiet:
                 console.print(f"  [yellow]Skipped[/yellow] project config: [cyan]{PROJECT_CONFIG_PATH}[/cyan] not found")
@@ -146,7 +162,7 @@ def sync_main_config_cmd(
         if dry_run:
             if total_updated > 0:
                 dry_run_msg = (
-                    f"[yellow]Dry run complete[/yellow]\n\n"
+                    "[yellow]Dry run complete[/yellow]\n\n"
                     f"{total_updated} key(s) would be updated.\n"
                     "[dim]Run without --dry-run to apply changes.[/dim]"
                 )

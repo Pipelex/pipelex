@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field
 from pydantic.json_schema import SkipJsonSchema
 from rich.console import Group
 from rich.panel import Panel
@@ -30,11 +30,6 @@ class PipeConditionSpec(PipeSpec):
     jinja2_expression_template: str = Field(description="Jinja2 expression to evaluate.")
     outcomes: dict[str, str] = Field(..., description="Mapping `dict[str, str]` of condition to outcomes.")
     default_outcome: str | SpecialOutcome = Field(description="The fallback outcome if the expression result does not match any key in outcome map.")
-
-    @field_validator("output", mode="after")
-    @classmethod
-    def forced_output(cls, _: str) -> str:
-        return "native.Anything"
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

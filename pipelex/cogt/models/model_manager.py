@@ -1,10 +1,11 @@
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import ModelManagerError
-from pipelex.cogt.model_backends.backend import InferenceBackend
+from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
 from pipelex.cogt.model_routing.routing_profile_loader import load_active_routing_profile
@@ -114,15 +115,17 @@ class ModelManager(ModelManagerAbstract):
                     case BackendMatchingMethod.DEFAULT:
                         # We could not find the model spec, but it was a default match,
                         # so we can look for it in the other available backends
-                        # Use fallback_order if specified (fallback is opt-in)
+                        # Use fallback_order if specified, otherwise only try internal backend
                         if backend_match_for_model.fallback_order:
                             # Try fallback_order first, then any enabled backends not in fallback_order
                             backends_to_try = backend_match_for_model.fallback_order + [
                                 b for b in enabled_backends if b not in backend_match_for_model.fallback_order
                             ]
                         else:
-                            # No fallback_order specified, skip this model (fallback is opt-in)
-                            continue
+                            # No fallback_order specified - only try the internal backend as a special case
+                            # Internal backend contains software-only models that should always be available
+                            # regardless of which AI provider routing profile is selected
+                            backends_to_try = [PipelexBackend.INTERNAL] if PipelexBackend.INTERNAL in enabled_backends else []
 
                         for available_backend in backends_to_try:
                             if available_backend == matched_backend_name:
@@ -143,24 +146,33 @@ class ModelManager(ModelManagerAbstract):
 
         return ModelDeck(
             inference_models=inference_models,
-            aliases=model_deck_blueprint.aliases,
-            waterfalls=model_deck_blueprint.waterfalls,
+            # LLM
+            llm_default_temperature=model_deck_blueprint.llm.choice_defaults.default_temperature,
+            llm_aliases=model_deck_blueprint.llm.aliases,
+            llm_waterfalls=model_deck_blueprint.llm.waterfalls,
             llm_presets=model_deck_blueprint.llm.presets,
             llm_choice_defaults=model_deck_blueprint.llm.choice_defaults,
             llm_choice_overrides=model_deck_blueprint.llm.choice_overrides,
+            # Extract
+            extract_aliases=model_deck_blueprint.extract.aliases,
+            extract_waterfalls=model_deck_blueprint.extract.waterfalls,
             extract_presets=model_deck_blueprint.extract.presets,
             extract_choice_default=model_deck_blueprint.extract.choice_default,
+            # ImgGen
+            img_gen_default_quality=model_deck_blueprint.img_gen.default_quality,
+            img_gen_aliases=model_deck_blueprint.img_gen.aliases,
+            img_gen_waterfalls=model_deck_blueprint.img_gen.waterfalls,
             img_gen_presets=model_deck_blueprint.img_gen.presets,
             img_gen_choice_default=model_deck_blueprint.img_gen.choice_default,
             model_deck_config=get_config().cogt.model_deck_config,
         )
 
     @override
-    def get_inference_model(self, model_handle: str) -> InferenceModelSpec:
+    def get_inference_model(self, model_handle: str, model_type: ModelType) -> InferenceModelSpec:
         if self.model_deck is None:
             msg = "Model deck is not initialized"
             raise RuntimeError(msg)
-        return self.model_deck.get_required_inference_model(model_handle=model_handle)
+        return self.model_deck.get_required_inference_model(model_handle=model_handle, model_type=model_type)
 
     @override
     def get_required_inference_backend(self, backend_name: str) -> InferenceBackend:

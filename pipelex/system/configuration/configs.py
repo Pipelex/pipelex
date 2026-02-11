@@ -31,12 +31,24 @@ class ConfigPaths:
     BASE_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{BASE_DECK_FILE_NAME}"
     OVERRIDES_DECK_FILE_NAME = "overrides.toml"
     OVERRIDES_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{OVERRIDES_DECK_FILE_NAME}"
+    # Dev-only config (not synced with kit)
+    DEV_CONFIG_DIR_PATH = "./.pipelex-dev"
 
 
 class ValidationErrorReaction(StrEnum):
     RAISE = "raise"
     LOG = "log"
     IGNORE = "ignore"
+
+
+class AgentTarget(StrEnum):
+    CURSOR = "cursor"
+    AGENTS = "agents"
+    CLAUDE = "claude"
+
+
+class KitConfig(ConfigModel):
+    preferred_agent_target: AgentTarget = Field(strict=False)
 
 
 class PipeRunConfig(ConfigModel):
@@ -102,11 +114,18 @@ class ScanConfig(ConfigModel):
         return frozenset(value)
 
 
+class TalentPresetMappings(ConfigModel):
+    llm: dict[str, str]
+    img_gen: dict[str, str]
+    extract: dict[str, str]
+
+
 class BuilderConfig(ConfigModel):
     fix_loop_max_attempts: int
     default_output_dir: str
     default_bundle_file_name: str
     default_directory_base_name: str
+    talent_preset_mappings: TalentPresetMappings
 
 
 class PipelineExecutionConfig(ConfigModel):
@@ -174,6 +193,7 @@ class Pipelex(ConfigModel):
     observer_config: ObserverConfig
     scan_config: ScanConfig
     builder_config: BuilderConfig
+    kit_config: KitConfig
 
 
 class MigrationConfig(ConfigModel):

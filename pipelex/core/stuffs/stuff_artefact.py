@@ -18,13 +18,15 @@ from typing import TYPE_CHECKING, Any, Iterator
 
 from typing_extensions import override
 
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.tools.jinja2.image_renderable import ImageRenderable
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from pipelex.cogt.templating.text_format import TextFormat
     from pipelex.core.stuffs.stuff import Stuff
     from pipelex.tools.jinja2.image_registry import ImageRegistry
+
+from pipelex.cogt.templating.text_format import TextFormat
 
 
 class BaseStuffArtefactField(StrEnum):
@@ -51,12 +53,12 @@ _PASSTHROUGH_ATTRS = frozenset(
         "__dict__",
         "__doc__",
         # Methods that must remain accessible (TagRenderable protocol)
-        "render_for_tag",
+        "render_for_tag_async",
         "default_tag_name",
         # Methods that must remain accessible (ImageRenderable protocol)
         "render_with_images",
-        # Other methods
-        "rendered_str_async",
+        # Methods that must remain accessible (TextFormatRenderable protocol)
+        "rendered_for_template_async",
         "stuff",
         # Dict-like methods for template iteration
         "iter_keys",
@@ -66,6 +68,8 @@ _PASSTHROUGH_ATTRS = frozenset(
         # Magic methods
         "__getitem__",
         "__contains__",
+        "__iter__",
+        "__len__",
         "__repr__",
         "__str__",
         "__init__",
@@ -93,8 +97,8 @@ class StuffArtefact:
     Use `artefact.iter_items()` for explicit dict-like iteration.
 
     Implements:
-        - TagRenderable protocol (render_for_tag, default_tag_name)
-        - TextFormatRenderable protocol (rendered_str_async)
+        - TagRenderable protocol (render_for_tag_async, default_tag_name)
+        - TextFormatRenderable protocol (rendered_for_template_async)
         - ImageRenderable protocol (render_with_images)
 
     Attributes:
@@ -163,22 +167,31 @@ class StuffArtefact:
                 # Fall back to normal attribute lookup for methods etc.
                 return object.__getattribute__(self, key)
 
-    def __getitem__(self, key: str) -> Any:
-        """Support bracket notation: stuff['field'].
+    def __getitem__(self, key: str | int | slice) -> Any:
+        """Support bracket notation: stuff['field'] or stuff[0] for list indexing.
 
         Args:
-            key: The key to access.
+            key: String key for field access, or int/slice for list content indexing.
 
         Returns:
-            The value for the key.
+            The value for the key, or the indexed item(s) from list content.
 
         Raises:
-            KeyError: If the key is not found.
+            KeyError: If string key is not found.
+            TypeError: If int/slice indexing on non-indexable content.
         """
-        try:
-            return getattr(self, key)
-        except AttributeError as exc:
-            raise KeyError(key) from exc
+        if isinstance(key, str):
+            try:
+                return getattr(self, key)
+            except AttributeError as exc:
+                raise KeyError(key) from exc
+        # Integer or slice - delegate to ListContent
+        content = self._stuff.content
+        if isinstance(content, ListContent):
+            return content[key]  # pyright: ignore[reportUnknownVariableType]
+        content_type = type(content).__name__
+        msg = f"'{content_type}' content does not support indexing."
+        raise TypeError(msg)
 
     def get(self, key: str, default: Any = None) -> Any:
         """Dict-like get method.
@@ -212,6 +225,43 @@ class StuffArtefact:
 
         # Check metadata fields
         return key in {"_stuff_name", "_content_class", "_concept_code", "_stuff_code", "_content"}
+
+    def __iter__(self) -> Iterator[Any]:
+        """Enable direct iteration when content is ListContent.
+
+        Enables: {% for item in my_list_stuff %} in Jinja2 templates.
+
+        Note: Only ListContent supports this. Other content types inherit
+        BaseModel.__iter__ which iterates over field names, not items.
+
+        Returns:
+            Iterator over the content's items.
+
+        Raises:
+            TypeError: If content is not ListContent.
+        """
+        content = self._stuff.content
+        if isinstance(content, ListContent):
+            return iter(content)  # type: ignore[call-overload]
+        content_type = type(content).__name__
+        msg = f"'{content_type}' content is not iterable. Only ListContent supports direct iteration."
+        raise TypeError(msg)
+
+    def __len__(self) -> int:
+        """Return length when content is ListContent.
+
+        Returns:
+            Length of the content (number of items in ListContent).
+
+        Raises:
+            TypeError: If content is not ListContent.
+        """
+        content = self._stuff.content
+        if isinstance(content, ListContent):
+            return len(content)
+        content_type = type(content).__name__
+        msg = f"'{content_type}' content does not support len()."
+        raise TypeError(msg)
 
     # -------------------------------------------------------------------------
     # Dict-like iteration (for template compatibility)
@@ -258,13 +308,15 @@ class StuffArtefact:
     # TagRenderable protocol implementation
     # -------------------------------------------------------------------------
 
-    def render_for_tag(self) -> str:
+    async def render_for_tag_async(self) -> str:
         """Render content as plain string for tagging.
 
         Returns:
-            Plain text representation via rendered_plain().
+            Plain text representation via rendered_for_template_async(PLAIN).
         """
-        result: str = self._stuff.content.rendered_plain()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        result: str = await self._stuff.content.rendered_for_template_async(  # pyright: ignore[reportUnknownVariableType]
+            text_format=TextFormat.PLAIN
+        )
         return result  # pyright: ignore[reportUnknownVariableType]
 
     @property
@@ -280,8 +332,8 @@ class StuffArtefact:
     # TextFormatRenderable protocol implementation
     # -------------------------------------------------------------------------
 
-    async def rendered_str_async(self, text_format: TextFormat) -> str:
-        """Render content as string.
+    async def rendered_for_template_async(self, text_format: TextFormat) -> str:
+        """Render content for templates in the specified text format.
 
         Args:
             text_format: The format for rendering.
@@ -289,7 +341,7 @@ class StuffArtefact:
         Returns:
             The rendered string.
         """
-        result: str = await self._stuff.content.rendered_str_async(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
+        result: str = await self._stuff.content.rendered_for_template_async(text_format=text_format)  # pyright: ignore[reportUnknownVariableType]
         return result  # pyright: ignore[reportUnknownVariableType]
 
     # -------------------------------------------------------------------------
@@ -335,6 +387,12 @@ class StuffArtefact:
             The wrapped Stuff object.
         """
         return self._stuff  # type: ignore[no-any-return]
+
+    @override
+    def __str__(self) -> str:
+        """Return plain text content for string conversion."""
+        result: str = self._stuff.content.rendered_plain()  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        return result  # pyright: ignore[reportUnknownVariableType]
 
     @override
     def __repr__(self) -> str:

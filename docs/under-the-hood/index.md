@@ -11,7 +11,10 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Architecture Overview** - The two-layer design and how components fit together
 - **Execution Graph Tracing** - How pipeline executions are captured as graphs for visualization
 - **Image Handling in LLM Prompts** - How images flow from inputs to LLM calls
+- **Reasoning Controls** - How reasoning effort/budget flows to each provider's SDK
 - **StuffArtefact & Image Rendering** - How template access and image extraction work
+- **Test Profile Configuration** - How to configure which models are used in tests
+- **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Technical Design Decisions** - Why we chose X over Y
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
@@ -25,4 +28,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button .md-button--primary }
 - [:material-graph: Execution Graph Tracing](./execution-graph-tracing.md){ .md-button }
 - [:material-image-multiple: Image Handling in LLM Prompts](./image-handling-in-llm-prompts.md){ .md-button }
+- [:material-brain: Reasoning Controls](./reasoning-controls.md){ .md-button }
 - [:material-code-braces: StuffArtefact & Image Rendering](./stuffartefact-and-image-rendering.md){ .md-button }
+- [:material-test-tube: Test Profile Configuration](./test-profile-configuration.md){ .md-button }
+- [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }

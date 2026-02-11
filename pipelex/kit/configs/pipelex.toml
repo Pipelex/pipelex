@@ -68,6 +68,8 @@ pan_to_top = true    # Pan to show top of graph on load
 method = "in_memory"
 # Whether to fetch remote HTTP URLs and store them locally
 is_fetch_remote_content_enabled = true
+# Whether to upload local file paths to storage and replace with pipelex-storage:// URIs
+is_upload_local_content_enabled = true
 
 [pipelex.storage_config.local]
 # Local storage settings
@@ -187,3 +189,4 @@ is_dump_response_text_enabled = false
 is_dump_kwargs_enabled = false
 is_dump_response_enabled = false
 is_dump_error_enabled = false
+

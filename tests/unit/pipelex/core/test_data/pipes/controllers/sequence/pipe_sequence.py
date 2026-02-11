@@ -7,6 +7,9 @@ PIPE_SEQUENCE = (
     """domain = "test_pipes"
 description = "Domain with sequence pipe"
 
+[concept]
+ProcessedData = "Processed data concept"
+
 [pipe.process_sequence]
 type = "PipeSequence"
 description = "Process data in sequence"
@@ -19,6 +22,7 @@ steps = [
     PipelexBundleBlueprint(
         domain="test_pipes",
         description="Domain with sequence pipe",
+        concept={"ProcessedData": "Processed data concept"},
         pipe={
             "process_sequence": PipeSequenceBlueprint(
                 type="PipeSequence",

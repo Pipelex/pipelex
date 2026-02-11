@@ -14,6 +14,12 @@ def validate_concept_code(concept_code: str) -> None:
 
 
 def is_concept_ref_valid(concept_ref: str) -> bool:
+    if "." not in concept_ref:
+        return False
+
+    if concept_ref.count(".") > 1:
+        return False
+
     domain, concept_code = concept_ref.split(".", 1)
 
     # Validate domain

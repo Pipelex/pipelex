@@ -1,6 +1,8 @@
+from pathlib import Path
 from typing import NoReturn
 
 import typer
+from rich.console import Console
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -35,6 +37,8 @@ class ErrorContext(StrEnum):
     VALIDATION_BEFORE_BUILD_PIPE = "Pre-validation (build pipe)"
     VALIDATION_BEFORE_BUILD_RUNNER = "Pre-validation (build runner)"
     VALIDATION_BEFORE_BUILD_INPUTS = "Pre-validation (build inputs)"
+    VALIDATION_BEFORE_BUILD_OUTPUT = "Pre-validation (build output)"
+    KIT = "Kit operation"
 
 
 def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorContext) -> NoReturn:
@@ -119,19 +123,13 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
     raise typer.Exit(1) from exc
 
 
-def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: str | None = None) -> NoReturn:
-    """Handle and display ValidateBundleError with formatted output.
+def _display_validation_error_details(console: Console, exc: ValidateBundleError) -> None:
+    """Display the detailed validation error information from a ValidateBundleError.
 
     Args:
+        console: Rich console instance to print to
         exc: The bundle validation error exception
-        bundle_path: Optional path to the bundle file being validated
     """
-    console = get_console()
-    console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
-
-    if bundle_path:
-        console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{bundle_path}[/yellow]\n")
-
     # Display blueprint validation errors (e.g., MISSING_INPUT_VARIABLE, EXTRANEOUS_INPUT_VARIABLE from blueprint validation)
     if exc.pipelex_bundle_blueprint_validation_errors:
         console.print("[bold cyan]Blueprint Validation Errors:[/bold cyan]\n")
@@ -196,10 +194,48 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: str | No
         console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
         console.print(f"[yellow]{exc.dry_run_error_message}[/yellow]\n")
 
+
+def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | None = None) -> NoReturn:
+    """Handle and display ValidateBundleError with formatted output.
+
+    Args:
+        exc: The bundle validation error exception
+        bundle_path: Optional path to the bundle file being validated
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
+
+    if bundle_path:
+        console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{bundle_path}[/yellow]\n")
+
+    _display_validation_error_details(console=console, exc=exc)
+
     # Display helpful tips
     console.print(
         "[bold green]💡 Tip:[/bold green] Review the error messages above and check your pipeline configuration. "
         "Make sure all required fields are present and correctly formatted."
+    )
+    console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
+    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
+    raise typer.Exit(1) from exc
+
+
+def handle_build_validation_failure(exc: ValidateBundleError) -> NoReturn:
+    """Handle ValidateBundleError that occurs when the builder loop cannot auto-fix validation issues.
+
+    Args:
+        exc: The bundle validation error exception from the build loop
+    """
+    console = get_console()
+    console.print("\n[bold red]❌ Pipe build failed: validation errors could not be auto-fixed[/bold red]\n")
+    console.print("[yellow]The builder attempted to fix validation errors automatically but could not resolve all issues.[/yellow]\n")
+
+    _display_validation_error_details(console=console, exc=exc)
+
+    # Display build-specific tips
+    console.print(
+        "[bold green]💡 Tip:[/bold green] Try rephrasing your prompt or simplifying the pipeline requirements. "
+        "Breaking complex workflows into smaller steps can also help."
     )
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")

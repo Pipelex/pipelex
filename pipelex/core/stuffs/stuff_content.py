@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import Any, TypeVar
+from typing import Any, TypeVar, final
 
 from kajson import kajson
 from rich.json import JSON
@@ -13,6 +13,17 @@ StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 
 class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
+    @override
+    def __str__(self) -> str:
+        return self.rendered_plain()
+
+    def validate_resources(self) -> None:
+        """Validate that external resources (URLs, file paths) referenced by this content exist.
+
+        Override in subclasses that reference external resources (e.g., ImageContent, DocumentContent).
+        Called during pipeline execution (both live and dry-run) rather than at model instantiation.
+        """
+
     @property
     def content_type(self) -> str | None:
         """Return the MIME type of the content, or None if not applicable."""
@@ -22,7 +33,14 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     def short_desc(self) -> str:
         return f"some {self.__class__.__name__}"
 
-    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
+    @final
+    def smart_dump(self) -> dict[str, Any]:
+        """Serialize content for storage or transmission.
+
+        Returns a dictionary representation suitable for JSON serialization.
+        This method is final and should not be overridden in subclasses.
+        For custom rendering, override the rendered_* methods instead.
+        """
         return self.model_dump(serialize_as_any=True)
 
     # -------------------------------------------------------------------------------------
@@ -30,23 +48,35 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     # -------------------------------------------------------------------------------------
 
     def rendered_plain(self) -> str:
-        """Sync plain text rendering - defaults to markdown."""
+        """Render content as plain text for console output or simple text contexts.
+
+        Defaults to markdown rendering. Override in subclasses for custom plain text output.
+        """
         return self.rendered_markdown()
 
     def rendered_html(self) -> str:
-        """Sync HTML rendering - defaults to JSON in pre tags."""
+        """Render content as HTML for web display.
+
+        Defaults to JSON wrapped in pre tags. Override in subclasses for custom HTML output.
+        """
         return f"<pre>{self.rendered_json()}</pre>"
 
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:  # noqa: ARG002
-        """Sync Markdown rendering - defaults to JSON in code block."""
+        """Render content as Markdown for documentation or LLM prompts.
+
+        Defaults to JSON in a code block. Override in subclasses for custom Markdown output.
+        """
         return f"```json\n{self.rendered_json()}\n```"
 
     def rendered_json(self) -> str:
-        """Sync JSON rendering - defaults to kajson.dumps of smart_dump."""
+        """Render content as a JSON string for data exchange.
+
+        Defaults to kajson.dumps of smart_dump. Override in subclasses for custom JSON output.
+        """
         return kajson.dumps(self.smart_dump(), indent=4)
 
-    def rendered_str(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
-        """Sync rendering based on text format."""
+    @final
+    def rendered_for_prompt(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return self.rendered_plain()
@@ -61,7 +91,8 @@ class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
     # Override these in subclasses that need async operations
     # -------------------------------------------------------------------------------------
 
-    async def rendered_str_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
+    @final
+    async def rendered_for_template_async(self, text_format: TextFormat = TextFormat.PLAIN) -> str:
         match text_format:
             case TextFormat.PLAIN:
                 return await self.rendered_plain_async()

@@ -166,8 +166,8 @@ class MistralFactory:
 
     def make_nb_tokens_by_category(self, usage: UsageInfo) -> NbTokensByCategoryDict:
         nb_tokens_by_category: NbTokensByCategoryDict = {
-            TokenCategory.INPUT: usage.prompt_tokens,
-            TokenCategory.OUTPUT: usage.completion_tokens,
+            TokenCategory.INPUT: usage.prompt_tokens or 0,
+            TokenCategory.OUTPUT: usage.completion_tokens or 0,
         }
         return nb_tokens_by_category
 
@@ -317,9 +317,9 @@ class MistralFactory:
             An ImageURLChunkTypedDict suitable for Mistral OCR API
 
         Example:
-            >>> doc = await make_mistral_image_url_chunk_from_uri("https://example.com/image.png")
+            >>> doc = await make_mistral_image_url_chunk_from_uri("https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example.png")
             >>> doc
-            {"type": "image_url", "image_url": "https://example.com/image.png"}
+            {"type": "image_url", "image_url": "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example.png"}
         """
         prepared = await prepare_file_from_uri(uri=uri, keep_http_url=True, keep_local_path=False)
 
@@ -362,9 +362,9 @@ class MistralFactory:
             ValueError: If mistral_client is None and a local file needs to be uploaded
 
         Example:
-            >>> doc = await make_mistral_document_url_chunk_from_uri("https://example.com/doc.pdf")
+            >>> doc = await make_mistral_document_url_chunk_from_uri("https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/Job-Offer-Scan.pdf")
             >>> doc
-            {"type": "document_url", "document_url": "https://example.com/doc.pdf"}
+            {"type": "document_url", "document_url": "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/Job-Offer-Scan.pdf"}
         """
         prepared = await prepare_file_from_uri(uri=uri, keep_http_url=True, keep_local_path=True)
 

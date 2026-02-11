@@ -8,6 +8,7 @@ from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -33,7 +34,11 @@ class PipeParallelSpec(PipeSpec):
     pipe_category: Literal["PipeController"] = "PipeController"
     parallels: list[SubPipeSpec] = Field(description="List of SubPipeSpec instances to execute concurrently.")
     add_each_output: bool = Field(description="Whether to include individual pipe outputs in the combined result.")
-    combined_output: str | None = Field(default=None, description="Optional ConceptCode in PascalCasefor the combined output structure.")
+    combined_output: str | None = Field(
+        default=None,
+        description="Optional ConceptCode in PascalCase for the combined output structure.",
+        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
+    )
 
     @field_validator("combined_output", mode="before")
     @classmethod

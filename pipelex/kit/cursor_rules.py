@@ -45,14 +45,13 @@ def _front_matter_for(name: str, kit_index: KitIndex) -> dict[str, Any]:
     return base
 
 
-def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str, dry_run: bool = False) -> None:
+def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str) -> None:
     """Update Cursor .mdc rule files from agent markdown with YAML front-matter.
 
     Args:
         repo_root: Repository root directory
         kit_index: Kit index configuration
         agent_set: Agent set to limit exported files
-        dry_run: If True, only print what would be done
     """
     agents_dir = get_kit_agents_dir()
     out_dir = repo_root / ".cursor" / "rules"
@@ -73,24 +72,20 @@ def update_cursor_rules(repo_root: Path, kit_index: KitIndex, agent_set: str, dr
         mdc = yaml_block + body
         out_path = out_dir / (fname.removesuffix(".md") + ".mdc")
 
-        if dry_run:
-            typer.echo(f"[DRY] write {out_path}")
+        # Only write and print if content changed
+        existing_content = out_path.read_text(encoding="utf-8") if out_path.exists() else None
+        if existing_content != mdc:
+            out_path.write_text(mdc, encoding="utf-8")
+            typer.echo(f"✅ Exported {out_path}")
         else:
-            # Only write and print if content changed
-            existing_content = out_path.read_text(encoding="utf-8") if out_path.exists() else None
-            if existing_content != mdc:
-                out_path.write_text(mdc, encoding="utf-8")
-                typer.echo(f"✅ Exported {out_path}")
-            else:
-                typer.echo(f"⚪ Unchanged {out_path}")
+            typer.echo(f"⚪ Unchanged {out_path}")
 
 
-def remove_cursor_rules(repo_root: Path, dry_run: bool = False) -> None:
+def remove_cursor_rules(repo_root: Path) -> None:
     """Remove Cursor .mdc files that correspond to agent markdown files.
 
     Args:
         repo_root: Repository root directory
-        dry_run: If True, only print what would be done
     """
     agents_dir = get_kit_agents_dir()
     out_dir = repo_root / ".cursor" / "rules"
@@ -104,11 +99,8 @@ def remove_cursor_rules(repo_root: Path, dry_run: bool = False) -> None:
         out_path = out_dir / (fname.removesuffix(".md") + ".mdc")
 
         if out_path.exists():
-            if dry_run:
-                typer.echo(f"[DRY] delete {out_path}")
-            else:
-                out_path.unlink()
-                typer.echo(f"🗑️  Deleted {out_path}")
+            out_path.unlink()
+            typer.echo(f"🗑️  Deleted {out_path}")
             removed_count += 1
 
     if removed_count == 0:

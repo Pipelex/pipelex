@@ -40,14 +40,14 @@ type = "PipeExtract"
 description = "Extracts text content from the CV PDF document"
 inputs = { cv_pdf = "Document" }
 output = "Page[]"
-model = "pdf_text_extractor"
+model = "@default-text-from-pdf"
 
 [pipe.extract_job_offer]
 type = "PipeExtract"
 description = "Extracts text content from the job offer PDF document"
 inputs = { job_offer_pdf = "Document" }
 output = "Page[]"
-model = "pdf_text_extractor"
+model = "@default-text-from-pdf"
 
 [pipe.analyze_documents]
 type = "PipeParallel"
@@ -67,7 +67,7 @@ Analyzes the CV to extract key information including skills, experience, educati
 """
 inputs = { cv_pages = "Page" }
 output = "CVAnalysis"
-model = "llm_to_answer_questions_cheap"
+model = "$writing-factual"
 system_prompt = """
 You are an expert HR analyst specializing in CV evaluation. Your task is to analyze curriculum vitae documents and extract structured information about candidates' professional profiles.
 """
@@ -84,7 +84,7 @@ Analyzes the job offer to extract requirements including required skills, prefer
 """
 inputs = { job_offer_pages = "Page" }
 output = "JobRequirements"
-model = "llm_to_answer_questions_cheap"
+model = "$writing-factual"
 system_prompt = """
 You are an expert HR analyst specializing in job offer analysis. Your task is to extract and structure key requirements from job postings into a structured format.
 """
@@ -101,7 +101,7 @@ Evaluates how well the candidate matches the job requirements, identifying match
 """
 inputs = { cv_analysis = "CVAnalysis", job_requirements = "JobRequirements" }
 output = "MatchAnalysis"
-model = "llm_to_answer_questions_cheap"
+model = "$writing-factual"
 system_prompt = """
 You are an expert HR analyst and recruiter. Your task is to evaluate how well a candidate matches a job position by analyzing their CV against the job requirements. Provide a structured assessment that will help hiring managers make informed decisions.
 """
@@ -124,7 +124,7 @@ Creates 5 targeted interview questions based on the match analysis, focusing on 
 """
 inputs = { cv_analysis = "CVAnalysis", job_requirements = "JobRequirements", match_analysis = "MatchAnalysis" }
 output = "InterviewQuestion[5]"
-model = "llm_to_answer_questions_cheap"
+model = "$writing-factual"
 system_prompt = """
 You are an expert HR interviewer and talent acquisition specialist. Your task is to generate structured interview questions that will help assess a candidate's fit for a specific role. Each question should be purposeful and designed to verify skills, explore potential gaps, or assess cultural fit.
 """

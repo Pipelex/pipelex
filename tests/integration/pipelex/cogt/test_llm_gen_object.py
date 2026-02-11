@@ -10,6 +10,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker, get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 def get_async_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMetadata):
@@ -34,13 +35,17 @@ def get_async_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: J
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 class TestLLMGenObject:
     @pytest.mark.parametrize(("user_text", "expected_instance"), LLMTestCases.SINGLE_OBJECT)
     async def test_gen_object_async_using_handle(
-        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, user_text: str, expected_instance: BaseModel
+        self,
+        job_metadata: JobMetadata,
+        llm_job_params: LLMJobParams,
+        llm_combo: ModelCombo,
+        user_text: str,
+        expected_instance: BaseModel,
     ):
-        llm_worker = get_llm_worker(llm_handle=llm_handle)
+        llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
         if not llm_worker.is_gen_object_supported:
             pytest.skip(f"LLM worker '{llm_worker.desc}' does not support object generation")
         llm_job = LLMJobFactory.make_llm_job(
@@ -55,7 +60,7 @@ class TestLLMGenObject:
         )
         expected_class = expected_instance.__class__
         output = await llm_worker.gen_object(llm_job=llm_job, schema=expected_class)
-        pretty_print(output, title=f"Output from {llm_handle}")
+        pretty_print(output, title=f"Output from {llm_combo.handle}")
         assert isinstance(output, expected_class)
         assert output.model_dump(serialize_as_any=True) == expected_instance.model_dump(serialize_as_any=True)
 
@@ -77,10 +82,10 @@ class TestLLMGenObject:
         self,
         job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
-        llm_handle: str,
+        llm_combo: ModelCombo,
         case_tuples: list[tuple[str, BaseModel]],
     ):
-        llm_worker = get_llm_worker(llm_handle=llm_handle)
+        llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
         if not llm_worker.is_gen_object_supported:
             pytest.skip(f"'{llm_worker.desc}' does not support object generation")
         tasks: list[asyncio.Task[BaseModel]] = []

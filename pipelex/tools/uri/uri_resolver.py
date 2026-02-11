@@ -1,10 +1,12 @@
 import urllib.parse
+from pathlib import Path
 
 from pipelex.tools.misc.base64_utils import (
+    make_base64_url_from_bytes,
     make_base64_url_from_http_url,
     make_base64_url_from_path,
 )
-from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
+from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract
 from pipelex.tools.uri.resolved_uri import (
     ResolvedBase64DataUrl,
     ResolvedHttpUrl,
@@ -16,6 +18,41 @@ from pipelex.tools.uri.resolved_uri import (
 # Base64 data URL markers
 BASE64_DATA_URL_PREFIX = "data:"
 BASE64_DATA_URL_MARKER = ";base64,"
+
+
+def extract_filename_from_uri(uri: str) -> str | None:
+    """Extract a filename from a URI, only for local file paths.
+
+    Args:
+        uri: The URI string to extract the filename from.
+
+    Returns:
+        The filename if the URI is a local file path, None otherwise.
+    """
+    resolved = resolve_uri(uri)
+    match resolved:
+        case ResolvedLocalPath():
+            name = Path(resolved.path).name
+            return name or None
+        case ResolvedHttpUrl():
+            return None
+        case ResolvedBase64DataUrl():
+            return None
+        case ResolvedPipelexStorage():
+            return None
+
+
+def describe_uri(uri: str) -> str:
+    """Describe a URI string.
+
+    Args:
+        uri: The URI string to describe.
+
+    Returns:
+        A human-readable description of the URI.
+    """
+    resolved_uri = resolve_uri(uri)
+    return resolved_uri.kind.desc
 
 
 def resolve_uri(uri: str) -> ResolvedUri:
@@ -37,11 +74,11 @@ def resolve_uri(uri: str) -> ResolvedUri:
         A ResolvedUri variant with the parsed URI information.
 
     Example:
-        >>> resolved_uri = resolve_uri("https://example.com/image.png")
+        >>> resolved_uri = resolve_uri("https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example.png")
         >>> resolved_uri.kind
         UriKind.HTTP_URL
         >>> resolved_uri.url
-        'https://example.com/image.png'
+        'https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example.png'
 
         >>> resolved_uri = resolve_uri("pipelex-storage://images/photo.png")
         >>> resolved_uri.kind
@@ -120,20 +157,25 @@ def _resolve_base64_data_url(uri: str) -> ResolvedBase64DataUrl:
     )
 
 
-async def make_base64_url_from_any_uri(uri: str) -> str:
+async def make_base64_url_from_any_uri(
+    uri: str,
+    storage_provider: StorageProviderAbstract | None = None,
+) -> str:
     """Convert a URI to a base64 data URL.
 
     Resolves the URI and fetches/converts content to base64 format.
     If the URI is already a data URL, returns it as-is.
 
     Args:
-        uri: A URI string (http://, local path, or data: URL)
+        uri: A URI string (http://, local path, data: URL, or pipelex-storage://)
+        storage_provider: Optional storage provider for resolving pipelex-storage:// URIs.
+            Required when the URI is a pipelex-storage:// URI.
 
     Returns:
         A base64 data URL string containing the base64-encoded data, whichever way we got it.
 
     Raises:
-        ValueError: If the URI type is not supported (e.g., pipelex-storage://)
+        ValueError: If the URI is a pipelex-storage:// URI and no storage provider is given.
     """
     base64_url: str
     resolved_uri = resolve_uri(uri)
@@ -146,6 +188,9 @@ async def make_base64_url_from_any_uri(uri: str) -> str:
         case ResolvedLocalPath():
             base64_url = await make_base64_url_from_path(path=resolved_uri.path)
         case ResolvedPipelexStorage():
-            msg = f"Unsupported URI type for base64 URL creation: {resolved_uri.kind} (requires storage provider)"
-            raise ValueError(msg)
+            if storage_provider is None:
+                msg = f"Cannot convert pipelex-storage:// URI to base64 without a storage provider: {uri}"
+                raise ValueError(msg)
+            raw_bytes = await storage_provider.load(uri=resolved_uri.storage_uri)
+            base64_url = make_base64_url_from_bytes(raw_bytes=raw_bytes)
     return base64_url

@@ -21,7 +21,7 @@ PipeFailure = "Details of a single pipe failure during dry run."
 [pipe.detail_pipe_spec]
 type = "PipeCondition"
 description = "Route by signature.type to the correct spec emitter."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "Anything"
 expression = "pipe_signature.type"
 default_outcome = "fail"
@@ -34,6 +34,7 @@ PipeLLM       = "detail_pipe_llm"
 PipeExtract   = "detail_pipe_extract"
 PipeImgGen    = "detail_pipe_img_gen"
 PipeBatch     = "detail_pipe_batch"
+PipeCompose   = "detail_pipe_compose"
 
 # ────────────────────────────────────────────────────────────────────────────────
 # PIPE CONTROLLERS
@@ -42,9 +43,9 @@ PipeBatch     = "detail_pipe_batch"
 [pipe.detail_pipe_sequence]
 type = "PipeLLM"
 description = "Build a PipeSequenceSpec from the signature (children referenced by code)."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeSequenceSpec"
-model = "llm_to_engineer"
+model = "$pipe-builder-engineering"
 prompt = """
 # Orchestrate a sequence of pipe steps that will run one after the other.
 
@@ -53,7 +54,7 @@ prompt = """
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
++ you can use the native concepts: Text, Html, Image, Document (note: PDF is a document), Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic
 
 @pipe_signature
 
@@ -66,9 +67,9 @@ Note:
 [pipe.detail_pipe_parallel]
 type = "PipeLLM"
 description = "Build a PipeParallelSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeParallelSpec"
-model = "llm_to_engineer"
+model = "$pipe-builder-engineering"
 prompt = """
 Orchestrate a set of independent pipes that will run concurrently.
 
@@ -77,19 +78,24 @@ Orchestrate a set of independent pipes that will run concurrently.
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
++ you can use the native concepts: Text, Html, Image, Document (note: PDF is a document), Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic
 
 @pipe_signature
 
 Based on the pipe signature, build the PipeParallelSpec.
+
+Notes:
+- Set add_each_output to true: each parallel branch's output will be available individually in working memory by its result name.
+- Do NOT set combined_output unless the concept is explicitly listed in the concept specs above.
+- The output of the PipeParallel should be set to "Anything" when add_each_output is true and no combined_output is used.
 """
 
 [pipe.detail_pipe_condition]
 type = "PipeLLM"
 description = "Build a PipeConditionSpec from the signature (provide expression/outcome consistent with children)."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeConditionSpec"
-model = "llm_to_engineer"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeConditionSpec to route to the correct pipe based on a conditional expression.
 
@@ -98,7 +104,7 @@ Design a PipeConditionSpec to route to the correct pipe based on a conditional e
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
++ you can use the native concepts: Text, Html, Image, Document (note: PDF is a document), Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic
 
 @pipe_signature
 
@@ -108,9 +114,9 @@ Based on the pipe signature, build the PipeConditionSpec.
 [pipe.detail_pipe_batch]
 type = "PipeLLM"
 description = "Build a PipeBatchSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeBatchSpec"
-model = "llm_to_engineer"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeBatchSpec to run a pipe in batch.
 Whatever it's really going to do has already been decided as part of this plan:
@@ -119,11 +125,22 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
++ you can use the native concepts: Text, Html, Image, Document (note: PDF is a document), Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic
 
-Based on the pipe signature, build the PipeComposeSpec.
+Based on the pipe signature, build the PipeBatchSpec.
 
 @pipe_signature
+
+CRITICAL NAMING RULES for PipeBatch:
+- input_list_name should be a PLURAL noun (e.g., "reports", "items", "images")
+- input_item_name should be the SINGULAR form (e.g., "report", "item", "image")
+- input_item_name must be DIFFERENT from input_list_name
+- input_item_name must NOT match any key in the inputs dict
+Examples:
+  - input_list_name = "reports", input_item_name = "report" ✓
+  - input_list_name = "report_data", input_item_name = "single_report_data" ✓
+  - input_list_name = "reports", input_item_name = "reports" ✗ (same as list name!)
+  - input_list_name = "report_data", input_item_name = "report_data" ✗ (same as inputs key!)
 """
 
 # ────────────────────────────────────────────────────────────────────────────────
@@ -133,9 +150,9 @@ Based on the pipe signature, build the PipeComposeSpec.
 [pipe.detail_pipe_llm]
 type = "PipeLLM"
 description = "Build a PipeLLMSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeLLMSpec"
-model = "llm_to_engineer"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeLLMSpec to use an LLM to generate a text, or a structured object using different kinds of inputs.
 Whatever it's really going to do has already been decided as part of this plan:
@@ -144,7 +161,7 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
++ you can use the native concepts: Text, Html, Image, Document (note: PDF is a document), Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic
 
 Based on the pipe signature, build the PipeLLMSpec.
 
@@ -160,9 +177,9 @@ Notes:
 [pipe.detail_pipe_extract]
 type = "PipeLLM"
 description = "Build a PipeExtractSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeExtractSpec"
-model = "llm_to_engineer"
+model = "$pipe-builder-engineering"
 prompt = """
 Design a PipeExtractSpec to extract text from an image or a pdf.
 Whatever it's really going to do has already been decided as part of this plan:
@@ -171,7 +188,7 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
++ you can use the native concepts: Text, Html, Image, Document (note: PDF is a document), Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic
 
 Based on the pipe signature, build the PipeExtractSpec.
 
@@ -181,9 +198,9 @@ Based on the pipe signature, build the PipeExtractSpec.
 [pipe.detail_pipe_img_gen]
 type = "PipeLLM"
 description = "Build a PipeImgGenSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeImgGenSpec"
-model = "llm_to_engineer"
+model = "$pipe-builder-engineering"
 prompt = """
 Your job is to design a PipeImgGenSpec to generate an image from a text prompt.
 Whatever it's really going to do has already been decided as part of this plan:
@@ -192,7 +209,7 @@ Whatever it's really going to do has already been decided as part of this plan:
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
++ you can use the native concepts: Text, Html, Image, Document (note: PDF is a document), Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic
 
 Based on the pipe signature, build the PipeImgGenSpec.
 
@@ -205,20 +222,60 @@ Notes:
 [pipe.detail_pipe_compose]
 type = "PipeLLM"
 description = "Build a PipeComposeSpec from the signature."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec" }
+inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
 output = "PipeComposeSpec"
-model = "llm_to_engineer"
+model = "$pipe-builder-engineering"
 prompt = """
-Design a PipeComposeSpec to render a jinja2 template.
+Design a PipeComposeSpec to compose content from working memory variables.
 Whatever it's really going to do has already been decided as part of this plan:
 @plan_draft
 
 You must pick the relevant concepts for inputs and outputs from the following possibilities:
 @concept_specs
 
-+ you can use the native concepts: Text, Image, Document (and note that PDF is a document), Number, Page
++ you can use the native concepts: Text, Html, Image, Document (note: PDF is a document), Number, Page, TextAndImages, ImgGenPrompt, JSON, Anything, Dynamic
 
 Based on the pipe signature, build the PipeComposeSpec.
+
+PipeCompose has two modes - choose the appropriate one based on the pipe's purpose:
+
+**Template mode** (for Text/Html output):
+- Use when you need to render a template to produce formatted text
+- Requires: template (template string), target_format (plain/markdown/html/json/mermaid)
+- Output must be Text (or a concept that refines Text), or Html (or a concept that refines Html) if generating HTML content
+- **IMPORTANT - Use Pipelex pre-processor syntax in templates:**
+  - Use `@ + variable_name` to render an entire object with all its attributes automatically formatted
+  - Use `$ + variable_name.field` for inline field access within text
+  - Only use raw Jinja2 double-braces when you need a specific single field in isolation
+  - **NEVER manually list all attributes** of an object in a template - use @ syntax instead to render the whole object
+
+**Construct mode** (for StructuredContent output):
+- Use when you need to assemble a structured object from working memory variables
+- Requires: construct (dict mapping field names to composition specs)
+- Each field can use:
+  - A fixed value (string, number, boolean, list)
+  - `{ from = "the_variable" }` to reference a variable directly from working memory
+  - `{ from = "the_variable.path" }` to reference a nested field
+  - `{ template = "..." }` ONLY when string interpolation is needed (e.g., combining a prefix with a variable)
+- **IMPORTANT - Best practices for construct mode:**
+  - **PREFER `{ from = "the_variable" }`** for direct object/value assignment
+  - **NEVER use templates to manually list attributes** - if you need the whole object, use `{ from = "the_variable" }`
+  - Use `{ template = "..." }` only for string composition like prefixes, formatting, or combining multiple fields into a single string
+
+**Examples of CORRECT vs INCORRECT usage:**
+
+WRONG - manually listing attributes in a template:
+  summary = { template = "Skills: (( the_obj.skills ))\nExperience: (( the_obj.experience ))" }
+CORRECT - direct reference to get the whole object:
+  summary = { from = "the_obj" }
+
+WRONG - template mode manually listing attributes:
+  template = "Skills: (( the_data.skills ))\nExperience: (( the_data.experience ))"
+CORRECT - use @ + the_data to auto-render the whole object:
+  template = "(@ + the_data)"
+
+CORRECT - template for string composition (prefix + field):
+  code = { template = "INV-($ + the_order.id)" }
 
 @pipe_signature
 """

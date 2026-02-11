@@ -1,3 +1,6 @@
+SHELL := /bin/bash
+.SHELLFLAGS := -o pipefail -c
+
 ifeq ($(wildcard .env),.env)
 include .env
 export
@@ -18,6 +21,7 @@ VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
+SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -67,6 +71,9 @@ make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
 make cgm                      - Shorthand -> check-gateway-models
+make regenerate-test-models   - Regenerate test model fixtures from backend configs
+make rtm                      - Shorthand -> regenerate-test-models
+make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
 make up                       - Shorthand -> update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env and lock files
@@ -83,6 +90,7 @@ make codex-tests              - Run tests for Codex (exit on first failure) (no 
 make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
 make test                     - Run unit tests (no inference)
 make test-xdist               - Run unit tests with xdist (no inference)
+make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
 make t                        - Shorthand -> test-xdist
 make test-quiet               - Run unit tests without prints (no inference)
 make tq                       - Shorthand -> test-quiet
@@ -126,18 +134,28 @@ make li                       - Shorthand -> lock install
 make test-count               - Count the number of tests
 make check-test-badge         - Check if the test count matches the badge value
 
+make test-durations           - Show slowest tests with xdist (TOP=30, MIN=0.5)
+make td                       - Shorthand -> test-durations
+make test-durations-serial    - Show slowest tests without xdist (TOP=30, MIN=0.5)
+make tds                      - Shorthand -> test-durations-serial
+make test-time                - Timed test run with xdist (wall clock)
+make tt                       - Shorthand -> test-time
+make test-time-serial         - Timed test run without xdist (wall clock)
+make tts                      - Shorthand -> test-time-serial
+
 endef
 export HELP
 
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
 	format lint pyright mypy pylint \
-    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu \
+    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
-	validate v check c cc agent-check \
+	validate v check c cc agent-check agent-test \
+	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
@@ -199,6 +217,7 @@ install: env-verbose
 	@. "$(VIRTUAL_ENV)/bin/activate" && \
 	uv sync --all-extras && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
+	@$(MAKE) --silent regenerate-test-models-quiet
 
 lock: env
 	$(call PRINT_TITLE,"Resolving dependencies without update")
@@ -213,7 +232,7 @@ update: env
 
 validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
-	$(VENV_PIPELEX) validate all
+	$(VENV_PIPELEX) validate --all
 
 build: env
 	$(call PRINT_TITLE,"Building the wheels")
@@ -221,7 +240,7 @@ build: env
 
 rules: env
 	$(call PRINT_TITLE,"Installing agent rules for contributing to Pipelex")
-	$(VENV_PIPELEX) kit rules --set coding_standards
+	$(VENV_PIPELEX_DEV) kit rules --set all
 
 check-rules: env
 	$(call PRINT_TITLE,"Checking installed agent rules against templates")
@@ -243,6 +262,8 @@ up-kit-configs:
 		--exclude='pipelex_override.toml' \
 		--exclude='telemetry_override.toml' \
 		--exclude='storage' \
+		--exclude='x_custom_llm_deck.toml' \
+		--exclude='x_custom_extract_deck.toml' \
 		.pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
@@ -280,9 +301,38 @@ smc-dry: env
 	$(call PRINT_TITLE,Previewing main config sync - dry run)
 	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
 
-##############################################################################################
-############################      Cleaning                        ############################
-##############################################################################################
+# Support PROF as shorthand for TEST_PROFILE
+ifdef PROF
+TEST_PROFILE := $(PROF)
+endif
+TEST_PROFILE ?= dev
+
+regenerate-test-models: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures")
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
+
+rtm: regenerate-test-models
+	@echo "> done: rtm = regenerate-test-models"
+
+regenerate-test-models-quiet: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures")
+	@$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE) > /dev/null 2>&1
+
+rtm-full: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures with full profile")
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile full
+
+insert-skeleton:
+	@if [ ! -d $(SKELETON_DIR) ]; then \
+			echo "Error: Skeleton directory $(SKELETON_DIR) not found"; \
+			exit 1; \
+	fi
+	@cp -rn $(SKELETON_DIR). .
+	@echo "Skeleton files inserted from $(SKELETON_DIR)"
+
+##########################################################################################
+### CLEANING
+##########################################################################################
 
 cleanderived:
 	$(call PRINT_TITLE,"Erasing derived files and directories")
@@ -296,6 +346,8 @@ cleanderived:
 	find . -type d -wholename '**/.pytest_cache' -exec rm -rf {} + && \
 	find . -type d -wholename './logs/*.log' -exec rm -rf {} + && \
 	find . -type d -wholename './.reports/*' -exec rm -rf {} + && \
+	rm -f tests/integration/pipelex/fixtures/_generated_model_sets.py && \
+	rm -f .pipelex-dev/model_availability.json && \
 	echo "Cleaned up derived files and directories";
 
 cleanenv:
@@ -318,21 +370,29 @@ cleanall: cleanderived cleanenv cleanconfig
 
 codex-tests: env
 	$(call PRINT_TITLE,"Unit testing for Codex")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
+	@echo "• Regenerating test model fixtures"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
 	@echo "• Running all unit tests"
 	$(VENV_PYTEST) -n auto --exitfirst --quiet
 
 run-manual-trigger-gha-tests: env
 	$(call PRINT_TITLE,"Running GHA tests")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running GHA unit tests for inference, llm, and not gha_disabled"
 	$(VENV_PYTEST) --exitfirst --quiet -m "not (gha_disabled or pipelex_api) and (inference or llm)" || [ $$? = 5 ]
 
@@ -409,6 +469,10 @@ tb: env
 
 test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -421,6 +485,10 @@ test-inference-with-prints: env
 
 test-inference-fast: env
 	$(call PRINT_TITLE,"Unit testing")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -451,6 +519,10 @@ ti-dry: env
 
 test-llm: env
 	$(call PRINT_TITLE,"Unit testing LLM")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "llm" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -466,6 +538,10 @@ tl: test-llm
 
 test-extract: env
 	$(call PRINT_TITLE,"Unit testing Extract")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "extract" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -481,6 +557,10 @@ te: test-extract
 
 test-img-gen: env
 	$(call PRINT_TITLE,"Unit testing Image Generation")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -508,6 +588,51 @@ test-pipelex-api: env
 
 ta: test-pipelex-api
 	@echo "> done: ta = test-pipelex-api"
+
+agent-test: env
+	@echo "• Running unit tests..."
+	@tmpfile=$$(mktemp); \
+	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1; \
+	exit_code=$$?; \
+	if [ $$exit_code -ne 0 ]; then grep -vE '\[\s*[0-9]+%\]\s*$$' "$$tmpfile"; fi; \
+	rm -f "$$tmpfile"; \
+	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
+	exit $$exit_code
+
+##########################################################################################
+### TEST DIAGNOSTICS
+##########################################################################################
+
+TOP ?= 30
+MIN ?= 0.5
+
+test-durations: env
+	$(call PRINT_TITLE,"Slowest tests - xdist - top=$(TOP) min=$(MIN)s")
+	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --durations=$(TOP) --durations-min=$(MIN) --tb=no -q
+
+td: test-durations
+	@echo "> done: td = test-durations"
+
+test-durations-serial: env
+	$(call PRINT_TITLE,"Slowest tests - serial - top=$(TOP) min=$(MIN)s")
+	$(VENV_PYTEST) -p no:xdist -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --durations=$(TOP) --durations-min=$(MIN) --tb=no -q
+
+tds: test-durations-serial
+	@echo "> done: tds = test-durations-serial"
+
+test-time: env
+	$(call PRINT_TITLE,"Timed test run - xdist")
+	@time $(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=no -q --no-header 2>&1 | tail -1
+
+tt: test-time
+	@echo "> done: tt = test-time"
+
+test-time-serial: env
+	$(call PRINT_TITLE,"Timed test run - serial")
+	@time $(VENV_PYTEST) -p no:xdist -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=no -q --no-header 2>&1 | tail -1
+
+tts: test-time-serial
+	@echo "> done: tts = test-time-serial"
 
 cov: env
 	$(call PRINT_TITLE,"Unit testing with coverage")
@@ -538,9 +663,9 @@ cov-missing: env
 cm: cov-missing
 	@echo "> done: cm = cov-missing"
 
-############################################################################################
-############################               Linting              ############################
-############################################################################################
+##########################################################################################
+### LINTING
+##########################################################################################
 
 format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
@@ -577,7 +702,7 @@ merge-check-ruff-lint: env check-unused-imports
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON)
+	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
@@ -707,8 +832,8 @@ vg: view-graph
 c: format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived c
-	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
+cc: cleanderived regenerate-test-models-quiet c
+	@echo "> done: cc = cleanderived regenerate-test-models format lint pyright pylint mypy"
 
 up: update-gateway-models up-kit-configs rules
 	@echo "> done: up = update-gateway-models up-kit-configs rules"

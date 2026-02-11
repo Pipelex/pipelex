@@ -4,6 +4,7 @@
 
 [pipelex.storage_config]
 is_fetch_remote_content_enabled = true
+is_upload_local_content_enabled = true
 method = "in_memory"                   # local, in_memory, s3, gcp
 
 [pipelex.storage_config.local]
@@ -50,6 +51,27 @@ fix_loop_max_attempts = 10
 default_output_dir = "."
 default_bundle_file_name = "bundle"
 default_directory_base_name = "pipeline"
+
+[pipelex.builder_config.talent_preset_mappings.llm]
+data-retrieval = "$retrieval"
+hr-expert = "$writing-factual"
+accounting-expert = "$writing-factual"
+creative-writer = "$writing-creative"
+engineer = "$engineering-structured"
+coder = "$engineering-code"
+code-analyzer = "$engineering-codebase-analysis"
+vision-language-model = "$vision"
+visual-designer = "$img-gen-prompting"
+
+[pipelex.builder_config.talent_preset_mappings.img_gen]
+gen-image = "$gen-image"
+gen-image-fast = "$gen-image-fast"
+gen-image-high-quality = "$gen-image-high-quality"
+
+[pipelex.builder_config.talent_preset_mappings.extract]
+pdf-basic-text-extractor = "@default-text-from-pdf"
+image-text-extractor = "@default-extract-image"
+full-document-extractor = "@default-extract-document"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags
@@ -144,11 +166,59 @@ is_dump_kwargs_enabled = false
 is_dump_response_enabled = false
 is_dump_error_enabled = false
 
+[cogt.llm_config.openai_config.effort_to_level_map]
+none = "none"
+minimal = "minimal"
+low = "low"
+medium = "medium"
+high = "high"
+max = "xhigh"
+
 [cogt.llm_config.anthropic_config]
 structured_output_timeout_seconds = 1200
 
+[cogt.llm_config.anthropic_config.effort_to_level_map]
+none = "disabled"
+minimal = "low"
+low = "low"
+medium = "medium"
+high = "high"
+max = "max"
+
+[cogt.llm_config.google_config.effort_to_level_map]
+none = "disabled"
+minimal = "low"
+low = "low"
+medium = "medium"
+high = "high"
+max = "high"
+
+[cogt.llm_config.mistral_config.effort_to_level_map]
+none = "disabled"
+minimal = "reasoning"
+low = "reasoning"
+medium = "reasoning"
+high = "reasoning"
+max = "reasoning"
+
 [cogt.llm_config.llm_job_config]
 max_retries = 3
+
+[cogt.llm_config.effort_to_budget_maps.anthropic]
+none = 0  # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
+minimal = 512
+low = 1024
+medium = 5000
+high = 16384
+max = 65536
+
+[cogt.llm_config.effort_to_budget_maps.gemini]
+none = 0  # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
+minimal = 512
+low = 1024
+medium = 5000
+high = 16384
+max = 65536
 
 [cogt.llm_config.generic_templates]
 structure_from_preliminary_text_system = """
@@ -274,7 +344,7 @@ reactflow_viewspec = true
 reactflow_html = true
 
 [pipelex.pipeline_execution_config.graph_config.mermaid_config]
-direction = "top_down"
+direction = "left_to_right"
 is_include_data_edges = true
 is_include_contains_edges = false
 is_include_selected_outcome_edges = true
@@ -285,13 +355,18 @@ theme = "dark"
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config]
 is_use_cdn = true
-layout_direction = "TB"
+layout_direction = "left_to_right"
 nodesep = 50
 ranksep = 30
 edge_type = "bezier"
 initial_zoom = 1.0
 pan_to_top = true
 default_title = "Pipelex Graph"
+# When true, PipeBatch controller nodes appear in the graph as pipe nodes for batch edges
+# When false, batch edges connect stuff nodes directly (list -> items, items -> list)
+show_batch_controller = false
+# When true, batch item nodes display their index suffix (e.g., "topic[0]" instead of "topic")
+show_batch_item_index = false
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
 theme = "dark"
@@ -330,7 +405,7 @@ ensure_trailing_newline = true
 ensure_leading_blank_line = true
 
 [pipelex.plx_config.concepts]
-structure_field_ordering = ["type", "description", "choices", "required"]
+structure_field_ordering = ["type", "concept_ref", "item_type", "item_concept_ref", "description", "choices", "required"]
 
 [pipelex.plx_config.pipes]
 field_ordering = ["type", "description", "inputs", "output"]
@@ -354,6 +429,20 @@ ocr = "model"
 llm_handle = "model"
 llm = "model"
 llm_to_structure = "model_to_structure"
+llm_skill = "llm_talent"
+img_gen_skill = "img_gen_talent"
+extract_skill = "extract_talent"
 
+
+####################################################################################################
+# Kit Config
+####################################################################################################
+
+[pipelex.kit_config]
+# Preferred agent for rules installation (used by `pipelex kit rules`)
+# Options: "cursor", "agents", "claude"
+# - "cursor" installs .cursor/rules/*.mdc files
+# - Other options install a single markdown file for that agent
+preferred_agent_target = "claude"
 
 [migration.migration_maps.telemetry]

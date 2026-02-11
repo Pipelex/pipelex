@@ -6,6 +6,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 
 if TYPE_CHECKING:
+    from pipelex.core.concepts.concept import Concept
     from pipelex.libraries.library import Library
 
 
@@ -50,6 +51,22 @@ class LibraryManagerAbstract(ABC):
         pass
 
     @abstractmethod
+    def load_concepts_only_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list["Concept"]:
+        """Load only domains and concepts from blueprints, skipping pipes.
+
+        This is a lightweight alternative to load_from_blueprints() that only processes
+        domains and concepts. It does not load pipes, does not perform pipe validation,
+        and does not run library.validate_library().
+
+        Args:
+            library_id: The ID of the library to load into
+            blueprints: List of parsed PLX blueprints to load
+
+        Returns:
+            List of all concepts that were loaded
+        """
+
+    @abstractmethod
     def _remove_from_blueprint(self, library_id: str, blueprint: PipelexBundleBlueprint) -> None:
         pass
 
@@ -65,3 +82,25 @@ class LibraryManagerAbstract(ABC):
         library_file_paths: list[Path] | None = None,
     ) -> list[PipeAbstract]:
         pass
+
+    @abstractmethod
+    def load_libraries_concepts_only(
+        self,
+        library_id: str,
+        library_dirs: list[Path] | None = None,
+        library_file_paths: list[Path] | None = None,
+    ) -> list["Concept"]:
+        """Load only domains and concepts from library directories, skipping pipes.
+
+        This is a lightweight alternative to load_libraries() that only processes
+        domains and concepts. It does not load pipes, does not perform pipe validation,
+        and does not run library.validate_library().
+
+        Args:
+            library_id: The ID of the library to load into
+            library_dirs: List of directories containing PLX files
+            library_file_paths: List of specific PLX file paths to load
+
+        Returns:
+            List of all concepts that were loaded
+        """

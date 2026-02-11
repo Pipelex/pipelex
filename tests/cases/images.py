@@ -2,6 +2,8 @@
 
 from typing import ClassVar
 
+from pipelex.urls import URLs
+
 
 class ImageTestCases:
     """Image test constants."""
@@ -19,12 +21,13 @@ class ImageTestCases:
     IMAGE_FILE_PATH_LOGO_TINY = f"{TEST_IMAGE_DIRECTORY}/logo-tiny.png"
 
     # Remote URLs
-    IMAGE_URL_PNG = "https://pipelex-web.s3.amazonaws.com/tests/solar_system.png"
+    IMAGE_URL_JPG = URLs.jpg_example_1
+    IMAGE_URL_PNG = URLs.png_example_1
 
     # File path collections
     IMAGE_FILE_PATHS: ClassVar[list[str]] = [
-        f"{TEST_IMAGE_DIRECTORY}/ai_lympics.png",
-        f"{TEST_IMAGE_DIRECTORY}/animal_lympics.jpg",
+        IMAGE_FILE_PATH_PNG_1,
+        IMAGE_FILE_PATH_JPG_1,
     ]
     IMAGE_TEXT_FILE_PATHS: ClassVar[list[str]] = [
         IMAGE_FILE_PATH_JPG_1,
@@ -34,8 +37,8 @@ class ImageTestCases:
 
     # URL collections
     IMAGE_URLS: ClassVar[list[str]] = [
-        "https://www.w3.org/People/mimasa/test/imgformat/img/w3c_home.png",
-        "https://www.google.com/images/branding/googlelogo/1x/googlelogo_color_272x92dp.png",
+        URLs.jpg_example_1,
+        URLs.jpg_example_2,
     ]
 
     # Base64-encoded test images for data URL testing

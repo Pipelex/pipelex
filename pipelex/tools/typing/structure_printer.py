@@ -2,9 +2,30 @@ import types
 from enum import Enum
 from typing import Any, Union, get_args, get_origin, get_type_hints
 
+from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
 
 from pipelex.types import StrEnum
+
+
+def _build_type_hints_namespace() -> dict[str, Any]:
+    """Build a namespace for get_type_hints to resolve forward references.
+
+    This is needed for dynamically generated classes (from StructureGenerator)
+    that have forward references like `customer: "Customer"`. These classes
+    don't have a proper module namespace, so get_type_hints() can't find the
+    referenced types.
+
+    We build a namespace by getting all classes from the class registry.
+
+    Returns:
+        A namespace dict with all registered classes
+    """
+    # Get all registered classes from the class registry
+    # The root attribute is a dict[str, type] but the type checker doesn't know this
+    class_registry = KajsonManager.get_class_registry()
+    root_dict: dict[str, Any] = getattr(class_registry, "root", {})
+    return dict(root_dict)
 
 
 class StructurePrinter:
@@ -158,7 +179,10 @@ class StructurePrinter:
                         collect_types(base)
 
                 try:
-                    type_hints = get_type_hints(tp)
+                    # Build a namespace for get_type_hints to resolve forward references
+                    # This is needed for dynamically generated classes (from StructureGenerator)
+                    globalns = _build_type_hints_namespace()
+                    type_hints = get_type_hints(tp, globalns=globalns)
                     model_fields = getattr(tp, "model_fields", {})
 
                     if model_fields:
@@ -227,7 +251,9 @@ class StructurePrinter:
 
             # Handle empty classes or classes that only inherit fields
             try:
-                type_hints = get_type_hints(class_type)
+                # Build a namespace for get_type_hints to resolve forward references
+                globalns = _build_type_hints_namespace()
+                type_hints = get_type_hints(class_type, globalns=globalns)
                 model_fields = getattr(class_type, "model_fields", {})
 
                 # Get and sort fields
@@ -240,7 +266,7 @@ class StructurePrinter:
                 parent_fields: set[str] = set()
                 for base in class_type.__bases__:
                     try:
-                        parent_fields.update(get_type_hints(base).keys())
+                        parent_fields.update(get_type_hints(base, globalns=globalns).keys())
                     except (TypeError, AttributeError):
                         continue
 

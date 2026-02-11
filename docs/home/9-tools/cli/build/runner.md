@@ -10,12 +10,13 @@ pipelex build runner <TARGET> [OPTIONS]
 
 **Arguments:**
 
-- `TARGET` - Either a bundle file path (`.plx`) or a library directory
+- `TARGET` - Bundle file path (`.plx`)
 
 **Options:**
 
-- `--pipe` - Pipe code to use (**mandatory** for library directory, **mandatory** for `.plx` without `main_pipe`)
+- `--pipe` - Pipe code to use (optional if the `.plx` declares a `main_pipe`)
 - `--output`, `-o` - Path to save the generated Python file (defaults to target's directory)
+- `--library-dirs`, `-L` - Directories to search for pipe definitions. Can be specified multiple times.
 
 ## Examples
 
@@ -31,10 +32,10 @@ pipelex build runner my_bundle.plx
 pipelex build runner my_bundle.plx --pipe my_pipe
 ```
 
-**Generate runner from a library directory (--pipe is mandatory):**
+**With additional library directories:**
 
 ```bash
-pipelex build runner ./my_library/ --pipe my_pipe
+pipelex build runner my_bundle.plx -L ./shared_pipes/ -L ./common/
 ```
 
 **Custom output path:**
@@ -73,5 +74,7 @@ After generating the runner file:
 
 - [Build Pipe](pipe.md) - Generate pipelines from natural language
 - [Build Structures](structures.md) - Generate Pydantic models separately
+- [Build Inputs](inputs.md) - Generate example input JSON for a pipe
+- [Build Output](output.md) - Generate example output JSON for a pipe
 - [Run Command](../run.md) - Run pipes directly from CLI
 

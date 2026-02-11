@@ -147,6 +147,11 @@ class LLMWorkerInternalAbstract(LLMWorkerAbstract):
         self._check_vision_support(llm_job=llm_job)
         self._check_document_support(llm_job=llm_job)
 
+    def _validate_no_reasoning_for_structured_gen(self, job_params: LLMJobParams):
+        if job_params.reasoning_effort is not None or job_params.reasoning_budget is not None:
+            msg = f"Model '{self.inference_model.desc}' does not support reasoning parameters for structured generation"
+            raise LLMCapabilityError(msg)
+
     def _check_vision_support(self, llm_job: LLMJob):
         if llm_job.llm_prompt.user_images:
             if not self.inference_model.is_vision_supported:

@@ -20,10 +20,10 @@ function makeLinksOpenInNewWindow(container) {
     });
 }
 
-// Validate that a URL is a safe HTTP/HTTPS URL (prevents javascript: and data: URL injection)
-function isValidHttpUrl(url) {
+// Validate that a URL is safe for display (prevents javascript: and data: URL injection)
+function isSafeDisplayUrl(url) {
     if (!url || typeof url !== 'string') return false;
-    return url.startsWith('https://') || url.startsWith('http://');
+    return url.startsWith('https://') || url.startsWith('http://') || url.startsWith('file://');
 }
 
 // Extract URL from stuff data (handles various data structures)
@@ -32,12 +32,12 @@ function extractUrl(jsonData) {
     if (!jsonData) return null;
     // Check if data itself is a URL string
     if (typeof jsonData === 'string') {
-        return isValidHttpUrl(jsonData) ? jsonData : null;
+        return isSafeDisplayUrl(jsonData) ? jsonData : null;
     }
-    // Prefer display_link (pre-signed S3 URL) over url (internal pipelex-storage:// URL)
-    const candidates = [jsonData.display_link, jsonData.src, jsonData.href, jsonData.uri, jsonData.url];
+    // Prefer public_url (pre-signed S3 URL or file:// URI) over url (internal pipelex-storage:// URL)
+    const candidates = [jsonData.public_url, jsonData.src, jsonData.href, jsonData.uri, jsonData.url];
     for (const candidate of candidates) {
-        if (isValidHttpUrl(candidate)) return candidate;
+        if (isSafeDisplayUrl(candidate)) return candidate;
     }
     return null;
 }

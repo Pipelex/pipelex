@@ -102,14 +102,18 @@ class PipelexBundleSpec(StructuredContent):
             # Finally, create the ordered dict
             pipe = dict[str, PipeBlueprintUnion](sorted_pipe_items)
 
-        return PipelexBundleBlueprint(
-            domain=self.domain,
-            description=self.description,
-            system_prompt=self.system_prompt,
-            main_pipe=self.main_pipe,
-            pipe=pipe,
-            concept=concept,
-        )
+        try:
+            return PipelexBundleBlueprint(
+                domain=self.domain,
+                description=self.description,
+                system_prompt=self.system_prompt,
+                main_pipe=self.main_pipe,
+                pipe=pipe,
+                concept=concept,
+            )
+        except ValidationError as exc:
+            msg = f"Failed to create pipelex bundle blueprint: {format_pydantic_validation_error(exc)}"
+            raise PipelexBundleSpecBlueprintError(msg) from exc
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

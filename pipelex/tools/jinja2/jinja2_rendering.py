@@ -1,4 +1,4 @@
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Callable
 from typing import Any, Protocol
 
 from jinja2.exceptions import (
@@ -40,6 +40,7 @@ def _compile_jinja2_template(
     *,
     use_registry: bool = False,
     enable_async: bool = True,
+    finalize: Callable[[Any], Any] | None = None,
 ) -> _Jinja2Template:
     if use_registry:
         jinja2_env = make_jinja2_env_from_registry(
@@ -51,6 +52,9 @@ def _compile_jinja2_template(
             template_category=template_category,
             enable_async=enable_async,
         )
+
+    if finalize is not None:
+        jinja2_env.finalize = finalize
 
     try:
         return jinja2_env.from_string(template_source)
@@ -171,11 +175,13 @@ async def render_jinja2_async(
     templating_style: TemplatingStyle | None = None,
     *,
     use_registry: bool = False,
+    finalize: Callable[[Any], Any] | None = None,
 ) -> str:
     template = _compile_jinja2_template(
         template_source=template_source,
         template_category=template_category,
         use_registry=use_registry,
+        finalize=finalize,
     )
     prepared_templating_context = _prepare_templating_context(
         templating_context=templating_context,

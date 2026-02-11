@@ -7,9 +7,8 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenModelNotFoundError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
-from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -17,9 +16,11 @@ from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsF
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
+    from openai.types.chat.chat_completion_content_part_param import ChatCompletionContentPartParam
     from openai.types.chat.chat_completion_message_param import ChatCompletionMessageParam
 
 
@@ -63,11 +64,10 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                 )
                 raise ImgGenParameterError(msg)
             image_format = ImageFormat.JPEG
-        if img_gen_job.job_params.aspect_ratio != AspectRatio.SQUARE:
-            msg = f"OpenAI Completions ImgGen worker only supports square images. Aspect ratio: {img_gen_job.job_params.aspect_ratio}"
-            raise ImgGenParameterError(msg)
-        img_gen_prompt_text = img_gen_job.img_gen_prompt.positive_text
-        messages: list[ChatCompletionMessageParam] = [{"role": "user", "content": img_gen_prompt_text}]
+
+        # Build message content with optional input images
+        messages = await self._build_messages_with_images(img_gen_job)
+
         try:
             extra_headers, extra_body = self.openai_completions_factory.make_extras(
                 inference_model=self.inference_model, inference_job=img_gen_job, output_desc=InferenceOutputType.IMAGE
@@ -118,13 +118,63 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         if not base64_str and not actual_url:
             msg = f"ImgGenCompletions response has no image. Model: {self.inference_model.desc}"
             raise ImgGenGenerationError(msg)
+        # Size is None because the API doesn't return it. We now support various aspect ratios,
+        # but detecting the size here (e.g., via Pillow) is left to downstream consumers if needed.
         return GeneratedImageRawDetails(
             actual_url=actual_url,
             base64_str=base64_str,
-            size=ImageSize(width=1024, height=1024),
+            size=None,
             mime_type=base64_extracted_mime_type,
             image_format=image_format,
         )
+
+    async def _build_messages_with_images(
+        self,
+        img_gen_job: ImgGenJob,
+    ) -> "list[ChatCompletionMessageParam]":
+        """Build chat messages with optional input images for image-to-image generation.
+
+        For models that support image inputs via the chat completions API (e.g., Gemini),
+        images are included as content parts alongside the text prompt.
+        """
+        img_gen_prompt = img_gen_job.img_gen_prompt
+        img_gen_prompt_text = img_gen_prompt.positive_text
+
+        # If no input images, return simple text message
+        if not img_gen_prompt.input_images:
+            return [{"role": "user", "content": img_gen_prompt_text}]
+
+        # Build content parts with images
+        user_contents: list[ChatCompletionContentPartParam] = []
+
+        # Add text prompt first
+        user_contents.append({"type": "text", "text": img_gen_prompt_text})
+
+        # Prepare and add images
+        prepped_images = await prep_prompt_images(
+            prompt_images=img_gen_prompt.input_images,
+            is_http_url_enabled=True,
+        )
+        for prepped_image in prepped_images:
+            if isinstance(prepped_image, PreparedFileBase64):
+                user_contents.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": prepped_image.as_data_url()},
+                    }
+                )
+            elif isinstance(prepped_image, PreparedFileHttpUrl):
+                user_contents.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": prepped_image.url},
+                    }
+                )
+            else:
+                msg = f"Unexpected PreparedFile type: {type(prepped_image).__name__}"
+                raise ImgGenParameterError(msg)
+
+        return [{"role": "user", "content": user_contents}]
 
     @override
     async def _gen_image_list(

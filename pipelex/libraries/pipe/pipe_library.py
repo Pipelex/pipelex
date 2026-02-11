@@ -38,9 +38,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     def add_new_pipe(self, pipe: PipeAbstract):
         if pipe.code in self.root:
             msg = (
-                f"Pipe '{pipe.code}' already exists in the library. You might be running the same pipe twice in the same pipeline. "
-                "We do not yet handle this case, so please avoid running the same pipe twice in the same pipeline. "
-                "Or consider adding for good in the library and call it by its code."
+                f"Pipe '{pipe.code}' already exists in the library. "
+                "It is likely declared in two different bundle files loaded into the same library. "
+                "Check your library configuration: PIPELEXPATH environment variable, "
+                "library_dirs passed to Pipelex.make(), or the --library-dir / -L CLI option."
             )
             raise PipeLibraryError(msg)
         self.root[pipe.code] = pipe
@@ -110,6 +111,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             )
 
             table.add_column("Code", style="green")
+            table.add_column("Type", style="cyan")
             table.add_column("Definition", style="white")
             table.add_column("Input", style="yellow")
             table.add_column("Output", style="yellow")
@@ -124,6 +126,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
                 table.add_row(
                     pipe.code,
+                    pipe.type,
                     pipe.description or "",
                     formatted_inputs_str,
                     output_code,

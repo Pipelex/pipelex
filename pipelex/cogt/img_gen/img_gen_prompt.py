@@ -3,6 +3,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenPromptError
+from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.system.runtime import ProblemReaction, runtime_manager
 from pipelex.tools.misc.json_utils import json_str
 
@@ -10,6 +11,7 @@ from pipelex.tools.misc.json_utils import json_str
 class ImgGenPrompt(BaseModel):
     positive_text: str
     negative_text: str | None = None
+    input_images: list[PromptImage] | None = None
 
     def validate_before_execution(self):
         reaction = runtime_manager.problem_reactions.job
