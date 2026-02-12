@@ -43,7 +43,11 @@ class PackageVisibilityChecker:
         self._main_pipes: dict[str, str] = {}
         for bundle in bundles:
             if bundle.main_pipe:
-                self._main_pipes[bundle.domain] = bundle.main_pipe
+                existing = self._main_pipes.get(bundle.domain)
+                if existing and existing != bundle.main_pipe:
+                    log.warning(f"Conflicting main_pipe for domain '{bundle.domain}': '{existing}' vs '{bundle.main_pipe}' — keeping first value")
+                else:
+                    self._main_pipes[bundle.domain] = bundle.main_pipe
 
     def is_pipe_accessible_from(self, pipe_ref: QualifiedRef, source_domain: str) -> bool:
         """Check if a domain-qualified pipe ref is accessible from source_domain.

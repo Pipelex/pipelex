@@ -42,7 +42,11 @@ def scan_bundles_for_domain_info(
                 domain_pipes[domain].append(pipe_code)
 
         if blueprint.main_pipe:
-            domain_main_pipes[domain] = blueprint.main_pipe
+            existing = domain_main_pipes.get(domain)
+            if existing and existing != blueprint.main_pipe:
+                errors.append(f"Conflicting main_pipe for domain '{domain}': '{existing}' vs '{blueprint.main_pipe}' (from {mthds_file})")
+            else:
+                domain_main_pipes[domain] = blueprint.main_pipe
 
     return domain_pipes, domain_main_pipes, errors
 

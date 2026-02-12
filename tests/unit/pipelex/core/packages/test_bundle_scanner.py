@@ -88,6 +88,79 @@ class TestBundleScanner:
         assert exports[0].domain_path == "alpha_domain"
         assert exports[1].domain_path == "zebra_domain"
 
+    def test_scan_bundles_detects_main_pipe_conflict(self, tmp_path: Path):
+        """Two bundles sharing a domain but declaring different main_pipe produce an error."""
+        bundle_a = tmp_path / "bundle_a.mthds"
+        bundle_a.write_text(
+            'domain = "shared_domain"\n'
+            'main_pipe = "pipe_alpha"\n'
+            "\n"
+            "[pipe.pipe_alpha]\n"
+            'type = "PipeLLM"\n'
+            'description = "Alpha"\n'
+            'output = "Text"\n'
+            'prompt = "alpha"\n',
+            encoding="utf-8",
+        )
+        bundle_b = tmp_path / "bundle_b.mthds"
+        bundle_b.write_text(
+            'domain = "shared_domain"\n'
+            'main_pipe = "pipe_beta"\n'
+            "\n"
+            "[pipe.pipe_beta]\n"
+            'type = "PipeLLM"\n'
+            'description = "Beta"\n'
+            'output = "Text"\n'
+            'prompt = "beta"\n',
+            encoding="utf-8",
+        )
+
+        _domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(
+            sorted([bundle_a, bundle_b]),
+        )
+
+        assert len(errors) == 1
+        assert "shared_domain" in errors[0]
+        assert "pipe_alpha" in errors[0]
+        assert "pipe_beta" in errors[0]
+        assert str(bundle_b) in errors[0]
+        # First value kept, conflict reported but not overwritten
+        assert domain_main_pipes["shared_domain"] == "pipe_alpha"
+
+    def test_scan_bundles_allows_identical_main_pipe(self, tmp_path: Path):
+        """Two bundles declaring the same main_pipe for a domain is not an error."""
+        bundle_a = tmp_path / "bundle_a.mthds"
+        bundle_a.write_text(
+            'domain = "shared_domain"\n'
+            'main_pipe = "same_pipe"\n'
+            "\n"
+            "[pipe.same_pipe]\n"
+            'type = "PipeLLM"\n'
+            'description = "A"\n'
+            'output = "Text"\n'
+            'prompt = "a"\n',
+            encoding="utf-8",
+        )
+        bundle_b = tmp_path / "bundle_b.mthds"
+        bundle_b.write_text(
+            'domain = "shared_domain"\n'
+            'main_pipe = "same_pipe"\n'
+            "\n"
+            "[pipe.same_pipe]\n"
+            'type = "PipeLLM"\n'
+            'description = "B copy"\n'
+            'output = "Text"\n'
+            'prompt = "b"\n',
+            encoding="utf-8",
+        )
+
+        _domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(
+            sorted([bundle_a, bundle_b]),
+        )
+
+        assert not errors
+        assert domain_main_pipes["shared_domain"] == "same_pipe"
+
     @pytest.mark.parametrize(
         ("topic", "domain_pipes", "domain_main_pipes", "expected_first_pipe"),
         [
