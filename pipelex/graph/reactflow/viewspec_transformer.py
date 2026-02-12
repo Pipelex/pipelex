@@ -63,6 +63,8 @@ def _map_edge_kind_to_view_type(kind: EdgeKind) -> str:
             return "batch_item"
         case EdgeKind.BATCH_AGGREGATE:
             return "batch_aggregate"
+        case EdgeKind.PARALLEL_COMBINE:
+            return "parallel_combine"
 
 
 def _build_node_label(node_spec: Any) -> str:
