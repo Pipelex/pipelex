@@ -872,3 +872,258 @@ class TestGraphTracer:
         edge = batch_aggregate_edges[0]
         assert edge.source_stuff_digest == "item_result_digest"
         assert edge.target_stuff_digest == "output_list_digest"
+
+    def test_register_controller_output(self) -> None:
+        """Test that register_controller_output adds to output_specs and _stuff_producer_map.
+
+        When a controller explicitly registers outputs, DATA edges should go from
+        the controller node to consumers of those outputs.
+        """
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="controller-output-test", data_inclusion=make_defaulted_data_inclusion_config())
+
+        started_at = datetime.now(timezone.utc)
+
+        # Controller node (e.g., PipeParallel)
+        controller_id, ctrl_ctx = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="my_parallel",
+            pipe_type="PipeParallel",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+            input_specs=[IOSpec(name="input_text", concept="Text", digest="input_digest")],
+        )
+
+        # Branch 1: produces output with digest "branch_output_1"
+        branch1_id, _ = tracer.on_pipe_start(
+            graph_context=ctrl_ctx,
+            pipe_code="branch_pipe_1",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=10),
+            input_specs=[IOSpec(name="input_text", concept="Text", digest="input_digest")],
+        )
+        tracer.on_pipe_end_success(
+            node_id=branch1_id,
+            ended_at=started_at + timedelta(milliseconds=50),
+            output_spec=IOSpec(name="short_summary", concept="Text", digest="branch_output_1"),
+        )
+
+        # Branch 2: produces output with digest "branch_output_2"
+        branch2_id, _ = tracer.on_pipe_start(
+            graph_context=ctrl_ctx,
+            pipe_code="branch_pipe_2",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=10),
+            input_specs=[IOSpec(name="input_text", concept="Text", digest="input_digest")],
+        )
+        tracer.on_pipe_end_success(
+            node_id=branch2_id,
+            ended_at=started_at + timedelta(milliseconds=50),
+            output_spec=IOSpec(name="long_summary", concept="Text", digest="branch_output_2"),
+        )
+
+        # Controller registers branch outputs (overriding sub-pipe registrations)
+        tracer.register_controller_output(
+            node_id=controller_id,
+            output_spec=IOSpec(name="short_summary", concept="Text", digest="branch_output_1"),
+        )
+        tracer.register_controller_output(
+            node_id=controller_id,
+            output_spec=IOSpec(name="long_summary", concept="Text", digest="branch_output_2"),
+        )
+
+        # Consumer pipe that uses branch_output_1
+        consumer_id, _ = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="consumer_pipe",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=60),
+            input_specs=[IOSpec(name="summary", concept="Text", digest="branch_output_1")],
+        )
+        tracer.on_pipe_end_success(
+            node_id=consumer_id,
+            ended_at=started_at + timedelta(milliseconds=100),
+        )
+
+        # End controller
+        tracer.on_pipe_end_success(
+            node_id=controller_id,
+            ended_at=started_at + timedelta(milliseconds=110),
+        )
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+
+        # Verify controller node has 2 output specs
+        controller_node = next(node for node in graph_spec.nodes if node.node_id == controller_id)
+        assert len(controller_node.node_io.outputs) == 2
+        output_names = {output.name for output in controller_node.node_io.outputs}
+        assert output_names == {"short_summary", "long_summary"}
+
+        # Verify DATA edge goes from controller (not branch) to consumer
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
+        controller_to_consumer = [edge for edge in data_edges if edge.target == consumer_id]
+        assert len(controller_to_consumer) == 1
+        assert controller_to_consumer[0].source == controller_id
+
+    def test_passthrough_output_skipped(self) -> None:
+        """Test that on_pipe_end_success skips output registration when output matches an input.
+
+        When a controller's main_stuff is unchanged from one of its inputs (pass-through),
+        the output should not be registered to avoid corrupting data edges.
+        """
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="passthrough-test", data_inclusion=make_defaulted_data_inclusion_config())
+
+        started_at = datetime.now(timezone.utc)
+
+        # Producer pipe creates stuff with digest "original_stuff"
+        producer_id, _ = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="producer",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at,
+        )
+        tracer.on_pipe_end_success(
+            node_id=producer_id,
+            ended_at=started_at + timedelta(milliseconds=50),
+            output_spec=IOSpec(name="output", concept="Text", digest="original_stuff"),
+        )
+
+        # Controller consumes "original_stuff" and its main_stuff is the same
+        controller_id, _ctrl_ctx = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="my_parallel",
+            pipe_type="PipeParallel",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at + timedelta(milliseconds=60),
+            input_specs=[IOSpec(name="input_text", concept="Text", digest="original_stuff")],
+        )
+
+        # Controller ends with the same digest as its input (pass-through)
+        tracer.on_pipe_end_success(
+            node_id=controller_id,
+            ended_at=started_at + timedelta(milliseconds=100),
+            output_spec=IOSpec(name="input_text", concept="Text", digest="original_stuff"),
+        )
+
+        # Consumer should still get the edge from the original producer, not the controller
+        consumer_id, _ = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="consumer",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=110),
+            input_specs=[IOSpec(name="input", concept="Text", digest="original_stuff")],
+        )
+        tracer.on_pipe_end_success(
+            node_id=consumer_id,
+            ended_at=started_at + timedelta(milliseconds=150),
+        )
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+
+        # Controller should have NO outputs (pass-through was skipped)
+        controller_node = next(node for node in graph_spec.nodes if node.node_id == controller_id)
+        assert len(controller_node.node_io.outputs) == 0
+
+        # DATA edges should go from producer to both controller (as input) and consumer
+        # The controller does NOT steal the producer registration (pass-through skipped)
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
+        assert len(data_edges) == 2
+        assert all(edge.source == producer_id for edge in data_edges)
+        targets = {edge.target for edge in data_edges}
+        assert targets == {controller_id, consumer_id}
+
+    def test_multiple_output_specs(self) -> None:
+        """Test that a node can have multiple outputs via register_controller_output.
+
+        All registered outputs should produce correct DATA edges to their consumers.
+        """
+        tracer = GraphTracer()
+        context = tracer.setup(graph_id="multi-output-test", data_inclusion=make_defaulted_data_inclusion_config())
+
+        started_at = datetime.now(timezone.utc)
+
+        # Controller with multiple outputs
+        controller_id, _ = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="multi_output_pipe",
+            pipe_type="PipeParallel",
+            node_kind=NodeKind.CONTROLLER,
+            started_at=started_at,
+        )
+
+        # Register three different outputs
+        tracer.register_controller_output(
+            node_id=controller_id,
+            output_spec=IOSpec(name="output_a", concept="Text", digest="digest_a"),
+        )
+        tracer.register_controller_output(
+            node_id=controller_id,
+            output_spec=IOSpec(name="output_b", concept="Text", digest="digest_b"),
+        )
+        tracer.register_controller_output(
+            node_id=controller_id,
+            output_spec=IOSpec(name="output_c", concept="Text", digest="digest_c"),
+        )
+
+        tracer.on_pipe_end_success(
+            node_id=controller_id,
+            ended_at=started_at + timedelta(milliseconds=100),
+        )
+
+        # Consumer A reads digest_a
+        consumer_a_id, _ = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="consumer_a",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=110),
+            input_specs=[IOSpec(name="input", concept="Text", digest="digest_a")],
+        )
+        tracer.on_pipe_end_success(node_id=consumer_a_id, ended_at=started_at + timedelta(milliseconds=120))
+
+        # Consumer B reads digest_b
+        consumer_b_id, _ = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="consumer_b",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=130),
+            input_specs=[IOSpec(name="input", concept="Text", digest="digest_b")],
+        )
+        tracer.on_pipe_end_success(node_id=consumer_b_id, ended_at=started_at + timedelta(milliseconds=140))
+
+        # Consumer C reads digest_c
+        consumer_c_id, _ = tracer.on_pipe_start(
+            graph_context=context,
+            pipe_code="consumer_c",
+            pipe_type="PipeLLM",
+            node_kind=NodeKind.OPERATOR,
+            started_at=started_at + timedelta(milliseconds=150),
+            input_specs=[IOSpec(name="input", concept="Text", digest="digest_c")],
+        )
+        tracer.on_pipe_end_success(node_id=consumer_c_id, ended_at=started_at + timedelta(milliseconds=160))
+
+        graph_spec = tracer.teardown()
+
+        assert graph_spec is not None
+
+        # Controller should have 3 output specs
+        controller_node = next(node for node in graph_spec.nodes if node.node_id == controller_id)
+        assert len(controller_node.node_io.outputs) == 3
+
+        # 3 DATA edges: controller -> consumer_a, controller -> consumer_b, controller -> consumer_c
+        data_edges = [edge for edge in graph_spec.edges if edge.kind.is_data]
+        assert len(data_edges) == 3
+        assert all(edge.source == controller_id for edge in data_edges)
+        targets = {edge.target for edge in data_edges}
+        assert targets == {consumer_a_id, consumer_b_id, consumer_c_id}
