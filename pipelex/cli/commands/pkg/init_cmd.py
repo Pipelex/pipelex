@@ -59,11 +59,18 @@ def do_pkg_init(force: bool = False) -> None:
         for error in errors:
             console.print(error)
 
-    # Build exports from collected domain/pipe data
+    # Build exports from collected domain/pipe data, placing main_pipe first
     exports: list[DomainExports] = []
     for domain, pipe_codes in sorted(domain_pipes.items()):
-        if pipe_codes:
-            exports.append(DomainExports(domain_path=domain, pipes=sorted(pipe_codes)))
+        exported: list[str] = []
+        main_pipe = domain_main_pipes.get(domain)
+        if main_pipe and main_pipe not in exported:
+            exported.append(main_pipe)
+        for pipe_code in sorted(pipe_codes):
+            if pipe_code not in exported:
+                exported.append(pipe_code)
+        if exported:
+            exports.append(DomainExports(domain_path=domain, pipes=exported))
 
     # Generate manifest with placeholder address
     dir_name = cwd.name.replace("-", "_").replace(" ", "_").lower()

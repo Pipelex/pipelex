@@ -58,6 +58,30 @@ class TestPkgInit:
         manifest = parse_methods_toml(content)
         assert manifest.version == "0.1.0"
 
+    def test_main_pipe_appears_first_in_exports(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """main_pipe should appear first in domain exports, not buried alphabetically."""
+        legal_tools_dir = PACKAGES_DATA_DIR / "legal_tools"
+        # Copy both .mthds files preserving subdirectory structure
+        for mthds_file in legal_tools_dir.rglob("*.mthds"):
+            rel = mthds_file.relative_to(legal_tools_dir)
+            dest = tmp_path / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(mthds_file, dest)
+
+        monkeypatch.chdir(tmp_path)
+        do_pkg_init(force=False)
+
+        manifest_path = tmp_path / MANIFEST_FILENAME
+        manifest = parse_methods_toml(manifest_path.read_text(encoding="utf-8"))
+
+        # Find the contracts domain
+        contracts_export = next(
+            (exp for exp in manifest.exports if exp.domain_path == "pkg_test_legal.contracts"),
+            None,
+        )
+        assert contracts_export is not None, "Expected pkg_test_legal.contracts domain in exports"
+        assert contracts_export.pipes[0] == "pkg_test_extract_clause", f"main_pipe should be first in exports, got: {contracts_export.pipes}"
+
     def test_no_mthds_files_error(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """No .mthds files -> error message."""
         monkeypatch.chdir(tmp_path)
