@@ -274,6 +274,10 @@ class TestPipeParallelGraph:
         output_dir = _get_next_output_folder(pipe_code)
         if graph_outputs.graphspec_json:
             save_text_to_path(graph_outputs.graphspec_json, str(output_dir / "graph.json"))
+        if graph_outputs.mermaidflow_html:
+            save_text_to_path(graph_outputs.mermaidflow_html, str(output_dir / "mermaidflow.html"))
+        if graph_outputs.mermaidflow_mmd:
+            save_text_to_path(graph_outputs.mermaidflow_mmd, str(output_dir / "mermaidflow.mmd"))
         if graph_outputs.reactflow_html:
             save_text_to_path(graph_outputs.reactflow_html, str(output_dir / "reactflow.html"))
 
