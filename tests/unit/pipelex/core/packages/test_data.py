@@ -74,6 +74,16 @@ MISSING_REQUIRED_FIELDS_TOML = """\
 description = "Missing address and version"
 """
 
+NON_TABLE_DEPENDENCY_TOML = """\
+[package]
+address = "github.com/pipelexlab/bad-deps"
+version = "1.0.0"
+description = "Package with a non-table dependency entry"
+
+[dependencies]
+foo = "1.0.0"
+"""
+
 
 # ============================================================
 # Expected model instances

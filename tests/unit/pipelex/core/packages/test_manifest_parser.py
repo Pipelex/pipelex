@@ -10,6 +10,7 @@ from tests.unit.pipelex.core.packages.test_data import (
     MISSING_PACKAGE_SECTION_TOML,
     MISSING_REQUIRED_FIELDS_TOML,
     MULTI_LEVEL_EXPORTS_TOML,
+    NON_TABLE_DEPENDENCY_TOML,
     ManifestTestData,
 )
 
@@ -77,6 +78,11 @@ class TestManifestParser:
         """Missing required fields in [package] should raise ManifestValidationError."""
         with pytest.raises(ManifestValidationError, match="validation failed"):
             parse_methods_toml(MISSING_REQUIRED_FIELDS_TOML)
+
+    def test_parse_non_table_dependency_raises(self):
+        """A dependency whose value is not a table should raise ManifestValidationError."""
+        with pytest.raises(ManifestValidationError, match="expected a table"):
+            parse_methods_toml(NON_TABLE_DEPENDENCY_TOML)
 
     def test_serialize_roundtrip(self):
         """Serialize a manifest to TOML and parse it back — roundtrip check."""

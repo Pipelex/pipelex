@@ -90,6 +90,11 @@ def parse_methods_toml(content: str) -> MthdsPackageManifest:
                 except ValidationError as exc:
                     msg = f"Invalid dependency '{alias}' in METHODS.toml: {exc}"
                     raise ManifestValidationError(msg) from exc
+            else:
+                msg = (
+                    f"Invalid dependency '{alias}' in METHODS.toml: expected a table with 'address' and 'version' keys, got {type(dep_data).__name__}"
+                )
+                raise ManifestValidationError(msg)
 
     # Extract [exports] section with recursive walk
     exports_section = raw.get("exports", {})
