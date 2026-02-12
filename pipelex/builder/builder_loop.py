@@ -19,6 +19,10 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.packages.discovery import MANIFEST_FILENAME
+from pipelex.core.packages.manifest import DomainExports, MthdsPackageManifest
+from pipelex.core.packages.manifest_parser import serialize_manifest_to_toml
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
@@ -910,3 +914,75 @@ class BuilderLoop:
         field_spec.choices = None
 
         return True
+
+
+def maybe_generate_manifest_for_output(output_dir: Path) -> Path | None:
+    """Generate a METHODS.toml if the output directory contains multiple domains.
+
+    Scans all .mthds files in the output directory, parses their headers to
+    extract domain and main_pipe information, and generates a METHODS.toml
+    if multiple distinct domains are found.
+
+    Args:
+        output_dir: Directory to scan for .mthds files
+
+    Returns:
+        Path to the generated METHODS.toml, or None if not generated
+    """
+    mthds_files = sorted(output_dir.rglob("*.mthds"))
+    if not mthds_files:
+        return None
+
+    # Parse each bundle to extract domain and pipe info
+    domain_pipes: dict[str, list[str]] = {}
+    domain_main_pipes: dict[str, str] = {}
+
+    for mthds_file in mthds_files:
+        try:
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
+        except Exception as exc:
+            log.warning(f"Could not parse {mthds_file}: {exc}")
+            continue
+
+        domain = blueprint.domain
+        if domain not in domain_pipes:
+            domain_pipes[domain] = []
+
+        if blueprint.pipe:
+            for pipe_code in blueprint.pipe:
+                domain_pipes[domain].append(pipe_code)
+
+        if blueprint.main_pipe:
+            domain_main_pipes[domain] = blueprint.main_pipe
+
+    # Only generate manifest when multiple domains are present
+    if len(domain_pipes) < 2:
+        return None
+
+    # Build exports: include main_pipe and all pipes from each domain
+    exports: list[DomainExports] = []
+    for domain, pipe_codes in sorted(domain_pipes.items()):
+        # For exports, include main_pipe if it exists, plus all pipes
+        exported: list[str] = []
+        main_pipe = domain_main_pipes.get(domain)
+        if main_pipe and main_pipe not in exported:
+            exported.append(main_pipe)
+        for pipe_code in sorted(pipe_codes):
+            if pipe_code not in exported:
+                exported.append(pipe_code)
+        if exported:
+            exports.append(DomainExports(domain_path=domain, pipes=exported))
+
+    dir_name = output_dir.name.replace("-", "_").replace(" ", "_").lower()
+    manifest = MthdsPackageManifest(
+        address=f"example.com/yourorg/{dir_name}",
+        version="0.1.0",
+        description=f"Package generated from {len(mthds_files)} .mthds file(s)",
+        exports=exports,
+    )
+
+    manifest_path = output_dir / MANIFEST_FILENAME
+    toml_content = serialize_manifest_to_toml(manifest)
+    manifest_path.write_text(toml_content, encoding="utf-8")
+
+    return manifest_path

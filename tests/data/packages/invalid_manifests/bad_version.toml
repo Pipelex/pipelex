@@ -1,0 +1,3 @@
+[package]
+address = "github.com/org/repo"
+version = "not-a-version"

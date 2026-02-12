@@ -11,6 +11,7 @@ from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cli.commands.pkg.app import pkg_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
@@ -26,7 +27,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["init", "doctor", "build", "validate", "run", "graph", "show", "which"]
+        return ["init", "doctor", "build", "validate", "run", "graph", "show", "which", "pkg"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -152,3 +153,4 @@ app.command(name="run", help="Run a pipe, optionally providing a specific bundle
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
+app.add_typer(pkg_app, name="pkg", help="Package management: initialize and inspect METHODS.toml manifests")

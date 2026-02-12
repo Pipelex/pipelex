@@ -160,7 +160,7 @@ class PipelexBundleBlueprint(BaseModel):
         """
         declared_pipes: set[str] = set(self.pipe.keys()) if self.pipe else set()
         special_outcomes = SpecialOutcome.value_list()
-        all_pipe_refs = self._collect_pipe_references()
+        all_pipe_refs = self.collect_pipe_references()
 
         invalid_refs: list[str] = []
         for pipe_ref_str, context in all_pipe_refs:
@@ -196,7 +196,7 @@ class PipelexBundleBlueprint(BaseModel):
             raise ValueError(msg)
         return self
 
-    def _collect_pipe_references(self) -> list[tuple[str, str]]:
+    def collect_pipe_references(self) -> list[tuple[str, str]]:
         """Collect all pipe references from controller blueprints.
 
         Returns:

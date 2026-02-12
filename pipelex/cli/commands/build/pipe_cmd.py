@@ -9,7 +9,7 @@ from posthog import tag
 
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
-from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.builder_loop import BuilderLoop, maybe_generate_manifest_for_output
 from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.runner_code import generate_runner_code
@@ -205,6 +205,11 @@ def build_pipe_cmd(
             console.print(f"\n[green]✓[/green] [bold]Pipeline built successfully ({end_time - start_time:.1f}s)[/bold]")
             console.print(f"  Output: {mthds_file_path}")
             return
+
+        # Generate METHODS.toml if multiple domains exist in output dir
+        manifest_path = maybe_generate_manifest_for_output(output_dir=Path(extras_output_dir))
+        if manifest_path:
+            log.verbose(f"Package manifest generated: {manifest_path}")
 
         # Generate extras (inputs and runner)
         main_pipe_code = pipelex_bundle_spec.main_pipe

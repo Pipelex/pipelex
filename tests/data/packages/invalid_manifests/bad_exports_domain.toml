@@ -1,0 +1,6 @@
+[package]
+address = "github.com/org/repo"
+version = "1.0.0"
+
+[exports.InvalidDomain]
+pipes = ["my_pipe"]

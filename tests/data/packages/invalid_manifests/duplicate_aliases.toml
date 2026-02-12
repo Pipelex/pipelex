@@ -1,0 +1,6 @@
+[package]
+address = "github.com/org/repo"
+version = "1.0.0"
+
+[dependencies]
+my_dep = { address = "github.com/org/dep1", version = "1.0.0" }

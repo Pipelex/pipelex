@@ -1,0 +1,106 @@
+from typing import ClassVar
+
+from pipelex.core.packages.manifest import DomainExports, MthdsPackageManifest, PackageDependency
+
+# ============================================================
+# TOML strings for parser tests
+# ============================================================
+
+FULL_MANIFEST_TOML = """\
+[package]
+address = "github.com/pipelexlab/legal-tools"
+version = "1.0.0"
+description = "Legal document analysis tools"
+authors = ["PipelexLab"]
+license = "MIT"
+mthds_version = "0.5.0"
+
+[dependencies]
+scoring_lib = { address = "github.com/pipelexlab/scoring-lib", version = "2.0.0" }
+
+[exports.legal.contracts]
+pipes = ["extract_clause", "analyze_contract"]
+
+[exports.scoring]
+pipes = ["compute_weighted_score"]
+"""
+
+MINIMAL_MANIFEST_TOML = """\
+[package]
+address = "github.com/pipelexlab/minimal"
+version = "0.1.0"
+"""
+
+EMPTY_EXPORTS_DEPS_TOML = """\
+[package]
+address = "github.com/pipelexlab/empty"
+version = "1.0.0"
+
+[dependencies]
+
+[exports]
+"""
+
+MULTI_LEVEL_EXPORTS_TOML = """\
+[package]
+address = "github.com/pipelexlab/deep"
+version = "1.0.0"
+
+[exports.legal.contracts.shareholder]
+pipes = ["extract_shareholder_clause"]
+
+[exports.legal.contracts]
+pipes = ["extract_clause"]
+
+[exports.scoring]
+pipes = ["compute_score"]
+"""
+
+INVALID_TOML_SYNTAX = """\
+[package
+address = "broken
+"""
+
+MISSING_PACKAGE_SECTION_TOML = """\
+[something_else]
+foo = "bar"
+"""
+
+MISSING_REQUIRED_FIELDS_TOML = """\
+[package]
+description = "Missing address and version"
+"""
+
+
+# ============================================================
+# Expected model instances
+# ============================================================
+
+
+class ManifestTestData:
+    """Reusable expected manifest instances for test assertions."""
+
+    FULL_MANIFEST: ClassVar[MthdsPackageManifest] = MthdsPackageManifest(
+        address="github.com/pipelexlab/legal-tools",
+        version="1.0.0",
+        description="Legal document analysis tools",
+        authors=["PipelexLab"],
+        license="MIT",
+        mthds_version="0.5.0",
+        dependencies=[
+            PackageDependency(
+                address="github.com/pipelexlab/scoring-lib",
+                version="2.0.0",
+                alias="scoring_lib",
+            ),
+        ],
+        exports=[
+            DomainExports(domain_path="legal.contracts", pipes=["extract_clause", "analyze_contract"]),
+            DomainExports(domain_path="scoring", pipes=["compute_weighted_score"]),
+        ],
+    )
+
+    MINIMAL_MANIFEST: ClassVar[MthdsPackageManifest] = MthdsPackageManifest(
+        address="github.com/pipelexlab/minimal",
+        version="0.1.0",
+    )

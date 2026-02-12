@@ -17,6 +17,9 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.packages.discovery import find_package_manifest
+from pipelex.core.packages.exceptions import ManifestError
+from pipelex.core.packages.visibility import check_visibility_for_blueprints
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -519,6 +522,9 @@ class LibraryManager(LibraryManagerAbstract):
                 ) from interpreter_error
             blueprints.append(blueprint)
 
+        # Run package visibility validation if a METHODS.toml manifest exists
+        self._check_package_visibility(blueprints=blueprints, mthds_paths=valid_mthds_paths)
+
         # Store resolved absolute paths for duplicate detection in the library
         library = self.get_library(library_id=library_id)
         for mthds_file_path in valid_mthds_paths:
@@ -536,6 +542,40 @@ class LibraryManager(LibraryManagerAbstract):
             raise LibraryError(
                 message=msg,
             ) from validation_error
+
+    def _check_package_visibility(
+        self,
+        blueprints: list[PipelexBundleBlueprint],
+        mthds_paths: list[Path],
+    ) -> None:
+        """Check package visibility if a METHODS.toml manifest exists.
+
+        Walks up from the first bundle path to find a METHODS.toml manifest.
+        If found, validates all cross-domain pipe references against the exports.
+
+        Args:
+            blueprints: The parsed bundle blueprints
+            mthds_paths: The MTHDS file paths that were loaded
+        """
+        if not mthds_paths:
+            return
+
+        # Try to find a manifest from the first bundle path
+        try:
+            manifest = find_package_manifest(mthds_paths[0])
+        except ManifestError as exc:
+            log.warning(f"Could not parse METHODS.toml: {exc.message}")
+            return
+
+        if manifest is None:
+            return
+
+        visibility_errors = check_visibility_for_blueprints(manifest=manifest, blueprints=blueprints)
+        if visibility_errors:
+            error_messages = [err.message for err in visibility_errors]
+            joined_errors = "\n  - ".join(error_messages)
+            msg = f"Package visibility violations found:\n  - {joined_errors}"
+            raise LibraryLoadingError(msg)
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

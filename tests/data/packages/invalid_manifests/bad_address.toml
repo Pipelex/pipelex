@@ -1,0 +1,3 @@
+[package]
+address = "no-dots-or-slashes"
+version = "1.0.0"

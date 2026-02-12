@@ -152,3 +152,36 @@ class QualifiedRef(BaseModel):
         if self.domain_path is None:
             return False
         return self.domain_path != domain
+
+    @staticmethod
+    def has_cross_package_prefix(raw: str) -> bool:
+        """Check if a raw reference string contains the cross-package '->' prefix.
+
+        Cross-package references look like: 'alias->domain.pipe_code'
+
+        Args:
+            raw: The raw reference string to check
+
+        Returns:
+            True if the string contains '->'
+        """
+        return "->" in raw
+
+    @staticmethod
+    def split_cross_package_ref(raw: str) -> tuple[str, str]:
+        """Split a cross-package reference into alias and remainder.
+
+        Args:
+            raw: The raw reference string like 'alias->domain.pipe_code'
+
+        Returns:
+            Tuple of (alias, remainder) where remainder is 'domain.pipe_code'
+
+        Raises:
+            QualifiedRefError: If the string does not contain '->'
+        """
+        if "->" not in raw:
+            msg = f"Reference '{raw}' is not a cross-package reference (no '->' found)"
+            raise QualifiedRefError(msg)
+        parts = raw.split("->", maxsplit=1)
+        return parts[0], parts[1]

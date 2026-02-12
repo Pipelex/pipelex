@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
-from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.builder_loop import BuilderLoop, maybe_generate_manifest_for_output
 from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.config import get_config
@@ -147,6 +147,11 @@ async def build_pipe_core(
         msg = f"Failed to convert bundle spec to blueprint: {exc}"
         raise BuildPipeError(message=msg) from exc
     save_text_to_path(text=mthds_content, path=str(mthds_file_path))
+
+    # Generate METHODS.toml if multiple domains exist in output dir
+    manifest_path = maybe_generate_manifest_for_output(output_dir=Path(extras_output_dir))
+    if manifest_path:
+        log.verbose(f"Package manifest generated: {manifest_path}")
 
     main_pipe_code = pipelex_bundle_spec.main_pipe or ""
     domain = pipelex_bundle_spec.domain or ""
