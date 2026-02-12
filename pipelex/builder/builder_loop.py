@@ -19,9 +19,9 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.packages.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
-from pipelex.core.packages.manifest import DomainExports, MthdsPackageManifest
+from pipelex.core.packages.manifest import MthdsPackageManifest
 from pipelex.core.packages.manifest_parser import serialize_manifest_to_toml
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
@@ -934,44 +934,16 @@ def maybe_generate_manifest_for_output(output_dir: Path) -> Path | None:
         return None
 
     # Parse each bundle to extract domain and pipe info
-    domain_pipes: dict[str, list[str]] = {}
-    domain_main_pipes: dict[str, str] = {}
-
-    for mthds_file in mthds_files:
-        try:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
-        except Exception as exc:
-            log.warning(f"Could not parse {mthds_file}: {exc}")
-            continue
-
-        domain = blueprint.domain
-        if domain not in domain_pipes:
-            domain_pipes[domain] = []
-
-        if blueprint.pipe:
-            for pipe_code in blueprint.pipe:
-                domain_pipes[domain].append(pipe_code)
-
-        if blueprint.main_pipe:
-            domain_main_pipes[domain] = blueprint.main_pipe
+    domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(mthds_files)
+    for error in errors:
+        log.warning(f"Could not parse {error}")
 
     # Only generate manifest when multiple domains are present
     if len(domain_pipes) < 2:
         return None
 
     # Build exports: include main_pipe and all pipes from each domain
-    exports: list[DomainExports] = []
-    for domain, pipe_codes in sorted(domain_pipes.items()):
-        # For exports, include main_pipe if it exists, plus all pipes
-        exported: list[str] = []
-        main_pipe = domain_main_pipes.get(domain)
-        if main_pipe and main_pipe not in exported:
-            exported.append(main_pipe)
-        for pipe_code in sorted(pipe_codes):
-            if pipe_code not in exported:
-                exported.append(pipe_code)
-        if exported:
-            exports.append(DomainExports(domain_path=domain, pipes=exported))
+    exports = build_domain_exports_from_scan(domain_pipes, domain_main_pipes)
 
     dir_name = output_dir.name.replace("-", "_").replace(" ", "_").lower()
     manifest = MthdsPackageManifest(

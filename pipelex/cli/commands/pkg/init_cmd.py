@@ -2,9 +2,9 @@ from pathlib import Path
 
 import typer
 
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.packages.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
-from pipelex.core.packages.manifest import DomainExports, MthdsPackageManifest
+from pipelex.core.packages.manifest import MthdsPackageManifest
 from pipelex.core.packages.manifest_parser import serialize_manifest_to_toml
 from pipelex.hub import get_console
 
@@ -32,45 +32,15 @@ def do_pkg_init(force: bool = False) -> None:
         raise typer.Exit(code=1)
 
     # Parse each bundle header to extract domain and main_pipe
-    domain_pipes: dict[str, list[str]] = {}
-    domain_main_pipes: dict[str, str] = {}
-    errors: list[str] = []
-
-    for mthds_file in mthds_files:
-        try:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
-        except Exception as exc:
-            errors.append(f"  {mthds_file}: {exc}")
-            continue
-
-        domain = blueprint.domain
-        if domain not in domain_pipes:
-            domain_pipes[domain] = []
-
-        if blueprint.pipe:
-            for pipe_code in blueprint.pipe:
-                domain_pipes[domain].append(pipe_code)
-
-        if blueprint.main_pipe:
-            domain_main_pipes[domain] = blueprint.main_pipe
+    domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(mthds_files)
 
     if errors:
         console.print("[yellow]Some files could not be parsed:[/yellow]")
         for error in errors:
-            console.print(error)
+            console.print(f"  {error}")
 
     # Build exports from collected domain/pipe data, placing main_pipe first
-    exports: list[DomainExports] = []
-    for domain, pipe_codes in sorted(domain_pipes.items()):
-        exported: list[str] = []
-        main_pipe = domain_main_pipes.get(domain)
-        if main_pipe and main_pipe not in exported:
-            exported.append(main_pipe)
-        for pipe_code in sorted(pipe_codes):
-            if pipe_code not in exported:
-                exported.append(pipe_code)
-        if exported:
-            exports.append(DomainExports(domain_path=domain, pipes=exported))
+    exports = build_domain_exports_from_scan(domain_pipes, domain_main_pipes)
 
     # Generate manifest with placeholder address
     dir_name = cwd.name.replace("-", "_").replace(" ", "_").lower()
