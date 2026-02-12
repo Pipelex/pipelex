@@ -386,3 +386,89 @@ class TestMermaidflow:
         # Should have multiple subgraphs with different colors
         assert "subgraph" in result.mermaid_code
         assert "style sg_" in result.mermaid_code  # Subgraph styling
+
+    def test_parallel_combine_stuff_rendered_inside_controller_subgraph(self) -> None:
+        """Test that PARALLEL_COMBINE target stuffs are rendered inside the controller's subgraph."""
+        parallel_ctrl = {
+            "node_id": "parallel_ctrl",
+            "kind": NodeKind.CONTROLLER,
+            "pipe_code": "parallel_controller",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[],
+                outputs=[IOSpec(name="combined_output", concept="MergedText", digest="combined_digest_001")],
+            ),
+        }
+        branch_a = {
+            "node_id": "branch_a",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "branch_a_pipe",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[],
+                outputs=[IOSpec(name="branch_a_out", concept="Text", digest="branch_a_digest")],
+            ),
+        }
+        branch_b = {
+            "node_id": "branch_b",
+            "kind": NodeKind.OPERATOR,
+            "pipe_code": "branch_b_pipe",
+            "status": NodeStatus.SUCCEEDED,
+            "node_io": NodeIOSpec(
+                inputs=[],
+                outputs=[IOSpec(name="branch_b_out", concept="Text", digest="branch_b_digest")],
+            ),
+        }
+        contains_a = {
+            "edge_id": "edge_contains_a",
+            "source": "parallel_ctrl",
+            "target": "branch_a",
+            "kind": EdgeKind.CONTAINS,
+        }
+        contains_b = {
+            "edge_id": "edge_contains_b",
+            "source": "parallel_ctrl",
+            "target": "branch_b",
+            "kind": EdgeKind.CONTAINS,
+        }
+        combine_a = {
+            "edge_id": "edge_combine_a",
+            "source": "branch_a",
+            "target": "parallel_ctrl",
+            "kind": EdgeKind.PARALLEL_COMBINE,
+            "source_stuff_digest": "branch_a_digest",
+            "target_stuff_digest": "combined_digest_001",
+        }
+        combine_b = {
+            "edge_id": "edge_combine_b",
+            "source": "branch_b",
+            "target": "parallel_ctrl",
+            "kind": EdgeKind.PARALLEL_COMBINE,
+            "source_stuff_digest": "branch_b_digest",
+            "target_stuff_digest": "combined_digest_001",
+        }
+        graph = self._make_graph(
+            nodes=[parallel_ctrl, branch_a, branch_b],
+            edges=[contains_a, contains_b, combine_a, combine_b],
+        )
+        graph_config = make_graph_config()
+        result = MermaidflowFactory.make_from_graphspec(graph, graph_config)
+
+        # The combined output stuff should appear inside the controller's subgraph
+        # (between subgraph ... and end)
+        lines = result.mermaid_code.split("\n")
+        subgraph_start_idx = None
+        subgraph_end_idx = None
+        for index_line, line in enumerate(lines):
+            if "subgraph" in line and "parallel_controller" in line:
+                subgraph_start_idx = index_line
+            if subgraph_start_idx is not None and subgraph_end_idx is None and line.strip() == "end":
+                subgraph_end_idx = index_line
+                break
+
+        assert subgraph_start_idx is not None, "Controller subgraph not found"
+        assert subgraph_end_idx is not None, "Controller subgraph end not found"
+
+        subgraph_content = "\n".join(lines[subgraph_start_idx : subgraph_end_idx + 1])
+        assert "combined_output" in subgraph_content, "Combined output stuff should be inside the controller subgraph"
+        assert ":::stuff" in subgraph_content, "Combined output stuff should have :::stuff class styling"
