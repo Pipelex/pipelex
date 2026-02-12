@@ -13,6 +13,7 @@ from typing import Any
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graphspec import (
+    EdgeSpec,
     GraphSpec,
     NodeKind,
     NodeSpec,
@@ -255,80 +256,8 @@ class MermaidflowFactory:
         if batch_item_edges or batch_aggregate_edges:
             lines.append("")
             lines.append("    %% Batch edges: list-item relationships")
-
-            for edge in batch_item_edges:
-                source_sid = stuff_id_mapping.get(edge.source_stuff_digest) if edge.source_stuff_digest else None
-                target_sid = stuff_id_mapping.get(edge.target_stuff_digest) if edge.target_stuff_digest else None
-                # Render missing stuff nodes on the fly
-                if not source_sid and edge.source_stuff_digest and edge.source_stuff_digest in all_stuff_info:
-                    name, concept = all_stuff_info[edge.source_stuff_digest]
-                    lines.append(
-                        cls._render_stuff_node(
-                            digest=edge.source_stuff_digest,
-                            name=name,
-                            concept=concept,
-                            stuff_id_mapping=stuff_id_mapping,
-                            show_stuff_codes=show_stuff_codes,
-                            indent="    ",
-                        )
-                    )
-                    source_sid = stuff_id_mapping.get(edge.source_stuff_digest)
-                if not target_sid and edge.target_stuff_digest and edge.target_stuff_digest in all_stuff_info:
-                    name, concept = all_stuff_info[edge.target_stuff_digest]
-                    lines.append(
-                        cls._render_stuff_node(
-                            digest=edge.target_stuff_digest,
-                            name=name,
-                            concept=concept,
-                            stuff_id_mapping=stuff_id_mapping,
-                            show_stuff_codes=show_stuff_codes,
-                            indent="    ",
-                        )
-                    )
-                    target_sid = stuff_id_mapping.get(edge.target_stuff_digest)
-                if source_sid and target_sid:
-                    label = edge.label or ""
-                    if label:
-                        lines.append(f'    {source_sid} -."{label}".-> {target_sid}')
-                    else:
-                        lines.append(f"    {source_sid} -.-> {target_sid}")
-
-            for edge in batch_aggregate_edges:
-                source_sid = stuff_id_mapping.get(edge.source_stuff_digest) if edge.source_stuff_digest else None
-                target_sid = stuff_id_mapping.get(edge.target_stuff_digest) if edge.target_stuff_digest else None
-                # Render missing stuff nodes on the fly
-                if not source_sid and edge.source_stuff_digest and edge.source_stuff_digest in all_stuff_info:
-                    name, concept = all_stuff_info[edge.source_stuff_digest]
-                    lines.append(
-                        cls._render_stuff_node(
-                            digest=edge.source_stuff_digest,
-                            name=name,
-                            concept=concept,
-                            stuff_id_mapping=stuff_id_mapping,
-                            show_stuff_codes=show_stuff_codes,
-                            indent="    ",
-                        )
-                    )
-                    source_sid = stuff_id_mapping.get(edge.source_stuff_digest)
-                if not target_sid and edge.target_stuff_digest and edge.target_stuff_digest in all_stuff_info:
-                    name, concept = all_stuff_info[edge.target_stuff_digest]
-                    lines.append(
-                        cls._render_stuff_node(
-                            digest=edge.target_stuff_digest,
-                            name=name,
-                            concept=concept,
-                            stuff_id_mapping=stuff_id_mapping,
-                            show_stuff_codes=show_stuff_codes,
-                            indent="    ",
-                        )
-                    )
-                    target_sid = stuff_id_mapping.get(edge.target_stuff_digest)
-                if source_sid and target_sid:
-                    label = edge.label or ""
-                    if label:
-                        lines.append(f'    {source_sid} -."{label}".-> {target_sid}')
-                    else:
-                        lines.append(f"    {source_sid} -.-> {target_sid}")
+            cls._render_dashed_edges(batch_item_edges, lines, stuff_id_mapping, all_stuff_info, show_stuff_codes)
+            cls._render_dashed_edges(batch_aggregate_edges, lines, stuff_id_mapping, all_stuff_info, show_stuff_codes)
 
         # Render parallel combine edges (branch outputs → combined output) with dashed styling
         # Same approach: use stuff digests to connect stuff-to-stuff.
@@ -336,42 +265,7 @@ class MermaidflowFactory:
         if parallel_combine_edges:
             lines.append("")
             lines.append("    %% Parallel combine edges: branch outputs → combined output")
-            for edge in parallel_combine_edges:
-                source_sid = stuff_id_mapping.get(edge.source_stuff_digest) if edge.source_stuff_digest else None
-                target_sid = stuff_id_mapping.get(edge.target_stuff_digest) if edge.target_stuff_digest else None
-                # Render missing stuff nodes on the fly
-                if not source_sid and edge.source_stuff_digest and edge.source_stuff_digest in all_stuff_info:
-                    name, concept = all_stuff_info[edge.source_stuff_digest]
-                    lines.append(
-                        cls._render_stuff_node(
-                            digest=edge.source_stuff_digest,
-                            name=name,
-                            concept=concept,
-                            stuff_id_mapping=stuff_id_mapping,
-                            show_stuff_codes=show_stuff_codes,
-                            indent="    ",
-                        )
-                    )
-                    source_sid = stuff_id_mapping.get(edge.source_stuff_digest)
-                if not target_sid and edge.target_stuff_digest and edge.target_stuff_digest in all_stuff_info:
-                    name, concept = all_stuff_info[edge.target_stuff_digest]
-                    lines.append(
-                        cls._render_stuff_node(
-                            digest=edge.target_stuff_digest,
-                            name=name,
-                            concept=concept,
-                            stuff_id_mapping=stuff_id_mapping,
-                            show_stuff_codes=show_stuff_codes,
-                            indent="    ",
-                        )
-                    )
-                    target_sid = stuff_id_mapping.get(edge.target_stuff_digest)
-                if source_sid and target_sid:
-                    label = edge.label or ""
-                    if label:
-                        lines.append(f'    {source_sid} -."{label}".-> {target_sid}')
-                    else:
-                        lines.append(f"    {source_sid} -.-> {target_sid}")
+            cls._render_dashed_edges(parallel_combine_edges, lines, stuff_id_mapping, all_stuff_info, show_stuff_codes)
 
         # Style definitions
         lines.append("")
@@ -512,6 +406,65 @@ class MermaidflowFactory:
             label = f"{label}<br/>{escape_mermaid_label(concept)}"
 
         return f'{indent}{stuff_mermaid_id}(["{label}"]):::stuff'
+
+    @classmethod
+    def _render_dashed_edges(
+        cls,
+        edges: list[EdgeSpec],
+        lines: list[str],
+        stuff_id_mapping: dict[str, str],
+        all_stuff_info: dict[str, tuple[str, str | None]],
+        show_stuff_codes: bool,
+    ) -> None:
+        """Render dashed edges between stuff nodes, resolving missing stuff nodes on the fly.
+
+        This handles BATCH_ITEM, BATCH_AGGREGATE, and PARALLEL_COMBINE edges which all share
+        the same rendering logic: look up source/target stuff IDs, render any missing stuff
+        nodes from all_stuff_info, and emit a dashed arrow with an optional label.
+
+        Args:
+            edges: The edges to render as dashed arrows.
+            lines: The mermaid output lines list (mutated).
+            stuff_id_mapping: Map to store/retrieve stuff mermaid IDs (mutated).
+            all_stuff_info: Supplementary stuff info from all nodes including controllers.
+            show_stuff_codes: Whether to show digest in stuff labels.
+        """
+        for edge in edges:
+            source_sid = stuff_id_mapping.get(edge.source_stuff_digest) if edge.source_stuff_digest else None
+            target_sid = stuff_id_mapping.get(edge.target_stuff_digest) if edge.target_stuff_digest else None
+            # Render missing stuff nodes on the fly
+            if not source_sid and edge.source_stuff_digest and edge.source_stuff_digest in all_stuff_info:
+                name, concept = all_stuff_info[edge.source_stuff_digest]
+                lines.append(
+                    cls._render_stuff_node(
+                        digest=edge.source_stuff_digest,
+                        name=name,
+                        concept=concept,
+                        stuff_id_mapping=stuff_id_mapping,
+                        show_stuff_codes=show_stuff_codes,
+                        indent="    ",
+                    )
+                )
+                source_sid = stuff_id_mapping.get(edge.source_stuff_digest)
+            if not target_sid and edge.target_stuff_digest and edge.target_stuff_digest in all_stuff_info:
+                name, concept = all_stuff_info[edge.target_stuff_digest]
+                lines.append(
+                    cls._render_stuff_node(
+                        digest=edge.target_stuff_digest,
+                        name=name,
+                        concept=concept,
+                        stuff_id_mapping=stuff_id_mapping,
+                        show_stuff_codes=show_stuff_codes,
+                        indent="    ",
+                    )
+                )
+                target_sid = stuff_id_mapping.get(edge.target_stuff_digest)
+            if source_sid and target_sid:
+                label = edge.label or ""
+                if label:
+                    lines.append(f'    {source_sid} -."{label}".-> {target_sid}')
+                else:
+                    lines.append(f"    {source_sid} -.-> {target_sid}")
 
     @classmethod
     def _render_subgraph_recursive(
