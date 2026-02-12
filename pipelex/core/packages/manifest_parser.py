@@ -101,7 +101,11 @@ def parse_methods_toml(content: str) -> MthdsPackageManifest:
     exports: list[DomainExports] = []
     if isinstance(exports_section, dict):
         exports_dict = cast("dict[str, Any]", exports_section)
-        exports = _walk_exports_table(exports_dict)
+        try:
+            exports = _walk_exports_table(exports_dict)
+        except ValidationError as exc:
+            msg = f"Invalid exports in METHODS.toml: {exc}"
+            raise ManifestValidationError(msg) from exc
 
     # Build the manifest
     address: str = str(pkg.get("address", ""))

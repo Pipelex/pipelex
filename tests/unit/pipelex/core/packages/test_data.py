@@ -84,6 +84,25 @@ description = "Package with a non-table dependency entry"
 foo = "1.0.0"
 """
 
+INVALID_DOMAIN_PATH_EXPORTS_TOML = """\
+[package]
+address = "github.com/pipelexlab/bad-exports"
+version = "1.0.0"
+description = "Package with an invalid domain path in exports"
+
+[exports.InvalidDomain]
+pipes = ["extract_clause"]
+"""
+
+INVALID_PIPE_NAME_EXPORTS_TOML = """\
+[package]
+address = "github.com/pipelexlab/bad-pipes"
+version = "1.0.0"
+description = "Package with an invalid pipe name in exports"
+
+[exports.legal]
+pipes = ["BadPipe"]
+"""
 
 # ============================================================
 # Expected model instances

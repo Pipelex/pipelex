@@ -5,6 +5,8 @@ from pipelex.core.packages.manifest_parser import parse_methods_toml, serialize_
 from tests.unit.pipelex.core.packages.test_data import (
     EMPTY_EXPORTS_DEPS_TOML,
     FULL_MANIFEST_TOML,
+    INVALID_DOMAIN_PATH_EXPORTS_TOML,
+    INVALID_PIPE_NAME_EXPORTS_TOML,
     INVALID_TOML_SYNTAX,
     MINIMAL_MANIFEST_TOML,
     MISSING_PACKAGE_SECTION_TOML,
@@ -83,6 +85,19 @@ class TestManifestParser:
         """A dependency whose value is not a table should raise ManifestValidationError."""
         with pytest.raises(ManifestValidationError, match="expected a table"):
             parse_methods_toml(NON_TABLE_DEPENDENCY_TOML)
+
+    @pytest.mark.parametrize(
+        ("topic", "toml_content"),
+        [
+            ("invalid domain path", INVALID_DOMAIN_PATH_EXPORTS_TOML),
+            ("invalid pipe name", INVALID_PIPE_NAME_EXPORTS_TOML),
+        ],
+    )
+    def test_parse_invalid_exports_raises(self, topic: str, toml_content: str):
+        """Invalid domain paths or pipe names in [exports] should raise ManifestValidationError."""
+        _ = topic  # Used for test identification
+        with pytest.raises(ManifestValidationError, match="Invalid exports"):
+            parse_methods_toml(toml_content)
 
     def test_serialize_roundtrip(self):
         """Serialize a manifest to TOML and parse it back — roundtrip check."""
