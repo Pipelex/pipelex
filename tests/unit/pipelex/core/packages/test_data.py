@@ -29,12 +29,14 @@ MINIMAL_MANIFEST_TOML = """\
 [package]
 address = "github.com/pipelexlab/minimal"
 version = "0.1.0"
+description = "A minimal MTHDS package"
 """
 
 EMPTY_EXPORTS_DEPS_TOML = """\
 [package]
 address = "github.com/pipelexlab/empty"
 version = "1.0.0"
+description = "Package with empty exports and dependencies"
 
 [dependencies]
 
@@ -45,6 +47,7 @@ MULTI_LEVEL_EXPORTS_TOML = """\
 [package]
 address = "github.com/pipelexlab/deep"
 version = "1.0.0"
+description = "Deep nested exports package"
 
 [exports.legal.contracts.shareholder]
 pipes = ["extract_shareholder_clause"]
@@ -103,4 +106,5 @@ class ManifestTestData:
     MINIMAL_MANIFEST: ClassVar[MthdsPackageManifest] = MthdsPackageManifest(
         address="github.com/pipelexlab/minimal",
         version="0.1.0",
+        description="A minimal MTHDS package",
     )

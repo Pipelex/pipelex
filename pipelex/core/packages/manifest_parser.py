@@ -101,8 +101,7 @@ def parse_methods_toml(content: str) -> MthdsPackageManifest:
     # Build the manifest
     address: str = str(pkg.get("address", ""))
     version: str = str(pkg.get("version", ""))
-    description_val = pkg.get("description")
-    description: str | None = str(description_val) if description_val is not None else None
+    description: str = str(pkg.get("description", ""))
     authors_val = pkg.get("authors", [])
     authors: list[str] = cast("list[str]", authors_val) if isinstance(authors_val, list) else []
     license_val = pkg.get("license")
@@ -143,8 +142,7 @@ def serialize_manifest_to_toml(manifest: MthdsPackageManifest) -> str:
     package_table = tomlkit.table()
     package_table.add("address", manifest.address)
     package_table.add("version", manifest.version)
-    if manifest.description is not None:
-        package_table.add("description", manifest.description)
+    package_table.add("description", manifest.description)
     if manifest.authors:
         package_table.add("authors", manifest.authors)
     if manifest.license is not None:

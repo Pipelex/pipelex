@@ -26,6 +26,7 @@ class TestCrossPackageRefs:
         manifest = MthdsPackageManifest(
             address="github.com/org/test",
             version="1.0.0",
+            description="Test package",
             dependencies=[
                 PackageDependency(
                     address="github.com/org/scoring-lib",
@@ -57,6 +58,7 @@ class TestCrossPackageRefs:
         manifest = MthdsPackageManifest(
             address="github.com/org/test",
             version="1.0.0",
+            description="Test package",
         )
         bundle = PipelexBundleBlueprint(
             domain="my_domain",
@@ -82,6 +84,7 @@ class TestCrossPackageRefs:
         manifest = MthdsPackageManifest(
             address="github.com/org/test",
             version="1.0.0",
+            description="Test package",
         )
         bundle = PipelexBundleBlueprint(
             domain="my_domain",

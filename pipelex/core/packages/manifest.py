@@ -15,6 +15,19 @@ SEMVER_PATTERN = re.compile(
     r"(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$"
 )
 
+# Version constraint pattern: supports standard range syntax used by Poetry/uv.
+# A single constraint is: optional operator + semver (with optional wildcard minor/patch).
+# Multiple constraints can be comma-separated (e.g., ">=1.0.0, <2.0.0").
+# Supported forms: "1.0.0", "^1.0.0", "~1.0.0", ">=1.0.0", "<=1.0.0", ">1.0.0", "<1.0.0",
+# "==1.0.0", "!=1.0.0", ">=1.0.0, <2.0.0", "*", "1.*", "1.0.*"
+_SINGLE_CONSTRAINT = (
+    r"(?:"
+    r"\*"  # wildcard: *
+    r"|(?:(?:\^|~|>=?|<=?|==|!=)?(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*|\*))?(?:\.(?:0|[1-9]\d*|\*))?)"  # [op]MAJOR[.MINOR[.PATCH]]
+    r"(?:-(?:(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?)"  # optional prerelease
+)
+VERSION_CONSTRAINT_PATTERN = re.compile(rf"^{_SINGLE_CONSTRAINT}(?:\s*,\s*{_SINGLE_CONSTRAINT})*$")
+
 # Address pattern: must contain at least one dot before a slash (hostname pattern)
 # e.g. "github.com/org/repo", "example.io/pkg"
 ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+/[a-zA-Z0-9._/-]+$")
@@ -23,6 +36,20 @@ ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+/[a-zA-Z0-9._/-]
 def is_valid_semver(version: str) -> bool:
     """Check if a version string is valid semver."""
     return SEMVER_PATTERN.match(version) is not None
+
+
+def is_valid_version_constraint(constraint: str) -> bool:
+    """Check if a version constraint string is valid.
+
+    Supports standard range syntax used by Poetry/uv:
+    - Exact: "1.0.0"
+    - Caret: "^1.0.0" (compatible release)
+    - Tilde: "~1.0.0" (approximately compatible)
+    - Comparison: ">=1.0.0", "<=1.0.0", ">1.0.0", "<1.0.0", "==1.0.0", "!=1.0.0"
+    - Compound: ">=1.0.0, <2.0.0"
+    - Wildcard: "*", "1.*", "1.0.*"
+    """
+    return VERSION_CONSTRAINT_PATTERN.match(constraint.strip()) is not None
 
 
 def is_valid_address(address: str) -> bool:
@@ -50,8 +77,8 @@ class PackageDependency(BaseModel):
     @field_validator("version")
     @classmethod
     def validate_version(cls, version: str) -> str:
-        if not is_valid_semver(version):
-            msg = f"Invalid version '{version}'. Must be valid semver (e.g. '1.0.0', '2.1.3-beta.1')."
+        if not is_valid_version_constraint(version):
+            msg = f"Invalid version constraint '{version}'. Must be a valid version range (e.g. '1.0.0', '^1.0.0', '>=1.0.0, <2.0.0')."
             raise ValueError(msg)
         return version
 
@@ -97,7 +124,7 @@ class MthdsPackageManifest(BaseModel):
 
     address: str
     version: str
-    description: str | None = None
+    description: str
     authors: list[str] = Field(default_factory=list)
     license: str | None = None
     mthds_version: str | None = None
@@ -120,6 +147,14 @@ class MthdsPackageManifest(BaseModel):
             msg = f"Invalid version '{version}'. Must be valid semver (e.g. '1.0.0', '2.1.3-beta.1')."
             raise ValueError(msg)
         return version
+
+    @field_validator("description")
+    @classmethod
+    def validate_description(cls, description: str) -> str:
+        if not description.strip():
+            msg = "Package description must not be empty."
+            raise ValueError(msg)
+        return description
 
     @model_validator(mode="after")
     def validate_unique_dependency_aliases(self) -> Self:

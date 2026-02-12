@@ -35,13 +35,31 @@ class TestMthdsPackageManifest:
         manifest = MthdsPackageManifest(
             address="github.com/org/pkg",
             version="0.1.0",
+            description="Minimal test package",
         )
         assert manifest.address == "github.com/org/pkg"
         assert manifest.version == "0.1.0"
-        assert manifest.description is None
+        assert manifest.description == "Minimal test package"
         assert manifest.authors == []
         assert manifest.dependencies == []
         assert manifest.exports == []
+
+    def test_missing_description_fails(self):
+        """Missing description should fail validation."""
+        with pytest.raises(ValidationError):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+            )  # type: ignore[call-arg]
+
+    def test_empty_description_fails(self):
+        """Empty description should fail validation."""
+        with pytest.raises(ValidationError, match="must not be empty"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="   ",
+            )
 
     def test_invalid_address_no_hostname(self):
         """Address without hostname pattern should fail."""
@@ -49,6 +67,7 @@ class TestMthdsPackageManifest:
             MthdsPackageManifest(
                 address="no-dots-or-slashes",
                 version="1.0.0",
+                description="Test",
             )
 
     def test_invalid_address_no_slash(self):
@@ -57,6 +76,7 @@ class TestMthdsPackageManifest:
             MthdsPackageManifest(
                 address="github.com",
                 version="1.0.0",
+                description="Test",
             )
 
     def test_invalid_version_not_semver(self):
@@ -65,6 +85,7 @@ class TestMthdsPackageManifest:
             MthdsPackageManifest(
                 address="github.com/org/repo",
                 version="not-a-version",
+                description="Test",
             )
 
     def test_invalid_version_partial(self):
@@ -73,6 +94,7 @@ class TestMthdsPackageManifest:
             MthdsPackageManifest(
                 address="github.com/org/repo",
                 version="1.0",
+                description="Test",
             )
 
     def test_valid_semver_with_prerelease(self):
@@ -80,6 +102,7 @@ class TestMthdsPackageManifest:
         manifest = MthdsPackageManifest(
             address="github.com/org/repo",
             version="1.0.0-beta.1",
+            description="Test",
         )
         assert manifest.version == "1.0.0-beta.1"
 
@@ -89,6 +112,7 @@ class TestMthdsPackageManifest:
             MthdsPackageManifest(
                 address="github.com/org/repo",
                 version="1.0.0",
+                description="Test",
                 dependencies=[
                     PackageDependency(address="github.com/org/dep1", version="1.0.0", alias="same_alias"),
                     PackageDependency(address="github.com/org/dep2", version="2.0.0", alias="same_alias"),
@@ -133,8 +157,56 @@ class TestMthdsPackageManifest:
         manifest = MthdsPackageManifest(
             address="github.com/org/repo",
             version="1.0.0",
+            description="Test",
             dependencies=[],
             exports=[],
         )
         assert manifest.dependencies == []
         assert manifest.exports == []
+
+    @pytest.mark.parametrize(
+        "version_str",
+        [
+            "^1.0.0",
+            "~1.0.0",
+            ">=1.0.0",
+            "<=2.0.0",
+            ">1.0.0",
+            "<2.0.0",
+            "==1.0.0",
+            "!=1.0.0",
+            ">=1.0.0, <2.0.0",
+            "*",
+            "1.*",
+            "1.0.*",
+            "1.0.0",
+            "2.1.3-beta.1",
+        ],
+    )
+    def test_valid_dependency_version_constraints(self, version_str: str):
+        """Version constraints using Poetry/uv range syntax should pass."""
+        dep = PackageDependency(
+            address="github.com/org/dep",
+            version=version_str,
+            alias="my_dep",
+        )
+        assert dep.version == version_str
+
+    @pytest.mark.parametrize(
+        "version_str",
+        [
+            "not-a-version",
+            "abc",
+            "1.0.0.0",
+            ">>1.0.0",
+            "~=1.0.0",
+        ],
+    )
+    def test_invalid_dependency_version_constraints(self, version_str: str):
+        """Invalid version constraint strings should fail."""
+        with pytest.raises(ValidationError, match="Invalid version constraint"):
+            PackageDependency(
+                address="github.com/org/dep",
+                version=version_str,
+                alias="my_dep",
+            )

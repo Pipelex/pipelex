@@ -39,8 +39,7 @@ def do_pkg_list() -> None:
     pkg_table.add_column("Value")
     pkg_table.add_row("Address", manifest.address)
     pkg_table.add_row("Version", manifest.version)
-    if manifest.description:
-        pkg_table.add_row("Description", manifest.description)
+    pkg_table.add_row("Description", manifest.description)
     if manifest.authors:
         pkg_table.add_row("Authors", ", ".join(manifest.authors))
     if manifest.license:

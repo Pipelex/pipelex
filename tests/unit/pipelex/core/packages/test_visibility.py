@@ -20,6 +20,7 @@ def _make_manifest_with_exports(exports: list[DomainExports]) -> MthdsPackageMan
     return MthdsPackageManifest(
         address="github.com/org/test",
         version="1.0.0",
+        description="Test package",
         exports=exports,
     )
 

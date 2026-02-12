@@ -46,7 +46,7 @@ class TestManifestDiscovery:
         bundle_path.touch()
 
         # Put a METHODS.toml above the .git boundary (should NOT be found)
-        manifest_content = '[package]\naddress = "github.com/org/above-git"\nversion = "1.0.0"\n'
+        manifest_content = '[package]\naddress = "github.com/org/above-git"\nversion = "1.0.0"\ndescription = "Above git"\n'
         (tmp_path / MANIFEST_FILENAME).write_text(manifest_content)
 
         result = find_package_manifest(bundle_path)
@@ -56,7 +56,7 @@ class TestManifestDiscovery:
         """METHODS.toml two levels up from bundle is found."""
         # tmp_path/METHODS.toml
         # tmp_path/sub/deep/bundle.mthds
-        manifest_content = '[package]\naddress = "github.com/org/deep"\nversion = "2.0.0"\n'
+        manifest_content = '[package]\naddress = "github.com/org/deep"\nversion = "2.0.0"\ndescription = "Deep package"\n'
         (tmp_path / MANIFEST_FILENAME).write_text(manifest_content)
         deep_dir = tmp_path / "sub" / "deep"
         deep_dir.mkdir(parents=True)
