@@ -131,10 +131,8 @@ class MermaidflowFactory:
             # We collect the stuff info from controller node outputs directly, because these
             # stuffs may not be in stuff_registry (which skips controller nodes).
             controller_output_stuffs: dict[str, dict[str, tuple[str, str | None]]] = {}
-            controller_combine_digests: set[str] = set()
             for edge in graph.edges:
                 if edge.kind.is_parallel_combine and edge.target_stuff_digest:
-                    controller_combine_digests.add(edge.target_stuff_digest)
                     controller_output_stuffs.setdefault(edge.target, {})[edge.target_stuff_digest] = ("", None)
             # Resolve names and concepts from the controller nodes' outputs
             for controller_id, digest_map in controller_output_stuffs.items():
