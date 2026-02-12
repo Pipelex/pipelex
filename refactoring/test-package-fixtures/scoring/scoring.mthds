@@ -1,0 +1,23 @@
+domain = "scoring"
+description = "Scoring domain for weighted evaluations"
+main_pipe = "compute_weighted_score"
+
+[concept]
+WeightedScore = "A weighted score result"
+
+[pipe]
+[pipe.compute_weighted_score]
+type = "PipeLLM"
+description = "Compute a weighted score for an item"
+inputs = { data = "Text" }
+output = "WeightedScore"
+model = "$quick-reasoning"
+prompt = "Compute a weighted score for: @data"
+
+[pipe.internal_score_normalizer]
+type = "PipeLLM"
+description = "Internal helper to normalize scores (private)"
+inputs = { raw_score = "WeightedScore" }
+output = "Text"
+model = "$quick-reasoning"
+prompt = "Normalize the following score: @raw_score"

@@ -1,0 +1,14 @@
+domain = "reporting"
+description = "Reporting domain for generating summaries"
+
+[pipe]
+[pipe.generate_report]
+type = "PipeSequence"
+description = "Generate a full report using exported pipes from other domains"
+inputs = { text = "Text" }
+output = "Text"
+steps = [
+    { pipe = "legal.contracts.extract_clause", result = "clause" },
+    { pipe = "scoring.compute_weighted_score", result = "score" },
+    { pipe = "scoring.internal_score_normalizer", result = "normalized" },
+]

@@ -1,0 +1,33 @@
+domain = "legal.contracts"
+description = "Contract analysis domain"
+main_pipe = "extract_clause"
+
+[concept]
+ContractClause = "A clause extracted from a legal contract"
+
+[pipe]
+[pipe.extract_clause]
+type = "PipeLLM"
+description = "Extract the main clause from a contract"
+inputs = { text = "Text" }
+output = "ContractClause"
+model = "$quick-reasoning"
+prompt = "Extract the main clause from the following contract text: @text"
+
+[pipe.analyze_contract]
+type = "PipeSequence"
+description = "Full contract analysis pipeline"
+inputs = { text = "Text" }
+output = "Text"
+steps = [
+    { pipe = "extract_clause", result = "clause" },
+    { pipe = "scoring.compute_weighted_score", result = "score" },
+]
+
+[pipe.internal_clause_helper]
+type = "PipeLLM"
+description = "Internal helper for clause normalization (private)"
+inputs = { clause = "ContractClause" }
+output = "Text"
+model = "$quick-reasoning"
+prompt = "Normalize the following clause: @clause"
