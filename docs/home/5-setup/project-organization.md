@@ -8,7 +8,8 @@ Pipelex automatically discovers `.mthds` pipeline files anywhere in your project
 
 ```bash
 your_project/
-├── my_project/             # Your Python package
+├── METHODS.toml                   # Package manifest (optional)
+├── my_project/                    # Your Python package
 │   ├── finance/
 │   │   ├── services.py
 │   │   ├── invoices.mthds           # Pipeline with finance code
@@ -22,6 +23,8 @@ your_project/
 ├── .env                           # API keys (git-ignored)
 └── requirements.txt
 ```
+
+- **Package manifest**: `METHODS.toml` at your project root declares package identity and pipe visibility. See [Packages](../6-build-reliable-ai-workflows/packages.md) for details.
 
 ## Alternative: Centralize pipelines
 

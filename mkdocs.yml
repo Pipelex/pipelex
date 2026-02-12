@@ -134,6 +134,7 @@ nav:
       - Design and Run Methods:
         - Overview: home/6-build-reliable-ai-workflows/pipes/index.md
         - Libraries: home/6-build-reliable-ai-workflows/libraries.md
+        - Packages: home/6-build-reliable-ai-workflows/packages.md
         - Executing Pipelines: home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md
         - Providing Inputs to Pipelines: home/6-build-reliable-ai-workflows/pipes/provide-inputs.md
         - Working Memory: home/6-build-reliable-ai-workflows/pipes/working-memory.md
@@ -179,6 +180,7 @@ nav:
         - Validate: home/9-tools/cli/validate.md
         - Run: home/9-tools/cli/run.md
         - Show: home/9-tools/cli/show.md
+        - Pkg: home/9-tools/cli/pkg.md
         - Build:
           - Overview: home/9-tools/cli/build/index.md
           - Pipe: home/9-tools/cli/build/pipe.md

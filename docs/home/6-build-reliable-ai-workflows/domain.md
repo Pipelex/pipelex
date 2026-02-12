@@ -39,6 +39,37 @@ system_prompt = "You are an expert in financial document analysis and invoice pr
     ❌ domain = "invoiceProcessing"  # camelCase not allowed
     ```
 
+## Hierarchical Domains
+
+Domains support **dotted paths** to express a hierarchy:
+
+```toml
+domain = "legal"
+domain = "legal.contracts"
+domain = "legal.contracts.shareholder"
+```
+
+Each segment must be `snake_case`. The hierarchy is organizational — there is no scope inheritance between parent and child domains. `legal.contracts` and `legal` are independent namespaces; defining concepts in one does not affect the other.
+
+**Valid hierarchical domains:**
+
+```toml
+✅ domain = "legal.contracts"
+✅ domain = "legal.contracts.shareholder"
+✅ domain = "finance.reporting"
+```
+
+**Invalid hierarchical domains:**
+
+```toml
+❌ domain = ".legal"              # Cannot start with a dot
+❌ domain = "legal."              # Cannot end with a dot
+❌ domain = "legal..contracts"    # No consecutive dots
+❌ domain = "Legal.Contracts"     # Segments must be snake_case
+```
+
+Hierarchical domains are used in the `[exports]` section of `METHODS.toml` to control pipe visibility across domains. See [Packages](./packages.md) for details.
+
 ## How Domains Work
 
 ### Concept Namespacing
@@ -170,6 +201,7 @@ Individual pipes can override the domain system prompt by defining their own `sy
 
 ## Related Documentation
 
+- [Packages](./packages.md) - Controlling pipe visibility with exports
 - [Pipelex Bundle Specification](./pipelex-bundle-specification.md) - How domains are declared in bundles
 - [Kick off a Pipelex Method Project](./kick-off-a-methods-project.md) - Getting started
 - [Define Your Concepts](./concepts/define_your_concepts.md) - Creating concepts within domains
