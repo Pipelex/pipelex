@@ -57,6 +57,7 @@ class PackageIndexEntry(BaseModel):
     concepts: list[ConceptEntry] = Field(default_factory=empty_list_factory_of(ConceptEntry))
     pipes: list[PipeSignature] = Field(default_factory=empty_list_factory_of(PipeSignature))
     dependencies: list[str] = Field(default_factory=list)
+    dependency_aliases: dict[str, str] = Field(default_factory=dict)
 
 
 class PackageIndex(BaseModel):

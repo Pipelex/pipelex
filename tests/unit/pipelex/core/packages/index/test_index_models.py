@@ -78,6 +78,7 @@ class TestData:
             )
         ],
         dependencies=["github.com/pipelexlab/scoring-lib"],
+        dependency_aliases={"scoring_dep": "github.com/pipelexlab/scoring-lib"},
     )
 
     ENTRY_B: ClassVar[PackageIndexEntry] = PackageIndexEntry(
@@ -146,6 +147,7 @@ class TestIndexModels:
         assert len(entry.concepts) == 1
         assert len(entry.pipes) == 1
         assert entry.dependencies == ["github.com/pipelexlab/scoring-lib"]
+        assert entry.dependency_aliases == {"scoring_dep": "github.com/pipelexlab/scoring-lib"}
 
     def test_package_index_entry_is_frozen(self) -> None:
         """PackageIndexEntry fields cannot be mutated."""

@@ -43,3 +43,7 @@ class TransitiveDependencyError(PipelexError):
 
 class IndexBuildError(PipelexError):
     """Raised when building a package index entry fails."""
+
+
+class GraphBuildError(PipelexError):
+    """Raised when building the know-how graph fails."""

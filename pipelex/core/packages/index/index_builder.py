@@ -90,6 +90,7 @@ def build_index_entry_from_package(package_root: Path) -> PackageIndexEntry:
         log.warning(f"Errors while indexing {package_root}: {errors}")
 
     dependency_addresses = [dep.address for dep in manifest.dependencies]
+    dependency_aliases = {dep.alias: dep.address for dep in manifest.dependencies}
 
     return PackageIndexEntry(
         address=manifest.address,
@@ -101,6 +102,7 @@ def build_index_entry_from_package(package_root: Path) -> PackageIndexEntry:
         concepts=concepts,
         pipes=pipes,
         dependencies=dependency_addresses,
+        dependency_aliases=dependency_aliases,
     )
 
 

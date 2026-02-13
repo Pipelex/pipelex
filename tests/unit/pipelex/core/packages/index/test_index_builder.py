@@ -101,6 +101,17 @@ class TestIndexBuilder:
         entry = build_index_entry_from_package(PACKAGES_DATA_DIR / "legal_tools")
         assert "github.com/pipelexlab/scoring-lib" in entry.dependencies
 
+    def test_build_entry_dependency_aliases(self) -> None:
+        """Builder populates dependency_aliases mapping alias to address."""
+        entry = build_index_entry_from_package(PACKAGES_DATA_DIR / "legal_tools")
+        assert "scoring_lib" in entry.dependency_aliases
+        assert entry.dependency_aliases["scoring_lib"] == "github.com/pipelexlab/scoring-lib"
+
+    def test_build_entry_dependency_aliases_empty_when_no_deps(self) -> None:
+        """Builder sets empty dependency_aliases when package has no dependencies."""
+        entry = build_index_entry_from_package(PACKAGES_DATA_DIR / "minimal_package")
+        assert entry.dependency_aliases == {}
+
     def test_build_entry_concept_with_refines(self) -> None:
         """Builder captures cross-package refines on concepts."""
         entry = build_index_entry_from_package(PACKAGES_DATA_DIR / "refining_consumer")
