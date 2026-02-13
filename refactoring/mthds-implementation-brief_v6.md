@@ -125,22 +125,24 @@ Delivered:
 
 ## Phase 4D: Transitive Dependencies + CLI Commands — PLANNED
 
+> **Prerequisite:** Phase 4C's lock file API (`generate_lock_file`, `parse_lock_file`, `serialize_lock_file`, `verify_lock_file`) is ready for the CLI commands to consume. `generate_lock_file()` already accepts any `list[ResolvedDependency]`, so once transitive resolution is added the lock file will include transitive deps automatically — no changes to `lock_file.py` needed.
+
 Deliverables:
 
 - **Transitive resolution**: Extend `dependency_resolver.py` with recursive resolution + cycle detection. Diamond dependency handling via `select_minimum_version_for_multiple_constraints` from Phase 4A.
 - **`TransitiveDependencyError`** in `exceptions.py`: Cycle detection, missing transitive deps.
-- **CLI `pipelex pkg lock`** (`pipelex/cli/commands/pkg/lock_cmd.py`): Scan `METHODS.toml`, resolve all deps (local + remote), write `methods.lock`.
-- **CLI `pipelex pkg install`** (`pipelex/cli/commands/pkg/install_cmd.py`): Read `methods.lock`, fetch any missing deps into cache, verify integrity.
-- **CLI `pipelex pkg update`** (`pipelex/cli/commands/pkg/update_cmd.py`): Re-resolve to latest compatible versions, update `methods.lock`.
+- **CLI `pipelex pkg lock`** (`pipelex/cli/commands/pkg/lock_cmd.py`): Scan `METHODS.toml`, call `resolve_all_dependencies()`, call `generate_lock_file()`, write `serialize_lock_file()` output to `methods.lock`.
+- **CLI `pipelex pkg install`** (`pipelex/cli/commands/pkg/install_cmd.py`): Read `methods.lock` via `parse_lock_file()`, fetch any missing deps into cache, call `verify_lock_file()` for integrity.
+- **CLI `pipelex pkg update`** (`pipelex/cli/commands/pkg/update_cmd.py`): Re-resolve to latest compatible versions, regenerate `methods.lock` via `generate_lock_file()`.
 - **Tests**: Transitive resolution (A→B→C), cycle detection (A→B→A), diamond deps (A→B, A→C, both→D), CLI command tests.
 
 Key files to create:
 
 | File | Purpose |
 |------|---------|
-| `pipelex/cli/commands/pkg/lock_cmd.py` | `pipelex pkg lock` |
-| `pipelex/cli/commands/pkg/install_cmd.py` | `pipelex pkg install` |
-| `pipelex/cli/commands/pkg/update_cmd.py` | `pipelex pkg update` |
+| `pipelex/cli/commands/pkg/lock_cmd.py` | `pipelex pkg lock` — chains resolve → generate → serialize → write |
+| `pipelex/cli/commands/pkg/install_cmd.py` | `pipelex pkg install` — parse lock → fetch → verify |
+| `pipelex/cli/commands/pkg/update_cmd.py` | `pipelex pkg update` — re-resolve → regenerate lock |
 
 Key files to modify:
 
@@ -186,7 +188,7 @@ Deliverables:
 ## What NOT to Do
 
 - **Do NOT implement remote registry or Know-How Graph browsing.** That is Phase 5.
-- **Phase 4 is in progress (4A + 4B complete).** Implement sub-phases in order — do not skip ahead to later sub-phases without completing prerequisites.
+- **Phase 4 is in progress (4A + 4B + 4C complete).** Implement sub-phases in order — do not skip ahead to later sub-phases without completing prerequisites.
 - **Do NOT rename the manifest** to anything other than `METHODS.toml`. The design docs are explicit about this name.
 - **Do NOT rename Python classes or internal Pipelex types.** The standard is MTHDS; the implementation is Pipelex. Keep existing class names.
 
