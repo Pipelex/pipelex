@@ -69,37 +69,130 @@ Delivered:
 
 ---
 
-## Known Limitations (Deferred to Phase 4+)
+## Known Limitations (current implementation)
 
-1. **Per-package Library isolation**: Dependency pipes and concepts are stored with aliased keys (`alias->pipe_code`, `alias->domain.ConceptCode`) in the same flat library dicts as the main package. This avoids creating separate Library instances per package but means concept name conflicts between a dependency and the local package log a warning and skip native-key registration (the aliased key still works for cross-package refs). Proper per-package Library isolation is planned for Phase 4.
+These are tracked as deliverables in the Phase 4 sub-phases above:
 
-2. **Cross-package concept refinement validation**: `refines = "alias->domain.Concept"` parses and stores correctly, but the compatibility checker (`are_concept_compatible()`) doesn't resolve across package boundaries yet. This requires the refines chain to traverse aliased concept keys — planned for Phase 4.
-
-3. **Transitive dependency resolution**: Phase 3 handles direct dependencies only. If Package A depends on Package B which depends on Package C, Package C is not automatically available to Package A. Recursive resolution with cycle detection is planned for Phase 4.
+1. **Per-package Library isolation** (Phase 4E): Dependency pipes/concepts stored with aliased keys in flat library dicts. Concept name conflicts log a warning and skip native-key registration.
+2. **Cross-package concept refinement validation** (Phase 4E): `refines = "alias->domain.Concept"` parses correctly, but `are_concept_compatible()` doesn't traverse across package boundaries yet.
+3. **Transitive dependency resolution** (Phase 4D): Only direct dependencies resolved. Recursive resolution with cycle detection pending.
 
 ---
 
-## Phase 4: Remote Dependency Resolution + Lock File — PLANNED
+## Phase 4A: Semver Constraint Evaluation Engine — COMPLETED
+
+- `pipelex/tools/misc/semver.py`: Typed wrapper around `semantic_version` providing `parse_version` (with `v`-prefix stripping for git tags), `parse_constraint`, `version_satisfies`, `parse_version_tag`, and Go-style Minimum Version Selection via `select_minimum_version` (single constraint) and `select_minimum_version_for_multiple_constraints` (transitive case).
+- `SemVerError` exception for parse failures.
+- Supports all constraint operators: `^`, `~`, `>=`, `>`, `<=`, `<`, `==`, `!=`, `*`, wildcards, compound (`>=1.0.0,<2.0.0`).
+- New dependency: `semantic-version>=2.10.0` in `pyproject.toml`.
+- 58 parametrized unit tests in `tests/unit/pipelex/tools/misc/test_semver.py`.
+
+---
+
+## Phase 4B: VCS Fetch + Package Cache — PLANNED
 
 Deliverables:
 
-- **VCS clone from addresses**: New `pipelex/core/packages/vcs_resolver.py` — clone packages from their addresses (the address IS the fetch URL: `github.com/acme/...` maps to `https://github.com/acme/...`).
-- **Version tag resolution**: Minimum version selection (Go's approach) — match version constraints against git tags. If Package A requires `>=1.0.0` of B and Package C requires `>=1.2.0` of B, resolve to `1.2.0`.
-- **Lock file `methods.lock`**: New `pipelex/core/packages/lock_file.py` — TOML format recording resolved version + SHA-256 hash + source URL for every dependency. Auto-generated, committed to version control.
-- **Package cache**: `~/.mthds/packages/` (global) or `.mthds/packages/` (project-local) — stores fetched package contents, organized by address and version.
-- **Transitive dependency resolution**: Extend `resolve_local_dependencies()` in `pipelex/core/packages/dependency_resolver.py` with recursive resolution + cycle detection.
-- **Cross-package concept refinement validation**: Extend `are_concept_compatible()` in concept validation to traverse aliased concept keys across package boundaries.
-- **Per-package Library isolation**: Replace flat aliased-key storage with per-package Library instances — refactor `_load_dependency_packages()` in `pipelex/libraries/library_manager.py`.
-- **Builder package-awareness**: Builder knows available packages' exported pipes/concepts, enabling cross-package pipe references during method generation.
-- **CLI commands**: `pipelex pkg install` (fetch and cache all deps from lock file), `pipelex pkg update` (update to latest compatible versions), `pipelex pkg lock` (regenerate lock file) — new commands in `pipelex/cli/commands/pkg/`.
-- **Layer 3 tests**: Local bare git repos with `file://` protocol, as designed in `testing-package-system.md`.
+- **VCS resolver** (`pipelex/core/packages/vcs_resolver.py`): Clone repos from addresses, list remote tags, checkout specific versions. Address-to-URL mapping: `github.com/acme/pkg` → `https://github.com/acme/pkg`. Uses subprocess `git` (no new library dependency — git CLI is universally available).
+- **Package cache** (`pipelex/core/packages/package_cache.py`): Manage `~/.mthds/packages/{address}/{version}/` directory structure. Resolution chain: local `path` → cache hit → VCS fetch. Cache lookup, store, and integrity check.
+- **New exceptions** in `exceptions.py`: `VCSFetchError`, `VersionResolutionError`, `PackageCacheError`.
+- **Version tag resolution**: List git tags, filter through `parse_version_tag`, apply MVS with `select_minimum_version` from Phase 4A.
+- **Layer 3 test fixtures**: Pytest fixtures creating temporary bare git repos with `file://` protocol, tagging releases, testing clone + tag resolution without network I/O.
+- **Tests**: `tests/integration/pipelex/core/packages/test_vcs_resolver.py` — clone valid ref, version mismatch, multiple tags (MVS selection), cache hit on second resolve.
+
+Key files to create:
+
+| File | Purpose |
+|------|---------|
+| `pipelex/core/packages/vcs_resolver.py` | Git clone, tag listing, checkout |
+| `pipelex/core/packages/package_cache.py` | Cache directory management |
+| `tests/integration/pipelex/core/packages/test_vcs_resolver.py` | Layer 3 tests |
 
 Key files to modify:
 
-- `pipelex/core/packages/dependency_resolver.py` — extend for remote + transitive resolution
-- `pipelex/libraries/library_manager.py` — per-package isolation refactor
-- `pipelex/core/packages/manifest.py` — potential additions for lock file model
-- `pipelex/cli/commands/pkg/` — new `install_cmd.py`, `update_cmd.py`, `lock_cmd.py`
+| File | Change |
+|------|--------|
+| `pipelex/core/packages/exceptions.py` | Add VCS/cache exceptions |
+
+---
+
+## Phase 4C: Lock File + Remote Dependency Resolution — PLANNED
+
+Deliverables:
+
+- **Lock file model and parser** (`pipelex/core/packages/lock_file.py`): `LockedPackage` model (version, SHA-256 hash, source URL), `LockFile` model, TOML parse/serialize. Format per design spec:
+  ```toml
+  ["github.com/mthds/scoring-lib"]
+  version = "0.5.1"
+  hash = "sha256:e5f6g7h8..."
+  source = "https://github.com/mthds/scoring-lib"
+  ```
+- **Hash computation**: SHA-256 of package contents for integrity verification.
+- **Lock file exception** in `exceptions.py`: `LockFileError`, `IntegrityError`.
+- **Extend `dependency_resolver.py`**: New `resolve_remote_dependency()` combining cache lookup + VCS fetch from 4B. New `resolve_all_dependencies()` unifying local path (Phase 3) + remote (4B/4C) resolution. Generate lock file entries during resolution.
+- **Tests**: Lock file round-trip (parse/serialize), hash computation, integrity verification, integrated resolution (local path + remote via bare git repo).
+
+Key files to create:
+
+| File | Purpose |
+|------|---------|
+| `pipelex/core/packages/lock_file.py` | Lock file model + TOML I/O |
+| `tests/unit/pipelex/core/packages/test_lock_file.py` | Lock file unit tests |
+
+Key files to modify:
+
+| File | Change |
+|------|--------|
+| `pipelex/core/packages/dependency_resolver.py` | Add remote resolution, lock file generation |
+| `pipelex/core/packages/exceptions.py` | Add lock file / integrity exceptions |
+
+---
+
+## Phase 4D: Transitive Dependencies + CLI Commands — PLANNED
+
+Deliverables:
+
+- **Transitive resolution**: Extend `dependency_resolver.py` with recursive resolution + cycle detection. Diamond dependency handling via `select_minimum_version_for_multiple_constraints` from Phase 4A.
+- **`TransitiveDependencyError`** in `exceptions.py`: Cycle detection, missing transitive deps.
+- **CLI `pipelex pkg lock`** (`pipelex/cli/commands/pkg/lock_cmd.py`): Scan `METHODS.toml`, resolve all deps (local + remote), write `methods.lock`.
+- **CLI `pipelex pkg install`** (`pipelex/cli/commands/pkg/install_cmd.py`): Read `methods.lock`, fetch any missing deps into cache, verify integrity.
+- **CLI `pipelex pkg update`** (`pipelex/cli/commands/pkg/update_cmd.py`): Re-resolve to latest compatible versions, update `methods.lock`.
+- **Tests**: Transitive resolution (A→B→C), cycle detection (A→B→A), diamond deps (A→B, A→C, both→D), CLI command tests.
+
+Key files to create:
+
+| File | Purpose |
+|------|---------|
+| `pipelex/cli/commands/pkg/lock_cmd.py` | `pipelex pkg lock` |
+| `pipelex/cli/commands/pkg/install_cmd.py` | `pipelex pkg install` |
+| `pipelex/cli/commands/pkg/update_cmd.py` | `pipelex pkg update` |
+
+Key files to modify:
+
+| File | Change |
+|------|--------|
+| `pipelex/core/packages/dependency_resolver.py` | Transitive resolution + cycle detection |
+| `pipelex/core/packages/exceptions.py` | Add `TransitiveDependencyError` |
+| `pipelex/cli/commands/pkg/app.py` | Register new commands |
+
+---
+
+## Phase 4E: Per-Package Library Isolation + Concept Refinement — PLANNED
+
+Deliverables:
+
+- **Per-package Library instances**: Refactor `library_manager.py` — each package gets its own `ConceptLibrary` + `PipeLibrary`. Main package accesses dependency libraries via alias. Eliminates concept name conflicts between packages.
+- **Cross-package concept refinement validation**: Extend `are_concept_compatible()` to traverse aliased concept keys across package boundaries. Validate at both install-time and load-time.
+- **Builder package-awareness**: Builder knows available packages' exported pipes/concepts for cross-package pipe references during method generation.
+- **Tests**: Concept name collision scenarios, refinement chain across packages, builder cross-package generation.
+
+Key files to modify:
+
+| File | Change |
+|------|--------|
+| `pipelex/libraries/library_manager.py` | Per-package Library isolation refactor |
+| `pipelex/core/concepts/validation.py` | Cross-package refinement traversal |
+| `pipelex/builder/builder_loop.py` | Package-aware generation |
 
 ---
 
@@ -118,7 +211,7 @@ Deliverables:
 ## What NOT to Do
 
 - **Do NOT implement remote registry or Know-How Graph browsing.** That is Phase 5.
-- **Do NOT implement remote VCS fetch or lock file generation.** That is Phase 4. Phase 3 only supports local `path` dependencies.
+- **Phase 4 is in progress (4A complete).** Implement sub-phases in order — do not skip ahead to later sub-phases without completing prerequisites.
 - **Do NOT rename the manifest** to anything other than `METHODS.toml`. The design docs are explicit about this name.
 - **Do NOT rename Python classes or internal Pipelex types.** The standard is MTHDS; the implementation is Pipelex. Keep existing class names.
 
