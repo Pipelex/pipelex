@@ -191,7 +191,7 @@ pipes = ["extract_clause", "analyze_nda", "compare_contracts"]
 pipes = ["compute_weighted_score"]
 ```
 
-**Implementation note**: The `[dependencies]` format uses the alias as the TOML key and the address as an inline field (see §4.1 note in `mthds-implementation-brief_v6.md`). Dependency versions support Poetry/uv-style range syntax (`^1.0.0`, `~1.0.0`, `>=1.0.0, <2.0.0`, wildcards) — validated at parse time. Dependencies with a `path` field are resolved and loaded at runtime (Phase 3). Version resolution against VCS tags is deferred to Phase 4. The `description` field is required and must be non-empty.
+**Implementation note**: The `[dependencies]` format uses the alias as the TOML key and the address as an inline field — this is more natural for `->` syntax since the alias is the lookup key when resolving cross-package references. Dependency versions support Poetry/uv-style range syntax (`^1.0.0`, `~1.0.0`, `>=1.0.0, <2.0.0`, wildcards) — validated at parse time. Dependencies with a `path` field are resolved and loaded at runtime (Phase 3). Version resolution against VCS tags is deferred to Phase 4. The `description` field is required and must be non-empty.
 
 **Impact**: New parser (`manifest_parser.py`), new model class (`MthdsPackageManifest`), new validation rules, new discovery function, new visibility checker. See `pipelex/core/packages/`.
 
@@ -326,8 +326,8 @@ Each phase gets its own implementation brief with decisions, grammar, acceptance
 | **1** | ~~Hierarchical domains + pipe namespacing: `domain_path.pipe_code` references, split-on-last-dot parsing for concepts and pipes~~ | **COMPLETED** |
 | **2** | ~~Package manifest (`METHODS.toml`) + exports / visibility model~~ | **COMPLETED** |
 | **3** | ~~Cross-package references (`alias->domain_path.name`) + local dependency resolution~~ | **COMPLETED** |
-| **4** | Remote dependency resolution, lock file (`methods.lock`), package cache | Phase 3 |
-| **5** | Registry, type-aware search, Know-How Graph browsing | Phase 4 |
+| **4** | Remote dependency resolution: VCS clone from addresses, version tag resolution (minimum version selection), lock file (`methods.lock`), package cache (`~/.mthds/packages/`), transitive dependency resolution, per-package Library isolation, cross-package concept refinement validation, CLI `pkg install`/`update`/`lock` | Phase 3 |
+| **5** | Registry index service (crawl, parse, index), type-aware search ("I have X, I need Y"), `pkg publish` CLI, Know-How Graph browsing + auto-composition, multi-tier deployment (Local / Project / Org / Community) | Phase 4 |
 
 ---
 

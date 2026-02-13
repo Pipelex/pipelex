@@ -114,8 +114,8 @@ license = "MIT"
 mthds_version = ">=0.2.0"
 
 [dependencies]
-"github.com/mthds/document-processing" = { version = "^1.0.0", alias = "docproc" }
-"github.com/mthds/scoring-lib" = { version = "^0.5.0", alias = "scoring_lib" }
+docproc = { address = "github.com/mthds/document-processing", version = "^1.0.0" }
+scoring_lib = { address = "github.com/mthds/scoring-lib", version = "^0.5.0" }
 
 [exports.legal]
 pipes = ["classify_document"]
@@ -142,12 +142,13 @@ pipes = ["compute_weighted_score"]
 
 **`[dependencies]`**
 
-Each key is a package address (must start with a hostname). Values:
+Each key is a `snake_case` alias — the short name used in `->` cross-package references. Values:
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `version` | Yes | Version constraint (semver range). |
-| `alias` | Yes | Short `snake_case` name for use in `.mthds` cross-package references. Must be valid `snake_case`. No auto-defaulting — explicit aliases keep references readable and intentional. |
+| `address` | Yes | Package address (must start with a hostname). The globally unique identifier for the dependency. |
+| `version` | Yes | Version constraint (semver range, e.g., `^1.0.0`, `~1.0.0`, `>=1.0.0, <2.0.0`). |
+| `path` | No | Local filesystem path to the dependency (resolved relative to the manifest directory). For development-time workflows, similar to Cargo's `path` deps or Go's `replace` directives. |
 
 **`[exports]`**
 

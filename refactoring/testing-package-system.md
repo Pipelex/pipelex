@@ -203,12 +203,16 @@ This layer tests the VCS fetch path — cloning a repo, checking out a version, 
 
 ### 3.1 How it works
 
-The test setup creates temporary git repos using `git init --bare`, pushes fixture content to them, and tags releases. The consumer's dependency uses a `file://` URL instead of a `github.com/...` address:
+The test setup creates temporary git repos using `git init --bare`, pushes fixture content to them, and tags releases. The consumer's dependency points to the local bare repo for fetching.
+
+**Important**: `file://` protocol URLs will not pass the `address` field validator on `PackageDependency`, which requires a hostname pattern (e.g., `github.com/...`). Test fixtures should use a standard address field alongside a test-specific fetch URL mechanism — for example, the `path` field can point to a temporary clone of the bare repo, or the VCS resolver should handle `file://` as a protocol variant for testing. The simplest approach is:
 
 ```toml
 [dependencies]
-scoring_lib = { address = "file:///tmp/test-repos/scoring-methods.git", version = "^1.0.0" }
+scoring_lib = { address = "github.com/test/scoring-methods", version = "^1.0.0", path = "/tmp/test-repos/scoring-methods-clone" }
 ```
+
+Alternatively, the VCS resolver could accept a test-mode override that maps addresses to `file://` URLs.
 
 ### 3.2 Test setup (pytest fixture)
 
@@ -533,7 +537,7 @@ The `reporting/summary.mthds` bundle is the key testing tool — its `generate_r
 - **Graceful degradation**: Unresolved cross-package refs (e.g., when test fixtures are loaded without their dependencies) are handled gracefully at three levels: library validation, pipe validation, and dry-run execution.
 - **CLI**: `pipelex pkg add` adds dependencies to `METHODS.toml`.
 
-**Layer 2 tests are fully implemented** (39 new tests across 6 test files). See §2.3 above.
+**Layer 2 tests are fully implemented** (40+ tests across 6 test files). See §2.3 above.
 
 **What remains for Phase 4:**
 

@@ -32,7 +32,7 @@ Delivered:
 
 Delivered:
 
-- **`MthdsPackageManifest` data model** (`pipelex/core/packages/manifest.py`): `PackageDependency`, `DomainExports`, and `MthdsPackageManifest` Pydantic models with field validators (address hostname pattern, semver for package version, version constraint ranges for dependency versions, non-empty description, snake_case aliases, unique aliases, valid domain paths, valid pipe codes).
+- **`MthdsPackageManifest` data model** (`pipelex/core/packages/manifest.py`): `PackageDependency`, `DomainExports`, and `MthdsPackageManifest` Pydantic models with field validators (address hostname pattern, semver for package version, version constraint ranges for dependency versions using Poetry/uv-style syntax, non-empty description, snake_case aliases, unique aliases, valid domain paths, valid pipe codes). The `[dependencies]` format uses the alias as the TOML key and the address as an inline field — this is more natural for the `->` syntax since the alias is the lookup key when resolving cross-package references.
 - **TOML parsing and serialization** (`pipelex/core/packages/manifest_parser.py`): `parse_methods_toml()` with recursive sub-table walk for `[exports]` domain path reconstruction; `serialize_manifest_to_toml()` using `tomlkit` for human-readable output.
 - **Custom exceptions** (`pipelex/core/packages/exceptions.py`): `ManifestError`, `ManifestParseError`, `ManifestValidationError`.
 - **Manifest discovery** (`pipelex/core/packages/discovery.py`): `find_package_manifest()` walks up from a bundle path, stopping at `METHODS.toml`, `.git/` boundary, or filesystem root. Returns `None` for standalone bundles.
@@ -42,23 +42,7 @@ Delivered:
 - **CLI commands** (`pipelex/cli/commands/pkg/`): `pipelex pkg init` scans `.mthds` files, generates skeleton `METHODS.toml` with auto-discovered domains and all pipes exported. `pipelex pkg list` finds and displays the manifest with Rich tables (package info, dependencies, exports).
 - **Builder awareness** (`pipelex/builder/builder_loop.py`): `maybe_generate_manifest_for_output()` checks if an output directory contains multiple domains and generates a `METHODS.toml` if so. Hooked into both `pipe_cmd.py` and `build_core.py`.
 - **Physical test data** (`tests/data/packages/`): `legal_tools/` (full manifest + multi-domain bundles), `minimal_package/` (minimal manifest), `standalone_bundle/` (no manifest), `invalid_manifests/` (6 negative test files).
-- **Comprehensive tests**: 45+ new tests across 10 test files covering manifest model validation, TOML parsing, discovery, visibility, cross-package refs, CLI commands, and builder manifest generation. All domain/pipe names prefixed with `pkg_test_` to avoid collisions with the existing e2e test suite.
-
-### Adaptations from the original brief
-
-1. **Model name `MthdsPackageManifest`** (not `MethodsPackageManifest`): consistent with existing `MthdsFactory`, `MthdsDecodeError` naming.
-
-2. **Dependencies TOML format uses alias as key**: the brief shows `[dependencies]\n"github.com/..." = { version = "^1.0.0", alias = "docproc" }` (address as key, alias inline). The implementation uses `[dependencies]\nscoring_lib = { address = "...", version = "2.0.0" }` (alias as key, address inline). This is more natural for the `->` syntax since the alias is the lookup key when resolving cross-package references.
-
-3. **`collect_pipe_references()` made public**: renamed from `_collect_pipe_references()` on `PipelexBundleBlueprint` because the `PackageVisibilityChecker` (an external class) needs to call it. This is a minimal API change.
-
-4. **`pkg_app` in `app.py` not `__init__.py`**: Ruff RUF067 prohibits logic in `__init__.py` files. Followed the existing `build/app.py` pattern: `__init__.py` is empty, `app.py` defines the Typer sub-group.
-
-5. **Visibility check hooked into `library_manager.py` only**: the brief suggested hooking into both `library_manager.py` and `validate_bundle.py`. The library manager hook covers the main bundle loading path, which is sufficient. `validate_bundle.py` was left unchanged to keep the change surface minimal.
-
-6. **Cross-package `validate_cross_package_references()` defined but not wired into runtime**: the method exists and is unit-tested, but `check_visibility_for_blueprints()` (the convenience function called by the library manager) only invokes `validate_all_pipe_references()`. This is intentional: `->` refs would already fail at the per-bundle level (the pipe wouldn't be found locally), so the cross-package checker is a preparatory API for Phase 3 when it will produce better error messages.
-
-7. **Dependency version supports range syntax**: `PackageDependency.version` validates against Poetry/uv-style version constraint syntax (`^1.0.0`, `~1.0.0`, `>=1.0.0, <2.0.0`, wildcards). The package's own `MthdsPackageManifest.version` remains strict semver since it represents a concrete version, not a constraint.
+- **Comprehensive tests**: 55+ new tests across 7 test files covering manifest model validation, TOML parsing, discovery, visibility, cross-package refs, CLI commands, and builder manifest generation. All domain/pipe names prefixed with `pkg_test_` to avoid collisions with the existing e2e test suite.
 
 ---
 
@@ -81,19 +65,53 @@ Delivered:
   - `dry_run.py`: catches `PipeNotFoundError` and treats it as a graceful skip (SUCCESS with info message)
 - **CLI `pipelex pkg add`** (`pipelex/cli/commands/pkg/add_cmd.py`): Adds a dependency to `METHODS.toml`. Options: `address` (required), `--alias` (auto-derived from address if omitted), `--version` (required), `--path` (optional local path). Validates alias uniqueness, serializes manifest back.
 - **Test fixtures** (`tests/data/packages/`): `scoring_dep/` (dependency package with exports) and `consumer_package/` (consumer with cross-package `->` refs and `path` dependency).
-- **Comprehensive tests**: 39 new tests across 6 test files covering dependency resolution, cross-package loading/lookup, concept validation, integration loading, CLI `pkg add`, and updated cross-package ref validation.
+- **Comprehensive tests**: 40+ new tests across 6 test files covering dependency resolution, cross-package loading/lookup, concept validation, integration loading, CLI `pkg add`, and updated cross-package ref validation.
 
-### Adaptations from the original brief
+---
 
-1. **Aliased keys in flat library dicts** (implementation detail): Dependency pipes stored as `alias->pipe_code` and concepts as `alias->domain.ConceptCode` in the same flat library dicts. This avoids creating separate Library instances per package, keeping the change surface minimal. Known limitation: concept name conflicts between dependency and local package log a warning and skip the native-key registration (the aliased key still works for cross-package refs). Proper per-package Library isolation can come in Phase 4.
+## Known Limitations (Deferred to Phase 4+)
 
-2. **Cross-package concept refinement deferred**: `refines = "alias->domain.Concept"` parses and stores correctly, but the compatibility checker (`are_concept_compatible()`) doesn't resolve across package boundaries yet. This requires the refines chain to traverse aliased concept keys, which adds complexity beyond Phase 3 scope.
+1. **Per-package Library isolation**: Dependency pipes and concepts are stored with aliased keys (`alias->pipe_code`, `alias->domain.ConceptCode`) in the same flat library dicts as the main package. This avoids creating separate Library instances per package but means concept name conflicts between a dependency and the local package log a warning and skip native-key registration (the aliased key still works for cross-package refs). Proper per-package Library isolation is planned for Phase 4.
 
-3. **`path` field for local deps** (not in original design doc): The design doc describes `~/.mthds/packages/` cache dirs. The `path` field is a Phase 3 pragmatic addition for local development, similar to Python's editable installs or Go's `replace` directives. It's forward-compatible — Phase 4's resolver will check `path` first, then fall back to cache/VCS.
+2. **Cross-package concept refinement validation**: `refines = "alias->domain.Concept"` parses and stores correctly, but the compatibility checker (`are_concept_compatible()`) doesn't resolve across package boundaries yet. This requires the refines chain to traverse aliased concept keys — planned for Phase 4.
 
-4. **`derive_alias_from_address()` made public**: The alias auto-derivation function in `add_cmd.py` is public (not `_`-prefixed) to enable direct testing. It converts the last segment of an address to `snake_case` (e.g., `github.com/org/scoring-lib` → `scoring_lib`).
+3. **Transitive dependency resolution**: Phase 3 handles direct dependencies only. If Package A depends on Package B which depends on Package C, Package C is not automatically available to Package A. Recursive resolution with cycle detection is planned for Phase 4.
 
-5. **Three-layer graceful degradation for unresolved deps**: The original plan didn't anticipate that test fixtures with cross-package refs would be discovered by `pipelex validate --all` (which scans all `.mthds` files from the project root). This required adding graceful handling at three levels: library validation, pipe validation (`needed_inputs`), and dry-run execution. Each layer independently handles the case where a `->` ref can't be resolved because the dependency package isn't loaded in the current context.
+---
+
+## Phase 4: Remote Dependency Resolution + Lock File — PLANNED
+
+Deliverables:
+
+- **VCS clone from addresses**: New `pipelex/core/packages/vcs_resolver.py` — clone packages from their addresses (the address IS the fetch URL: `github.com/acme/...` maps to `https://github.com/acme/...`).
+- **Version tag resolution**: Minimum version selection (Go's approach) — match version constraints against git tags. If Package A requires `>=1.0.0` of B and Package C requires `>=1.2.0` of B, resolve to `1.2.0`.
+- **Lock file `methods.lock`**: New `pipelex/core/packages/lock_file.py` — TOML format recording resolved version + SHA-256 hash + source URL for every dependency. Auto-generated, committed to version control.
+- **Package cache**: `~/.mthds/packages/` (global) or `.mthds/packages/` (project-local) — stores fetched package contents, organized by address and version.
+- **Transitive dependency resolution**: Extend `resolve_local_dependencies()` in `pipelex/core/packages/dependency_resolver.py` with recursive resolution + cycle detection.
+- **Cross-package concept refinement validation**: Extend `are_concept_compatible()` in concept validation to traverse aliased concept keys across package boundaries.
+- **Per-package Library isolation**: Replace flat aliased-key storage with per-package Library instances — refactor `_load_dependency_packages()` in `pipelex/libraries/library_manager.py`.
+- **Builder package-awareness**: Builder knows available packages' exported pipes/concepts, enabling cross-package pipe references during method generation.
+- **CLI commands**: `pipelex pkg install` (fetch and cache all deps from lock file), `pipelex pkg update` (update to latest compatible versions), `pipelex pkg lock` (regenerate lock file) — new commands in `pipelex/cli/commands/pkg/`.
+- **Layer 3 tests**: Local bare git repos with `file://` protocol, as designed in `testing-package-system.md`.
+
+Key files to modify:
+
+- `pipelex/core/packages/dependency_resolver.py` — extend for remote + transitive resolution
+- `pipelex/libraries/library_manager.py` — per-package isolation refactor
+- `pipelex/core/packages/manifest.py` — potential additions for lock file model
+- `pipelex/cli/commands/pkg/` — new `install_cmd.py`, `update_cmd.py`, `lock_cmd.py`
+
+---
+
+## Phase 5: Registry + Know-How Graph Discovery — PLANNED
+
+Deliverables:
+
+- **Registry index service**: Crawl known package addresses, parse `METHODS.toml` for metadata, parse `.mthds` files for concept definitions and pipe signatures, build a searchable index. No duplication — all data derived from the source files.
+- **Type-aware search**: "I have X, I need Y" queries leveraging typed pipe signatures and concept refinement hierarchies — a capability that text-based discovery (like Agent Skills) cannot support.
+- **`pipelex pkg publish` CLI command**: Validate and prepare a package for distribution, register with a registry.
+- **Know-How Graph browsing + auto-composition**: Navigate the refinement hierarchy, explore pipe signatures, find chains through the graph when no single pipe goes from X to Y.
+- **Multi-tier deployment**: Local (single `.mthds` file) / Project (package in a repo) / Organization (internal registry/proxy) / Community (public Git repos + public registries).
 
 ---
 
@@ -126,4 +144,7 @@ Delivered:
 | CLI commands | `pipelex-package-system-changes_v*.md` | §5.6 CLI |
 | Builder impact | `pipelex-package-system-changes_v*.md` | §5.5 Builder |
 | Roadmap position | `pipelex-package-system-changes_v*.md` | §6 Roadmap table |
+| Phase 4 — remote resolution | `pipelex-package-system-design_v*.md` | §7 Dependency Management (fetching, lock file, version resolution) |
+| Phase 4 — testing strategy | `testing-package-system.md` | Layer 3 (local git repos), Layer 4 (GitHub smoke test) |
+| Phase 5 — registry/discovery | `pipelex-package-system-design_v*.md` | §8 Distribution Architecture, §9 Know-How Graph Integration |
 | Design rationale | `Proposal -The Pipelex Package System.md` | §2, §4 |
