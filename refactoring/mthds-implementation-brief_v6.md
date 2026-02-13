@@ -89,34 +89,24 @@ These are tracked as deliverables in the Phase 4 sub-phases above:
 
 ---
 
-## Phase 4B: VCS Fetch + Package Cache — PLANNED
+## Phase 4B: VCS Fetch + Package Cache — COMPLETED
 
-Deliverables:
+Delivered:
 
-- **VCS resolver** (`pipelex/core/packages/vcs_resolver.py`): Clone repos from addresses, list remote tags, checkout specific versions. Address-to-URL mapping: `github.com/acme/pkg` → `https://github.com/acme/pkg`. Uses subprocess `git` (no new library dependency — git CLI is universally available).
-- **Package cache** (`pipelex/core/packages/package_cache.py`): Manage `~/.mthds/packages/{address}/{version}/` directory structure. Resolution chain: local `path` → cache hit → VCS fetch. Cache lookup, store, and integrity check.
-- **New exceptions** in `exceptions.py`: `VCSFetchError`, `VersionResolutionError`, `PackageCacheError`.
-- **Version tag resolution**: List git tags, filter through `parse_version_tag`, apply MVS with `select_minimum_version` from Phase 4A.
-- **Layer 3 test fixtures**: Pytest fixtures creating temporary bare git repos with `file://` protocol, tagging releases, testing clone + tag resolution without network I/O.
-- **Tests**: `tests/integration/pipelex/core/packages/test_vcs_resolver.py` — clone valid ref, version mismatch, multiple tags (MVS selection), cache hit on second resolve.
-
-Key files to create:
-
-| File | Purpose |
-|------|---------|
-| `pipelex/core/packages/vcs_resolver.py` | Git clone, tag listing, checkout |
-| `pipelex/core/packages/package_cache.py` | Cache directory management |
-| `tests/integration/pipelex/core/packages/test_vcs_resolver.py` | Layer 3 tests |
-
-Key files to modify:
-
-| File | Change |
-|------|--------|
-| `pipelex/core/packages/exceptions.py` | Add VCS/cache exceptions |
+- **VCS resolver** (`pipelex/core/packages/vcs_resolver.py`): `address_to_clone_url()` maps package addresses to HTTPS clone URLs (appends `.git`). `list_remote_version_tags()` runs `git ls-remote --tags`, parses output through `parse_version_tag`, skips dereferenced `^{}` entries. `resolve_version_from_tags()` applies MVS via `select_minimum_version` from Phase 4A. `clone_at_version()` does a shallow clone (`--depth 1 --branch <tag>`) into a destination directory. All git subprocess calls have timeouts and convert errors to typed exceptions.
+- **Package cache** (`pipelex/core/packages/package_cache.py`): Cache layout `~/.mthds/packages/{address}/{version}/`. `get_cached_package_path()` computes paths, `is_cached()` checks existence + non-emptiness, `store_in_cache()` uses staging directory + atomic rename and strips `.git/` from cached copies, `remove_cached_package()` for cleanup. All functions accept a `cache_root` override for testability.
+- **New exceptions** in `exceptions.py`: `VCSFetchError`, `VersionResolutionError`, `PackageCacheError` — all inheriting from `PipelexError`.
+- **Dependency resolver extended** (`dependency_resolver.py`): New `resolve_remote_dependency()` orchestrating clone URL → tag listing → MVS selection → cache check → clone if miss → `ResolvedDependency`. New `resolve_all_dependencies()` unifying local path (Phase 3) + remote VCS resolution. Refactored existing local resolution into `_resolve_local_dependency()` for reuse. `fetch_url_overrides` parameter enables test fixtures to substitute `file://` URLs.
+- **Library manager updated** (`library_manager.py`): `_load_dependency_packages()` now calls `resolve_all_dependencies()` instead of `resolve_local_dependencies()`, enabling remote deps to be loaded transparently alongside local path deps.
+- **Layer 3 test fixtures** (`tests/integration/pipelex/core/packages/conftest.py`): `bare_git_repo` fixture creates a temporary bare git repo with two tagged versions (v1.0.0, v1.1.0) containing METHODS.toml and .mthds bundles, accessible via `file://` protocol — no network I/O required. Test data constants in `test_vcs_data.py`.
+- **Unit tests** (`tests/unit/pipelex/core/packages/`): 6 tests for `address_to_clone_url`, `resolve_version_from_tags` (MVS selection, no-match, empty tags). 7 tests for package cache (path layout, store/retrieve, `.git` removal, content preservation, remove).
+- **Integration tests** (`tests/integration/pipelex/core/packages/test_vcs_resolver_integration.py`): 7 tests covering tag listing, clone at version, MVS selection via `resolve_remote_dependency`, higher constraint, no-match error, cache hit on second resolve, and mixed local + remote resolution via `resolve_all_dependencies`.
 
 ---
 
-## Phase 4C: Lock File + Remote Dependency Resolution — PLANNED
+## Phase 4C: Lock File — PLANNED
+
+> **Note:** `resolve_remote_dependency()` and `resolve_all_dependencies()` were delivered in Phase 4B. Phase 4C is now focused purely on the lock file model and integrity verification.
 
 Deliverables:
 
@@ -128,9 +118,9 @@ Deliverables:
   source = "https://github.com/mthds/scoring-lib"
   ```
 - **Hash computation**: SHA-256 of package contents for integrity verification.
-- **Lock file exception** in `exceptions.py`: `LockFileError`, `IntegrityError`.
-- **Extend `dependency_resolver.py`**: New `resolve_remote_dependency()` combining cache lookup + VCS fetch from 4B. New `resolve_all_dependencies()` unifying local path (Phase 3) + remote (4B/4C) resolution. Generate lock file entries during resolution.
-- **Tests**: Lock file round-trip (parse/serialize), hash computation, integrity verification, integrated resolution (local path + remote via bare git repo).
+- **Lock file exceptions** in `exceptions.py`: `LockFileError`, `IntegrityError`.
+- **Lock file generation hook** in `dependency_resolver.py`: After `resolve_all_dependencies()` succeeds, generate `LockedPackage` entries with resolved version + hash for each remote dependency.
+- **Tests**: Lock file round-trip (parse/serialize), hash computation, integrity verification.
 
 Key files to create:
 
@@ -143,7 +133,7 @@ Key files to modify:
 
 | File | Change |
 |------|--------|
-| `pipelex/core/packages/dependency_resolver.py` | Add remote resolution, lock file generation |
+| `pipelex/core/packages/dependency_resolver.py` | Add lock file entry generation after resolution |
 | `pipelex/core/packages/exceptions.py` | Add lock file / integrity exceptions |
 
 ---
@@ -211,7 +201,7 @@ Deliverables:
 ## What NOT to Do
 
 - **Do NOT implement remote registry or Know-How Graph browsing.** That is Phase 5.
-- **Phase 4 is in progress (4A complete).** Implement sub-phases in order — do not skip ahead to later sub-phases without completing prerequisites.
+- **Phase 4 is in progress (4A + 4B complete).** Implement sub-phases in order — do not skip ahead to later sub-phases without completing prerequisites.
 - **Do NOT rename the manifest** to anything other than `METHODS.toml`. The design docs are explicit about this name.
 - **Do NOT rename Python classes or internal Pipelex types.** The standard is MTHDS; the implementation is Pipelex. Keep existing class names.
 
