@@ -17,7 +17,7 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.core.packages.dependency_resolver import DependencyResolveError, ResolvedDependency, resolve_local_dependencies
+from pipelex.core.packages.dependency_resolver import DependencyResolveError, ResolvedDependency, resolve_all_dependencies
 from pipelex.core.packages.discovery import find_package_manifest
 from pipelex.core.packages.exceptions import ManifestError
 from pipelex.core.packages.manifest import MthdsPackageManifest
@@ -641,7 +641,7 @@ class LibraryManager(LibraryManagerAbstract):
             package_root: The root directory of the consuming package
         """
         try:
-            resolved_deps = resolve_local_dependencies(manifest=manifest, package_root=package_root)
+            resolved_deps = resolve_all_dependencies(manifest=manifest, package_root=package_root)
         except DependencyResolveError as exc:
             msg = f"Failed to resolve dependencies: {exc}"
             raise LibraryLoadingError(msg) from exc
