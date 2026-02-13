@@ -1,16 +1,321 @@
-# Package System — Manual Testing Guide
+# Package System — Testing Guide
 
-This guide walks through manually testing the package system (METHODS.toml, exports/visibility, `pkg` CLI) both locally and with cross-package references.
+This guide covers testing the package system (METHODS.toml, exports/visibility, `pkg` CLI, cross-package references) using a layered strategy that maximizes coverage while minimizing external dependencies.
+
+## Testing Strategy Overview
+
+Cross-package references are the hardest part to test because they involve two independent packages — a **provider** (exports pipes) and a **consumer** (references them via `alias->domain.pipe`). The naive approach — creating multiple GitHub accounts — is fragile, slow, and unnecessary.
+
+Instead, we use four testing layers, each building on the previous one:
+
+| Layer | What it tests | I/O | Runs in CI |
+|-------|--------------|-----|------------|
+| **1. Unit tests** | `->` syntax parsing, alias validation, manifest models | None | Yes |
+| **2. Local path deps** | Full resolution pipeline with two directories on disk | Filesystem only | Yes |
+| **3. Local git repos** | VCS fetch path using `file://` protocol URLs | Local git, no network | Yes |
+| **4. Manual smoke test** | Real GitHub fetch + export validation | Network (GitHub) | No — manual only |
+
+Layers 1-3 are automated and form the test suite. Layer 4 is a one-time confidence check before shipping.
+
+**Why not two GitHub accounts?**
+
+- GitHub ToS discourages multiple personal accounts per person.
+- Credential management in CI is painful (two sets of secrets, token rotation).
+- Tests become fragile: network outages, rate limits, and GitHub API changes break them.
+- Slow feedback loop — every test run hits the network.
+- You don't need two *accounts*, you need two *repositories*. A single account or org can own both.
+- And for automated tests, you don't need GitHub at all — local git repos and local path deps cover the logic.
 
 ## Prerequisites
 
 - A working Pipelex install with the virtual environment activated
-- The test fixtures in `refactoring/test-package-fixtures/`
+- The test fixtures in `tests/data/packages/` (automated tests) and optionally `refactoring/test-package-fixtures/` (manual tests)
 - All commands below assume you are in the **project root** (where `.pipelex/` lives)
 
-**Important**: `pipelex validate --all` requires a full Pipelex setup (the `.pipelex/` config directory). Use `--library-dir` to point it at the fixture files while running from the project root. The `pkg list` and `pkg init` commands only need a `METHODS.toml` in the current directory, so for those you `cd` into the fixtures.
+**Important**: `pipelex validate --all` requires a full Pipelex setup (the `.pipelex/` config directory). Use `--library-dir` to point it at fixture files while running from the project root. The `pkg list` and `pkg init` commands only need a `METHODS.toml` in the current directory, so for those you `cd` into the fixtures.
 
-## A. Local Testing (single repo, visibility enforcement)
+---
+
+## Layer 1: Unit Tests (parsing, validation, models)
+
+These tests verify the low-level building blocks with no I/O at all. They already exist from Phase 2.
+
+### 1.1 Cross-package ref parsing
+
+The `->` syntax is validated by unit tests in `tests/unit/pipelex/core/packages/test_cross_package_refs.py`:
+
+```bash
+make tp TEST=TestCrossPackageRefs
+```
+
+**Expected**: All 4 tests pass:
+
+- `test_has_cross_package_prefix` — detects `->` in ref strings
+- `test_split_cross_package_ref` — splits `alias->domain.pipe` correctly
+- `test_known_alias_emits_warning_not_error` — known alias produces no error (warning via log)
+- `test_unknown_alias_produces_error` — unknown alias produces a `VisibilityError`
+
+### 1.2 Manifest model validation
+
+Manifest parsing, field validation, and serialization are covered by tests in `tests/unit/pipelex/core/packages/`. Run the full package unit test suite:
+
+```bash
+make tp TEST=tests/unit/pipelex/core/packages
+```
+
+### 1.3 What the `->` syntax looks like in practice
+
+In a `.mthds` file, a cross-package reference uses the alias from `[dependencies]`:
+
+```toml
+[pipe.call_remote_scoring]
+type = "PipeSequence"
+description = "Call a pipe from the shared_scoring remote package"
+inputs = { data = "Text" }
+output = "Text"
+steps = [
+    { pipe = "shared_scoring->scoring.compute_score", result = "remote_score" },
+]
+```
+
+Where `shared_scoring` matches the dependency declared in METHODS.toml:
+
+```toml
+[dependencies]
+shared_scoring = { address = "github.com/acme/scoring-methods", version = "^2.0.0" }
+```
+
+---
+
+## Layer 2: Integration Tests with Local Path Dependencies
+
+This is where 90% of the cross-package test coverage should live. Two directories on disk, each with its own `METHODS.toml`, the consumer declaring the provider as a local path dependency. This tests the full resolution pipeline — discover manifest, read exports, validate visibility — with zero network I/O.
+
+### 2.1 Fixture layout
+
+The test fixtures live under `tests/data/packages/` and follow this structure:
+
+```
+tests/data/packages/
+├── provider_package/
+│   ├── METHODS.toml          # declares [exports.scoring]
+│   └── scoring/
+│       └── scoring.mthds     # defines compute_weighted_score (public) + internal_score_normalizer (private)
+│
+├── consumer_valid/
+│   ├── METHODS.toml          # [dependencies] scoring_lib = { path = "../provider_package" }
+│   └── analysis/
+│       └── analysis.mthds    # uses scoring_lib->scoring.compute_weighted_score (valid)
+│
+├── consumer_invalid/
+│   ├── METHODS.toml          # same dependency declaration
+│   └── analysis/
+│       └── analysis.mthds    # uses scoring_lib->scoring.internal_score_normalizer (blocked — not exported)
+│
+└── consumer_unknown_alias/
+    ├── METHODS.toml           # no [dependencies] section
+    └── analysis/
+        └── analysis.mthds    # uses nonexistent_lib->scoring.compute_weighted_score (unknown alias)
+```
+
+### 2.2 What the local path dependency looks like
+
+The consumer's `METHODS.toml` uses a `path` field instead of (or alongside) an `address`:
+
+```toml
+[package]
+name = "contract-analysis"
+version = "1.0.0"
+description = "Analyzes contracts using external scoring"
+
+[dependencies]
+scoring_lib = { path = "../provider_package", version = "^1.0.0" }
+```
+
+The `path` field is resolved relative to the `METHODS.toml` file's location. This is the same pattern used by Cargo (`path = "..."`), Go (`replace` directive), and Poetry (`path` dependencies).
+
+### 2.3 Test cases
+
+These are automated tests (pytest), not manual steps:
+
+| Test case | Consumer fixture | Expected result |
+|-----------|-----------------|-----------------|
+| Valid cross-package ref | `consumer_valid/` | Passes — pipe is exported by provider |
+| Private pipe ref | `consumer_invalid/` | Fails — `internal_score_normalizer` not in provider's `[exports]` |
+| Unknown alias | `consumer_unknown_alias/` | Fails — alias not declared in `[dependencies]` |
+| Provider has no manifest | (provider without METHODS.toml) | Passes — no manifest means all public |
+| Provider `main_pipe` auto-export | (consumer refs provider's main_pipe not in exports) | Passes — main_pipe is auto-exported |
+
+### 2.4 Running the tests
+
+```bash
+make tp TEST=TestCrossPackageLocalPath
+```
+
+### 2.5 Why this layer matters
+
+Local path dependencies test the **exact same resolution logic** that remote dependencies will use — the only difference is *how* the provider package is located on disk. Once the provider's directory is found:
+
+1. Read its `METHODS.toml`
+2. Build a `PackageVisibilityChecker` from its exports
+3. Validate the consumer's `->` references against the provider's exports
+
+Steps 1-3 are identical regardless of whether the provider came from a local path, a local git clone, or a GitHub fetch. This is why local path tests give high confidence.
+
+---
+
+## Layer 3: Integration Tests with Local Git Repos
+
+This layer tests the VCS fetch path — cloning a repo, checking out a version, reading its manifest — without touching the network. It uses bare git repos on the local filesystem with `file://` protocol URLs.
+
+### 3.1 How it works
+
+The test setup creates temporary git repos using `git init --bare`, pushes fixture content to them, and tags releases. The consumer's dependency uses a `file://` URL instead of a `github.com/...` address:
+
+```toml
+[dependencies]
+scoring_lib = { address = "file:///tmp/test-repos/scoring-methods.git", version = "^1.0.0" }
+```
+
+### 3.2 Test setup (pytest fixture)
+
+A pytest fixture handles the lifecycle:
+
+1. Create a temp directory
+2. Initialize a bare git repo: `git init --bare /tmp/test-repos/scoring-methods.git`
+3. Clone it to a working copy, add the provider package files (METHODS.toml + .mthds bundles)
+4. Commit and tag: `git tag v1.0.0`
+5. Push to the bare repo
+6. Yield the `file://` URL to the test
+7. Clean up on teardown
+
+This mirrors exactly what happens with a real GitHub repo, but runs entirely on the local filesystem.
+
+### 3.3 Test cases
+
+| Test case | Setup | Expected result |
+|-----------|-------|-----------------|
+| Clone + resolve valid ref | Provider tagged `v1.0.0`, consumer requires `^1.0.0` | Passes — version matches, pipe is exported |
+| Version mismatch | Provider tagged `v1.0.0`, consumer requires `^2.0.0` | Fails — no matching version |
+| Clone + visibility violation | Provider exports only `compute_weighted_score`, consumer refs private pipe | Fails — visibility error with helpful message |
+| Multiple tags | Provider has `v1.0.0` and `v1.1.0`, consumer requires `^1.0.0` | Resolves to `v1.1.0` (latest matching) |
+
+### 3.4 Running the tests
+
+```bash
+make tp TEST=TestCrossPackageGitLocal
+```
+
+### 3.5 What this adds over Layer 2
+
+Layer 2 tests the resolution logic assuming the provider is already on disk. Layer 3 tests the **fetch** logic:
+
+- Can we clone from a URL?
+- Can we resolve version constraints against git tags?
+- Can we read the manifest from the cloned repo?
+- Does caching work (second resolve doesn't re-clone)?
+
+These are the moving parts that break when the VCS integration has bugs.
+
+---
+
+## Layer 4: Manual Smoke Test (GitHub)
+
+This is a one-time manual test to confirm end-to-end behavior with real GitHub repos. It is **not** part of the automated test suite. You need a single GitHub account (or org) with two public repos.
+
+### 4.1 Setup
+
+1. Create a GitHub repo `yourorg/scoring-methods` containing:
+
+   ```
+   METHODS.toml
+   scoring/
+     scoring.mthds
+   ```
+
+   Where `METHODS.toml` declares:
+
+   ```toml
+   [package]
+   name = "scoring-methods"
+   version = "1.0.0"
+   description = "Shared scoring methods"
+   address = "github.com/yourorg/scoring-methods"
+
+   [exports.scoring]
+   pipes = ["compute_weighted_score"]
+   ```
+
+   Tag a release: `git tag v1.0.0 && git push --tags`
+
+2. Create a GitHub repo `yourorg/contract-analysis` containing:
+
+   ```
+   METHODS.toml
+   analysis/
+     analysis.mthds
+   ```
+
+   Where `METHODS.toml` declares:
+
+   ```toml
+   [package]
+   name = "contract-analysis"
+   version = "1.0.0"
+   description = "Contract analysis pipeline"
+   address = "github.com/yourorg/contract-analysis"
+
+   [dependencies]
+   scoring_lib = { address = "github.com/yourorg/scoring-methods", version = "^1.0.0" }
+
+   [exports.analysis]
+   pipes = ["analyze_contract"]
+   ```
+
+   And `analysis.mthds` references the remote pipe:
+
+   ```toml
+   [pipe.analyze_contract]
+   type = "PipeSequence"
+   description = "Analyze a contract using remote scoring"
+   inputs = { data = "Text" }
+   output = "Text"
+   steps = [
+       { pipe = "scoring_lib->scoring.compute_weighted_score", result = "score" },
+   ]
+   ```
+
+### 4.2 Test it
+
+Clone the consumer repo and run:
+
+```bash
+pipelex validate --all --library-dir .
+```
+
+**Expected**: Passes — the scoring pipe is exported and the version matches.
+
+### 4.3 Test a visibility violation
+
+Update `analysis.mthds` to reference a private pipe:
+
+```toml
+steps = [
+    { pipe = "scoring_lib->scoring.internal_score_normalizer", result = "score" },
+]
+```
+
+Re-run validation. **Expected**: Fails with a visibility error naming the pipe and suggesting to add it to `[exports.scoring]`.
+
+### 4.4 When to run this
+
+Run the smoke test once after implementing the GitHub fetch path, and again before releasing. It does not need to be part of CI.
+
+---
+
+## A. Local Testing (single package, visibility enforcement)
+
+These are manual tests for Phase 2 functionality (single-package visibility). They remain useful for quickly verifying the visibility model without running the full pytest suite.
 
 ### 1. Verify the fixture structure
 
@@ -166,77 +471,7 @@ pipelex validate --all --library-dir /tmp/pkg-main-pipe-test
 
 **Expected**: Passes. The reference to `legal.contracts.extract_clause` is still valid because it is the `main_pipe` of its domain.
 
-## B. Remote Testing (cross-package, GitHub)
-
-Cross-package references use the `->` syntax: `alias->domain.pipe_code`, where the alias is declared in `[dependencies]`.
-
-### Current state
-
-Cross-package reference **parsing and alias validation** are implemented in `PackageVisibilityChecker.validate_cross_package_references()` (`pipelex/core/packages/visibility.py:128`). However, this method is **not yet wired** into the `pipelex validate --all` pipeline — `check_visibility_for_blueprints()` only calls `validate_all_pipe_references()`, not `validate_cross_package_references()`. This means `->` references are currently validated only by unit tests, not at CLI level.
-
-Full cross-package **resolution** (fetching and loading remote packages) is also not yet implemented.
-
-### 1. Test cross-package ref parsing (unit test level)
-
-The `->` syntax is validated by unit tests in `tests/unit/pipelex/core/packages/test_cross_package_refs.py`. Run them:
-
-```bash
-make tp TEST=TestCrossPackageRefs
-```
-
-**Expected**: All 4 tests pass:
-
-- `test_has_cross_package_prefix` — detects `->` in ref strings
-- `test_split_cross_package_ref` — splits `alias->domain.pipe` correctly
-- `test_known_alias_emits_warning_not_error` — known alias produces no error (warning via log)
-- `test_unknown_alias_produces_error` — unknown alias produces a `VisibilityError`
-
-### 2. What the `->` syntax looks like in practice
-
-In a `.mthds` file, a cross-package reference uses the alias from `[dependencies]`:
-
-```toml
-[pipe.call_remote_scoring]
-type = "PipeSequence"
-description = "Call a pipe from the shared_scoring remote package"
-inputs = { data = "Text" }
-output = "Text"
-steps = [
-    { pipe = "shared_scoring->scoring.compute_score", result = "remote_score" },
-]
-```
-
-Where `shared_scoring` matches the dependency declared in METHODS.toml:
-
-```toml
-[dependencies]
-shared_scoring = { address = "github.com/acme/scoring-methods", version = "^2.0.0" }
-```
-
-### 3. What will change with full cross-package resolution
-
-Once cross-package validation is wired into the CLI pipeline and resolution is implemented:
-
-- `validate_cross_package_references()` will be called alongside `validate_all_pipe_references()` during `pipelex validate --all`
-- Known alias `->` references will emit warnings (then eventually resolve to actual pipes)
-- Unknown alias `->` references will produce hard errors
-- `pipelex` will download/cache the remote package based on the address and version constraint
-- The remote package's METHODS.toml will be read to check its exports
-
-### Creating a test GitHub repo (for future use)
-
-When cross-package resolution is implemented, you can test it end-to-end:
-
-1. Create a GitHub repo (e.g. `acme-scoring-methods`) containing:
-   - `METHODS.toml` with `[exports.scoring]` listing the public pipes
-   - `scoring/scoring.mthds` with the actual pipe definitions
-2. In your consumer project, add it as a dependency:
-   ```toml
-   [dependencies]
-   shared_scoring = { address = "github.com/yourorg/acme-scoring-methods", version = "^1.0.0" }
-   ```
-3. Reference it with `shared_scoring->scoring.compute_score` in a step
-4. Run `pipelex validate --all`
+---
 
 ## Fixture File Reference
 
@@ -251,3 +486,17 @@ The `reporting/summary.mthds` bundle is the key testing tool — its `generate_r
 - `legal.contracts.extract_clause` — **valid** (exported)
 - `scoring.compute_weighted_score` — **valid** (exported)
 - `scoring.internal_score_normalizer` — **blocked** (not exported) — toggle this line to test pass/fail
+
+---
+
+## Current Implementation State
+
+Cross-package reference **parsing and alias validation** are implemented in `PackageVisibilityChecker.validate_cross_package_references()` (`pipelex/core/packages/visibility.py:128`). However, this method is **not yet wired** into the `pipelex validate --all` pipeline — `check_visibility_for_blueprints()` only calls `validate_all_pipe_references()`, not `validate_cross_package_references()`. This means `->` references are currently validated only by unit tests, not at CLI level.
+
+Full cross-package **resolution** (fetching and loading remote packages) is also not yet implemented. The test layers described above (2, 3, 4) serve as the specification for what Phase 3 must deliver:
+
+- **Layer 2 defines** the local path dependency format and resolution behavior.
+- **Layer 3 defines** the VCS fetch, version resolution, and caching behavior.
+- **Layer 4 defines** the end-user experience with real GitHub repos.
+
+Phase 3 implementation should make these test cases pass, in order.
