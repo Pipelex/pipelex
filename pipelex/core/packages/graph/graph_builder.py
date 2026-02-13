@@ -29,8 +29,9 @@ def build_know_how_graph(index: PackageIndex) -> KnowHowGraph:
         A fully populated KnowHowGraph with concept nodes, pipe nodes,
         refinement edges, and data-flow edges
 
-    Raises:
-        GraphBuildError: If the graph cannot be built due to invalid data
+    Note:
+        Unresolvable concepts and refines targets are logged as warnings
+        and excluded from the graph rather than raising errors.
     """
     graph = KnowHowGraph()
 
