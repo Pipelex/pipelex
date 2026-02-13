@@ -145,22 +145,45 @@ Delivered:
 
 ---
 
-## Phase 5: Registry + Know-How Graph Discovery — PLANNED
+## Phase 5: Local Package Discovery + Know-How Graph — IN PROGRESS
 
-Deliverables:
+Scoped to **local-first** (no registry server). A future phase layers a hosted registry on top. Sub-phases:
 
-- **Registry index service**: Crawl known package addresses, parse `METHODS.toml` for metadata, parse `.mthds` files for concept definitions and pipe signatures, build a searchable index. No duplication — all data derived from the source files.
-- **Type-aware search**: "I have X, I need Y" queries leveraging typed pipe signatures and concept refinement hierarchies — a capability that text-based discovery (like Agent Skills) cannot support.
-- **`pipelex pkg publish` CLI command**: Validate and prepare a package for distribution, register with a registry.
-- **Know-How Graph browsing + auto-composition**: Navigate the refinement hierarchy, explore pipe signatures, find chains through the graph when no single pipe goes from X to Y.
-- **Multi-tier deployment**: Local (single `.mthds` file) / Project (package in a repo) / Organization (internal registry/proxy) / Community (public Git repos + public registries).
+### Phase 5A: Package Index Model + Index Builder — COMPLETED
+
+Delivered:
+
+- **Index data models** (`pipelex/core/packages/index/models.py`): Frozen Pydantic models for indexing packages at the blueprint level (no runtime class loading, no side effects). `PipeSignature` stores pipe code, type, domain, description, input/output specs as strings, and export status. `ConceptEntry` stores concept code, domain, concept_ref, description, refines chain, and structure field names. `DomainEntry` stores domain code and description. `PackageIndexEntry` stores full package metadata (address, version, description, authors, license) plus lists of domains, concepts, pipes, and dependency addresses. `PackageIndex` is a mutable collection keyed by address with `add_entry()`, `get_entry()`, `remove_entry()`, `all_concepts()`, `all_pipes()`.
+- **Index builder** (`pipelex/core/packages/index/index_builder.py`): `build_index_entry_from_package(package_root)` parses `METHODS.toml` for metadata and scans `.mthds` files via `PipelexInterpreter.make_pipelex_bundle_blueprint()` to extract pipe signatures, concept entries, and domain info — all at string level. Determines export status from manifest `[exports]` + `main_pipe` auto-export. `build_index_from_cache(cache_root)` discovers all cached packages by recursively scanning for `METHODS.toml` files. `build_index_from_project(project_root)` indexes the current project plus its local and cached dependencies.
+- **Public utility functions**: `collect_mthds_files()` and `determine_exported_pipes()` in `dependency_resolver.py` made public (removed `_` prefix) for reuse by the index builder.
+- **`IndexBuildError`** exception in `exceptions.py`.
+- **32 tests** across 2 test files: `test_index_models.py` (15 tests: model construction, immutability, add/get/remove/replace on PackageIndex, all_concepts/all_pipes aggregation) and `test_index_builder.py` (17 tests: build from legal_tools/scoring_dep/minimal_package/refining_consumer, domain/concept/pipe extraction, input/output specs, export status, main_pipe auto-export, concept refines, error cases, cache scanning, project indexing).
+
+### Phase 5B: Know-How Graph Model + Query Engine — PLANNED
+
+- **Graph data model** (`pipelex/core/packages/graph/`): `GraphNode` (pipe signature + package identity), `GraphEdge` (DATA_FLOW or REFINEMENT), `ConceptNode` (concept ref + refines chain), `KnowHowGraph` (pipe nodes, concept nodes, data flow edges, refinement edges).
+- **Graph builder**: Build graph from `PackageIndex` — create nodes per exported pipe, refinement edges per concept `refines` chain, data flow edges where pipe A's output matches/refines pipe B's input. Concept matching respects package isolation (same-package match by ref, cross-package only via explicit refinement).
+- **Query engine**: `query_i_have_i_need(input_concept, output_concept, max_depth=3)` finds pipe chains via BFS. `query_what_can_i_do(concept_ref)` lists pipes accepting a concept. `query_what_produces(concept_ref)` lists pipes producing a concept. `check_compatibility(pipe_a, pipe_b)` verifies output-to-input match. `resolve_refinement_chain(concept_ref)` walks up ancestors.
+
+### Phase 5C: CLI Commands (index, search, inspect, graph) — PLANNED
+
+- `pipelex pkg index`: Build/display the local package index (project or cache).
+- `pipelex pkg search <query>`: Text search across descriptions, domains, concepts, pipes. Filters: `--domain`, `--concept`, `--pipe`.
+- `pipelex pkg inspect <address>`: Detailed view of one indexed package (domains, concepts with refines, pipe signatures).
+- `pipelex pkg graph`: Know-How Graph queries (`--from`, `--to`, `--check`, `--max-depth`).
+
+### Phase 5D: Package Publish Validation — PLANNED
+
+- `pipelex pkg publish`: Validates package readiness (manifest completeness, export consistency, concept consistency, dependency pinning, lock file freshness, bundle validity, git tag readiness). Local-only, no push to any registry.
+- `PublishValidationResult` and `PublishValidationIssue` models.
+- `--tag` option to create git tag `v{version}` locally.
 
 ---
 
 ## What NOT to Do
 
-- **Do NOT implement remote registry or Know-How Graph browsing.** That is Phase 5.
-- **Phase 4 is complete (4A–4E all delivered).** Next work is Phase 5.
+- **Do NOT implement a hosted registry server.** That is a future phase beyond Phase 5.
+- **Phase 5 is local-first.** All index, search, graph, and publish operations run as CLI tools on local data.
 - **Do NOT rename the manifest** to anything other than `METHODS.toml`. The design docs are explicit about this name.
 - **Do NOT rename Python classes or internal Pipelex types.** The standard is MTHDS; the implementation is Pipelex. Keep existing class names.
 
