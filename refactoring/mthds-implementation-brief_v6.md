@@ -69,15 +69,6 @@ Delivered:
 
 ---
 
-## Known Limitations (current implementation)
-
-These are tracked as deliverables in the Phase 4E sub-phase:
-
-1. **Per-package Library isolation** (Phase 4E): Dependency pipes/concepts stored with aliased keys in flat library dicts. Concept name conflicts log a warning and skip native-key registration.
-2. **Cross-package concept refinement validation** (Phase 4E): `refines = "alias->domain.Concept"` parses correctly, but `are_concept_compatible()` doesn't traverse across package boundaries yet.
-
----
-
 ## Phase 4A: Semver Constraint Evaluation Engine — COMPLETED
 
 - `pipelex/tools/misc/semver.py`: Typed wrapper around `semantic_version` providing `parse_version` (with `v`-prefix stripping for git tags), `parse_constraint`, `version_satisfies`, `parse_version_tag`, and Go-style Minimum Version Selection via `select_minimum_version` (single constraint) and `select_minimum_version_for_multiple_constraints` (transitive case).
@@ -139,25 +130,18 @@ Delivered:
 
 ---
 
-## Phase 4E: Per-Package Library Isolation + Concept Refinement — PLANNED
+## Phase 4E: Per-Package Library Isolation + Concept Refinement — COMPLETED
 
-Deliverables:
+Delivered:
 
-- **Per-package Library instances**: Each dependency package gets its own `ConceptLibrary` + `PipeLibrary` held inside a child `Library` instance. The main `Library` gains a `dependency_libraries: dict[str, Library]` mapping (alias → child library). Cross-package lookups (`alias->domain.Concept`, `alias->domain.pipe_code`) route through the child library by splitting on `->`, resolving the alias to the child, then looking up the local key. This eliminates the current flat-namespace workaround where concepts are registered with both aliased keys and native keys (with skip-on-conflict for name collisions).
-- **Cross-package concept refinement validation**: `are_concept_compatible()` in `pipelex/core/concepts/concept.py` (not `validation.py`) currently compares `concept_ref`, `structure_class_name`, and `refines` chains via string equality — it cannot traverse `alias->domain.Concept` references across package boundaries. Extend it to accept a concept resolver callback (or library reference) so it can dereference aliased concept refs to their actual `Concept` objects when checking refinement compatibility. Validate at both install-time and load-time.
-- **Builder package-awareness**: Builder knows available packages' exported pipes/concepts for cross-package pipe references during method generation. `maybe_generate_manifest_for_output()` already exists from Phase 2; extend to include cross-package dependency awareness.
-- **Tests**: Concept name collision scenarios (two deps exporting same concept code — no conflict with isolation), refinement chain across packages (`refines = "alias->domain.Concept"` validated end-to-end), builder cross-package generation.
-
-Key files to modify:
-
-| File | Change |
-|------|--------|
-| `pipelex/libraries/library.py` | Add `dependency_libraries: dict[str, Library]` field or accessor |
-| `pipelex/libraries/library_manager.py` | Per-package Library isolation: `_load_single_dependency()` creates child `Library` per dep instead of registering into flat namespace |
-| `pipelex/libraries/concept/concept_library.py` | Route `->` lookups through child library instead of flat dict |
-| `pipelex/libraries/pipe/pipe_library.py` | Route `->` lookups through child library instead of flat dict |
-| `pipelex/core/concepts/concept.py` | `are_concept_compatible()`: accept resolver callback for cross-package refinement traversal |
-| `pipelex/builder/builder_loop.py` | Package-aware generation with access to dependency libraries |
+- **Per-package Library instances** (`pipelex/libraries/library.py`): Each dependency package gets its own isolated `Library` instance held in `Library.dependency_libraries: dict[str, Library]` (alias → child library). `get_dependency_library(alias)` retrieves child libraries. `resolve_concept(concept_ref)` routes `alias->domain.Code` lookups through the child library by splitting on `->`, resolving the alias to the child, then looking up the local key. `validate_concept_library_with_libraries()` validates cross-package refines targets exist after all dependencies are loaded. `teardown()` cleans up child libraries. This eliminates the previous flat-namespace workaround where concepts were registered with both aliased keys and native keys (with skip-on-conflict for name collisions).
+- **Per-package loading in LibraryManager** (`pipelex/libraries/library_manager.py`): `_load_single_dependency()` creates a child `Library` per dependency. Domains, concepts, and exported pipes are loaded into the child library in isolation. Temporary concept registration in the main library during pipe construction (needed for pipe validation), then removed. Aliased entries (`alias->concept_ref`, `alias->pipe_code`) added to the main library for backward-compatible cross-package lookups. Calls `library.concept_library.set_concept_resolver(library.resolve_concept)` after all dependency loading completes.
+- **Cross-package concept refinement validation** (`pipelex/core/concepts/concept.py`): `are_concept_compatible()` gains a `concept_resolver: Callable[[str], Concept | None] | None` parameter. Cross-package refines (`alias->domain.Concept`) are resolved through the resolver callback before compatibility comparison. Handles sibling concepts (both refining the same cross-package concept) by comparing resolved refines by `concept_ref`.
+- **ConceptLibrary resolver wiring** (`pipelex/libraries/concept/concept_library.py`): `_concept_resolver` field stores the resolver callback. `set_concept_resolver(resolver)` wires it after dependency loading. `is_compatible()` passes the resolver to `are_concept_compatible()`. `validation_static` skips cross-package refines (validated later via `validate_concept_library_with_libraries()`).
+- **ConceptFactory cross-package refines** (`pipelex/core/concepts/concept_factory.py`): `_handle_refines()` detects cross-package refines via `QualifiedRef.has_cross_package_prefix()`. For cross-package refines, generates a standalone `TextContent` subclass (base class not available locally). Refinement relationship tracked in `concept.refines` field for runtime validation.
+- **Builder package-awareness** (`pipelex/builder/builder_loop.py`): `_fix_undeclared_concept_references()` skips cross-package refs when collecting undeclared concepts. `_prune_unreachable_specs()` skips cross-package refs when collecting local concept refs. New `_extract_local_bare_code()` helper returns `None` for cross-package refs, used by `_collect_concept_refs_from_pipe_spec()` and `_collect_concept_refs_from_concept_spec()`. Ensures fix/prune operations only operate on local concepts, not dependency concepts.
+- **Physical test data** (`tests/data/packages/`): `analytics_dep/` (second dependency with same concept code as `scoring_dep` for collision testing), `multi_dep_consumer/` (consumer depending on both scoring and analytics deps), `refining_consumer/` (consumer with concept refining a cross-package concept).
+- **Comprehensive tests**: 30 tests across 4 test files covering library isolation (child registration, retrieval, concept isolation, cross-package lookups, name collision with two deps, teardown), cross-package concept refinement (resolver-based compatibility, sibling concepts, local refines unaffected), concept validation (skip cross-package refines in static validation, catch missing targets, pass with loaded deps), and integration loading (end-to-end with isolated deps, cross-package pipe lookups, collision prevention, refinement chains, resolver wiring).
 
 ---
 
@@ -176,7 +160,7 @@ Deliverables:
 ## What NOT to Do
 
 - **Do NOT implement remote registry or Know-How Graph browsing.** That is Phase 5.
-- **Phase 4 is in progress (4A + 4B + 4C + 4D complete).** Implement sub-phases in order — do not skip ahead to later sub-phases without completing prerequisites.
+- **Phase 4 is complete (4A–4E all delivered).** Next work is Phase 5.
 - **Do NOT rename the manifest** to anything other than `METHODS.toml`. The design docs are explicit about this name.
 - **Do NOT rename Python classes or internal Pipelex types.** The standard is MTHDS; the implementation is Pipelex. Keep existing class names.
 
@@ -189,6 +173,8 @@ Deliverables:
 - Use hierarchical domains and domain-qualified pipe references (Phase 1)
 - Create `METHODS.toml` manifests with `pipelex pkg init`, inspect with `pipelex pkg list` (Phase 2)
 - Declare local path dependencies with `pipelex pkg add` and use `alias->domain.pipe_code` cross-package references (Phase 3)
+- Use remote dependencies with semver constraints, lock files, and transitive resolution via `pipelex pkg lock/install/update` (Phase 4A–4D)
+- Depend on multiple packages without concept name collisions thanks to per-package library isolation (Phase 4E)
 
 ---
 
