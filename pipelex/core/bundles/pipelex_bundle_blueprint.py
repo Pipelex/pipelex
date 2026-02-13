@@ -125,6 +125,10 @@ class PipelexBundleBlueprint(BaseModel):
 
         undeclared_refs: list[str] = []
         for concept_ref_or_code, context in all_refs:
+            # Cross-package references are validated at package level, not bundle level
+            if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
+                continue
+
             # Parse the reference using QualifiedRef
             ref = QualifiedRef.parse(concept_ref_or_code)
 
@@ -166,6 +170,10 @@ class PipelexBundleBlueprint(BaseModel):
         for pipe_ref_str, context in all_pipe_refs:
             # Skip special outcomes
             if pipe_ref_str in special_outcomes:
+                continue
+
+            # Cross-package references are validated at package level, not bundle level
+            if QualifiedRef.has_cross_package_prefix(pipe_ref_str):
                 continue
 
             # Try to parse as a pipe ref

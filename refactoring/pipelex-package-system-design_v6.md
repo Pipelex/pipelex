@@ -302,6 +302,7 @@ The canonical form is always the full hostname-based address.
 
 Resolution chain:
 
+0. **Local path**: Dependencies with a `path` field in `METHODS.toml` are resolved directly from the local filesystem. This supports development-time workflows (similar to Cargo's `path` deps or Go's `replace` directives).
 1. **Local cache**: `~/.mthds/packages/` (global) or `.mthds/packages/` (project-local)
 2. **VCS fetch**: The address IS the fetch URL — `github.com/acme/...` maps to `https://github.com/acme/...`
 3. **Proxy/mirror**: Optional, configurable proxy for speed, reliability, or air-gapped environments (like Go's `GOPROXY`)

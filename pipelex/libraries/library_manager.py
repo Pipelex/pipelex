@@ -17,8 +17,10 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.packages.dependency_resolver import DependencyResolveError, ResolvedDependency, resolve_local_dependencies
 from pipelex.core.packages.discovery import find_package_manifest
 from pipelex.core.packages.exceptions import ManifestError
+from pipelex.core.packages.manifest import MthdsPackageManifest
 from pipelex.core.packages.visibility import check_visibility_for_blueprints
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
@@ -499,7 +501,8 @@ class LibraryManager(LibraryManagerAbstract):
 
         This method:
         1. Parses blueprints from MTHDS files
-        2. Loads blueprints into the specified library
+        2. Finds and loads dependency packages (if manifest has dependencies with local paths)
+        3. Loads blueprints into the specified library
 
         Args:
             library_id: The ID of the library to load into
@@ -522,8 +525,18 @@ class LibraryManager(LibraryManagerAbstract):
                 ) from interpreter_error
             blueprints.append(blueprint)
 
-        # Run package visibility validation if a METHODS.toml manifest exists
-        self._check_package_visibility(blueprints=blueprints, mthds_paths=valid_mthds_paths)
+        # Find manifest and run package visibility validation
+        manifest = self._check_package_visibility(blueprints=blueprints, mthds_paths=valid_mthds_paths)
+
+        # Load dependency packages if manifest has local-path dependencies
+        if manifest is not None and manifest.dependencies:
+            package_root = self._find_package_root(mthds_paths=valid_mthds_paths)
+            if package_root is not None:
+                self._load_dependency_packages(
+                    library_id=library_id,
+                    manifest=manifest,
+                    package_root=package_root,
+                )
 
         # Store resolved absolute paths for duplicate detection in the library
         library = self.get_library(library_id=library_id)
@@ -547,7 +560,7 @@ class LibraryManager(LibraryManagerAbstract):
         self,
         blueprints: list[PipelexBundleBlueprint],
         mthds_paths: list[Path],
-    ) -> None:
+    ) -> MthdsPackageManifest | None:
         """Check package visibility if a METHODS.toml manifest exists.
 
         Walks up from the first bundle path to find a METHODS.toml manifest.
@@ -556,19 +569,22 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             blueprints: The parsed bundle blueprints
             mthds_paths: The MTHDS file paths that were loaded
+
+        Returns:
+            The manifest if found, or None
         """
         if not mthds_paths:
-            return
+            return None
 
         # Try to find a manifest from the first bundle path
         try:
             manifest = find_package_manifest(mthds_paths[0])
         except ManifestError as exc:
             log.warning(f"Could not parse METHODS.toml: {exc.message}")
-            return
+            return None
 
         if manifest is None:
-            return
+            return None
 
         visibility_errors = check_visibility_for_blueprints(manifest=manifest, blueprints=blueprints)
         if visibility_errors:
@@ -576,6 +592,139 @@ class LibraryManager(LibraryManagerAbstract):
             joined_errors = "\n  - ".join(error_messages)
             msg = f"Package visibility violations found:\n  - {joined_errors}"
             raise LibraryLoadingError(msg)
+
+        return manifest
+
+    def _find_package_root(self, mthds_paths: list[Path]) -> Path | None:
+        """Find the package root directory by walking up from the first .mthds file.
+
+        The package root is the directory containing METHODS.toml.
+
+        Args:
+            mthds_paths: The MTHDS file paths
+
+        Returns:
+            The package root path, or None
+        """
+        if not mthds_paths:
+            return None
+
+        current = mthds_paths[0].parent.resolve()
+        while True:
+            manifest_path = current / "METHODS.toml"
+            if manifest_path.is_file():
+                return current
+
+            git_dir = current / ".git"
+            if git_dir.exists():
+                return None
+
+            parent = current.parent
+            if parent == current:
+                return None
+            current = parent
+
+    def _load_dependency_packages(
+        self,
+        library_id: str,
+        manifest: MthdsPackageManifest,
+        package_root: Path,
+    ) -> None:
+        """Load dependency packages into the library.
+
+        Resolves local-path dependencies, parses their blueprints, and loads
+        their concepts and exported pipes with aliased keys.
+
+        Args:
+            library_id: The library to load into
+            manifest: The consuming package's manifest
+            package_root: The root directory of the consuming package
+        """
+        try:
+            resolved_deps = resolve_local_dependencies(manifest=manifest, package_root=package_root)
+        except DependencyResolveError as exc:
+            msg = f"Failed to resolve dependencies: {exc}"
+            raise LibraryLoadingError(msg) from exc
+
+        library = self.get_library(library_id=library_id)
+
+        for resolved_dep in resolved_deps:
+            self._load_single_dependency(
+                library=library,
+                resolved_dep=resolved_dep,
+            )
+
+    def _load_single_dependency(
+        self,
+        library: Library,
+        resolved_dep: ResolvedDependency,
+    ) -> None:
+        """Load a single resolved dependency into the library.
+
+        Args:
+            library: The library to load into
+            resolved_dep: The resolved dependency info
+        """
+        alias = resolved_dep.alias
+
+        # Parse dependency blueprints
+        dep_blueprints: list[PipelexBundleBlueprint] = []
+        for mthds_path in resolved_dep.mthds_files:
+            try:
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
+                blueprint.source = str(mthds_path)
+            except (FileNotFoundError, PipelexInterpreterError) as exc:
+                log.warning(f"Could not parse dependency '{alias}' bundle '{mthds_path}': {exc}")
+                continue
+            dep_blueprints.append(blueprint)
+
+        if not dep_blueprints:
+            log.warning(f"No valid blueprints found for dependency '{alias}'")
+            return
+
+        # Load concepts from dependency blueprints
+        dep_concepts = self._load_concepts_from_blueprints(dep_blueprints)
+
+        # Add concepts with aliased keys for cross-package lookup
+        for concept in dep_concepts:
+            library.concept_library.add_dependency_concept(alias=alias, concept=concept)
+            # Also try to add with native key for dependency-internal pipe resolution
+            if not library.concept_library.is_concept_exists(concept.concept_ref):
+                library.concept_library.root[concept.concept_ref] = concept
+            else:
+                log.info(f"Dependency '{alias}' concept '{concept.concept_ref}' conflicts with existing concept, skipping native-key registration")
+
+        # Collect main_pipes for auto-export
+        main_pipes: set[str] = set()
+        for blueprint in dep_blueprints:
+            if blueprint.main_pipe:
+                main_pipes.add(blueprint.main_pipe)
+
+        # Determine if we filter by exports or load all
+        has_exports = len(resolved_dep.exported_pipe_codes) > 0
+        all_exported = resolved_dep.exported_pipe_codes | main_pipes
+
+        # Load exported pipes with aliased keys
+        concept_codes = [concept.code for concept in dep_concepts]
+        for blueprint in dep_blueprints:
+            if blueprint.pipe is None:
+                continue
+            for pipe_code, pipe_blueprint in blueprint.pipe.items():
+                # If manifest has exports, only load exported pipes
+                if has_exports and pipe_code not in all_exported:
+                    continue
+                try:
+                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                        domain_code=blueprint.domain,
+                        pipe_code=pipe_code,
+                        blueprint=pipe_blueprint,
+                        concept_codes_from_the_same_domain=concept_codes,
+                    )
+                    library.pipe_library.add_dependency_pipe(alias=alias, pipe=pipe)
+                except (PipeLibraryError, ValidationError) as exc:
+                    log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+
+        log.verbose(f"Loaded dependency '{alias}': {len(dep_concepts)} concepts, pipes from {len(dep_blueprints)} bundles")
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

@@ -169,6 +169,15 @@ class ConceptFactory:
         concept_ref_or_code: str,
         domain_code: str | None = None,
     ) -> DomainAndConceptCode:
+        # Handle cross-package references (alias->domain.ConceptCode)
+        if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
+            alias, remainder = QualifiedRef.split_cross_package_ref(concept_ref_or_code)
+            ref = QualifiedRef.parse_concept_ref(remainder)
+            if ref.domain_path is None:
+                msg = f"Cross-package concept ref '{concept_ref_or_code}' must include a domain"
+                raise ConceptFactoryError(msg)
+            return DomainAndConceptCode(domain_code=f"{alias}->{ref.domain_path}", concept_code=ref.local_code)
+
         if "." not in concept_ref_or_code and not domain_code:
             msg = f"Not enough information to make a domain and concept code from '{concept_ref_or_code}'"
             raise ConceptFactoryError(msg)
@@ -217,6 +226,7 @@ class ConceptFactory:
         it will be normalized to include the native domain prefix (e.g., 'native.Text').
         If the refine is a local concept code without domain (e.g., 'MyCustomConcept'),
         it will be prefixed with the given domain_code.
+        Cross-package refs (e.g., 'alias->domain.Concept') are passed through as-is.
 
         Args:
             refine: The refine string to validate and normalize
@@ -229,6 +239,9 @@ class ConceptFactory:
             ConceptFactoryError: If the refine is invalid
 
         """
+        # Cross-package refs pass through unchanged
+        if QualifiedRef.has_cross_package_prefix(refine):
+            return refine
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=refine):
             return NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refine)
         elif "." in refine:

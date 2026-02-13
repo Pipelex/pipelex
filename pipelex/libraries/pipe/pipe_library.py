@@ -58,11 +58,29 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         pipe = self.root.get(pipe_code)
         if pipe is not None:
             return pipe
+        # Cross-package: "alias->domain.pipe_code" -> lookup "alias->pipe_code"
+        if QualifiedRef.has_cross_package_prefix(pipe_code):
+            alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
+            ref = QualifiedRef.parse(remainder)
+            return self.root.get(f"{alias}->{ref.local_code}")
         # If it's a domain-qualified ref (e.g. "scoring.compute_score"), try the local code
         if "." in pipe_code:
             ref = QualifiedRef.parse(pipe_code)
             return self.root.get(ref.local_code)
         return None
+
+    def add_dependency_pipe(self, alias: str, pipe: PipeAbstract) -> None:
+        """Add a pipe from a dependency package with an aliased key.
+
+        Args:
+            alias: The dependency alias
+            pipe: The pipe to add
+        """
+        key = f"{alias}->{pipe.code}"
+        if key in self.root:
+            msg = f"Dependency pipe '{key}' already exists in the library"
+            raise PipeLibraryError(msg)
+        self.root[key] = pipe
 
     @override
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:

@@ -19,6 +19,17 @@ class TestDomainValidation:
             ("legal.contracts.shareholder", True),
             ("a.b.c", True),
             ("my_app.sub_domain", True),
+            # Cross-package domain codes
+            ("scoring_lib->scoring", True),
+            ("my_lib->legal.contracts", True),
+            ("alias->a.b.c", True),
+            ("lib->native", True),
+            # Cross-package with invalid remainder
+            ("lib->Legal", False),
+            ("lib->", False),
+            ("lib->legal.", False),
+            ("lib->.legal", False),
+            ("lib->legal..contracts", False),
             # Invalid
             ("Legal", False),
             ("legal.", False),

@@ -168,6 +168,8 @@ def serialize_manifest_to_toml(manifest: MthdsPackageManifest) -> str:
             dep_table = tomlkit.inline_table()
             dep_table.append("address", dep.address)
             dep_table.append("version", dep.version)
+            if dep.path is not None:
+                dep_table.append("path", dep.path)
             deps_table.add(dep.alias, dep_table)
         doc.add("dependencies", deps_table)
 

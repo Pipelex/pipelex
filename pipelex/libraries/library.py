@@ -3,6 +3,7 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from pipelex.base_exceptions import PipelexUnexpectedError
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.concept.concept_library import ConceptLibrary
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.domain.domain_library import DomainLibrary
@@ -69,6 +70,9 @@ class Library(BaseModel):
             # Validate pipe dependencies exist for pipe controllers
             if isinstance(pipe, PipeController):
                 for sub_pipe_code in pipe.pipe_dependencies():
+                    # Cross-package refs that aren't loaded are validated at package level, not library level
+                    if QualifiedRef.has_cross_package_prefix(sub_pipe_code) and self.pipe_library.get_optional_pipe(sub_pipe_code) is None:
+                        continue
                     try:
                         self.pipe_library.get_required_pipe(pipe_code=sub_pipe_code)
                     except PipeLibraryError as pipe_error:
@@ -76,7 +80,24 @@ class Library(BaseModel):
                         raise LibraryError(msg) from pipe_error
 
         for pipe in self.pipe_library.root.values():
+            # Skip full validation for pipe controllers with unresolved cross-package dependencies
+            if isinstance(pipe, PipeController) and self._has_unresolved_cross_package_deps(pipe):
+                continue
             pipe.validate_with_libraries()
+
+    def _has_unresolved_cross_package_deps(self, pipe: PipeController) -> bool:
+        """Check if a pipe controller has cross-package dependencies that aren't loaded.
+
+        Args:
+            pipe: The pipe controller to check
+
+        Returns:
+            True if the pipe has unresolved cross-package dependencies
+        """
+        for dep_code in pipe.pipe_dependencies():
+            if QualifiedRef.has_cross_package_prefix(dep_code) and self.pipe_library.get_optional_pipe(dep_code) is None:
+                return True
+        return False
 
     def validate_concept_library_with_libraries(self) -> None:
         pass

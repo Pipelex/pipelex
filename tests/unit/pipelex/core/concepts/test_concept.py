@@ -1,5 +1,6 @@
 import pytest
 from kajson.kajson_manager import KajsonManager
+from pydantic import ValidationError
 
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.core.concepts.concept import Concept
@@ -234,6 +235,41 @@ class TestConcept:
 
         with pytest.raises(ConceptStringError):
             validate_concept_ref(f"{valid_domain}.text-name")
+
+    @pytest.mark.parametrize(
+        "domain_code",
+        [
+            "scoring_lib->scoring",
+            "my_lib->legal.contracts",
+        ],
+    )
+    def test_concept_with_cross_package_domain_code(self, domain_code: str):
+        """Concept construction with a cross-package domain code should pass validation."""
+        concept = Concept(
+            code="WeightedScore",
+            domain_code=domain_code,
+            description="Test concept",
+            structure_class_name="TextContent",
+        )
+        assert concept.domain_code == domain_code
+
+    @pytest.mark.parametrize(
+        "domain_code",
+        [
+            "lib->",
+            "lib->Legal",
+            "lib->.scoring",
+        ],
+    )
+    def test_concept_with_invalid_cross_package_domain_code(self, domain_code: str):
+        """Concept construction with an invalid cross-package domain code should raise."""
+        with pytest.raises(ValidationError):
+            Concept(
+                code="WeightedScore",
+                domain_code=domain_code,
+                description="Test concept",
+                structure_class_name="TextContent",
+            )
 
     def test_are_concept_compatible(self):
         concept1 = ConceptFactory.make_from_blueprint(

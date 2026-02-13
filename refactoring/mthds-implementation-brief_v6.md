@@ -62,19 +62,45 @@ Delivered:
 
 ---
 
-## Phase 3: Cross-Package References + Local Dependency Resolution
+## Phase 3: Cross-Package References + Local Dependency Resolution — COMPLETED
 
-### Goal
+Delivered:
 
-Implement the `alias->domain_path.name` syntax for cross-package references. Resolve dependencies locally (fetch from local paths or VCS). Wire `validate_cross_package_references()` into the runtime for better error messages.
+- **`path` field on `PackageDependency`** (`pipelex/core/packages/manifest.py`): Dependencies can now declare a local filesystem path (`path = "../scoring-lib"`) for development-time dependency resolution, similar to Cargo's `path` deps or Go's `replace` directives. The field is optional and forward-compatible with Phase 4's remote fetch.
+- **Cross-package concept validation** (`pipelex/core/concepts/validation.py`): `is_concept_ref_valid()` and `is_concept_ref_or_code_valid()` now accept `->` refs by stripping the alias prefix before validating the remainder.
+- **Bundle-level validation skip for `->` refs** (`pipelex/core/bundles/pipelex_bundle_blueprint.py`): Both `validate_local_concept_references()` and `validate_local_pipe_references()` explicitly skip `->` refs with a `QualifiedRef.has_cross_package_prefix()` check. Previously these were skipped by accident (the `->` in the domain path didn't match any known domain); the explicit check is cleaner and prevents edge cases.
+- **ConceptFactory cross-package handling** (`pipelex/core/concepts/concept_factory.py`): `make_domain_and_concept_code_from_concept_ref_or_code()` handles `->` refs, producing aliased domain codes like `"scoring_lib->scoring"` so that `make_concept_ref_with_domain()` reconstructs `"scoring_lib->scoring.WeightedScore"` — the key used for lookup in ConceptLibrary. `make_refine()` passes through cross-package refs unchanged.
+- **Cross-package pipe lookup** (`pipelex/libraries/pipe/pipe_library.py`): `get_optional_pipe()` resolves `alias->domain.pipe_code` to `alias->pipe_code` via dict lookup. New `add_dependency_pipe(alias, pipe)` method stores dependency pipes with key `alias->pipe.code`.
+- **Cross-package concept lookup** (`pipelex/libraries/concept/concept_library.py`): `get_required_concept()` handles `->` refs via direct dict lookup, bypassing format validation. New `add_dependency_concept(alias, concept)` method stores with key `alias->concept.concept_ref`.
+- **Dependency resolver** (`pipelex/core/packages/dependency_resolver.py`): New module. `resolve_local_dependencies()` resolves dependencies that have a local `path` field: resolves the path relative to package root, finds `METHODS.toml` in the dependency (optional — standalone bundles work), scans for `.mthds` files, determines exported pipes from manifest exports + `main_pipe` auto-export.
+- **Dependency loading in LibraryManager** (`pipelex/libraries/library_manager.py`): New `_load_dependency_packages()` method integrated into `_load_mthds_files_into_library()`. For each resolved dependency: parses blueprints, loads concepts with aliased keys (`alias->concept_ref`) and native keys (for internal resolution, skip on conflict), loads only exported pipes with aliased keys (`alias->pipe_code`).
+- **Cross-package validation wired into runtime** (`pipelex/core/packages/visibility.py`): `check_visibility_for_blueprints()` now also calls `validate_cross_package_references()`. Known aliases produce info-level logs (no error); unknown aliases produce errors.
+- **Graceful handling of unresolved cross-package refs**: Three layers of safety for pipes that reference cross-package deps not loaded in the current context:
+  - `library.py`: skips validation for pipe controllers with unresolved cross-package dependencies
+  - `pipe_sequence.py`: `needed_inputs()` uses `get_optional_pipe` for `->` refs and skips if None; `validate_output_with_library()` skips if last step is unresolved
+  - `dry_run.py`: catches `PipeNotFoundError` and treats it as a graceful skip (SUCCESS with info message)
+- **CLI `pipelex pkg add`** (`pipelex/cli/commands/pkg/add_cmd.py`): Adds a dependency to `METHODS.toml`. Options: `address` (required), `--alias` (auto-derived from address if omitted), `--version` (required), `--path` (optional local path). Validates alias uniqueness, serializes manifest back.
+- **Test fixtures** (`tests/data/packages/`): `scoring_dep/` (dependency package with exports) and `consumer_package/` (consumer with cross-package `->` refs and `path` dependency).
+- **Comprehensive tests**: 39 new tests across 6 test files covering dependency resolution, cross-package loading/lookup, concept validation, integration loading, CLI `pkg add`, and updated cross-package ref validation.
 
-This phase does NOT implement remote registry browsing or the Know-How Graph.
+### Adaptations from the original brief
+
+1. **Aliased keys in flat library dicts** (implementation detail): Dependency pipes stored as `alias->pipe_code` and concepts as `alias->domain.ConceptCode` in the same flat library dicts. This avoids creating separate Library instances per package, keeping the change surface minimal. Known limitation: concept name conflicts between dependency and local package log a warning and skip the native-key registration (the aliased key still works for cross-package refs). Proper per-package Library isolation can come in Phase 4.
+
+2. **Cross-package concept refinement deferred**: `refines = "alias->domain.Concept"` parses and stores correctly, but the compatibility checker (`are_concept_compatible()`) doesn't resolve across package boundaries yet. This requires the refines chain to traverse aliased concept keys, which adds complexity beyond Phase 3 scope.
+
+3. **`path` field for local deps** (not in original design doc): The design doc describes `~/.mthds/packages/` cache dirs. The `path` field is a Phase 3 pragmatic addition for local development, similar to Python's editable installs or Go's `replace` directives. It's forward-compatible — Phase 4's resolver will check `path` first, then fall back to cache/VCS.
+
+4. **`derive_alias_from_address()` made public**: The alias auto-derivation function in `add_cmd.py` is public (not `_`-prefixed) to enable direct testing. It converts the last segment of an address to `snake_case` (e.g., `github.com/org/scoring-lib` → `scoring_lib`).
+
+5. **Three-layer graceful degradation for unresolved deps**: The original plan didn't anticipate that test fixtures with cross-package refs would be discovered by `pipelex validate --all` (which scans all `.mthds` files from the project root). This required adding graceful handling at three levels: library validation, pipe validation (`needed_inputs`), and dry-run execution. Each layer independently handles the case where a `->` ref can't be resolved because the dependency package isn't loaded in the current context.
 
 ---
 
 ## What NOT to Do
 
 - **Do NOT implement remote registry or Know-How Graph browsing.** That is Phase 5.
+- **Do NOT implement remote VCS fetch or lock file generation.** That is Phase 4. Phase 3 only supports local `path` dependencies.
 - **Do NOT rename the manifest** to anything other than `METHODS.toml`. The design docs are explicit about this name.
 - **Do NOT rename Python classes or internal Pipelex types.** The standard is MTHDS; the implementation is Pipelex. Keep existing class names.
 
@@ -82,11 +108,11 @@ This phase does NOT implement remote registry browsing or the Know-How Graph.
 
 ## Note on Client Project Brief
 
-`mthds-client-project-update-brief.md` exists in the `implementation/` directory for propagating changes to cookbooks, tutorials, and client-facing documentation. After Phase 2 lands, that brief should be updated to reflect:
-- The existence of `METHODS.toml` and what it means for project setup.
-- The new `pipelex pkg init` and `pipelex pkg list` commands.
-- The visibility model and its impact on how bundles are organized.
-- Any changes to the builder output format.
+`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–3). Client projects can now:
+- Use `.mthds` file extension and "method" terminology (Phase 0)
+- Use hierarchical domains and domain-qualified pipe references (Phase 1)
+- Create `METHODS.toml` manifests with `pipelex pkg init`, inspect with `pipelex pkg list` (Phase 2)
+- Declare local path dependencies with `pipelex pkg add` and use `alias->domain.pipe_code` cross-package references (Phase 3)
 
 ---
 

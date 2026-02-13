@@ -2,7 +2,7 @@
 
 ## Context
 
-The core **Pipelex** library has been updated to implement the **MTHDS standard** (Phases 0 and 1). Client projects — cookbooks, example repos, tutorials, starter kits — must now be updated to match.
+The core **Pipelex** library has been updated to implement the **MTHDS standard**. Client projects — cookbooks, example repos, tutorials, starter kits — must now be updated to match.
 
 This brief tells you exactly what to change and what to leave alone.
 
@@ -13,6 +13,11 @@ This brief tells you exactly what to change and what to leave alone.
 3. **Hierarchical domains**: domain codes now support dotted paths (e.g., `legal.contracts`)
 4. **Pipe namespacing**: pipes can now use domain-qualified references (e.g., `scoring.compute_score`)
 5. **Concept reference parsing**: uses split-on-last-dot rule for hierarchical domains (e.g., `legal.contracts.NonCompeteClause`)
+6. **Package manifest**: `METHODS.toml` declares package identity, dependencies, and exports
+7. **Visibility model**: pipes are private by default when a manifest exists; exported via `[exports]`
+8. **Cross-package references**: `alias->domain.pipe_code` syntax for referencing pipes/concepts from dependency packages
+9. **Local path dependencies**: dependencies with `path = "..."` in `METHODS.toml` are resolved from the local filesystem
+10. **CLI commands**: `pipelex pkg init`, `pipelex pkg list`, `pipelex pkg add`
 
 ---
 
@@ -151,8 +156,47 @@ Check for `.plx`-related patterns in:
 - **Do NOT rename Python classes or internal Pipelex types.** Pipelex is the implementation brand. MTHDS is the open standard. Class names like `PipelexBundleBlueprint` stay as-is.
 - **Do NOT change the TOML structure** inside `.mthds` files. The internal format is identical to what `.plx` used — only the extension changes.
 - **Do NOT add backward-compatible `.plx` support.** This is a clean break.
-- **Do NOT implement `->` package-qualified syntax.** That is Phase 3 of the core library and not yet available.
-- **Do NOT create `METHODS.toml` manifest files.** That is Phase 2.
+- **Do NOT use remote VCS dependencies.** Only local path dependencies (`path = "..."` in `METHODS.toml`) are currently supported. Remote fetch from Git URLs is not yet available.
+
+---
+
+## Step 7: Set up `METHODS.toml` if the project uses multiple domains
+
+If the client project has multiple `.mthds` bundles across different domains, it should have a `METHODS.toml` manifest:
+
+```bash
+# Scaffold a manifest from existing bundles
+pipelex pkg init
+```
+
+This creates a `METHODS.toml` with auto-discovered domains and all pipes exported. Review and trim the exports to only expose the intended public API.
+
+To inspect the manifest:
+
+```bash
+pipelex pkg list
+```
+
+---
+
+## Step 8: Declare dependencies for cross-package references
+
+If the project depends on another MTHDS package (locally on disk):
+
+```bash
+pipelex pkg add github.com/org/scoring-lib --alias scoring_lib --version "^2.0.0" --path ../scoring-lib
+```
+
+This adds a `[dependencies]` entry to `METHODS.toml`. The `--path` flag points to the dependency's local directory. The `--alias` flag sets the name used in `->` references (auto-derived from the address if omitted).
+
+In `.mthds` files, reference the dependency's pipes and concepts with the `->` syntax:
+
+```toml
+steps = [
+    { pipe = "scoring_lib->scoring.compute_score", result = "score" },
+]
+inputs = { profile = "scoring_lib->scoring.CandidateProfile" }
+```
 
 ---
 
@@ -164,3 +208,5 @@ Check for `.plx`-related patterns in:
 - All code examples and CLI invocations in documentation use `.mthds`
 - If the project has tests or a CI pipeline, they pass after the changes
 - The project README accurately describes the MTHDS file format and terminology
+- If the project uses multiple domains, a `METHODS.toml` exists with correct exports
+- If the project depends on other packages, dependencies are declared with `pipelex pkg add` and `->` references resolve correctly

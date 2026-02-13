@@ -17,7 +17,11 @@ def is_concept_ref_valid(concept_ref: str) -> bool:
     """Check if a concept reference (domain.ConceptCode) is valid.
 
     Supports hierarchical domains: "legal.contracts.NonCompeteClause" is valid.
+    Supports cross-package refs: "alias->domain.ConceptCode" is valid.
     """
+    if QualifiedRef.has_cross_package_prefix(concept_ref):
+        _, remainder = QualifiedRef.split_cross_package_ref(concept_ref)
+        return is_concept_ref_valid(concept_ref=remainder)
     try:
         ref = QualifiedRef.parse_concept_ref(concept_ref)
     except QualifiedRefError:
@@ -40,9 +44,13 @@ def is_concept_ref_or_code_valid(concept_ref_or_code: str) -> bool:
 
     Supports hierarchical domains: "legal.contracts.NonCompeteClause" is valid.
     Bare codes must be PascalCase: "NonCompeteClause" is valid.
+    Supports cross-package refs: "alias->domain.ConceptCode" is valid.
     """
     if not concept_ref_or_code:
         return False
+    if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
+        _, remainder = QualifiedRef.split_cross_package_ref(concept_ref_or_code)
+        return is_concept_ref_or_code_valid(concept_ref_or_code=remainder)
     if "." in concept_ref_or_code:
         return is_concept_ref_valid(concept_ref=concept_ref_or_code)
     return is_concept_code_valid(concept_code=concept_ref_or_code)

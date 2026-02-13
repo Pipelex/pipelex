@@ -156,11 +156,9 @@ class PackageVisibilityChecker:
                 alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_ref_str)
 
                 if alias in known_aliases:
-                    # Known alias -> emit warning (cross-package resolution not yet implemented)
-                    log.warning(
-                        f"Cross-package reference '{pipe_ref_str}' in {context} "
-                        f"(domain '{bundle.domain}'): alias '{alias}' is a known dependency. "
-                        "Cross-package resolution is not yet implemented."
+                    # Known alias -> informational (cross-package resolution is active)
+                    log.info(
+                        f"Cross-package reference '{pipe_ref_str}' in {context} (domain '{bundle.domain}'): alias '{alias}' is a known dependency."
                     )
                 else:
                     # Unknown alias -> error
@@ -188,6 +186,8 @@ def check_visibility_for_blueprints(
 ) -> list[VisibilityError]:
     """Convenience function: check visibility for a set of blueprints.
 
+    Validates both intra-package cross-domain visibility and cross-package references.
+
     Args:
         manifest: The package manifest (None means all-public)
         blueprints: The bundle blueprints to check
@@ -196,4 +196,6 @@ def check_visibility_for_blueprints(
         List of visibility errors
     """
     checker = PackageVisibilityChecker(manifest=manifest, bundles=blueprints)
-    return checker.validate_all_pipe_references()
+    errors = checker.validate_all_pipe_references()
+    errors.extend(checker.validate_cross_package_references())
+    return errors

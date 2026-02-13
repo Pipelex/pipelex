@@ -65,6 +65,7 @@ class PackageDependency(BaseModel):
     address: str
     version: str
     alias: str
+    path: str | None = None
 
     @field_validator("address")
     @classmethod

@@ -20,9 +20,10 @@ This document maps the proposed MTHDS package system back to the current Pipelex
 | Visibility model | **Done** | Pipes are private by default when manifest exists, exported via `[exports]` |
 | CLI `pipelex pkg` | **Done** | `pipelex pkg init` (scaffold manifest), `pipelex pkg list` (display manifest) |
 | Lock file | **New artifact** | `methods.lock` — resolved dependency versions and checksums |
-| Dependency resolver | **New subsystem** | Fetches, caches, and version-resolves packages |
-| Cross-package references | **New syntax** | `alias->domain_path.pipe_code` and `alias->domain_path.ConceptCode` |
-| Bundle loading | **Major rework** | Package-aware resolver replaces flat `library_dirs` scanning |
+| Dependency resolver | **Done (local)** | Resolves local `path` dependencies; fetches/caches/version-resolves from VCS in Phase 4 |
+| Cross-package references | **Done** | `alias->domain_path.pipe_code` and `alias->domain_path.ConceptCode` — parsing, validation, loading, runtime lookup |
+| CLI `pipelex pkg add` | **Done** | Add dependency to `METHODS.toml` with address, alias, version, optional path |
+| Bundle loading | **Done (local deps)** | Dependency packages loaded via local path; full package-aware resolver in Phase 4 |
 
 ---
 
@@ -163,9 +164,9 @@ No new required fields in the `.mthds` file itself. The package relationship is 
 
 ## 4. New Artifacts
 
-### 4.1 Package Manifest: `METHODS.toml` — IMPLEMENTED (Phase 2)
+### 4.1 Package Manifest: `METHODS.toml` — IMPLEMENTED (Phase 2, extended Phase 3)
 
-Parsed and validated. Declares package identity, dependencies (stored but not resolved), and exports.
+Parsed and validated. Declares package identity, dependencies, and exports. Dependencies with a `path` field are resolved and loaded at runtime (Phase 3). The `path` field is resolved relative to the manifest's directory.
 
 Exports use TOML sub-tables, one per domain. The domain path maps directly to the TOML table path — `legal.contracts` becomes `[exports.legal.contracts]`.
 
@@ -190,7 +191,7 @@ pipes = ["extract_clause", "analyze_nda", "compare_contracts"]
 pipes = ["compute_weighted_score"]
 ```
 
-**Implementation note**: The `[dependencies]` format uses the alias as the TOML key and the address as an inline field (see §4.1 note in `mthds-implementation-brief_v6.md`). Dependency versions support Poetry/uv-style range syntax (`^1.0.0`, `~1.0.0`, `>=1.0.0, <2.0.0`, wildcards) — validated at parse time, resolution deferred to Phase 3+. The `description` field is required and must be non-empty.
+**Implementation note**: The `[dependencies]` format uses the alias as the TOML key and the address as an inline field (see §4.1 note in `mthds-implementation-brief_v6.md`). Dependency versions support Poetry/uv-style range syntax (`^1.0.0`, `~1.0.0`, `>=1.0.0, <2.0.0`, wildcards) — validated at parse time. Dependencies with a `path` field are resolved and loaded at runtime (Phase 3). Version resolution against VCS tags is deferred to Phase 4. The `description` field is required and must be non-empty.
 
 **Impact**: New parser (`manifest_parser.py`), new model class (`MthdsPackageManifest`), new validation rules, new discovery function, new visibility checker. See `pipelex/core/packages/`.
 
@@ -232,9 +233,9 @@ source = "https://github.com/mthds/scoring-lib"
 
 **Changes**:
 - `validate_pipe_keys()`: unchanged (definitions are still bare names)
-- `validate_local_concept_references()`: must understand the `alias->domain_path.ConceptCode` form and skip validation for external references (already partially done for domain-qualified refs)
+- `validate_local_concept_references()`: **Done in Phase 3** — explicitly skips `->` refs with `QualifiedRef.has_cross_package_prefix()` check (validated at package level instead)
+- `validate_local_pipe_references()`: **Done in Phase 3** — same explicit skip for `->` refs
 - `collect_pipe_references()`: **Done in Phase 2** — made public (was `_collect_pipe_references`) so the `PackageVisibilityChecker` can call it
-- Both concept and pipe reference collectors need to understand the `->` syntax
 
 ### 5.3 Interpreter (`pipelex/core/interpreter/`)
 
@@ -256,7 +257,7 @@ source = "https://github.com/mthds/scoring-lib"
 - `maybe_generate_manifest_for_output()` in `builder_loop.py` generates `METHODS.toml` alongside `.mthds` files when the output directory contains multiple domains
 - Hooked into `pipe_cmd.py` (CLI build) and `build_core.py` (agent CLI build)
 
-**Still pending (Phase 3+)**:
+**Still pending (Phase 4+)**:
 - When building a method that depends on external packages, the builder needs awareness of available packages and their exported pipes/concepts
 - Pipe signature design needs to account for cross-package pipe references
 
@@ -268,16 +269,16 @@ source = "https://github.com/mthds/scoring-lib"
 |---------|--------|------|
 | `pipelex pkg init` | **Done** | Create a `METHODS.toml` in the current directory |
 | `pipelex pkg list` | **Done** | Show package info, dependencies, and exported pipes from the manifest |
-| `pipelex pkg add <address>` | Phase 3+ | Add a dependency to the manifest |
+| `pipelex pkg add <address>` | **Done** | Add a dependency to the manifest (address, alias, version, optional path) |
 | `pipelex pkg install` | Phase 4 | Fetch and cache all dependencies from lock file |
 | `pipelex pkg update` | Phase 4 | Update dependencies to latest compatible versions |
 | `pipelex pkg lock` | Phase 4 | Regenerate the lock file |
 | `pipelex pkg publish` | Phase 5 | Validate and prepare a package for distribution |
 
-**Existing commands impacted (Phase 3+)**:
-- `pipelex validate`: must resolve packages before validating cross-package references
-- `pipelex run`: must load dependency packages into the runtime
-- `pipelex-agent build`: should be package-aware for cross-package pipe references
+**Existing commands impacted**:
+- `pipelex validate`: **Done (Phase 3)** — resolves local path dependencies and validates cross-package references during library loading. Unresolved cross-package refs (missing deps) are handled gracefully.
+- `pipelex run`: **Done (Phase 3)** — dependency packages are loaded into the runtime via `_load_dependency_packages()` in `library_manager.py`. Cross-package pipes and concepts are accessible at runtime.
+- `pipelex-agent build`: Phase 4+ — should be package-aware for cross-package pipe references
 
 ### 5.7 Pipe Blueprints (All Pipe Types)
 
@@ -292,12 +293,26 @@ Every pipe type that holds references to other pipes needs its validation/resolu
 
 Each of these must accept and parse the three-scope pipe reference format. Look in `pipelex/pipe_controllers/`.
 
-### 5.8 Library Manager (`pipelex/libraries/`) — NEW (Phase 2)
+### 5.8 Library Manager (`pipelex/libraries/`) — Phase 2 + Phase 3
 
-**Change**: `_check_package_visibility()` added to `library_manager.py`. After parsing all blueprints from `.mthds` files, it:
+**Phase 2**: `_check_package_visibility()` added to `library_manager.py`. After parsing all blueprints from `.mthds` files, it:
 1. Finds the nearest `METHODS.toml` manifest via walk-up discovery
-2. If found, runs the `PackageVisibilityChecker` against all blueprints
+2. If found, runs the `PackageVisibilityChecker` against all blueprints (including cross-package reference validation)
 3. Raises `LibraryLoadingError` if cross-domain pipe references violate visibility
+
+**Phase 3**: `_load_dependency_packages()` added. The loading flow is now:
+1. Parse main package blueprints from `.mthds` files
+2. Find manifest via `find_package_manifest()`
+3. If manifest has dependencies with `path`: resolve local dependencies, for each resolved dependency:
+   - Parse dependency blueprints
+   - Load dependency concepts into library (aliased keys `alias->concept_ref` for cross-package lookup + native keys for internal resolution, skip on conflict)
+   - Load only exported pipes with aliased keys (`alias->pipe_code`)
+4. Check visibility (pipe visibility + cross-package reference validation)
+5. `load_from_blueprints()` for main package
+
+Also added `_find_package_root()` to walk up from `.mthds` files to find the directory containing `METHODS.toml`.
+
+**Validation safety** (Phase 3): `library.py` skips full validation for pipe controllers with unresolved cross-package dependencies. `pipe_sequence.py` handles unresolved `->` refs gracefully in `needed_inputs()` and `validate_output_with_library()`. `dry_run.py` catches `PipeNotFoundError` for graceful skip during dry-run.
 
 ---
 
@@ -310,7 +325,7 @@ Each phase gets its own implementation brief with decisions, grammar, acceptance
 | **0** | ~~Extension rename + terminology update~~ | **COMPLETED** |
 | **1** | ~~Hierarchical domains + pipe namespacing: `domain_path.pipe_code` references, split-on-last-dot parsing for concepts and pipes~~ | **COMPLETED** |
 | **2** | ~~Package manifest (`METHODS.toml`) + exports / visibility model~~ | **COMPLETED** |
-| **3** | Cross-package references (`alias->domain_path.name`) + local dependency resolution | Phase 2 |
+| **3** | ~~Cross-package references (`alias->domain_path.name`) + local dependency resolution~~ | **COMPLETED** |
 | **4** | Remote dependency resolution, lock file (`methods.lock`), package cache | Phase 3 |
 | **5** | Registry, type-aware search, Know-How Graph browsing | Phase 4 |
 

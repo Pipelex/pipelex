@@ -36,9 +36,9 @@ Layers 1-3 are automated and form the test suite. Layer 4 is a one-time confiden
 
 ---
 
-## Layer 1: Unit Tests (parsing, validation, models)
+## Layer 1: Unit Tests (parsing, validation, models) — IMPLEMENTED (Phase 2 + Phase 3)
 
-These tests verify the low-level building blocks with no I/O at all. They already exist from Phase 2.
+These tests verify the low-level building blocks with no I/O at all. Phase 2 delivered manifest, visibility, and `->` parsing tests. Phase 3 added concept validation, bundle validation, and cross-package loading/lookup tests.
 
 ### 1.1 Cross-package ref parsing
 
@@ -48,12 +48,14 @@ The `->` syntax is validated by unit tests in `tests/unit/pipelex/core/packages/
 make tp TEST=TestCrossPackageRefs
 ```
 
-**Expected**: All 4 tests pass:
+**Expected**: All 6 tests pass:
 
 - `test_has_cross_package_prefix` — detects `->` in ref strings
 - `test_split_cross_package_ref` — splits `alias->domain.pipe` correctly
-- `test_known_alias_emits_warning_not_error` — known alias produces no error (warning via log)
+- `test_known_alias_emits_warning_not_error` — known alias produces no error (info-level log)
 - `test_unknown_alias_produces_error` — unknown alias produces a `VisibilityError`
+- `test_wired_validation_includes_cross_package` — `check_visibility_for_blueprints()` runs cross-package validation
+- `test_cross_package_ref_with_no_deps_produces_error` — `->` ref with no `[dependencies]` section produces an error
 
 ### 1.2 Manifest model validation
 
@@ -87,69 +89,99 @@ shared_scoring = { address = "github.com/acme/scoring-methods", version = "^2.0.
 
 ---
 
-## Layer 2: Integration Tests with Local Path Dependencies
+## Layer 2: Integration Tests with Local Path Dependencies — IMPLEMENTED (Phase 3)
 
-This is where 90% of the cross-package test coverage should live. Two directories on disk, each with its own `METHODS.toml`, the consumer declaring the provider as a local path dependency. This tests the full resolution pipeline — discover manifest, read exports, validate visibility — with zero network I/O.
+This is where 90% of the cross-package test coverage lives. Two directories on disk, each with its own `METHODS.toml`, the consumer declaring the provider as a local path dependency. This tests the full resolution pipeline — discover manifest, resolve dependencies, load dependency packages, validate visibility — with zero network I/O.
 
 ### 2.1 Fixture layout
 
-The test fixtures live under `tests/data/packages/` and follow this structure:
+The test fixtures live under `tests/data/packages/`:
 
 ```
 tests/data/packages/
-├── provider_package/
-│   ├── METHODS.toml          # declares [exports.scoring]
-│   └── scoring/
-│       └── scoring.mthds     # defines compute_weighted_score (public) + internal_score_normalizer (private)
+├── scoring_dep/
+│   ├── METHODS.toml          # exports pkg_test_compute_score
+│   └── scoring.mthds         # domain = "pkg_test_scoring_dep", concepts + pipes
 │
-├── consumer_valid/
-│   ├── METHODS.toml          # [dependencies] scoring_lib = { path = "../provider_package" }
-│   └── analysis/
-│       └── analysis.mthds    # uses scoring_lib->scoring.compute_weighted_score (valid)
+├── consumer_package/
+│   ├── METHODS.toml          # depends on scoring_dep with path = "../scoring_dep"
+│   └── analysis.mthds        # uses scoring_dep->pkg_test_scoring_dep.pkg_test_compute_score
 │
-├── consumer_invalid/
-│   ├── METHODS.toml          # same dependency declaration
-│   └── analysis/
-│       └── analysis.mthds    # uses scoring_lib->scoring.internal_score_normalizer (blocked — not exported)
+├── standalone_bundle/
+│   └── standalone.mthds      # no METHODS.toml — standalone bundle
 │
-└── consumer_unknown_alias/
-    ├── METHODS.toml           # no [dependencies] section
-    └── analysis/
-        └── analysis.mthds    # uses nonexistent_lib->scoring.compute_weighted_score (unknown alias)
+├── minimal_package/
+│   ├── METHODS.toml          # minimal manifest
+│   └── minimal.mthds
+│
+└── (other fixtures from Phase 2)
 ```
 
 ### 2.2 What the local path dependency looks like
 
-The consumer's `METHODS.toml` uses a `path` field instead of (or alongside) an `address`:
+The consumer's `METHODS.toml` uses a `path` field alongside an `address`:
 
 ```toml
 [package]
-name = "contract-analysis"
+address = "github.com/mthds/consumer-app"
 version = "1.0.0"
-description = "Analyzes contracts using external scoring"
+description = "Consumer test package"
 
 [dependencies]
-scoring_lib = { path = "../provider_package", version = "^1.0.0" }
+scoring_dep = { address = "github.com/mthds/scoring-lib", version = "2.0.0", path = "../scoring_dep" }
 ```
 
 The `path` field is resolved relative to the `METHODS.toml` file's location. This is the same pattern used by Cargo (`path = "..."`), Go (`replace` directive), and Poetry (`path` dependencies).
 
-### 2.3 Test cases
+### 2.3 Test suites
 
-These are automated tests (pytest), not manual steps:
+Phase 3 delivered multiple test classes covering different layers:
 
-| Test case | Consumer fixture | Expected result |
-|-----------|-----------------|-----------------|
-| Valid cross-package ref | `consumer_valid/` | Passes — pipe is exported by provider |
-| Private pipe ref | `consumer_invalid/` | Fails — `internal_score_normalizer` not in provider's `[exports]` |
-| Unknown alias | `consumer_unknown_alias/` | Fails — alias not declared in `[dependencies]` |
-| Provider has no manifest | (provider without METHODS.toml) | Passes — no manifest means all public |
-| Provider `main_pipe` auto-export | (consumer refs provider's main_pipe not in exports) | Passes — main_pipe is auto-exported |
+**`TestDependencyResolver`** (`tests/unit/pipelex/core/packages/test_dependency_resolver.py`) — 5 tests:
+
+| Test case | Expected result |
+|-----------|-----------------|
+| Resolve local path dependency | `ResolvedDependency` with correct alias, path, mthds files, exported pipe codes |
+| Dependency without path is skipped | Empty list (non-local deps skipped) |
+| Non-existent path raises error | `DependencyResolveError` |
+| Dependency without manifest | Empty `exported_pipe_codes` (all public) |
+| ResolvedDependency is frozen | Immutable model |
+
+**`TestCrossPackageLoading`** (`tests/unit/pipelex/core/packages/test_cross_package_loading.py`) — 13 tests:
+
+| Test case | Expected result |
+|-----------|-----------------|
+| PipeLibrary `add_dependency_pipe` | Stores with `alias->pipe_code` key |
+| PipeLibrary `get_optional_pipe` resolves `->` refs | Returns the pipe via aliased key |
+| ConceptLibrary `add_dependency_concept` | Stores with `alias->concept_ref` key |
+| ConceptLibrary `get_required_concept` resolves `->` refs | Returns the concept via aliased key |
+| Duplicate dependency pipe raises error | `PipeLibraryError` |
+| Non-exported pipe not accessible | `get_optional_pipe` returns None |
+| Concept validation accepts `->` refs | `is_concept_ref_valid` returns True |
+| Bundle validation skips `->` concept refs | No error raised |
+| Bundle validation skips `->` pipe refs | No error raised |
+| ConceptFactory handles `->` refs | Produces aliased domain code |
+| ConceptFactory rejects `->` without domain | `ConceptFactoryError` |
+| Concept domain validator accepts `->` | No validation error |
+| `get_required_concept_from_concept_ref_or_code` handles `->` | Delegates to `get_required_concept` |
+
+**`TestCrossPackageIntegration`** (`tests/integration/pipelex/core/packages/test_cross_package_integration.py`) — 5 tests:
+
+| Test case | Expected result |
+|-----------|-----------------|
+| Load consumer package with scoring_dep dependency | Concepts and pipes loaded with aliased keys |
+| Exported pipe accessible via alias | `get_optional_pipe("scoring_dep->pkg_test_compute_score")` returns pipe |
+| Non-exported pipe not accessible | Returns None |
+| Dependency concepts accessible | `get_required_concept("scoring_dep->...")` returns concept |
+| Manifest returned from visibility check | `_check_package_visibility` returns the manifest |
 
 ### 2.4 Running the tests
 
 ```bash
-make tp TEST=TestCrossPackageLocalPath
+make tp TEST=TestDependencyResolver
+make tp TEST=TestCrossPackageLoading
+make tp TEST=TestCrossPackageIntegration
+make tp TEST=TestConceptValidationCrossPackage
 ```
 
 ### 2.5 Why this layer matters
@@ -157,10 +189,11 @@ make tp TEST=TestCrossPackageLocalPath
 Local path dependencies test the **exact same resolution logic** that remote dependencies will use — the only difference is *how* the provider package is located on disk. Once the provider's directory is found:
 
 1. Read its `METHODS.toml`
-2. Build a `PackageVisibilityChecker` from its exports
-3. Validate the consumer's `->` references against the provider's exports
+2. Determine exported pipes (from manifest exports + `main_pipe` auto-export)
+3. Parse dependency blueprints and load concepts/pipes into the library
+4. Validate the consumer's `->` references against the loaded dependency
 
-Steps 1-3 are identical regardless of whether the provider came from a local path, a local git clone, or a GitHub fetch. This is why local path tests give high confidence.
+Steps 1-4 are identical regardless of whether the provider came from a local path, a local git clone, or a GitHub fetch. This is why local path tests give high confidence.
 
 ---
 
@@ -491,12 +524,21 @@ The `reporting/summary.mthds` bundle is the key testing tool — its `generate_r
 
 ## Current Implementation State
 
-Cross-package reference **parsing and alias validation** are implemented in `PackageVisibilityChecker.validate_cross_package_references()` (`pipelex/core/packages/visibility.py:128`). However, this method is **not yet wired** into the `pipelex validate --all` pipeline — `check_visibility_for_blueprints()` only calls `validate_all_pipe_references()`, not `validate_cross_package_references()`. This means `->` references are currently validated only by unit tests, not at CLI level.
+**Phase 3 is complete.** Cross-package references work end-to-end for local path dependencies:
 
-Full cross-package **resolution** (fetching and loading remote packages) is also not yet implemented. The test layers described above (2, 3, 4) serve as the specification for what Phase 3 must deliver:
+- **Parsing and validation**: `PackageVisibilityChecker.validate_cross_package_references()` is wired into `check_visibility_for_blueprints()`, so `->` refs are validated during `pipelex validate --all` and normal library loading.
+- **Dependency resolution**: `resolve_local_dependencies()` in `pipelex/core/packages/dependency_resolver.py` resolves dependencies with a `path` field, finds manifests, collects `.mthds` files, and determines exported pipes.
+- **Library loading**: `_load_dependency_packages()` in `pipelex/libraries/library_manager.py` loads dependency concepts and exported pipes into the library with aliased keys.
+- **Runtime lookup**: `PipeLibrary.get_optional_pipe()` and `ConceptLibrary.get_required_concept()` resolve `->` refs to the correct dependency objects.
+- **Graceful degradation**: Unresolved cross-package refs (e.g., when test fixtures are loaded without their dependencies) are handled gracefully at three levels: library validation, pipe validation, and dry-run execution.
+- **CLI**: `pipelex pkg add` adds dependencies to `METHODS.toml`.
 
-- **Layer 2 defines** the local path dependency format and resolution behavior.
-- **Layer 3 defines** the VCS fetch, version resolution, and caching behavior.
-- **Layer 4 defines** the end-user experience with real GitHub repos.
+**Layer 2 tests are fully implemented** (39 new tests across 6 test files). See §2.3 above.
 
-Phase 3 implementation should make these test cases pass, in order.
+**What remains for Phase 4:**
+
+- **Layer 3** (local git repos): VCS fetch path using `file://` protocol URLs — not yet implemented.
+- **Layer 4** (GitHub smoke test): Real GitHub fetch + export validation — manual test, not yet applicable.
+- Lock file (`methods.lock`) generation and verification.
+- Remote dependency resolution (VCS clone, version tag resolution, caching).
+- Transitive dependency resolution (Phase 3 handles direct deps only).
