@@ -126,16 +126,16 @@ Delivered:
 
 Delivered:
 
-- **Exception infrastructure** (`pipelex/core/packages/exceptions.py`): `DependencyResolveError` moved from `dependency_resolver.py` (was plain `Exception`, now inherits `PipelexError`). New `TransitiveDependencyError(PipelexError)` for cycles and unsatisfiable diamond constraints.
-- **`address` field on `ResolvedDependency`** (`dependency_resolver.py`): Tracks the package address through resolution, enabling lock file generation for transitive deps without requiring them to exist in the root manifest.
+- **Exception infrastructure** (`pipelex/core/packages/exceptions.py`): `DependencyResolveError` moved from `dependency_resolver.py` (was plain `Exception`, now inherits `PipelexError`). New `TransitiveDependencyError(PipelexError)` for cycles and unsatisfiable diamond constraints. All import sites updated (`library_manager.py`, unit tests, integration tests).
+- **`address` field on `ResolvedDependency`** (`dependency_resolver.py`): Tracks the package address through resolution, enabling lock file generation for transitive deps without requiring them to exist in the root manifest. All construction sites updated: `_resolve_local_dependency()`, `resolve_remote_dependency()`, `_build_resolved_from_dir()`, `resolve_local_dependencies()`, plus test files.
 - **Transitive resolution algorithm** (`dependency_resolver.py`): `_resolve_transitive_tree()` implements DFS with a stack set for cycle detection. Per dependency: cycle check → constraint tracking → dedup check (existing version satisfies new constraint?) → diamond re-resolution if needed → normal resolve → recurse into sub-deps. `_resolve_with_multiple_constraints()` handles diamond dependencies by fetching/caching the tag list, parsing all constraints, and calling `select_minimum_version_for_multiple_constraints()` from Phase 4A. `resolve_all_dependencies()` refactored: resolves local path deps first (no recursion), then passes remote deps through the transitive tree walker.
-- **Lock file generation updated** (`lock_file.py`): `generate_lock_file()` refactored to use `resolved.address` directly instead of alias-based lookup against root manifest. This naturally includes transitive deps while still excluding local path overrides.
+- **Lock file generation updated** (`lock_file.py`): `generate_lock_file()` refactored to use `resolved.address` directly instead of alias-based lookup against root manifest. This naturally includes transitive deps while still excluding local path overrides. Backward-compatible: direct remote deps still lock identically.
 - **CLI `pipelex pkg lock`** (`pipelex/cli/commands/pkg/lock_cmd.py`): Parses `METHODS.toml`, calls `resolve_all_dependencies()` (now with transitive), generates lock file, writes `methods.lock`. Reports package count.
 - **CLI `pipelex pkg install`** (`pipelex/cli/commands/pkg/install_cmd.py`): Reads `methods.lock`, fetches missing packages via `resolve_remote_dependency()` with exact version constraint, verifies integrity via `verify_lock_file()`. Reports fetched/cached counts.
 - **CLI `pipelex pkg update`** (`pipelex/cli/commands/pkg/update_cmd.py`): Fresh resolve ignoring existing lock, generates new lock file, displays diff (added/removed/updated packages) via `_display_lock_diff()`.
 - **6 unit tests** for transitive resolution (`tests/unit/pipelex/core/packages/test_transitive_resolver.py`): linear chain (A→B→C), cycle detection (A→B→A), diamond resolved (compatible constraints), diamond unsatisfiable (conflicting constraints), local deps not recursed, dedup same address.
 - **2 integration tests** (`tests/integration/pipelex/core/packages/test_transitive_integration.py`): transitive chain resolves using local bare git repos (`dependent-pkg` → `vcs-fixture`), lock file includes both direct and transitive addresses. New `bare_git_repo_dependent` fixture and `DependentFixtureData` constants.
-- **9 CLI command tests** (`tests/unit/pipelex/cli/`): `test_pkg_lock.py` (3 tests: no manifest exits, creates empty lock, local dep excluded), `test_pkg_install.py` (2 tests: no lock exits, empty lock succeeds), `test_pkg_update.py` (2 tests: no manifest exits, creates fresh lock)
+- **7 CLI command tests** (`tests/unit/pipelex/cli/`): `test_pkg_lock.py` (3 tests: no manifest exits, creates empty lock, local dep excluded), `test_pkg_install.py` (2 tests: no lock exits, empty lock succeeds), `test_pkg_update.py` (2 tests: no manifest exits, creates fresh lock).
 
 ---
 
@@ -143,18 +143,21 @@ Delivered:
 
 Deliverables:
 
-- **Per-package Library instances**: Refactor `library_manager.py` — each package gets its own `ConceptLibrary` + `PipeLibrary`. Main package accesses dependency libraries via alias. Eliminates concept name conflicts between packages.
-- **Cross-package concept refinement validation**: Extend `are_concept_compatible()` to traverse aliased concept keys across package boundaries. Validate at both install-time and load-time.
-- **Builder package-awareness**: Builder knows available packages' exported pipes/concepts for cross-package pipe references during method generation.
-- **Tests**: Concept name collision scenarios, refinement chain across packages, builder cross-package generation.
+- **Per-package Library instances**: Each dependency package gets its own `ConceptLibrary` + `PipeLibrary` held inside a child `Library` instance. The main `Library` gains a `dependency_libraries: dict[str, Library]` mapping (alias → child library). Cross-package lookups (`alias->domain.Concept`, `alias->domain.pipe_code`) route through the child library by splitting on `->`, resolving the alias to the child, then looking up the local key. This eliminates the current flat-namespace workaround where concepts are registered with both aliased keys and native keys (with skip-on-conflict for name collisions).
+- **Cross-package concept refinement validation**: `are_concept_compatible()` in `pipelex/core/concepts/concept.py` (not `validation.py`) currently compares `concept_ref`, `structure_class_name`, and `refines` chains via string equality — it cannot traverse `alias->domain.Concept` references across package boundaries. Extend it to accept a concept resolver callback (or library reference) so it can dereference aliased concept refs to their actual `Concept` objects when checking refinement compatibility. Validate at both install-time and load-time.
+- **Builder package-awareness**: Builder knows available packages' exported pipes/concepts for cross-package pipe references during method generation. `maybe_generate_manifest_for_output()` already exists from Phase 2; extend to include cross-package dependency awareness.
+- **Tests**: Concept name collision scenarios (two deps exporting same concept code — no conflict with isolation), refinement chain across packages (`refines = "alias->domain.Concept"` validated end-to-end), builder cross-package generation.
 
 Key files to modify:
 
 | File | Change |
 |------|--------|
-| `pipelex/libraries/library_manager.py` | Per-package Library isolation refactor |
-| `pipelex/core/concepts/validation.py` | Cross-package refinement traversal |
-| `pipelex/builder/builder_loop.py` | Package-aware generation |
+| `pipelex/libraries/library.py` | Add `dependency_libraries: dict[str, Library]` field or accessor |
+| `pipelex/libraries/library_manager.py` | Per-package Library isolation: `_load_single_dependency()` creates child `Library` per dep instead of registering into flat namespace |
+| `pipelex/libraries/concept/concept_library.py` | Route `->` lookups through child library instead of flat dict |
+| `pipelex/libraries/pipe/pipe_library.py` | Route `->` lookups through child library instead of flat dict |
+| `pipelex/core/concepts/concept.py` | `are_concept_compatible()`: accept resolver callback for cross-package refinement traversal |
+| `pipelex/builder/builder_loop.py` | Package-aware generation with access to dependency libraries |
 
 ---
 
