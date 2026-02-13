@@ -39,3 +39,7 @@ class DependencyResolveError(PipelexError):
 
 class TransitiveDependencyError(PipelexError):
     """Raised for cycles or unsatisfiable diamond constraints in transitive resolution."""
+
+
+class IndexBuildError(PipelexError):
+    """Raised when building a package index entry fails."""

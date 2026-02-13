@@ -34,7 +34,7 @@ class ResolvedDependency(BaseModel):
     exported_pipe_codes: set[str]
 
 
-def _collect_mthds_files(directory: Path) -> list[Path]:
+def collect_mthds_files(directory: Path) -> list[Path]:
     """Collect all .mthds files under a directory recursively.
 
     Args:
@@ -46,7 +46,7 @@ def _collect_mthds_files(directory: Path) -> list[Path]:
     return sorted(directory.rglob("*.mthds"))
 
 
-def _determine_exported_pipes(manifest: MthdsPackageManifest | None) -> set[str]:
+def determine_exported_pipes(manifest: MthdsPackageManifest | None) -> set[str]:
     """Determine which pipes are exported by a dependency.
 
     If a manifest with exports exists, use the exports. Otherwise all pipes are public.
@@ -114,10 +114,10 @@ def resolve_local_dependencies(
                 log.warning(f"Could not parse METHODS.toml for dependency '{dep.alias}': {exc.message}")
 
         # Collect .mthds files
-        mthds_files = _collect_mthds_files(dep_dir)
+        mthds_files = collect_mthds_files(dep_dir)
 
         # Determine exported pipes
-        exported_pipe_codes = _determine_exported_pipes(dep_manifest)
+        exported_pipe_codes = determine_exported_pipes(dep_manifest)
 
         resolved.append(
             ResolvedDependency(
@@ -179,8 +179,8 @@ def _resolve_local_dependency(
         raise DependencyResolveError(msg)
 
     dep_manifest = _find_manifest_in_dir(dep_dir)
-    mthds_files = _collect_mthds_files(dep_dir)
-    exported_pipe_codes = _determine_exported_pipes(dep_manifest)
+    mthds_files = collect_mthds_files(dep_dir)
+    exported_pipe_codes = determine_exported_pipes(dep_manifest)
 
     return ResolvedDependency(
         alias=dep.alias,
@@ -257,8 +257,8 @@ def _build_resolved_from_dir(alias: str, address: str, directory: Path) -> Resol
         The resolved dependency.
     """
     dep_manifest = _find_manifest_in_dir(directory)
-    mthds_files = _collect_mthds_files(directory)
-    exported_pipe_codes = _determine_exported_pipes(dep_manifest)
+    mthds_files = collect_mthds_files(directory)
+    exported_pipe_codes = determine_exported_pipes(dep_manifest)
 
     return ResolvedDependency(
         alias=alias,
