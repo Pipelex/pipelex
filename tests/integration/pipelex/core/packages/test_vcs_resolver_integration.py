@@ -4,10 +4,10 @@ import pytest
 from semantic_version import Version  # type: ignore[import-untyped]
 
 from pipelex.core.packages.dependency_resolver import (
-    DependencyResolveError,
     resolve_all_dependencies,
     resolve_remote_dependency,
 )
+from pipelex.core.packages.exceptions import DependencyResolveError
 from pipelex.core.packages.manifest import MthdsPackageManifest, PackageDependency
 from pipelex.core.packages.package_cache import is_cached
 from pipelex.core.packages.vcs_resolver import clone_at_version, list_remote_version_tags

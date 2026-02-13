@@ -1,18 +1,24 @@
+# pyright: reportUnknownMemberType=false, reportUnknownVariableType=false, reportUnknownArgumentType=false
 import tempfile
 from pathlib import Path
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
 from pipelex import log
 from pipelex.core.packages.discovery import MANIFEST_FILENAME, find_package_manifest
-from pipelex.core.packages.exceptions import ManifestError, PackageCacheError, VCSFetchError, VersionResolutionError
+from pipelex.core.packages.exceptions import (
+    DependencyResolveError,
+    ManifestError,
+    PackageCacheError,
+    TransitiveDependencyError,
+    VCSFetchError,
+    VersionResolutionError,
+)
 from pipelex.core.packages.manifest import MthdsPackageManifest, PackageDependency
 from pipelex.core.packages.package_cache import get_cached_package_path, is_cached, store_in_cache
 from pipelex.core.packages.vcs_resolver import address_to_clone_url, clone_at_version, list_remote_version_tags, resolve_version_from_tags
-
-
-class DependencyResolveError(Exception):
-    """Raised when a dependency cannot be resolved."""
+from pipelex.tools.misc.semver import parse_constraint, parse_version, select_minimum_version_for_multiple_constraints, version_satisfies
 
 
 class ResolvedDependency(BaseModel):
@@ -21,6 +27,7 @@ class ResolvedDependency(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     alias: str
+    address: str
     manifest: MthdsPackageManifest | None
     package_root: Path
     mthds_files: list[Path]
@@ -115,6 +122,7 @@ def resolve_local_dependencies(
         resolved.append(
             ResolvedDependency(
                 alias=dep.alias,
+                address=dep.address,
                 manifest=dep_manifest,
                 package_root=dep_dir,
                 mthds_files=mthds_files,
@@ -176,6 +184,7 @@ def _resolve_local_dependency(
 
     return ResolvedDependency(
         alias=dep.alias,
+        address=dep.address,
         manifest=dep_manifest,
         package_root=dep_dir,
         mthds_files=mthds_files,
@@ -220,7 +229,7 @@ def resolve_remote_dependency(
     if is_cached(dep.address, version_str, cache_root):
         cached_path = get_cached_package_path(dep.address, version_str, cache_root)
         log.verbose(f"Dependency '{dep.alias}' ({dep.address}@{version_str}) found in cache")
-        return _build_resolved_from_dir(dep.alias, cached_path)
+        return _build_resolved_from_dir(dep.alias, dep.address, cached_path)
 
     # Clone and cache
     try:
@@ -233,14 +242,15 @@ def resolve_remote_dependency(
         raise DependencyResolveError(msg) from exc
 
     log.verbose(f"Dependency '{dep.alias}' ({dep.address}@{version_str}) fetched and cached")
-    return _build_resolved_from_dir(dep.alias, cached_path)
+    return _build_resolved_from_dir(dep.alias, dep.address, cached_path)
 
 
-def _build_resolved_from_dir(alias: str, directory: Path) -> ResolvedDependency:
+def _build_resolved_from_dir(alias: str, address: str, directory: Path) -> ResolvedDependency:
     """Build a ResolvedDependency from a package directory.
 
     Args:
         alias: The dependency alias.
+        address: The package address.
         directory: The package directory (local or cached).
 
     Returns:
@@ -252,11 +262,196 @@ def _build_resolved_from_dir(alias: str, directory: Path) -> ResolvedDependency:
 
     return ResolvedDependency(
         alias=alias,
+        address=address,
         manifest=dep_manifest,
         package_root=directory,
         mthds_files=mthds_files,
         exported_pipe_codes=exported_pipe_codes,
     )
+
+
+def _resolve_with_multiple_constraints(
+    address: str,
+    alias: str,
+    constraints: list[str],
+    tags_cache: dict[str, list[tuple[Any, str]]],
+    cache_root: Path | None,
+    fetch_url_override: str | None,
+) -> ResolvedDependency:
+    """Resolve a dependency that has multiple version constraints (diamond).
+
+    Gets/caches the remote tag list, parses all constraints, and selects the
+    minimum version satisfying all of them simultaneously.
+
+    Args:
+        address: The package address.
+        alias: The dependency alias.
+        constraints: All version constraint strings from different dependents.
+        tags_cache: Shared cache of address -> tag list.
+        cache_root: Override for the package cache root.
+        fetch_url_override: Override clone URL (for tests).
+
+    Returns:
+        The resolved dependency.
+
+    Raises:
+        TransitiveDependencyError: If no version satisfies all constraints.
+        DependencyResolveError: If VCS operations fail.
+    """
+    clone_url = fetch_url_override or address_to_clone_url(address)
+
+    # Get or cache tag list
+    if address not in tags_cache:
+        try:
+            tags_cache[address] = list_remote_version_tags(clone_url)
+        except VCSFetchError as exc:
+            msg = f"Failed to list tags for '{address}': {exc}"
+            raise DependencyResolveError(msg) from exc
+
+    version_tags = tags_cache[address]
+    versions = [entry[0] for entry in version_tags]
+
+    # Parse all constraints and find a version satisfying all
+    parsed_constraints = [parse_constraint(constraint) for constraint in constraints]
+    selected = select_minimum_version_for_multiple_constraints(versions, parsed_constraints)
+
+    if selected is None:
+        constraints_str = ", ".join(constraints)
+        msg = f"No version of '{address}' satisfies all constraints: {constraints_str}"
+        raise TransitiveDependencyError(msg)
+
+    version_str = str(selected)
+
+    # Check cache
+    if is_cached(address, version_str, cache_root):
+        cached_path = get_cached_package_path(address, version_str, cache_root)
+        log.verbose(f"Diamond dep '{alias}' ({address}@{version_str}) found in cache")
+        return _build_resolved_from_dir(alias, address, cached_path)
+
+    # Find the corresponding tag name
+    selected_tag: str | None = None
+    for ver, tag_name in version_tags:
+        if ver == selected:
+            selected_tag = tag_name
+            break
+
+    if selected_tag is None:
+        msg = f"Internal error: selected version {selected} not found in tag list for '{address}'"
+        raise DependencyResolveError(msg)
+
+    # Clone and cache
+    try:
+        with tempfile.TemporaryDirectory(prefix="mthds_clone_") as tmp_dir:
+            clone_dest = Path(tmp_dir) / "pkg"
+            clone_at_version(clone_url, selected_tag, clone_dest)
+            cached_path = store_in_cache(clone_dest, address, version_str, cache_root)
+    except (VCSFetchError, PackageCacheError) as exc:
+        msg = f"Failed to fetch/cache '{address}@{version_str}': {exc}"
+        raise DependencyResolveError(msg) from exc
+
+    log.verbose(f"Diamond dep '{alias}' ({address}@{version_str}) fetched and cached")
+    return _build_resolved_from_dir(alias, address, cached_path)
+
+
+def _resolve_transitive_tree(
+    deps: list[PackageDependency],
+    resolution_stack: set[str],
+    resolved_map: dict[str, ResolvedDependency],
+    constraints_by_address: dict[str, list[str]],
+    tags_cache: dict[str, list[tuple[Any, str]]],
+    cache_root: Path | None,
+    fetch_url_overrides: dict[str, str] | None,
+) -> None:
+    """Recursively resolve remote dependencies with cycle detection and diamond handling.
+
+    Uses DFS with a stack set for cycle detection. Diamond dependencies (same address
+    reached via multiple paths) are resolved by finding a version satisfying all constraints.
+
+    Args:
+        deps: Dependencies to resolve at this level.
+        resolution_stack: Addresses currently on the DFS path (cycle detection).
+        resolved_map: Address -> resolved dependency (deduplication).
+        constraints_by_address: Address -> list of version constraints seen.
+        tags_cache: Address -> cached tag list (avoid repeated git ls-remote).
+        cache_root: Override for the package cache root.
+        fetch_url_overrides: Map of address to override clone URL (for tests).
+
+    Raises:
+        TransitiveDependencyError: If a cycle is detected or diamond constraints are unsatisfiable.
+        DependencyResolveError: If resolution fails.
+    """
+    for dep in deps:
+        # Skip local path deps in transitive resolution
+        if dep.path is not None:
+            continue
+
+        # Cycle detection
+        if dep.address in resolution_stack:
+            msg = f"Dependency cycle detected: '{dep.address}' is already on the resolution stack"
+            raise TransitiveDependencyError(msg)
+
+        # Track constraint
+        if dep.address not in constraints_by_address:
+            constraints_by_address[dep.address] = []
+        constraints_by_address[dep.address].append(dep.version)
+
+        # Already resolved — check if existing version satisfies new constraint
+        if dep.address in resolved_map:
+            existing = resolved_map[dep.address]
+            if existing.manifest is not None:
+                existing_constraint = parse_constraint(dep.version)
+                existing_ver = parse_version(existing.manifest.version)
+                if version_satisfies(existing_ver, existing_constraint):
+                    log.verbose(f"Transitive dep '{dep.address}' already resolved at {existing.manifest.version}, satisfies '{dep.version}'")
+                    continue
+
+            # Diamond: re-resolve with all constraints
+            override_url = (fetch_url_overrides or {}).get(dep.address)
+            resolved_map[dep.address] = _resolve_with_multiple_constraints(
+                address=dep.address,
+                alias=dep.alias,
+                constraints=constraints_by_address[dep.address],
+                tags_cache=tags_cache,
+                cache_root=cache_root,
+                fetch_url_override=override_url,
+            )
+            continue
+
+        # Normal resolve
+        resolution_stack.add(dep.address)
+        try:
+            override_url = (fetch_url_overrides or {}).get(dep.address)
+
+            # Check if multiple constraints already (shouldn't happen on first visit, but defensive)
+            if len(constraints_by_address[dep.address]) > 1:
+                resolved_dep = _resolve_with_multiple_constraints(
+                    address=dep.address,
+                    alias=dep.alias,
+                    constraints=constraints_by_address[dep.address],
+                    tags_cache=tags_cache,
+                    cache_root=cache_root,
+                    fetch_url_override=override_url,
+                )
+            else:
+                resolved_dep = resolve_remote_dependency(dep, cache_root=cache_root, fetch_url_override=override_url)
+
+            resolved_map[dep.address] = resolved_dep
+
+            # Recurse into sub-dependencies (remote only)
+            if resolved_dep.manifest is not None and resolved_dep.manifest.dependencies:
+                remote_sub_deps = [sub for sub in resolved_dep.manifest.dependencies if sub.path is None]
+                if remote_sub_deps:
+                    _resolve_transitive_tree(
+                        deps=remote_sub_deps,
+                        resolution_stack=resolution_stack,
+                        resolved_map=resolved_map,
+                        constraints_by_address=constraints_by_address,
+                        tags_cache=tags_cache,
+                        cache_root=cache_root,
+                        fetch_url_overrides=fetch_url_overrides,
+                    )
+        finally:
+            resolution_stack.discard(dep.address)
 
 
 def resolve_all_dependencies(
@@ -265,11 +460,11 @@ def resolve_all_dependencies(
     cache_root: Path | None = None,
     fetch_url_overrides: dict[str, str] | None = None,
 ) -> list[ResolvedDependency]:
-    """Resolve all dependencies: local path first, then VCS fetch for remote.
+    """Resolve all dependencies with transitive resolution for remote deps.
 
-    For each dependency in the manifest:
-    - If ``path`` is set: resolve locally (existing logic).
-    - Otherwise: resolve via VCS fetch + cache.
+    Local path dependencies are resolved directly (no recursion into their sub-deps).
+    Remote dependencies are resolved transitively with cycle detection and diamond
+    constraint handling.
 
     Args:
         manifest: The consuming package's manifest.
@@ -278,25 +473,50 @@ def resolve_all_dependencies(
         fetch_url_overrides: Map of ``address`` to override clone URL (for tests).
 
     Returns:
-        List of resolved dependencies.
+        List of resolved dependencies (local + all transitive remote).
 
     Raises:
         DependencyResolveError: If any dependency fails to resolve.
+        TransitiveDependencyError: If cycles or unsatisfiable diamonds are found.
     """
-    resolved: list[ResolvedDependency] = []
+    # 1. Resolve local path deps (direct only, no recursion)
+    local_resolved: list[ResolvedDependency] = []
+    remote_deps: list[PackageDependency] = []
 
     for dep in manifest.dependencies:
         if dep.path is not None:
             resolved_dep = _resolve_local_dependency(dep, package_root)
+            local_resolved.append(resolved_dep)
+            log.verbose(
+                f"Resolved local dependency '{resolved_dep.alias}': "
+                f"{len(resolved_dep.mthds_files)} .mthds files, "
+                f"{len(resolved_dep.exported_pipe_codes)} exported pipes"
+            )
         else:
-            override_url = (fetch_url_overrides or {}).get(dep.address)
-            resolved_dep = resolve_remote_dependency(dep, cache_root=cache_root, fetch_url_override=override_url)
+            remote_deps.append(dep)
 
-        resolved.append(resolved_dep)
+    # 2. Resolve remote deps transitively
+    resolved_map: dict[str, ResolvedDependency] = {}
+    constraints_by_address: dict[str, list[str]] = {}
+    tags_cache: dict[str, list[tuple[Any, str]]] = {}
+    resolution_stack: set[str] = set()
+
+    if remote_deps:
+        _resolve_transitive_tree(
+            deps=remote_deps,
+            resolution_stack=resolution_stack,
+            resolved_map=resolved_map,
+            constraints_by_address=constraints_by_address,
+            tags_cache=tags_cache,
+            cache_root=cache_root,
+            fetch_url_overrides=fetch_url_overrides,
+        )
+
+    for resolved_dep in resolved_map.values():
         log.verbose(
-            f"Resolved dependency '{resolved_dep.alias}': "
+            f"Resolved remote dependency '{resolved_dep.alias}': "
             f"{len(resolved_dep.mthds_files)} .mthds files, "
             f"{len(resolved_dep.exported_pipe_codes)} exported pipes"
         )
 
-    return resolved
+    return local_resolved + list(resolved_map.values())

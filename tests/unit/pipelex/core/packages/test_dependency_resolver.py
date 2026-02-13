@@ -2,7 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from pipelex.core.packages.dependency_resolver import DependencyResolveError, ResolvedDependency, resolve_local_dependencies
+from pipelex.core.packages.dependency_resolver import ResolvedDependency, resolve_local_dependencies
+from pipelex.core.packages.exceptions import DependencyResolveError
 from pipelex.core.packages.manifest import MthdsPackageManifest, PackageDependency
 
 PACKAGES_DIR = Path(__file__).resolve().parents[4] / "data" / "packages"
@@ -105,6 +106,7 @@ class TestDependencyResolver:
         """ResolvedDependency should be immutable (frozen model)."""
         dep = ResolvedDependency(
             alias="test",
+            address="github.com/test/test",
             manifest=None,
             package_root=tmp_path / "test",
             mthds_files=[],

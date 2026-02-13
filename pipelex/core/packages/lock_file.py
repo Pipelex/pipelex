@@ -193,8 +193,9 @@ def generate_lock_file(
 ) -> LockFile:
     """Generate a lock file from resolved dependencies.
 
-    Filters out local dependencies (those with ``path`` set) and creates
-    ``LockedPackage`` entries for remote dependencies.
+    Locks all remote dependencies (including transitive) by using
+    ``resolved.address`` directly. Local path overrides from the root
+    manifest are excluded.
 
     Args:
         manifest: The consuming package's manifest.
@@ -208,26 +209,20 @@ def generate_lock_file(
     """
     packages: dict[str, LockedPackage] = {}
 
-    # Build a lookup from alias to dependency spec
-    dep_by_alias: dict[str, Any] = {}
-    for dep in manifest.dependencies:
-        dep_by_alias[dep.alias] = dep
+    # Build set of local-override addresses from root manifest
+    local_addresses = {dep.address for dep in manifest.dependencies if dep.path is not None}
 
     for resolved in resolved_deps:
-        dep_spec = dep_by_alias.get(resolved.alias)
-        if dep_spec is None:
-            continue
-
-        # Skip local dependencies
-        if dep_spec.path is not None:
+        # Skip local path overrides
+        if resolved.address in local_addresses:
             continue
 
         # Remote dep must have a manifest
         if resolved.manifest is None:
-            msg = f"Remote dependency '{resolved.alias}' ({dep_spec.address}) has no manifest — cannot generate lock entry"
+            msg = f"Remote dependency '{resolved.alias}' ({resolved.address}) has no manifest — cannot generate lock entry"
             raise LockFileError(msg)
 
-        address = dep_spec.address
+        address = resolved.address
         version = resolved.manifest.version
         hash_value = compute_directory_hash(resolved.package_root)
         source = f"https://{address}"

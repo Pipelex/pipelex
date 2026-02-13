@@ -4,7 +4,10 @@ import typer
 
 from pipelex.cli.commands.pkg.add_cmd import do_pkg_add
 from pipelex.cli.commands.pkg.init_cmd import do_pkg_init
+from pipelex.cli.commands.pkg.install_cmd import do_pkg_install
 from pipelex.cli.commands.pkg.list_cmd import do_pkg_list
+from pipelex.cli.commands.pkg.lock_cmd import do_pkg_lock
+from pipelex.cli.commands.pkg.update_cmd import do_pkg_update
 
 pkg_app = typer.Typer(
     no_args_is_help=True,
@@ -49,3 +52,21 @@ def pkg_add_cmd(
 ) -> None:
     """Add a dependency to the package manifest."""
     do_pkg_add(address=address, alias=alias, version=version, path=path)
+
+
+@pkg_app.command("lock", help="Resolve dependencies and generate methods.lock")
+def pkg_lock_cmd() -> None:
+    """Resolve all dependencies and write a lock file."""
+    do_pkg_lock()
+
+
+@pkg_app.command("install", help="Install dependencies from methods.lock")
+def pkg_install_cmd() -> None:
+    """Fetch packages recorded in the lock file."""
+    do_pkg_install()
+
+
+@pkg_app.command("update", help="Re-resolve dependencies and update methods.lock")
+def pkg_update_cmd() -> None:
+    """Fresh resolve of all dependencies and rewrite the lock file."""
+    do_pkg_update()

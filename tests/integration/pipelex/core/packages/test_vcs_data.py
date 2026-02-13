@@ -42,3 +42,26 @@ pipes = ["vcs_test_pipe", "vcs_extra_pipe"]
 --- pipe vcs_test_pipe
 --- pipe vcs_extra_pipe
 """
+
+
+class DependentFixtureData:
+    """Constants for a package that depends on vcs-fixture."""
+
+    METHODS_TOML: ClassVar[str] = """\
+[package]
+address = "github.com/mthds-test/dependent-pkg"
+version = "1.0.0"
+description = "A dependent test fixture package"
+authors = ["TestBot"]
+
+[dependencies]
+vcs_fixture = { address = "github.com/mthds-test/vcs-fixture", version = "^1.0.0" }
+
+[exports.dependent]
+pipes = ["dependent_pipe"]
+"""
+
+    BUNDLE_CONTENT: ClassVar[str] = """\
+--- domain dependent
+--- pipe dependent_pipe
+"""

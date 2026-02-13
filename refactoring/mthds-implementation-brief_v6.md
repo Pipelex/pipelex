@@ -71,11 +71,10 @@ Delivered:
 
 ## Known Limitations (current implementation)
 
-These are tracked as deliverables in the Phase 4 sub-phases above:
+These are tracked as deliverables in the Phase 4E sub-phase:
 
 1. **Per-package Library isolation** (Phase 4E): Dependency pipes/concepts stored with aliased keys in flat library dicts. Concept name conflicts log a warning and skip native-key registration.
 2. **Cross-package concept refinement validation** (Phase 4E): `refines = "alias->domain.Concept"` parses correctly, but `are_concept_compatible()` doesn't traverse across package boundaries yet.
-3. **Transitive dependency resolution** (Phase 4D): Only direct dependencies resolved. Recursive resolution with cycle detection pending.
 
 ---
 
@@ -123,34 +122,20 @@ Delivered:
 
 ---
 
-## Phase 4D: Transitive Dependencies + CLI Commands — PLANNED
+## Phase 4D: Transitive Dependencies + CLI Commands — COMPLETED
 
-> **Prerequisite:** Phase 4C's lock file API (`generate_lock_file`, `parse_lock_file`, `serialize_lock_file`, `verify_lock_file`) is ready for the CLI commands to consume. `generate_lock_file()` already accepts any `list[ResolvedDependency]`, so once transitive resolution is added the lock file will include transitive deps automatically — no changes to `lock_file.py` needed.
+Delivered:
 
-Deliverables:
-
-- **Transitive resolution**: Extend `dependency_resolver.py` with recursive resolution + cycle detection. Diamond dependency handling via `select_minimum_version_for_multiple_constraints` from Phase 4A.
-- **`TransitiveDependencyError`** in `exceptions.py`: Cycle detection, missing transitive deps.
-- **CLI `pipelex pkg lock`** (`pipelex/cli/commands/pkg/lock_cmd.py`): Scan `METHODS.toml`, call `resolve_all_dependencies()`, call `generate_lock_file()`, write `serialize_lock_file()` output to `methods.lock`.
-- **CLI `pipelex pkg install`** (`pipelex/cli/commands/pkg/install_cmd.py`): Read `methods.lock` via `parse_lock_file()`, fetch any missing deps into cache, call `verify_lock_file()` for integrity.
-- **CLI `pipelex pkg update`** (`pipelex/cli/commands/pkg/update_cmd.py`): Re-resolve to latest compatible versions, regenerate `methods.lock` via `generate_lock_file()`.
-- **Tests**: Transitive resolution (A→B→C), cycle detection (A→B→A), diamond deps (A→B, A→C, both→D), CLI command tests.
-
-Key files to create:
-
-| File | Purpose |
-|------|---------|
-| `pipelex/cli/commands/pkg/lock_cmd.py` | `pipelex pkg lock` — chains resolve → generate → serialize → write |
-| `pipelex/cli/commands/pkg/install_cmd.py` | `pipelex pkg install` — parse lock → fetch → verify |
-| `pipelex/cli/commands/pkg/update_cmd.py` | `pipelex pkg update` — re-resolve → regenerate lock |
-
-Key files to modify:
-
-| File | Change |
-|------|--------|
-| `pipelex/core/packages/dependency_resolver.py` | Transitive resolution + cycle detection |
-| `pipelex/core/packages/exceptions.py` | Add `TransitiveDependencyError` |
-| `pipelex/cli/commands/pkg/app.py` | Register new commands |
+- **Exception infrastructure** (`pipelex/core/packages/exceptions.py`): `DependencyResolveError` moved from `dependency_resolver.py` (was plain `Exception`, now inherits `PipelexError`). New `TransitiveDependencyError(PipelexError)` for cycles and unsatisfiable diamond constraints.
+- **`address` field on `ResolvedDependency`** (`dependency_resolver.py`): Tracks the package address through resolution, enabling lock file generation for transitive deps without requiring them to exist in the root manifest.
+- **Transitive resolution algorithm** (`dependency_resolver.py`): `_resolve_transitive_tree()` implements DFS with a stack set for cycle detection. Per dependency: cycle check → constraint tracking → dedup check (existing version satisfies new constraint?) → diamond re-resolution if needed → normal resolve → recurse into sub-deps. `_resolve_with_multiple_constraints()` handles diamond dependencies by fetching/caching the tag list, parsing all constraints, and calling `select_minimum_version_for_multiple_constraints()` from Phase 4A. `resolve_all_dependencies()` refactored: resolves local path deps first (no recursion), then passes remote deps through the transitive tree walker.
+- **Lock file generation updated** (`lock_file.py`): `generate_lock_file()` refactored to use `resolved.address` directly instead of alias-based lookup against root manifest. This naturally includes transitive deps while still excluding local path overrides.
+- **CLI `pipelex pkg lock`** (`pipelex/cli/commands/pkg/lock_cmd.py`): Parses `METHODS.toml`, calls `resolve_all_dependencies()` (now with transitive), generates lock file, writes `methods.lock`. Reports package count.
+- **CLI `pipelex pkg install`** (`pipelex/cli/commands/pkg/install_cmd.py`): Reads `methods.lock`, fetches missing packages via `resolve_remote_dependency()` with exact version constraint, verifies integrity via `verify_lock_file()`. Reports fetched/cached counts.
+- **CLI `pipelex pkg update`** (`pipelex/cli/commands/pkg/update_cmd.py`): Fresh resolve ignoring existing lock, generates new lock file, displays diff (added/removed/updated packages) via `_display_lock_diff()`.
+- **6 unit tests** for transitive resolution (`tests/unit/pipelex/core/packages/test_transitive_resolver.py`): linear chain (A→B→C), cycle detection (A→B→A), diamond resolved (compatible constraints), diamond unsatisfiable (conflicting constraints), local deps not recursed, dedup same address.
+- **2 integration tests** (`tests/integration/pipelex/core/packages/test_transitive_integration.py`): transitive chain resolves using local bare git repos (`dependent-pkg` → `vcs-fixture`), lock file includes both direct and transitive addresses. New `bare_git_repo_dependent` fixture and `DependentFixtureData` constants.
+- **9 CLI command tests** (`tests/unit/pipelex/cli/`): `test_pkg_lock.py` (3 tests: no manifest exits, creates empty lock, local dep excluded), `test_pkg_install.py` (2 tests: no lock exits, empty lock succeeds), `test_pkg_update.py` (2 tests: no manifest exits, creates fresh lock)
 
 ---
 
@@ -188,7 +173,7 @@ Deliverables:
 ## What NOT to Do
 
 - **Do NOT implement remote registry or Know-How Graph browsing.** That is Phase 5.
-- **Phase 4 is in progress (4A + 4B + 4C complete).** Implement sub-phases in order — do not skip ahead to later sub-phases without completing prerequisites.
+- **Phase 4 is in progress (4A + 4B + 4C + 4D complete).** Implement sub-phases in order — do not skip ahead to later sub-phases without completing prerequisites.
 - **Do NOT rename the manifest** to anything other than `METHODS.toml`. The design docs are explicit about this name.
 - **Do NOT rename Python classes or internal Pipelex types.** The standard is MTHDS; the implementation is Pipelex. Keep existing class names.
 

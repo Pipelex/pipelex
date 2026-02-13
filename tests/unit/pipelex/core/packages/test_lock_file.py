@@ -273,6 +273,7 @@ class TestLockFile:
         resolved_deps = [
             ResolvedDependency(
                 alias="local_dep",
+                address="github.com/org/local",
                 manifest=None,
                 package_root=tmp_path / "local",
                 mthds_files=[],
@@ -280,6 +281,7 @@ class TestLockFile:
             ),
             ResolvedDependency(
                 alias="remote_dep",
+                address="github.com/org/remote",
                 manifest=remote_manifest,
                 package_root=remote_dir,
                 mthds_files=[],
@@ -317,6 +319,7 @@ class TestLockFile:
         resolved_deps = [
             ResolvedDependency(
                 alias="local_only",
+                address="github.com/org/local",
                 manifest=None,
                 package_root=local_dir,
                 mthds_files=[],

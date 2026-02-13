@@ -31,3 +31,11 @@ class LockFileError(PipelexError):
 
 class IntegrityError(PipelexError):
     """Raised when a cached package does not match its lock file hash."""
+
+
+class DependencyResolveError(PipelexError):
+    """Raised when a dependency cannot be resolved."""
+
+
+class TransitiveDependencyError(PipelexError):
+    """Raised for cycles or unsatisfiable diamond constraints in transitive resolution."""
