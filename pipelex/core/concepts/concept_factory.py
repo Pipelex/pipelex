@@ -378,6 +378,26 @@ class ConceptFactory:
             msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
 
+        # Cross-package refines: base class isn't available locally, so generate
+        # a standalone TextContent subclass. The refinement relationship is tracked
+        # in the concept model's refines field for runtime compatibility checks.
+        if QualifiedRef.has_cross_package_prefix(current_refine):
+            try:
+                _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+                    class_name=concept_code,
+                    structure_blueprint={},
+                    description=blueprint.description,
+                )
+            except ConceptStructureGeneratorError as exc:
+                msg = (
+                    f"Error generating structure class for concept '{concept_code}' "
+                    f"with cross-package refines '{current_refine}' in domain '{domain_code}': {exc}"
+                )
+                raise ConceptFactoryError(msg) from exc
+
+            KajsonManager.get_class_registry().register_class(the_generated_class)
+            return concept_code, current_refine
+
         # Get the refined concept's structure class name
         # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
         # For custom concepts, the structure class name is just the concept code (e.g., Customer)

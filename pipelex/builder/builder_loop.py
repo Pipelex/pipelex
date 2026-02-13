@@ -26,6 +26,7 @@ from pipelex.core.packages.manifest_parser import serialize_manifest_to_toml
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
 from pipelex.language.mthds_factory import MthdsFactory
@@ -134,29 +135,32 @@ class BuilderLoop:
         if pipelex_bundle_spec.pipe:
             for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
                 source = f"pipe '{pipe_code}'"
-                # Parse output
+                # Parse output — skip cross-package refs
                 output_parse = parse_concept_with_multiplicity(pipe_spec.output)
                 output_concept = output_parse.concept_ref_or_code
-                if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                    bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
-                    concept_references.append((bare_code, source, "output"))
+                if not QualifiedRef.has_cross_package_prefix(output_concept):
+                    if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                        bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
+                        concept_references.append((bare_code, source, "output"))
 
-                # Parse inputs
+                # Parse inputs — skip cross-package refs
                 if pipe_spec.inputs:
                     for input_name, input_concept_str in pipe_spec.inputs.items():
                         input_parse = parse_concept_with_multiplicity(input_concept_str)
                         input_concept = input_parse.concept_ref_or_code
-                        if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                            bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
-                            concept_references.append((bare_code, source, f"input '{input_name}'"))
+                        if not QualifiedRef.has_cross_package_prefix(input_concept):
+                            if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                                bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
+                                concept_references.append((bare_code, source, f"input '{input_name}'"))
 
-                # Parse PipeParallel combined_output
+                # Parse PipeParallel combined_output — skip cross-package refs
                 if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
                     combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
                     combined_concept = combined_parse.concept_ref_or_code
-                    if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                        bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
-                        concept_references.append((bare_code, source, "combined_output"))
+                    if not QualifiedRef.has_cross_package_prefix(combined_concept):
+                        if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                            bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
+                            concept_references.append((bare_code, source, "combined_output"))
 
         # Collect concept references from concept definitions (refines, structure concept_ref, item_concept_ref)
         if pipelex_bundle_spec.concept:
@@ -165,26 +169,28 @@ class BuilderLoop:
                     continue
                 source = f"concept '{concept_code}'"
 
-                # Check refines
+                # Check refines — skip cross-package refs
                 if concept_spec_or_name.refines:
                     ref = concept_spec_or_name.refines
-                    if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                    if not QualifiedRef.has_cross_package_prefix(ref) and ("." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain):
                         bare_code = ref.split(".")[-1] if "." in ref else ref
                         concept_references.append((bare_code, source, "refines"))
 
-                # Check structure fields
+                # Check structure fields — skip cross-package refs
                 if concept_spec_or_name.structure:
                     for field_name, field_spec in concept_spec_or_name.structure.items():
                         if field_spec.concept_ref:
                             ref = field_spec.concept_ref
-                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
-                                bare_code = ref.split(".")[-1] if "." in ref else ref
-                                concept_references.append((bare_code, source, f"structure.{field_name}.concept_ref"))
+                            if not QualifiedRef.has_cross_package_prefix(ref):
+                                if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                    bare_code = ref.split(".")[-1] if "." in ref else ref
+                                    concept_references.append((bare_code, source, f"structure.{field_name}.concept_ref"))
                         if field_spec.item_concept_ref:
                             ref = field_spec.item_concept_ref
-                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
-                                bare_code = ref.split(".")[-1] if "." in ref else ref
-                                concept_references.append((bare_code, source, f"structure.{field_name}.item_concept_ref"))
+                            if not QualifiedRef.has_cross_package_prefix(ref):
+                                if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                    bare_code = ref.split(".")[-1] if "." in ref else ref
+                                    concept_references.append((bare_code, source, f"structure.{field_name}.item_concept_ref"))
 
         # Step 2: Determine which are undeclared
         declared_concepts: set[str] = set()
@@ -372,15 +378,18 @@ class BuilderLoop:
         """Extract a bare concept code only if the reference is local.
 
         A reference is considered local if it has no domain prefix or if
-        its domain prefix matches the bundle domain.
+        its domain prefix matches the bundle domain. Cross-package refs
+        (containing '->') are never local.
 
         Args:
             concept_ref_or_code: A concept reference like "Document", "my_domain.Document", or "external.Document"
             domain: The bundle's domain
 
         Returns:
-            The bare concept code if local, or None if external
+            The bare concept code if local, or None if external or cross-package
         """
+        if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
+            return None
         if "." not in concept_ref_or_code:
             return concept_ref_or_code
         prefix, bare_code = concept_ref_or_code.rsplit(".", maxsplit=1)

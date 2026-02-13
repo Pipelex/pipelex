@@ -633,7 +633,8 @@ class LibraryManager(LibraryManagerAbstract):
         """Load dependency packages into the library.
 
         Resolves local-path dependencies, parses their blueprints, and loads
-        their concepts and exported pipes with aliased keys.
+        their concepts and exported pipes into isolated child libraries.
+        Aliased entries are also added to the main library for backward-compatible lookups.
 
         Args:
             library_id: The library to load into
@@ -654,15 +655,23 @@ class LibraryManager(LibraryManagerAbstract):
                 resolved_dep=resolved_dep,
             )
 
+        # Wire concept resolver after all deps are loaded so cross-package
+        # refinement checks can traverse into child libraries
+        library.concept_library.set_concept_resolver(library.resolve_concept)
+
     def _load_single_dependency(
         self,
         library: Library,
         resolved_dep: ResolvedDependency,
     ) -> None:
-        """Load a single resolved dependency into the library.
+        """Load a single resolved dependency into an isolated child library.
+
+        Creates a child Library for the dependency, loads domains/concepts/pipes
+        into it, registers it in library.dependency_libraries, and adds aliased
+        entries to the main library for backward-compatible cross-package lookups.
 
         Args:
-            library: The library to load into
+            library: The main library to load into
             resolved_dep: The resolved dependency info
         """
         alias = resolved_dep.alias
@@ -682,17 +691,26 @@ class LibraryManager(LibraryManagerAbstract):
             log.warning(f"No valid blueprints found for dependency '{alias}'")
             return
 
-        # Load concepts from dependency blueprints
-        dep_concepts = self._load_concepts_from_blueprints(dep_blueprints)
+        # Create isolated child library for this dependency
+        child_library = LibraryFactory.make_empty()
 
-        # Add concepts with aliased keys for cross-package lookup
-        for concept in dep_concepts:
-            library.concept_library.add_dependency_concept(alias=alias, concept=concept)
-            # Also try to add with native key for dependency-internal pipe resolution
-            if not library.concept_library.is_concept_exists(concept.concept_ref):
-                library.concept_library.root[concept.concept_ref] = concept
-            else:
-                log.info(f"Dependency '{alias}' concept '{concept.concept_ref}' conflicts with existing concept, skipping native-key registration")
+        # Load domains into child library
+        all_domains: list[Domain] = []
+        for blueprint in dep_blueprints:
+            domain = DomainFactory.make_from_blueprint(
+                blueprint=DomainBlueprint(
+                    source=blueprint.source,
+                    code=blueprint.domain,
+                    description=blueprint.description or "",
+                    system_prompt=blueprint.system_prompt,
+                ),
+            )
+            all_domains.append(domain)
+        child_library.domain_library.add_domains(domains=all_domains)
+
+        # Load concepts into child library
+        dep_concepts = self._load_concepts_from_blueprints(dep_blueprints)
+        child_library.concept_library.add_concepts(concepts=dep_concepts)
 
         # Collect main_pipes for auto-export
         main_pipes: set[str] = set()
@@ -704,7 +722,15 @@ class LibraryManager(LibraryManagerAbstract):
         has_exports = len(resolved_dep.exported_pipe_codes) > 0
         all_exported = resolved_dep.exported_pipe_codes | main_pipes
 
-        # Load exported pipes with aliased keys
+        # Temporarily register dep concepts in main library for pipe construction
+        # (PipeFactory resolves concepts through the hub's current library)
+        temp_concept_refs: list[str] = []
+        for concept in dep_concepts:
+            if not library.concept_library.is_concept_exists(concept_ref=concept.concept_ref):
+                library.concept_library.add_new_concept(concept=concept)
+                temp_concept_refs.append(concept.concept_ref)
+
+        # Load exported pipes into child library
         concept_codes = [concept.code for concept in dep_concepts]
         for blueprint in dep_blueprints:
             if blueprint.pipe is None:
@@ -720,9 +746,22 @@ class LibraryManager(LibraryManagerAbstract):
                         blueprint=pipe_blueprint,
                         concept_codes_from_the_same_domain=concept_codes,
                     )
-                    library.pipe_library.add_dependency_pipe(alias=alias, pipe=pipe)
+                    child_library.pipe_library.add_new_pipe(pipe=pipe)
                 except (PipeLibraryError, ValidationError) as exc:
                     log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+
+        # Remove temporary native-key entries from main library
+        library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)
+
+        # Register child library for isolation
+        library.dependency_libraries[alias] = child_library
+
+        # Add aliased entries to main library for backward-compatible cross-package lookups
+        for concept in dep_concepts:
+            library.concept_library.add_dependency_concept(alias=alias, concept=concept)
+
+        for pipe in child_library.pipe_library.get_pipes():
+            library.pipe_library.add_dependency_pipe(alias=alias, pipe=pipe)
 
         log.verbose(f"Loaded dependency '{alias}': {len(dep_concepts)} concepts, pipes from {len(dep_blueprints)} bundles")
 

@@ -1,7 +1,9 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
 
+from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.concept.concept_library import ConceptLibrary
@@ -12,6 +14,9 @@ from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
+if TYPE_CHECKING:
+    from pipelex.core.concepts.concept import Concept
 
 
 class Library(BaseModel):
@@ -29,6 +34,7 @@ class Library(BaseModel):
     concept_library: ConceptLibrary
     pipe_library: PipeLibrary
     loaded_mthds_paths: list[Path] = Field(default_factory=empty_list_factory_of(Path))
+    dependency_libraries: dict[str, "Library"] = Field(default_factory=dict)
 
     def get_domain_library(self) -> DomainLibrary:
         return self.domain_library
@@ -39,7 +45,43 @@ class Library(BaseModel):
     def get_pipe_library(self) -> PipeLibrary:
         return self.pipe_library
 
+    def get_dependency_library(self, alias: str) -> "Library | None":
+        """Get a child library for a dependency by alias.
+
+        Args:
+            alias: The dependency alias
+
+        Returns:
+            The child Library, or None if not found
+        """
+        return self.dependency_libraries.get(alias)
+
+    def resolve_concept(self, concept_ref: str) -> "Concept | None":
+        """Resolve a concept ref, routing cross-package refs through child libraries.
+
+        For cross-package refs (containing '->'), splits into alias and remainder,
+        then looks up the concept in the corresponding child library's concept_library.
+        For local refs, looks up in the main concept_library.
+
+        Args:
+            concept_ref: A concept ref, possibly cross-package (e.g. "alias->domain.Code")
+
+        Returns:
+            The resolved Concept, or None if not found
+        """
+        if QualifiedRef.has_cross_package_prefix(concept_ref):
+            alias, remainder = QualifiedRef.split_cross_package_ref(concept_ref)
+            child_library = self.dependency_libraries.get(alias)
+            if child_library is None:
+                return None
+            return child_library.concept_library.get_optional_concept(concept_ref=remainder)
+        return self.concept_library.get_optional_concept(concept_ref=concept_ref)
+
     def teardown(self) -> None:
+        # Tear down child libraries first
+        for child_library in self.dependency_libraries.values():
+            child_library.teardown()
+        self.dependency_libraries = {}
         self.pipe_library.teardown()
         self.concept_library.teardown()
         self.domain_library.teardown()
@@ -88,6 +130,9 @@ class Library(BaseModel):
     def _has_unresolved_cross_package_deps(self, pipe: PipeController) -> bool:
         """Check if a pipe controller has cross-package dependencies that aren't loaded.
 
+        A cross-package dep is only "unresolved" if the alias has no child library
+        AND the pipe isn't found in the main pipe library.
+
         Args:
             pipe: The pipe controller to check
 
@@ -95,12 +140,37 @@ class Library(BaseModel):
             True if the pipe has unresolved cross-package dependencies
         """
         for dep_code in pipe.pipe_dependencies():
-            if QualifiedRef.has_cross_package_prefix(dep_code) and self.pipe_library.get_optional_pipe(dep_code) is None:
-                return True
+            if QualifiedRef.has_cross_package_prefix(dep_code):
+                # Check main pipe library first (aliased entries)
+                if self.pipe_library.get_optional_pipe(dep_code) is not None:
+                    continue
+                # Check if the alias has a child library
+                alias, _remainder = QualifiedRef.split_cross_package_ref(dep_code)
+                if alias not in self.dependency_libraries:
+                    return True
         return False
 
     def validate_concept_library_with_libraries(self) -> None:
-        pass
+        """Validate cross-package concept refines have their targets available.
+
+        For each concept with a cross-package refines, verify the target exists
+        in the corresponding child library via resolve_concept().
+        """
+        for concept in self.concept_library.root.values():
+            if concept.refines and QualifiedRef.has_cross_package_prefix(concept.refines):
+                resolved = self.resolve_concept(concept.refines)
+                if resolved is None:
+                    alias, remainder = QualifiedRef.split_cross_package_ref(concept.refines)
+                    if alias in self.dependency_libraries:
+                        msg = (
+                            f"Concept '{concept.concept_ref}' refines cross-package concept '{concept.refines}' "
+                            f"but '{remainder}' was not found in dependency '{alias}'"
+                        )
+                        raise LibraryError(msg)
+                    log.verbose(
+                        f"Concept '{concept.concept_ref}' refines cross-package concept '{concept.refines}' "
+                        f"from unloaded dependency '{alias}', skipping validation"
+                    )
 
     def validate_domain_library_with_libraries(self) -> None:
         pass

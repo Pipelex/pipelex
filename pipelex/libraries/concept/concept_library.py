@@ -1,3 +1,5 @@
+from typing import Any, Callable
+
 from pydantic import Field, RootModel, model_validator
 from typing_extensions import override
 
@@ -18,10 +20,22 @@ ConceptLibraryRoot = dict[str, Concept]
 class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     root: ConceptLibraryRoot = Field(default_factory=dict)
 
+    @override
+    def model_post_init(self, _context: Any) -> None:
+        self._concept_resolver: Callable[[str], Concept | None] | None = None
+
+    def set_concept_resolver(self, resolver: Callable[[str], Concept | None]) -> None:
+        """Set a resolver callback for cross-package concept lookups.
+
+        Args:
+            resolver: A callable that takes a concept ref and returns the Concept or None
+        """
+        self._concept_resolver = resolver
+
     @model_validator(mode="after")
     def validation_static(self):
         for concept in self.root.values():
-            if concept.refines and concept.refines not in self.root:
+            if concept.refines and not QualifiedRef.has_cross_package_prefix(concept.refines) and concept.refines not in self.root:
                 msg = f"Concept '{concept.code}' refines '{concept.refines}' but no concept with the code '{concept.refines}' exists"
                 raise ConceptLibraryError(msg)
         return self
@@ -83,7 +97,12 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
-        return Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept, strict=strict)
+        return Concept.are_concept_compatible(
+            concept_1=tested_concept,
+            concept_2=wanted_concept,
+            strict=strict,
+            concept_resolver=self._concept_resolver,
+        )
 
     def get_optional_concept(self, concept_ref: str) -> Concept | None:
         return self.root.get(concept_ref)
