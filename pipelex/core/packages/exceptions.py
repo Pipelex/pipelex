@@ -23,3 +23,11 @@ class VersionResolutionError(PipelexError):
 
 class PackageCacheError(PipelexError):
     """Raised when cache operations (lookup, store) fail."""
+
+
+class LockFileError(PipelexError):
+    """Raised when lock file parsing, generation, or I/O fails."""
+
+
+class IntegrityError(PipelexError):
+    """Raised when a cached package does not match its lock file hash."""

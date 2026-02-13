@@ -104,37 +104,22 @@ Delivered:
 
 ---
 
-## Phase 4C: Lock File — PLANNED
+## Phase 4C: Lock File — COMPLETED
 
-> **Note:** `resolve_remote_dependency()` and `resolve_all_dependencies()` were delivered in Phase 4B. Phase 4C is now focused purely on the lock file model and integrity verification.
+Delivered:
 
-Deliverables:
-
-- **Lock file model and parser** (`pipelex/core/packages/lock_file.py`): `LockedPackage` model (version, SHA-256 hash, source URL), `LockFile` model, TOML parse/serialize. Format per design spec:
+- **Lock file model and parser** (`pipelex/core/packages/lock_file.py`): `LockedPackage` frozen model (version validated with `is_valid_semver`, SHA-256 hash validated with regex, source validated with `https://` prefix), `LockFile` frozen model with `dict[str, LockedPackage]` keyed by package address. TOML parse/serialize using `tomli` + `tomlkit`, with deterministic sorted output. Format per design spec:
   ```toml
   ["github.com/mthds/scoring-lib"]
   version = "0.5.1"
   hash = "sha256:e5f6g7h8..."
   source = "https://github.com/mthds/scoring-lib"
   ```
-- **Hash computation**: SHA-256 of package contents for integrity verification.
-- **Lock file exceptions** in `exceptions.py`: `LockFileError`, `IntegrityError`.
-- **Lock file generation hook** in `dependency_resolver.py`: After `resolve_all_dependencies()` succeeds, generate `LockedPackage` entries with resolved version + hash for each remote dependency.
-- **Tests**: Lock file round-trip (parse/serialize), hash computation, integrity verification.
-
-Key files to create:
-
-| File | Purpose |
-|------|---------|
-| `pipelex/core/packages/lock_file.py` | Lock file model + TOML I/O |
-| `tests/unit/pipelex/core/packages/test_lock_file.py` | Lock file unit tests |
-
-Key files to modify:
-
-| File | Change |
-|------|--------|
-| `pipelex/core/packages/dependency_resolver.py` | Add lock file entry generation after resolution |
-| `pipelex/core/packages/exceptions.py` | Add lock file / integrity exceptions |
+- **Hash computation** (`compute_directory_hash()`): Deterministic SHA-256 of directory contents — collects all regular files recursively, skips `.git/` paths, sorts by POSIX-normalized relative path, feeds relative path string (UTF-8) + raw bytes into a single hasher. Binary-mode reads only.
+- **Lock file generation** (`generate_lock_file()`): Standalone function taking `MthdsPackageManifest` + `list[ResolvedDependency]` — filters out local deps (those with `path` set), computes hash from `package_root` for each remote dep. `dependency_resolver.py` intentionally unchanged; the caller (future CLI in Phase 4D) chains: resolve -> generate lock -> write to disk.
+- **Integrity verification** (`verify_locked_package()`, `verify_lock_file()`): Computes hash of cached directory via `get_cached_package_path()`, compares with lock entry hash, raises `IntegrityError` on mismatch or missing cache.
+- **Lock file exceptions** in `exceptions.py`: `LockFileError`, `IntegrityError` — both inheriting from `PipelexError`.
+- **18 unit tests** in `tests/unit/pipelex/core/packages/test_lock_file.py`: Single `TestLockFile` class covering parsing (2-entry TOML, empty, invalid TOML, invalid hash), serialization (structure, roundtrip, deterministic order), hash computation (deterministic, content-sensitive, path-sensitive, `.git/` exclusion, nonexistent dir), verification (success, mismatch, missing cache), generation (remote-only filtering, empty with no remote deps), and model immutability.
 
 ---
 

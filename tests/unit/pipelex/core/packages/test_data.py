@@ -137,3 +137,29 @@ class ManifestTestData:
         version="0.1.0",
         description="A minimal MTHDS package",
     )
+
+
+# ============================================================
+# Lock file TOML strings for lock file tests
+# ============================================================
+
+LOCK_FILE_TOML = """\
+["github.com/pipelexlab/document-processing"]
+version = "1.2.3"
+hash = "sha256:a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2"
+source = "https://github.com/pipelexlab/document-processing"
+
+["github.com/pipelexlab/scoring-lib"]
+version = "0.5.1"
+hash = "sha256:1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+source = "https://github.com/pipelexlab/scoring-lib"
+"""
+
+EMPTY_LOCK_FILE_TOML = ""
+
+INVALID_HASH_LOCK_FILE_TOML = """\
+["github.com/pipelexlab/bad-hash"]
+version = "1.0.0"
+hash = "md5:not-a-valid-hash"
+source = "https://github.com/pipelexlab/bad-hash"
+"""
