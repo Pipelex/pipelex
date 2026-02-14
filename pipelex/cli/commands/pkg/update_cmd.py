@@ -38,7 +38,7 @@ def _display_lock_diff(console: Console, old_lock: LockFile, new_lock: LockFile)
         old_ver = old_lock.packages[address].version
         new_ver = new_lock.packages[address].version
         if old_ver != new_ver:
-            updated.append(f"  {address}: {old_ver} -> {new_ver}")
+            updated.append(f"{address}: {old_ver} -> {new_ver}")
 
     if not added and not removed and not updated:
         console.print("[dim]No changes — lock file is up to date.[/dim]")
