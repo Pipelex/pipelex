@@ -13,7 +13,7 @@ The Pipelex CLI is organized into several command groups:
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
 | [**run**](run.md) | Execute pipelines |
 | [**build**](build/index.md) | Generate pipelines, runners, and structures |
-| [**pkg**](pkg.md) | Package management: initialize and inspect manifests |
+| [**pkg**](pkg.md) | Package management: initialize manifests, manage dependencies, and lock versions |
 
 ## Usage Tips
 

@@ -184,6 +184,92 @@ refines = "Customer"
 
 Both `VIPCustomer` and `InactiveCustomer` will have access to the `name` and `email` fields defined in `Customer`. When you create content for these concepts, it will be compatible with the base `Customer` structure.
 
+## Cross-Package Refinement
+
+You can refine concepts that live in a different package. This lets you specialize a shared concept from a dependency without modifying the dependency itself.
+
+### Syntax
+
+Use the `->` cross-package reference operator in the `refines` field:
+
+```toml
+[concept.RefinedConcept]
+description = "A more specialized version of a cross-package concept"
+refines = "alias->domain.BaseConceptCode"
+```
+
+| Part | Description |
+|------|-------------|
+| `alias` | The dependency alias declared in your `METHODS.toml` `[dependencies]` section |
+| `->` | Cross-package reference operator |
+| `domain` | The dot-separated domain path inside the dependency package |
+| `BaseConceptCode` | The `PascalCase` concept code to refine |
+
+### Full Example
+
+Suppose you depend on a scoring library that defines a `WeightedScore` concept:
+
+**Dependency package** (`scoring-lib`):
+
+```toml title="METHODS.toml"
+[package]
+address = "github.com/acme/scoring-lib"
+version = "2.0.0"
+description = "Scoring utilities."
+
+[exports.scoring]
+pipes = ["compute_weighted_score"]
+```
+
+```toml title="scoring.mthds"
+domain = "scoring"
+
+[concept.WeightedScore]
+description = "A weighted score result"
+
+[pipe.compute_weighted_score]
+type = "PipeLLM"
+description = "Compute a weighted score"
+output = "WeightedScore"
+prompt = "Compute a weighted score for: {{ item }}"
+```
+
+**Your consumer package**:
+
+```toml title="METHODS.toml"
+[package]
+address = "github.com/acme/analysis-app"
+version = "1.0.0"
+description = "Analysis application."
+
+[dependencies]
+scoring_lib = { address = "github.com/acme/scoring-lib", version = "^2.0.0" }
+
+[exports.analysis]
+pipes = ["compute_detailed_score"]
+```
+
+```toml title="analysis.mthds"
+domain = "analysis"
+
+[concept.DetailedScore]
+description = "An extended score with additional detail"
+refines = "scoring_lib->scoring.WeightedScore"
+
+[pipe.compute_detailed_score]
+type = "PipeLLM"
+description = "Compute a detailed score"
+output = "DetailedScore"
+prompt = "Compute a detailed score for: {{ item }}"
+```
+
+`DetailedScore` inherits the structure of `WeightedScore` from the `scoring_lib` dependency's `scoring` domain.
+
+!!! important
+    The base concept must be accessible from the dependency. The dependency must export the pipes in the domain that contains the concept, or the concept's domain must be reachable via an exported pipe's bundle.
+
+For more on how dependencies and cross-package references work, see [Packages](../packages.md#cross-package-references).
+
 ## Type Compatibility
 
 Understanding how refined concepts interact with pipe inputs is crucial.
@@ -312,4 +398,5 @@ refines = "Customer"
 - [Native Concepts](native-concepts.md) - Complete guide to native concepts
 - [Inline Structures](inline-structures.md) - Add structure to concepts
 - [Python StructuredContent Classes](python-classes.md) - Advanced customization
+- [Packages](../packages.md) - Package system, dependencies, and cross-package references
 
