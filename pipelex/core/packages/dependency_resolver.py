@@ -360,6 +360,45 @@ def _resolve_with_multiple_constraints(
     return _build_resolved_from_dir(alias, address, cached_path)
 
 
+def _remove_stale_subdep_constraints(
+    old_manifest: MthdsPackageManifest | None,
+    resolved_map: dict[str, ResolvedDependency],
+    constraints_by_address: dict[str, list[str]],
+) -> None:
+    """Remove constraints that were contributed by a dependency version being replaced.
+
+    When a diamond re-resolution picks a new version, the OLD version's sub-dependencies
+    may have added constraints to ``constraints_by_address``. Those constraints are stale
+    because the old version is no longer active. This function recursively removes them.
+
+    Args:
+        old_manifest: The manifest of the dependency version being replaced.
+        resolved_map: Address -> resolved dependency (entries may be removed).
+        constraints_by_address: Address -> list of version constraints (entries may be pruned).
+    """
+    if old_manifest is None or not old_manifest.dependencies:
+        return
+
+    for old_sub in old_manifest.dependencies:
+        if old_sub.path is not None:
+            continue
+        constraints_list = constraints_by_address.get(old_sub.address)
+        if constraints_list is None:
+            continue
+        # Remove the specific constraint string that the old sub-dep contributed
+        try:
+            constraints_list.remove(old_sub.version)
+        except ValueError:
+            continue
+        # If no constraints remain, the dep was only needed by the old version
+        if not constraints_list:
+            del constraints_by_address[old_sub.address]
+            old_resolved_sub = resolved_map.pop(old_sub.address, None)
+            if old_resolved_sub is not None:
+                # Recursively clean up the removed dep's own sub-dep contributions
+                _remove_stale_subdep_constraints(old_resolved_sub.manifest, resolved_map, constraints_by_address)
+
+
 def _resolve_transitive_tree(
     deps: list[PackageDependency],
     resolution_stack: set[str],
@@ -411,6 +450,10 @@ def _resolve_transitive_tree(
                 if version_satisfies(existing_ver, existing_constraint):
                     log.verbose(f"Transitive dep '{dep.address}' already resolved at {existing.manifest.version}, satisfies '{dep.version}'")
                     continue
+
+            # Diamond: remove stale constraints from the old version's sub-deps
+            # before re-resolving, so they don't cause false conflicts
+            _remove_stale_subdep_constraints(existing.manifest, resolved_map, constraints_by_address)
 
             # Diamond: re-resolve with all constraints
             override_url = (fetch_url_overrides or {}).get(dep.address)

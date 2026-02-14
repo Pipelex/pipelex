@@ -9,9 +9,11 @@ from tests.unit.pipelex.core.packages.graph.test_data import (
     ANALYTICS_LIB_ADDRESS,
     LEGAL_TOOLS_ADDRESS,
     PHANTOM_PKG_ADDRESS,
+    QUALIFIED_REF_ADDRESS,
     REFINING_APP_ADDRESS,
     SCORING_LIB_ADDRESS,
     make_test_package_index,
+    make_test_package_index_with_qualified_concept_specs,
     make_test_package_index_with_unresolvable_concepts,
 )
 
@@ -225,3 +227,51 @@ class TestGraphBuilder:
         assert len(non_native_keys) == 1
         expected_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_phantom.PkgTestValidConcept"
         assert non_native_keys[0] == expected_key
+
+    def test_domain_qualified_output_spec_resolved(self) -> None:
+        """Pipe with domain-qualified output spec (domain.ConceptCode) is included in graph."""
+        index = make_test_package_index_with_qualified_concept_specs()
+        graph = build_know_how_graph(index)
+
+        pipe_key = f"{QUALIFIED_REF_ADDRESS}::pkg_test_produce_result"
+        pipe_node = graph.get_pipe_node(pipe_key)
+        assert pipe_node is not None, f"Pipe '{pipe_key}' should be in graph but was excluded"
+        assert pipe_node.output_concept_id.package_address == QUALIFIED_REF_ADDRESS
+        assert pipe_node.output_concept_id.concept_ref == "pkg_test_qualified.PkgTestLocalResult"
+
+    def test_cross_package_input_spec_resolved(self) -> None:
+        """Pipe with cross-package input spec (alias->domain.Code) is included in graph."""
+        index = make_test_package_index_with_qualified_concept_specs()
+        graph = build_know_how_graph(index)
+
+        pipe_key = f"{QUALIFIED_REF_ADDRESS}::pkg_test_consume_score"
+        pipe_node = graph.get_pipe_node(pipe_key)
+        assert pipe_node is not None, f"Pipe '{pipe_key}' should be in graph but was excluded"
+        # The input should resolve to the scoring-lib's concept
+        score_input = pipe_node.input_concept_ids["score"]
+        assert score_input.package_address == SCORING_LIB_ADDRESS
+        assert score_input.concept_ref == "pkg_test_scoring_dep.PkgTestWeightedScore"
+
+    def test_cross_package_output_spec_resolved(self) -> None:
+        """Pipe with cross-package output spec (alias->domain.Code) is included in graph."""
+        index = make_test_package_index_with_qualified_concept_specs()
+        graph = build_know_how_graph(index)
+
+        pipe_key = f"{QUALIFIED_REF_ADDRESS}::pkg_test_forward_score"
+        pipe_node = graph.get_pipe_node(pipe_key)
+        assert pipe_node is not None, f"Pipe '{pipe_key}' should be in graph but was excluded"
+        assert pipe_node.output_concept_id.package_address == SCORING_LIB_ADDRESS
+        assert pipe_node.output_concept_id.concept_ref == "pkg_test_scoring_dep.PkgTestWeightedScore"
+
+    def test_all_qualified_ref_pipes_included(self) -> None:
+        """All pipes using qualified/cross-package concept specs are included in graph."""
+        index = make_test_package_index_with_qualified_concept_specs()
+        graph = build_know_how_graph(index)
+
+        expected_pipes = {
+            f"{SCORING_LIB_ADDRESS}::pkg_test_compute_score",
+            f"{QUALIFIED_REF_ADDRESS}::pkg_test_produce_result",
+            f"{QUALIFIED_REF_ADDRESS}::pkg_test_consume_score",
+            f"{QUALIFIED_REF_ADDRESS}::pkg_test_forward_score",
+        }
+        assert set(graph.pipe_nodes.keys()) == expected_pipes

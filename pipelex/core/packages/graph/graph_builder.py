@@ -173,14 +173,21 @@ def _resolve_concept_code(
     package_address: str,
     domain_code: str,
     package_concept_lookup: dict[str, dict[str, ConceptId]],
+    index: PackageIndex,
 ) -> ConceptId | None:
     """Resolve a concept spec string (from pipe input/output) to a ConceptId.
 
+    Handles native concepts, bare concept codes, domain-qualified refs
+    (e.g. ``domain.ConceptCode``), and cross-package refs
+    (e.g. ``alias->domain.ConceptCode``).
+
     Args:
-        concept_spec: The concept spec string (e.g. "Text", "PkgTestContractClause")
+        concept_spec: The concept spec string (e.g. "Text", "PkgTestContractClause",
+            "domain.ConceptCode", "alias->domain.ConceptCode")
         package_address: The package address containing the pipe
         domain_code: The domain code of the pipe
         package_concept_lookup: The package->code->ConceptId lookup table
+        index: The package index (needed for cross-package alias resolution)
 
     Returns:
         A resolved ConceptId, or None if the concept could not be resolved
@@ -193,13 +200,67 @@ def _resolve_concept_code(
             concept_ref=native_ref,
         )
 
+    # Cross-package ref: alias->domain.ConceptCode
+    if QualifiedRef.has_cross_package_prefix(concept_spec):
+        return _resolve_cross_package_concept(concept_spec, package_address, index, package_concept_lookup)
+
     # Look up in same package by bare concept code
     local_lookup = package_concept_lookup.get(package_address, {})
     if concept_spec in local_lookup:
         return local_lookup[concept_spec]
 
+    # Domain-qualified ref: domain.ConceptCode
+    if "." in concept_spec:
+        for concept_id in local_lookup.values():
+            if concept_id.concept_ref == concept_spec:
+                return concept_id
+
     # Unresolved: log warning and return None to exclude from the graph
     log.warning(f"Could not resolve concept '{concept_spec}' in package {package_address}, domain {domain_code}")
+    return None
+
+
+def _resolve_cross_package_concept(
+    concept_spec: str,
+    package_address: str,
+    index: PackageIndex,
+    package_concept_lookup: dict[str, dict[str, ConceptId]],
+) -> ConceptId | None:
+    """Resolve a cross-package concept spec (alias->domain.ConceptCode) to a ConceptId.
+
+    Args:
+        concept_spec: The cross-package concept spec (e.g. "scoring_dep->pkg_test_scoring.Score")
+        package_address: The address of the package containing the reference
+        index: The package index for alias resolution
+        package_concept_lookup: The package->code->ConceptId lookup table
+
+    Returns:
+        A resolved ConceptId, or None if the alias or concept could not be resolved
+    """
+    alias, remainder = QualifiedRef.split_cross_package_ref(concept_spec)
+    entry = index.get_entry(package_address)
+    if entry is None:
+        log.warning(f"Package '{package_address}' not found in index for cross-package ref '{concept_spec}'")
+        return None
+
+    resolved_address = entry.dependency_aliases.get(alias)
+    if resolved_address is None:
+        log.warning(f"Unknown dependency alias '{alias}' in concept spec '{concept_spec}' for package {package_address}")
+        return None
+
+    target_lookup = package_concept_lookup.get(resolved_address, {})
+
+    # Try by bare concept code (last segment of remainder)
+    ref = QualifiedRef.parse(remainder)
+    if ref.local_code in target_lookup:
+        return target_lookup[ref.local_code]
+
+    # Try by full concept_ref
+    for concept_id in target_lookup.values():
+        if concept_id.concept_ref == remainder:
+            return concept_id
+
+    log.warning(f"Could not resolve cross-package concept '{concept_spec}' in target package {resolved_address}")
     return None
 
 
@@ -219,6 +280,7 @@ def _build_pipe_nodes(
             package_address=address,
             domain_code=pipe_sig.domain_code,
             package_concept_lookup=package_concept_lookup,
+            index=index,
         )
         if output_concept_id is None:
             log.warning(f"Excluding pipe '{pipe_sig.pipe_code}' from graph: unresolvable output concept '{pipe_sig.output_spec}'")
@@ -232,6 +294,7 @@ def _build_pipe_nodes(
                 package_address=address,
                 domain_code=pipe_sig.domain_code,
                 package_concept_lookup=package_concept_lookup,
+                index=index,
             )
             if resolved_input is None:
                 log.warning(f"Excluding pipe '{pipe_sig.pipe_code}' from graph: unresolvable input concept '{input_spec}' for param '{param_name}'")
