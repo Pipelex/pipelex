@@ -8,9 +8,11 @@ from pipelex.core.packages.index.models import PackageIndex
 from tests.unit.pipelex.core.packages.graph.test_data import (
     ANALYTICS_LIB_ADDRESS,
     LEGAL_TOOLS_ADDRESS,
+    PHANTOM_PKG_ADDRESS,
     REFINING_APP_ADDRESS,
     SCORING_LIB_ADDRESS,
     make_test_package_index,
+    make_test_package_index_with_unresolvable_concepts,
 )
 
 
@@ -185,3 +187,41 @@ class TestGraphBuilder:
         assert len(graph.concept_nodes) > 0
         native_keys = [key for key in graph.concept_nodes if key.startswith(NATIVE_PACKAGE_ADDRESS)]
         assert len(native_keys) == len(graph.concept_nodes)
+
+    def test_pipe_with_unresolvable_output_excluded(self) -> None:
+        """Pipe referencing a nonexistent output concept is excluded from the graph."""
+        index = make_test_package_index_with_unresolvable_concepts()
+        graph = build_know_how_graph(index)
+
+        bad_output_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_bad_output_pipe"
+        assert graph.get_pipe_node(bad_output_key) is None
+
+    def test_pipe_with_unresolvable_input_excluded(self) -> None:
+        """Pipe referencing a nonexistent input concept is excluded from the graph."""
+        index = make_test_package_index_with_unresolvable_concepts()
+        graph = build_know_how_graph(index)
+
+        bad_input_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_bad_input_pipe"
+        assert graph.get_pipe_node(bad_input_key) is None
+
+    def test_valid_pipe_not_affected_by_unresolvable_siblings(self) -> None:
+        """Valid pipes in the same package are still included when siblings have unresolvable concepts."""
+        index = make_test_package_index_with_unresolvable_concepts()
+        graph = build_know_how_graph(index)
+
+        valid_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_valid_pipe"
+        pipe_node = graph.get_pipe_node(valid_key)
+        assert pipe_node is not None
+        assert pipe_node.output_concept_id.package_address == PHANTOM_PKG_ADDRESS
+        assert pipe_node.output_concept_id.concept_ref == "pkg_test_phantom.PkgTestValidConcept"
+
+    def test_no_phantom_concept_nodes_created(self) -> None:
+        """Unresolvable concept specs do not create phantom entries in concept_nodes."""
+        index = make_test_package_index_with_unresolvable_concepts()
+        graph = build_know_how_graph(index)
+
+        # Only the valid concept and native concepts should exist
+        non_native_keys = [key for key in graph.concept_nodes if not key.startswith(NATIVE_PACKAGE_ADDRESS)]
+        assert len(non_native_keys) == 1
+        expected_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_phantom.PkgTestValidConcept"
+        assert non_native_keys[0] == expected_key

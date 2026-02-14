@@ -173,7 +173,7 @@ def _resolve_concept_code(
     package_address: str,
     domain_code: str,
     package_concept_lookup: dict[str, dict[str, ConceptId]],
-) -> ConceptId:
+) -> ConceptId | None:
     """Resolve a concept spec string (from pipe input/output) to a ConceptId.
 
     Args:
@@ -183,7 +183,7 @@ def _resolve_concept_code(
         package_concept_lookup: The package->code->ConceptId lookup table
 
     Returns:
-        A resolved ConceptId
+        A resolved ConceptId, or None if the concept could not be resolved
     """
     # Check if it's a native concept
     if NativeConceptCode.is_native_concept_ref_or_code(concept_spec):
@@ -198,12 +198,9 @@ def _resolve_concept_code(
     if concept_spec in local_lookup:
         return local_lookup[concept_spec]
 
-    # Unresolved: create a ConceptId with domain-qualified ref and log warning
+    # Unresolved: log warning and return None to exclude from the graph
     log.warning(f"Could not resolve concept '{concept_spec}' in package {package_address}, domain {domain_code}")
-    return ConceptId(
-        package_address=package_address,
-        concept_ref=f"{domain_code}.{concept_spec}",
-    )
+    return None
 
 
 def _build_pipe_nodes(
@@ -211,7 +208,11 @@ def _build_pipe_nodes(
     graph: KnowHowGraph,
     package_concept_lookup: dict[str, dict[str, ConceptId]],
 ) -> None:
-    """Create PipeNodes with resolved concept identities."""
+    """Create PipeNodes with resolved concept identities.
+
+    Pipes with unresolvable output or input concepts are excluded from the
+    graph rather than creating dangling references.
+    """
     for address, pipe_sig in index.all_pipes():
         output_concept_id = _resolve_concept_code(
             concept_spec=pipe_sig.output_spec,
@@ -219,15 +220,27 @@ def _build_pipe_nodes(
             domain_code=pipe_sig.domain_code,
             package_concept_lookup=package_concept_lookup,
         )
+        if output_concept_id is None:
+            log.warning(f"Excluding pipe '{pipe_sig.pipe_code}' from graph: unresolvable output concept '{pipe_sig.output_spec}'")
+            continue
 
         input_concept_ids: dict[str, ConceptId] = {}
+        has_unresolvable_input = False
         for param_name, input_spec in pipe_sig.input_specs.items():
-            input_concept_ids[param_name] = _resolve_concept_code(
+            resolved_input = _resolve_concept_code(
                 concept_spec=input_spec,
                 package_address=address,
                 domain_code=pipe_sig.domain_code,
                 package_concept_lookup=package_concept_lookup,
             )
+            if resolved_input is None:
+                log.warning(f"Excluding pipe '{pipe_sig.pipe_code}' from graph: unresolvable input concept '{input_spec}' for param '{param_name}'")
+                has_unresolvable_input = True
+                break
+            input_concept_ids[param_name] = resolved_input
+
+        if has_unresolvable_input:
+            continue
 
         pipe_node = PipeNode(
             package_address=address,

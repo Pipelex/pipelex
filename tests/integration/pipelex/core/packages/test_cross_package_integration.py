@@ -45,6 +45,7 @@ class TestCrossPackageIntegration:
         assert dep.manifest is not None
         assert dep.manifest.address == "github.com/mthds/scoring-lib"
         assert len(dep.mthds_files) >= 1
+        assert dep.exported_pipe_codes is not None
         assert "pkg_test_compute_score" in dep.exported_pipe_codes
 
     def test_scoring_dep_manifest_parsed_correctly(self):

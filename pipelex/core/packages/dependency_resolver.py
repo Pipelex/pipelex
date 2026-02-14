@@ -31,7 +31,7 @@ class ResolvedDependency(BaseModel):
     manifest: MthdsPackageManifest | None
     package_root: Path
     mthds_files: list[Path]
-    exported_pipe_codes: set[str]
+    exported_pipe_codes: set[str] | None
 
 
 def collect_mthds_files(directory: Path) -> list[Path]:
@@ -46,20 +46,26 @@ def collect_mthds_files(directory: Path) -> list[Path]:
     return sorted(directory.rglob("*.mthds"))
 
 
-def determine_exported_pipes(manifest: MthdsPackageManifest | None) -> set[str]:
+def determine_exported_pipes(manifest: MthdsPackageManifest | None) -> set[str] | None:
     """Determine which pipes are exported by a dependency.
 
-    If a manifest with exports exists, use the exports. Otherwise all pipes are public.
+    Returns None when all pipes should be public (no manifest, or manifest
+    without an ``[[exports]]`` section). Returns a set of pipe codes when
+    the manifest explicitly declares exports (the set may be empty if
+    export entries list no pipes, meaning only ``main_pipe`` is public).
 
     Args:
         manifest: The dependency's manifest (if any)
 
     Returns:
-        Set of exported pipe codes. Empty set means "all public" (no manifest).
+        None if all pipes are public, or the set of explicitly exported pipe codes.
     """
     if manifest is None:
-        # No manifest -> all pipes are public (empty set signals "all")
-        return set()
+        return None
+
+    # No exports section in manifest -> all pipes are public
+    if not manifest.exports:
+        return None
 
     exported: set[str] = set()
     for domain_export in manifest.exports:
@@ -129,7 +135,8 @@ def resolve_local_dependencies(
                 exported_pipe_codes=exported_pipe_codes,
             )
         )
-        log.verbose(f"Resolved dependency '{dep.alias}': {len(mthds_files)} .mthds files, {len(exported_pipe_codes)} exported pipes")
+        export_count = len(exported_pipe_codes) if exported_pipe_codes is not None else "all"
+        log.verbose(f"Resolved dependency '{dep.alias}': {len(mthds_files)} .mthds files, {export_count} exported pipes")
 
     return resolved
 
@@ -407,7 +414,7 @@ def _resolve_transitive_tree(
 
             # Diamond: re-resolve with all constraints
             override_url = (fetch_url_overrides or {}).get(dep.address)
-            resolved_map[dep.address] = _resolve_with_multiple_constraints(
+            re_resolved = _resolve_with_multiple_constraints(
                 address=dep.address,
                 alias=dep.alias,
                 constraints=constraints_by_address[dep.address],
@@ -415,6 +422,26 @@ def _resolve_transitive_tree(
                 cache_root=cache_root,
                 fetch_url_override=override_url,
             )
+            resolved_map[dep.address] = re_resolved
+
+            # Recurse into sub-dependencies of the re-resolved version,
+            # which may differ from the previously resolved version
+            if re_resolved.manifest is not None and re_resolved.manifest.dependencies:
+                remote_sub_deps = [sub for sub in re_resolved.manifest.dependencies if sub.path is None]
+                if remote_sub_deps:
+                    resolution_stack.add(dep.address)
+                    try:
+                        _resolve_transitive_tree(
+                            deps=remote_sub_deps,
+                            resolution_stack=resolution_stack,
+                            resolved_map=resolved_map,
+                            constraints_by_address=constraints_by_address,
+                            tags_cache=tags_cache,
+                            cache_root=cache_root,
+                            fetch_url_overrides=fetch_url_overrides,
+                        )
+                    finally:
+                        resolution_stack.discard(dep.address)
             continue
 
         # Normal resolve
@@ -487,10 +514,9 @@ def resolve_all_dependencies(
         if dep.path is not None:
             resolved_dep = _resolve_local_dependency(dep, package_root)
             local_resolved.append(resolved_dep)
+            local_export_count = len(resolved_dep.exported_pipe_codes) if resolved_dep.exported_pipe_codes is not None else "all"
             log.verbose(
-                f"Resolved local dependency '{resolved_dep.alias}': "
-                f"{len(resolved_dep.mthds_files)} .mthds files, "
-                f"{len(resolved_dep.exported_pipe_codes)} exported pipes"
+                f"Resolved local dependency '{resolved_dep.alias}': {len(resolved_dep.mthds_files)} .mthds files, {local_export_count} exported pipes"
             )
         else:
             remote_deps.append(dep)
@@ -513,10 +539,9 @@ def resolve_all_dependencies(
         )
 
     for resolved_dep in resolved_map.values():
+        remote_export_count = len(resolved_dep.exported_pipe_codes) if resolved_dep.exported_pipe_codes is not None else "all"
         log.verbose(
-            f"Resolved remote dependency '{resolved_dep.alias}': "
-            f"{len(resolved_dep.mthds_files)} .mthds files, "
-            f"{len(resolved_dep.exported_pipe_codes)} exported pipes"
+            f"Resolved remote dependency '{resolved_dep.alias}': {len(resolved_dep.mthds_files)} .mthds files, {remote_export_count} exported pipes"
         )
 
     return local_resolved + list(resolved_map.values())

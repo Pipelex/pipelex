@@ -223,17 +223,17 @@ def _build_concept_entry(
 
 def _is_pipe_exported(
     pipe_code: str,
-    exported_pipe_codes: set[str],
+    exported_pipe_codes: set[str] | None,
     main_pipe: str | None,
 ) -> bool:
     """Determine if a pipe is exported.
 
     A pipe is exported if:
-    - exported_pipe_codes is empty (no manifest or no exports = all public)
+    - exported_pipe_codes is None (no manifest = all public)
     - pipe_code is in the exported set
     - pipe_code is the main_pipe (auto-exported)
     """
-    if not exported_pipe_codes:
+    if exported_pipe_codes is None:
         return True
     return pipe_code in exported_pipe_codes or pipe_code == main_pipe
 

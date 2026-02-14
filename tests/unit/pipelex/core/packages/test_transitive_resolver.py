@@ -41,7 +41,7 @@ def _make_resolved(
         manifest=manifest,
         package_root=pkg_dir,
         mthds_files=[],
-        exported_pipe_codes=set(),
+        exported_pipe_codes=None,
     )
 
 
@@ -298,6 +298,109 @@ sub_dep = { address = "github.com/org/sub_dep", version = "^1.0.0" }
         result = resolve_all_dependencies(manifest_a, tmp_path)
         assert len(result) == 1
         assert result[0].alias == "local_pkg"
+
+    def test_diamond_re_resolve_recurses_into_new_sub_deps(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """When diamond re-resolution picks a new version, its sub-deps are resolved."""
+        # D v1.2.0 has sub-dep E (which D v1.0.0 did not have)
+        manifest_e = _make_manifest("github.com/org/pkg_e", "1.0.0")
+        manifest_d_v1 = _make_manifest("github.com/org/pkg_d", "1.0.0")
+        manifest_d_v1_2 = _make_manifest(
+            "github.com/org/pkg_d",
+            "1.2.0",
+            dependencies=[
+                PackageDependency(address="github.com/org/pkg_e", version="^1.0.0", alias="pkg_e"),
+            ],
+        )
+        manifest_b = _make_manifest(
+            "github.com/org/pkg_b",
+            "1.0.0",
+            dependencies=[
+                PackageDependency(address="github.com/org/pkg_d", version="^1.0.0", alias="pkg_d"),
+            ],
+        )
+        manifest_c = _make_manifest(
+            "github.com/org/pkg_c",
+            "1.0.0",
+            dependencies=[
+                PackageDependency(address="github.com/org/pkg_d", version="^1.1.0", alias="pkg_d"),
+            ],
+        )
+
+        resolved_b = _make_resolved("pkg_b", "github.com/org/pkg_b", manifest_b, tmp_path)
+        resolved_c = _make_resolved("pkg_c", "github.com/org/pkg_c", manifest_c, tmp_path)
+        resolved_d_v1 = _make_resolved("pkg_d", "github.com/org/pkg_d", manifest_d_v1, tmp_path)
+        resolved_e = _make_resolved("pkg_e", "github.com/org/pkg_e", manifest_e, tmp_path)
+
+        def mock_resolve_remote(dep: PackageDependency, **_kwargs: object) -> ResolvedDependency:
+            if dep.address == "github.com/org/pkg_b":
+                return resolved_b
+            if dep.address == "github.com/org/pkg_c":
+                return resolved_c
+            if dep.address == "github.com/org/pkg_d":
+                return resolved_d_v1
+            if dep.address == "github.com/org/pkg_e":
+                return resolved_e
+            msg = f"Unexpected address: {dep.address}"
+            raise AssertionError(msg)
+
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.resolve_remote_dependency",
+            side_effect=mock_resolve_remote,
+        )
+
+        # First encounter of D: v1.0.0 satisfies ^1.0.0 but NOT ^1.1.0
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.version_satisfies",
+            return_value=False,
+        )
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.parse_constraint",
+            return_value=mocker.MagicMock(),
+        )
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.parse_version",
+            return_value=Version("1.0.0"),
+        )
+
+        # Diamond re-resolution picks D v1.2.0
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.list_remote_version_tags",
+            return_value=[(Version("1.0.0"), "v1.0.0"), (Version("1.2.0"), "v1.2.0")],
+        )
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.select_minimum_version_for_multiple_constraints",
+            return_value=Version("1.2.0"),
+        )
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.is_cached",
+            return_value=True,
+        )
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.get_cached_package_path",
+            return_value=tmp_path / "pkg_d",
+        )
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver._find_manifest_in_dir",
+            return_value=manifest_d_v1_2,
+        )
+        mocker.patch(
+            "pipelex.core.packages.dependency_resolver.collect_mthds_files",
+            return_value=[],
+        )
+
+        manifest_a = _make_manifest(
+            "github.com/org/pkg_a",
+            "1.0.0",
+            dependencies=[
+                PackageDependency(address="github.com/org/pkg_b", version="^1.0.0", alias="pkg_b"),
+                PackageDependency(address="github.com/org/pkg_c", version="^1.0.0", alias="pkg_c"),
+            ],
+        )
+
+        result = resolve_all_dependencies(manifest_a, tmp_path)
+        addresses = {dep.address for dep in result}
+        # E should be resolved as a sub-dep of the re-resolved D v1.2.0
+        assert "github.com/org/pkg_e" in addresses
 
     def test_dedup_same_address(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """Multiple paths to same address: resolved only once."""

@@ -25,6 +25,7 @@ SCORING_LIB_ADDRESS = "github.com/pkg_test/scoring-lib"
 REFINING_APP_ADDRESS = "github.com/pkg_test/refining-app"
 LEGAL_TOOLS_ADDRESS = "github.com/pkg_test/legal-tools"
 ANALYTICS_LIB_ADDRESS = "github.com/pkg_test/analytics-lib"
+PHANTOM_PKG_ADDRESS = "github.com/pkg_test/phantom-pkg"
 
 
 def make_test_package_index() -> PackageIndex:
@@ -155,5 +156,64 @@ def make_test_package_index() -> PackageIndex:
         ],
     )
     index.add_entry(analytics_lib)
+
+    return index
+
+
+def make_test_package_index_with_unresolvable_concepts() -> PackageIndex:
+    """Build a PackageIndex containing pipes with unresolvable concept references.
+
+    Creates a package with:
+    - One valid concept (PkgTestValidConcept)
+    - One pipe with a valid output concept (pkg_test_valid_pipe)
+    - One pipe whose output references a nonexistent concept (pkg_test_bad_output_pipe)
+    - One pipe whose input references a nonexistent concept (pkg_test_bad_input_pipe)
+    """
+    index = PackageIndex()
+
+    phantom_pkg = PackageIndexEntry(
+        address=PHANTOM_PKG_ADDRESS,
+        version="1.0.0",
+        description="Package with unresolvable concept references",
+        domains=[DomainEntry(domain_code="pkg_test_phantom")],
+        concepts=[
+            ConceptEntry(
+                concept_code="PkgTestValidConcept",
+                domain_code="pkg_test_phantom",
+                concept_ref="pkg_test_phantom.PkgTestValidConcept",
+                description="A valid concept",
+            ),
+        ],
+        pipes=[
+            PipeSignature(
+                pipe_code="pkg_test_valid_pipe",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_phantom",
+                description="Valid pipe with resolvable concepts",
+                input_specs={"text": "Text"},
+                output_spec="PkgTestValidConcept",
+                is_exported=True,
+            ),
+            PipeSignature(
+                pipe_code="pkg_test_bad_output_pipe",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_phantom",
+                description="Pipe with unresolvable output concept",
+                input_specs={"text": "Text"},
+                output_spec="NonExistentOutputConcept",
+                is_exported=True,
+            ),
+            PipeSignature(
+                pipe_code="pkg_test_bad_input_pipe",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_phantom",
+                description="Pipe with unresolvable input concept",
+                input_specs={"data": "NonExistentInputConcept"},
+                output_spec="PkgTestValidConcept",
+                is_exported=True,
+            ),
+        ],
+    )
+    index.add_entry(phantom_pkg)
 
     return index
