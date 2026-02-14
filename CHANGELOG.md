@@ -1,4 +1,9 @@
-# Changelog
+## [v0.17.6] - 2026-02-14
+
+### Added
+
+- **Claude Code GitHub Actions**: Added `claude.yml` workflow for interactive Claude Code assistance on issues and PR comments, and `claude-code-review.yml` workflow for automated code review on pull requests.
+
 
 ## [v0.17.5] - 2026-01-16
 
