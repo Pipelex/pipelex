@@ -350,8 +350,14 @@ def _check_git(manifest: MthdsPackageManifest, package_root: Path) -> list[Publi
                 )
             )
     except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        # Already warned about git issues above
-        pass
+        issues.append(
+            PublishValidationIssue(
+                level=IssueLevel.WARNING,
+                category=IssueCategory.GIT,
+                message=f"Could not verify whether git tag '{version_tag}' already exists",
+                suggestion="Manually check existing tags with `git tag -l` before publishing",
+            )
+        )
 
     return issues
 

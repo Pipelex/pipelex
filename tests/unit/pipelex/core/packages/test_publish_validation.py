@@ -1,6 +1,10 @@
 import shutil
+import subprocess  # noqa: S404
 import textwrap
 from pathlib import Path
+from unittest.mock import MagicMock
+
+from pytest_mock import MockerFixture
 
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
 from pipelex.core.packages.publish_validation import (
@@ -254,3 +258,30 @@ class TestPublishValidation:
         warning_messages = {issue.message for issue in manifest_warnings}
         assert any("authors" in msg.lower() for msg in warning_messages)
         assert any("license" in msg.lower() for msg in warning_messages)
+
+    def test_git_tag_check_failure_emits_warning(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """When git status succeeds but git tag -l fails, a GIT warning is emitted."""
+        src_dir = PACKAGES_DATA_DIR / "minimal_package"
+        pkg_dir = tmp_path / "tag_fail"
+        shutil.copytree(src_dir, pkg_dir)
+
+        # git status --porcelain succeeds with clean output, git tag -l raises
+        status_result = MagicMock()
+        status_result.stdout = ""
+
+        def side_effect_run(cmd: list[str], **kwargs: object) -> MagicMock:  # noqa: ARG001
+            if "status" in cmd:
+                return status_result
+            if "tag" in cmd:
+                raise subprocess.CalledProcessError(128, "git tag -l")
+            return MagicMock(stdout="")
+
+        mocker.patch("pipelex.core.packages.publish_validation.subprocess.run", side_effect=side_effect_run)
+
+        result = validate_for_publish(pkg_dir, check_git=True)
+
+        git_issues = _issues_by_category(result, IssueCategory.GIT)
+        assert len(git_issues) >= 1
+        tag_warnings = [issue for issue in git_issues if "tag" in issue.message.lower()]
+        assert len(tag_warnings) == 1
+        assert tag_warnings[0].level.is_warning
