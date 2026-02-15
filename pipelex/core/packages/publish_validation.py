@@ -75,6 +75,7 @@ class PublishValidationResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     issues: list[PublishValidationIssue] = Field(default_factory=empty_list_factory_of(PublishValidationIssue))
+    package_version: str | None = None
 
     @property
     def is_publishable(self) -> bool:
@@ -386,7 +387,7 @@ def validate_for_publish(package_root: Path, check_git: bool = True) -> PublishV
     all_issues.extend(manifest_issues)
 
     if manifest is None:
-        return PublishValidationResult(issues=all_issues)
+        return PublishValidationResult(issues=all_issues, package_version=None)
 
     # 2-6. Check manifest fields
     all_issues.extend(_check_manifest_fields(manifest))
@@ -412,4 +413,4 @@ def validate_for_publish(package_root: Path, check_git: bool = True) -> PublishV
     if check_git:
         all_issues.extend(_check_git(manifest, package_root))
 
-    return PublishValidationResult(issues=all_issues)
+    return PublishValidationResult(issues=all_issues, package_version=manifest.version)

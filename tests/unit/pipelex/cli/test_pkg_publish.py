@@ -104,6 +104,75 @@ class TestPkgPublish:
         )
         assert "v0.1.0" in result.stdout
 
+    def test_publish_tag_does_not_reparse_manifest(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Tag creation uses version from validation result, not by re-reading METHODS.toml.
+
+        Regression test: previously _create_git_tag re-parsed METHODS.toml, which could
+        raise unhandled ManifestParseError/ManifestValidationError if the file was
+        modified or corrupted between validation and tagging.
+        """
+        src_dir = PACKAGES_DATA_DIR / "minimal_package"
+        pkg_dir = tmp_path / "reparse_check"
+        shutil.copytree(src_dir, pkg_dir)
+
+        manifest_content = textwrap.dedent("""\
+            [package]
+            address = "github.com/pipelexlab/minimal"
+            version = "0.2.0"
+            description = "A minimal MTHDS package"
+            authors = ["Test"]
+            license = "MIT"
+        """)
+        (pkg_dir / MANIFEST_FILENAME).write_text(manifest_content, encoding="utf-8")
+
+        # Initialize a git repo so tagging works
+        subprocess.run(["git", "init"], cwd=pkg_dir, capture_output=True, check=True)  # noqa: S607
+        subprocess.run(["git", "add", "."], cwd=pkg_dir, capture_output=True, check=True)  # noqa: S607
+        subprocess.run(
+            ["git", "commit", "-m", "initial"],  # noqa: S607
+            cwd=pkg_dir,
+            capture_output=True,
+            check=True,
+            env={
+                **os.environ,
+                "GIT_AUTHOR_NAME": "Test",
+                "GIT_AUTHOR_EMAIL": "test@test.com",
+                "GIT_COMMITTER_NAME": "Test",
+                "GIT_COMMITTER_EMAIL": "test@test.com",
+                "HOME": str(tmp_path),
+            },
+        )
+
+        monkeypatch.chdir(pkg_dir)
+
+        # Delete METHODS.toml after validation would have parsed it.
+        # Old code re-read it here and would crash; new code uses the cached version.
+        original_validate = validate_for_publish
+
+        def validate_then_delete(package_root: Path, check_git: bool = True) -> PublishValidationResult:
+            _ = check_git
+            result = original_validate(package_root, check_git=False)
+            (package_root / MANIFEST_FILENAME).unlink()
+            return result
+
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.publish_cmd.validate_for_publish",
+            validate_then_delete,
+        )
+
+        # Should not raise — version comes from validation result, not re-parsed file
+        do_pkg_publish(tag=True)
+
+        # Verify tag was created with the correct version
+        result = subprocess.run(
+            ["git", "tag", "-l", "v0.2.0"],  # noqa: S607
+            cwd=pkg_dir,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert "v0.2.0" in result.stdout
+
     def test_publish_with_warnings_still_succeeds(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """minimal_package (no authors/license) -> warnings but no exit."""
         src_dir = PACKAGES_DATA_DIR / "minimal_package"

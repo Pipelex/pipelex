@@ -215,6 +215,23 @@ class TestPublishValidation:
         git_issues = _issues_by_category(result, IssueCategory.GIT)
         assert not git_issues
 
+    def test_result_includes_package_version_on_success(self, tmp_path: Path) -> None:
+        """Successful validation populates package_version from the parsed manifest."""
+        src_dir = PACKAGES_DATA_DIR / "minimal_package"
+        pkg_dir = tmp_path / "version_check"
+        shutil.copytree(src_dir, pkg_dir)
+
+        result = validate_for_publish(pkg_dir, check_git=False)
+
+        assert result.package_version is not None
+        assert result.package_version == "0.1.0"
+
+    def test_result_has_no_package_version_when_manifest_missing(self, tmp_path: Path) -> None:
+        """Missing manifest -> package_version is None."""
+        result = validate_for_publish(tmp_path, check_git=False)
+
+        assert result.package_version is None
+
     def test_manifest_field_checks_produce_no_errors(self, tmp_path: Path) -> None:
         """Manifest field checks only produce warnings (authors/license), never errors.
 
