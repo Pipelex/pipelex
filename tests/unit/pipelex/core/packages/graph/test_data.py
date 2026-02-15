@@ -27,6 +27,7 @@ LEGAL_TOOLS_ADDRESS = "github.com/pkg_test/legal-tools"
 ANALYTICS_LIB_ADDRESS = "github.com/pkg_test/analytics-lib"
 PHANTOM_PKG_ADDRESS = "github.com/pkg_test/phantom-pkg"
 QUALIFIED_REF_ADDRESS = "github.com/pkg_test/qualified-ref-pkg"
+MALFORMED_REF_ADDRESS = "github.com/pkg_test/malformed-ref-pkg"
 
 
 def make_test_package_index() -> PackageIndex:
@@ -311,5 +312,79 @@ def make_test_package_index_with_qualified_concept_specs() -> PackageIndex:
         dependency_aliases={"scoring_dep": SCORING_LIB_ADDRESS},
     )
     index.add_entry(qualified_ref_pkg)
+
+    return index
+
+
+def make_test_package_index_with_malformed_cross_package_ref() -> PackageIndex:
+    """Build a PackageIndex with a pipe whose cross-package remainder is malformed.
+
+    Creates a package with:
+    - One valid concept (PkgTestValidConcept)
+    - One valid pipe (pkg_test_valid_pipe) that uses bare concept codes
+    - One pipe (pkg_test_malformed_ref_pipe) whose output spec is a cross-package ref
+      with a malformed remainder (e.g. "scoring_dep->..BadRef") that would cause
+      QualifiedRefError if not caught
+    - scoring-lib as a dependency so the alias resolves
+    """
+    index = PackageIndex()
+
+    # scoring-lib (dependency)
+    scoring_lib = PackageIndexEntry(
+        address=SCORING_LIB_ADDRESS,
+        version="1.0.0",
+        description="Scoring library",
+        domains=[DomainEntry(domain_code="pkg_test_scoring_dep")],
+        concepts=[
+            ConceptEntry(
+                concept_code="PkgTestWeightedScore",
+                domain_code="pkg_test_scoring_dep",
+                concept_ref="pkg_test_scoring_dep.PkgTestWeightedScore",
+                description="A weighted score",
+            ),
+        ],
+        pipes=[],
+    )
+    index.add_entry(scoring_lib)
+
+    malformed_pkg = PackageIndexEntry(
+        address=MALFORMED_REF_ADDRESS,
+        version="1.0.0",
+        description="Package with malformed cross-package refs",
+        domains=[DomainEntry(domain_code="pkg_test_malformed")],
+        concepts=[
+            ConceptEntry(
+                concept_code="PkgTestValidConcept",
+                domain_code="pkg_test_malformed",
+                concept_ref="pkg_test_malformed.PkgTestValidConcept",
+                description="A valid concept",
+            ),
+        ],
+        pipes=[
+            # Valid pipe — should survive even if sibling has malformed ref
+            PipeSignature(
+                pipe_code="pkg_test_valid_pipe",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_malformed",
+                description="Valid pipe with resolvable concepts",
+                input_specs={"text": "Text"},
+                output_spec="PkgTestValidConcept",
+                is_exported=True,
+            ),
+            # Malformed cross-package ref: remainder starts with ".."
+            PipeSignature(
+                pipe_code="pkg_test_malformed_ref_pipe",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_malformed",
+                description="Pipe with malformed cross-package remainder",
+                input_specs={"text": "Text"},
+                output_spec="scoring_dep->..BadRef",
+                is_exported=True,
+            ),
+        ],
+        dependencies=[SCORING_LIB_ADDRESS],
+        dependency_aliases={"scoring_dep": SCORING_LIB_ADDRESS},
+    )
+    index.add_entry(malformed_pkg)
 
     return index

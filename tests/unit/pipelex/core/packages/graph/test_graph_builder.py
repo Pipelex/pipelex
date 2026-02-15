@@ -8,11 +8,13 @@ from pipelex.core.packages.index.models import PackageIndex
 from tests.unit.pipelex.core.packages.graph.test_data import (
     ANALYTICS_LIB_ADDRESS,
     LEGAL_TOOLS_ADDRESS,
+    MALFORMED_REF_ADDRESS,
     PHANTOM_PKG_ADDRESS,
     QUALIFIED_REF_ADDRESS,
     REFINING_APP_ADDRESS,
     SCORING_LIB_ADDRESS,
     make_test_package_index,
+    make_test_package_index_with_malformed_cross_package_ref,
     make_test_package_index_with_qualified_concept_specs,
     make_test_package_index_with_unresolvable_concepts,
 )
@@ -275,3 +277,23 @@ class TestGraphBuilder:
             f"{QUALIFIED_REF_ADDRESS}::pkg_test_forward_score",
         }
         assert set(graph.pipe_nodes.keys()) == expected_pipes
+
+    def test_malformed_cross_package_ref_excluded_without_crash(self) -> None:
+        """Malformed cross-package remainder is excluded gracefully, not raising."""
+        index = make_test_package_index_with_malformed_cross_package_ref()
+        # This must not raise QualifiedRefError
+        graph = build_know_how_graph(index)
+
+        # The malformed pipe should be excluded
+        bad_key = f"{MALFORMED_REF_ADDRESS}::pkg_test_malformed_ref_pipe"
+        assert graph.get_pipe_node(bad_key) is None
+
+    def test_valid_pipe_survives_malformed_sibling(self) -> None:
+        """Valid pipe in same package is still included when sibling has malformed ref."""
+        index = make_test_package_index_with_malformed_cross_package_ref()
+        graph = build_know_how_graph(index)
+
+        valid_key = f"{MALFORMED_REF_ADDRESS}::pkg_test_valid_pipe"
+        pipe_node = graph.get_pipe_node(valid_key)
+        assert pipe_node is not None
+        assert pipe_node.output_concept_id.package_address == MALFORMED_REF_ADDRESS

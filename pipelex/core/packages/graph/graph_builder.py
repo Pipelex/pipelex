@@ -16,7 +16,7 @@ from pipelex.core.packages.graph.models import (
     PipeNode,
 )
 from pipelex.core.packages.index.models import PackageIndex
-from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 
 
 def build_know_how_graph(index: PackageIndex) -> KnowHowGraph:
@@ -251,7 +251,11 @@ def _resolve_cross_package_concept(
     target_lookup = package_concept_lookup.get(resolved_address, {})
 
     # Try by bare concept code (last segment of remainder)
-    ref = QualifiedRef.parse(remainder)
+    try:
+        ref = QualifiedRef.parse(remainder)
+    except QualifiedRefError:
+        log.warning(f"Malformed cross-package concept spec '{concept_spec}': remainder '{remainder}' is not a valid reference")
+        return None
     if ref.local_code in target_lookup:
         return target_lookup[ref.local_code]
 
