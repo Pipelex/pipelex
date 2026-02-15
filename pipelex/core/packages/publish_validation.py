@@ -7,21 +7,16 @@ lock file freshness, and git tag readiness.
 
 import subprocess  # noqa: S404
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from pipelex import log
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.packages.bundle_scanner import scan_bundles_for_domain_info
-
-if TYPE_CHECKING:
-    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.packages.dependency_resolver import collect_mthds_files
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
 from pipelex.core.packages.exceptions import ManifestError, PublishValidationError
 from pipelex.core.packages.lock_file import LOCK_FILENAME, parse_lock_file
-from pipelex.core.packages.manifest import MthdsPackageManifest, is_valid_address, is_valid_semver
+from pipelex.core.packages.manifest import MthdsPackageManifest
 from pipelex.core.packages.manifest_parser import parse_methods_toml
 from pipelex.core.packages.visibility import check_visibility_for_blueprints
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
@@ -109,38 +104,13 @@ def _check_manifest_exists(package_root: Path) -> tuple[MthdsPackageManifest | N
 
 
 def _check_manifest_fields(manifest: MthdsPackageManifest) -> list[PublishValidationIssue]:
-    """Check manifest field validity (address, version, description, authors, license)."""
+    """Check manifest field completeness (authors, license).
+
+    Note: address, version, and description are validated by Pydantic validators
+    in MthdsPackageManifest during parse_methods_toml(). If parsing succeeded,
+    those fields are guaranteed valid — no need to re-check here.
+    """
     issues: list[PublishValidationIssue] = []
-
-    if not is_valid_address(manifest.address):
-        issues.append(
-            PublishValidationIssue(
-                level=IssueLevel.ERROR,
-                category=IssueCategory.MANIFEST,
-                message=f"Invalid package address '{manifest.address}'",
-                suggestion="Address must follow hostname/path pattern (e.g. 'github.com/org/repo')",
-            )
-        )
-
-    if not is_valid_semver(manifest.version):
-        issues.append(
-            PublishValidationIssue(
-                level=IssueLevel.ERROR,
-                category=IssueCategory.MANIFEST,
-                message=f"Invalid version '{manifest.version}'",
-                suggestion="Version must be valid semver (e.g. '1.0.0')",
-            )
-        )
-
-    if not manifest.description.strip():
-        issues.append(
-            PublishValidationIssue(
-                level=IssueLevel.ERROR,
-                category=IssueCategory.MANIFEST,
-                message="Package description is empty",
-                suggestion="Add a meaningful description to [package] in METHODS.toml",
-            )
-        )
 
     if not manifest.authors:
         issues.append(
@@ -165,11 +135,13 @@ def _check_manifest_fields(manifest: MthdsPackageManifest) -> list[PublishValida
     return issues
 
 
-def _check_bundles(package_root: Path) -> tuple[dict[str, list[str]], list[PublishValidationIssue]]:
+def _check_bundles(
+    package_root: Path,
+) -> tuple[dict[str, list[str]], list[PipelexBundleBlueprint], list[PublishValidationIssue]]:
     """Check that .mthds files exist and parse without error.
 
     Returns:
-        Tuple of (domain_pipes mapping, list of issues)
+        Tuple of (domain_pipes mapping, parsed blueprints, list of issues)
     """
     issues: list[PublishValidationIssue] = []
 
@@ -183,9 +155,9 @@ def _check_bundles(package_root: Path) -> tuple[dict[str, list[str]], list[Publi
                 suggestion="Add at least one .mthds bundle file",
             )
         )
-        return {}, issues
+        return {}, [], issues
 
-    domain_pipes, _domain_main_pipes, scan_errors = scan_bundles_for_domain_info(mthds_files)
+    domain_pipes, _domain_main_pipes, blueprints, scan_errors = scan_bundles_for_domain_info(mthds_files)
 
     for error in scan_errors:
         issues.append(
@@ -196,7 +168,7 @@ def _check_bundles(package_root: Path) -> tuple[dict[str, list[str]], list[Publi
             )
         )
 
-    return domain_pipes, issues
+    return domain_pipes, blueprints, issues
 
 
 def _check_exports(manifest: MthdsPackageManifest, domain_pipes: dict[str, list[str]]) -> list[PublishValidationIssue]:
@@ -221,18 +193,9 @@ def _check_exports(manifest: MthdsPackageManifest, domain_pipes: dict[str, list[
     return issues
 
 
-def _check_visibility(manifest: MthdsPackageManifest, mthds_files: list[Path]) -> list[PublishValidationIssue]:
-    """Check cross-domain visibility rules."""
+def _check_visibility(manifest: MthdsPackageManifest, blueprints: list[PipelexBundleBlueprint]) -> list[PublishValidationIssue]:
+    """Check cross-domain visibility rules using already-parsed blueprints."""
     issues: list[PublishValidationIssue] = []
-    blueprints: list[PipelexBundleBlueprint] = []
-
-    for mthds_file in mthds_files:
-        try:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file)
-            blueprints.append(blueprint)
-        except Exception as exc:
-            log.debug(f"Skipping visibility check for {mthds_file}: {exc}")
-            continue
 
     visibility_errors = check_visibility_for_blueprints(manifest, blueprints)
     for vis_error in visibility_errors:
@@ -413,16 +376,15 @@ def validate_for_publish(package_root: Path, check_git: bool = True) -> PublishV
     all_issues.extend(_check_manifest_fields(manifest))
 
     # 7-8. Check bundles exist and parse
-    domain_pipes, bundle_issues = _check_bundles(package_root)
+    domain_pipes, blueprints, bundle_issues = _check_bundles(package_root)
     all_issues.extend(bundle_issues)
 
     # 9. Check exports consistency
     all_issues.extend(_check_exports(manifest, domain_pipes))
 
     # 10. Check visibility rules
-    mthds_files = collect_mthds_files(package_root)
-    if mthds_files:
-        all_issues.extend(_check_visibility(manifest, mthds_files))
+    if blueprints:
+        all_issues.extend(_check_visibility(manifest, blueprints))
 
     # 11. Check dependency pinning
     all_issues.extend(_check_dependencies(manifest))

@@ -32,7 +32,7 @@ def do_pkg_init(force: bool = False) -> None:
         raise typer.Exit(code=1)
 
     # Parse each bundle header to extract domain and main_pipe
-    domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(mthds_files)
+    domain_pipes, domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info(mthds_files)
 
     if errors:
         console.print("[yellow]Some files could not be parsed:[/yellow]")

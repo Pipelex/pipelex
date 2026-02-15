@@ -16,7 +16,7 @@ class TestBundleScanner:
         mthds_files = sorted(PACKAGES_DATA_DIR.joinpath("legal_tools").rglob("*.mthds"))
         assert len(mthds_files) >= 2, "Expected at least two .mthds fixtures"
 
-        domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(mthds_files)
+        domain_pipes, domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info(mthds_files)
 
         assert not errors
         assert "pkg_test_legal.contracts" in domain_pipes
@@ -32,17 +32,18 @@ class TestBundleScanner:
         bad_file = tmp_path / "broken.mthds"
         bad_file.write_text("[broken\n", encoding="utf-8")
 
-        _domain_pipes, _domain_main_pipes, errors = scan_bundles_for_domain_info([bad_file])
+        _domain_pipes, _domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info([bad_file])
 
         assert len(errors) == 1
         assert str(bad_file) in errors[0]
 
     def test_scan_bundles_handles_empty_input(self):
         """Passing no files returns empty results."""
-        domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info([])
+        domain_pipes, domain_main_pipes, blueprints, errors = scan_bundles_for_domain_info([])
 
         assert domain_pipes == {}
         assert domain_main_pipes == {}
+        assert blueprints == []
         assert errors == []
 
     def test_build_exports_main_pipe_first(self):
@@ -115,7 +116,7 @@ class TestBundleScanner:
             encoding="utf-8",
         )
 
-        _domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(
+        _domain_pipes, domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info(
             sorted([bundle_a, bundle_b]),
         )
 
@@ -154,7 +155,7 @@ class TestBundleScanner:
             encoding="utf-8",
         )
 
-        _domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(
+        _domain_pipes, domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info(
             sorted([bundle_a, bundle_b]),
         )
 

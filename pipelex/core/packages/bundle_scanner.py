@@ -1,13 +1,14 @@
 from collections.abc import Iterable
 from pathlib import Path
 
+from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.packages.manifest import DomainExports
 
 
 def scan_bundles_for_domain_info(
     mthds_files: Iterable[Path],
-) -> tuple[dict[str, list[str]], dict[str, str], list[str]]:
+) -> tuple[dict[str, list[str]], dict[str, str], list[PipelexBundleBlueprint], list[str]]:
     """Scan .mthds files and extract domain/pipe information from their headers.
 
     Iterates over the given bundle files, parses each blueprint to collect
@@ -17,13 +18,15 @@ def scan_bundles_for_domain_info(
         mthds_files: Paths to .mthds files to scan
 
     Returns:
-        A tuple of (domain_pipes, domain_main_pipes, errors) where:
+        A tuple of (domain_pipes, domain_main_pipes, blueprints, errors) where:
         - domain_pipes maps domain codes to their list of pipe codes
         - domain_main_pipes maps domain codes to their main_pipe code
+        - blueprints is a list of successfully parsed PipelexBundleBlueprint objects
         - errors is a list of "{path}: {exc}" strings for files that failed parsing
     """
     domain_pipes: dict[str, list[str]] = {}
     domain_main_pipes: dict[str, str] = {}
+    blueprints: list[PipelexBundleBlueprint] = []
     errors: list[str] = []
 
     for mthds_file in mthds_files:
@@ -32,6 +35,8 @@ def scan_bundles_for_domain_info(
         except Exception as exc:
             errors.append(f"{mthds_file}: {exc}")
             continue
+
+        blueprints.append(blueprint)
 
         domain = blueprint.domain
         if domain not in domain_pipes:
@@ -48,7 +53,7 @@ def scan_bundles_for_domain_info(
             else:
                 domain_main_pipes[domain] = blueprint.main_pipe
 
-    return domain_pipes, domain_main_pipes, errors
+    return domain_pipes, domain_main_pipes, blueprints, errors
 
 
 def build_domain_exports_from_scan(

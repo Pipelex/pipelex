@@ -943,7 +943,7 @@ def maybe_generate_manifest_for_output(output_dir: Path) -> Path | None:
         return None
 
     # Parse each bundle to extract domain and pipe info
-    domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(mthds_files)
+    domain_pipes, domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info(mthds_files)
     for error in errors:
         log.warning(f"Could not parse {error}")
 

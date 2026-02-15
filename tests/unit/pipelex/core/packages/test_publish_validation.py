@@ -207,3 +207,26 @@ class TestPublishValidation:
 
         git_issues = _issues_by_category(result, IssueCategory.GIT)
         assert not git_issues
+
+    def test_manifest_field_checks_produce_no_errors(self, tmp_path: Path) -> None:
+        """Manifest field checks only produce warnings (authors/license), never errors.
+
+        Address, version, and description are validated by Pydantic validators
+        during parsing. If the manifest parsed successfully, those fields are
+        guaranteed valid — the field checker should not re-check them.
+        """
+        src_dir = PACKAGES_DATA_DIR / "minimal_package"
+        pkg_dir = tmp_path / "manifest_fields"
+        shutil.copytree(src_dir, pkg_dir)
+
+        result = validate_for_publish(pkg_dir, check_git=False)
+
+        manifest_issues = _issues_by_category(result, IssueCategory.MANIFEST)
+        manifest_errors = [issue for issue in manifest_issues if issue.level == IssueLevel.ERROR]
+        assert not manifest_errors, f"Expected no MANIFEST errors, got: {manifest_errors}"
+        # minimal_package has no authors and no license -> exactly 2 warnings
+        manifest_warnings = [issue for issue in manifest_issues if issue.level == IssueLevel.WARNING]
+        assert len(manifest_warnings) == 2
+        warning_messages = {issue.message for issue in manifest_warnings}
+        assert any("authors" in msg.lower() for msg in warning_messages)
+        assert any("license" in msg.lower() for msg in warning_messages)
