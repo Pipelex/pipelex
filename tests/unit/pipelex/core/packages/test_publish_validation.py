@@ -297,3 +297,50 @@ class TestPublishValidation:
         manifest_errors = _issues_by_category(result, IssueCategory.MANIFEST)
         mthds_version_errors = [issue for issue in manifest_errors if "mthds_version" in issue.message]
         assert not mthds_version_errors
+
+    def test_unsatisfied_mthds_version_produces_warning(self, tmp_path: Path) -> None:
+        """Manifest with mthds_version targeting a future version should produce a WARNING."""
+        src_dir = PACKAGES_DATA_DIR / "minimal_package"
+        pkg_dir = tmp_path / "future_mthds_ver"
+        shutil.copytree(src_dir, pkg_dir)
+
+        manifest_content = textwrap.dedent("""\
+            [package]
+            address = "github.com/test/future-mthds"
+            version = "1.0.0"
+            description = "Future mthds_version test"
+            authors = ["Test"]
+            license = "MIT"
+            mthds_version = ">=99.0.0"
+        """)
+        (pkg_dir / MANIFEST_FILENAME).write_text(manifest_content, encoding="utf-8")
+
+        result = validate_for_publish(pkg_dir, check_git=False)
+
+        manifest_issues = _issues_by_category(result, IssueCategory.MANIFEST)
+        satisfiability_warnings = [issue for issue in manifest_issues if issue.level == IssueLevel.WARNING and "not satisfied" in issue.message]
+        assert len(satisfiability_warnings) == 1
+        assert "99.0.0" in satisfiability_warnings[0].message
+
+    def test_satisfied_mthds_version_no_warning(self, tmp_path: Path) -> None:
+        """Manifest with mthds_version satisfied by current version should produce no warning."""
+        src_dir = PACKAGES_DATA_DIR / "minimal_package"
+        pkg_dir = tmp_path / "satisfied_mthds_ver"
+        shutil.copytree(src_dir, pkg_dir)
+
+        manifest_content = textwrap.dedent("""\
+            [package]
+            address = "github.com/test/satisfied-mthds"
+            version = "1.0.0"
+            description = "Satisfied mthds_version test"
+            authors = ["Test"]
+            license = "MIT"
+            mthds_version = ">=1.0.0"
+        """)
+        (pkg_dir / MANIFEST_FILENAME).write_text(manifest_content, encoding="utf-8")
+
+        result = validate_for_publish(pkg_dir, check_git=False)
+
+        manifest_issues = _issues_by_category(result, IssueCategory.MANIFEST)
+        satisfiability_warnings = [issue for issue in manifest_issues if issue.level == IssueLevel.WARNING and "not satisfied" in issue.message]
+        assert not satisfiability_warnings

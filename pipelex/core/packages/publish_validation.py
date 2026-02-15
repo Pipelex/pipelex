@@ -16,10 +16,10 @@ from pipelex.core.packages.dependency_resolver import collect_mthds_files
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
 from pipelex.core.packages.exceptions import ManifestError, PublishValidationError
 from pipelex.core.packages.lock_file import LOCK_FILENAME, parse_lock_file
-from pipelex.core.packages.manifest import RESERVED_DOMAINS, MthdsPackageManifest, is_reserved_domain_path
+from pipelex.core.packages.manifest import MTHDS_STANDARD_VERSION, RESERVED_DOMAINS, MthdsPackageManifest, is_reserved_domain_path
 from pipelex.core.packages.manifest_parser import parse_methods_toml
 from pipelex.core.packages.visibility import check_visibility_for_blueprints
-from pipelex.tools.misc.semver import SemVerError, parse_constraint
+from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.types import StrEnum
 
@@ -137,12 +137,12 @@ def _check_manifest_fields(manifest: MthdsPackageManifest) -> list[PublishValida
 
 
 def _check_mthds_version(manifest: MthdsPackageManifest) -> list[PublishValidationIssue]:
-    """Check that mthds_version, if specified, is parseable by the semver engine."""
+    """Check that mthds_version, if specified, is parseable and satisfiable by the current standard version."""
     issues: list[PublishValidationIssue] = []
     if manifest.mthds_version is None:
         return issues
     try:
-        parse_constraint(manifest.mthds_version)
+        constraint = parse_constraint(manifest.mthds_version)
     except SemVerError:
         issues.append(
             PublishValidationIssue(
@@ -150,6 +150,22 @@ def _check_mthds_version(manifest: MthdsPackageManifest) -> list[PublishValidati
                 category=IssueCategory.MANIFEST,
                 message=f"mthds_version constraint '{manifest.mthds_version}' is not parseable by the semver engine",
                 suggestion="Use a valid version constraint (e.g. '1.0.0', '^1.0.0', '>=1.0.0')",
+            )
+        )
+        return issues
+
+    # Check satisfiability against the current MTHDS standard version
+    current_version = parse_version(MTHDS_STANDARD_VERSION)
+    if not version_satisfies(current_version, constraint):
+        issues.append(
+            PublishValidationIssue(
+                level=IssueLevel.WARNING,
+                category=IssueCategory.MANIFEST,
+                message=(
+                    f"mthds_version constraint '{manifest.mthds_version}' is not satisfied by "
+                    f"the current MTHDS standard version '{MTHDS_STANDARD_VERSION}'"
+                ),
+                suggestion="Verify this is intentional if targeting a future standard version",
             )
         )
     return issues

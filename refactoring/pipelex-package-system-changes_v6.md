@@ -10,20 +10,23 @@ This document maps the proposed MTHDS package system back to the current Pipelex
 
 ## 1. Summary of Changes
 
-| Category | Nature | Description |
-|----------|--------|-------------|
-| File extension | **Done** | `.mthds` (renamed from `.plx` in Phase 0) |
-| Terminology | **Done** | "method" terminology throughout docs and UI (renamed from "workflow" in Phase 0) |
-| Hierarchical domains | **Done** | Domains support `.`-separated hierarchy (e.g., `legal.contracts`) |
-| Pipe namespacing | **Done** | Pipes gain `domain_path.pipe_code` references, symmetric with concepts |
-| Package manifest | **Done** | `METHODS.toml` — identity, dependencies (parsed only), exports |
-| Visibility model | **Done** | Pipes are private by default when manifest exists, exported via `[exports]` |
-| CLI `pipelex pkg` | **Done** | `pipelex pkg init` (scaffold manifest), `pipelex pkg list` (display manifest) |
-| Lock file | **New artifact** | `methods.lock` — resolved dependency versions and checksums |
-| Dependency resolver | **Done (local)** | Resolves local `path` dependencies; fetches/caches/version-resolves from VCS in Phase 4 |
-| Cross-package references | **Done** | `alias->domain_path.pipe_code` and `alias->domain_path.ConceptCode` — parsing, validation, loading, runtime lookup |
-| CLI `pipelex pkg add` | **Done** | Add dependency to `METHODS.toml` with address, alias, version, optional path |
-| Bundle loading | **Done (local deps)** | Dependency packages loaded via local path; full package-aware resolver in Phase 4 |
+| Category | Description |
+|----------|-------------|
+| File extension | `.mthds` (renamed from `.plx` in Phase 0) |
+| Terminology | "method" terminology throughout docs and UI (renamed from "workflow" in Phase 0) |
+| Hierarchical domains | Domains support `.`-separated hierarchy (e.g., `legal.contracts`) |
+| Pipe namespacing | Pipes gain `domain_path.pipe_code` references, symmetric with concepts |
+| Package manifest | `METHODS.toml` — identity, dependencies, exports |
+| Visibility model | Pipes are private by default when manifest exists, exported via `[exports]` |
+| Lock file | `methods.lock` — resolved dependency versions and checksums |
+| Dependency resolver | Resolves local `path` dependencies and remote VCS dependencies with transitive resolution |
+| Cross-package references | `alias->domain_path.pipe_code` and `alias->domain_path.ConceptCode` — parsing, validation, loading, runtime lookup |
+| Bundle loading | Dependency packages loaded via local path or remote VCS, with per-package library isolation |
+| Reserved domain enforcement | `native`, `mthds`, `pipelex` domains enforced at manifest parse time, bundle load time, and publish validation |
+| `mthds_version` enforcement | Runtime warnings when constraint unsatisfied; publish validation checks parseability and satisfiability |
+| Type-compatible search | `pipelex pkg search --accepts`/`--produces` for type-aware pipe discovery |
+| Auto-composition | `pipelex pkg graph --compose` for pipe chain suggestions |
+| CLI `pipelex pkg` | Full command set: `init`, `list`, `add`, `install`, `update`, `lock`, `publish`, `index`, `search`, `inspect`, `graph` |
 
 ---
 
@@ -249,6 +252,8 @@ source = "https://github.com/mthds/scoring-lib"
 
 **Change**: Must accept `.`-separated hierarchical domain paths where each segment is `snake_case`. Must also handle package-qualified domain references (`alias->domain_path`).
 
+**Reserved domains**: `native`, `mthds`, `pipelex` are now enforced at three levels: manifest parse time (Pydantic validator rejects reserved domains in `[exports]`), bundle load time (`PackageVisibilityChecker.validate_reserved_domains()` in the visibility checker, including standalone bundles without a manifest), and publish validation (`_check_reserved_domains()` in `publish_validation.py`).
+
 ### 5.5 Builder (`pipelex/builder/`)
 
 **Current**: Generates `.mthds` bundles.
@@ -270,15 +275,19 @@ source = "https://github.com/mthds/scoring-lib"
 | `pipelex pkg init` | **Done** | Create a `METHODS.toml` in the current directory |
 | `pipelex pkg list` | **Done** | Show package info, dependencies, and exported pipes from the manifest |
 | `pipelex pkg add <address>` | **Done** | Add a dependency to the manifest (address, alias, version, optional path) |
-| `pipelex pkg install` | Phase 4 | Fetch and cache all dependencies from lock file |
-| `pipelex pkg update` | Phase 4 | Update dependencies to latest compatible versions |
-| `pipelex pkg lock` | Phase 4 | Regenerate the lock file |
-| `pipelex pkg publish` | Phase 5 | Validate and prepare a package for distribution |
+| `pipelex pkg install` | **Done** | Fetch and cache all dependencies from lock file |
+| `pipelex pkg update` | **Done** | Update dependencies to latest compatible versions |
+| `pipelex pkg lock` | **Done** | Regenerate the lock file |
+| `pipelex pkg publish` | **Done** | Validate and prepare a package for distribution (15 checks, `--tag` for git tagging) |
+| `pipelex pkg index` | **Done** | Build and display local package index (`--cache` for cached packages) |
+| `pipelex pkg search` | **Done** | Text search + type-compatible search (`--accepts`/`--produces` flags) |
+| `pipelex pkg inspect` | **Done** | Detailed view of a single package (domains, concepts, pipe signatures) |
+| `pipelex pkg graph` | **Done** | Know-how graph queries (`--from`/`--to`/`--check`/`--compose` flags) |
 
 **Existing commands impacted**:
-- `pipelex validate`: **Done (Phase 3)** — resolves local path dependencies and validates cross-package references during library loading. Unresolved cross-package refs (missing deps) are handled gracefully.
-- `pipelex run`: **Done (Phase 3)** — dependency packages are loaded into the runtime via `_load_dependency_packages()` in `library_manager.py`. Cross-package pipes and concepts are accessible at runtime.
-- `pipelex-agent build`: Phase 4+ — should be package-aware for cross-package pipe references
+- `pipelex validate`: **Done (Phase 3)** — resolves local and remote dependencies and validates cross-package references during library loading. Unresolved cross-package refs (missing deps) are handled gracefully. Reserved domain enforcement active at load time. Runtime `mthds_version` warning emitted when constraint unsatisfied (Phase 6B).
+- `pipelex run`: **Done (Phase 3)** — dependency packages are loaded into the runtime via `_load_dependency_packages()` in `library_manager.py`. Cross-package pipes and concepts are accessible at runtime. Same load-time guardrails as validate.
+- `pipelex-agent build`: Phase 8 — should be package-aware for cross-package pipe references
 
 ### 5.7 Pipe Blueprints (All Pipe Types)
 
@@ -328,8 +337,8 @@ Each phase gets its own implementation brief with decisions, grammar, acceptance
 | **3** | ~~Cross-package references (`alias->domain_path.name`) + local dependency resolution~~ | **COMPLETED** |
 | **4** | ~~Remote dependency resolution: VCS clone, version tag resolution (MVS), lock file (`methods.lock`), package cache (`~/.mthds/packages/`), transitive deps, per-package Library isolation, cross-package concept refinement, CLI `pkg install`/`update`/`lock`~~ | **COMPLETED** |
 | **5** | ~~Local-first package index, Know-How Graph model + query engine, CLI `pkg index`/`search`/`inspect`/`graph`/`publish`, publish validation~~ | **COMPLETED** |
-| **6** | Hardening + guardrails: reserved domain enforcement (`native`, `mthds`, `pipelex`), `mthds_version` standard version enforcement with runtime warnings and publish validation | Independent |
-| **7** | Type-aware search CLI (`--accepts`/`--produces` flags), auto-composition suggestions (`--compose` flag on `pkg graph`) | Phase 5B |
+| **6** | ~~Hardening + guardrails: reserved domain enforcement (`native`, `mthds`, `pipelex`) at manifest parse, bundle load (including standalone bundles), and publish time; `mthds_version` standard version enforcement with runtime warnings and publish satisfiability validation~~ | **COMPLETED** |
+| **7** | ~~Type-aware search CLI (`--accepts`/`--produces` flags), auto-composition suggestions (`--compose` flag on `pkg graph`)~~ | **COMPLETED** |
 | **8** | Builder package awareness: dependency signature catalog, LLM prompt context with dependency pipes, fix loop validates cross-package references against catalog | Phase 5A |
 | **9** | Registry specification + integration: normative API/crawling/search/distribution spec for external registry project, CLI `--registry` integration, `registry_client.py` | All prior phases |
 

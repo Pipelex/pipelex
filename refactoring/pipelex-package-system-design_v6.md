@@ -63,7 +63,7 @@ The domain remains valuable for **discovery**: searching the Know-How Graph for 
 - Domain names must be lowercase `snake_case` segments, optionally separated by `.` for hierarchy.
 - Each segment follows `snake_case` rules: `[a-z][a-z0-9_]*`.
 - Recommended depth: 1-3 levels. Recommended segment length: 1-4 words.
-- Reserved domains that cannot be used by packages: `native`, `mthds`, `pipelex`. (Note: currently not enforced by domain validation — the manifest parser is the right place to check this.)
+- Reserved domains that cannot be used by packages: `native`, `mthds`, `pipelex`. Enforcement is active at manifest parse time (Pydantic validator rejects reserved domains in `[exports]`), bundle load time (visibility checker, including standalone bundles without a manifest), and publish validation.
 
 ---
 

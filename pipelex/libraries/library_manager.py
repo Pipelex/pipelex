@@ -21,7 +21,7 @@ from pipelex.core.packages.dependency_resolver import ResolvedDependency, resolv
 from pipelex.core.packages.discovery import find_package_manifest
 from pipelex.core.packages.exceptions import DependencyResolveError, ManifestError
 from pipelex.core.packages.manifest import MTHDS_STANDARD_VERSION, MthdsPackageManifest
-from pipelex.core.packages.visibility import check_visibility_for_blueprints
+from pipelex.core.packages.visibility import PackageVisibilityChecker, check_visibility_for_blueprints
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -612,6 +612,14 @@ class LibraryManager(LibraryManagerAbstract):
             return None
 
         if manifest is None:
+            # Still enforce reserved domains even for standalone bundles
+            checker = PackageVisibilityChecker(manifest=None, bundles=blueprints)
+            reserved_errors = checker.validate_reserved_domains()
+            if reserved_errors:
+                error_messages = [err.message for err in reserved_errors]
+                joined_errors = "\n  - ".join(error_messages)
+                msg = f"Reserved domain violations found:\n  - {joined_errors}"
+                raise LibraryLoadingError(msg)
             return None
 
         visibility_errors = check_visibility_for_blueprints(manifest=manifest, blueprints=blueprints)
