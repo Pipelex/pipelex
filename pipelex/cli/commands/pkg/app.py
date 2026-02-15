@@ -160,9 +160,13 @@ def pkg_graph_cmd(
         bool,
         typer.Option("--cache", "-c", help="Use cached packages"),
     ] = False,
+    compose: Annotated[
+        bool,
+        typer.Option("--compose", help="Show MTHDS composition template (requires --from and --to)"),
+    ] = False,
 ) -> None:
     """Query the know-how graph for concept/pipe relationships."""
-    do_pkg_graph(from_concept=from_concept, to_concept=to_concept, check=check, max_depth=max_depth, cache=cache)
+    do_pkg_graph(from_concept=from_concept, to_concept=to_concept, check=check, max_depth=max_depth, cache=cache, compose=compose)
 
 
 @pkg_app.command("publish", help="Validate package readiness for distribution")

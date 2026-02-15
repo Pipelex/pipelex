@@ -219,22 +219,27 @@ Delivered:
 
 ## Phase 7: Type-Aware Search + Auto-Composition CLI
 
-### Phase 7A: Type-Compatible Search in CLI
+### Phase 7A: Type-Compatible Search in CLI — COMPLETED
 
-- **`--accepts <concept>` and `--produces <concept>` flags** on `pipelex pkg search`: Enable type-aware search from the command line. `--accepts` finds pipes that can consume a given concept; `--produces` finds pipes that output a given concept.
-- **Fuzzy concept resolution**: The CLI matches the user-supplied concept string (case-insensitive substring) across all indexed packages to resolve to `ConceptId`(s). If ambiguous, display all matches and let the user refine.
-- **Wraps existing query engine**: `--accepts` calls `query_what_can_i_do()` and `--produces` calls `query_what_produces()` from Phase 5B's `KnowHowQueryEngine`.
-- **Display**: Results appear in the same Rich table format as existing `pipelex pkg search` output (pipe code, type, domain, description, package address).
-- Files: `search_cmd.py`, `app.py`, tests
-- ~6–8 tests
+Delivered:
 
-### Phase 7B: Auto-Composition Suggestions
+- **`--accepts <concept>` and `--produces <concept>` flags** on `pipelex pkg search`: Enable type-aware search from the command line. `--accepts` finds pipes that can consume a given concept; `--produces` finds pipes that output a given concept. The `query` argument is now optional — users can run `pipelex pkg search --accepts Text` without a positional query.
+- **Fuzzy concept resolution** (`_resolve_concept_fuzzy()`): Collects candidates from native concepts (`NativeConceptCode` enum) and indexed concepts (`index.all_concepts()`), performs case-insensitive substring matching against concept_code and concept_ref. Exact-match priority: if any candidate's code or ref matches exactly (case-insensitive), only exact matches are returned — prevents `"Text"` from ambiguously matching `"TextAndImages"`. Returns list of `(ConceptId, concept_code)` tuples.
+- **Ambiguous concept display** (`_display_ambiguous_concepts()`): Rich table with Package, Concept Code, Concept Ref columns plus a hint to refine the query. Exits 1 when ambiguous.
+- **Wraps existing query engine**: `_handle_accepts_search()` calls `engine.query_what_can_i_do()` and `_handle_produces_search()` calls `engine.query_what_produces()` from Phase 5B's `KnowHowQueryEngine`. `_do_type_search()` builds the graph and creates the engine.
+- **Display** (`_display_type_search_pipes()`): Results appear in the same Rich table format as existing search output (Package, Pipe, Type, Domain, Description, Exported).
+- **Validation**: `do_pkg_search()` requires at least one of query/accepts/produces, else exits 1. Type search mode (accepts/produces) takes precedence over text search mode.
+- **7 new tests** monkeypatching `build_index_from_project` to return `make_test_package_index()` from Phase 5B's test data: accepts finds pipes (Text→all pipes), produces finds pipes (PkgTestContractClause→extract_clause), ambiguous concept exits (Score→3 matches), no concept found (nonexistent→message), no pipes produce (Dynamic→message), no args exits, exact match preferred (Text≠TextAndImages).
+- Files: `search_cmd.py`, `app.py`, `test_pkg_search.py`
 
-- **`--compose` flag** on `pipelex pkg graph`: Meaningful only with `--from` + `--to` (the "I have X, I need Y" query). When set, the command prints a human-readable MTHDS pipe sequence template showing the discovered chain steps, input/output wiring, and cross-package references.
-- **New `chain_formatter.py`** in `pipelex/core/packages/graph/`: `format_chain_as_mthds_snippet()` takes a list of `PipeNode`s (from `query_i_have_i_need()`) and produces a readable template. Advisory output only — not executable generation (that is builder territory).
-- **Output format**: A numbered step list with each pipe's package, domain, input concept(s), and output concept, plus `alias->domain.pipe_code` cross-package reference syntax where applicable.
-- Files: new `chain_formatter.py`, `graph_cmd.py`, `app.py`, tests
-- ~5–7 tests
+### Phase 7B: Auto-Composition Suggestions ✅
+
+- **`--compose` flag** on `pipelex pkg graph`: Meaningful only with `--from` + `--to` (the "I have X, I need Y" query). When set, the command prints a human-readable MTHDS pipe sequence template showing the discovered chain steps, input/output wiring, and cross-package references. Validates that both `--from` and `--to` are provided when `--compose` is set, exits 1 otherwise.
+- **New `chain_formatter.py`** in `pipelex/core/packages/graph/`: `format_chain_as_mthds_snippet(chain_pipes, from_concept, to_concept)` takes a list of resolved `PipeNode`s and produces a readable composition template. Helpers: `_format_concept_ref()`, `_format_step()`, `_is_cross_package_chain()`. Advisory output only — not executable generation (that is builder territory).
+- **Output format**: A "Composition:" header showing the concept flow (from -> intermediates -> to), followed by numbered steps listing each pipe's package address, domain, input concept(s), and output concept. When chains span multiple packages, appends a cross-package note about `alias->domain.pipe_code` syntax.
+- **CLI integration**: `do_pkg_graph()` gains `compose: bool` param; `_handle_from_to()` expanded with `graph` and `compose` args; new `_print_compose_output()` resolves node_keys to PipeNodes and formats each chain. Multiple chains are prefixed with "Chain N of M:".
+- Files: new `chain_formatter.py`, `graph_cmd.py`, `app.py`, new `test_chain_formatter.py`, `test_pkg_graph.py`
+- **7 new tests**: 5 in `test_chain_formatter.py` (single step, two-step same-package, cross-package, empty chain, header concept flow) + 2 in `test_pkg_graph.py` (compose without from/to exits, compose with from/to succeeds)
 
 ---
 
@@ -310,7 +315,7 @@ The registry is built by a separate team in a separate project (not Python-based
 
 ## Note on Client Project Brief
 
-`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–6B). Client projects can now:
+`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–7A). Client projects can now:
 - Use `.mthds` file extension and "method" terminology (Phase 0)
 - Use hierarchical domains and domain-qualified pipe references (Phase 1)
 - Create `METHODS.toml` manifests with `pipelex pkg init`, inspect with `pipelex pkg list` (Phase 2)
@@ -322,9 +327,9 @@ The registry is built by a separate team in a separate project (not Python-based
 - Validate package readiness for distribution with `pipelex pkg publish` (Phase 5D)
 - Trust that reserved domains (`native`, `mthds`, `pipelex`) are protected from accidental collision (Phase 6A)
 - Get runtime warnings when a dependency requires a newer MTHDS standard version (Phase 6B)
+- Search for pipes by input/output concept types with `pipelex pkg search --accepts/--produces` (Phase 7A)
 
 Once future phases are completed, client projects will additionally be able to:
-- Search for pipes by input/output concept types with `pipelex pkg search --accepts/--produces` (Phase 7A)
 - Get auto-composition suggestions showing how to chain pipes across packages with `pipelex pkg graph --compose` (Phase 7B)
 - Have the builder generate cross-package references to dependency pipes/concepts automatically (Phase 8)
 - Discover, search, and publish packages via a remote registry with `--registry <url>` (Phase 9E)

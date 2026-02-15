@@ -74,3 +74,27 @@ class TestPkgGraph:
         """Bad concept format (missing ::) -> exit 1."""
         with pytest.raises(Exit):
             do_pkg_graph(from_concept="bad_format_no_separator")
+
+    def test_graph_compose_without_from_to_exits(self) -> None:
+        """--compose without both --from and --to -> exit 1."""
+        with pytest.raises(Exit):
+            do_pkg_graph(compose=True)
+
+        with pytest.raises(Exit):
+            do_pkg_graph(from_concept="__native__::native.Text", compose=True)
+
+        with pytest.raises(Exit):
+            do_pkg_graph(to_concept="__native__::native.Text", compose=True)
+
+    def test_graph_compose_with_from_to_succeeds(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """--compose with --from and --to prints composition template without error."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.graph_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+
+        do_pkg_graph(
+            from_concept="__native__::native.Text",
+            to_concept=f"{LEGAL_TOOLS_ADDRESS}::pkg_test_legal.PkgTestContractClause",
+            compose=True,
+        )

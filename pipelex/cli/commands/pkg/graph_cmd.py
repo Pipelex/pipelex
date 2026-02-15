@@ -6,8 +6,9 @@ from rich.console import Console
 from rich.table import Table
 
 from pipelex.core.packages.exceptions import GraphBuildError, IndexBuildError
+from pipelex.core.packages.graph.chain_formatter import format_chain_as_mthds_snippet
 from pipelex.core.packages.graph.graph_builder import build_know_how_graph
-from pipelex.core.packages.graph.models import ConceptId
+from pipelex.core.packages.graph.models import ConceptId, KnowHowGraph, PipeNode
 from pipelex.core.packages.graph.query_engine import KnowHowQueryEngine
 from pipelex.core.packages.index.index_builder import build_index_from_cache, build_index_from_project
 from pipelex.hub import get_console
@@ -44,6 +45,7 @@ def do_pkg_graph(
     check: str | None = None,
     max_depth: int = 3,
     cache: bool = False,
+    compose: bool = False,
 ) -> None:
     """Query the know-how graph for concept/pipe relationships.
 
@@ -53,8 +55,13 @@ def do_pkg_graph(
         check: Two pipe keys comma-separated to check compatibility.
         max_depth: Max chain depth for --from + --to together.
         cache: Use cached packages instead of the current project.
+        compose: Show MTHDS composition template (requires --from and --to).
     """
     console = get_console()
+
+    if compose and (not from_concept or not to_concept):
+        console.print("[red]--compose requires both --from and --to.[/red]")
+        raise typer.Exit(code=1)
 
     if not from_concept and not to_concept and not check:
         console.print("[red]Please specify at least one of --from, --to, or --check.[/red]")
@@ -85,7 +92,7 @@ def do_pkg_graph(
     if check:
         _handle_check(console, engine, check)
     elif from_concept and to_concept:
-        _handle_from_to(console, engine, from_concept, to_concept, max_depth)
+        _handle_from_to(console, engine, graph, from_concept, to_concept, max_depth, compose)
     elif from_concept:
         _handle_from(console, engine, from_concept)
     elif to_concept:
@@ -154,9 +161,11 @@ def _handle_to(console: Console, engine: KnowHowQueryEngine, raw_concept: str) -
 def _handle_from_to(
     console: Console,
     engine: KnowHowQueryEngine,
+    graph: KnowHowGraph,
     raw_from: str,
     raw_to: str,
     max_depth: int,
+    compose: bool,
 ) -> None:
     """Find pipe chains from input concept to output concept."""
     from_id = _parse_concept_id(raw_from)
@@ -167,12 +176,42 @@ def _handle_from_to(
         console.print(f"[yellow]No pipe chains found from '{raw_from}' to '{raw_to}' (max depth {max_depth}).[/yellow]")
         return
 
-    console.print(f"[bold]Pipe chains from {raw_from} to {raw_to}:[/bold]\n")
-    for chain_index, chain in enumerate(chains, start=1):
-        steps = " -> ".join(chain)
-        console.print(f"  {chain_index}. {steps}")
+    if compose:
+        _print_compose_output(console, graph, chains, from_id, to_id)
+    else:
+        console.print(f"[bold]Pipe chains from {raw_from} to {raw_to}:[/bold]\n")
+        for chain_index, chain in enumerate(chains, start=1):
+            steps = " -> ".join(chain)
+            console.print(f"  {chain_index}. {steps}")
+        console.print(f"\n[dim]{len(chains)} chain(s) found.[/dim]")
 
-    console.print(f"\n[dim]{len(chains)} chain(s) found.[/dim]")
+
+def _print_compose_output(
+    console: Console,
+    graph: KnowHowGraph,
+    chains: list[list[str]],
+    from_id: ConceptId,
+    to_id: ConceptId,
+) -> None:
+    """Print MTHDS composition templates for discovered chains."""
+    multiple = len(chains) > 1
+
+    for chain_index, chain in enumerate(chains, start=1):
+        pipe_nodes: list[PipeNode] = []
+        for node_key in chain:
+            pipe_node = graph.get_pipe_node(node_key)
+            if pipe_node is not None:
+                pipe_nodes.append(pipe_node)
+
+        snippet = format_chain_as_mthds_snippet(pipe_nodes, from_id, to_id)
+        if not snippet:
+            continue
+
+        if multiple:
+            console.print(f"[bold]Chain {chain_index} of {len(chains)}:[/bold]")
+        console.print(snippet)
+        if multiple and chain_index < len(chains):
+            console.print()
 
 
 def _handle_check(console: Console, engine: KnowHowQueryEngine, check_arg: str) -> None:
