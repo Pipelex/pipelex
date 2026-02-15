@@ -18,12 +18,19 @@ def _issues_by_category(result: PublishValidationResult, category: IssueCategory
     return [issue for issue in result.issues if issue.category == category]
 
 
-def _issues_by_level(result: PublishValidationResult, level: IssueLevel) -> list[PublishValidationIssue]:
-    return [issue for issue in result.issues if issue.level == level]
+def _issues_by_level_warning(result: PublishValidationResult) -> list[PublishValidationIssue]:
+    return [issue for issue in result.issues if issue.level.is_warning]
 
 
 class TestPublishValidation:
     """Tests for publish validation logic."""
+
+    def test_issue_level_properties(self) -> None:
+        """IssueLevel.is_error and is_warning are mutually exclusive and exhaustive."""
+        assert IssueLevel.ERROR.is_error is True
+        assert IssueLevel.ERROR.is_warning is False
+        assert IssueLevel.WARNING.is_error is False
+        assert IssueLevel.WARNING.is_warning is True
 
     def test_valid_package_passes(self, tmp_path: Path) -> None:
         """legal_tools with full manifest, bundles, and exports -> is_publishable=True (git checks off)."""
@@ -35,7 +42,7 @@ class TestPublishValidation:
 
         # legal_tools has a remote dep but no lock file, so there will be a lock file error
         # Filter out lock file issues for this test — the package is otherwise valid
-        non_lock_errors = [issue for issue in result.issues if issue.level == IssueLevel.ERROR and issue.category != IssueCategory.LOCK_FILE]
+        non_lock_errors = [issue for issue in result.issues if issue.level.is_error and issue.category != IssueCategory.LOCK_FILE]
         assert not non_lock_errors, f"Unexpected errors: {non_lock_errors}"
 
     def test_no_manifest_errors(self, tmp_path: Path) -> None:
@@ -45,7 +52,7 @@ class TestPublishValidation:
         assert not result.is_publishable
         manifest_errors = _issues_by_category(result, IssueCategory.MANIFEST)
         assert len(manifest_errors) == 1
-        assert manifest_errors[0].level == IssueLevel.ERROR
+        assert manifest_errors[0].level.is_error
         assert MANIFEST_FILENAME in manifest_errors[0].message
 
     def test_no_bundles_errors(self, tmp_path: Path) -> None:
@@ -65,7 +72,7 @@ class TestPublishValidation:
         assert not result.is_publishable
         bundle_errors = _issues_by_category(result, IssueCategory.BUNDLE)
         assert len(bundle_errors) == 1
-        assert bundle_errors[0].level == IssueLevel.ERROR
+        assert bundle_errors[0].level.is_error
         assert ".mthds" in bundle_errors[0].message
 
     def test_missing_authors_warns(self, tmp_path: Path) -> None:
@@ -76,7 +83,7 @@ class TestPublishValidation:
 
         result = validate_for_publish(pkg_dir, check_git=False)
 
-        warnings = _issues_by_level(result, IssueLevel.WARNING)
+        warnings = _issues_by_level_warning(result)
         author_warnings = [warning for warning in warnings if "authors" in warning.message.lower()]
         assert len(author_warnings) == 1
 
@@ -88,7 +95,7 @@ class TestPublishValidation:
 
         result = validate_for_publish(pkg_dir, check_git=False)
 
-        warnings = _issues_by_level(result, IssueLevel.WARNING)
+        warnings = _issues_by_level_warning(result)
         license_warnings = [warning for warning in warnings if "license" in warning.message.lower()]
         assert len(license_warnings) == 1
 
@@ -116,7 +123,7 @@ class TestPublishValidation:
 
         export_errors = _issues_by_category(result, IssueCategory.EXPORT)
         assert len(export_errors) == 1
-        assert export_errors[0].level == IssueLevel.ERROR
+        assert export_errors[0].level.is_error
         assert "pkg_test_nonexistent_pipe" in export_errors[0].message
 
     def test_lock_file_missing_with_remote_deps_errors(self, tmp_path: Path) -> None:
@@ -143,7 +150,7 @@ class TestPublishValidation:
 
         lock_errors = _issues_by_category(result, IssueCategory.LOCK_FILE)
         assert len(lock_errors) == 1
-        assert lock_errors[0].level == IssueLevel.ERROR
+        assert lock_errors[0].level.is_error
         assert "methods.lock" in lock_errors[0].message
 
     def test_lock_file_not_required_without_remote_deps(self, tmp_path: Path) -> None:
@@ -194,7 +201,7 @@ class TestPublishValidation:
 
         dep_warnings = _issues_by_category(result, IssueCategory.DEPENDENCY)
         assert len(dep_warnings) == 1
-        assert dep_warnings[0].level == IssueLevel.WARNING
+        assert dep_warnings[0].level.is_warning
         assert "wildcard" in dep_warnings[0].message.lower()
 
     def test_git_checks_skipped_when_disabled(self, tmp_path: Path) -> None:
@@ -222,10 +229,10 @@ class TestPublishValidation:
         result = validate_for_publish(pkg_dir, check_git=False)
 
         manifest_issues = _issues_by_category(result, IssueCategory.MANIFEST)
-        manifest_errors = [issue for issue in manifest_issues if issue.level == IssueLevel.ERROR]
+        manifest_errors = [issue for issue in manifest_issues if issue.level.is_error]
         assert not manifest_errors, f"Expected no MANIFEST errors, got: {manifest_errors}"
         # minimal_package has no authors and no license -> exactly 2 warnings
-        manifest_warnings = [issue for issue in manifest_issues if issue.level == IssueLevel.WARNING]
+        manifest_warnings = [issue for issue in manifest_issues if issue.level.is_warning]
         assert len(manifest_warnings) == 2
         warning_messages = {issue.message for issue in manifest_warnings}
         assert any("authors" in msg.lower() for msg in warning_messages)

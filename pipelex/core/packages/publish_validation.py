@@ -29,6 +29,22 @@ class IssueLevel(StrEnum):
     ERROR = "error"
     WARNING = "warning"
 
+    @property
+    def is_error(self) -> bool:
+        match self:
+            case IssueLevel.ERROR:
+                return True
+            case IssueLevel.WARNING:
+                return False
+
+    @property
+    def is_warning(self) -> bool:
+        match self:
+            case IssueLevel.ERROR:
+                return False
+            case IssueLevel.WARNING:
+                return True
+
 
 class IssueCategory(StrEnum):
     """Category of a publish validation issue."""
@@ -63,7 +79,7 @@ class PublishValidationResult(BaseModel):
     @property
     def is_publishable(self) -> bool:
         """Package is publishable if there are no ERROR-level issues."""
-        return not any(issue.level == IssueLevel.ERROR for issue in self.issues)
+        return not any(issue.level.is_error for issue in self.issues)
 
 
 # ---------------------------------------------------------------------------

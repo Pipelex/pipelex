@@ -9,7 +9,7 @@ from rich.table import Table
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
 from pipelex.core.packages.exceptions import PublishValidationError
 from pipelex.core.packages.manifest_parser import parse_methods_toml
-from pipelex.core.packages.publish_validation import IssueLevel, PublishValidationResult, validate_for_publish
+from pipelex.core.packages.publish_validation import PublishValidationResult, validate_for_publish
 from pipelex.hub import get_console
 
 
@@ -30,8 +30,8 @@ def do_pkg_publish(tag: bool = False) -> None:
 
     _display_results(console, result)
 
-    errors = [issue for issue in result.issues if issue.level == IssueLevel.ERROR]
-    warnings = [issue for issue in result.issues if issue.level == IssueLevel.WARNING]
+    errors = [issue for issue in result.issues if issue.level.is_error]
+    warnings = [issue for issue in result.issues if issue.level.is_warning]
 
     console.print(f"\n{len(errors)} error(s), {len(warnings)} warning(s)")
 
@@ -47,8 +47,8 @@ def do_pkg_publish(tag: bool = False) -> None:
 
 def _display_results(console: Console, result: PublishValidationResult) -> None:
     """Display validation issues as Rich tables."""
-    errors = [issue for issue in result.issues if issue.level == IssueLevel.ERROR]
-    warnings = [issue for issue in result.issues if issue.level == IssueLevel.WARNING]
+    errors = [issue for issue in result.issues if issue.level.is_error]
+    warnings = [issue for issue in result.issues if issue.level.is_warning]
 
     if errors:
         error_table = Table(title="Errors", box=box.ROUNDED, show_header=True)
