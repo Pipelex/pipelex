@@ -47,6 +47,15 @@ class TestPkgSearch:
         # since scoring concepts are in a different domain
         do_pkg_search(query="score", domain="pkg_test_legal.contracts")
 
+    def test_search_both_concept_and_pipe_flags(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """When both --concept and --pipe flags are set, treat as 'show both'."""
+        src_dir = PACKAGES_DATA_DIR / "legal_tools"
+        shutil.copytree(src_dir, tmp_path / "legal_tools")
+        monkeypatch.chdir(tmp_path / "legal_tools")
+
+        # Should not raise or show "no results" — both concepts and pipes are searched
+        do_pkg_search(query="ContractClause", concept_only=True, pipe_only=True)
+
     def test_search_empty_project_exits(self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         """No packages in empty dir -> exit 1."""
         monkeypatch.chdir(tmp_path)

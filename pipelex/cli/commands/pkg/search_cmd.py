@@ -69,8 +69,9 @@ def do_pkg_search(
         console.print("[yellow]No packages found to search.[/yellow]")
         raise typer.Exit(code=1)
 
-    show_concepts = not pipe_only
-    show_pipes = not concept_only
+    both_or_neither = concept_only == pipe_only
+    show_concepts = both_or_neither or concept_only
+    show_pipes = both_or_neither or pipe_only
 
     matching_concepts = _search_concepts(index, query, domain) if show_concepts else []
     matching_pipes = _search_pipes(index, query, domain) if show_pipes else []
