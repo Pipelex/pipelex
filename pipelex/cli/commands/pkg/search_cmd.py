@@ -138,6 +138,7 @@ def _handle_accepts_search(
     index: PackageIndex,
     engine: KnowHowQueryEngine,
     console: Console,
+    domain_filter: str | None = None,
 ) -> None:
     """Resolve concept fuzzy and find pipes that accept it."""
     matches = _resolve_concept_fuzzy(concept_str, index)
@@ -150,6 +151,8 @@ def _handle_accepts_search(
 
     concept_id, concept_code = matches[0]
     pipes = engine.query_what_can_i_do(concept_id)
+    if domain_filter is not None:
+        pipes = [pipe_node for pipe_node in pipes if pipe_node.domain_code == domain_filter]
     if not pipes:
         console.print(f"[yellow]No pipes accept concept '{concept_code}' ({concept_id.concept_ref}).[/yellow]")
         return
@@ -161,6 +164,7 @@ def _handle_produces_search(
     index: PackageIndex,
     engine: KnowHowQueryEngine,
     console: Console,
+    domain_filter: str | None = None,
 ) -> None:
     """Resolve concept fuzzy and find pipes that produce it."""
     matches = _resolve_concept_fuzzy(concept_str, index)
@@ -173,6 +177,8 @@ def _handle_produces_search(
 
     concept_id, concept_code = matches[0]
     pipes = engine.query_what_produces(concept_id)
+    if domain_filter is not None:
+        pipes = [pipe_node for pipe_node in pipes if pipe_node.domain_code == domain_filter]
     if not pipes:
         console.print(f"[yellow]No pipes produce concept '{concept_code}' ({concept_id.concept_ref}).[/yellow]")
         return
@@ -184,6 +190,7 @@ def _do_type_search(
     accepts: str | None,
     produces: str | None,
     console: Console,
+    domain_filter: str | None = None,
 ) -> None:
     """Build the know-how graph and delegate to accepts/produces search handlers."""
     try:
@@ -195,9 +202,9 @@ def _do_type_search(
     engine = KnowHowQueryEngine(graph)
 
     if accepts is not None:
-        _handle_accepts_search(accepts, index, engine, console)
+        _handle_accepts_search(accepts, index, engine, console, domain_filter=domain_filter)
     if produces is not None:
-        _handle_produces_search(produces, index, engine, console)
+        _handle_produces_search(produces, index, engine, console, domain_filter=domain_filter)
 
 
 def do_pkg_search(
@@ -240,7 +247,7 @@ def do_pkg_search(
         raise typer.Exit(code=1)
 
     if accepts is not None or produces is not None:
-        _do_type_search(index, accepts, produces, console)
+        _do_type_search(index, accepts, produces, console, domain_filter=domain)
         return
 
     assert query is not None

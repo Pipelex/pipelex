@@ -1,5 +1,10 @@
+from pathlib import Path
+
 from pytest_mock import MockerFixture
 
+from pipelex.core.packages.dependency_resolver import ResolvedDependency
+from pipelex.core.packages.manifest import MthdsPackageManifest
+from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager import LibraryManager
 
 
@@ -49,3 +54,40 @@ class TestMthdsVersionWarning:
         mock_log.warning.assert_called_once()
         warning_msg = mock_log.warning.call_args[0][0]
         assert "Could not parse" in warning_msg
+
+    def test_warning_emitted_for_dependency_mthds_version(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Warning emitted when a dependency manifest has unsatisfied mthds_version."""
+        mocker.patch("pipelex.libraries.library_manager.MTHDS_STANDARD_VERSION", "1.0.0")
+        mock_log = mocker.patch("pipelex.libraries.library_manager.log")
+
+        # Create a minimal .mthds file so the interpreter can parse it
+        mthds_file = tmp_path / "dep.mthds"
+        mthds_file.write_text('domain = "dep_domain"\n')
+
+        dep_manifest = MthdsPackageManifest(
+            address="github.com/org/dep-pkg",
+            version="1.0.0",
+            description="A dependency",
+            mthds_version="^2.0.0",
+        )
+        resolved_dep = ResolvedDependency(
+            alias="dep_alias",
+            address="github.com/org/dep-pkg",
+            manifest=dep_manifest,
+            package_root=tmp_path,
+            mthds_files=[mthds_file],
+            exported_pipe_codes=None,
+        )
+
+        manager = LibraryManager()
+        library = LibraryFactory.make_empty()
+
+        manager._load_single_dependency(  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            library=library,
+            resolved_dep=resolved_dep,
+        )
+
+        # Verify a version warning was emitted for the dependency address
+        warning_calls = [call_args[0][0] for call_args in mock_log.warning.call_args_list]
+        dep_version_warnings = [msg for msg in warning_calls if "github.com/org/dep-pkg" in msg and "^2.0.0" in msg]
+        assert len(dep_version_warnings) >= 1

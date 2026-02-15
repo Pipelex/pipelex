@@ -609,6 +609,14 @@ class LibraryManager(LibraryManagerAbstract):
             manifest = find_package_manifest(mthds_paths[0])
         except ManifestError as exc:
             log.warning(f"Could not parse METHODS.toml: {exc.message}")
+            # Still enforce reserved domains even when manifest is unparseable
+            checker = PackageVisibilityChecker(manifest=None, bundles=blueprints)
+            reserved_errors = checker.validate_reserved_domains()
+            if reserved_errors:
+                error_messages = [err.message for err in reserved_errors]
+                joined_errors = "\n  - ".join(error_messages)
+                msg = f"Reserved domain violations found:\n  - {joined_errors}"
+                raise LibraryLoadingError(msg) from exc
             return None
 
         if manifest is None:
@@ -726,6 +734,13 @@ class LibraryManager(LibraryManagerAbstract):
         if not dep_blueprints:
             log.warning(f"No valid blueprints found for dependency '{alias}'")
             return
+
+        # Warn if the dependency requires a newer MTHDS standard version
+        if resolved_dep.manifest is not None and resolved_dep.manifest.mthds_version is not None:
+            self._warn_if_mthds_version_unsatisfied(
+                mthds_version_constraint=resolved_dep.manifest.mthds_version,
+                package_address=resolved_dep.address,
+            )
 
         # Create isolated child library for this dependency
         child_library = LibraryFactory.make_empty()

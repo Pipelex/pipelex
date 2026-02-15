@@ -1,8 +1,10 @@
 import shutil
+from io import StringIO
 from pathlib import Path
 
 import pytest
 from click.exceptions import Exit
+from rich.console import Console
 
 from pipelex.cli.commands.pkg.search_cmd import do_pkg_search
 from pipelex.core.packages.index.models import PackageIndex
@@ -127,3 +129,35 @@ class TestPkgSearch:
         )
         # "Text" is a substring of "TextAndImages", but exact match should prevent ambiguity
         do_pkg_search(accepts="Text")
+
+    def test_search_accepts_with_domain_filter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """accepts='Text' with domain='pkg_test_legal' returns only legal-domain pipes."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+        # Use a wide console to avoid Rich truncation
+        string_io = StringIO()
+        wide_console = Console(file=string_io, width=300)
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.get_console",
+            lambda: wide_console,
+        )
+        do_pkg_search(accepts="Text", domain="pkg_test_legal")
+        captured = string_io.getvalue()
+        # The legal pipe that accepts Text should appear
+        assert "pkg_test_extract_clause" in captured
+        # Pipes from other domains should be excluded
+        assert "pkg_test_compute_score" not in captured
+        assert "pkg_test_refine_score" not in captured
+        assert "pkg_test_compute_analytics" not in captured
+
+    def test_search_produces_with_domain_filter(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """produces='Text' with domain from a non-matching domain yields no results."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+        # pkg_test_analyze_clause produces Text and is in pkg_test_legal domain.
+        # Filtering to pkg_test_scoring_dep should exclude it, yielding no results.
+        do_pkg_search(produces="Text", domain="pkg_test_scoring_dep")
