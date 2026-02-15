@@ -14,7 +14,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.packages.bundle_scanner import scan_bundles_for_domain_info
 from pipelex.core.packages.dependency_resolver import collect_mthds_files
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
-from pipelex.core.packages.exceptions import ManifestError, PublishValidationError
+from pipelex.core.packages.exceptions import LockFileError, ManifestError, PublishValidationError
 from pipelex.core.packages.lock_file import LOCK_FILENAME, parse_lock_file
 from pipelex.core.packages.manifest import MthdsPackageManifest
 from pipelex.core.packages.manifest_parser import parse_methods_toml
@@ -252,7 +252,7 @@ def _check_lock_file(manifest: MthdsPackageManifest, package_root: Path) -> list
     content = lock_path.read_text(encoding="utf-8")
     try:
         lock_file = parse_lock_file(content)
-    except Exception as exc:
+    except LockFileError as exc:
         issues.append(
             PublishValidationIssue(
                 level=IssueLevel.ERROR,
