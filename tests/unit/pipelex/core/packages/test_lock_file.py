@@ -277,7 +277,7 @@ class TestLockFile:
                 manifest=None,
                 package_root=tmp_path / "local",
                 mthds_files=[],
-                exported_pipe_codes=set(),
+                exported_pipe_codes=None,
             ),
             ResolvedDependency(
                 alias="remote_dep",
@@ -285,7 +285,7 @@ class TestLockFile:
                 manifest=remote_manifest,
                 package_root=remote_dir,
                 mthds_files=[],
-                exported_pipe_codes=set(),
+                exported_pipe_codes=None,
             ),
         ]
 
@@ -323,7 +323,7 @@ class TestLockFile:
                 manifest=None,
                 package_root=local_dir,
                 mthds_files=[],
-                exported_pipe_codes=set(),
+                exported_pipe_codes=None,
             ),
         ]
 
