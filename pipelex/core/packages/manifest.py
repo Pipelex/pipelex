@@ -34,6 +34,8 @@ ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+/[a-zA-Z0-9._/-]
 
 RESERVED_DOMAINS: frozenset[str] = frozenset({"native", "mthds", "pipelex"})
 
+MTHDS_STANDARD_VERSION: str = "1.0.0"
+
 
 def is_reserved_domain_path(domain_path: str) -> bool:
     """Check if a domain path starts with a reserved domain segment."""
@@ -171,6 +173,14 @@ class MthdsPackageManifest(BaseModel):
             msg = "Package description must not be empty."
             raise ValueError(msg)
         return description
+
+    @field_validator("mthds_version")
+    @classmethod
+    def validate_mthds_version(cls, mthds_version: str | None) -> str | None:
+        if mthds_version is not None and not is_valid_version_constraint(mthds_version):
+            msg = f"Invalid mthds_version constraint '{mthds_version}'. Must be a valid version constraint (e.g. '1.0.0', '^1.0.0', '>=1.0.0')."
+            raise ValueError(msg)
+        return mthds_version
 
     @model_validator(mode="after")
     def validate_unique_dependency_aliases(self) -> Self:

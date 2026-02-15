@@ -262,3 +262,38 @@ class TestPublishValidation:
         reserved_errors = [issue for issue in manifest_errors if "reserved" in issue.message.lower()]
         assert len(reserved_errors) >= 1
         assert reserved_errors[0].level == IssueLevel.ERROR
+
+    def test_valid_mthds_version_no_publish_errors(self, tmp_path: Path) -> None:
+        """Manifest with valid mthds_version should produce no mthds_version MANIFEST errors."""
+        src_dir = PACKAGES_DATA_DIR / "minimal_package"
+        pkg_dir = tmp_path / "valid_mthds_ver"
+        shutil.copytree(src_dir, pkg_dir)
+
+        manifest_content = textwrap.dedent("""\
+            [package]
+            address = "github.com/test/valid-mthds"
+            version = "1.0.0"
+            description = "Valid mthds_version test"
+            authors = ["Test"]
+            license = "MIT"
+            mthds_version = "^1.0.0"
+        """)
+        (pkg_dir / MANIFEST_FILENAME).write_text(manifest_content, encoding="utf-8")
+
+        result = validate_for_publish(pkg_dir, check_git=False)
+
+        manifest_errors = _issues_by_category(result, IssueCategory.MANIFEST)
+        mthds_version_errors = [issue for issue in manifest_errors if "mthds_version" in issue.message]
+        assert not mthds_version_errors
+
+    def test_absent_mthds_version_no_publish_errors(self, tmp_path: Path) -> None:
+        """Manifest without mthds_version should produce no mthds_version MANIFEST errors."""
+        src_dir = PACKAGES_DATA_DIR / "minimal_package"
+        pkg_dir = tmp_path / "no_mthds_ver"
+        shutil.copytree(src_dir, pkg_dir)
+
+        result = validate_for_publish(pkg_dir, check_git=False)
+
+        manifest_errors = _issues_by_category(result, IssueCategory.MANIFEST)
+        mthds_version_errors = [issue for issue in manifest_errors if "mthds_version" in issue.message]
+        assert not mthds_version_errors

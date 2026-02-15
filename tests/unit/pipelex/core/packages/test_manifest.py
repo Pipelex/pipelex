@@ -246,3 +246,41 @@ class TestMthdsPackageManifest:
                 version=version_str,
                 alias="my_dep",
             )
+
+    @pytest.mark.parametrize(
+        "mthds_version",
+        ["1.0.0", "^1.0.0", "~1.0.0", ">=1.0.0", "*"],
+    )
+    def test_valid_mthds_version_constraints(self, mthds_version: str):
+        """Valid mthds_version constraints should pass validation."""
+        manifest = MthdsPackageManifest(
+            address="github.com/org/repo",
+            version="1.0.0",
+            description="Test",
+            mthds_version=mthds_version,
+        )
+        assert manifest.mthds_version == mthds_version
+
+    @pytest.mark.parametrize(
+        "mthds_version",
+        ["not-a-version", "abc", ">>1.0.0"],
+    )
+    def test_invalid_mthds_version_constraints(self, mthds_version: str):
+        """Invalid mthds_version constraints should fail validation."""
+        with pytest.raises(ValidationError, match="Invalid mthds_version constraint"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                mthds_version=mthds_version,
+            )
+
+    def test_none_mthds_version_accepted(self):
+        """mthds_version=None should pass validation."""
+        manifest = MthdsPackageManifest(
+            address="github.com/org/repo",
+            version="1.0.0",
+            description="Test",
+            mthds_version=None,
+        )
+        assert manifest.mthds_version is None

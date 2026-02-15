@@ -20,7 +20,7 @@ from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.packages.dependency_resolver import ResolvedDependency, resolve_all_dependencies
 from pipelex.core.packages.discovery import find_package_manifest
 from pipelex.core.packages.exceptions import DependencyResolveError, ManifestError
-from pipelex.core.packages.manifest import MthdsPackageManifest
+from pipelex.core.packages.manifest import MTHDS_STANDARD_VERSION, MthdsPackageManifest
 from pipelex.core.packages.visibility import check_visibility_for_blueprints
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
@@ -40,6 +40,7 @@ from pipelex.libraries.library_utils import (
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
+from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
@@ -528,6 +529,13 @@ class LibraryManager(LibraryManagerAbstract):
         # Find manifest and run package visibility validation
         manifest = self._check_package_visibility(blueprints=blueprints, mthds_paths=valid_mthds_paths)
 
+        # Warn if the package requires a newer MTHDS standard version
+        if manifest is not None and manifest.mthds_version is not None:
+            self._warn_if_mthds_version_unsatisfied(
+                mthds_version_constraint=manifest.mthds_version,
+                package_address=manifest.address,
+            )
+
         # Load dependency packages if manifest has local-path dependencies
         if manifest is not None and manifest.dependencies:
             package_root = self._find_package_root(mthds_paths=valid_mthds_paths)
@@ -555,6 +563,26 @@ class LibraryManager(LibraryManagerAbstract):
             raise LibraryError(
                 message=msg,
             ) from validation_error
+
+    def _warn_if_mthds_version_unsatisfied(
+        self,
+        mthds_version_constraint: str,
+        package_address: str,
+    ) -> None:
+        """Emit a warning if the current MTHDS standard version does not satisfy the package's constraint."""
+        try:
+            constraint = parse_constraint(mthds_version_constraint)
+            current_version = parse_version(MTHDS_STANDARD_VERSION)
+        except SemVerError as exc:
+            log.warning(f"Could not parse mthds_version constraint '{mthds_version_constraint}' for package '{package_address}': {exc}")
+            return
+
+        if not version_satisfies(current_version, constraint):
+            log.warning(
+                f"Package '{package_address}' requires MTHDS standard version "
+                f"'{mthds_version_constraint}', but the current version is "
+                f"'{MTHDS_STANDARD_VERSION}'. Some features may not work correctly."
+            )
 
     def _check_package_visibility(
         self,

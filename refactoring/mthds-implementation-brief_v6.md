@@ -193,22 +193,27 @@ Delivered:
 
 ## Phase 6: Hardening + Guardrails
 
-### Phase 6A: Reserved Domain Enforcement
+### Phase 6A: Reserved Domain Enforcement — COMPLETED
 
-- **`RESERVED_DOMAINS` frozenset** (`manifest.py`): `frozenset({"native", "mthds", "pipelex"})` — domains that user packages must not claim in their `[exports]` section, since they belong to the standard or the reference implementation.
-- **Manifest model validator**: Field validator on `MthdsPackageManifest` that rejects reserved domain paths in `[exports]` keys. Raises `ManifestValidationError` with a clear message naming the reserved domain.
-- **Bundle domain validation within package context**: During visibility checking, if a bundle declares or uses a domain that collides with a reserved domain, produce an error. Extends `PackageVisibilityChecker` logic.
-- **Publish validation check**: `validate_for_publish()` gains a reserved-domain check in the `manifest` category — scans exported domain paths and flags any that start with a reserved prefix.
-- Files: `manifest.py`, `publish_validation.py`, `visibility.py`, `exceptions.py`, tests
-- ~5–8 tests
+Delivered:
 
-### Phase 6B: `mthds_version` Enforcement
+- **`RESERVED_DOMAINS` frozenset + `is_reserved_domain_path()` helper** (`manifest.py`): `frozenset({"native", "mthds", "pipelex"})` constant and a helper that checks if a domain path's first segment is reserved. Protects the namespace so that standard-defined concepts and future standard domains don't collide with user packages.
+- **`DomainExports.validate_domain_path()` extended** (`manifest.py`): Pydantic field validator rejects reserved domain paths in `[exports]` keys at parse time. Raises `ValueError` matching "reserved domain" with a clear message naming the reserved domain and listing all reserved domains.
+- **`PackageVisibilityChecker.validate_reserved_domains()`** (`visibility.py`): New method iterates bundles and produces a `VisibilityError` for each bundle declaring a domain starting with a reserved segment. Wired into `check_visibility_for_blueprints()` before pipe reference and cross-package checks.
+- **`_check_reserved_domains()` in publish validation** (`publish_validation.py`): Iterates bundle-scanned domain paths and flags any starting with a reserved prefix as `IssueLevel.ERROR` in `IssueCategory.MANIFEST` with a suggestion to rename. Wired into `validate_for_publish()` after bundle scanning, before exports check. Reserved domains in `[exports]` are caught at parse time by the Pydantic validator; this function catches reserved domains declared in bundle `.mthds` files.
+- **7 new tests** (some parametrized, covering all 3 reserved domains): 3 in `test_manifest.py` (exact reserved rejected, hierarchical prefix rejected, non-reserved accepted), 1 in `test_manifest_parser.py` (parser raises on reserved domain in exports), 2 in `test_visibility.py` (reserved domain produces error, non-reserved passes), 1 in `test_publish_validation.py` (reserved domain in bundle file produces MANIFEST ERROR).
+- Files: `manifest.py`, `visibility.py`, `publish_validation.py`, `test_data.py`, `test_manifest.py`, `test_manifest_parser.py`, `test_visibility.py`, `test_publish_validation.py`
 
-- **`MTHDS_STANDARD_VERSION` constant** (`manifest.py`): Separate from the Pipelex application version — the MTHDS standard may evolve independently (e.g., `"1.0.0"`).
-- **Runtime warning in `library_manager.py`**: When a loaded package's `mthds_version` constraint (from `METHODS.toml`) requires a newer MTHDS standard version than the current `MTHDS_STANDARD_VERSION`, emit a warning via `log.warning()`. Uses existing `version_satisfies()` from Phase 4A semver engine — no new version logic needed.
-- **Publish validation error**: If the package's own `mthds_version` constraint string is unparseable by the semver engine, `validate_for_publish()` reports it as an error in the `manifest` category.
-- Files: `manifest.py` (constant), `library_manager.py`, `publish_validation.py`, tests
-- ~6–8 tests
+### Phase 6B: `mthds_version` Enforcement — COMPLETED
+
+Delivered:
+
+- **`MTHDS_STANDARD_VERSION` constant** (`manifest.py`): `"1.0.0"` — separate from the Pipelex application version, the MTHDS standard may evolve independently.
+- **`validate_mthds_version` field validator** (`manifest.py`): Pydantic `field_validator` on `MthdsPackageManifest.mthds_version` that rejects invalid version constraint strings at parse time using `is_valid_version_constraint()`. Accepts `None` (field is optional).
+- **Runtime warning in `library_manager.py`**: `_warn_if_mthds_version_unsatisfied()` method checks if the current `MTHDS_STANDARD_VERSION` satisfies the package's `mthds_version` constraint using `parse_constraint()`, `parse_version()`, and `version_satisfies()` from Phase 4A. Emits `log.warning()` if unsatisfied or if the constraint is unparseable. Wired into `_load_mthds_files_into_library()` after manifest discovery and before dependency loading.
+- **Publish validation check** (`publish_validation.py`): `_check_mthds_version()` verifies the `mthds_version` constraint is parseable by the semver engine via `parse_constraint()`. Reports `IssueLevel.ERROR` in `IssueCategory.MANIFEST` if unparseable. Wired into `validate_for_publish()` after manifest field checks.
+- **8 new test methods** (14 test items with parametrization) across 3 test files: `test_manifest.py` (3 methods: valid constraints parametrized with 5 values, invalid constraints parametrized with 3 values, None accepted), `test_publish_validation.py` (2 methods: valid mthds_version no errors, absent mthds_version no errors), `test_mthds_version_warning.py` (3 methods: warning emitted when unsatisfied, no warning when satisfied, warning on unparseable constraint).
+- Files: `manifest.py`, `library_manager.py`, `publish_validation.py`, `test_manifest.py`, `test_publish_validation.py`, new `test_mthds_version_warning.py`
 
 ---
 
@@ -305,7 +310,7 @@ The registry is built by a separate team in a separate project (not Python-based
 
 ## Note on Client Project Brief
 
-`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–5). Client projects can now:
+`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–6B). Client projects can now:
 - Use `.mthds` file extension and "method" terminology (Phase 0)
 - Use hierarchical domains and domain-qualified pipe references (Phase 1)
 - Create `METHODS.toml` manifests with `pipelex pkg init`, inspect with `pipelex pkg list` (Phase 2)
@@ -315,10 +320,10 @@ The registry is built by a separate team in a separate project (not Python-based
 - Discover and search packages locally with `pipelex pkg index/search/inspect` (Phase 5A–5C)
 - Query the know-how graph for concept/pipe relationships with `pipelex pkg graph` (Phase 5B–5C)
 - Validate package readiness for distribution with `pipelex pkg publish` (Phase 5D)
-
-Once future phases are completed, client projects will additionally be able to:
 - Trust that reserved domains (`native`, `mthds`, `pipelex`) are protected from accidental collision (Phase 6A)
 - Get runtime warnings when a dependency requires a newer MTHDS standard version (Phase 6B)
+
+Once future phases are completed, client projects will additionally be able to:
 - Search for pipes by input/output concept types with `pipelex pkg search --accepts/--produces` (Phase 7A)
 - Get auto-composition suggestions showing how to chain pipes across packages with `pipelex pkg graph --compose` (Phase 7B)
 - Have the builder generate cross-package references to dependency pipes/concepts automatically (Phase 8)

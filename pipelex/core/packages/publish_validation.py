@@ -19,6 +19,7 @@ from pipelex.core.packages.lock_file import LOCK_FILENAME, parse_lock_file
 from pipelex.core.packages.manifest import RESERVED_DOMAINS, MthdsPackageManifest, is_reserved_domain_path
 from pipelex.core.packages.manifest_parser import parse_methods_toml
 from pipelex.core.packages.visibility import check_visibility_for_blueprints
+from pipelex.tools.misc.semver import SemVerError, parse_constraint
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.types import StrEnum
 
@@ -132,6 +133,25 @@ def _check_manifest_fields(manifest: MthdsPackageManifest) -> list[PublishValida
             )
         )
 
+    return issues
+
+
+def _check_mthds_version(manifest: MthdsPackageManifest) -> list[PublishValidationIssue]:
+    """Check that mthds_version, if specified, is parseable by the semver engine."""
+    issues: list[PublishValidationIssue] = []
+    if manifest.mthds_version is None:
+        return issues
+    try:
+        parse_constraint(manifest.mthds_version)
+    except SemVerError:
+        issues.append(
+            PublishValidationIssue(
+                level=IssueLevel.ERROR,
+                category=IssueCategory.MANIFEST,
+                message=f"mthds_version constraint '{manifest.mthds_version}' is not parseable by the semver engine",
+                suggestion="Use a valid version constraint (e.g. '1.0.0', '^1.0.0', '>=1.0.0')",
+            )
+        )
     return issues
 
 
@@ -403,6 +423,7 @@ def validate_for_publish(package_root: Path, check_git: bool = True) -> PublishV
 
     # 2-6. Check manifest fields
     all_issues.extend(_check_manifest_fields(manifest))
+    all_issues.extend(_check_mthds_version(manifest))
 
     # 7-8. Check bundles exist and parse
     domain_pipes, blueprints, bundle_issues = _check_bundles(package_root)
