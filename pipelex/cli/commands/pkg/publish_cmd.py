@@ -6,10 +6,8 @@ from rich import box
 from rich.console import Console
 from rich.table import Table
 
-from pipelex.core.packages.discovery import MANIFEST_FILENAME
 from pipelex.core.packages.exceptions import PublishValidationError
-from pipelex.core.packages.manifest_parser import parse_methods_toml
-from pipelex.core.packages.publish_validation import IssueLevel, PublishValidationResult, validate_for_publish
+from pipelex.core.packages.publish_validation import PublishValidationResult, validate_for_publish
 from pipelex.hub import get_console
 
 
@@ -30,8 +28,8 @@ def do_pkg_publish(tag: bool = False) -> None:
 
     _display_results(console, result)
 
-    errors = [issue for issue in result.issues if issue.level == IssueLevel.ERROR]
-    warnings = [issue for issue in result.issues if issue.level == IssueLevel.WARNING]
+    errors = [issue for issue in result.issues if issue.level.is_error]
+    warnings = [issue for issue in result.issues if issue.level.is_warning]
 
     console.print(f"\n{len(errors)} error(s), {len(warnings)} warning(s)")
 
@@ -39,16 +37,16 @@ def do_pkg_publish(tag: bool = False) -> None:
         console.print("[red]Package is NOT ready for distribution.[/red]")
         raise typer.Exit(code=1)
 
-    if tag:
-        _create_git_tag(console, package_root)
+    if tag and result.package_version:
+        _create_git_tag(console, package_root, result.package_version)
 
     console.print("[green]Package is ready for distribution.[/green]")
 
 
 def _display_results(console: Console, result: PublishValidationResult) -> None:
     """Display validation issues as Rich tables."""
-    errors = [issue for issue in result.issues if issue.level == IssueLevel.ERROR]
-    warnings = [issue for issue in result.issues if issue.level == IssueLevel.WARNING]
+    errors = [issue for issue in result.issues if issue.level.is_error]
+    warnings = [issue for issue in result.issues if issue.level.is_warning]
 
     if errors:
         error_table = Table(title="Errors", box=box.ROUNDED, show_header=True)
@@ -81,12 +79,9 @@ def _display_results(console: Console, result: PublishValidationResult) -> None:
         console.print(warning_table)
 
 
-def _create_git_tag(console: Console, package_root: Path) -> None:
-    """Read the manifest version and create a local git tag."""
-    manifest_path = package_root / MANIFEST_FILENAME
-    content = manifest_path.read_text(encoding="utf-8")
-    manifest = parse_methods_toml(content)
-    version_tag = f"v{manifest.version}"
+def _create_git_tag(console: Console, package_root: Path, version: str) -> None:
+    """Create a local git tag from the already-validated package version."""
+    version_tag = f"v{version}"
 
     try:
         subprocess.run(  # noqa: S603

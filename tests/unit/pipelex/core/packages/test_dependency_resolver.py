@@ -36,6 +36,7 @@ class TestDependencyResolver:
         assert dep.package_root == (PACKAGES_DIR / "scoring_dep").resolve()
         assert len(dep.mthds_files) >= 1
         # The scoring_dep has exports, so exported_pipe_codes should be populated
+        assert dep.exported_pipe_codes is not None
         assert "pkg_test_compute_score" in dep.exported_pipe_codes
 
     def test_dependency_without_path_is_skipped(self):
@@ -78,7 +79,7 @@ class TestDependencyResolver:
             resolve_local_dependencies(manifest=manifest, package_root=package_root)
 
     def test_dependency_without_manifest_has_no_exports(self):
-        """A dependency directory without METHODS.toml -> empty exported_pipe_codes (all public)."""
+        """A dependency directory without METHODS.toml -> None exported_pipe_codes (all public)."""
         manifest = MthdsPackageManifest(
             address="github.com/mthds/consumer-app",
             version="1.0.0",
@@ -99,8 +100,8 @@ class TestDependencyResolver:
         dep = resolved[0]
         assert dep.alias == "standalone"
         assert dep.manifest is None
-        # No manifest = empty exports = all public
-        assert dep.exported_pipe_codes == set()
+        # No manifest = None exports = all public
+        assert dep.exported_pipe_codes is None
 
     def test_resolved_dependency_is_frozen(self, tmp_path: Path):
         """ResolvedDependency should be immutable (frozen model)."""
@@ -110,6 +111,6 @@ class TestDependencyResolver:
             manifest=None,
             package_root=tmp_path / "test",
             mthds_files=[],
-            exported_pipe_codes=set(),
+            exported_pipe_codes=None,
         )
         assert dep.alias == "test"

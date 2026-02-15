@@ -754,9 +754,17 @@ class LibraryManager(LibraryManagerAbstract):
             if blueprint.main_pipe:
                 main_pipes.add(blueprint.main_pipe)
 
-        # Determine if we filter by exports or load all
-        has_exports = len(resolved_dep.exported_pipe_codes) > 0
-        all_exported = resolved_dep.exported_pipe_codes | main_pipes
+        # Determine if we filter by exports or load all.
+        # exported_pipe_codes is None when no manifest exists (all pipes public),
+        # or a set (possibly empty) when a manifest defines exports.
+        if resolved_dep.exported_pipe_codes is None:
+            # No manifest: all pipes are public, no filtering
+            has_exports = False
+            all_exported: set[str] = set()
+        else:
+            # Manifest exists: filter to exported pipes + main_pipes
+            has_exports = True
+            all_exported = resolved_dep.exported_pipe_codes | main_pipes
 
         # Temporarily register dep concepts in main library for pipe construction
         # (PipeFactory resolves concepts through the hub's current library)
@@ -766,28 +774,30 @@ class LibraryManager(LibraryManagerAbstract):
                 library.concept_library.add_new_concept(concept=concept)
                 temp_concept_refs.append(concept.concept_ref)
 
-        # Load exported pipes into child library
-        concept_codes = [concept.code for concept in dep_concepts]
-        for blueprint in dep_blueprints:
-            if blueprint.pipe is None:
-                continue
-            for pipe_code, pipe_blueprint in blueprint.pipe.items():
-                # If manifest has exports, only load exported pipes
-                if has_exports and pipe_code not in all_exported:
+        # Load exported pipes into child library, ensuring temp concepts are
+        # always cleaned up even if an unexpected exception occurs
+        try:
+            concept_codes = [concept.code for concept in dep_concepts]
+            for blueprint in dep_blueprints:
+                if blueprint.pipe is None:
                     continue
-                try:
-                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                        domain_code=blueprint.domain,
-                        pipe_code=pipe_code,
-                        blueprint=pipe_blueprint,
-                        concept_codes_from_the_same_domain=concept_codes,
-                    )
-                    child_library.pipe_library.add_new_pipe(pipe=pipe)
-                except (PipeLibraryError, ValidationError) as exc:
-                    log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
-
-        # Remove temporary native-key entries from main library
-        library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)
+                for pipe_code, pipe_blueprint in blueprint.pipe.items():
+                    # If manifest has exports, only load exported pipes
+                    if has_exports and pipe_code not in all_exported:
+                        continue
+                    try:
+                        pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                            domain_code=blueprint.domain,
+                            pipe_code=pipe_code,
+                            blueprint=pipe_blueprint,
+                            concept_codes_from_the_same_domain=concept_codes,
+                        )
+                        child_library.pipe_library.add_new_pipe(pipe=pipe)
+                    except (PipeLibraryError, ValidationError) as exc:
+                        log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+        finally:
+            # Remove temporary concept entries from main library
+            library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)
 
         # Register child library for isolation
         library.dependency_libraries[alias] = child_library

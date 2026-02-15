@@ -14,7 +14,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.packages.bundle_scanner import scan_bundles_for_domain_info
 from pipelex.core.packages.dependency_resolver import collect_mthds_files
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
-from pipelex.core.packages.exceptions import ManifestError, PublishValidationError
+from pipelex.core.packages.exceptions import LockFileError, ManifestError, PublishValidationError
 from pipelex.core.packages.lock_file import LOCK_FILENAME, parse_lock_file
 from pipelex.core.packages.manifest import MTHDS_STANDARD_VERSION, RESERVED_DOMAINS, MthdsPackageManifest, is_reserved_domain_path
 from pipelex.core.packages.manifest_parser import parse_methods_toml
@@ -29,6 +29,22 @@ class IssueLevel(StrEnum):
 
     ERROR = "error"
     WARNING = "warning"
+
+    @property
+    def is_error(self) -> bool:
+        match self:
+            case IssueLevel.ERROR:
+                return True
+            case IssueLevel.WARNING:
+                return False
+
+    @property
+    def is_warning(self) -> bool:
+        match self:
+            case IssueLevel.ERROR:
+                return False
+            case IssueLevel.WARNING:
+                return True
 
 
 class IssueCategory(StrEnum):
@@ -60,11 +76,12 @@ class PublishValidationResult(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     issues: list[PublishValidationIssue] = Field(default_factory=empty_list_factory_of(PublishValidationIssue))
+    package_version: str | None = None
 
     @property
     def is_publishable(self) -> bool:
         """Package is publishable if there are no ERROR-level issues."""
-        return not any(issue.level == IssueLevel.ERROR for issue in self.issues)
+        return not any(issue.level.is_error for issue in self.issues)
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +334,7 @@ def _check_lock_file(manifest: MthdsPackageManifest, package_root: Path) -> list
     content = lock_path.read_text(encoding="utf-8")
     try:
         lock_file = parse_lock_file(content)
-    except Exception as exc:
+    except LockFileError as exc:
         issues.append(
             PublishValidationIssue(
                 level=IssueLevel.ERROR,
@@ -398,8 +415,14 @@ def _check_git(manifest: MthdsPackageManifest, package_root: Path) -> list[Publi
                 )
             )
     except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired):
-        # Already warned about git issues above
-        pass
+        issues.append(
+            PublishValidationIssue(
+                level=IssueLevel.WARNING,
+                category=IssueCategory.GIT,
+                message=f"Could not verify whether git tag '{version_tag}' already exists",
+                suggestion="Manually check existing tags with `git tag -l` before publishing",
+            )
+        )
 
     return issues
 
@@ -435,7 +458,7 @@ def validate_for_publish(package_root: Path, check_git: bool = True) -> PublishV
     all_issues.extend(manifest_issues)
 
     if manifest is None:
-        return PublishValidationResult(issues=all_issues)
+        return PublishValidationResult(issues=all_issues, package_version=None)
 
     # 2-6. Check manifest fields
     all_issues.extend(_check_manifest_fields(manifest))
@@ -465,4 +488,4 @@ def validate_for_publish(package_root: Path, check_git: bool = True) -> PublishV
     if check_git:
         all_issues.extend(_check_git(manifest, package_root))
 
-    return PublishValidationResult(issues=all_issues)
+    return PublishValidationResult(issues=all_issues, package_version=manifest.version)

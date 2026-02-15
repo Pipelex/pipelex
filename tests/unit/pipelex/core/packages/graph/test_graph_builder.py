@@ -8,9 +8,18 @@ from pipelex.core.packages.index.models import PackageIndex
 from tests.unit.pipelex.core.packages.graph.test_data import (
     ANALYTICS_LIB_ADDRESS,
     LEGAL_TOOLS_ADDRESS,
+    MALFORMED_REF_ADDRESS,
+    MULTI_DOMAIN_CONSUMER_ADDRESS,
+    MULTI_DOMAIN_PKG_ADDRESS,
+    PHANTOM_PKG_ADDRESS,
+    QUALIFIED_REF_ADDRESS,
     REFINING_APP_ADDRESS,
     SCORING_LIB_ADDRESS,
     make_test_package_index,
+    make_test_package_index_with_malformed_cross_package_ref,
+    make_test_package_index_with_multi_domain_same_concept_code,
+    make_test_package_index_with_qualified_concept_specs,
+    make_test_package_index_with_unresolvable_concepts,
 )
 
 
@@ -185,3 +194,153 @@ class TestGraphBuilder:
         assert len(graph.concept_nodes) > 0
         native_keys = [key for key in graph.concept_nodes if key.startswith(NATIVE_PACKAGE_ADDRESS)]
         assert len(native_keys) == len(graph.concept_nodes)
+
+    def test_pipe_with_unresolvable_output_excluded(self) -> None:
+        """Pipe referencing a nonexistent output concept is excluded from the graph."""
+        index = make_test_package_index_with_unresolvable_concepts()
+        graph = build_know_how_graph(index)
+
+        bad_output_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_bad_output_pipe"
+        assert graph.get_pipe_node(bad_output_key) is None
+
+    def test_pipe_with_unresolvable_input_excluded(self) -> None:
+        """Pipe referencing a nonexistent input concept is excluded from the graph."""
+        index = make_test_package_index_with_unresolvable_concepts()
+        graph = build_know_how_graph(index)
+
+        bad_input_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_bad_input_pipe"
+        assert graph.get_pipe_node(bad_input_key) is None
+
+    def test_valid_pipe_not_affected_by_unresolvable_siblings(self) -> None:
+        """Valid pipes in the same package are still included when siblings have unresolvable concepts."""
+        index = make_test_package_index_with_unresolvable_concepts()
+        graph = build_know_how_graph(index)
+
+        valid_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_valid_pipe"
+        pipe_node = graph.get_pipe_node(valid_key)
+        assert pipe_node is not None
+        assert pipe_node.output_concept_id.package_address == PHANTOM_PKG_ADDRESS
+        assert pipe_node.output_concept_id.concept_ref == "pkg_test_phantom.PkgTestValidConcept"
+
+    def test_no_phantom_concept_nodes_created(self) -> None:
+        """Unresolvable concept specs do not create phantom entries in concept_nodes."""
+        index = make_test_package_index_with_unresolvable_concepts()
+        graph = build_know_how_graph(index)
+
+        # Only the valid concept and native concepts should exist
+        non_native_keys = [key for key in graph.concept_nodes if not key.startswith(NATIVE_PACKAGE_ADDRESS)]
+        assert len(non_native_keys) == 1
+        expected_key = f"{PHANTOM_PKG_ADDRESS}::pkg_test_phantom.PkgTestValidConcept"
+        assert non_native_keys[0] == expected_key
+
+    def test_domain_qualified_output_spec_resolved(self) -> None:
+        """Pipe with domain-qualified output spec (domain.ConceptCode) is included in graph."""
+        index = make_test_package_index_with_qualified_concept_specs()
+        graph = build_know_how_graph(index)
+
+        pipe_key = f"{QUALIFIED_REF_ADDRESS}::pkg_test_produce_result"
+        pipe_node = graph.get_pipe_node(pipe_key)
+        assert pipe_node is not None, f"Pipe '{pipe_key}' should be in graph but was excluded"
+        assert pipe_node.output_concept_id.package_address == QUALIFIED_REF_ADDRESS
+        assert pipe_node.output_concept_id.concept_ref == "pkg_test_qualified.PkgTestLocalResult"
+
+    def test_cross_package_input_spec_resolved(self) -> None:
+        """Pipe with cross-package input spec (alias->domain.Code) is included in graph."""
+        index = make_test_package_index_with_qualified_concept_specs()
+        graph = build_know_how_graph(index)
+
+        pipe_key = f"{QUALIFIED_REF_ADDRESS}::pkg_test_consume_score"
+        pipe_node = graph.get_pipe_node(pipe_key)
+        assert pipe_node is not None, f"Pipe '{pipe_key}' should be in graph but was excluded"
+        # The input should resolve to the scoring-lib's concept
+        score_input = pipe_node.input_concept_ids["score"]
+        assert score_input.package_address == SCORING_LIB_ADDRESS
+        assert score_input.concept_ref == "pkg_test_scoring_dep.PkgTestWeightedScore"
+
+    def test_cross_package_output_spec_resolved(self) -> None:
+        """Pipe with cross-package output spec (alias->domain.Code) is included in graph."""
+        index = make_test_package_index_with_qualified_concept_specs()
+        graph = build_know_how_graph(index)
+
+        pipe_key = f"{QUALIFIED_REF_ADDRESS}::pkg_test_forward_score"
+        pipe_node = graph.get_pipe_node(pipe_key)
+        assert pipe_node is not None, f"Pipe '{pipe_key}' should be in graph but was excluded"
+        assert pipe_node.output_concept_id.package_address == SCORING_LIB_ADDRESS
+        assert pipe_node.output_concept_id.concept_ref == "pkg_test_scoring_dep.PkgTestWeightedScore"
+
+    def test_all_qualified_ref_pipes_included(self) -> None:
+        """All pipes using qualified/cross-package concept specs are included in graph."""
+        index = make_test_package_index_with_qualified_concept_specs()
+        graph = build_know_how_graph(index)
+
+        expected_pipes = {
+            f"{SCORING_LIB_ADDRESS}::pkg_test_compute_score",
+            f"{QUALIFIED_REF_ADDRESS}::pkg_test_produce_result",
+            f"{QUALIFIED_REF_ADDRESS}::pkg_test_consume_score",
+            f"{QUALIFIED_REF_ADDRESS}::pkg_test_forward_score",
+        }
+        assert set(graph.pipe_nodes.keys()) == expected_pipes
+
+    def test_malformed_cross_package_ref_excluded_without_crash(self) -> None:
+        """Malformed cross-package remainder is excluded gracefully, not raising."""
+        index = make_test_package_index_with_malformed_cross_package_ref()
+        # This must not raise QualifiedRefError
+        graph = build_know_how_graph(index)
+
+        # The malformed pipe should be excluded
+        bad_key = f"{MALFORMED_REF_ADDRESS}::pkg_test_malformed_ref_pipe"
+        assert graph.get_pipe_node(bad_key) is None
+
+    def test_valid_pipe_survives_malformed_sibling(self) -> None:
+        """Valid pipe in same package is still included when sibling has malformed ref."""
+        index = make_test_package_index_with_malformed_cross_package_ref()
+        graph = build_know_how_graph(index)
+
+        valid_key = f"{MALFORMED_REF_ADDRESS}::pkg_test_valid_pipe"
+        pipe_node = graph.get_pipe_node(valid_key)
+        assert pipe_node is not None
+        assert pipe_node.output_concept_id.package_address == MALFORMED_REF_ADDRESS
+
+    def test_cross_package_ref_resolves_correct_domain_when_same_code_in_multiple_domains(self) -> None:
+        """Cross-package ref alias->domain.Code resolves to the specified domain, not another domain with same code."""
+        index = make_test_package_index_with_multi_domain_same_concept_code()
+        graph = build_know_how_graph(index)
+
+        # Both concept nodes should exist in the multi-domain package
+        scoring_concept = ConceptId(
+            package_address=MULTI_DOMAIN_PKG_ADDRESS,
+            concept_ref="pkg_test_scoring.PkgTestMetric",
+        )
+        analytics_concept = ConceptId(
+            package_address=MULTI_DOMAIN_PKG_ADDRESS,
+            concept_ref="pkg_test_analytics.PkgTestMetric",
+        )
+        assert graph.get_concept_node(scoring_concept) is not None
+        assert graph.get_concept_node(analytics_concept) is not None
+
+        # The consumer pipe referencing multi_domain->pkg_test_scoring.PkgTestMetric
+        # must resolve to the scoring domain, NOT analytics
+        scoring_pipe_key = f"{MULTI_DOMAIN_CONSUMER_ADDRESS}::pkg_test_use_scoring_metric"
+        scoring_pipe = graph.get_pipe_node(scoring_pipe_key)
+        assert scoring_pipe is not None, f"Pipe '{scoring_pipe_key}' should be in graph"
+        scoring_input = scoring_pipe.input_concept_ids["metric"]
+        assert scoring_input.package_address == MULTI_DOMAIN_PKG_ADDRESS
+        assert scoring_input.concept_ref == "pkg_test_scoring.PkgTestMetric"
+
+        # The consumer pipe referencing multi_domain->pkg_test_analytics.PkgTestMetric
+        # must resolve to the analytics domain, NOT scoring
+        analytics_pipe_key = f"{MULTI_DOMAIN_CONSUMER_ADDRESS}::pkg_test_use_analytics_metric"
+        analytics_pipe = graph.get_pipe_node(analytics_pipe_key)
+        assert analytics_pipe is not None, f"Pipe '{analytics_pipe_key}' should be in graph"
+        analytics_input = analytics_pipe.input_concept_ids["metric"]
+        assert analytics_input.package_address == MULTI_DOMAIN_PKG_ADDRESS
+        assert analytics_input.concept_ref == "pkg_test_analytics.PkgTestMetric"
+
+    def test_multi_domain_same_code_both_concept_nodes_preserved(self) -> None:
+        """Same concept code in two domains within one package creates distinct nodes."""
+        index = make_test_package_index_with_multi_domain_same_concept_code()
+        graph = build_know_how_graph(index)
+
+        # Count non-native concept nodes from the multi-domain package
+        multi_domain_keys = [key for key in graph.concept_nodes if key.startswith(MULTI_DOMAIN_PKG_ADDRESS)]
+        assert len(multi_domain_keys) == 2, f"Expected 2 concept nodes for multi-domain-pkg, got {len(multi_domain_keys)}: {multi_domain_keys}"
