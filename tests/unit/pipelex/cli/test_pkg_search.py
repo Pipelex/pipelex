@@ -5,6 +5,13 @@ import pytest
 from click.exceptions import Exit
 
 from pipelex.cli.commands.pkg.search_cmd import do_pkg_search
+from pipelex.core.packages.index.models import PackageIndex
+from tests.unit.pipelex.core.packages.graph.test_data import make_test_package_index
+
+
+def _mock_build_index(_path: Path) -> PackageIndex:
+    return make_test_package_index()
+
 
 PACKAGES_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data" / "packages"
 
@@ -62,3 +69,61 @@ class TestPkgSearch:
 
         with pytest.raises(Exit):
             do_pkg_search(query="anything")
+
+    # --- Type-compatible search tests (Phase 7A) ---
+
+    def test_search_accepts_finds_pipes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """accepts='Text' resolves to native.Text and finds pipes that accept it."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+        # All test pipes accept Text as input, so this should not raise
+        do_pkg_search(accepts="Text")
+
+    def test_search_produces_finds_pipes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """produces='PkgTestContractClause' resolves uniquely and finds extract_clause."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+        do_pkg_search(produces="PkgTestContractClause")
+
+    def test_search_accepts_ambiguous_concept(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """accepts='Score' matches multiple concepts across packages -> Exit raised."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+        with pytest.raises(Exit):
+            do_pkg_search(accepts="Score")
+
+    def test_search_accepts_no_concept_found(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """accepts='zzz_nonexistent_zzz' matches nothing -> prints message, no raise."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+        do_pkg_search(accepts="zzz_nonexistent_zzz")
+
+    def test_search_produces_no_pipes(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """produces='Dynamic' resolves to native.Dynamic but no pipe produces it."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+        do_pkg_search(produces="Dynamic")
+
+    def test_search_no_query_or_type_flag_exits(self) -> None:
+        """No query, no accepts, no produces -> Exit raised."""
+        with pytest.raises(Exit):
+            do_pkg_search()
+
+    def test_search_accepts_exact_match_preferred(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """accepts='Text' resolves to exactly native.Text (not TextAndImages) -> no Exit."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.search_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+        # "Text" is a substring of "TextAndImages", but exact match should prevent ambiguity
+        do_pkg_search(accepts="Text")

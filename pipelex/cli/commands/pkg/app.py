@@ -91,9 +91,9 @@ def pkg_index_cmd(
 @pkg_app.command("search", help="Search the package index for concepts and pipes")
 def pkg_search_cmd(
     query: Annotated[
-        str,
+        str | None,
         typer.Argument(help="Search term (case-insensitive substring match)"),
-    ],
+    ] = None,
     domain: Annotated[
         str | None,
         typer.Option("--domain", "-d", help="Filter to specific domain"),
@@ -110,9 +110,17 @@ def pkg_search_cmd(
         bool,
         typer.Option("--cache", "-c", help="Search cached packages"),
     ] = False,
+    accepts: Annotated[
+        str | None,
+        typer.Option("--accepts", help="Find pipes that accept this concept (type-compatible search)"),
+    ] = None,
+    produces: Annotated[
+        str | None,
+        typer.Option("--produces", help="Find pipes that produce this concept (type-compatible search)"),
+    ] = None,
 ) -> None:
     """Search the package index for concepts and pipes matching a query."""
-    do_pkg_search(query=query, domain=domain, concept_only=concept, pipe_only=pipe, cache=cache)
+    do_pkg_search(query=query, domain=domain, concept_only=concept, pipe_only=pipe, cache=cache, accepts=accepts, produces=produces)
 
 
 @pkg_app.command("inspect", help="Display detailed information about a package")
