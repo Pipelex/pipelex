@@ -191,7 +191,7 @@ Delivered:
 
 ---
 
-## Phase 6: Hardening + Guardrails
+## Phase 6: Hardening + Guardrails — COMPLETED
 
 ### Phase 6A: Reserved Domain Enforcement — COMPLETED
 
@@ -217,7 +217,7 @@ Delivered:
 
 ---
 
-## Phase 7: Type-Aware Search + Auto-Composition CLI
+## Phase 7: Type-Aware Search + Auto-Composition CLI — COMPLETED
 
 ### Phase 7A: Type-Compatible Search in CLI — COMPLETED
 
@@ -232,7 +232,7 @@ Delivered:
 - **7 new tests** monkeypatching `build_index_from_project` to return `make_test_package_index()` from Phase 5B's test data: accepts finds pipes (Text→all pipes), produces finds pipes (PkgTestContractClause→extract_clause), ambiguous concept exits (Score→3 matches), no concept found (nonexistent→message), no pipes produce (Dynamic→message), no args exits, exact match preferred (Text≠TextAndImages).
 - Files: `search_cmd.py`, `app.py`, `test_pkg_search.py`
 
-### Phase 7B: Auto-Composition Suggestions ✅
+### Phase 7B: Auto-Composition Suggestions — COMPLETED
 
 - **`--compose` flag** on `pipelex pkg graph`: Meaningful only with `--from` + `--to` (the "I have X, I need Y" query). When set, the command prints a human-readable MTHDS pipe sequence template showing the discovered chain steps, input/output wiring, and cross-package references. Validates that both `--from` and `--to` are provided when `--compose` is set, exits 1 otherwise.
 - **New `chain_formatter.py`** in `pipelex/core/packages/graph/`: `format_chain_as_mthds_snippet(chain_pipes, from_concept, to_concept)` takes a list of resolved `PipeNode`s and produces a readable composition template. Helpers: `_format_concept_ref()`, `_format_step()`, `_is_cross_package_chain()`. Advisory output only — not executable generation (that is builder territory).
@@ -315,7 +315,7 @@ The registry is built by a separate team in a separate project (not Python-based
 
 ## Note on Client Project Brief
 
-`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–7A). Client projects can now:
+`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–7B). Client projects can now:
 - Use `.mthds` file extension and "method" terminology (Phase 0)
 - Use hierarchical domains and domain-qualified pipe references (Phase 1)
 - Create `METHODS.toml` manifests with `pipelex pkg init`, inspect with `pipelex pkg list` (Phase 2)
@@ -328,9 +328,9 @@ The registry is built by a separate team in a separate project (not Python-based
 - Trust that reserved domains (`native`, `mthds`, `pipelex`) are protected from accidental collision (Phase 6A)
 - Get runtime warnings when a dependency requires a newer MTHDS standard version (Phase 6B)
 - Search for pipes by input/output concept types with `pipelex pkg search --accepts/--produces` (Phase 7A)
+- Get auto-composition suggestions showing how to chain pipes across packages with `pipelex pkg graph --compose` (Phase 7B)
 
 Once future phases are completed, client projects will additionally be able to:
-- Get auto-composition suggestions showing how to chain pipes across packages with `pipelex pkg graph --compose` (Phase 7B)
 - Have the builder generate cross-package references to dependency pipes/concepts automatically (Phase 8)
 - Discover, search, and publish packages via a remote registry with `--registry <url>` (Phase 9E)
 

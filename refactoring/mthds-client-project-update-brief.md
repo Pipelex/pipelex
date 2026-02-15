@@ -17,7 +17,9 @@ This brief tells you exactly what to change and what to leave alone.
 7. **Visibility model**: pipes are private by default when a manifest exists; exported via `[exports]`
 8. **Cross-package references**: `alias->domain.pipe_code` syntax for referencing pipes/concepts from dependency packages
 9. **Local path dependencies**: dependencies with `path = "..."` in `METHODS.toml` are resolved from the local filesystem
-10. **CLI commands**: `pipelex pkg init`, `pipelex pkg list`, `pipelex pkg add`
+10. **CLI commands**: `pipelex pkg init`, `pipelex pkg list`, `pipelex pkg add`, `pipelex pkg lock`, `pipelex pkg install`, `pipelex pkg update`, `pipelex pkg index`, `pipelex pkg search`, `pipelex pkg inspect`, `pipelex pkg graph`, `pipelex pkg publish`
+11. **Remote dependencies**: VCS dependencies with semver constraints, resolved via `pipelex pkg lock` and fetched via `pipelex pkg install`
+12. **Reserved domains**: `native`, `mthds`, and `pipelex` are reserved — user packages must not use these as domain prefixes
 
 ---
 
@@ -156,7 +158,7 @@ Check for `.plx`-related patterns in:
 - **Do NOT rename Python classes or internal Pipelex types.** Pipelex is the implementation brand. MTHDS is the open standard. Class names like `PipelexBundleBlueprint` stay as-is.
 - **Do NOT change the TOML structure** inside `.mthds` files. The internal format is identical to what `.plx` used — only the extension changes.
 - **Do NOT add backward-compatible `.plx` support.** This is a clean break.
-- **Do NOT use remote VCS dependencies.** Only local path dependencies (`path = "..."` in `METHODS.toml`) are currently supported. Remote fetch from Git URLs is not yet available.
+- **Remote VCS dependencies are now supported.** If the project uses remote dependencies, run `pipelex pkg lock` and `pipelex pkg install` after adding them with `pipelex pkg add`. Only use `--path` for local development overrides.
 
 ---
 
