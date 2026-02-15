@@ -25,15 +25,26 @@ def _parse_concept_id(raw: str) -> ConceptId:
     Raises:
         typer.Exit: If the format is invalid.
     """
+    console = get_console()
+
     if "::" not in raw:
-        console = get_console()
         console.print(f"[red]Invalid concept format: '{raw}'[/red]")
+        console.print("[dim]Expected format: package_address::concept_ref (e.g. __native__::native.Text)[/dim]")
+        raise typer.Exit(code=1)
+
+    if raw.count("::") > 1:
+        console.print(f"[red]Invalid concept format: '{raw}' contains multiple '::' separators.[/red]")
         console.print("[dim]Expected format: package_address::concept_ref (e.g. __native__::native.Text)[/dim]")
         raise typer.Exit(code=1)
 
     separator_index = raw.index("::")
     package_address = raw[:separator_index]
     concept_ref = raw[separator_index + 2 :]
+
+    if not package_address or not concept_ref:
+        console.print(f"[red]Invalid concept format: '{raw}' — both package_address and concept_ref must be non-empty.[/red]")
+        console.print("[dim]Expected format: package_address::concept_ref (e.g. __native__::native.Text)[/dim]")
+        raise typer.Exit(code=1)
 
     return ConceptId(package_address=package_address, concept_ref=concept_ref)
 
@@ -185,6 +196,11 @@ def _handle_check(console: Console, engine: KnowHowQueryEngine, check_arg: str) 
 
     source_key = parts[0].strip()
     target_key = parts[1].strip()
+
+    if not source_key or not target_key:
+        console.print("[red]--check requires two non-empty pipe keys separated by a comma.[/red]")
+        console.print("[dim]Example: --check 'pkg::pipe_a,pkg::pipe_b'[/dim]")
+        raise typer.Exit(code=1)
 
     compatible_params = engine.check_compatibility(source_key, target_key)
 

@@ -79,3 +79,49 @@ class TestPkgGraph:
 
         with pytest.raises(Exit):
             do_pkg_graph(from_concept="bad_format_no_separator")
+
+    @pytest.mark.parametrize(
+        "raw_concept",
+        [
+            pytest.param("package::", id="empty_concept_ref"),
+            pytest.param("::concept", id="empty_package_address"),
+            pytest.param("::", id="both_empty"),
+        ],
+    )
+    def test_graph_concept_id_empty_parts_exits(self, monkeypatch: pytest.MonkeyPatch, raw_concept: str) -> None:
+        """Concept IDs with empty package_address or concept_ref after splitting -> exit 1."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.graph_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+
+        with pytest.raises(Exit):
+            do_pkg_graph(from_concept=raw_concept)
+
+    def test_graph_concept_id_multiple_separators_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Concept ID with multiple :: separators -> exit 1."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.graph_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+
+        with pytest.raises(Exit):
+            do_pkg_graph(from_concept="package::domain::Concept")
+
+    @pytest.mark.parametrize(
+        "check_arg",
+        [
+            pytest.param("pipe1,", id="empty_target"),
+            pytest.param(",pipe2", id="empty_source"),
+            pytest.param(",", id="both_empty"),
+        ],
+    )
+    def test_graph_check_empty_pipe_key_exits(self, monkeypatch: pytest.MonkeyPatch, check_arg: str) -> None:
+        """--check with empty pipe key after comma split -> exit 1."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.graph_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+
+        with pytest.raises(Exit):
+            do_pkg_graph(check=check_arg)
