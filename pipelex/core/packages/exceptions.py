@@ -47,3 +47,7 @@ class IndexBuildError(PipelexError):
 
 class GraphBuildError(PipelexError):
     """Raised when building the know-how graph fails."""
+
+
+class PublishValidationError(PipelexError):
+    """Raised when publish validation encounters an unrecoverable error."""

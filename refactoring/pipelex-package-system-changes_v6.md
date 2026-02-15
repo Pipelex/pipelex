@@ -326,8 +326,12 @@ Each phase gets its own implementation brief with decisions, grammar, acceptance
 | **1** | ~~Hierarchical domains + pipe namespacing: `domain_path.pipe_code` references, split-on-last-dot parsing for concepts and pipes~~ | **COMPLETED** |
 | **2** | ~~Package manifest (`METHODS.toml`) + exports / visibility model~~ | **COMPLETED** |
 | **3** | ~~Cross-package references (`alias->domain_path.name`) + local dependency resolution~~ | **COMPLETED** |
-| **4** | Remote dependency resolution: VCS clone from addresses, version tag resolution (minimum version selection), lock file (`methods.lock`), package cache (`~/.mthds/packages/`), transitive dependency resolution, per-package Library isolation, cross-package concept refinement validation, CLI `pkg install`/`update`/`lock` | Phase 3 |
-| **5** | Registry index service (crawl, parse, index), type-aware search ("I have X, I need Y"), `pkg publish` CLI, Know-How Graph browsing + auto-composition, multi-tier deployment (Local / Project / Org / Community) | Phase 4 |
+| **4** | ~~Remote dependency resolution: VCS clone, version tag resolution (MVS), lock file (`methods.lock`), package cache (`~/.mthds/packages/`), transitive deps, per-package Library isolation, cross-package concept refinement, CLI `pkg install`/`update`/`lock`~~ | **COMPLETED** |
+| **5** | ~~Local-first package index, Know-How Graph model + query engine, CLI `pkg index`/`search`/`inspect`/`graph`/`publish`, publish validation~~ | **COMPLETED** |
+| **6** | Hardening + guardrails: reserved domain enforcement (`native`, `mthds`, `pipelex`), `mthds_version` standard version enforcement with runtime warnings and publish validation | Independent |
+| **7** | Type-aware search CLI (`--accepts`/`--produces` flags), auto-composition suggestions (`--compose` flag on `pkg graph`) | Phase 5B |
+| **8** | Builder package awareness: dependency signature catalog, LLM prompt context with dependency pipes, fix loop validates cross-package references against catalog | Phase 5A |
+| **9** | Registry specification + integration: normative API/crawling/search/distribution spec for external registry project, CLI `--registry` integration, `registry_client.py` | All prior phases |
 
 ---
 

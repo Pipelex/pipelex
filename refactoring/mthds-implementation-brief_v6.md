@@ -145,7 +145,7 @@ Delivered:
 
 ---
 
-## Phase 5: Local Package Discovery + Know-How Graph — IN PROGRESS
+## Phase 5: Local Package Discovery + Know-How Graph — COMPLETED
 
 Scoped to **local-first** (no registry server). A future phase layers a hosted registry on top. Sub-phases:
 
@@ -182,18 +182,122 @@ Delivered:
 - **Command registration** (`pipelex/cli/commands/pkg/app.py`): 4 new commands registered with `Annotated` type hints following the existing pattern of the 6 prior `pkg` commands.
 - **17 tests** across 4 test files: `test_pkg_index.py` (3 tests: project with manifest, empty project exits, empty cache exits via monkeypatch), `test_pkg_search.py` (5 tests: find concept, find pipe, no results, domain filter, empty project exits), `test_pkg_inspect.py` (3 tests: existing package, unknown address exits, empty project exits), `test_pkg_graph.py` (6 tests: no options exits, `--from` finds pipes, `--to` finds pipes, `--check` compatible, `--check` incompatible, invalid concept format exits). Graph tests monkeypatch `build_index_from_project` to return `make_test_package_index()` from Phase 5B's test data.
 
-### Phase 5D: Package Publish Validation — PLANNED
+### Phase 5D: Package Publish Validation — COMPLETED
 
-- `pipelex pkg publish`: Validates package readiness (manifest completeness, export consistency, concept consistency, dependency pinning, lock file freshness, bundle validity, git tag readiness). Local-only, no push to any registry.
-- `PublishValidationResult` and `PublishValidationIssue` models.
-- `--tag` option to create git tag `v{version}` locally.
+- **`pipelex pkg publish [--tag]`** (`pipelex/cli/commands/pkg/publish_cmd.py`): Validates package readiness for distribution with 15 checks across 7 categories (manifest, bundle, export, visibility, dependency, lock_file, git). Displays errors (red) and warnings (yellow) as Rich tables with suggestions. Exits 1 on errors. `--tag` creates local git tag `v{version}` on success.
+- **Core validation** (`pipelex/core/packages/publish_validation.py`): `IssueLevel` and `IssueCategory` StrEnums, `PublishValidationIssue` and `PublishValidationResult` frozen models, `validate_for_publish()` orchestrator with `check_git` flag for test isolation. Reuses `parse_methods_toml()`, `collect_mthds_files()`, `scan_bundles_for_domain_info()`, `check_visibility_for_blueprints()`, `parse_lock_file()`.
+- **`PublishValidationError`** added to `pipelex/core/packages/exceptions.py`.
+- **14 tests** across 2 test files: `test_publish_validation.py` (10 tests: valid package, no manifest, no bundles, missing authors/license warnings, phantom export, lock file missing/not required, wildcard version, git checks disabled) and `test_pkg_publish.py` (4 tests: no manifest exits, valid package succeeds, tag creation, warnings still succeed).
+
+---
+
+## Phase 6: Hardening + Guardrails
+
+### Phase 6A: Reserved Domain Enforcement
+
+- **`RESERVED_DOMAINS` frozenset** (`manifest.py`): `frozenset({"native", "mthds", "pipelex"})` — domains that user packages must not claim in their `[exports]` section, since they belong to the standard or the reference implementation.
+- **Manifest model validator**: Field validator on `MthdsPackageManifest` that rejects reserved domain paths in `[exports]` keys. Raises `ManifestValidationError` with a clear message naming the reserved domain.
+- **Bundle domain validation within package context**: During visibility checking, if a bundle declares or uses a domain that collides with a reserved domain, produce an error. Extends `PackageVisibilityChecker` logic.
+- **Publish validation check**: `validate_for_publish()` gains a reserved-domain check in the `manifest` category — scans exported domain paths and flags any that start with a reserved prefix.
+- Files: `manifest.py`, `publish_validation.py`, `visibility.py`, `exceptions.py`, tests
+- ~5–8 tests
+
+### Phase 6B: `mthds_version` Enforcement
+
+- **`MTHDS_STANDARD_VERSION` constant** (`manifest.py`): Separate from the Pipelex application version — the MTHDS standard may evolve independently (e.g., `"1.0.0"`).
+- **Runtime warning in `library_manager.py`**: When a loaded package's `mthds_version` constraint (from `METHODS.toml`) requires a newer MTHDS standard version than the current `MTHDS_STANDARD_VERSION`, emit a warning via `log.warning()`. Uses existing `version_satisfies()` from Phase 4A semver engine — no new version logic needed.
+- **Publish validation error**: If the package's own `mthds_version` constraint string is unparseable by the semver engine, `validate_for_publish()` reports it as an error in the `manifest` category.
+- Files: `manifest.py` (constant), `library_manager.py`, `publish_validation.py`, tests
+- ~6–8 tests
+
+---
+
+## Phase 7: Type-Aware Search + Auto-Composition CLI
+
+### Phase 7A: Type-Compatible Search in CLI
+
+- **`--accepts <concept>` and `--produces <concept>` flags** on `pipelex pkg search`: Enable type-aware search from the command line. `--accepts` finds pipes that can consume a given concept; `--produces` finds pipes that output a given concept.
+- **Fuzzy concept resolution**: The CLI matches the user-supplied concept string (case-insensitive substring) across all indexed packages to resolve to `ConceptId`(s). If ambiguous, display all matches and let the user refine.
+- **Wraps existing query engine**: `--accepts` calls `query_what_can_i_do()` and `--produces` calls `query_what_produces()` from Phase 5B's `KnowHowQueryEngine`.
+- **Display**: Results appear in the same Rich table format as existing `pipelex pkg search` output (pipe code, type, domain, description, package address).
+- Files: `search_cmd.py`, `app.py`, tests
+- ~6–8 tests
+
+### Phase 7B: Auto-Composition Suggestions
+
+- **`--compose` flag** on `pipelex pkg graph`: Meaningful only with `--from` + `--to` (the "I have X, I need Y" query). When set, the command prints a human-readable MTHDS pipe sequence template showing the discovered chain steps, input/output wiring, and cross-package references.
+- **New `chain_formatter.py`** in `pipelex/core/packages/graph/`: `format_chain_as_mthds_snippet()` takes a list of `PipeNode`s (from `query_i_have_i_need()`) and produces a readable template. Advisory output only — not executable generation (that is builder territory).
+- **Output format**: A numbered step list with each pipe's package, domain, input concept(s), and output concept, plus `alias->domain.pipe_code` cross-package reference syntax where applicable.
+- Files: new `chain_formatter.py`, `graph_cmd.py`, `app.py`, tests
+- ~5–7 tests
+
+---
+
+## Phase 8: Builder Package Awareness
+
+- **Dependency signature catalog**: The builder gains a "dependency signature catalog" constructed from the package index. This catalog holds exported pipe signatures (code, type, input/output specs) and public concepts from all declared dependencies.
+- **`build_and_fix()` accepts dependency context**: `BuilderLoop.build_and_fix()` accepts an optional dependency context (the catalog) so the LLM prompt can include available dependency pipe signatures. This lets generated specs reference `alias->domain.pipe` without the builder treating them as undeclared.
+- **LLM prompt context**: The builder's prompt template includes a section listing available dependency pipe signatures, enabling the LLM to generate cross-package references that are valid by construction.
+- **Fix loop validates cross-package references**: During the fix loop, cross-package `alias->domain.pipe_code` references are validated against the catalog rather than being silently skipped.
+- **`_fix_undeclared_concept_references()` checks dependency concepts first**: Before creating a new concept definition, the fix loop checks whether the concept exists in a dependency's public concepts. If so, it generates a cross-package reference instead of a duplicate local concept.
+- **Addresses changes doc §5.5**: "builder needs awareness of available packages and their exported pipes/concepts."
+- Files: `builder_loop.py`, new catalog helper in `pipelex/core/packages/index/`, `pipe_cmd.py`, `build_cmd.py`, tests
+- ~8–10 tests
+
+---
+
+## Phase 9: Registry Specification + Integration Guide
+
+The registry is built by a separate team in a separate project (not Python-based). Phase 9 produces a **normative specification document** so that team has everything they need to build a conformant registry, regardless of language or framework.
+
+### Phase 9A: Registry API Specification
+
+- Normative document defining the HTTP API contract the registry must implement.
+- **Endpoints**: package listing, package detail, text search, type-compatible search (accepts/produces), graph chain queries.
+- **Request/response schemas** (JSON) derived from existing `PackageIndex`, `PackageIndexEntry`, `PipeSignature`, `ConceptEntry` models.
+- **Authentication model**: API keys, OAuth — options with recommendations.
+- **Pagination, rate limiting, error response format**.
+- **Versioning strategy** for the API itself (`/v1/`).
+
+### Phase 9B: Crawling + Indexing Specification
+
+- Normative rules for how the registry discovers and indexes packages.
+- **Input**: package address → git clone → find `METHODS.toml` → parse manifest + scan `.mthds` bundles.
+- **Output**: `PackageIndexEntry` equivalent (exact JSON schema).
+- **Index refresh strategy**: webhooks, polling, manual trigger.
+- **Extraction rules**: How to extract pipe signatures, concept entries, domain info, export status, and dependency aliases at the blueprint level (mirroring `build_index_entry_from_package()` logic).
+- **Know-How Graph construction**: How to build the Know-How Graph from the index (mirroring `build_know_how_graph()` logic): concept nodes, native concepts, refinement resolution, pipe nodes, data flow edges, refinement edges.
+
+### Phase 9C: Type-Aware Search + Graph Query Specification
+
+- Normative rules for type-compatible search: refinement chain walking, concept compatibility.
+- **Graph query semantics**: "what can I do with X", "what produces Y", "I have X, I need Y" (BFS chain discovery).
+- **Compatibility check logic** between pipe signatures.
+- **Cross-package concept resolution** via `dependency_aliases`.
+
+### Phase 9D: Distribution Protocol Specification
+
+- **Proxy/mirror protocol**: How a proxy intercepts fetch requests, caches packages, serves them (like Go's `GOPROXY`).
+- **Signed manifests**: Signature format, verification algorithm, trust store model.
+- **Social signals**: Install counts, stars, endorsements — data model and API endpoints.
+- **Multi-tier deployment guide**: Local (no registry), Project (package in repo), Organization (internal registry/proxy), Community (public registry).
+
+### Phase 9E: CLI Integration Points
+
+- **`--registry <url>` option** for `pipelex pkg search`, `pipelex pkg index`, `pipelex pkg inspect`: Queries the remote registry API instead of (or in addition to) local data.
+- **CLI client code**: Thin HTTP client in Pipelex conforming to the API spec from 9A. New `registry_client.py` module.
+- **`pipelex pkg publish` extended**: Registers a package with a remote registry (POST endpoint) after local validation passes.
+- Files: `search_cmd.py`, `index_cmd.py`, `inspect_cmd.py`, `publish_cmd.py`, new `registry_client.py`
+- ~8–12 tests
+
+**Deliverable format:** A standalone specification document (e.g., `mthds-registry-specification_v1.md`) in `refactoring/`, structured as a normative guide with JSON schemas, endpoint definitions, algorithm descriptions, and conformance requirements. The spec must be language-agnostic and self-contained.
 
 ---
 
 ## What NOT to Do
 
-- **Do NOT implement a hosted registry server.** That is a future phase beyond Phase 5.
-- **Phase 5 is local-first.** All index, search, graph, and publish operations run as CLI tools on local data.
+- **Do NOT implement the registry server in Python.** Phase 9 produces a normative specification for the separate registry project (built by another team in a different language). The Pipelex codebase only contains the CLI client (Phase 9E) that talks to the registry API.
+- **Phases 5–8 are local-first.** All index, search, graph, publish, and builder operations run as CLI tools on local data. Remote registry integration comes in Phase 9E.
 - **Do NOT rename the manifest** to anything other than `METHODS.toml`. The design docs are explicit about this name.
 - **Do NOT rename Python classes or internal Pipelex types.** The standard is MTHDS; the implementation is Pipelex. Keep existing class names.
 
@@ -201,13 +305,24 @@ Delivered:
 
 ## Note on Client Project Brief
 
-`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–3). Client projects can now:
+`mthds-client-project-update-brief.md` has been updated to reflect all completed phases (0–5). Client projects can now:
 - Use `.mthds` file extension and "method" terminology (Phase 0)
 - Use hierarchical domains and domain-qualified pipe references (Phase 1)
 - Create `METHODS.toml` manifests with `pipelex pkg init`, inspect with `pipelex pkg list` (Phase 2)
 - Declare local path dependencies with `pipelex pkg add` and use `alias->domain.pipe_code` cross-package references (Phase 3)
 - Use remote dependencies with semver constraints, lock files, and transitive resolution via `pipelex pkg lock/install/update` (Phase 4A–4D)
 - Depend on multiple packages without concept name collisions thanks to per-package library isolation (Phase 4E)
+- Discover and search packages locally with `pipelex pkg index/search/inspect` (Phase 5A–5C)
+- Query the know-how graph for concept/pipe relationships with `pipelex pkg graph` (Phase 5B–5C)
+- Validate package readiness for distribution with `pipelex pkg publish` (Phase 5D)
+
+Once future phases are completed, client projects will additionally be able to:
+- Trust that reserved domains (`native`, `mthds`, `pipelex`) are protected from accidental collision (Phase 6A)
+- Get runtime warnings when a dependency requires a newer MTHDS standard version (Phase 6B)
+- Search for pipes by input/output concept types with `pipelex pkg search --accepts/--produces` (Phase 7A)
+- Get auto-composition suggestions showing how to chain pipes across packages with `pipelex pkg graph --compose` (Phase 7B)
+- Have the builder generate cross-package references to dependency pipes/concepts automatically (Phase 8)
+- Discover, search, and publish packages via a remote registry with `--registry <url>` (Phase 9E)
 
 ---
 
@@ -224,4 +339,11 @@ Delivered:
 | Phase 4 — remote resolution | `pipelex-package-system-design_v*.md` | §7 Dependency Management (fetching, lock file, version resolution) |
 | Phase 4 — testing strategy | `testing-package-system.md` | Layer 3 (local git repos), Layer 4 (GitHub smoke test) |
 | Phase 5 — registry/discovery | `pipelex-package-system-design_v*.md` | §8 Distribution Architecture, §9 Know-How Graph Integration |
+| Phase 6 — reserved domains | `pipelex-package-system-design_v*.md` | §2 Reserved domains, §4 Manifest validation |
+| Phase 6 — mthds_version | `pipelex-package-system-design_v*.md` | §4 `mthds_version` field |
+| Phase 7 — type-aware search | `pipelex-package-system-design_v*.md` | §9 Know-How Graph Integration (type-compatible search) |
+| Phase 7 — auto-composition | `pipelex-package-system-design_v*.md` | §9 Auto-composition suggestions |
+| Phase 8 — builder awareness | `pipelex-package-system-changes_v*.md` | §5.5 Builder (dependency awareness) |
+| Phase 9 — proxy/signed manifests | `pipelex-package-system-design_v*.md` | §7 Proxy/mirror protocol, signed manifests |
+| Phase 9 — registry/multi-tier | `pipelex-package-system-design_v*.md` | §8 Distribution Architecture, multi-tier deployment |
 | Design rationale | `Proposal -The Pipelex Package System.md` | §2, §4 |

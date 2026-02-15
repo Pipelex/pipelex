@@ -10,6 +10,7 @@ from pipelex.cli.commands.pkg.inspect_cmd import do_pkg_inspect
 from pipelex.cli.commands.pkg.install_cmd import do_pkg_install
 from pipelex.cli.commands.pkg.list_cmd import do_pkg_list
 from pipelex.cli.commands.pkg.lock_cmd import do_pkg_lock
+from pipelex.cli.commands.pkg.publish_cmd import do_pkg_publish
 from pipelex.cli.commands.pkg.search_cmd import do_pkg_search
 from pipelex.cli.commands.pkg.update_cmd import do_pkg_update
 
@@ -154,3 +155,14 @@ def pkg_graph_cmd(
 ) -> None:
     """Query the know-how graph for concept/pipe relationships."""
     do_pkg_graph(from_concept=from_concept, to_concept=to_concept, check=check, max_depth=max_depth, cache=cache)
+
+
+@pkg_app.command("publish", help="Validate package readiness for distribution")
+def pkg_publish_cmd(
+    tag: Annotated[
+        bool,
+        typer.Option("--tag", help="Create git tag v{version} locally on success"),
+    ] = False,
+) -> None:
+    """Validate that the package is ready for distribution."""
+    do_pkg_publish(tag=tag)
