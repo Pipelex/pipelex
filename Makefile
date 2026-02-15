@@ -20,6 +20,7 @@ VENV_PIPELEX := "$(VIRTUAL_ENV)/bin/pipelex"
 VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
+VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
@@ -58,6 +59,8 @@ make format                   - format with ruff format
 make lint                     - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
+make plxt-format              - Format TOML/MTHDS/PLX files with plxt
+make plxt-lint                - Lint TOML/MTHDS/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
 make up-kit-configs           - Update kit configs from .pipelex/
@@ -67,6 +70,8 @@ make ccs                      - Shorthand -> check-config-sync
 make check-rules              - Verify installed agent rules match kit templates
 make check-urls               - Check all URLs in pipelex/urls.py for broken links (quiet)
 make cu                       - Check URLs with verbose output (shows details)
+make generate-mthds-schema    - Generate JSON Schema for .mthds files
+make gms                      - Shorthand -> generate-mthds-schema
 make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
@@ -84,6 +89,8 @@ make merge-check-ruff-lint    - Run ruff merge check without updating files
 make merge-check-ruff-format  - Run ruff merge check without updating files
 make merge-check-mypy         - Run mypy merge check without updating files
 make merge-check-pyright	  - Run pyright merge check without updating files
+make merge-check-plxt-format  - Run plxt format check without modifying files
+make merge-check-plxt-lint    - Run plxt lint check
 
 make v                        - Shorthand -> validate
 make codex-tests              - Run tests for Codex (exit on first failure) (no inference, no codex_disabled)
@@ -148,7 +155,7 @@ export HELP
 
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
-	format lint pyright mypy pylint \
+	format lint pyright mypy pylint plxt-format plxt-lint \
     rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
@@ -156,9 +163,10 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc agent-check agent-test \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
-	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
+	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
+	generate-mthds-schema gms \
 	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
@@ -224,6 +232,12 @@ lock: env
 	@uv lock && \
 	echo uv lock without update;
 
+plxt: env ## Rebuild and reinstall plxt CLI from local vscode-pipelex source
+	$(call PRINT_TITLE,"Reinstalling plxt from source")
+	@. $(VIRTUAL_ENV)/bin/activate && \
+	uv sync --all-extras --reinstall-package plxt && \
+	echo "Reinstalled plxt in ${VIRTUAL_ENV}";
+
 update: env
 	$(call PRINT_TITLE,"Updating all dependencies")
 	@uv lock --upgrade && \
@@ -275,6 +289,15 @@ check-config-sync: env
 
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"
+
+generate-mthds-schema: env
+	$(call PRINT_TITLE,"Generating MTHDS JSON Schema")
+	$(VENV_PIPELEX_DEV) generate-mthds-schema
+
+gms: generate-mthds-schema
+	@echo "> done: gms = generate-mthds-schema"
+
+# TODO: Add check-mthds-schema target (like check-gateway-models) for CI freshness verification
 
 update-gateway-models: env
 	$(call PRINT_TITLE,"Updating gateway models reference")
@@ -687,6 +710,14 @@ pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
 	$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests
 
+plxt-format: env
+	$(call PRINT_TITLE,"Formatting TOML/MTHDS with plxt")
+	$(VENV_PLXT) fmt
+
+plxt-lint: env
+	$(call PRINT_TITLE,"Linting TOML/MTHDS with plxt")
+	$(VENV_PLXT) lint
+
 
 ##########################################################################################
 ### MERGE CHECKS
@@ -711,6 +742,14 @@ merge-check-mypy: env
 merge-check-pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
 	$(VENV_PYLINT) --rcfile pyproject.toml .
+
+merge-check-plxt-format: env
+	$(call PRINT_TITLE,"Checking TOML/MTHDS formatting with plxt")
+	$(VENV_PLXT) fmt --check
+
+merge-check-plxt-lint: env
+	$(call PRINT_TITLE,"Linting TOML/MTHDS with plxt")
+	$(VENV_PLXT) lint
 
 ##########################################################################################
 ### MISCELLANEOUS
@@ -829,7 +868,7 @@ vg: view-graph
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright mypy
+c: format lint pyright mypy plxt-format plxt-lint
 	@echo "> done: c = check"
 
 cc: cleanderived regenerate-test-models-quiet c
@@ -841,7 +880,7 @@ up: update-gateway-models up-kit-configs rules
 check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports format lint pyright mypy
+agent-check: fix-unused-imports format lint pyright mypy plxt-format plxt-lint
 	@echo "> done: agent-check"
 
 v: validate

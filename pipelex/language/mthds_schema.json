@@ -319,7 +319,7 @@
       "description": "Construct section defining how to compose a StructuredContent from working memory fields.",
       "type": "object",
       "additionalProperties": {
-        "oneOf": [
+        "anyOf": [
           {
             "type": "string",
             "description": "Fixed string value"
@@ -382,7 +382,7 @@
     },
     "ConstructFieldBlueprint": {
       "title": "ConstructFieldBlueprint",
-      "oneOf": [
+      "anyOf": [
         {
           "type": "string",
           "description": "Fixed string value"
@@ -534,9 +534,9 @@
         "nb_steps": {
           "anyOf": [
             {
-              "minimum": 0,
               "exclusiveMinimum": true,
-              "type": "integer"
+              "type": "integer",
+              "minimum": 0
             },
             {
               "type": "null"
@@ -548,9 +548,9 @@
         "guidance_scale": {
           "anyOf": [
             {
-              "minimum": 0,
               "exclusiveMinimum": true,
-              "type": "number"
+              "type": "number",
+              "minimum": 0
             },
             {
               "type": "null"
@@ -658,9 +658,9 @@
         "reasoning_budget": {
           "anyOf": [
             {
-              "minimum": 0,
               "exclusiveMinimum": true,
-              "type": "integer"
+              "type": "integer",
+              "minimum": 0
             },
             {
               "type": "null"

@@ -151,11 +151,11 @@ class TestMthdsSchemaGeneration:
         definitions = schema.get("definitions", {})
         field_def = definitions.get("ConstructFieldBlueprint", {})
 
-        one_of = field_def.get("oneOf", [])
-        assert len(one_of) >= 4, "ConstructFieldBlueprint should have at least 4 oneOf variants"
+        any_of = field_def.get("anyOf", [])
+        assert len(any_of) >= 4, "ConstructFieldBlueprint should have at least 4 anyOf variants"
 
         # Check we have the key formats: raw values, {from: ...}, {template: ...}, nested
-        descriptions = [item.get("description", "") for item in one_of]
+        descriptions = [item.get("description", "") for item in any_of]
         has_from = any("from" in desc.lower() or "variable" in desc.lower() for desc in descriptions)
         has_template = any("template" in desc.lower() for desc in descriptions)
         has_nested = any("nested" in desc.lower() for desc in descriptions)

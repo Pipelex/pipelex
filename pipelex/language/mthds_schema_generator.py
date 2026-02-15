@@ -198,7 +198,7 @@ def _build_construct_field_schema() -> dict[str, Any]:
     - Object with other keys: nested construct (recursive)
     """
     return {
-        "oneOf": [
+        "anyOf": [
             {"type": "string", "description": "Fixed string value"},
             {"type": "number", "description": "Fixed numeric value"},
             {"type": "boolean", "description": "Fixed boolean value"},
