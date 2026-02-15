@@ -1,3 +1,4 @@
+import os
 import shutil
 import subprocess  # noqa: S404
 import textwrap
@@ -80,6 +81,7 @@ class TestPkgPublish:
             capture_output=True,
             check=True,
             env={
+                **os.environ,
                 "GIT_AUTHOR_NAME": "Test",
                 "GIT_AUTHOR_EMAIL": "test@test.com",
                 "GIT_COMMITTER_NAME": "Test",
