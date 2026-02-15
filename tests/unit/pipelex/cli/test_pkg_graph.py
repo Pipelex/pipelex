@@ -70,7 +70,12 @@ class TestPkgGraph:
 
         do_pkg_graph(check=f"{source_key},{target_key}")
 
-    def test_graph_invalid_concept_format_exits(self) -> None:
+    def test_graph_invalid_concept_format_exits(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """Bad concept format (missing ::) -> exit 1."""
+        monkeypatch.setattr(
+            "pipelex.cli.commands.pkg.graph_cmd.build_index_from_project",
+            _mock_build_index,
+        )
+
         with pytest.raises(Exit):
             do_pkg_graph(from_concept="bad_format_no_separator")
