@@ -16,7 +16,7 @@ from pipelex.core.packages.dependency_resolver import collect_mthds_files
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
 from pipelex.core.packages.exceptions import LockFileError, ManifestError, PublishValidationError
 from pipelex.core.packages.lock_file import LOCK_FILENAME, parse_lock_file
-from pipelex.core.packages.manifest import MTHDS_STANDARD_VERSION, RESERVED_DOMAINS, MthdsPackageManifest, is_reserved_domain_path
+from pipelex.core.packages.manifest import MTHDS_STANDARD_VERSION, MthdsPackageManifest
 from pipelex.core.packages.manifest_parser import parse_methods_toml
 from pipelex.core.packages.visibility import check_visibility_for_blueprints
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
@@ -222,35 +222,6 @@ def _check_bundles(
         )
 
     return domain_pipes, blueprints, issues
-
-
-def _check_reserved_domains(domain_pipes: dict[str, list[str]]) -> list[PublishValidationIssue]:
-    """Check that no bundle domain starts with a reserved domain segment.
-
-    Args:
-        domain_pipes: Mapping of domain paths to pipe codes found in bundles
-
-    Returns:
-        List of issues for each reserved domain violation
-    """
-    issues: list[PublishValidationIssue] = []
-
-    for domain in domain_pipes:
-        if is_reserved_domain_path(domain):
-            first_segment = domain.split(".")[0]
-            issues.append(
-                PublishValidationIssue(
-                    level=IssueLevel.ERROR,
-                    category=IssueCategory.MANIFEST,
-                    message=(
-                        f"Bundle domain '{domain}' uses reserved domain '{first_segment}'. "
-                        f"Reserved domains ({', '.join(sorted(RESERVED_DOMAINS))}) cannot be used in user packages."
-                    ),
-                    suggestion=f"Rename the domain in your .mthds file to avoid the reserved prefix '{first_segment}'",
-                )
-            )
-
-    return issues
 
 
 def _check_exports(manifest: MthdsPackageManifest, domain_pipes: dict[str, list[str]]) -> list[PublishValidationIssue]:
@@ -467,9 +438,6 @@ def validate_for_publish(package_root: Path, check_git: bool = True) -> PublishV
     # 7-8. Check bundles exist and parse
     domain_pipes, blueprints, bundle_issues = _check_bundles(package_root)
     all_issues.extend(bundle_issues)
-
-    # 8b. Check for reserved domains in bundles
-    all_issues.extend(_check_reserved_domains(domain_pipes))
 
     # 9. Check exports consistency
     all_issues.extend(_check_exports(manifest, domain_pipes))

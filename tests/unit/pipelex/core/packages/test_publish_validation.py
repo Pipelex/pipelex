@@ -260,7 +260,7 @@ class TestPublishValidation:
         assert any("license" in msg.lower() for msg in warning_messages)
 
     def test_reserved_domain_in_bundle_errors(self, tmp_path: Path) -> None:
-        """Bundle with a reserved domain should produce a MANIFEST ERROR mentioning 'reserved'."""
+        """Bundle with a reserved domain should produce a VISIBILITY ERROR mentioning 'reserved'."""
         # Write a valid manifest without reserved domains in exports
         manifest_content = textwrap.dedent("""\
             [package]
@@ -286,10 +286,41 @@ class TestPublishValidation:
 
         result = validate_for_publish(tmp_path, check_git=False)
 
-        manifest_errors = _issues_by_category(result, IssueCategory.MANIFEST)
-        reserved_errors = [issue for issue in manifest_errors if "reserved" in issue.message.lower()]
-        assert len(reserved_errors) >= 1
+        visibility_errors = _issues_by_category(result, IssueCategory.VISIBILITY)
+        reserved_errors = [issue for issue in visibility_errors if "reserved" in issue.message.lower()]
+        assert len(reserved_errors) == 1
         assert reserved_errors[0].level == IssueLevel.ERROR
+
+    def test_reserved_domain_not_reported_twice(self, tmp_path: Path) -> None:
+        """Reserved domain violation must appear exactly once, not duplicated across categories."""
+        manifest_content = textwrap.dedent("""\
+            [package]
+            address = "github.com/test/reserved-dup"
+            version = "1.0.0"
+            description = "Dedup test"
+            authors = ["Test"]
+            license = "MIT"
+        """)
+        (tmp_path / MANIFEST_FILENAME).write_text(manifest_content, encoding="utf-8")
+
+        bundle_content = textwrap.dedent("""\
+            domain = "native"
+
+            [pipe.some_pipe]
+            type = "PipeLLM"
+            description = "A test pipe"
+            output = "Text"
+            prompt = "Hello"
+        """)
+        (tmp_path / "reserved.mthds").write_text(bundle_content, encoding="utf-8")
+
+        result = validate_for_publish(tmp_path, check_git=False)
+
+        all_reserved = [issue for issue in result.issues if "reserved" in issue.message.lower()]
+        assert len(all_reserved) == 1, (
+            f"Expected exactly 1 reserved-domain issue, got {len(all_reserved)} across categories: "
+            f"{[(issue.category, issue.message) for issue in all_reserved]}"
+        )
 
     def test_valid_mthds_version_no_publish_errors(self, tmp_path: Path) -> None:
         """Manifest with valid mthds_version should produce no mthds_version MANIFEST errors."""
