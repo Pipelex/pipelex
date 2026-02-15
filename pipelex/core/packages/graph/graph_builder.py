@@ -75,7 +75,7 @@ def _build_concept_nodes(
 
         if address not in package_concept_lookup:
             package_concept_lookup[address] = {}
-        package_concept_lookup[address][concept_entry.concept_code] = concept_id
+        package_concept_lookup[address][concept_entry.concept_ref] = concept_id
 
 
 def _build_native_concept_nodes(graph: KnowHowGraph) -> None:
@@ -158,12 +158,12 @@ def _resolve_refines_string(
 
     # Local reference: look up in same package
     local_lookup = package_concept_lookup.get(package_address, {})
-    # Try as a bare concept code first
+    # Try as a concept_ref (domain-qualified) key
     if refines in local_lookup:
         return local_lookup[refines]
-    # Try as a full concept_ref
+    # Fall back to bare concept code match
     for concept_id in local_lookup.values():
-        if concept_id.concept_ref == refines:
+        if concept_id.concept_code == refines:
             return concept_id
     return None
 
@@ -204,16 +204,15 @@ def _resolve_concept_code(
     if QualifiedRef.has_cross_package_prefix(concept_spec):
         return _resolve_cross_package_concept(concept_spec, package_address, index, package_concept_lookup)
 
-    # Look up in same package by bare concept code
+    # Look up in same package — try as concept_ref (domain-qualified) key first
     local_lookup = package_concept_lookup.get(package_address, {})
     if concept_spec in local_lookup:
         return local_lookup[concept_spec]
 
-    # Domain-qualified ref: domain.ConceptCode
-    if "." in concept_spec:
-        for concept_id in local_lookup.values():
-            if concept_id.concept_ref == concept_spec:
-                return concept_id
+    # Fall back to bare concept code match
+    for concept_id in local_lookup.values():
+        if concept_id.concept_code == concept_spec:
+            return concept_id
 
     # Unresolved: log warning and return None to exclude from the graph
     log.warning(f"Could not resolve concept '{concept_spec}' in package {package_address}, domain {domain_code}")
@@ -250,18 +249,18 @@ def _resolve_cross_package_concept(
 
     target_lookup = package_concept_lookup.get(resolved_address, {})
 
-    # Try by bare concept code (last segment of remainder)
+    # Try by full concept_ref (remainder is domain.ConceptCode)
+    if remainder in target_lookup:
+        return target_lookup[remainder]
+
+    # Fall back to bare concept code (last segment of remainder)
     try:
         ref = QualifiedRef.parse(remainder)
     except QualifiedRefError:
         log.warning(f"Malformed cross-package concept spec '{concept_spec}': remainder '{remainder}' is not a valid reference")
         return None
-    if ref.local_code in target_lookup:
-        return target_lookup[ref.local_code]
-
-    # Try by full concept_ref
     for concept_id in target_lookup.values():
-        if concept_id.concept_ref == remainder:
+        if concept_id.concept_code == ref.local_code:
             return concept_id
 
     log.warning(f"Could not resolve cross-package concept '{concept_spec}' in target package {resolved_address}")

@@ -9,12 +9,15 @@ from tests.unit.pipelex.core.packages.graph.test_data import (
     ANALYTICS_LIB_ADDRESS,
     LEGAL_TOOLS_ADDRESS,
     MALFORMED_REF_ADDRESS,
+    MULTI_DOMAIN_CONSUMER_ADDRESS,
+    MULTI_DOMAIN_PKG_ADDRESS,
     PHANTOM_PKG_ADDRESS,
     QUALIFIED_REF_ADDRESS,
     REFINING_APP_ADDRESS,
     SCORING_LIB_ADDRESS,
     make_test_package_index,
     make_test_package_index_with_malformed_cross_package_ref,
+    make_test_package_index_with_multi_domain_same_concept_code,
     make_test_package_index_with_qualified_concept_specs,
     make_test_package_index_with_unresolvable_concepts,
 )
@@ -297,3 +300,47 @@ class TestGraphBuilder:
         pipe_node = graph.get_pipe_node(valid_key)
         assert pipe_node is not None
         assert pipe_node.output_concept_id.package_address == MALFORMED_REF_ADDRESS
+
+    def test_cross_package_ref_resolves_correct_domain_when_same_code_in_multiple_domains(self) -> None:
+        """Cross-package ref alias->domain.Code resolves to the specified domain, not another domain with same code."""
+        index = make_test_package_index_with_multi_domain_same_concept_code()
+        graph = build_know_how_graph(index)
+
+        # Both concept nodes should exist in the multi-domain package
+        scoring_concept = ConceptId(
+            package_address=MULTI_DOMAIN_PKG_ADDRESS,
+            concept_ref="pkg_test_scoring.PkgTestMetric",
+        )
+        analytics_concept = ConceptId(
+            package_address=MULTI_DOMAIN_PKG_ADDRESS,
+            concept_ref="pkg_test_analytics.PkgTestMetric",
+        )
+        assert graph.get_concept_node(scoring_concept) is not None
+        assert graph.get_concept_node(analytics_concept) is not None
+
+        # The consumer pipe referencing multi_domain->pkg_test_scoring.PkgTestMetric
+        # must resolve to the scoring domain, NOT analytics
+        scoring_pipe_key = f"{MULTI_DOMAIN_CONSUMER_ADDRESS}::pkg_test_use_scoring_metric"
+        scoring_pipe = graph.get_pipe_node(scoring_pipe_key)
+        assert scoring_pipe is not None, f"Pipe '{scoring_pipe_key}' should be in graph"
+        scoring_input = scoring_pipe.input_concept_ids["metric"]
+        assert scoring_input.package_address == MULTI_DOMAIN_PKG_ADDRESS
+        assert scoring_input.concept_ref == "pkg_test_scoring.PkgTestMetric"
+
+        # The consumer pipe referencing multi_domain->pkg_test_analytics.PkgTestMetric
+        # must resolve to the analytics domain, NOT scoring
+        analytics_pipe_key = f"{MULTI_DOMAIN_CONSUMER_ADDRESS}::pkg_test_use_analytics_metric"
+        analytics_pipe = graph.get_pipe_node(analytics_pipe_key)
+        assert analytics_pipe is not None, f"Pipe '{analytics_pipe_key}' should be in graph"
+        analytics_input = analytics_pipe.input_concept_ids["metric"]
+        assert analytics_input.package_address == MULTI_DOMAIN_PKG_ADDRESS
+        assert analytics_input.concept_ref == "pkg_test_analytics.PkgTestMetric"
+
+    def test_multi_domain_same_code_both_concept_nodes_preserved(self) -> None:
+        """Same concept code in two domains within one package creates distinct nodes."""
+        index = make_test_package_index_with_multi_domain_same_concept_code()
+        graph = build_know_how_graph(index)
+
+        # Count non-native concept nodes from the multi-domain package
+        multi_domain_keys = [key for key in graph.concept_nodes if key.startswith(MULTI_DOMAIN_PKG_ADDRESS)]
+        assert len(multi_domain_keys) == 2, f"Expected 2 concept nodes for multi-domain-pkg, got {len(multi_domain_keys)}: {multi_domain_keys}"

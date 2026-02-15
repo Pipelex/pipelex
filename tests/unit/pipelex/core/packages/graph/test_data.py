@@ -28,6 +28,8 @@ ANALYTICS_LIB_ADDRESS = "github.com/pkg_test/analytics-lib"
 PHANTOM_PKG_ADDRESS = "github.com/pkg_test/phantom-pkg"
 QUALIFIED_REF_ADDRESS = "github.com/pkg_test/qualified-ref-pkg"
 MALFORMED_REF_ADDRESS = "github.com/pkg_test/malformed-ref-pkg"
+MULTI_DOMAIN_PKG_ADDRESS = "github.com/pkg_test/multi-domain-pkg"
+MULTI_DOMAIN_CONSUMER_ADDRESS = "github.com/pkg_test/multi-domain-consumer"
 
 
 def make_test_package_index() -> PackageIndex:
@@ -386,5 +388,112 @@ def make_test_package_index_with_malformed_cross_package_ref() -> PackageIndex:
         dependency_aliases={"scoring_dep": SCORING_LIB_ADDRESS},
     )
     index.add_entry(malformed_pkg)
+
+    return index
+
+
+def make_test_package_index_with_multi_domain_same_concept_code() -> PackageIndex:
+    """Build a PackageIndex where one package has the same concept code in two domains.
+
+    This tests that cross-package resolution picks the correct domain when
+    ``alias->domain.ConceptCode`` is used and the target package has that
+    concept code in multiple domains.
+
+    Creates:
+    - multi-domain-pkg with:
+      - Domain pkg_test_scoring: PkgTestMetric (concept_ref: pkg_test_scoring.PkgTestMetric)
+      - Domain pkg_test_analytics: PkgTestMetric (concept_ref: pkg_test_analytics.PkgTestMetric)
+      - Two pipes producing each variant
+    - multi-domain-consumer that:
+      - Depends on multi-domain-pkg (alias: multi_domain)
+      - Has a pipe consuming multi_domain->pkg_test_scoring.PkgTestMetric
+      - Has a pipe consuming multi_domain->pkg_test_analytics.PkgTestMetric
+    """
+    index = PackageIndex()
+
+    multi_domain_pkg = PackageIndexEntry(
+        address=MULTI_DOMAIN_PKG_ADDRESS,
+        version="1.0.0",
+        description="Package with same concept code in two domains",
+        domains=[
+            DomainEntry(domain_code="pkg_test_scoring"),
+            DomainEntry(domain_code="pkg_test_analytics"),
+        ],
+        concepts=[
+            ConceptEntry(
+                concept_code="PkgTestMetric",
+                domain_code="pkg_test_scoring",
+                concept_ref="pkg_test_scoring.PkgTestMetric",
+                description="A scoring metric",
+                structure_fields=["score_value"],
+            ),
+            ConceptEntry(
+                concept_code="PkgTestMetric",
+                domain_code="pkg_test_analytics",
+                concept_ref="pkg_test_analytics.PkgTestMetric",
+                description="An analytics metric",
+                structure_fields=["analytics_value"],
+            ),
+        ],
+        pipes=[
+            PipeSignature(
+                pipe_code="pkg_test_compute_scoring_metric",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_scoring",
+                description="Compute scoring metric from text",
+                input_specs={"text": "Text"},
+                output_spec="PkgTestMetric",
+                is_exported=True,
+            ),
+            PipeSignature(
+                pipe_code="pkg_test_compute_analytics_metric",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_analytics",
+                description="Compute analytics metric from text",
+                input_specs={"text": "Text"},
+                output_spec="PkgTestMetric",
+                is_exported=True,
+            ),
+        ],
+    )
+    index.add_entry(multi_domain_pkg)
+
+    multi_domain_consumer = PackageIndexEntry(
+        address=MULTI_DOMAIN_CONSUMER_ADDRESS,
+        version="1.0.0",
+        description="Consumer that references specific domains of multi-domain-pkg",
+        domains=[DomainEntry(domain_code="pkg_test_consumer")],
+        concepts=[
+            ConceptEntry(
+                concept_code="PkgTestConsumerResult",
+                domain_code="pkg_test_consumer",
+                concept_ref="pkg_test_consumer.PkgTestConsumerResult",
+                description="A consumer result",
+            ),
+        ],
+        pipes=[
+            PipeSignature(
+                pipe_code="pkg_test_use_scoring_metric",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_consumer",
+                description="Use scoring metric from dependency",
+                input_specs={"metric": "multi_domain->pkg_test_scoring.PkgTestMetric"},
+                output_spec="Text",
+                is_exported=True,
+            ),
+            PipeSignature(
+                pipe_code="pkg_test_use_analytics_metric",
+                pipe_type="PipeLLM",
+                domain_code="pkg_test_consumer",
+                description="Use analytics metric from dependency",
+                input_specs={"metric": "multi_domain->pkg_test_analytics.PkgTestMetric"},
+                output_spec="Text",
+                is_exported=True,
+            ),
+        ],
+        dependencies=[MULTI_DOMAIN_PKG_ADDRESS],
+        dependency_aliases={"multi_domain": MULTI_DOMAIN_PKG_ADDRESS},
+    )
+    index.add_entry(multi_domain_consumer)
 
     return index
