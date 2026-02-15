@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 
 from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.packages.manifest import MthdsPackageManifest
+from pipelex.core.packages.manifest import RESERVED_DOMAINS, MthdsPackageManifest, is_reserved_domain_path
 from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 
@@ -179,6 +179,33 @@ class PackageVisibilityChecker:
 
         return errors
 
+    def validate_reserved_domains(self) -> list[VisibilityError]:
+        """Check that no bundle declares a domain starting with a reserved segment.
+
+        Returns:
+            List of VisibilityError for each bundle using a reserved domain
+        """
+        errors: list[VisibilityError] = []
+
+        for bundle in self._bundles:
+            if is_reserved_domain_path(bundle.domain):
+                first_segment = bundle.domain.split(".")[0]
+                msg = (
+                    f"Bundle domain '{bundle.domain}' uses reserved domain '{first_segment}'. "
+                    f"Reserved domains ({', '.join(sorted(RESERVED_DOMAINS))}) cannot be used in user packages."
+                )
+                errors.append(
+                    VisibilityError(
+                        pipe_ref="",
+                        source_domain=bundle.domain,
+                        target_domain=first_segment,
+                        context="bundle domain declaration",
+                        message=msg,
+                    )
+                )
+
+        return errors
+
 
 def check_visibility_for_blueprints(
     manifest: MthdsPackageManifest | None,
@@ -196,6 +223,7 @@ def check_visibility_for_blueprints(
         List of visibility errors
     """
     checker = PackageVisibilityChecker(manifest=manifest, bundles=blueprints)
-    errors = checker.validate_all_pipe_references()
+    errors = checker.validate_reserved_domains()
+    errors.extend(checker.validate_all_pipe_references())
     errors.extend(checker.validate_cross_package_references())
     return errors

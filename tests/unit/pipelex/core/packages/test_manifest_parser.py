@@ -13,6 +13,7 @@ from tests.unit.pipelex.core.packages.test_data import (
     MISSING_REQUIRED_FIELDS_TOML,
     MULTI_LEVEL_EXPORTS_TOML,
     NON_TABLE_DEPENDENCY_TOML,
+    RESERVED_DOMAIN_EXPORTS_TOML,
     ManifestTestData,
 )
 
@@ -98,6 +99,11 @@ class TestManifestParser:
         _ = topic  # Used for test identification
         with pytest.raises(ManifestValidationError, match="Invalid exports"):
             parse_methods_toml(toml_content)
+
+    def test_parse_reserved_domain_in_exports_raises(self):
+        """Reserved domain in [exports] should raise ManifestValidationError."""
+        with pytest.raises(ManifestValidationError, match="Invalid exports"):
+            parse_methods_toml(RESERVED_DOMAIN_EXPORTS_TOML)
 
     def test_serialize_roundtrip(self):
         """Serialize a manifest to TOML and parse it back — roundtrip check."""

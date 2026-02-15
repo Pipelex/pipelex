@@ -1,3 +1,5 @@
+import pytest
+
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.packages.manifest import DomainExports, MthdsPackageManifest
 from pipelex.core.packages.visibility import PackageVisibilityChecker
@@ -154,4 +156,32 @@ class TestPackageVisibilityChecker:
         )
         checker = PackageVisibilityChecker(manifest=manifest, bundles=[bundle_legal])
         errors = checker.validate_all_pipe_references()
+        assert errors == []
+
+    @pytest.mark.parametrize(
+        "reserved_domain",
+        ["native", "mthds", "pipelex"],
+    )
+    def test_bundle_with_reserved_domain_produces_error(self, reserved_domain: str):
+        """Bundle declaring a reserved domain should produce a VisibilityError."""
+        manifest = _make_manifest_with_exports([])
+        bundle = PipelexBundleBlueprint(
+            domain=reserved_domain,
+            pipe={"some_pipe": _make_llm_pipe()},
+        )
+        checker = PackageVisibilityChecker(manifest=manifest, bundles=[bundle])
+        errors = checker.validate_reserved_domains()
+        assert len(errors) == 1
+        assert "reserved domain" in errors[0].message
+        assert reserved_domain in errors[0].message
+
+    def test_bundle_with_non_reserved_domain_no_error(self):
+        """Bundle declaring a non-reserved domain should produce no errors."""
+        manifest = _make_manifest_with_exports([])
+        bundle = PipelexBundleBlueprint(
+            domain="legal",
+            pipe={"some_pipe": _make_llm_pipe()},
+        )
+        checker = PackageVisibilityChecker(manifest=manifest, bundles=[bundle])
+        errors = checker.validate_reserved_domains()
         assert errors == []

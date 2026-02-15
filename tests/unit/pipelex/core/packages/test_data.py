@@ -157,6 +157,16 @@ source = "https://github.com/pipelexlab/scoring-lib"
 
 EMPTY_LOCK_FILE_TOML = ""
 
+RESERVED_DOMAIN_EXPORTS_TOML = """\
+[package]
+address = "github.com/pipelexlab/reserved-domain"
+version = "1.0.0"
+description = "Package with a reserved domain in exports"
+
+[exports.native]
+pipes = ["some_pipe"]
+"""
+
 INVALID_HASH_LOCK_FILE_TOML = """\
 ["github.com/pipelexlab/bad-hash"]
 version = "1.0.0"

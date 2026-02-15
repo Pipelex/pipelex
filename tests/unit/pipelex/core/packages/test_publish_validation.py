@@ -230,3 +230,35 @@ class TestPublishValidation:
         warning_messages = {issue.message for issue in manifest_warnings}
         assert any("authors" in msg.lower() for msg in warning_messages)
         assert any("license" in msg.lower() for msg in warning_messages)
+
+    def test_reserved_domain_in_bundle_errors(self, tmp_path: Path) -> None:
+        """Bundle with a reserved domain should produce a MANIFEST ERROR mentioning 'reserved'."""
+        # Write a valid manifest without reserved domains in exports
+        manifest_content = textwrap.dedent("""\
+            [package]
+            address = "github.com/test/reserved-bundle"
+            version = "1.0.0"
+            description = "Reserved domain test"
+            authors = ["Test"]
+            license = "MIT"
+        """)
+        (tmp_path / MANIFEST_FILENAME).write_text(manifest_content, encoding="utf-8")
+
+        # Write a .mthds bundle file that declares a reserved domain
+        bundle_content = textwrap.dedent("""\
+            domain = "native"
+
+            [pipe.some_pipe]
+            type = "PipeLLM"
+            description = "A test pipe"
+            output = "Text"
+            prompt = "Hello"
+        """)
+        (tmp_path / "reserved.mthds").write_text(bundle_content, encoding="utf-8")
+
+        result = validate_for_publish(tmp_path, check_git=False)
+
+        manifest_errors = _issues_by_category(result, IssueCategory.MANIFEST)
+        reserved_errors = [issue for issue in manifest_errors if "reserved" in issue.message.lower()]
+        assert len(reserved_errors) >= 1
+        assert reserved_errors[0].level == IssueLevel.ERROR

@@ -128,6 +128,42 @@ class TestMthdsPackageManifest:
                 alias="NotSnakeCase",
             )
 
+    @pytest.mark.parametrize(
+        "reserved_domain",
+        ["native", "mthds", "pipelex"],
+    )
+    def test_reserved_domain_exact_in_exports_rejected(self, reserved_domain: str):
+        """Exact reserved domain names in exports should be rejected."""
+        with pytest.raises(ValidationError, match="reserved domain"):
+            DomainExports(
+                domain_path=reserved_domain,
+                pipes=["some_pipe"],
+            )
+
+    @pytest.mark.parametrize(
+        "reserved_domain_path",
+        ["native.concepts", "mthds.core", "pipelex.internal"],
+    )
+    def test_reserved_domain_prefix_in_exports_rejected(self, reserved_domain_path: str):
+        """Hierarchical paths starting with a reserved domain should be rejected."""
+        with pytest.raises(ValidationError, match="reserved domain"):
+            DomainExports(
+                domain_path=reserved_domain_path,
+                pipes=["some_pipe"],
+            )
+
+    @pytest.mark.parametrize(
+        "safe_domain",
+        ["legal", "my_native_utils", "pipeline", "scoring"],
+    )
+    def test_non_reserved_domain_accepted(self, safe_domain: str):
+        """Domain names that are not reserved should pass validation."""
+        export = DomainExports(
+            domain_path=safe_domain,
+            pipes=["some_pipe"],
+        )
+        assert export.domain_path == safe_domain
+
     def test_invalid_domain_path_in_exports(self):
         """Invalid domain path in exports should fail."""
         with pytest.raises(ValidationError, match="Invalid domain path"):

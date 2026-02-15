@@ -32,6 +32,14 @@ VERSION_CONSTRAINT_PATTERN = re.compile(rf"^{_SINGLE_CONSTRAINT}(?:\s*,\s*{_SING
 # e.g. "github.com/org/repo", "example.io/pkg"
 ADDRESS_PATTERN = re.compile(r"^[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+/[a-zA-Z0-9._/-]+$")
 
+RESERVED_DOMAINS: frozenset[str] = frozenset({"native", "mthds", "pipelex"})
+
+
+def is_reserved_domain_path(domain_path: str) -> bool:
+    """Check if a domain path starts with a reserved domain segment."""
+    first_segment = domain_path.split(".", maxsplit=1)[0]
+    return first_segment in RESERVED_DOMAINS
+
 
 def is_valid_semver(version: str) -> bool:
     """Check if a version string is valid semver."""
@@ -105,6 +113,13 @@ class DomainExports(BaseModel):
     def validate_domain_path(cls, domain_path: str) -> str:
         if not is_domain_code_valid(domain_path):
             msg = f"Invalid domain path '{domain_path}' in [exports]. Domain paths must be dot-separated snake_case segments."
+            raise ValueError(msg)
+        if is_reserved_domain_path(domain_path):
+            first_segment = domain_path.split(".", maxsplit=1)[0]
+            msg = (
+                f"Domain path '{domain_path}' uses reserved domain '{first_segment}'. "
+                f"Reserved domains ({', '.join(sorted(RESERVED_DOMAINS))}) cannot be used in package exports."
+            )
             raise ValueError(msg)
         return domain_path
 
