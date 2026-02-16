@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.tools.misc.package_utils import get_package_version
 
 # Fields that are injected at load time, never written by users in .mthds files
@@ -274,12 +273,3 @@ def _walk_schema(node: dict[str, Any] | list[Any] | Any, visitor: Callable[[dict
         typed_list = cast("list[Any]", node)
         for child_item in typed_list:
             _walk_schema(child_item, visitor)
-
-
-def get_all_pipe_type_values() -> list[str]:
-    """Return all PipeType enum values for schema validation.
-
-    Returns:
-        List of all pipe type string values (e.g., ['PipeFunc', 'PipeLLM', ...])
-    """
-    return PipeType.value_list()
