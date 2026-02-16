@@ -55,8 +55,10 @@ make update                   - Upgrade dependencies via uv
 make validate                 - Run the setup sequence to validate the config and libraries
 make build                    - Build the wheels
 
-make format                   - format with ruff format
-make lint                     - lint with ruff check
+make format                   - format with ruff and plxt
+make lint                     - lint with ruff and plxt
+make ruff-format              - format with ruff format
+make ruff-lint                - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
 make plxt-format              - Format TOML/MTHDS/PLX files with plxt
@@ -155,7 +157,7 @@ export HELP
 
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
-	format lint pyright mypy pylint plxt-format plxt-lint \
+	format lint ruff-format ruff-lint pyright mypy pylint plxt-format plxt-lint \
     rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
@@ -687,16 +689,30 @@ cm: cov-missing
 	@echo "> done: cm = cov-missing"
 
 ##########################################################################################
-### LINTING
+### FORMATTING, LINTING, AND TYPECHECKING
 ##########################################################################################
 
-format: env
+ruff-format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
 	$(VENV_RUFF) format . --config pyproject.toml
 
-lint: env
+ruff-lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
 	$(VENV_RUFF) check . --fix --config pyproject.toml
+
+plxt-format: env
+	$(call PRINT_TITLE,"Formatting TOML/MTHDS with plxt")
+	$(VENV_PLXT) fmt
+
+plxt-lint: env
+	$(call PRINT_TITLE,"Linting TOML/MTHDS with plxt")
+	$(VENV_PLXT) lint
+
+format: ruff-format plxt-format
+	@echo "> done: format = ruff-format plxt-format"
+
+lint: ruff-lint plxt-lint
+	@echo "> done: lint = ruff-lint plxt-lint"
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
@@ -709,20 +725,6 @@ mypy: env
 pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
 	$(VENV_PYLINT) --rcfile pyproject.toml pipelex tests
-
-# No-op: disabled to pass CI/CD before we reformat all the TOML and PLX files
-# plxt-format: env
-# 	$(call PRINT_TITLE,"Formatting TOML/MTHDS with plxt")
-# 	$(VENV_PLXT) fmt
-plxt-format:
-	@true
-
-# No-op: disabled to pass CI/CD before we reformat all the TOML and PLX files
-# plxt-lint: env
-# 	$(call PRINT_TITLE,"Linting TOML/MTHDS with plxt")
-# 	$(VENV_PLXT) lint
-plxt-lint:
-	@true
 
 
 ##########################################################################################
@@ -874,7 +876,7 @@ vg: view-graph
 ### SHORTHANDS
 ##########################################################################################
 
-c: format lint pyright mypy plxt-format plxt-lint
+c: format lint pyright mypy
 	@echo "> done: c = check"
 
 cc: cleanderived regenerate-test-models-quiet c
@@ -886,7 +888,7 @@ up: update-gateway-models up-kit-configs rules
 check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models pylint
 	@echo "> done: check"
 
-agent-check: fix-unused-imports format lint pyright mypy plxt-format plxt-lint
+agent-check: fix-unused-imports format lint pyright mypy
 	@echo "> done: agent-check"
 
 v: validate
