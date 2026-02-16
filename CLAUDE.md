@@ -16,6 +16,7 @@
    - Pyright: Static type checking
    - Ruff: Fix unused imports, lint, format  
    - Mypy: Static type checker
+   - plxt: Format and lint TOML, MTHDS, and PLX files
 
    Always fix any issues reported by these tools before proceeding.
 
@@ -87,6 +88,22 @@
    ```
 
    For standard installations, the virtual environment is named `.venv`. Always check this first. On Windows, the path is `.venv\Scripts\` instead of `.venv/bin/`.
+
+### Pipelex Dev CLI (`pipelex-dev`)
+
+   The `pipelex-dev` CLI provides internal development tools that are not distributed with the package. It is available in the virtual environment.
+
+   ```bash
+   .venv/bin/pipelex-dev --help
+   ```
+
+   Key commands:
+
+   - **`generate-mthds-schema`**: Regenerate the MTHDS JSON Schema (`pipelex/language/mthds_schema.json`). Run this after modifying `mthds_schema_generator.py`.
+
+     ```bash
+     .venv/bin/pipelex-dev generate-mthds-schema
+     ```
 
 ## Coding Standards & Best Practices for Python Code
 
