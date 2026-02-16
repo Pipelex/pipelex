@@ -934,7 +934,7 @@ A package is a directory containing a `METHODS.toml` manifest and one or more `.
 ```
 my-tool/
 ├── METHODS.toml
-└── method.mthds
+└── main.mthds
 ```
 
 **Full package:**

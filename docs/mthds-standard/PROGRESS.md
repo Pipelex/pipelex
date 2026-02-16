@@ -4,7 +4,7 @@
 |---|----------|--------|-------------|
 | 1 | `03-specification.md` | done | 2026-02-16 |
 | 2 | `01-the-language.md` | done | 2026-02-16 |
-| 3 | `02-the-package-system.md` | pending | — |
+| 3 | `02-the-package-system.md` | done | 2026-02-16 |
 | 4 | `00-home-and-overview.md` | pending | — |
 | 5 | `04-cli-and-guides.md` | pending | — |
 | 6 | `05-implementers-and-about.md` | pending | — |
@@ -57,3 +57,42 @@
 
 - The Language doc references the Package System doc in several "See Also" sections. The Package System doc should cover: package structure, METHODS.toml manifest, exports & visibility, dependencies, cross-package references, lock file, distribution, version resolution, and the Know-How Graph.
 - Key codebase paths to verify: `manifest.py` (MthdsPackageManifest, PackageDependency, DomainExports, RESERVED_DOMAINS), `visibility.py` (PackageVisibilityChecker), `dependency_resolver.py`, `vcs_resolver.py`, `lock_file.py`, `semver.py`.
+
+### Session 3 — 2026-02-16 — `02-the-package-system.md`
+
+**Structure:**
+
+- 9 pages: Package Structure, The Manifest, Exports & Visibility, Dependencies, Cross-Package References, The Lock File, Distribution, Version Resolution, The Know-How Graph.
+- Progressive ordering: starts with directory layout, builds through manifest fields, visibility, dependencies, cross-package references, then moves to lock file, distribution, version resolution, and culminates with the Know-How Graph vision.
+
+**Decisions made:**
+
+- All technical details verified against the codebase (7 spot-checks passed: RESERVED_DOMAINS, MTHDS_STANDARD_VERSION, cache layout `~/.mthds/packages/`, VCS URL construction, MVS algorithm, local path deps not resolved transitively, lock file hash pattern).
+- The cross-package scoring_lib example is reused from both the spec and the language doc for consistency across all three documents.
+- Version constraint table includes all operators supported in code (`>=`, `<=`, `>`, `<`, `==`, `!=`, `^`, `~`, wildcard `*`, compound `,`) — verified against `VERSION_CONSTRAINT_PATTERN` regex in `manifest.py`.
+- The hash computation algorithm matches `compute_directory_hash()` in `lock_file.py` exactly: rglob files, skip .git, sort by POSIX path, feed path string UTF-8 + raw bytes.
+- Manifest discovery algorithm matches `find_package_manifest()` in `discovery.py`: walk up, stop at METHODS.toml or .git or root.
+- The `PackageDependency` model in code has an `alias` field (populated from the TOML key during parsing), but the TOML representation uses the key directly — the doc correctly shows the TOML syntax where the key IS the alias.
+- Visibility checker behavior confirmed: no manifest = all public, bare refs always allowed, same-domain always allowed, cross-domain checks exports list and main_pipe.
+
+**Cross-document consistency:**
+
+- All terminology matches `01-the-language.md` and `03-specification.md`: "bundle", "concept code", "pipe code", "domain code", "bare reference", "domain-qualified", "package-qualified".
+- The three visibility rules (concepts always public, pipes private by default, main_pipe auto-exported) match the spec's `[exports]` section exactly.
+- The scoring_lib cross-package example is identical across all three docs.
+- The cross-package reference resolution steps match the spec's flowchart.
+- Reserved domains listed consistently (`native`, `mthds`, `pipelex`).
+- The `METHODS.toml` example uses `mthds_version = ">=1.0.0"` (consistent with Session 1's decision to use the real standard version `1.0.0`, not the design doc's `0.2.0`).
+
+**Open questions for future docs:**
+
+- The `mthds pkg publish` command runs validation checks. The number (mentioned as "15 checks" in the strategy doc) should be verified when writing the CLI reference in `04-cli-tooling-and-guides.md`.
+- The `mthds pkg graph` command has `--from`, `--to`, `--check`, `--compose`, and `--max-depth` options. The auto-composition feature (graph traversal) should be documented in the CLI reference with practical examples.
+- The `mthds pkg search` command has `--accepts` and `--produces` options for type-compatible search. These tie directly to the Know-How Graph and should be showcased in the "Discover Methods" guide.
+
+**Prep notes for next document (`00-home-and-overview.md`):**
+
+- The overview should introduce the Two Pillars (Language + Package System) and the Progressive Enhancement principle.
+- It should provide 4 entry points as per the strategy doc: "Set up your editor", "Learn the language", "Read the specification", "Get started".
+- Keep it concise (~200 words for landing, ~1000 words for "What is MTHDS?").
+- All substance now exists in docs 01, 02, and 03 — the overview can reference them with confidence.
