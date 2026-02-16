@@ -1,6 +1,6 @@
-domain = "crazy_image_generation"
+domain      = "crazy_image_generation"
 description = "Imagining and rendering absurd, funny images with unexpected surreal elements"
-main_pipe = "generate_crazy_image"
+main_pipe   = "generate_crazy_image"
 
 [concept.ImagePrompt]
 description = """
@@ -15,8 +15,8 @@ Main pipeline that orchestrates the full crazy image generation flow - imagines 
 """
 output = "Image"
 steps = [
-    { pipe = "imagine_scene", result = "image_prompt" },
-    { pipe = "render_image", result = "crazy_image" },
+  { pipe = "imagine_scene", result = "image_prompt" },
+  { pipe = "render_image", result = "crazy_image" },
 ]
 
 [pipe.imagine_scene]
@@ -34,9 +34,9 @@ Generate a creative, absurd, and funny image concept. Combine unexpected element
 """
 
 [pipe.render_image]
-type = "PipeImgGen"
+type        = "PipeImgGen"
 description = "Generates the absurd image based on the creative scene description"
-inputs = { image_prompt = "ImagePrompt" }
-output = "Image"
-prompt = "$image_prompt"
-model = "@default-small"
+inputs      = { image_prompt = "ImagePrompt" }
+output      = "Image"
+prompt      = "$image_prompt"
+model       = "@default-small"

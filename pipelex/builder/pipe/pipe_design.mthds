@@ -2,28 +2,28 @@ domain = "pipe_design"
 
 [concept]
 PipeSignature = "A pipe contract which says what the pipe does, not how it does it: code (the pipe code in snake_case), type, description, inputs, output."
-PipeSpec = "A structured spec for a pipe (union)."
+PipeSpec      = "A structured spec for a pipe (union)."
 # Pipe controllers
-PipeBatchSpec = "A structured spec for a PipeBatch."
+PipeBatchSpec     = "A structured spec for a PipeBatch."
 PipeConditionSpec = "A structured spec for a PipeCondition."
-PipeParallelSpec = "A structured spec for a PipeParallel."
-PipeSequenceSpec = "A structured spec for a PipeSequence."
+PipeParallelSpec  = "A structured spec for a PipeParallel."
+PipeSequenceSpec  = "A structured spec for a PipeSequence."
 # Pipe operators
-PipeFuncSpec = "A structured spec for a PipeFunc."
-PipeImgGenSpec = "A structured spec for a PipeImgGen."
+PipeFuncSpec    = "A structured spec for a PipeFunc."
+PipeImgGenSpec  = "A structured spec for a PipeImgGen."
 PipeComposeSpec = "A structured spec for a pipe jinja2."
-PipeLLMSpec = "A structured spec for a PipeLLM."
+PipeLLMSpec     = "A structured spec for a PipeLLM."
 PipeExtractSpec = "A structured spec for a PipeExtract."
-PipeFailure = "Details of a single pipe failure during dry run."
+PipeFailure     = "Details of a single pipe failure during dry run."
 
 [pipe]
 
 [pipe.detail_pipe_spec]
-type = "PipeCondition"
-description = "Route by signature.type to the correct spec emitter."
-inputs = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
-output = "Anything"
-expression = "pipe_signature.type"
+type            = "PipeCondition"
+description     = "Route by signature.type to the correct spec emitter."
+inputs          = { plan_draft = "builder.PlanDraft", pipe_signature = "PipeSignature", concept_specs = "builder.ConceptSpec[]" }
+output          = "Anything"
+expression      = "pipe_signature.type"
 default_outcome = "fail"
 
 [pipe.detail_pipe_spec.outcomes]

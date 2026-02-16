@@ -1,4 +1,4 @@
-domain = "test_integration2"
+domain      = "test_integration2"
 description = "Test pipes for PipeCondition based on text length"
 
 [pipe]
@@ -24,4 +24,3 @@ prompt = """Add the prefix "SHORT: " to the beginning of the following text:
 @input_text.text
 
 Return only the prefixed text, nothing else."""
-

@@ -1,4 +1,4 @@
-domain = "test_integration4"
+domain      = "test_integration4"
 description = "Test pipe for capitalizing text to uppercase"
 
 [pipe]
@@ -23,4 +23,3 @@ prompt = """Add the prefix "PROCESSED: " to the beginning of the following text:
 @capitalized_text.text
 
 Return only the prefixed text, nothing else."""
-

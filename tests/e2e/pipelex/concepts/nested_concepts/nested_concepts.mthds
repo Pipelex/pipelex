@@ -1,6 +1,6 @@
-domain = "nested_concepts_test"
+domain      = "nested_concepts_test"
 description = "Test domain for concept-to-concept references (nested concepts)"
-main_pipe = "generate_invoice"
+main_pipe   = "generate_invoice"
 
 # Define the LineItem concept with a structure
 [concept.LineItem]
@@ -8,15 +8,15 @@ description = "A single line item in an invoice"
 
 [concept.LineItem.structure]
 product_name = { type = "text", description = "Name of the product", required = true }
-quantity = { type = "integer", description = "Quantity ordered", required = true }
-unit_price = { type = "number", description = "Price per unit", required = true }
+quantity     = { type = "integer", description = "Quantity ordered", required = true }
+unit_price   = { type = "number", description = "Price per unit", required = true }
 
 # Define the Customer concept with a structure
 [concept.Customer]
 description = "A customer for an invoice"
 
 [concept.Customer.structure]
-name = { type = "text", description = "Customer's full name", required = true }
+name  = { type = "text", description = "Customer's full name", required = true }
 email = { type = "text", description = "Customer's email address", required = true }
 
 # Define the Invoice concept with nested concept references
@@ -25,10 +25,10 @@ description = "An invoice with customer and line items"
 
 [concept.Invoice.structure]
 invoice_number = { type = "text", description = "Unique invoice identifier", required = true }
-customer = { type = "concept", concept_ref = "nested_concepts_test.Customer", description = "The customer for this invoice", required = true }
-line_items = { type = "list", item_type = "concept", item_concept_ref = "nested_concepts_test.LineItem", description = "List of line items in the invoice", required = true }
-total_amount = { type = "number", description = "Total invoice amount", required = true }
-notes = { type = "text", description = "Optional notes for the invoice", required = false }
+customer       = { type = "concept", concept_ref = "nested_concepts_test.Customer", description = "The customer for this invoice", required = true }
+line_items     = { type = "list", item_type = "concept", item_concept_ref = "nested_concepts_test.LineItem", description = "List of line items in the invoice", required = true }
+total_amount   = { type = "number", description = "Total invoice amount", required = true }
+notes          = { type = "text", description = "Optional notes for the invoice", required = false }
 
 # Pipe to generate an invoice from text description
 [pipe.generate_invoice]

@@ -8,12 +8,12 @@ default_set = "all"
 
 [agent_rules.sets]
 all = [
-    "commands.md",
-    "python_standards.md",
-    "pipelex_standards.md",
-    "pytest_standards.md",
-    "docs.md",
-    "tdd.md",
+  "commands.md",
+  "python_standards.md",
+  "pipelex_standards.md",
+  "pytest_standards.md",
+  "docs.md",
+  "tdd.md",
 ]
 
 [agent_rules.cursor.front_matter]
@@ -48,12 +48,12 @@ path = "AGENTS.md"
 
 [agent_rules.targets.agents.sets]
 all = [
-    "codex_commands.md",
-    "python_standards.md",
-    "pipelex_standards.md",
-    "pytest_standards.md",
-    "docs.md",
-    "tdd.md",
+  "codex_commands.md",
+  "python_standards.md",
+  "pipelex_standards.md",
+  "pytest_standards.md",
+  "docs.md",
+  "tdd.md",
 ]
 
 [agent_rules.targets.claude]

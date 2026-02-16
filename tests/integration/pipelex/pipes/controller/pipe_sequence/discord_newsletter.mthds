@@ -1,10 +1,10 @@
-domain = "discord_newsletter"
+domain      = "discord_newsletter"
 description = "Create newsletters from Discord channel content by summarizing messages and organizing them according to newsletter format"
 
 [concept]
 DiscordChannelUpdate = "A Discord channel with its messages for newsletter generation"
-ChannelSummary = "A summarized Discord channel for newsletter inclusion"
-HtmlNewsletter = "The final newsletter content in html format with organized channel summaries"
+ChannelSummary       = "A summarized Discord channel for newsletter inclusion"
+HtmlNewsletter       = "The final newsletter content in html format with organized channel summaries"
 
 [pipe.write_discord_newsletter]
 type = "PipeSequence"
@@ -12,19 +12,19 @@ description = "Create a newsletter from Discord articles by summarizing channels
 inputs = { discord_channel_updates = "DiscordChannelUpdate[]" }
 output = "HtmlNewsletter"
 steps = [
-   { pipe = "summarize_discord_channel_update", batch_over = "discord_channel_updates", batch_as = "discord_channel_update", result = "channel_summaries" },
-   { pipe = "write_weekly_summary", result = "weekly_summary" },
-   { pipe = "format_html_newsletter", result = "html_newsletter" },
+  { pipe = "summarize_discord_channel_update", batch_over = "discord_channel_updates", batch_as = "discord_channel_update", result = "channel_summaries" },
+  { pipe = "write_weekly_summary", result = "weekly_summary" },
+  { pipe = "format_html_newsletter", result = "html_newsletter" },
 ]
 
 
 [pipe.summarize_discord_channel_update]
-type = "PipeCondition"
-description = "Select the appropriate summary pipe based on the channel name"
-inputs = { discord_channel_update = "DiscordChannelUpdate" }
-output = "ChannelSummary"
-expression = "discord_channel_update.name"
-outcomes = { "Introduce-Yourself" = "summarize_discord_channel_update_for_new_members" }
+type            = "PipeCondition"
+description     = "Select the appropriate summary pipe based on the channel name"
+inputs          = { discord_channel_update = "DiscordChannelUpdate" }
+output          = "ChannelSummary"
+expression      = "discord_channel_update.name"
+outcomes        = { "Introduce-Yourself" = "summarize_discord_channel_update_for_new_members" }
 default_outcome = "summarize_discord_channel_update_general"
 
 [pipe.summarize_discord_channel_update_for_new_members]
@@ -74,10 +74,10 @@ Keep it short: 200 characters.
 """
 
 [pipe.format_html_newsletter]
-type = "PipeCompose"
+type        = "PipeCompose"
 description = "Combine weekly and channel summaries into a complete newsletter following specific formatting requirements"
-inputs = { weekly_summary = "Text", channel_summaries = "ChannelSummary[]" }
-output = "HtmlNewsletter"
+inputs      = { weekly_summary = "Text", channel_summaries = "ChannelSummary[]" }
+output      = "HtmlNewsletter"
 
 [pipe.format_html_newsletter.template]
 category = "html"
@@ -124,4 +124,3 @@ $weekly_summary
    {% endfor %}
 {% endif %}
 """
-

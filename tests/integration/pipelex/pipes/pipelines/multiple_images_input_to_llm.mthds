@@ -1,4 +1,4 @@
-domain = "test_multiple_images_input_to_llm"
+domain      = "test_multiple_images_input_to_llm"
 description = "Test pipeline that takes multiple images as input to a PipeLLM."
 
 [concept]

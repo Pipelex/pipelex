@@ -1,4 +1,4 @@
-domain = "legal"
+domain      = "legal"
 description = "Single-segment domain baseline"
 
 [concept]
@@ -6,9 +6,9 @@ ContractClause = "A clause in a legal contract"
 
 [pipe]
 [pipe.extract_clause]
-type = "PipeLLM"
+type        = "PipeLLM"
 description = "Extract a clause from a contract"
-inputs = { contract = "Text" }
-output = "ContractClause"
-model = "$quick-reasoning"
-prompt = "Extract the clause from @contract"
+inputs      = { contract = "Text" }
+output      = "ContractClause"
+model       = "$quick-reasoning"
+prompt      = "Extract the clause from @contract"

@@ -1,15 +1,15 @@
-domain = "test_image_in_out"
+domain      = "test_image_in_out"
 description = "Test domain for verifying image output / input support"
-main_pipe = "image_out_in"
+main_pipe   = "image_out_in"
 
 
 [pipe]
 [pipe.generate_image]
-type = "PipeImgGen"
+type        = "PipeImgGen"
 description = "Generate an image from a prompt"
-output = "Image"
-prompt = "A beautiful landscape"
-model = "$gen-image-testing"
+output      = "Image"
+prompt      = "A beautiful landscape"
+model       = "$gen-image-testing"
 
 [pipe.describe_image]
 type = "PipeLLM"
@@ -27,6 +27,6 @@ type = "PipeSequence"
 description = "Generate an image from a prompt and describe it"
 output = "Text"
 steps = [
-    { pipe = "generate_image", result = "image" },
-    { pipe = "describe_image", result = "visual_description" },
+  { pipe = "generate_image", result = "image" },
+  { pipe = "describe_image", result = "visual_description" },
 ]

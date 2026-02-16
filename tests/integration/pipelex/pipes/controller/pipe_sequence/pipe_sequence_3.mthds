@@ -1,13 +1,13 @@
-domain = "creative_ideation"
-description = "Creative ideation pipeline with multiple outputs, batching, and evaluation"
+domain        = "creative_ideation"
+description   = "Creative ideation pipeline with multiple outputs, batching, and evaluation"
 system_prompt = "You are a creative brainstorming expert who generates and evaluates ideas"
 
 [concept]
-CreativeTopic = "A topic or theme for creative ideation"
-CreativeIdea = "A single creative idea or concept"
-IdeaAnalysis = "Detailed analysis of a single creative idea"
+CreativeTopic  = "A topic or theme for creative ideation"
+CreativeIdea   = "A single creative idea or concept"
+IdeaAnalysis   = "Detailed analysis of a single creative idea"
 IdeaEvaluation = "An evaluation and ranking of creative ideas"
-BestIdea = "The top-ranked creative idea with justification"
+BestIdea       = "The top-ranked creative idea with justification"
 
 [pipe]
 [pipe.creative_ideation_sequence]
@@ -16,10 +16,10 @@ description = "Generate multiple ideas, analyze each individually, then select t
 inputs = { topic = "CreativeTopic" }
 output = "BestIdea"
 steps = [
-    { pipe = "generate_multiple_ideas", result = "idea_list" },
-    { pipe = "analyze_single_idea", batch_over = "idea_list", batch_as = "single_idea", result = "detailed_analyses" },
-    { pipe = "evaluate_all_ideas", result = "evaluation" },
-    { pipe = "select_best_idea", result = "final_best_idea" },
+  { pipe = "generate_multiple_ideas", result = "idea_list" },
+  { pipe = "analyze_single_idea", batch_over = "idea_list", batch_as = "single_idea", result = "detailed_analyses" },
+  { pipe = "evaluate_all_ideas", result = "evaluation" },
+  { pipe = "select_best_idea", result = "final_best_idea" },
 ]
 
 [pipe.generate_multiple_ideas]
@@ -109,4 +109,3 @@ Provide:
 2. Key strengths that make it the best choice
 3. Potential next steps for implementation
 """
-

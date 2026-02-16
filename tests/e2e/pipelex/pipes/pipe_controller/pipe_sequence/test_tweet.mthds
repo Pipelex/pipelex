@@ -1,11 +1,11 @@
-domain = "tech_tweet"
+domain      = "tech_tweet"
 description = "A pipeline for optimizing tech tweets using Twitter/X best practices"
 
 [concept]
-DraftTweet = "A draft version of a tech tweet that needs optimization"
+DraftTweet     = "A draft version of a tech tweet that needs optimization"
 OptimizedTweet = "A tweet optimized for Twitter/X engagement following best practices"
-TweetAnalysis = "Analysis of the tweet's structure and potential improvements"
-WritingStyle = "A style of writing"
+TweetAnalysis  = "Analysis of the tweet's structure and potential improvements"
+WritingStyle   = "A style of writing"
 
 [pipe]
 [pipe.analyze_tweet]
@@ -76,7 +76,6 @@ description = "Analyze and optimize a tech tweet in sequence"
 inputs = { draft_tweet = "DraftTweet", writing_style = "WritingStyle" }
 output = "OptimizedTweet"
 steps = [
-    { pipe = "analyze_tweet", result = "tweet_analysis" },
-    { pipe = "optimize_tweet", result = "optimized_tweet" },
+  { pipe = "analyze_tweet", result = "tweet_analysis" },
+  { pipe = "optimize_tweet", result = "optimized_tweet" },
 ]
-

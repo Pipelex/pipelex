@@ -1,17 +1,17 @@
-domain = "builder"
+domain      = "builder"
 description = "Auto-generate a Pipelex bundle (concepts + pipes) from a short user brief."
 
 [concept]
-UserBrief = "A short, natural-language description of what the user wants."
-PlanDraft = "Natural-language pipeline plan text describing sequences, inputs, outputs."
-ConceptDrafts = "Textual draft of the concepts to create."
+UserBrief         = "A short, natural-language description of what the user wants."
+PlanDraft         = "Natural-language pipeline plan text describing sequences, inputs, outputs."
+ConceptDrafts     = "Textual draft of the concepts to create."
 PipelexBundleSpec = "A Pipelex bundle spec."
-BundleHeaderSpec = "A domain information object."
-FlowDraft = "Draft of the flow of the pipeline."
+BundleHeaderSpec  = "A domain information object."
+FlowDraft         = "Draft of the flow of the pipeline."
 
 ## Concepts
 ConceptStructureSpec = "A concept spec with structure but without full implementation."
-ConceptSpec = "A specification for a concept including its code, description, and a structure draft as plain text."
+ConceptSpec          = "A specification for a concept including its code, description, and a structure draft as plain text."
 
 
 [pipe]
@@ -21,15 +21,15 @@ description = "This pipe is going to be the entry point for the builder. It will
 inputs = { brief = "UserBrief" }
 output = "PipelexBundleSpec"
 steps = [
-    { pipe = "draft_the_plan", result = "plan_draft" },
-    { pipe = "draft_the_concepts", result = "concept_drafts" },
-    { pipe = "structure_concepts", result = "concept_specs" },
-    { pipe = "draft_flow", result = "flow_draft" },
-    { pipe = "review_flow", result = "prepared_flow" },
-    { pipe = "design_pipe_signatures", result = "pipe_signatures" },
-    { pipe = "write_bundle_header", result = "bundle_header_spec" },
-    { pipe = "pipe_design.detail_pipe_spec", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
-    { pipe = "assemble_pipelex_bundle_spec", result = "pipelex_bundle_spec" }
+  { pipe = "draft_the_plan", result = "plan_draft" },
+  { pipe = "draft_the_concepts", result = "concept_drafts" },
+  { pipe = "structure_concepts", result = "concept_specs" },
+  { pipe = "draft_flow", result = "flow_draft" },
+  { pipe = "review_flow", result = "prepared_flow" },
+  { pipe = "design_pipe_signatures", result = "pipe_signatures" },
+  { pipe = "write_bundle_header", result = "bundle_header_spec" },
+  { pipe = "pipe_design.detail_pipe_spec", batch_over = "pipe_signatures", batch_as = "pipe_signature", result = "pipe_specs" },
+  { pipe = "assemble_pipelex_bundle_spec", result = "pipelex_bundle_spec" },
 ]
 
 [pipe.draft_the_plan]
@@ -365,15 +365,15 @@ The main pipe is the one that will carry out the main task of the pipeline, it s
 """
 
 [pipe.assemble_pipelex_bundle_spec]
-type = "PipeCompose"
+type        = "PipeCompose"
 description = "Compile the pipelex bundle spec."
-inputs = { pipe_specs = "pipe_design.PipeSpec[]", concept_specs = "ConceptSpec[]", bundle_header_spec = "BundleHeaderSpec" }
-output = "PipelexBundleSpec"
+inputs      = { pipe_specs = "pipe_design.PipeSpec[]", concept_specs = "ConceptSpec[]", bundle_header_spec = "BundleHeaderSpec" }
+output      = "PipelexBundleSpec"
 
 [pipe.assemble_pipelex_bundle_spec.construct]
-domain = { from = "bundle_header_spec.domain_code" }
-description = { from = "bundle_header_spec.description" }
+domain        = { from = "bundle_header_spec.domain_code" }
+description   = { from = "bundle_header_spec.description" }
 system_prompt = { from = "bundle_header_spec.system_prompt" }
-main_pipe = { from = "bundle_header_spec.main_pipe" }
-concept = { from = "concept_specs", list_to_dict_keyed_by = "the_concept_code" }
-pipe = { from = "pipe_specs", list_to_dict_keyed_by = "pipe_code" }
+main_pipe     = { from = "bundle_header_spec.main_pipe" }
+concept       = { from = "concept_specs", list_to_dict_keyed_by = "the_concept_code" }
+pipe          = { from = "pipe_specs", list_to_dict_keyed_by = "pipe_code" }

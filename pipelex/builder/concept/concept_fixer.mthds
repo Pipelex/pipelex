@@ -1,4 +1,4 @@
-domain = "concept_fixer"
+domain      = "concept_fixer"
 description = "Generate ConceptSpec definitions for missing concepts referenced in a pipeline."
 
 [concept]

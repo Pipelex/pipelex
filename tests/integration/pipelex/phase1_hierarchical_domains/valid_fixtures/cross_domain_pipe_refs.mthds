@@ -1,4 +1,4 @@
-domain = "orchestration"
+domain      = "orchestration"
 description = "Orchestration domain using cross-domain pipe references"
 
 [pipe]
@@ -8,5 +8,5 @@ description = "Orchestrate scoring via cross-domain pipe ref"
 inputs = { data = "Text" }
 output = "scoring.WeightedScore"
 steps = [
-    { pipe = "scoring.compute_score", result = "score" },
+  { pipe = "scoring.compute_score", result = "score" },
 ]

@@ -31,19 +31,19 @@ observer_dir = "results/observer"
 
 [pipelex.scan_config]
 excluded_dirs = [
-    ".venv",
-    "venv",
-    "env",
-    ".env",
-    "virtualenv",
-    ".virtualenv",
-    ".git",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "node_modules",
-    "results",
+  ".venv",
+  "venv",
+  "env",
+  ".env",
+  "virtualenv",
+  ".virtualenv",
+  ".git",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  "node_modules",
+  "results",
 ]
 
 [pipelex.builder_config]
@@ -205,7 +205,7 @@ max = "reasoning"
 max_retries = 3
 
 [cogt.llm_config.effort_to_budget_maps.anthropic]
-none = 0  # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
+none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
 minimal = 512
 low = 1024
 medium = 5000
@@ -213,7 +213,7 @@ high = 16384
 max = 65536
 
 [cogt.llm_config.effort_to_budget_maps.gemini]
-none = 0  # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
+none = 0      # Required by validator; unreachable at runtime (level map gates NONE as disabled before budget lookup)
 minimal = 512
 low = 1024
 medium = 5000
@@ -382,12 +382,12 @@ text_gen_truncate_length = 256
 nb_list_items = 3
 nb_extract_pages = 4
 allowed_to_fail_pipes = [
-    "infinite_loop_1", # Loop but only for testing purposes
-    "pipe_builder",    # Still not fully proofed
+  "infinite_loop_1", # Loop but only for testing purposes
+  "pipe_builder",    # Still not fully proofed
 ]
 image_urls = [
-    "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
-    "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
+  "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg",
+  "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png",
 ]
 
 ####################################################################################################
@@ -405,7 +405,15 @@ ensure_trailing_newline = true
 ensure_leading_blank_line = true
 
 [pipelex.mthds_config.concepts]
-structure_field_ordering = ["type", "concept_ref", "item_type", "item_concept_ref", "description", "choices", "required"]
+structure_field_ordering = [
+  "type",
+  "concept_ref",
+  "item_type",
+  "item_concept_ref",
+  "description",
+  "choices",
+  "required",
+]
 
 [pipelex.mthds_config.pipes]
 field_ordering = ["type", "description", "inputs", "output"]

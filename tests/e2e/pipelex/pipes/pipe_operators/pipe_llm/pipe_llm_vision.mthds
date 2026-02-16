@@ -1,13 +1,13 @@
-domain = "pipe_llm_vision_e2e"
+domain      = "pipe_llm_vision_e2e"
 description = "Test PipeLLM with vision capabilities"
 
 [concept]
-VisionAnalysisE2E = "Some analysis based on the image"
+VisionAnalysisE2E   = "Some analysis based on the image"
 BasicDescriptionE2E = "Basic description of the image"
 
 [concept.PhotoE2E]
 description = "A photo"
-refines = "Image"
+refines     = "Image"
 
 [pipe.describe_image_e2e]
 type = "PipeLLM"
@@ -54,4 +54,3 @@ prompt = """
 Analyze this image and describe what's the main topic (be concise).
 $image
 """
-

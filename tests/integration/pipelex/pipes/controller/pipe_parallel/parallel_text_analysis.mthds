@@ -1,4 +1,4 @@
-domain = "test_integration3"
+domain      = "test_integration3"
 description = "Test pipes for PipeParallel text analysis"
 
 [pipe]
@@ -36,4 +36,3 @@ structuring_method = "preliminary_text"
 Extract the top 3 keywords from the following text. Return them as a comma-separated list:
 @input_text.text
 """
-

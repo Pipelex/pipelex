@@ -1,10 +1,10 @@
-domain = "test_pipe_parallel"
+domain      = "test_pipe_parallel"
 description = "Simple test for PipeParallel functionality"
 
 [concept]
-DocumentInput = "Input document with text content"
-LengthAnalysis = "Analysis of document length and structure"
-ContentAnalysis = "Analysis of document content and themes"
+DocumentInput    = "Input document with text content"
+LengthAnalysis   = "Analysis of document length and structure"
+ContentAnalysis  = "Analysis of document content and themes"
 CombinedAnalysis = "Combined analysis results from parallel processing"
 
 [pipe]
@@ -16,8 +16,8 @@ output = "CombinedAnalysis"
 add_each_output = true
 combined_output = "CombinedAnalysis"
 branches = [
-    { pipe = "analyze_length", result = "length_result" },
-    { pipe = "analyze_content", result = "content_result" },
+  { pipe = "analyze_length", result = "length_result" },
+  { pipe = "analyze_content", result = "content_result" },
 ]
 
 [pipe.analyze_length]
@@ -53,4 +53,3 @@ Provide a brief analysis focusing on:
 - Key concepts discussed
 - Overall content summary
 """
-

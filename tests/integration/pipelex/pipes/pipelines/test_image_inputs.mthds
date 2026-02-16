@@ -1,4 +1,4 @@
-domain = "test_image_inputs"
+domain      = "test_image_inputs"
 description = "Test domain for verifying image input functionality"
 
 [concept]
@@ -34,4 +34,3 @@ Extract the year and title.
 Also, add this to the description:
 $page.text_and_images.text.text
 """
-

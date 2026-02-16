@@ -1,4 +1,4 @@
-domain = "out_of_order_test"
+domain      = "out_of_order_test"
 description = "Test library for out-of-order concept refinement"
 
 # INTENTIONALLY DEFINED OUT OF ORDER:
@@ -8,14 +8,14 @@ description = "Test library for out-of-order concept refinement"
 # Refined concept (defined FIRST, but references Customer which is defined AFTER)
 [concept.VIPCustomer]
 description = "A VIP customer with special privileges"
-refines = "out_of_order_test.Customer"
+refines     = "out_of_order_test.Customer"
 
 # Base concept WITH structure (defined AFTER VIPCustomer)
 [concept.Customer]
 description = "A customer"
 
 [concept.Customer.structure]
-name = { type = "text", required = true, description = "Customer name" }
+name  = { type = "text", required = true, description = "Customer name" }
 email = { type = "text", required = true, description = "Customer email" }
 
 # Concepts refining native concepts (should always work regardless of order)
@@ -23,16 +23,16 @@ email = { type = "text", required = true, description = "Customer email" }
 
 [concept.Poem]
 description = "A poem is a piece of text with artistic expression"
-refines = "native.Text"
+refines     = "native.Text"
 
 [concept.Summary]
 description = "A summary of a longer text"
-refines = "Text"
+refines     = "Text"
 
 [concept.Screenshot]
 description = "A screenshot image"
-refines = "native.Image"
+refines     = "native.Image"
 
 [concept.DetailedSummary]
 description = "A detailed summary that refines Summary"
-refines = "out_of_order_test.Summary"
+refines     = "out_of_order_test.Summary"

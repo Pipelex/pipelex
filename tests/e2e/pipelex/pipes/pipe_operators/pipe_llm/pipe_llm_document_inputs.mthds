@@ -1,10 +1,10 @@
-domain = "pipe_llm_document_inputs_e2e"
+domain      = "pipe_llm_document_inputs_e2e"
 description = "E2E tests for document input handling in PipeLLM"
 
 [concept]
-DocumentSummaryE2E = "Summary of a document"
+DocumentSummaryE2E      = "Summary of a document"
 DocumentListAnalysisE2E = "Analysis of multiple documents"
-MixedMediaAnalysisE2E = "Analysis of documents and images together"
+MixedMediaAnalysisE2E   = "Analysis of documents and images together"
 
 # Scenario 1: Direct document
 [pipe.summarize_single_document_e2e]

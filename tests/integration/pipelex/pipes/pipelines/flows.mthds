@@ -1,6 +1,6 @@
 
 
-domain = "flows"
+domain      = "flows"
 description = "A collection of pipes that are used to test the flow of a pipeline"
 
 [concept]
@@ -22,8 +22,8 @@ description = "Sequence for parallel test"
 inputs = { color = "Color" }
 output = "Color"
 steps = [
-    { pipe = "capitalize_color", result = "capitalized_color" },
-    { pipe = "capitalize_last_letter", result = "capitalized_last_letter" },
+  { pipe = "capitalize_color", result = "capitalized_color" },
+  { pipe = "capitalize_last_letter", result = "capitalized_last_letter" },
 ]
 
 [pipe.capitalize_color]
@@ -53,4 +53,3 @@ Here is the word:
 
 Output only the word, nothing else.
 """
-

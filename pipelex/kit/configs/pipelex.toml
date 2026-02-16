@@ -101,19 +101,19 @@ signed_urls_lifespan_seconds = 3600                           # Set to "disabled
 [pipelex.scan_config]
 # Directories to exclude when scanning for pipeline files
 excluded_dirs = [
-    ".venv",
-    "venv",
-    "env",
-    ".env",
-    "virtualenv",
-    ".virtualenv",
-    ".git",
-    "__pycache__",
-    ".pytest_cache",
-    ".mypy_cache",
-    ".ruff_cache",
-    "node_modules",
-    "results",
+  ".venv",
+  "venv",
+  "env",
+  ".env",
+  "virtualenv",
+  ".virtualenv",
+  ".git",
+  "__pycache__",
+  ".pytest_cache",
+  ".mypy_cache",
+  ".ruff_cache",
+  "node_modules",
+  "results",
 ]
 
 ####################################################################################################
@@ -189,4 +189,3 @@ is_dump_response_text_enabled = false
 is_dump_kwargs_enabled = false
 is_dump_response_enabled = false
 is_dump_error_enabled = false
-
