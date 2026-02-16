@@ -41,15 +41,17 @@ Create a Python file to execute the pipeline:
 
 `character.py`
 ```python
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipelex import Pipelex
 
 # Initialize pipelex to load your pipeline libraries
 Pipelex.make()
 
-pipe_output = await execute_pipeline(
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     pipe_code="create_character",
 )
+pipe_output = response.pipe_output
 
 print(pipe_output.main_stuff_as_str)            # `main_stuff_as_str` is allowed here because the output is a `TextContent`
 ```
@@ -229,7 +231,7 @@ Learn more about Jinja in the [PipeLLM documentation](../../home/6-build-reliabl
 
 `run_pipe.py`
 ```python
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipelex import Pipelex
 
 from character_model import CharacterMetadata
@@ -250,10 +252,12 @@ inputs = {
 }
 
 # Run the pipe with loaded inputs
-pipe_output = await execute_pipeline(
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     pipe_code="extract_character_advances",
     inputs=inputs,
 )
+pipe_output = response.pipe_output
 
 # Get the result as a properly typed instance
 print(pipe_output)
@@ -284,7 +288,7 @@ class CharacterMetadata(StructuredContent):
 
 `run_pipe.py`
 ```python
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipelex import Pipelex
 
 from character_model import CharacterMetadata
@@ -305,10 +309,12 @@ inputs = {
 }
 
 # Run the pipe with loaded inputs
-pipe_output = await execute_pipeline(
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     pipe_code="extract_character_advances",
     inputs=inputs,
 )
+pipe_output = response.pipe_output
 
 # Get the result as a properly typed instance
 extracted_metadata = pipe_output.main_stuff_as(content_type=CharacterMetadata)

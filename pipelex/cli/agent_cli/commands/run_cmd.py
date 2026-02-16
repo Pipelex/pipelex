@@ -19,7 +19,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path
 
 
@@ -58,15 +58,18 @@ async def _run_pipeline_core(
         mock_inputs=mock_inputs or None,
     )
 
-    pipe_output = await execute_pipeline(
-        pipe_code=pipe_code,
-        plx_content=plx_content,
+    runner = PipelexRunner(
         bundle_uri=bundle_uri,
-        inputs=inputs,
         pipe_run_mode=pipe_run_mode,
         execution_config=execution_config,
         library_dirs=library_dirs,
     )
+    response = await runner.execute_pipeline(
+        pipe_code=pipe_code,
+        mthds_content=plx_content,
+        inputs=inputs,
+    )
+    pipe_output = response.pipe_output
 
     main_stuff = pipe_output.working_memory.get_optional_main_stuff()
     main_stuff_json: dict[str, Any] = {}

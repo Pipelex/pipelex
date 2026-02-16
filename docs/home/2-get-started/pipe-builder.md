@@ -54,7 +54,7 @@ This requires having the `.plx` file or your pipe inside the directory where the
 
 ```python
 import json
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipelex import Pipelex
 
 # Initialize Pipelex
@@ -65,10 +65,12 @@ with open("inputs.json", "r", encoding="utf-8") as json_file:
     inputs = json.load(json_file)
 
 # Execute the pipeline
-pipe_output = await execute_pipeline(
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     pipe_code="analyze_cv_and_prepare_interview",
     inputs=inputs
 )
+pipe_output = response.pipe_output
 
 print(pipe_output.main_stuff)
 

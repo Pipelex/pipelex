@@ -10,11 +10,11 @@ Note: Dry-run mode generates random values, so we only test types and structure,
 """
 
 import pytest
-from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex import pretty_print
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipeline.runner import PipelexRunner
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__customer import Customer
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__invoice import Invoice
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__line_item import LineItem
@@ -36,16 +36,19 @@ class TestNestedConceptsPipe:
         3. The LLM generates structured output with proper nested types
         4. The output can be accessed via working_memory.get_stuff_as() with typed models
         """
-        pipe_output = await execute_pipeline(
-            pipe_code="generate_invoice",
+        runner = PipelexRunner(
             library_dirs=["tests/e2e/pipelex/concepts/nested_concepts"],
+            pipe_run_mode=pipe_run_mode,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="generate_invoice",
             inputs={
                 "description_text": TextContent(
                     text="Create an invoice for John Smith (john.smith@example.com) who ordered 3 widgets at $10 each and 2 gadgets at $25 each."
                 ),
             },
-            pipe_run_mode=pipe_run_mode,
         )
+        pipe_output = response.pipe_output
 
         # Verify the concept metadata
         assert pipe_output.main_stuff.concept.code == "Invoice"

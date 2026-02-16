@@ -27,7 +27,7 @@ from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
 from pipelex.language.plx_factory import PlxFactory
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
@@ -50,12 +50,15 @@ class BuilderLoop:
         output_dir: str | None = None,
     ) -> tuple[PipelexBundleSpec, GraphSpec | None]:
         # TODO: Doesn't make sense to be able to put a builder_pipe code but hardcoding the Path to the builder pipe.
-        pipe_output = await execute_pipeline(
-            pipe_code=builder_pipe,
+        runner = PipelexRunner(
             library_dirs=[str(Path(builder.__file__).parent)],
-            inputs=inputs,
             execution_config=execution_config,
         )
+        response = await runner.execute_pipeline(
+            pipe_code=builder_pipe,
+            inputs=inputs,
+        )
+        pipe_output = response.pipe_output
 
         if is_save_working_memory_enabled:
             working_memory_path = get_incremental_file_path(
@@ -256,11 +259,14 @@ class BuilderLoop:
             undeclared_concepts = "\n".join(lines)
             log.info(f"🤖 Generating ConceptSpec definitions for {len(undeclared)} undeclared concept(s) via LLM...")
 
-            concept_fixer_output = await execute_pipeline(
-                pipe_code="generate_missing_concepts",
+            concept_fixer_runner = PipelexRunner(
                 library_dirs=[str(Path(builder.__file__).parent / "concept")],
+            )
+            concept_fixer_response = await concept_fixer_runner.execute_pipeline(
+                pipe_code="generate_missing_concepts",
                 inputs={"undeclared_concepts": undeclared_concepts},
             )
+            concept_fixer_output = concept_fixer_response.pipe_output
 
             generated_concepts_list = concept_fixer_output.working_memory.get_stuff_as_list(
                 name="generate_missing_concepts",
