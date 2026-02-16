@@ -5,7 +5,7 @@
 | 1 | `03-specification.md` | done | 2026-02-16 |
 | 2 | `01-the-language.md` | done | 2026-02-16 |
 | 3 | `02-the-package-system.md` | done | 2026-02-16 |
-| 4 | `00-home-and-overview.md` | pending | — |
+| 4 | `00-home-and-overview.md` | done | 2026-02-16 |
 | 5 | `04-cli-and-guides.md` | pending | — |
 | 6 | `05-implementers-and-about.md` | pending | — |
 
@@ -96,3 +96,38 @@
 - It should provide 4 entry points as per the strategy doc: "Set up your editor", "Learn the language", "Read the specification", "Get started".
 - Keep it concise (~200 words for landing, ~1000 words for "What is MTHDS?").
 - All substance now exists in docs 01, 02, and 03 — the overview can reference them with confidence.
+
+### Session 4 — 2026-02-16 — `00-home-and-overview.md`
+
+**Structure:**
+
+- 2 pages: Home (landing page), What is MTHDS? (conceptual overview).
+- Home page uses Material for MkDocs `grid cards` for the four entry points: "Set Up Your Editor", "Learn the Language", "Read the Specification", "Get Started". "Set Up Your Editor" is listed first per the strategy doc's guidance.
+- "What is MTHDS?" page covers: The Two Pillars, Core Concepts at a Glance, A Concrete Example, Progressive Enhancement, What Makes MTHDS Different, Where to Go Next.
+
+**Decisions made:**
+
+- Followed the strategy doc's tone guidelines: compelling, concise, no marketing speak, no superlatives. The standard speaks for itself.
+- Pipelex does not appear anywhere in the document, consistent with the strategy doc's standard/implementation boundary.
+- The joke generation bundle is reused as the concrete example, consistent with `03-specification.md` (lines 708–750) and `01-the-language.md` (lines 633–675). The example is copied exactly.
+- Added a "Core Concepts at a Glance" table with analogies (concept = form with typed fields, pipe = processing step, domain = folder, bundle = source file, package = versioned library) as recommended by the strategy doc.
+- Added a "What Makes MTHDS Different" section covering three differentiators: typed signatures, built-in composition, and a real package system. This is neutral and factual, not comparative or promotional.
+- The `->` syntax explanation uses the same phrasing as the design doc: "chosen for readability by non-technical audiences."
+
+**Cross-document consistency (5 spot-checks passed):**
+
+- The joke generation example matches `03-specification.md` and `01-the-language.md` exactly.
+- Five operators (PipeLLM, PipeFunc, PipeImgGen, PipeExtract, PipeCompose) and four controllers (PipeSequence, PipeParallel, PipeCondition, PipeBatch) confirmed against `PipeType` enum in `pipe_blueprint.py`.
+- Progressive enhancement four layers (single file → package → dependencies → ecosystem) match `02-the-package-system.md` Package Structure page.
+- `->` syntax and cross-package reference description consistent across all docs.
+- Pipelex absent from the document, as required.
+
+**Prep notes for next document (`04-cli-tooling-and-guides.md`):**
+
+- This is the largest remaining document: CLI Reference (all commands), Tooling (Editor Support, Formatting & Linting, JSON Schema), Getting Started (Write Your First Method), and 4 Guides (Create Package, Use Deps, Publish, Discover).
+- The `mthds pkg publish` validation checks count (strategy doc says "15 checks") should be verified against `publish_validation.py`.
+- The `mthds pkg graph` command options (`--from`, `--to`, `--check`, `--compose`, `--max-depth`) should be documented with practical examples.
+- The `mthds pkg search` command options (`--accepts`, `--produces`) should be showcased in the "Discover Methods" guide.
+- CLI commands map to the `pipelex/cli/commands/pkg/` directory. VS Code extension info is in `../vscode-pipelex/editors/vscode/package.json`. The `plxt` CLI is in `../vscode-pipelex/crates/pipelex-cli/`.
+- The "Write Your First Method" guide should walk through creating a `.mthds` file step by step, using the editor extension for syntax highlighting, `plxt fmt` for formatting, and `mthds validate` for validation.
+- The document should not reference Pipelex in the CLI Reference, Tooling, or Guides sections (per the strategy doc's standard/implementation boundary). The `mthds` CLI is the standard's official tool.
