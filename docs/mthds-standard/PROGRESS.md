@@ -7,7 +7,7 @@
 | 3 | `02-the-package-system.md` | done | 2026-02-16 |
 | 4 | `00-home-and-overview.md` | done | 2026-02-16 |
 | 5 | `04-cli-and-guides.md` | done | 2026-02-16 |
-| 6 | `05-implementers-and-about.md` | pending | — |
+| 6 | `05-implementers-and-about.md` | done | 2026-02-16 |
 
 ## Notes
 
@@ -174,3 +174,38 @@
 - Key codebase paths: `pipelex/core/` for runtime architecture, `publish_validation.py` for validation rules, `dependency_resolver.py` for package loading, `../vscode-pipelex/editors/vscode/src/syntax/mthds/` for TextMate grammar internals, `../vscode-pipelex/editors/vscode/src/pipelex/semanticTokenProvider.ts` for semantic token implementation.
 - The `model` field routing profile syntax (`$prefix`, `@prefix`, `~prefix`) should be documented in the Implementers section — this was deferred from the spec and language docs.
 - The `TemplateBlueprint` advanced features (`category`, `templating_style`, `extra_context`) should also be covered in the Implementers section.
+
+### Session 6 — 2026-02-16 — `05-implementers-and-about.md`
+
+**Structure:**
+
+- 7 pages: Building a Runtime, Validation Rules, Package Loading, Building Editor Support, Design Philosophy, Comparison with Agent Skills, Roadmap, Contributing.
+- The Implementers section (4 pages) focuses on how to build a compliant MTHDS runtime, validator, or editor tool. Uses pseudocode algorithms and the reference implementation (Pipelex) for illustration, with consistent framing: "A compliant runtime may choose a different approach as long as it satisfies the specification."
+- The About section (4 pages) covers design rationale, Agent Skills comparison, roadmap, and contributing.
+
+**Decisions made:**
+
+- The `model` field routing profile mechanics are documented in the "Building a Runtime" page under "Model Routing (Implementation-Specific)". The `$` prefix (LLM/image gen), `@` prefix (extraction), and no-prefix (direct model identifier) conventions are described. The `~` prefix mentioned in Session 5 prep notes was not found in the codebase — only `$` and `@` are used. The doc documents only what exists.
+- The `TemplateBlueprint` advanced features are documented in the "Building a Runtime" page under "Template Blueprint (Advanced PipeCompose)". All 7 `TemplateCategory` values (`basic`, `expression`, `html`, `markdown`, `mermaid`, `llm_prompt`, `img_gen_prompt`) are listed — verified against `template_category.py`.
+- The Validation Rules page consolidates all rules from the spec into 9 stages, ordered by when they should be enforced during loading. This provides implementers with a checklist.
+- The publish validation table lists all 15 checks with their categories and severity levels — verified against `publish_validation.py`.
+- The dependency resolution algorithm pseudocode matches `resolve_all_dependencies()` and `_resolve_transitive_tree()` in `dependency_resolver.py`: local deps are non-transitive, remote deps are transitive with DFS cycle detection and diamond handling.
+- The visibility checking algorithm pseudocode matches `check_visibility_for_blueprints()` in `visibility.py`: three passes (reserved domains, intra-package visibility, cross-package aliases).
+- The Agent Skills comparison uses neutral language per the strategy doc: "no feature comparisons that position MTHDS as 'better' than alternatives." The comparison table is factual.
+- Pipelex is mentioned only with the "reference implementation" framing, consistent with the strategy doc's boundary. Pipelex appears in: "Building a Runtime" (model routing, template blueprint, Pydantic discriminated union), "Building Editor Support" (schema generator command), and "Contributing" (coding standards). It does not appear in the About section pages.
+
+**Cross-document consistency (5 spot-checks passed):**
+
+- RESERVED_DOMAINS = {"native", "mthds", "pipelex"} — matches all previous documents.
+- MTHDS_STANDARD_VERSION = "1.0.0" — matches all previous documents.
+- IssueCategory has 7 values matching "seven categories" for publish validation — consistent with `04-cli-and-guides.md`.
+- TemplateCategory values match the 7 values listed in the doc — verified against codebase.
+- `select_minimum_version_for_multiple_constraints` algorithm matches the diamond resolution pseudocode.
+
+**Open questions resolved from previous sessions:**
+
+- The `model` field routing profile syntax deferred from Sessions 1–2 is now documented in "Building a Runtime".
+- The `TemplateBlueprint` advanced features deferred from Sessions 1–2 are now documented in "Building a Runtime".
+- Cross-package concept refinement validation (install-time vs load-time) is addressed in the "Roadmap" page as a near-term goal, noting the current code validates at load time only.
+
+**All documents are now complete.** A final consistency review across all 6 documents found no issues. Terminology, technical claims, and cross-references are consistent.
