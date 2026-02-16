@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from mthds.pipeline import MAIN_STUFF_NAME, PipelineResponse, PipelineState
+from mthds.pipeline import MAIN_STUFF_NAME, PipelineExecuteResponse, PipelineStartResponse, PipelineState
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 
 
-class PipelexPipelineResponse(PipelineResponse[PipeOutput]):
-    pipe_output: PipeOutput | None = None
-
+class PipelexPipelineExecuteResponse(PipelineExecuteResponse[PipeOutput]):
     @classmethod
     def from_pipe_output(
         cls,
@@ -16,7 +14,7 @@ class PipelexPipelineResponse(PipelineResponse[PipeOutput]):
         created_at: str = "",
         pipeline_state: PipelineState = PipelineState.COMPLETED,
         finished_at: str | None = None,
-    ) -> PipelexPipelineResponse:
+    ) -> PipelexPipelineExecuteResponse:
         return cls(
             pipeline_run_id=pipeline_run_id,
             created_at=created_at,
@@ -25,3 +23,7 @@ class PipelexPipelineResponse(PipelineResponse[PipeOutput]):
             pipe_output=pipe_output,
             main_stuff_name=pipe_output.working_memory.aliases.get(MAIN_STUFF_NAME, MAIN_STUFF_NAME),
         )
+
+
+class PipelexPipelineStartResponse(PipelineStartResponse[PipeOutput]):
+    pass

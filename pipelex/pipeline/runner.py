@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
@@ -9,8 +8,6 @@ from mthds.pipeline import PipelineState
 from mthds.protocol import RunnerProtocol
 from pydantic import ValidationError
 from typing_extensions import override
-
-from pipelex.pipeline.pipeline_response import PipelexPipelineResponse
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
@@ -23,14 +20,18 @@ from pipelex.hub import (
 )
 from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipeline.exceptions import PipeExecutionError, PipelineExecutionError
+from pipelex.pipeline.pipeline_response import PipelexPipelineExecuteResponse
 from pipelex.pipeline.pipeline_run_setup import pipeline_run_setup
 from pipelex.system.telemetry.events import EventName, EventProperty, Outcome
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 if TYPE_CHECKING:
+    import asyncio
+
     from mthds.models.pipe_output import VariableMultiplicity
     from mthds.models.pipeline_inputs import PipelineInputs
     from mthds.models.working_memory import WorkingMemoryAbstract
+    from mthds.pipeline import PipelineStartResponse
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -39,7 +40,7 @@ if TYPE_CHECKING:
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
-class PipelexRunner(RunnerProtocol):
+class PipelexRunner(RunnerProtocol["PipeOutput"]):
     """Pipelex implementation of the mthds RunnerProtocol.
 
     Adapts pipelex pipeline execution to the mthds protocol interface.
@@ -88,7 +89,7 @@ class PipelexRunner(RunnerProtocol):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
-    ) -> PipelexPipelineResponse:
+    ) -> PipelexPipelineExecuteResponse:
         """Execute a pipeline and wait for its completion."""
         created_at = datetime.now(UTC).isoformat()
         execution_config = self._resolve_execution_config()
@@ -176,7 +177,7 @@ class PipelexRunner(RunnerProtocol):
         get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
 
         finished_at = datetime.now(UTC).isoformat()
-        return PipelexPipelineResponse.from_pipe_output(
+        return PipelexPipelineExecuteResponse.from_pipe_output(
             pipe_output=pipe_output,
             pipeline_run_id=pipe_output.pipeline_run_id,
             created_at=created_at,
@@ -193,35 +194,5 @@ class PipelexRunner(RunnerProtocol):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
-    ) -> PipelexPipelineResponse:
-        """Start a pipeline in the background without waiting for completion."""
-        execution_config = self._resolve_execution_config()
-        plx_content = self._resolve_plx_content(mthds_content)
-        # Cast inputs: the protocol accepts WorkingMemoryAbstract but pipelex expects WorkingMemory
-        pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
-
-        # TODO: make sure we close the graph tracer after the task completes
-        pipe_job, pipeline_run_id, _library_id = await pipeline_run_setup(
-            execution_config=execution_config,
-            library_id=self.library_id,
-            library_dirs=self.library_dirs,
-            pipe_code=pipe_code,
-            plx_content=plx_content,
-            bundle_uri=self.bundle_uri,
-            inputs=pipelex_inputs,
-            output_name=output_name,
-            output_multiplicity=output_multiplicity,
-            dynamic_output_concept_code=dynamic_output_concept_code,
-            pipe_run_mode=self.pipe_run_mode,
-            search_domain_codes=self.search_domain_codes,
-            user_id=self.user_id,
-        )
-
-        task: asyncio.Task[PipeOutput] = asyncio.create_task(get_pipe_router().run(pipe_job))
-        self._running_tasks[pipeline_run_id] = task
-
-        return PipelexPipelineResponse(
-            pipeline_run_id=pipeline_run_id,
-            created_at=datetime.now(UTC).isoformat(),
-            pipeline_state=PipelineState.STARTED,
-        )
+    ) -> PipelineStartResponse[PipeOutput]:
+        raise NotImplementedError
