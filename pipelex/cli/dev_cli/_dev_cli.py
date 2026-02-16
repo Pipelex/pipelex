@@ -1,6 +1,7 @@
 """Main entry point for the internal development CLI."""
 
 import sys
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -13,6 +14,7 @@ from pipelex.cli.dev_cli.commands.check_config_sync_cmd import LeadingConfig, ch
 from pipelex.cli.dev_cli.commands.check_gateway_models_cmd import check_gateway_models_cmd
 from pipelex.cli.dev_cli.commands.check_rules_sync_cmd import check_rules_sync_cmd
 from pipelex.cli.dev_cli.commands.check_urls_cmd import DEFAULT_TIMEOUT, check_urls_cmd
+from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import generate_mthds_schema_cmd
 from pipelex.cli.dev_cli.commands.kit_cmd import kit_app
 from pipelex.cli.dev_cli.commands.preprocess_test_models_cmd import preprocess_test_models_cmd
 from pipelex.cli.dev_cli.commands.sync_main_config_cmd import SyncTarget, sync_main_config_cmd
@@ -32,6 +34,7 @@ class PipelexDevCLI(TyperGroup):
             "check-gateway-models",
             "check-rules",
             "check-urls",
+            "generate-mthds-schema",
             "kit",
             "preprocess-test-models",
             "sync-main-config",
@@ -128,6 +131,24 @@ def check_urls_command(
     """Check all URLs in pipelex/urls.py for broken links."""
     try:
         check_urls_cmd(quiet=quiet, timeout=timeout)
+    except Exception:
+        console = get_console()
+        console.print()
+        console.print("[bold red]Unexpected error occurred[/bold red]")
+        console.print()
+        console.print(Traceback())
+        sys.exit(1)
+
+
+@app.command(name="generate-mthds-schema", help="Generate JSON Schema for .mthds files (for Taplo validation)")
+def generate_mthds_schema_command(
+    output: Annotated[str | None, typer.Option("--output", "-o", help="Custom output path for the schema file")] = None,
+    quiet: Annotated[bool, typer.Option("--quiet", "-q", help="Output only a single validation line")] = False,
+) -> None:
+    """Generate a Taplo-compatible JSON Schema from MTHDS blueprint classes."""
+    try:
+        output_path = Path(output) if output else None
+        generate_mthds_schema_cmd(output=output_path, quiet=quiet)
     except Exception:
         console = get_console()
         console.print()

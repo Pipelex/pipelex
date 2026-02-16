@@ -187,6 +187,7 @@ nav:
           - Inputs: home/9-tools/cli/build/inputs.md
           - Output: home/9-tools/cli/build/output.md
       - Pipe Builder: home/9-tools/pipe-builder.md
+      - plxt (Formatter & Linter): home/9-tools/plxt.md
       - Logging: home/9-tools/logging.md
     - Advanced Customizations:
       - Overview: home/10-advanced-customizations/index.md
