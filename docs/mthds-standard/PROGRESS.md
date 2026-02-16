@@ -6,7 +6,7 @@
 | 2 | `01-the-language.md` | done | 2026-02-16 |
 | 3 | `02-the-package-system.md` | done | 2026-02-16 |
 | 4 | `00-home-and-overview.md` | done | 2026-02-16 |
-| 5 | `04-cli-and-guides.md` | pending | — |
+| 5 | `04-cli-and-guides.md` | done | 2026-02-16 |
 | 6 | `05-implementers-and-about.md` | pending | — |
 
 ## Notes
@@ -131,3 +131,46 @@
 - CLI commands map to the `pipelex/cli/commands/pkg/` directory. VS Code extension info is in `../vscode-pipelex/editors/vscode/package.json`. The `plxt` CLI is in `../vscode-pipelex/crates/pipelex-cli/`.
 - The "Write Your First Method" guide should walk through creating a `.mthds` file step by step, using the editor extension for syntax highlighting, `plxt fmt` for formatting, and `mthds validate` for validation.
 - The document should not reference Pipelex in the CLI Reference, Tooling, or Guides sections (per the strategy doc's standard/implementation boundary). The `mthds` CLI is the standard's official tool.
+
+### Session 5 — 2026-02-16 — `04-cli-and-guides.md`
+
+**Structure:**
+
+- 9 pages: CLI Reference, Editor Support, Formatting & Linting, MTHDS JSON Schema, Write Your First Method, Create a Package, Use Dependencies, Publish a Package, Discover Methods.
+- CLI Reference covers 2 core commands (`validate`, `run`) and 11 package commands (`pkg init`, `list`, `add`, `lock`, `install`, `update`, `index`, `search`, `inspect`, `graph`, `publish`).
+- Tooling covers the VS Code extension (7 semantic token types, formatting, schema validation), the `plxt` CLI (format/lint), and the MTHDS JSON Schema.
+- Getting Started is a step-by-step tutorial creating a text summarizer bundle from scratch.
+- Guides cover the four remaining workflows: creating a package, using dependencies, publishing, and discovering methods.
+
+**Decisions made:**
+
+- All CLI command flags verified against the actual code in `pipelex/cli/commands/pkg/app.py` and individual `*_cmd.py` files. Flag names, short aliases, and default values match the implementation exactly.
+- The `mthds pkg add` default version is `0.1.0` (from code: `typer.Option(...) = "0.1.0"`), documented accurately.
+- The `mthds pkg publish` validation runs 15 checks across 7 categories — confirmed by counting the check points in `publish_validation.py` (comments #1 through #14-15, spanning manifest, manifest completeness, mthds_version, bundles, exports, visibility, dependencies, lock file, and git checks).
+- The `mthds pkg graph` command uses `package_address::concept_ref` format for `--from`/`--to` (confirmed in `graph_cmd.py:_parse_concept_id`). The native package address is `__native__` (confirmed in `graph/models.py:NATIVE_PACKAGE_ADDRESS`).
+- The `mthds pkg search` command uses fuzzy matching for `--accepts`/`--produces` (confirmed in `search_cmd.py:_resolve_concept_fuzzy`), while `mthds pkg graph` uses precise concept IDs. The doc explains both approaches.
+- The VS Code extension provides 7 MTHDS-specific semantic token types — verified against `package.json` `semanticTokenTypes` array: `mthdsConcept`, `mthdsPipeType`, `mthdsDataVariable`, `mthdsPipeName`, `mthdsPipeSection`, `mthdsConceptSection`, `mthdsModelRef`.
+- The `plxt` CLI has `format` (alias `fmt`) and `lint` (aliases `check`, `validate`) commands — verified in `args.rs`.
+- Pipelex is mentioned only in the Editor Support page (the extension is named "Pipelex" in the marketplace) and in the Formatting & Linting page (plxt is distributed with Pipelex docs). The CLI Reference and Guides use only the `mthds` command, consistent with the strategy doc's standard/implementation boundary.
+
+**Cross-document consistency (5 spot-checks passed):**
+
+- MTHDS_STANDARD_VERSION = "1.0.0" — consistent with all previous documents.
+- RESERVED_DOMAINS = {"native", "mthds", "pipelex"} — matches spec and all docs.
+- Cache path `~/.mthds/packages/` — matches `02-the-package-system.md` Distribution page.
+- Version constraint syntax in the "Use Dependencies" guide matches `02-the-package-system.md` Dependencies page.
+- Visibility rules (concepts always public, pipes private by default, main_pipe auto-exported) described consistently in the "Create a Package" guide and the "Use Dependencies" guide.
+
+**Open questions resolved from previous sessions:**
+
+- The "15 checks" claim from the strategy doc is confirmed: the code runs checks numbered 1 through 14-15, mapping to 15 distinct validation points.
+- The `mthds pkg graph` command options are fully documented with practical examples including auto-composition (`--compose`) and compatibility checking (`--check`).
+- The `mthds pkg search` command's `--accepts` and `--produces` options are showcased in the "Discover Methods" guide with multiple examples.
+
+**Prep notes for next document (`05-implementers-and-about.md`):**
+
+- The Implementers section should cover: Building a Runtime (loader architecture, resolution order), Validation Rules (comprehensive list), Package Loading (dependency resolution, library isolation), Building Editor Support (TextMate grammar, semantic token types, JSON Schema usage, LSP integration).
+- The About section should cover: Design Philosophy (filesystem as interface, progressive enhancement, type-driven composability, federated distribution), Comparison with Agent Skills (typed vs text-based, language vs format), Roadmap, Contributing.
+- Key codebase paths: `pipelex/core/` for runtime architecture, `publish_validation.py` for validation rules, `dependency_resolver.py` for package loading, `../vscode-pipelex/editors/vscode/src/syntax/mthds/` for TextMate grammar internals, `../vscode-pipelex/editors/vscode/src/pipelex/semanticTokenProvider.ts` for semantic token implementation.
+- The `model` field routing profile syntax (`$prefix`, `@prefix`, `~prefix`) should be documented in the Implementers section — this was deferred from the spec and language docs.
+- The `TemplateBlueprint` advanced features (`category`, `templating_style`, `extra_context`) should also be covered in the Implementers section.
