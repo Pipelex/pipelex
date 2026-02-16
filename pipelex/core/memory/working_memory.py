@@ -2,7 +2,7 @@ from operator import attrgetter
 from typing import Any, cast
 
 from mthds.models.working_memory import WorkingMemoryAbstract
-from pydantic import BaseModel, Field, model_validator
+from pydantic import Field, model_validator
 from typing_extensions import override
 
 from pipelex import log, pretty_print
@@ -18,7 +18,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
-from pipelex.core.stuffs.stuff import DictStuff, Stuff
+from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
@@ -33,11 +33,6 @@ TEST_DUMMY_NAME = "dummy_result"
 
 StuffDict = dict[str, Stuff]
 StuffArtefactDict = dict[str, StuffArtefact]
-
-
-class DictWorkingMemory(BaseModel):
-    root: dict[str, DictStuff]
-    aliases: dict[str, str]
 
 
 class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
