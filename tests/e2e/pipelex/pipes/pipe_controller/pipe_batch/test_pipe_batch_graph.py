@@ -4,6 +4,7 @@ from collections import Counter
 from pathlib import Path
 
 import pytest
+from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex import log, pretty_print
 from pipelex.config import get_config
@@ -11,7 +12,6 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases
 from tests.conftest import TEST_OUTPUTS_DIR

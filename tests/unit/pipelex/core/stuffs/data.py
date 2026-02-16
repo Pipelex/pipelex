@@ -1,9 +1,9 @@
 from typing import ClassVar
 
 from markupsafe import escape
+from mthds.models.pipeline_inputs import StuffContentOrData
 from pydantic import Field
 
-from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain

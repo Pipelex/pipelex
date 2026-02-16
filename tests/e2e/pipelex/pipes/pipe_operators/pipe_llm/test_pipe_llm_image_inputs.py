@@ -1,6 +1,7 @@
 """E2E tests for image inputs in PipeLLM using execute_pipeline()."""
 
 import pytest
+from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex import pretty_print
 from pipelex.core.stuffs.image_content import ImageContent
@@ -9,7 +10,6 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
 from tests.cases import ImageTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_image_inputs import (
     ImageDescriptionE2E,

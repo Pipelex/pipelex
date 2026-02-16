@@ -3,6 +3,7 @@
 import os
 from typing import Any
 
+from pipelex.cli.commands.init.ide_extension import suggest_extension_install_if_needed
 from pipelex.cli.commands.init.ui.backends_ui import (
     build_backend_selection_panel,
     display_selected_backends,
@@ -124,6 +125,9 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
             currently_enabled=currently_enabled,
             is_first_time_setup=is_first_time_setup,
         )
+
+        # Suggest IDE extension install after backend selection, before gateway terms
+        suggest_extension_install_if_needed(console)
 
         # Check if pipelex_gateway is selected and handle terms acceptance
         if PipelexBackend.GATEWAY in selected_backends:

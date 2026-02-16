@@ -1,11 +1,11 @@
 """E2E tests for PipeImgGen operator including text-to-image and img2img."""
 
 import pytest
+from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex import pretty_print
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
 from tests.cases import ImageTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen"]

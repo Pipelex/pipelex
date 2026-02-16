@@ -8,6 +8,7 @@ interactive Mermaid diagrams.
 from pathlib import Path
 
 import pytest
+from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex import log
 from pipelex.config import get_config
@@ -22,7 +23,6 @@ from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases

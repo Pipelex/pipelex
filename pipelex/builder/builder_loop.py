@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from mthds.models.pipeline_inputs import PipelineInputs
+
 from pipelex import builder, log
 from pipelex.builder.builder import (
     PipelexBundleSpec,
@@ -16,7 +18,6 @@ from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
-from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType

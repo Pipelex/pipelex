@@ -1,11 +1,11 @@
 """E2E test for PipeCompose with CV Job Matching pipeline."""
 
 import pytest
+from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex import pretty_print
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
 from tests.cases import DocumentTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_compose.cv_job_matching_itvw_sheet import InterviewSheet
 

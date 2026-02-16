@@ -1,6 +1,7 @@
 from operator import attrgetter
 from typing import Any, cast
 
+from mthds.models.working_memory import WorkingMemoryAbstract
 from pydantic import BaseModel, Field, model_validator
 from typing_extensions import override
 
@@ -39,7 +40,7 @@ class DictWorkingMemory(BaseModel):
     aliases: dict[str, str]
 
 
-class WorkingMemory(BaseModel, ContextProviderAbstract):
+class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
     root: StuffDict = Field(default_factory=dict)
     aliases: dict[str, str] = Field(default_factory=dict)
 

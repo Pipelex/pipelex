@@ -1,11 +1,11 @@
 """E2E test for PipeLLM with vision capabilities."""
 
 import pytest
+from pipelex.pipeline.runner import PipelexRunner
 
 from pipelex import pretty_print, pretty_print_md
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_vision import VisionAnalysisE2E
 from tests.integration.pipelex.cogt.test_data import LLMVisionTestCases
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -18,17 +18,15 @@ from tests.integration.pipelex.test_data import PipeTestCases
 class TestPipeLLMVision:
     async def test_describe_image_single(self, pipe_run_mode: PipeRunMode):
         # Execute the pipeline with an image
-        pipe_output = await execute_pipeline(
+        pipeline_response = await PipelexRunner(library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"]).execute_pipeline(
             pipe_code="describe_image_e2e",
-            library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"],
             inputs={
                 "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG),
-            },
-            pipe_run_mode=pipe_run_mode,
+            }
         )
 
         # Get the result as text
-        result_text = pipe_output.main_stuff_as_str
+        result_text = pipeline_response.pipe_output.main_stuff_as_str
 
         # Basic assertions
         assert pipe_output is not None

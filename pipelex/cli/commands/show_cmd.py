@@ -29,7 +29,6 @@ from pipelex.hub import (
 )
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
@@ -77,8 +76,8 @@ def do_show_backends(show_all: bool = False) -> None:
             backend_library = InferenceBackendLibrary()
             backend_library.load(
                 secrets_provider=secrets_provider,
-                backends_library_path=ConfigPaths.BACKENDS_FILE_PATH,
-                backends_dir_path=ConfigPaths.BACKENDS_DIR_PATH,
+                backends_library_path=config_manager.backends_file_path,
+                backends_dir_path=config_manager.backends_dir_path,
                 include_disabled=True,
             )
         else:

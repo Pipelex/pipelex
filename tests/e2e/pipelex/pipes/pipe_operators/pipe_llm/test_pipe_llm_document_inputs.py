@@ -1,13 +1,13 @@
 """E2E tests for document inputs in PipeLLM using execute_pipeline()."""
 
 import pytest
+from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex import pretty_print
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
 from tests.cases.documents import DocumentTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_document_inputs import (
     DocumentListAnalysisE2E,

@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Callable, cast
 
 import pytest
+from pipelex.pipeline.execute import execute_pipeline
 
 from pipelex import log
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -13,7 +14,6 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence import Document, ProductRating
 

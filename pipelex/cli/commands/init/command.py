@@ -82,6 +82,7 @@ def determine_needs(
     backends_toml_path: str,
     routing_profiles_toml_path: str,
     telemetry_config_path: str,
+    target_config_dir: str | None = None,
 ) -> tuple[bool, bool, bool, bool]:
     """Determine what needs to be initialized based on current state.
 
@@ -94,11 +95,12 @@ def determine_needs(
         backends_toml_path: Path to backends.toml file.
         routing_profiles_toml_path: Path to routing_profiles.toml file.
         telemetry_config_path: Path to telemetry config file.
+        target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
 
     Returns:
         Tuple of (needs_config, needs_inference, needs_routing, needs_telemetry) booleans.
     """
-    nb_missing_config_files = init_config(reset=False, dry_run=True) if check_config else 0
+    nb_missing_config_files = init_config(reset=False, dry_run=True, target_dir=target_config_dir) if check_config else 0
     needs_config = check_config and (nb_missing_config_files > 0 or reset)
     needs_inference = check_inference and (not path_exists(backends_toml_path) or reset)
     needs_routing = check_routing and (not path_exists(routing_profiles_toml_path) or reset)
@@ -165,6 +167,7 @@ def execute_initialization(
     backends_toml_path: str,
     telemetry_config_path: str,
     is_first_time_backends_setup: bool,
+    target_config_dir: str | None = None,
 ):
     """Execute the initialization steps.
 
@@ -180,6 +183,7 @@ def execute_initialization(
         backends_toml_path: Path to backends.toml file.
         telemetry_config_path: Path to telemetry config file.
         is_first_time_backends_setup: Whether backends.toml didn't exist before this run.
+        target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
 
     """
     # Track if backends were just copied during config initialization
@@ -191,7 +195,7 @@ def execute_initialization(
         backends_existed_before = path_exists(backends_toml_path)
 
         console.print()
-        init_config(reset=reset)
+        init_config(reset=reset, target_dir=target_config_dir)
 
         # If backends.toml was just created (freshly copied), always prompt for backend selection
         backends_exists_now = path_exists(backends_toml_path)
@@ -215,7 +219,8 @@ def execute_initialization(
         # If reset is True and we didn't already copy via config init, copy the template files
         if reset and not backends_just_copied_during_config:
             template_inference_dir = os.path.join(str(get_kit_configs_dir()), "inference")
-            target_inference_dir = os.path.join(config_manager.pipelex_config_dir, "inference")
+            effective_config_dir = target_config_dir or config_manager.pipelex_config_dir
+            target_inference_dir = os.path.join(effective_config_dir, "inference")
 
             # Reset backends.toml
             template_backends_path = os.path.join(template_inference_dir, "backends.toml")
@@ -267,7 +272,8 @@ def execute_initialization(
 
         # If reset is True, copy the template file first
         if reset:
-            routing_profiles_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "routing_profiles.toml")
+            effective_config_dir_for_routing = target_config_dir or config_manager.pipelex_config_dir
+            routing_profiles_toml_path = os.path.join(effective_config_dir_for_routing, "inference", "routing_profiles.toml")
             template_routing_path = os.path.join(str(get_kit_configs_dir()), "inference", "routing_profiles.toml")
             shutil.copy2(template_routing_path, routing_profiles_toml_path)
             console.print("✅ Reset routing_profiles.toml from template")
@@ -339,6 +345,7 @@ def _init_agreement(console: Console) -> None:
 def init_cmd(
     focus: InitFocus = InitFocus.ALL,
     skip_confirmation: bool = False,
+    local: bool = False,
 ):
     """Initialize Pipelex configuration, inference backends, routing, and telemetry.
 
@@ -348,6 +355,7 @@ def init_cmd(
     Args:
         focus: What to initialize - 'agreement', 'config', 'inference', 'routing', 'telemetry', or 'all' (default)
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
+        local: If True, create project-level .pipelex/ at the detected project root. Otherwise, create global ~/.pipelex/.
     """
     console = get_console()
 
@@ -358,7 +366,21 @@ def init_cmd(
 
     # Config updates are not yet supported - always reset
     reset = True
-    pipelex_config_dir = config_manager.pipelex_config_dir
+
+    # Determine target directory
+    if local:
+        # --local: create at project root, fall back to CWD
+        project_root = config_manager.project_root
+        if project_root is not None:
+            target_config_dir = os.path.join(project_root, ".pipelex")
+        else:
+            target_config_dir = os.path.join(os.getcwd(), ".pipelex")
+    else:
+        # Default: create global config at ~/.pipelex/
+        target_config_dir = config_manager.global_config_dir
+    console.print(f"[dim]Target directory: {target_config_dir}[/dim]")
+
+    pipelex_config_dir = target_config_dir
     telemetry_config_path = os.path.join(pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME)
     backends_toml_path = os.path.join(pipelex_config_dir, "inference", "backends.toml")
     routing_profiles_toml_path = os.path.join(pipelex_config_dir, "inference", "routing_profiles.toml")
@@ -382,6 +404,7 @@ def init_cmd(
         backends_toml_path=backends_toml_path,
         routing_profiles_toml_path=routing_profiles_toml_path,
         telemetry_config_path=telemetry_config_path,
+        target_config_dir=pipelex_config_dir,
     )
 
     # Show info message if config already exists
@@ -418,6 +441,7 @@ def init_cmd(
             backends_toml_path=backends_toml_path,
             telemetry_config_path=telemetry_config_path,
             is_first_time_backends_setup=is_first_time_backends_setup,
+            target_config_dir=pipelex_config_dir,
         )
 
     except typer.Exit:

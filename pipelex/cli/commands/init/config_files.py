@@ -15,18 +15,19 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 INIT_SKIP_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {TELEMETRY_CONFIG_FILE_NAME, ".DS_Store"}
 
 
-def init_config(reset: bool = False, dry_run: bool = False) -> int:
+def init_config(reset: bool = False, dry_run: bool = False, target_dir: str | None = None) -> int:
     """Initialize pipelex configuration in the .pipelex directory. Does not install telemetry, just the main config and inference backends.
 
     Args:
         reset: Whether to overwrite existing files.
         dry_run: Whether to only print the files that would be copied, without actually copying them.
+        target_dir: Explicit target directory. If None, uses config_manager.pipelex_config_dir.
 
     Returns:
         The number of files copied.
     """
     config_template_dir = str(get_kit_configs_dir())
-    target_config_dir = config_manager.pipelex_config_dir
+    target_config_dir = target_dir or config_manager.pipelex_config_dir
 
     os.makedirs(target_config_dir, exist_ok=True)
 
