@@ -209,3 +209,27 @@
 - Cross-package concept refinement validation (install-time vs load-time) is addressed in the "Roadmap" page as a near-term goal, noting the current code validates at load time only.
 
 **All documents are now complete.** A final consistency review across all 6 documents found no issues. Terminology, technical claims, and cross-references are consistent.
+
+### Final Consistency Review — 2026-02-16
+
+A comprehensive cross-document review was performed by re-reading all 6 documents and spot-checking against the codebase. Findings:
+
+**Codebase spot-checks (7 checks, all passed):**
+
+1. `PipeType` enum: 5 operators (PipeFunc, PipeImgGen, PipeCompose, PipeLLM, PipeExtract) + 4 controllers (PipeBatch, PipeCondition, PipeParallel, PipeSequence) — matches all docs.
+2. `NativeConceptCode` enum: 11 values (Dynamic, Text, Image, Document, Html, TextAndImages, Number, ImgGenPrompt, Page, JSON, Anything) — matches spec and language doc exactly (same order).
+3. `RESERVED_DOMAINS`: `frozenset({"native", "mthds", "pipelex"})` — consistent across all 6 docs.
+4. `MTHDS_STANDARD_VERSION`: `"1.0.0"` — consistent across all 6 docs.
+5. `ConceptStructureBlueprintFieldType` enum: 8 values (text, list, dict, integer, boolean, number, date, concept) — matches spec and language doc.
+6. `TemplateCategory` enum: 7 values (basic, expression, html, markdown, mermaid, llm_prompt, img_gen_prompt) — matches implementers doc.
+7. `NATIVE_PACKAGE_ADDRESS`: `"__native__"` — matches CLI reference in `04-cli-and-guides.md`.
+
+**Cross-document consistency checks (5 checks, all passed):**
+
+1. **Joke generation example**: Identical across `03-specification.md`, `01-the-language.md`, and `00-home-and-overview.md` (minor TOML whitespace alignment difference in the overview version — semantically identical).
+2. **scoring_lib cross-package example**: Consistent across `03-specification.md`, `01-the-language.md`, `02-the-package-system.md`, and `05-implementers-and-about.md`.
+3. **Reserved domains**: All mentions across all 6 docs consistently list `native`, `mthds`, `pipelex`.
+4. **Cross-reference filenames**: All `[text](file.md#anchor)` links use correct filenames (`04-cli-and-guides.md`, `05-implementers-and-about.md`, etc.).
+5. **Terminology**: "bundle", "concept code", "pipe code", "domain code", "bare reference", "domain-qualified", "package-qualified" used consistently across all docs.
+
+**No issues found.** The documentation project is complete and internally consistent.
