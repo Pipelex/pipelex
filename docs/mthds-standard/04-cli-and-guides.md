@@ -554,7 +554,7 @@ The `plxt lint` command (also available as `plxt check` or `plxt validate`) chec
 
 ### Configuration
 
-`plxt` reads its configuration from a `.pipelex/toml_config.toml` file in the project root or a parent directory. This file controls formatting rules (alignment, column width, trailing commas, etc.) and can define per-file-type overrides.
+`plxt` reads its configuration from a `.pipelex/plxt.toml` file in the project root or a parent directory. This file controls formatting rules (alignment, column width, trailing commas, etc.) and can define per-file-type overrides.
 
 A basic configuration:
 
