@@ -210,6 +210,7 @@ nav:
     - Reasoning Controls: under-the-hood/reasoning-controls.md
     - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
     - Test Profile Configuration: under-the-hood/test-profile-configuration.md
+    - Init CLI Flows: under-the-hood/init-cli-flows.md
   - API: https://pipelex.github.io/pipelex-api/
   - MCP: https://pipelex.github.io/pipelex-mcp/
   - n8n: https://pipelex.github.io/n8n-nodes-pipelex/
