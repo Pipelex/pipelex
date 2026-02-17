@@ -14,6 +14,7 @@ GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
         "telemetry_override.toml",
         "pipelex_gateway_models.md",  # Auto-generated from remote config
         "pipelex_gateway_models_plain.md",  # Auto-generated from remote config
+        "mthds_schema.json",  # Auto-generated from MTHDS blueprint classes
         # Custom deck files differ intentionally: kit templates have waterfalls
         # commented out, while .pipelex/ has them active for tests
         "x_custom_llm_deck.toml",

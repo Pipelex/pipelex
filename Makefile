@@ -74,6 +74,8 @@ make check-urls               - Check all URLs in pipelex/urls.py for broken lin
 make cu                       - Check URLs with verbose output (shows details)
 make generate-mthds-schema    - Generate JSON Schema for .mthds files
 make gms                      - Shorthand -> generate-mthds-schema
+make check-mthds-schema       - Check MTHDS JSON Schema is up-to-date
+make cms                      - Shorthand -> check-mthds-schema
 make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
@@ -82,7 +84,7 @@ make regenerate-test-models   - Regenerate test model fixtures from backend conf
 make rtm                      - Shorthand -> regenerate-test-models
 make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
-make up                       - Shorthand -> update-gateway-models up-kit-configs rules
+make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
@@ -168,7 +170,7 @@ export HELP
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
-	generate-mthds-schema gms \
+	generate-mthds-schema gms check-mthds-schema cms \
 	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
@@ -299,7 +301,12 @@ generate-mthds-schema: env
 gms: generate-mthds-schema
 	@echo "> done: gms = generate-mthds-schema"
 
-# TODO: Add check-mthds-schema target (like check-gateway-models) for CI freshness verification
+check-mthds-schema: env
+	$(call PRINT_TITLE,"Checking MTHDS JSON Schema is up-to-date")
+	$(VENV_PIPELEX_DEV) check-mthds-schema --quiet
+
+cms: check-mthds-schema
+	@echo "> done: cms = check-mthds-schema"
 
 update-gateway-models: env
 	$(call PRINT_TITLE,"Updating gateway models reference")
@@ -915,10 +922,10 @@ c: format lint pyright mypy
 cc: cleanderived regenerate-test-models-quiet c
 	@echo "> done: cc = cleanderived regenerate-test-models format lint pyright pylint mypy"
 
-up: update-gateway-models up-kit-configs rules
-	@echo "> done: up = update-gateway-models up-kit-configs rules"
+up: generate-mthds-schema update-gateway-models up-kit-configs rules
+	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
-check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models pylint
+check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema pylint
 	@echo "> done: check"
 
 agent-check: fix-unused-imports format lint pyright mypy
