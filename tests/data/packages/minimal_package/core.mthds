@@ -1,0 +1,7 @@
+domain = "pkg_test_minimal_core"
+
+[pipe.pkg_test_hello]
+type        = "PipeLLM"
+description = "Say hello"
+output      = "Text"
+prompt      = "Say hello"

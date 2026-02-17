@@ -52,7 +52,7 @@ class Dpe(StructuredContent):
     yearly_energy_costs: Optional[float] = None
 ```
 
-## The Pipeline Definition: `extract_dpe.plx`
+## The Pipeline Definition: `extract_dpe.mthds`
 
 The pipeline uses a `PipeLLM` with a very specific prompt to extract the information from the document. The combination of the image and the OCR text allows the LLM to accurately capture all the details.
 

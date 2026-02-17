@@ -19,7 +19,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
 !!! info "Not Required for Using Pipelex"
-    You don't need to read this section to use Pipelex effectively. The [Home](../index.md) section covers everything you need to build workflows.
+    You don't need to read this section to use Pipelex effectively. The [Home](../index.md) section covers everything you need to build methods.
 
 ---
 

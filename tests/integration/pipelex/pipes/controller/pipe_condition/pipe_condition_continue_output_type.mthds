@@ -1,0 +1,44 @@
+domain      = "test_pipe_condition_continue_output_type"
+description = "Test PipeCondition with continue outcome and batching over verified links"
+
+[concept]
+VerifiedLink = "A verified link with a verdict (approved or rejected)"
+Constraint   = "A mathematical price constraint"
+
+[pipe]
+[pipe.process_verified_links]
+type             = "PipeBatch"
+description      = "Batches over verified links and routes each based on verdict."
+inputs           = { verified_links = "VerifiedLink[]" }
+output           = "Constraint[]"
+input_list_name  = "verified_links"
+input_item_name  = "verified_link"
+branch_pipe_code = "build_or_skip"
+
+[pipe.build_or_skip]
+type                = "PipeCondition"
+description         = "Routes approved links to builder, rejected links to skip (continue)."
+inputs              = { verified_link = "VerifiedLink" }
+output              = "Constraint"
+expression_template = "{{ verified_link.verdict }}"
+default_outcome     = "continue"
+
+[pipe.build_or_skip.outcomes]
+approved = "build_single_constraint"
+rejected = "continue"
+
+[pipe.build_single_constraint]
+type = "PipeLLM"
+description = "Converts an approved verified link into a mathematical price constraint."
+inputs = { verified_link = "VerifiedLink" }
+output = "Constraint"
+prompt = """
+@verified_link
+
+Convert to a price constraint.
+The math: If A → B, then Price(A) ≤ Price(B).
+
+Output a constraint with:
+- expression: "Price({{ verified_link.source }}_Yes) <= Price({{ verified_link.target }}_Yes)"
+- description: "{{ verified_link.source }} implies {{ verified_link.target }}"
+"""

@@ -1,0 +1,38 @@
+domain      = "middle_domain"
+description = "Middle domain with chain of refinements - INTENTIONALLY OUT OF ORDER"
+
+# INTENTIONALLY DEFINED OUT OF ORDER:
+# PlatinumCustomer -> VIPCustomer -> Customer -> Person (from base_domain)
+# But defined in REVERSE order to trigger the bug at multiple levels
+
+# Level 3: PlatinumCustomer refines VIPCustomer (defined FIRST, but VIPCustomer not yet defined)
+[concept.PlatinumCustomer]
+description = "A platinum customer with highest privileges"
+refines     = "middle_domain.VIPCustomer"
+
+# Level 2: VIPCustomer refines Customer (defined SECOND, but Customer not yet defined)
+[concept.VIPCustomer]
+description = "A VIP customer with special privileges"
+refines     = "middle_domain.Customer"
+
+# Level 1: Customer refines Person from base_domain (defined THIRD)
+# This one should work IF base_domain is loaded first
+[concept.Customer]
+description = "A customer"
+refines     = "base_domain.Person"
+
+# Native concept refinements mixed in - also out of order!
+# UrgentNotification refines WelcomeMessage but is defined FIRST
+[concept.UrgentNotification]
+description = "An urgent notification for platinum customers"
+refines     = "middle_domain.WelcomeMessage"
+
+# WelcomeMessage refines Text (native) - defined AFTER UrgentNotification
+[concept.WelcomeMessage]
+description = "A welcome message for customers"
+refines     = "Text"
+
+# Simple native refinement (no ordering issues)
+[concept.CustomerPortrait]
+description = "A portrait of a customer"
+refines     = "Image"

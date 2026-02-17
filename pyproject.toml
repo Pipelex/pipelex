@@ -43,6 +43,7 @@ dependencies = [
   "python-dotenv>=1.0.1",
   "PyYAML>=6.0.2",
   "rich>=13.8.1",
+  "semantic-version>=2.10.0",
   "shortuuid>=1.0.13",
   "tomli>=2.3.0",
   "tomlkit>=0.13.2",

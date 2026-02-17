@@ -39,6 +39,11 @@ class TestConceptValidation:
             ("crm.Customer", True),
             ("my_app.Entity", True),
             ("domain.A", True),
+            # Hierarchical domains
+            ("legal.contracts.NonCompeteClause", True),
+            ("legal.contracts.shareholder.Agreement", True),
+            ("a.b.c.D", True),
+            # Invalid
             ("native.text", False),
             ("NATIVE.Text", False),
             ("my-app.Entity", False),
@@ -63,12 +68,13 @@ class TestConceptValidation:
             ("myapp.BaseEntity", True),
             ("crm.Customer", True),
             ("my_app.Entity", True),
+            # Valid - hierarchical domain refs (now supported)
+            ("org.dept.team.Entity", True),
+            ("a.b.c.D", True),
+            ("legal.contracts.NonCompeteClause", True),
             # Invalid - lowercase bare code
             ("somecustomconcept", False),
             ("text", False),
-            # Invalid - deeply nested domain
-            ("org.dept.team.Entity", False),
-            ("a.b.c.D", False),
             # Invalid - hyphenated domain
             ("my-app.Entity", False),
             # Invalid - empty string

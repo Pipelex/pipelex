@@ -1,7 +1,7 @@
 """Integration tests for PipeCompose with construct (StructuredContent output).
 
 These tests verify that PipeCompose can produce StructuredContent objects
-using the construct blueprint syntax in PLX files.
+using the construct blueprint syntax in MTHDS files.
 """
 
 from pathlib import Path

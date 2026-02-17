@@ -36,7 +36,7 @@ This example shows how to use multiple inputs to guide the generation process an
 
 ## The Data Structure: `OptimizedTweet` Model
 
-The data model for this pipeline is very simple, as the final output is just a piece of text. However, the pipeline uses several concepts internally to manage the workflow, such as `DraftTweet`, `TweetAnalysis`, and `WritingStyle`.
+The data model for this pipeline is very simple, as the final output is just a piece of text. However, the pipeline uses several concepts internally to manage the method, such as `DraftTweet`, `TweetAnalysis`, and `WritingStyle`.
 
 ```python
 class OptimizedTweet(TextContent):
@@ -44,7 +44,7 @@ class OptimizedTweet(TextContent):
     pass
 ```
 
-## The Pipeline Definition: `tech_tweet.plx`
+## The Pipeline Definition: `tech_tweet.mthds`
 
 This pipeline uses a two-step "analyze and optimize" sequence. The first pipe analyzes the draft tweet for common pitfalls, and the second pipe rewrites the tweet based on the analysis and a provided writing style. This is a powerful pattern for refining generated content.
 
@@ -82,7 +82,7 @@ Evaluate the tweet for these key issues:
 @draft_tweet
 """
 ```
-This "analyze and refine" pattern is a great way to build more reliable and sophisticated text generation workflows. The first step provides a structured critique, and the second step uses that critique to improve the final output.
+This "analyze and refine" pattern is a great way to build more reliable and sophisticated text generation methods. The first step provides a structured critique, and the second step uses that critique to improve the final output.
 
 Here is the flowchart generated during this run:
 

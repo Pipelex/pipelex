@@ -19,12 +19,17 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.packages.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
+from pipelex.core.packages.discovery import MANIFEST_FILENAME
+from pipelex.core.packages.manifest import MthdsPackageManifest
+from pipelex.core.packages.manifest_parser import serialize_manifest_to_toml
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
-from pipelex.language.plx_factory import PlxFactory
+from pipelex.language.mthds_factory import MthdsFactory
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
@@ -69,15 +74,15 @@ class BuilderLoop:
 
         if is_save_first_iteration_enabled:
             try:
-                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 first_iteration_path = get_incremental_file_path(
                     base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_1st_iteration",
-                    extension="plx",
+                    extension="mthds",
                 )
-                save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
+                save_text_to_path(text=mthds_content, path=str(first_iteration_path), create_directory=True)
             except PipelexBundleSpecBlueprintError as exc:
-                log.warning(f"Could not save first iteration PLX: {exc}")
+                log.warning(f"Could not save first iteration MTHDS: {exc}")
 
         max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts
         for attempt in range(1, max_attempts + 1):
@@ -130,29 +135,32 @@ class BuilderLoop:
         if pipelex_bundle_spec.pipe:
             for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
                 source = f"pipe '{pipe_code}'"
-                # Parse output
+                # Parse output — skip cross-package refs
                 output_parse = parse_concept_with_multiplicity(pipe_spec.output)
                 output_concept = output_parse.concept_ref_or_code
-                if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                    bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
-                    concept_references.append((bare_code, source, "output"))
+                if not QualifiedRef.has_cross_package_prefix(output_concept):
+                    if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                        bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
+                        concept_references.append((bare_code, source, "output"))
 
-                # Parse inputs
+                # Parse inputs — skip cross-package refs
                 if pipe_spec.inputs:
                     for input_name, input_concept_str in pipe_spec.inputs.items():
                         input_parse = parse_concept_with_multiplicity(input_concept_str)
                         input_concept = input_parse.concept_ref_or_code
-                        if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                            bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
-                            concept_references.append((bare_code, source, f"input '{input_name}'"))
+                        if not QualifiedRef.has_cross_package_prefix(input_concept):
+                            if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                                bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
+                                concept_references.append((bare_code, source, f"input '{input_name}'"))
 
-                # Parse PipeParallel combined_output
+                # Parse PipeParallel combined_output — skip cross-package refs
                 if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
                     combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
                     combined_concept = combined_parse.concept_ref_or_code
-                    if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                        bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
-                        concept_references.append((bare_code, source, "combined_output"))
+                    if not QualifiedRef.has_cross_package_prefix(combined_concept):
+                        if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                            bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
+                            concept_references.append((bare_code, source, "combined_output"))
 
         # Collect concept references from concept definitions (refines, structure concept_ref, item_concept_ref)
         if pipelex_bundle_spec.concept:
@@ -161,26 +169,28 @@ class BuilderLoop:
                     continue
                 source = f"concept '{concept_code}'"
 
-                # Check refines
+                # Check refines — skip cross-package refs
                 if concept_spec_or_name.refines:
                     ref = concept_spec_or_name.refines
-                    if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                    if not QualifiedRef.has_cross_package_prefix(ref) and ("." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain):
                         bare_code = ref.split(".")[-1] if "." in ref else ref
                         concept_references.append((bare_code, source, "refines"))
 
-                # Check structure fields
+                # Check structure fields — skip cross-package refs
                 if concept_spec_or_name.structure:
                     for field_name, field_spec in concept_spec_or_name.structure.items():
                         if field_spec.concept_ref:
                             ref = field_spec.concept_ref
-                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
-                                bare_code = ref.split(".")[-1] if "." in ref else ref
-                                concept_references.append((bare_code, source, f"structure.{field_name}.concept_ref"))
+                            if not QualifiedRef.has_cross_package_prefix(ref):
+                                if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                    bare_code = ref.split(".")[-1] if "." in ref else ref
+                                    concept_references.append((bare_code, source, f"structure.{field_name}.concept_ref"))
                         if field_spec.item_concept_ref:
                             ref = field_spec.item_concept_ref
-                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
-                                bare_code = ref.split(".")[-1] if "." in ref else ref
-                                concept_references.append((bare_code, source, f"structure.{field_name}.item_concept_ref"))
+                            if not QualifiedRef.has_cross_package_prefix(ref):
+                                if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                    bare_code = ref.split(".")[-1] if "." in ref else ref
+                                    concept_references.append((bare_code, source, f"structure.{field_name}.item_concept_ref"))
 
         # Step 2: Determine which are undeclared
         declared_concepts: set[str] = set()
@@ -368,15 +378,18 @@ class BuilderLoop:
         """Extract a bare concept code only if the reference is local.
 
         A reference is considered local if it has no domain prefix or if
-        its domain prefix matches the bundle domain.
+        its domain prefix matches the bundle domain. Cross-package refs
+        (containing '->') are never local.
 
         Args:
             concept_ref_or_code: A concept reference like "Document", "my_domain.Document", or "external.Document"
             domain: The bundle's domain
 
         Returns:
-            The bare concept code if local, or None if external
+            The bare concept code if local, or None if external or cross-package
         """
+        if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
+            return None
         if "." not in concept_ref_or_code:
             return concept_ref_or_code
         prefix, bare_code = concept_ref_or_code.rsplit(".", maxsplit=1)
@@ -693,15 +706,15 @@ class BuilderLoop:
         # Save second iteration if we made any changes (pipes or concepts)
         if (fixed_pipes or added_concepts) and is_save_second_iteration_enabled:
             try:
-                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 second_iteration_path = get_incremental_file_path(
                     base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_2nd_iteration",
-                    extension="plx",
+                    extension="mthds",
                 )
-                save_text_to_path(text=plx_content, path=str(second_iteration_path))
+                save_text_to_path(text=mthds_content, path=str(second_iteration_path))
             except PipelexBundleSpecBlueprintError as exc:
-                log.warning(f"Could not save second iteration PLX: {exc}")
+                log.warning(f"Could not save second iteration MTHDS: {exc}")
 
         return pipelex_bundle_spec
 
@@ -910,3 +923,47 @@ class BuilderLoop:
         field_spec.choices = None
 
         return True
+
+
+def maybe_generate_manifest_for_output(output_dir: Path) -> Path | None:
+    """Generate a METHODS.toml if the output directory contains multiple domains.
+
+    Scans all .mthds files in the output directory, parses their headers to
+    extract domain and main_pipe information, and generates a METHODS.toml
+    if multiple distinct domains are found.
+
+    Args:
+        output_dir: Directory to scan for .mthds files
+
+    Returns:
+        Path to the generated METHODS.toml, or None if not generated
+    """
+    mthds_files = sorted(output_dir.rglob("*.mthds"))
+    if not mthds_files:
+        return None
+
+    # Parse each bundle to extract domain and pipe info
+    domain_pipes, domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info(mthds_files)
+    for error in errors:
+        log.warning(f"Could not parse {error}")
+
+    # Only generate manifest when multiple domains are present
+    if len(domain_pipes) < 2:
+        return None
+
+    # Build exports: include main_pipe and all pipes from each domain
+    exports = build_domain_exports_from_scan(domain_pipes, domain_main_pipes)
+
+    dir_name = output_dir.name.replace("-", "_").replace(" ", "_").lower()
+    manifest = MthdsPackageManifest(
+        address=f"example.com/yourorg/{dir_name}",
+        version="0.1.0",
+        description=f"Package generated from {len(mthds_files)} .mthds file(s)",
+        exports=exports,
+    )
+
+    manifest_path = output_dir / MANIFEST_FILENAME
+    toml_content = serialize_manifest_to_toml(manifest)
+    manifest_path.write_text(toml_content, encoding="utf-8")
+
+    return manifest_path

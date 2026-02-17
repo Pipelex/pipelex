@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
+from pipelex.core.qualified_ref import QualifiedRef
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -35,10 +36,8 @@ def get_structure_class_name_from_blueprint(
         raise ValueError(msg)
 
     # Extract concept_code from concept_ref_or_code
-    if "." in concept_ref_or_code:
-        concept_code = concept_ref_or_code.rsplit(".", maxsplit=1)[-1]
-    else:
-        concept_code = concept_ref_or_code
+    ref = QualifiedRef.parse(concept_ref_or_code)
+    concept_code = ref.local_code
 
     if isinstance(blueprint_or_string_description, str):
         return concept_code
@@ -101,6 +100,5 @@ def extract_concept_code_from_concept_ref_or_code(concept_ref_or_code: str) -> s
         msg = f"Invalid concept_ref_or_code: '{concept_ref_or_code}' for extracting concept code"
         raise ValueError(msg)
 
-    if "." in concept_ref_or_code:
-        return concept_ref_or_code.rsplit(".", maxsplit=1)[-1]
-    return concept_ref_or_code
+    ref = QualifiedRef.parse(concept_ref_or_code)
+    return ref.local_code

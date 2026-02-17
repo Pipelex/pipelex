@@ -137,7 +137,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         extract_choice: ExtractModelChoice = self.extract_choice or get_model_deck().extract_choice_default
         extract_setting: ExtractSetting = get_model_deck().get_extract_setting(extract_choice=extract_choice)
 
-        # PLX-level max_page_images takes precedence if set, otherwise use ExtractSetting
+        # MTHDS-level max_page_images takes precedence if set, otherwise use ExtractSetting
         max_nb_images = self.max_page_images if self.max_page_images is not None else extract_setting.max_nb_images
 
         extract_job_params = ExtractJobParams(

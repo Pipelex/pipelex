@@ -48,7 +48,7 @@ class PipelineRequest(BaseModel):
 
     Attributes:
         pipe_code (str | None): Code of the pipe to execute
-        plx_content (str | None): Content of the pipeline bundle to execute
+        mthds_content (str | None): Content of the pipeline bundle to execute
         inputs (PipelineInputs | None): Inputs in PipelineInputs format - Pydantic validation is skipped
             to preserve the flexible format (dicts, strings, StuffContent objects, etc.)
         output_name (str | None): Name of the output slot to write to
@@ -58,7 +58,7 @@ class PipelineRequest(BaseModel):
     """
 
     pipe_code: str | None = None
-    plx_content: str | None = None
+    mthds_content: str | None = None
     inputs: Annotated[PipelineInputs | None, SkipValidation] = None
     output_name: str | None = None
     output_multiplicity: VariableMultiplicity | None = None
@@ -67,11 +67,11 @@ class PipelineRequest(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def validate_request(cls, values: dict[str, Any]):
-        if values.get("pipe_code") is None and values.get("plx_content") is None:
+        if values.get("pipe_code") is None and values.get("mthds_content") is None:
             msg = (
-                "pipe_code and plx_content cannot be None together. Its either: Both of them, or if there is no plx_content, "
+                "pipe_code and mthds_content cannot be None together. Its either: Both of them, or if there is no mthds_content, "
                 "then pipe_code must be provided and must reference a pipe already registered in the library."
-                "If plx_content is provided but no pipe_code, plx_content must have a main_pipe property."
+                "If mthds_content is provided but no pipe_code, mthds_content must have a main_pipe property."
             )
             raise PipelineRequestError(msg)
         return values
@@ -129,7 +129,7 @@ class PipelexProtocol(Protocol):
     async def execute_pipeline(
         self,
         pipe_code: str | None = None,
-        plx_content: str | None = None,
+        mthds_content: str | None = None,
         inputs: PipelineInputs | WorkingMemory | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
@@ -139,7 +139,7 @@ class PipelexProtocol(Protocol):
 
         Args:
             pipe_code (str): The code identifying the pipeline to execute
-            plx_content (str | None): Content of the pipeline bundle to execute
+            mthds_content (str | None): Content of the pipeline bundle to execute
             inputs (PipelineInputs | WorkingMemory | None): Inputs passed to the pipeline
             output_name (str | None): Target output slot name
             output_multiplicity (PipeOutputMultiplicity | None): Output multiplicity setting
@@ -158,7 +158,7 @@ class PipelexProtocol(Protocol):
     async def start_pipeline(
         self,
         pipe_code: str | None = None,
-        plx_content: str | None = None,
+        mthds_content: str | None = None,
         inputs: PipelineInputs | WorkingMemory | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
@@ -168,7 +168,7 @@ class PipelexProtocol(Protocol):
 
         Args:
             pipe_code (str): The code identifying the pipeline to execute
-            plx_content (str | None): Content of the pipeline bundle to execute
+            mthds_content (str | None): Content of the pipeline bundle to execute
             inputs (PipelineInputs | WorkingMemory | None): Inputs passed to the pipeline
             output_name (str | None): Target output slot name
             output_multiplicity (PipeOutputMultiplicity | None): Output multiplicity setting

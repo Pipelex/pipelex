@@ -122,7 +122,7 @@ age = { type = "integer", description = "User's age", required = false }
 **Step 2: Generate the base class**
 
 ```bash
-pipelex build structures ./my_pipeline.plx -o ./structures/
+pipelex build structures ./my_pipeline.mthds -o ./structures/
 ```
 
 **Step 3: Add custom validation**
@@ -151,7 +151,7 @@ class UserProfile(StructuredContent):
         return v
 ```
 
-**Step 4: Update your .plx file**
+**Step 4: Update your .mthds file**
 
 ```toml
 [concept]
@@ -184,7 +184,7 @@ in_stock = { type = "boolean", description = "Stock availability", default_value
 **2. Generate the Python class:**
 
 ```bash
-pipelex build structures ./ecommerce.plx -o ./structures/
+pipelex build structures ./ecommerce.mthds -o ./structures/
 ```
 
 **3. Add your custom logic** to the generated file:
@@ -217,7 +217,7 @@ class Product(StructuredContent):
         return f"${self.price:.2f}"
 ```
 
-**4. Update your `.plx` file:**
+**4. Update your `.mthds` file:**
 
 ```toml
 domain = "ecommerce"
@@ -255,5 +255,5 @@ Product = "A product in the catalog"
 
 - [Inline Structures](inline-structures.md) - Fast prototyping with TOML
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
-- [Writing Workflows Tutorial](../../2-get-started/pipe-builder.md) - Get started with structured outputs
+- [Writing Methods Tutorial](../../2-get-started/pipe-builder.md) - Get started with structured outputs
 

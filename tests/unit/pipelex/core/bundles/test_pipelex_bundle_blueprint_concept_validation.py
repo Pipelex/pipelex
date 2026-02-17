@@ -225,6 +225,62 @@ class TestPipelexBundleBlueprintConceptValidation:
         )
         assert bundle.concept is not None
 
+    # ========== HIERARCHICAL DOMAIN CASES ==========
+
+    def test_valid_hierarchical_domain_concept_ref_output(self):
+        """Hierarchical domain concept ref for same domain should be valid."""
+        bundle = PipelexBundleBlueprint(
+            domain="legal.contracts",
+            description="Test bundle",
+            concept={"NonCompeteClause": "A non-compete clause concept"},
+            pipe={
+                "my_pipe": PipeLLMBlueprint(
+                    type="PipeLLM",
+                    description="Test pipe",
+                    output="legal.contracts.NonCompeteClause",
+                    prompt="Generate something",
+                ),
+            },
+        )
+        assert bundle.concept is not None
+
+    def test_valid_hierarchical_domain_external_concept_ref(self):
+        """External concept ref from a different hierarchical domain should be skipped."""
+        bundle = PipelexBundleBlueprint(
+            domain="legal.contracts",
+            description="Test bundle",
+            pipe={
+                "my_pipe": PipeLLMBlueprint(
+                    type="PipeLLM",
+                    description="Test pipe",
+                    inputs={"score": "scoring.WeightedScore"},
+                    output="Text",
+                    prompt="Process @score",
+                ),
+            },
+        )
+        assert bundle.pipe is not None
+
+    def test_invalid_hierarchical_domain_undeclared_same_domain(self):
+        """Hierarchical same-domain concept ref that is not declared should raise error."""
+        with pytest.raises(ValidationError) as exc_info:
+            PipelexBundleBlueprint(
+                domain="legal.contracts",
+                description="Test bundle",
+                pipe={
+                    "my_pipe": PipeLLMBlueprint(
+                        type="PipeLLM",
+                        description="Test pipe",
+                        output="legal.contracts.Missing",
+                        prompt="Generate something",
+                    ),
+                },
+            )
+
+        error_message = str(exc_info.value)
+        assert "Missing" in error_message
+        assert "not declared in domain" in error_message
+
     # ========== INVALID CASES ==========
 
     def test_invalid_undeclared_local_concept_in_pipe_output(self):

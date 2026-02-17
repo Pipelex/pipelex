@@ -27,7 +27,7 @@ class TestPipeParallelSimple:
     ):
         """Test PipeParallel running three text analysis pipes in parallel."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
-        # Create PipeParallel instance - pipes are loaded from PLX files
+        # Create PipeParallel instance - pipes are loaded from MTHDS files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},

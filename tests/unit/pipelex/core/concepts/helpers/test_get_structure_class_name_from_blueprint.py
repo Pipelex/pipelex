@@ -91,13 +91,13 @@ class TestGetStructureClassNameFromBlueprint:
                 concept_ref_or_code="invalid_lowercase_code",
             )
 
-    def test_invalid_nested_domain_raises_error(self):
-        """Nested domain format (more than one dot) raises ValueError."""
-        with pytest.raises(ValueError, match="Invalid concept_ref_or_code"):
-            get_structure_class_name_from_blueprint(
-                blueprint_or_string_description="A description",
-                concept_ref_or_code="domain.subdomain.ConceptName",
-            )
+    def test_hierarchical_domain_extracts_concept_code(self):
+        """Hierarchical domain format (multiple dots) extracts the concept code correctly."""
+        result = get_structure_class_name_from_blueprint(
+            blueprint_or_string_description="A description",
+            concept_ref_or_code="domain.subdomain.ConceptName",
+        )
+        assert result == "ConceptName"
 
     def test_empty_string_raises_error(self):
         """Empty string raises ValueError."""

@@ -128,7 +128,7 @@ make docs-list                - List deployed documentation versions
 make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
 make docs-deploy-specific-version         - Deploy docs for the current version with 'pre-release' alias (CI only)
-make docs-deploy-404          - Deploy 404.html for versionless URL redirects
+make docs-deploy-root          - Deploy root assets (404.html, robots.txt, index.html) to gh-pages
 make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 
 make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
@@ -172,7 +172,7 @@ export HELP
 	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
-	docs-deploy-404
+	docs-deploy-root
 
 all help:
 	@echo "$$HELP"
@@ -784,6 +784,31 @@ check-TODOs: env
 
 # Extract version from pyproject.toml for docs deployment
 DOCS_VERSION := $(shell grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
+
+define ROOT_ROBOTS_TXT
+User-agent: *
+Allow: /latest/
+Disallow: /
+Sitemap: https://$(SITE_DOMAIN)/latest/sitemap.xml
+endef
+export ROOT_ROBOTS_TXT
+
+define ROOT_INDEX_HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Redirecting to latest documentation...</title>
+    <meta http-equiv="refresh" content="0;url=/latest/">
+    <link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
+</head>
+<body>
+    <p>Redirecting to <a href="/latest/">latest documentation</a>...</p>
+</body>
+</html>
+endef
+export ROOT_INDEX_HTML
 
 docs: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
@@ -805,24 +830,32 @@ docs-deploy: env
 	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
 	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
 
-docs-deploy-stable: env docs-deploy-404
+docs-deploy-stable: env
 	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
+	$(MAKE) docs-deploy-root
 
-docs-deploy-specific-version: env docs-deploy-404
+docs-deploy-specific-version: env
 	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
+	$(MAKE) docs-deploy-root
 
-docs-deploy-404:
-	$(call PRINT_TITLE,"Deploying 404.html to gh-pages root for versionless URL redirects")
-	@TMPDIR=$$(mktemp -d); \
+docs-deploy-root:
+ifeq ($(SITE_DOMAIN),)
+	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
+endif
+	$(call PRINT_TITLE,"Deploying root assets (404.html, robots.txt, index.html) to gh-pages")
+	@git fetch origin gh-pages:gh-pages 2>/dev/null || true; \
+	TMPDIR=$$(mktemp -d); \
 	trap "cd '$(CURDIR)'; git worktree remove '$$TMPDIR' 2>/dev/null || true; rm -rf '$$TMPDIR'" EXIT; \
 	git worktree add "$$TMPDIR" gh-pages && \
 	cp docs/404.html "$$TMPDIR/404.html" && \
+	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
+	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
 	cd "$$TMPDIR" && \
-	git add 404.html && \
-	(git diff --cached --quiet || git commit -m "Update 404.html for versionless URL redirects") && \
+	git add 404.html robots.txt index.html && \
+	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html)") && \
 	git push origin gh-pages
 
 docs-delete: env

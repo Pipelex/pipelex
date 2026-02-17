@@ -1,0 +1,4 @@
+[package]
+address = "github.com/pipelexlab/minimal"
+version = "0.1.0"
+description = "A minimal MTHDS package"

@@ -1,0 +1,7 @@
+[package]
+address = "github.com/mthds/analytics-lib"
+version = "1.0.0"
+description = "Analytics library for cross-package collision testing"
+
+[exports.pkg_test_analytics_dep]
+pipes = ["pkg_test_compute_analytics"]

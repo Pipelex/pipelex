@@ -1,3 +1,5 @@
+from typing import Any, Callable
+
 from pydantic import Field, RootModel, model_validator
 from typing_extensions import override
 
@@ -7,6 +9,7 @@ from pipelex.core.concepts.exceptions import ConceptLibraryConceptNotFoundError,
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.validation import is_concept_ref_valid, validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.types import Self
@@ -17,10 +20,22 @@ ConceptLibraryRoot = dict[str, Concept]
 class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     root: ConceptLibraryRoot = Field(default_factory=dict)
 
+    @override
+    def model_post_init(self, _context: Any) -> None:
+        self._concept_resolver: Callable[[str], Concept | None] | None = None
+
+    def set_concept_resolver(self, resolver: Callable[[str], Concept | None]) -> None:
+        """Set a resolver callback for cross-package concept lookups.
+
+        Args:
+            resolver: A callable that takes a concept ref and returns the Concept or None
+        """
+        self._concept_resolver = resolver
+
     @model_validator(mode="after")
     def validation_static(self):
         for concept in self.root.values():
-            if concept.refines and concept.refines not in self.root:
+            if concept.refines and not QualifiedRef.has_cross_package_prefix(concept.refines) and concept.refines not in self.root:
                 msg = f"Concept '{concept.code}' refines '{concept.refines}' but no concept with the code '{concept.refines}' exists"
                 raise ConceptLibraryError(msg)
         return self
@@ -82,7 +97,12 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
 
     @override
     def is_compatible(self, tested_concept: Concept, wanted_concept: Concept, strict: bool = False) -> bool:
-        return Concept.are_concept_compatible(concept_1=tested_concept, concept_2=wanted_concept, strict=strict)
+        return Concept.are_concept_compatible(
+            concept_1=tested_concept,
+            concept_2=wanted_concept,
+            strict=strict,
+            concept_resolver=self._concept_resolver,
+        )
 
     def get_optional_concept(self, concept_ref: str) -> Concept | None:
         return self.root.get(concept_ref)
@@ -90,8 +110,18 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
     @override
     def get_required_concept(self, concept_ref: str) -> Concept:
         """`concept_ref` can have the domain or not. If it doesn't have the domain, it is assumed to be native.
-        If it is not native and doesnt have a domain, it should raise an error
+        If it is not native and doesnt have a domain, it should raise an error.
+        Cross-package refs (alias->domain.Code) are looked up directly by key.
         """
+        # Cross-package refs bypass format validation (direct dict lookup)
+        if QualifiedRef.has_cross_package_prefix(concept_ref):
+            the_concept = self.root.get(concept_ref)
+            if not the_concept:
+                alias, remainder = QualifiedRef.split_cross_package_ref(concept_ref)
+                msg = f"Cross-package concept '{remainder}' from dependency '{alias}' not found in the library. Is the dependency loaded?"
+                raise ConceptLibraryError(msg)
+            return the_concept
+
         if not is_concept_ref_valid(concept_ref=concept_ref):
             msg = f"Concept string '{concept_ref}' is not a valid concept string"
             raise ConceptLibraryError(msg)
@@ -121,6 +151,10 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
         except ConceptStringError as exc:
             msg = f"Could not validate concept string or code '{concept_ref_or_code}': {exc}"
             raise ConceptLibraryError(msg) from exc
+
+        # Cross-package refs are looked up via get_required_concept which handles them
+        if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
+            return self.get_required_concept(concept_ref=concept_ref_or_code)
 
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
             native_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
@@ -153,6 +187,19 @@ class ConceptLibrary(RootModel[ConceptLibraryRoot], ConceptLibraryAbstract):
                     msg = f"Multiple concepts found for '{concept_ref_or_code}': {found_concepts}. Please specify the domain."
                     raise ConceptLibraryConceptNotFoundError(msg)
                 return found_concepts[0]
+
+    def add_dependency_concept(self, alias: str, concept: Concept) -> None:
+        """Add a concept from a dependency package with an aliased key.
+
+        Args:
+            alias: The dependency alias
+            concept: The concept to add
+        """
+        key = f"{alias}->{concept.concept_ref}"
+        if key in self.root:
+            msg = f"Dependency concept '{key}' already exists in the library"
+            raise ConceptLibraryError(msg)
+        self.root[key] = concept
 
     def is_concept_exists(self, concept_ref: str) -> bool:
         return concept_ref in self.root

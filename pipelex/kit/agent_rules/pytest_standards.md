@@ -11,7 +11,7 @@ NEVER EVER put more than one TestClass into a test module.
 - Place test files in the appropriate test category directory:
     - `tests/unit/` - for unit tests that test individual functions/classes in isolation
     - `tests/integration/` - for integration tests that test component interactions
-    - `tests/e2e/` - for end-to-end tests that test complete workflows
+    - `tests/e2e/` - for end-to-end tests that test complete methods
 - Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.

@@ -108,7 +108,7 @@ class TestPipeConditionSimple:
     ):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
-        # Create PipeCondition instance - pipes are loaded from PLX files
+        # Create PipeCondition instance - pipes are loaded from MTHDS files
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Text length condition for short text testing",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},

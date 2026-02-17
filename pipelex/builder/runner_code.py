@@ -165,7 +165,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
     Args:
         pipe: The pipe to generate runner code for
         output_multiplicity: Whether the output is a list (e.g., Text[])
-        library_dir: Directory containing the PLX bundles to load
+        library_dir: Directory containing the MTHDS bundles to load
     """
     # Get output information
     structure_class_name = pipe.output.concept.structure_class_name

@@ -4,7 +4,7 @@ title: "Architecture Overview"
 
 # Architecture Overview
 
-Pipelex is a Python framework for building and running **repeatable AI workflows** using a declarative language (`.plx` files).
+Pipelex is a Python framework for building and running **repeatable AI methods** using a declarative language (`.mthds` files).
 
 ---
 
@@ -51,7 +51,7 @@ Located in [`pipelex/core/`](https://github.com/Pipelex/pipelex/tree/main/pipele
 - **Concepts** - Semantic types with meaning (not just data types)
 - **Stuffs** - Knowledge objects combining a concept type with content
 - **Working Memory** - Runtime storage for data flowing through pipes
-- **Bundles** - Complete pipeline definitions loaded from `.plx` files
+- **Bundles** - Complete pipeline definitions loaded from `.mthds` files
 
 ---
 
@@ -93,9 +93,9 @@ Each plugin translates Pipelex's unified interface into provider-specific API ca
 
 ```mermaid
 flowchart TB
-    subgraph PLX[".plx Pipeline Files"]
+    subgraph MTHDS[".mthds Pipeline Files"]
         direction LR
-        D1["Declarative workflow definitions"]
+        D1["Declarative method definitions"]
     end
 
     subgraph HL["HIGH-LEVEL: Business Logic"]
@@ -145,7 +145,7 @@ flowchart TB
         A1["External Services"]
     end
 
-    PLX --> HL
+    MTHDS --> HL
     HL --> LL
     LL --> API
 ```

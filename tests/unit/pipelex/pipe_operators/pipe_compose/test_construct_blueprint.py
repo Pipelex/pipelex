@@ -1,6 +1,6 @@
 """Unit tests for ConstructBlueprint - the container for field blueprints.
 
-ConstructBlueprint is parsed from the `[pipe.name.construct]` section in PLX files.
+ConstructBlueprint is parsed from the `[pipe.name.construct]` section in MTHDS files.
 """
 
 from typing import Any, ClassVar

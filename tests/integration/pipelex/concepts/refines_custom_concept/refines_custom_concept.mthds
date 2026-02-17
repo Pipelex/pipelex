@@ -1,0 +1,15 @@
+domain      = "refines_custom_test"
+description = "Test library for refining custom concepts"
+
+# Base concept WITH structure
+[concept.Customer]
+description = "A customer"
+
+[concept.Customer.structure]
+name  = { type = "text", required = true, description = "Customer name" }
+email = { type = "text", required = true, description = "Customer email" }
+
+# Refined concept (inherits structure, cannot add own)
+[concept.VIPCustomer]
+description = "A VIP customer with special privileges"
+refines     = "refines_custom_test.Customer"

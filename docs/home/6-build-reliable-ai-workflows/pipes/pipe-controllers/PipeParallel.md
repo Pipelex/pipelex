@@ -16,9 +16,9 @@ You must use `add_each_output`, `combined_output`, or both.
 
 ## Configuration
 
-`PipeParallel` is configured in your pipeline's `.plx` file.
+`PipeParallel` is configured in your pipeline's `.mthds` file.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter         | Type          | Description                                                                                                                                                                    | Required |
 | ----------------- | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |

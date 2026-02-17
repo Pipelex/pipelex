@@ -48,7 +48,7 @@ class ProofOfPurchase(StructuredContent):
 ```
 This demonstrates how you can create nested data structures to accurately model your data.
 
-## The Pipeline Definition: `extract_proof_of_purchase.plx`
+## The Pipeline Definition: `extract_proof_of_purchase.mthds`
 
 The pipeline uses a powerful `PipeLLM` to extract the structured data from the document. The prompt is carefully engineered to guide the LLM.
 

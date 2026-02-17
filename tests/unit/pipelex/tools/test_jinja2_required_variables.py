@@ -181,19 +181,19 @@ Best regards,
         ),
     ]
 
-    PLX_STYLE_TEMPLATES: ClassVar[list[tuple[str, str, set[str]]]] = [
+    MTHDS_STYLE_TEMPLATES: ClassVar[list[tuple[str, str, set[str]]]] = [
         (
-            "plx_at_variable_preprocessed",
+            "mthds_at_variable_preprocessed",
             '{{ page.page_view|tag("page.page_view") }}',
             {"page.page_view"},
         ),
         (
-            "plx_dollar_variable_preprocessed",
+            "mthds_dollar_variable_preprocessed",
             "{{ page.text_and_images.text.text|format() }}",
             {"page.text_and_images.text.text"},
         ),
         (
-            "plx_mixed_preprocessed",
+            "mthds_mixed_preprocessed",
             '{{ page.page_view|tag("page.page_view") }}\n{{ page.text_and_images.text.text|format() }}',
             {"page.page_view", "page.text_and_images.text.text"},
         ),
@@ -343,15 +343,15 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_paths"),
-        TestData.PLX_STYLE_TEMPLATES,
+        TestData.MTHDS_STYLE_TEMPLATES,
     )
-    def test_plx_style_templates(
+    def test_mthds_style_templates(
         self,
         topic: str,
         template_source: str,
         expected_paths: set[str],
     ):
-        """Test detection in PLX-style preprocessed templates with tag/format filters."""
+        """Test detection in MTHDS-style preprocessed templates with tag/format filters."""
         result = detect_jinja2_required_variables(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,
@@ -647,7 +647,7 @@ class TestDetectJinja2VariableReferences:
         assert "upper" in result[0].filters
 
     def test_format_filter_detected(self) -> None:
-        """Test that format filter (common in PLX templates) is detected."""
+        """Test that format filter (common in MTHDS templates) is detected."""
         result = detect_jinja2_variable_references(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source="{{ content|format() }}",

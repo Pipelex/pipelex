@@ -13,9 +13,9 @@ The `PipeCondition` controller adds branching logic to your pipelines. It evalua
 
 ## Configuration
 
-`PipeCondition` is configured in your pipeline's `.plx` file.
+`PipeCondition` is configured in your pipeline's `.mthds` file.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter                      | Type           | Description                                                                                                                                              | Required                       |
 | ------------------------------ | -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |

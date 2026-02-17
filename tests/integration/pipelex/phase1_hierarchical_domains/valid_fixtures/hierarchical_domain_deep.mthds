@@ -1,0 +1,14 @@
+domain      = "legal.contracts.shareholder"
+description = "Deeply nested hierarchical domain for shareholder contracts"
+
+[concept]
+ShareholderAgreement = "A shareholder agreement document"
+
+[pipe]
+[pipe.analyze_agreement]
+type        = "PipeLLM"
+description = "Analyze a shareholder agreement"
+inputs      = { agreement = "ShareholderAgreement" }
+output      = "Text"
+model       = "$quick-reasoning"
+prompt      = "Analyze @agreement"

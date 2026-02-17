@@ -1,6 +1,6 @@
 # Agent CLI (`pipelex-agent`)
 
-Machine-first CLI for building, running, and validating Pipelex workflow bundles (`.plx` files). All output is structured JSON to stdout (success) or stderr (error). No Rich formatting, no interactive prompts.
+Machine-first CLI for building, running, and validating Pipelex method bundles (`.mthds` files). All output is structured JSON to stdout (success) or stderr (error). No Rich formatting, no interactive prompts.
 
 ## Companion: Agent Skills
 
@@ -28,7 +28,7 @@ commands/
   inputs_cmd.py                # inputs — generate example input JSON
   concept_cmd.py               # concept — JSON spec → concept TOML
   pipe_cmd.py                  # pipe — JSON spec → pipe TOML
-  assemble_cmd.py              # assemble — combine TOML parts into .plx
+  assemble_cmd.py              # assemble — combine TOML parts into .mthds
   graph_cmd.py                 # graph — render execution graph HTML
   models_cmd.py                # models — list presets, aliases, talent mappings
   doctor_cmd.py                # doctor — config health check
@@ -38,14 +38,14 @@ commands/
 
 | Command | Does |
 |---------|------|
-| `build` | Runs BuilderLoop to generate a `.plx` from a natural language prompt |
+| `build` | Runs BuilderLoop to generate a `.mthds` from a natural language prompt |
 | `run` | Executes a pipeline, returns JSON with main_stuff + working_memory |
 | `validate` | Dry-runs pipes/bundles, returns validation status per pipe |
 | `inputs` | Generates example input JSON for a given pipe |
 | `concept` | Converts a JSON concept spec into TOML |
 | `pipe` | Converts a JSON pipe spec (typed) into TOML |
-| `assemble` | Merges concept + pipe TOML sections into a complete `.plx` file |
-| `graph` | Generates graph visualization (HTML) from a .plx bundle via dry-run |
+| `assemble` | Merges concept + pipe TOML sections into a complete `.mthds` file |
+| `graph` | Generates graph visualization (HTML) from a .mthds bundle via dry-run |
 | `models` | Lists available model presets, aliases, waterfalls, and talent mappings |
 | `doctor` | Checks config, credentials, models health |
 

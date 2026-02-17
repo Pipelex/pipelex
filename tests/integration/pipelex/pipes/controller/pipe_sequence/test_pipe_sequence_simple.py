@@ -41,7 +41,7 @@ class TestPipeSequenceSimple:
         concept_library.add_concepts([concept_1])
         concept_2 = get_native_concept(native_concept=NativeConceptCode.TEXT)
 
-        # Create PipeSequence instance - pipes are loaded from PLX files
+        # Create PipeSequence instance - pipes are loaded from MTHDS files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Simple sequence for text processing",
             inputs={"input_text": concept_1.concept_ref},

@@ -49,7 +49,7 @@ async def prepare_runner(
 
     if bundle_path:
         try:
-            validate_bundle_result = await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+            validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
             all_blueprints.extend(validate_bundle_result.blueprints)
             first_blueprint = validate_bundle_result.blueprints[0]
             if not pipe_code:
@@ -88,7 +88,7 @@ async def prepare_runner(
     if output_path:
         final_output_path = output_path
     else:
-        # Place runner in the same directory as the PLX file
+        # Place runner in the same directory as the MTHDS file
         bundle_dir = Path(bundle_path).parent
         final_output_path = bundle_dir / f"run_{pipe_code}.py"
     output_dir = Path(final_output_path).parent
@@ -161,11 +161,11 @@ async def prepare_runner(
 def prepare_runner_cmd(
     target: Annotated[
         str | None,
-        typer.Argument(help="Bundle file path (.plx)"),
+        typer.Argument(help="Bundle file path (.mthds)"),
     ] = None,
     pipe: Annotated[
         str | None,
-        typer.Option("--pipe", help="Pipe code to use (optional if the .plx declares a main_pipe)"),
+        typer.Option("--pipe", help="Pipe code to use (optional if the .mthds declares a main_pipe)"),
     ] = None,
     output_path: Annotated[
         str | None,
@@ -173,7 +173,7 @@ def prepare_runner_cmd(
     ] = None,
     library_dirs: Annotated[
         list[str] | None,
-        typer.Option("--library-dirs", "-L", help="Directories to search for pipe definitions (.plx files). Can be specified multiple times."),
+        typer.Option("--library-dirs", "-L", help="Directories to search for pipe definitions (.mthds files). Can be specified multiple times."),
     ] = None,
 ) -> None:
     """Prepare a Python runner file for a pipe.
@@ -186,9 +186,9 @@ def prepare_runner_cmd(
     Custom concept types will have their structure recursively generated.
 
     Examples:
-        pipelex build runner my_bundle.plx
-        pipelex build runner my_bundle.plx --pipe my_pipe
-        pipelex build runner my_bundle.plx --output runner.py
+        pipelex build runner my_bundle.mthds
+        pipelex build runner my_bundle.mthds --pipe my_pipe
+        pipelex build runner my_bundle.mthds --output runner.py
     """
     # Show help if no target provided
     if target is None:
@@ -201,10 +201,10 @@ def prepare_runner_cmd(
     output_path_path = Path(output_path) if output_path else None
     library_dirs_paths = [Path(lib_dir) for lib_dir in library_dirs] if library_dirs else None
 
-    # Validate: target must be a .plx file
+    # Validate: target must be a .mthds file
     if not is_pipelex_file(target_path):
         typer.secho(
-            f"Failed to run: '{target}' is not a .plx file.",
+            f"Failed to run: '{target}' is not a .mthds file.",
             fg=typer.colors.RED,
             err=True,
         )

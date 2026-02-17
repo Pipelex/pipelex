@@ -1,0 +1,32 @@
+domain      = "test_image_in_out"
+description = "Test domain for verifying image output / input support"
+main_pipe   = "image_out_in"
+
+
+[pipe]
+[pipe.generate_image]
+type        = "PipeImgGen"
+description = "Generate an image from a prompt"
+output      = "Image"
+prompt      = "A beautiful landscape"
+model       = "$gen-image-testing"
+
+[pipe.describe_image]
+type = "PipeLLM"
+description = "Describe what is in the image"
+inputs = { image = "Image" }
+output = "Text"
+model = "$vision-cheap"
+prompt = """
+Describe what you see in this image in 1-2 sentences, be concise.
+$image
+"""
+
+[pipe.image_out_in]
+type = "PipeSequence"
+description = "Generate an image from a prompt and describe it"
+output = "Text"
+steps = [
+  { pipe = "generate_image", result = "image" },
+  { pipe = "describe_image", result = "visual_description" },
+]

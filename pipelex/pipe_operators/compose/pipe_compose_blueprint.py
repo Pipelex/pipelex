@@ -24,7 +24,7 @@ class PipeComposeBlueprint(PipeBlueprint):
 
     # Either template or construct must be provided, but not both
     # Note: The field is named 'construct_blueprint' internally to avoid conflict with Pydantic's
-    # BaseModel.construct() method. In PLX/TOML files, use 'construct' (via aliases).
+    # BaseModel.construct() method. In MTHDS/TOML files, use 'construct' (via aliases).
     template: str | TemplateBlueprint | None = None
     construct_blueprint: ConstructBlueprint | None = Field(default=None, validation_alias="construct", serialization_alias="construct")
 

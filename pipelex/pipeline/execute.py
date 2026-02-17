@@ -33,7 +33,7 @@ async def execute_pipeline(
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
-    plx_content: str | None = None,
+    mthds_content: str | None = None,
     bundle_uri: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
@@ -57,19 +57,19 @@ async def execute_pipeline(
     library_dirs:
         List of directory paths to load pipe definitions from. Combined with directories
         from the ``PIPELEXPATH`` environment variable (PIPELEXPATH directories are searched
-        first). When provided alongside ``plx_content``, definitions from both sources
+        first). When provided alongside ``mthds_content``, definitions from both sources
         are loaded into the library.
     pipe_code:
-        Code identifying the pipe to execute. Required when ``plx_content`` is not
-        provided. When both ``plx_content`` and ``pipe_code`` are provided, the
-        specified pipe from the PLX content will be executed (overriding any
-        ``main_pipe`` defined in the plx_content).
-    plx_content:
-        Complete PLX file content as a string. The pipe to execute is determined by
-        ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
+        Code identifying the pipe to execute. Required when ``mthds_content`` is not
+        provided. When both ``mthds_content`` and ``pipe_code`` are provided, the
+        specified pipe from the MTHDS content will be executed (overriding any
+        ``main_pipe`` defined in the mthds_content).
+    mthds_content:
+        Complete MTHDS file content as a string. The pipe to execute is determined by
+        ``pipe_code`` (if provided) or the ``main_pipe`` property in the MTHDS content.
         Can be combined with ``library_dirs`` to load additional definitions.
     bundle_uri:
-        URI identifying the bundle. If ``plx_content`` is not provided and ``bundle_uri``
+        URI identifying the bundle. If ``mthds_content`` is not provided and ``bundle_uri``
         points to a local file path, the content will be read from that file. Also used
         to detect if the bundle was already loaded from library directories (e.g., via
         PIPELEXPATH) to avoid duplicate domain registration.
@@ -107,11 +107,11 @@ async def execute_pipeline(
     # Use provided config or get default
     execution_config = execution_config or get_config().pipelex.pipeline_execution_config
 
-    # If plx_content is not provided but bundle_uri points to a file, read it
-    if plx_content is None and bundle_uri is not None:
+    # If MTHDS content is not provided but bundle_uri points to a file, read it
+    if mthds_content is None and bundle_uri is not None:
         bundle_path = Path(bundle_uri)
         if bundle_path.is_file():
-            plx_content = bundle_path.read_text(encoding="utf-8")
+            mthds_content = bundle_path.read_text(encoding="utf-8")
 
     properties: dict[EventProperty, Any]
     graph_spec_result = None
@@ -125,7 +125,7 @@ async def execute_pipeline(
             library_id=library_id,
             library_dirs=library_dirs,
             pipe_code=pipe_code,
-            plx_content=plx_content,
+            mthds_content=mthds_content,
             bundle_uri=bundle_uri,
             inputs=inputs,
             output_name=output_name,

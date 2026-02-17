@@ -7,7 +7,7 @@
    ```bash
    make agent-check
    # If the current system doesn't have the `make` command,
-   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy plxt-format plxt-lint)
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
    ```
 
    This runs multiple code quality tools:
@@ -38,6 +38,8 @@
 
 ## Running Tests with Prints
 
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
+
    If anything went wrong, you can run the tests with prints to see the error:
 
    ```bash
@@ -47,6 +49,8 @@
 
 ## Running specific Tests
 
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
+
    ```bash
    make tp TEST=TestClassName
    # or
@@ -55,6 +59,8 @@
    Note: Matches names starting with the provided string.
 
 ## Running Last Failed Tests
+
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
 
    To rerun only the tests that failed in the previous run, use:
 

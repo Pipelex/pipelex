@@ -77,7 +77,7 @@ def do_validate_all_libraries_and_dry_run(
 def validate_cmd(
     target: Annotated[
         str | None,
-        typer.Argument(help="Pipe code or bundle file path (auto-detected based on .plx extension)"),
+        typer.Argument(help="Pipe code or bundle file path (auto-detected based on .mthds extension)"),
     ] = None,
     pipe: Annotated[
         str | None,
@@ -87,7 +87,7 @@ def validate_cmd(
         str | None,
         typer.Option(
             "--bundle",
-            help="Bundle file path (.plx) - validates all pipes in the bundle",
+            help="Bundle file path (.mthds) - validates all pipes in the bundle",
         ),
     ] = None,
     validate_all: Annotated[
@@ -99,7 +99,7 @@ def validate_cmd(
         typer.Option(
             "--library-dir",
             "-L",
-            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+            help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times.",
         ),
     ] = None,
 ) -> None:
@@ -107,9 +107,9 @@ def validate_cmd(
 
     Examples:
         pipelex validate my_pipe
-        pipelex validate my_bundle.plx
-        pipelex validate --bundle my_bundle.plx
-        pipelex validate --bundle my_bundle.plx --pipe my_pipe
+        pipelex validate my_bundle.mthds
+        pipelex validate --bundle my_bundle.mthds
+        pipelex validate --bundle my_bundle.mthds --pipe my_pipe
         pipelex validate --all
     """
     if validate_all:
@@ -149,7 +149,7 @@ def validate_cmd(
             bundle_path = target_path
             if bundle:
                 typer.secho(
-                    "Failed to validate: cannot use option --bundle if you're already passing a bundle file (.plx) as positional argument",
+                    "Failed to validate: cannot use option --bundle if you're already passing a bundle file (.mthds) as positional argument",
                     fg=typer.colors.RED,
                     err=True,
                 )
@@ -187,7 +187,7 @@ def validate_cmd(
     ):
         if bundle_path:
             try:
-                await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+                await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
                 typer.secho(
                     f"✅ Successfully validated bundle '{bundle_path}'",
                     fg=typer.colors.GREEN,

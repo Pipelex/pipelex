@@ -1,4 +1,4 @@
-"""Agent CLI graph command - generate graph HTML from a .plx bundle via dry-run."""
+"""Agent CLI graph command - generate graph HTML from a .mthds bundle via dry-run."""
 
 import asyncio
 from pathlib import Path
@@ -9,7 +9,7 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -33,7 +33,7 @@ class GraphFormat(StrEnum):
 def graph_cmd(
     target: Annotated[
         str,
-        typer.Argument(help="Path to a .plx bundle file"),
+        typer.Argument(help="Path to a .mthds bundle file"),
     ],
     graph_format: Annotated[
         GraphFormat,
@@ -41,10 +41,10 @@ def graph_cmd(
     ] = GraphFormat.REACTFLOW,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
-    """Generate graph visualization from a .plx bundle.
+    """Generate graph visualization from a .mthds bundle.
 
     Performs a dry-run of the pipeline with mock inputs to produce the execution
     graph, then renders it as HTML.
@@ -52,9 +52,9 @@ def graph_cmd(
     Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
 
     Examples:
-        pipelex-agent graph bundle.plx
-        pipelex-agent graph bundle.plx --format mermaidflow
-        pipelex-agent graph bundle.plx -L ./my_pipes/
+        pipelex-agent graph bundle.mthds
+        pipelex-agent graph bundle.mthds --format mermaidflow
+        pipelex-agent graph bundle.mthds -L ./my_pipes/
     """
     input_path = Path(target)
 
@@ -62,12 +62,12 @@ def graph_cmd(
         agent_error(f"File not found: {target}", "FileNotFoundError")
 
     if not is_pipelex_file(input_path):
-        agent_error(f"Expected a .plx bundle file, got: {input_path.name}", "ArgumentError")
+        agent_error(f"Expected a .mthds bundle file, got: {input_path.name}", "ArgumentError")
 
-    # Read PLX content and extract main pipe
+    # Read MTHDS content and extract main pipe
     try:
-        plx_content = input_path.read_text(encoding="utf-8")
-        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
+        mthds_content = input_path.read_text(encoding="utf-8")
+        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
         main_pipe_code = bundle_blueprint.main_pipe
         if not main_pipe_code:
             agent_error(
@@ -77,7 +77,7 @@ def graph_cmd(
         pipe_code: str = main_pipe_code
     except (OSError, UnicodeDecodeError) as exc:
         agent_error(f"Failed to read bundle file '{target}': {exc}", type(exc).__name__, cause=exc)
-    except (PipelexInterpreterError, PLXDecodeError) as exc:
+    except (PipelexInterpreterError, MthdsDecodeError) as exc:
         agent_error(f"Failed to parse bundle '{target}': {exc}", type(exc).__name__, cause=exc)
 
     # Initialize Pipelex
@@ -93,7 +93,7 @@ def graph_cmd(
         pipe_output = asyncio.run(
             execute_pipeline(
                 pipe_code=pipe_code,
-                plx_content=plx_content,
+                mthds_content=mthds_content,
                 bundle_uri=target,
                 pipe_run_mode=PipeRunMode.DRY,
                 execution_config=execution_config,
