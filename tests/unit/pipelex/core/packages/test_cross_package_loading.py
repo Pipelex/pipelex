@@ -37,6 +37,7 @@ class TestCrossPackageLoading:
         library = PipeLibrary.make_empty()
         mock_pipe = mocker.MagicMock()
         mock_pipe.code = "compute_score"
+        mock_pipe.domain_code = "scoring"
         library.add_dependency_pipe(alias="scoring_lib", pipe=mock_pipe)
 
         result = library.get_optional_pipe("scoring_lib->scoring.compute_score")
