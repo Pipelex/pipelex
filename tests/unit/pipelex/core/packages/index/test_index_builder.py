@@ -23,6 +23,7 @@ class TestIndexBuilder:
         assert entry.address == "github.com/pipelexlab/legal-tools"
         assert entry.version == "1.0.0"
         assert entry.description == "Legal document analysis tools"
+        assert entry.display_name == "Legal Tools"
         assert entry.authors == ["PipelexLab"]
         assert entry.license == "MIT"
 

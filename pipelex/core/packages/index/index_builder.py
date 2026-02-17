@@ -94,6 +94,7 @@ def build_index_entry_from_package(package_root: Path) -> PackageIndexEntry:
 
     return PackageIndexEntry(
         address=manifest.address,
+        display_name=manifest.display_name,
         version=manifest.version,
         description=manifest.description,
         authors=list(manifest.authors),

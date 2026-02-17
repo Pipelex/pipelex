@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -141,6 +142,7 @@ class MthdsPackageManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     address: str
+    display_name: str | None = None
     version: str
     description: str
     authors: list[str] = Field(default_factory=list)
@@ -165,6 +167,23 @@ class MthdsPackageManifest(BaseModel):
             msg = f"Invalid version '{version}'. Must be valid semver (e.g. '1.0.0', '2.1.3-beta.1')."
             raise ValueError(msg)
         return version
+
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, display_name: str | None) -> str | None:
+        if display_name is None:
+            return None
+        stripped = display_name.strip()
+        if not stripped:
+            msg = "Display name must not be empty or whitespace when provided."
+            raise ValueError(msg)
+        if len(stripped) > 128:
+            msg = f"Display name must not exceed 128 characters (got {len(stripped)})."
+            raise ValueError(msg)
+        if any(unicodedata.category(char) == "Cc" for char in stripped):
+            msg = "Display name must not contain control characters."
+            raise ValueError(msg)
+        return stripped
 
     @field_validator("description")
     @classmethod

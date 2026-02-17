@@ -110,7 +110,7 @@ def parse_methods_toml(content: str) -> MthdsPackageManifest:
             raise ManifestValidationError(msg) from exc
 
     # Reject unknown keys in [package] section
-    known_package_keys = {"address", "version", "description", "authors", "license", "mthds_version"}
+    known_package_keys = {"address", "display_name", "version", "description", "authors", "license", "mthds_version"}
     unknown_keys = set(pkg.keys()) - known_package_keys
     if unknown_keys:
         msg = f"Unknown keys in [package] section: {', '.join(sorted(unknown_keys))}"
@@ -126,10 +126,13 @@ def parse_methods_toml(content: str) -> MthdsPackageManifest:
     license_str: str | None = str(license_val) if license_val is not None else None
     mthds_version_val = pkg.get("mthds_version")
     mthds_version: str | None = str(mthds_version_val) if mthds_version_val is not None else None
+    display_name_val = pkg.get("display_name")
+    display_name: str | None = str(display_name_val) if display_name_val is not None else None
 
     try:
         manifest = MthdsPackageManifest(
             address=address,
+            display_name=display_name,
             version=version,
             description=description,
             authors=authors,
@@ -159,6 +162,8 @@ def serialize_manifest_to_toml(manifest: MthdsPackageManifest) -> str:
     # [package] section
     package_table = tomlkit.table()
     package_table.add("address", manifest.address)
+    if manifest.display_name is not None:
+        package_table.add("display_name", manifest.display_name)
     package_table.add("version", manifest.version)
     package_table.add("description", manifest.description)
     if manifest.authors:

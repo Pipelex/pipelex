@@ -49,6 +49,7 @@ class PackageIndexEntry(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
     address: str
+    display_name: str | None = None
     version: str
     description: str
     authors: list[str] = Field(default_factory=list)

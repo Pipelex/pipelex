@@ -38,6 +38,8 @@ def do_pkg_list() -> None:
     pkg_table.add_column("Field", style="cyan")
     pkg_table.add_column("Value")
     pkg_table.add_row("Address", manifest.address)
+    if manifest.display_name:
+        pkg_table.add_row("Display Name", manifest.display_name)
     pkg_table.add_row("Version", manifest.version)
     pkg_table.add_row("Description", manifest.description)
     if manifest.authors:

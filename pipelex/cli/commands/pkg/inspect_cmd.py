@@ -43,6 +43,8 @@ def do_pkg_inspect(address: str, cache: bool = False) -> None:
     info_table.add_column("Field", style="cyan")
     info_table.add_column("Value")
     info_table.add_row("Address", entry.address)
+    if entry.display_name:
+        info_table.add_row("Display Name", entry.display_name)
     info_table.add_row("Version", entry.version)
     info_table.add_row("Description", entry.description)
     if entry.authors:

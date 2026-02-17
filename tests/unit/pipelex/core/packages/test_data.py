@@ -9,6 +9,7 @@ from pipelex.core.packages.manifest import DomainExports, MthdsPackageManifest, 
 FULL_MANIFEST_TOML = """\
 [package]
 address = "github.com/pipelexlab/legal-tools"
+display_name = "Legal Tools"
 version = "1.0.0"
 description = "Legal document analysis tools"
 authors = ["PipelexLab"]
@@ -114,6 +115,7 @@ class ManifestTestData:
 
     FULL_MANIFEST: ClassVar[MthdsPackageManifest] = MthdsPackageManifest(
         address="github.com/pipelexlab/legal-tools",
+        display_name="Legal Tools",
         version="1.0.0",
         description="Legal document analysis tools",
         authors=["PipelexLab"],

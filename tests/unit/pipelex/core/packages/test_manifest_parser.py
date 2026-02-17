@@ -31,6 +31,7 @@ class TestManifestParser:
         assert manifest.description == ManifestTestData.FULL_MANIFEST.description
         assert manifest.authors == ManifestTestData.FULL_MANIFEST.authors
         assert manifest.license == ManifestTestData.FULL_MANIFEST.license
+        assert manifest.display_name == ManifestTestData.FULL_MANIFEST.display_name
         assert manifest.mthds_version == ManifestTestData.FULL_MANIFEST.mthds_version
         assert len(manifest.dependencies) == 1
         assert manifest.dependencies[0].alias == "scoring_lib"
@@ -45,6 +46,7 @@ class TestManifestParser:
         manifest = parse_methods_toml(MINIMAL_MANIFEST_TOML)
         assert manifest.address == ManifestTestData.MINIMAL_MANIFEST.address
         assert manifest.version == ManifestTestData.MINIMAL_MANIFEST.version
+        assert manifest.display_name is None
         assert manifest.dependencies == []
         assert manifest.exports == []
 

@@ -384,3 +384,85 @@ class TestMthdsPackageManifest:
                 version="1.0.0",
                 description=whitespace_description,
             )
+
+    # --- Display name validation ---
+
+    def test_valid_display_name(self):
+        """A valid display_name should be stored."""
+        manifest = MthdsPackageManifest(
+            address="github.com/org/repo",
+            version="1.0.0",
+            description="Test",
+            display_name="Legal Tools",
+        )
+        assert manifest.display_name == "Legal Tools"
+
+    def test_display_name_with_emoji(self):
+        """Emoji characters in display_name should pass."""
+        manifest = MthdsPackageManifest(
+            address="github.com/org/repo",
+            version="1.0.0",
+            description="Test",
+            display_name="\U0001f680 Legal Tools",
+        )
+        assert manifest.display_name == "\U0001f680 Legal Tools"
+
+    def test_none_display_name_accepted(self):
+        """display_name=None should pass validation (default)."""
+        manifest = MthdsPackageManifest(
+            address="github.com/org/repo",
+            version="1.0.0",
+            description="Test",
+            display_name=None,
+        )
+        assert manifest.display_name is None
+
+    def test_empty_display_name_fails(self):
+        """Empty display_name should fail validation."""
+        with pytest.raises(ValidationError, match="must not be empty or whitespace"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                display_name="",
+            )
+
+    def test_whitespace_display_name_fails(self):
+        """Whitespace-only display_name should fail validation."""
+        with pytest.raises(ValidationError, match="must not be empty or whitespace"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                display_name="   ",
+            )
+
+    def test_display_name_too_long_fails(self):
+        """display_name exceeding 128 characters should fail validation."""
+        with pytest.raises(ValidationError, match="must not exceed 128 characters"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                display_name="x" * 129,
+            )
+
+    def test_display_name_with_control_chars_fails(self):
+        """display_name containing control characters should fail validation."""
+        with pytest.raises(ValidationError, match="must not contain control characters"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                display_name="Legal\x00Tools",
+            )
+
+    def test_display_name_strips_whitespace(self):
+        """display_name with leading/trailing whitespace should be stripped."""
+        manifest = MthdsPackageManifest(
+            address="github.com/org/repo",
+            version="1.0.0",
+            description="Test",
+            display_name="  Legal Tools  ",
+        )
+        assert manifest.display_name == "Legal Tools"
