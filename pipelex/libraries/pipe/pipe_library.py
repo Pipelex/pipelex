@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.types import Self
@@ -61,12 +61,24 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         # Cross-package: "alias->domain.pipe_code" -> lookup "alias->pipe_code"
         if QualifiedRef.has_cross_package_prefix(pipe_code):
             alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
-            ref = QualifiedRef.parse(remainder)
-            return self.root.get(f"{alias}->{ref.local_code}")
+            try:
+                ref = QualifiedRef.parse(remainder)
+            except QualifiedRefError:
+                return None
+            pipe = self.root.get(f"{alias}->{ref.local_code}")
+            if pipe is not None and ref.is_qualified and pipe.domain_code != ref.domain_path:
+                return None
+            return pipe
         # If it's a domain-qualified ref (e.g. "scoring.compute_score"), try the local code
         if "." in pipe_code:
-            ref = QualifiedRef.parse(pipe_code)
-            return self.root.get(ref.local_code)
+            try:
+                ref = QualifiedRef.parse(pipe_code)
+            except QualifiedRefError:
+                return None
+            pipe = self.root.get(ref.local_code)
+            if pipe is not None and ref.is_qualified and pipe.domain_code != ref.domain_path:
+                return None
+            return pipe
         return None
 
     def add_dependency_pipe(self, alias: str, pipe: PipeAbstract) -> None:
