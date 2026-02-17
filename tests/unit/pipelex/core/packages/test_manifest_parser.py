@@ -15,6 +15,7 @@ from tests.unit.pipelex.core.packages.test_data import (
     NON_LIST_PIPES_EXPORTS_TOML,
     NON_TABLE_DEPENDENCY_TOML,
     RESERVED_DOMAIN_EXPORTS_TOML,
+    UNKNOWN_PACKAGE_KEYS_TOML,
     ManifestTestData,
 )
 
@@ -130,3 +131,8 @@ class TestManifestParser:
         assert 'address = "github.com/pipelexlab/minimal"' in toml_str
         assert "[dependencies]" not in toml_str
         assert "[exports" not in toml_str
+
+    def test_parse_unknown_package_keys_raises(self):
+        """Unknown keys in [package] section should raise ManifestValidationError."""
+        with pytest.raises(ManifestValidationError, match="Unknown keys in \\[package\\] section"):
+            parse_methods_toml(UNKNOWN_PACKAGE_KEYS_TOML)

@@ -174,6 +174,23 @@ class MthdsPackageManifest(BaseModel):
             raise ValueError(msg)
         return description
 
+    @field_validator("authors")
+    @classmethod
+    def validate_authors(cls, authors: list[str]) -> list[str]:
+        for index_author, author in enumerate(authors):
+            if not author.strip():
+                msg = f"Author at index {index_author} must not be empty or whitespace."
+                raise ValueError(msg)
+        return authors
+
+    @field_validator("license")
+    @classmethod
+    def validate_license(cls, license_value: str | None) -> str | None:
+        if license_value is not None and not license_value.strip():
+            msg = "License must not be empty or whitespace when provided."
+            raise ValueError(msg)
+        return license_value
+
     @field_validator("mthds_version")
     @classmethod
     def validate_mthds_version(cls, mthds_version: str | None) -> str | None:

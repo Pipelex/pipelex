@@ -177,6 +177,14 @@ description = "Package with a string instead of list for pipes"
 pipes = "single_pipe"
 """
 
+UNKNOWN_PACKAGE_KEYS_TOML = """\
+[package]
+address = "github.com/pipelexlab/unknown-keys"
+version = "1.0.0"
+description = "Package with unknown keys"
+homepage = "https://example.com"
+"""
+
 INVALID_HASH_LOCK_FILE_TOML = """\
 ["github.com/pipelexlab/bad-hash"]
 version = "1.0.0"

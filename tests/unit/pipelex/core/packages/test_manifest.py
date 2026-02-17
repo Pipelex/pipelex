@@ -284,3 +284,103 @@ class TestMthdsPackageManifest:
             mthds_version=None,
         )
         assert manifest.mthds_version is None
+
+    # --- Authors validation ---
+
+    def test_empty_author_string_fails(self):
+        """An empty string in authors should fail validation."""
+        with pytest.raises(ValidationError, match="must not be empty or whitespace"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                authors=[""],
+            )
+
+    def test_whitespace_author_string_fails(self):
+        """A whitespace-only string in authors should fail validation."""
+        with pytest.raises(ValidationError, match="must not be empty or whitespace"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                authors=["   "],
+            )
+
+    def test_mixed_valid_and_empty_author_fails(self):
+        """A mix of valid and empty authors should fail validation."""
+        with pytest.raises(ValidationError, match="Author at index 1"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                authors=["Alice", ""],
+            )
+
+    # --- License validation ---
+
+    def test_empty_license_string_fails(self):
+        """An empty license string should fail validation."""
+        with pytest.raises(ValidationError, match="must not be empty or whitespace"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                license="",
+            )
+
+    def test_whitespace_license_string_fails(self):
+        """A whitespace-only license string should fail validation."""
+        with pytest.raises(ValidationError, match="must not be empty or whitespace"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                license="   ",
+            )
+
+    # --- extra="forbid" tests ---
+
+    def test_manifest_rejects_unknown_fields(self):
+        """Unknown fields on MthdsPackageManifest should be rejected by extra='forbid'."""
+        with pytest.raises(ValidationError, match="extra_forbidden"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description="Test",
+                unknown_field="x",  # type: ignore[call-arg]
+            )
+
+    def test_dependency_rejects_unknown_fields(self):
+        """Unknown fields on PackageDependency should be rejected by extra='forbid'."""
+        with pytest.raises(ValidationError, match="extra_forbidden"):
+            PackageDependency(
+                address="github.com/org/dep",
+                version="1.0.0",
+                alias="my_dep",
+                unknown_field="x",  # type: ignore[call-arg]
+            )
+
+    def test_domain_exports_rejects_unknown_fields(self):
+        """Unknown fields on DomainExports should be rejected by extra='forbid'."""
+        with pytest.raises(ValidationError, match="extra_forbidden"):
+            DomainExports(
+                domain_path="legal",
+                pipes=["my_pipe"],
+                unknown_field="x",  # type: ignore[call-arg]
+            )
+
+    # --- Description whitespace variants ---
+
+    @pytest.mark.parametrize(
+        "whitespace_description",
+        ["\t", "\n", " \t\n "],
+    )
+    def test_whitespace_only_description_fails(self, whitespace_description: str):
+        """Various whitespace-only descriptions should fail validation."""
+        with pytest.raises(ValidationError, match="must not be empty"):
+            MthdsPackageManifest(
+                address="github.com/org/repo",
+                version="1.0.0",
+                description=whitespace_description,
+            )

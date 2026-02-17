@@ -109,6 +109,13 @@ def parse_methods_toml(content: str) -> MthdsPackageManifest:
             msg = f"Invalid exports in METHODS.toml: {exc}"
             raise ManifestValidationError(msg) from exc
 
+    # Reject unknown keys in [package] section
+    known_package_keys = {"address", "version", "description", "authors", "license", "mthds_version"}
+    unknown_keys = set(pkg.keys()) - known_package_keys
+    if unknown_keys:
+        msg = f"Unknown keys in [package] section: {', '.join(sorted(unknown_keys))}"
+        raise ManifestValidationError(msg)
+
     # Build the manifest
     address: str = str(pkg.get("address", ""))
     version: str = str(pkg.get("version", ""))
