@@ -8,7 +8,7 @@ from pathlib import Path
 from rich.panel import Panel
 
 from pipelex.hub import get_console
-from pipelex.kit.paths import GIT_IGNORED_CONFIG_DIRS, GIT_IGNORED_CONFIG_FILES
+from pipelex.kit.paths import CONFIG_SYNC_EXCLUDED_FILES, GIT_IGNORED_CONFIG_DIRS
 from pipelex.tools.misc.diff import has_diff_dirs, make_diff_dirs_pretty
 from pipelex.types import StrEnum
 
@@ -74,7 +74,7 @@ def check_config_sync_cmd(
 
     # Check for differences (excluding files and directories that intentionally differ)
     try:
-        has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=GIT_IGNORED_CONFIG_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
+        has_diff = has_diff_dirs(left_dir, right_dir, exclude_files=CONFIG_SYNC_EXCLUDED_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
     except OSError as exc:
         # Handle race condition where directories are deleted/modified after existence checks
         if quiet:
@@ -118,7 +118,7 @@ def check_config_sync_cmd(
 
         if show_diff:
             console.print()
-            pretty_diff = make_diff_dirs_pretty(left_dir, right_dir, exclude_files=GIT_IGNORED_CONFIG_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
+            pretty_diff = make_diff_dirs_pretty(left_dir, right_dir, exclude_files=CONFIG_SYNC_EXCLUDED_FILES, exclude_dirs=GIT_IGNORED_CONFIG_DIRS)
             console.print(pretty_diff)
             console.print()
 
