@@ -53,6 +53,7 @@ class TestData:
 
     ENTRY: ClassVar[PackageIndexEntry] = PackageIndexEntry(
         address="github.com/pipelexlab/legal-tools",
+        display_name="Legal Tools",
         version="1.0.0",
         description="Legal document analysis tools",
         authors=["PipelexLab"],
@@ -139,6 +140,7 @@ class TestIndexModels:
         """PackageIndexEntry stores all expected metadata."""
         entry = TestData.ENTRY
         assert entry.address == "github.com/pipelexlab/legal-tools"
+        assert entry.display_name == "Legal Tools"
         assert entry.version == "1.0.0"
         assert entry.description == "Legal document analysis tools"
         assert entry.authors == ["PipelexLab"]

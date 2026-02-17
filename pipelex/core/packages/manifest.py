@@ -1,4 +1,5 @@
 import re
+import unicodedata
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -141,6 +142,7 @@ class MthdsPackageManifest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     address: str
+    display_name: str | None = None
     version: str
     description: str
     authors: list[str] = Field(default_factory=list)
@@ -166,6 +168,23 @@ class MthdsPackageManifest(BaseModel):
             raise ValueError(msg)
         return version
 
+    @field_validator("display_name")
+    @classmethod
+    def validate_display_name(cls, display_name: str | None) -> str | None:
+        if display_name is None:
+            return None
+        stripped = display_name.strip()
+        if not stripped:
+            msg = "Display name must not be empty or whitespace when provided."
+            raise ValueError(msg)
+        if len(stripped) > 128:
+            msg = f"Display name must not exceed 128 characters (got {len(stripped)})."
+            raise ValueError(msg)
+        if any(unicodedata.category(char) == "Cc" for char in stripped):
+            msg = "Display name must not contain control characters."
+            raise ValueError(msg)
+        return stripped
+
     @field_validator("description")
     @classmethod
     def validate_description(cls, description: str) -> str:
@@ -173,6 +192,23 @@ class MthdsPackageManifest(BaseModel):
             msg = "Package description must not be empty."
             raise ValueError(msg)
         return description
+
+    @field_validator("authors")
+    @classmethod
+    def validate_authors(cls, authors: list[str]) -> list[str]:
+        for index_author, author in enumerate(authors):
+            if not author.strip():
+                msg = f"Author at index {index_author} must not be empty or whitespace."
+                raise ValueError(msg)
+        return authors
+
+    @field_validator("license")
+    @classmethod
+    def validate_license(cls, license_value: str | None) -> str | None:
+        if license_value is not None and not license_value.strip():
+            msg = "License must not be empty or whitespace when provided."
+            raise ValueError(msg)
+        return license_value
 
     @field_validator("mthds_version")
     @classmethod

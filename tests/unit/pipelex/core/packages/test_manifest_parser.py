@@ -12,8 +12,10 @@ from tests.unit.pipelex.core.packages.test_data import (
     MISSING_PACKAGE_SECTION_TOML,
     MISSING_REQUIRED_FIELDS_TOML,
     MULTI_LEVEL_EXPORTS_TOML,
+    NON_LIST_PIPES_EXPORTS_TOML,
     NON_TABLE_DEPENDENCY_TOML,
     RESERVED_DOMAIN_EXPORTS_TOML,
+    UNKNOWN_PACKAGE_KEYS_TOML,
     ManifestTestData,
 )
 
@@ -29,6 +31,7 @@ class TestManifestParser:
         assert manifest.description == ManifestTestData.FULL_MANIFEST.description
         assert manifest.authors == ManifestTestData.FULL_MANIFEST.authors
         assert manifest.license == ManifestTestData.FULL_MANIFEST.license
+        assert manifest.display_name == ManifestTestData.FULL_MANIFEST.display_name
         assert manifest.mthds_version == ManifestTestData.FULL_MANIFEST.mthds_version
         assert len(manifest.dependencies) == 1
         assert manifest.dependencies[0].alias == "scoring_lib"
@@ -43,6 +46,7 @@ class TestManifestParser:
         manifest = parse_methods_toml(MINIMAL_MANIFEST_TOML)
         assert manifest.address == ManifestTestData.MINIMAL_MANIFEST.address
         assert manifest.version == ManifestTestData.MINIMAL_MANIFEST.version
+        assert manifest.display_name is None
         assert manifest.dependencies == []
         assert manifest.exports == []
 
@@ -100,6 +104,11 @@ class TestManifestParser:
         with pytest.raises(ManifestValidationError, match="Invalid exports"):
             parse_methods_toml(toml_content)
 
+    def test_parse_non_list_pipes_raises(self):
+        """A non-list value for 'pipes' should raise ManifestValidationError, not be silently dropped."""
+        with pytest.raises(ManifestValidationError, match="must be a list"):
+            parse_methods_toml(NON_LIST_PIPES_EXPORTS_TOML)
+
     def test_parse_reserved_domain_in_exports_raises(self):
         """Reserved domain in [exports] should raise ManifestValidationError."""
         with pytest.raises(ManifestValidationError, match="Invalid exports"):
@@ -124,3 +133,8 @@ class TestManifestParser:
         assert 'address = "github.com/pipelexlab/minimal"' in toml_str
         assert "[dependencies]" not in toml_str
         assert "[exports" not in toml_str
+
+    def test_parse_unknown_package_keys_raises(self):
+        """Unknown keys in [package] section should raise ManifestValidationError."""
+        with pytest.raises(ManifestValidationError, match="Unknown keys in \\[package\\] section"):
+            parse_methods_toml(UNKNOWN_PACKAGE_KEYS_TOML)

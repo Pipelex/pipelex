@@ -9,6 +9,7 @@ from pipelex.core.packages.manifest import DomainExports, MthdsPackageManifest, 
 FULL_MANIFEST_TOML = """\
 [package]
 address = "github.com/pipelexlab/legal-tools"
+display_name = "Legal Tools"
 version = "1.0.0"
 description = "Legal document analysis tools"
 authors = ["PipelexLab"]
@@ -114,6 +115,7 @@ class ManifestTestData:
 
     FULL_MANIFEST: ClassVar[MthdsPackageManifest] = MthdsPackageManifest(
         address="github.com/pipelexlab/legal-tools",
+        display_name="Legal Tools",
         version="1.0.0",
         description="Legal document analysis tools",
         authors=["PipelexLab"],
@@ -165,6 +167,24 @@ description = "Package with a reserved domain in exports"
 
 [exports.native]
 pipes = ["some_pipe"]
+"""
+
+NON_LIST_PIPES_EXPORTS_TOML = """\
+[package]
+address = "github.com/pipelexlab/bad-pipes-type"
+version = "1.0.0"
+description = "Package with a string instead of list for pipes"
+
+[exports.legal]
+pipes = "single_pipe"
+"""
+
+UNKNOWN_PACKAGE_KEYS_TOML = """\
+[package]
+address = "github.com/pipelexlab/unknown-keys"
+version = "1.0.0"
+description = "Package with unknown keys"
+homepage = "https://example.com"
 """
 
 INVALID_HASH_LOCK_FILE_TOML = """\
