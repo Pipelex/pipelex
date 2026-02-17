@@ -842,6 +842,9 @@ docs-deploy-specific-version: env
 	$(MAKE) docs-deploy-root
 
 docs-deploy-root:
+ifeq ($(SITE_DOMAIN),)
+	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
+endif
 	$(call PRINT_TITLE,"Deploying root assets (404.html, robots.txt, index.html) to gh-pages")
 	@git fetch origin gh-pages:gh-pages 2>/dev/null || true; \
 	TMPDIR=$$(mktemp -d); \
