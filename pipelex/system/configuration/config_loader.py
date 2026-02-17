@@ -162,6 +162,8 @@ class ConfigLoader:
         Returns:
             dict[str, Any]: The merged configuration dictionary
         """
+        self.ensure_global_config_exists()
+
         list_of_configs: list[str] = []
 
         # 1. Pipelex package defaults
