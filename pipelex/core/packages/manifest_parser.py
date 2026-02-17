@@ -34,9 +34,11 @@ def _walk_exports_table(table: dict[str, Any], prefix: str = "") -> list[DomainE
             # Check if this level has a "pipes" key (leaf domain)
             if "pipes" in value_dict:
                 pipes_value = value_dict["pipes"]
-                if isinstance(pipes_value, list):
-                    pipes_list = cast("list[str]", pipes_value)
-                    result.append(DomainExports(domain_path=current_path, pipes=pipes_list))
+                if not isinstance(pipes_value, list):
+                    msg = f"'pipes' in domain '{current_path}' must be a list, got {type(pipes_value).__name__}"
+                    raise ManifestValidationError(msg)
+                pipes_list = cast("list[str]", pipes_value)
+                result.append(DomainExports(domain_path=current_path, pipes=pipes_list))
 
                 # Also recurse into remaining sub-tables (a domain can have both pipes and sub-domains)
                 for sub_key, sub_value in value_dict.items():

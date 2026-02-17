@@ -167,6 +167,16 @@ description = "Package with a reserved domain in exports"
 pipes = ["some_pipe"]
 """
 
+NON_LIST_PIPES_EXPORTS_TOML = """\
+[package]
+address = "github.com/pipelexlab/bad-pipes-type"
+version = "1.0.0"
+description = "Package with a string instead of list for pipes"
+
+[exports.legal]
+pipes = "single_pipe"
+"""
+
 INVALID_HASH_LOCK_FILE_TOML = """\
 ["github.com/pipelexlab/bad-hash"]
 version = "1.0.0"
