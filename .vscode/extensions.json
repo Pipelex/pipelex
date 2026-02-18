@@ -1,6 +1,5 @@
 {
     "recommendations": [
-        "Pipelex.pipelex",
         "charliermarsh.ruff",
         "matangover.mypy"
     ]

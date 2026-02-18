@@ -23,7 +23,7 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
         if needs_inference:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] inference backends")
-            message_parts.append("• Suggest IDE extension for [cyan].pplx[/cyan] syntax highlighting")
+            message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
         if needs_routing:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] routing profile")
         if needs_telemetry:
@@ -33,7 +33,7 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
             message_parts.append("• Create required configuration files in [cyan].pipelex/[/cyan]")
         if needs_inference:
             message_parts.append("• Ask you to choose your inference backends")
-            message_parts.append("• Suggest IDE extension for [cyan].pplx[/cyan] syntax highlighting")
+            message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
         if needs_routing:
             message_parts.append("• Ask you to configure your routing profile")
         if needs_telemetry:

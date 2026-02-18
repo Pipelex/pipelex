@@ -226,35 +226,26 @@ def execute_initialization(
             template_backends_path = os.path.join(template_inference_dir, "backends.toml")
             os.makedirs(os.path.dirname(backends_toml_path), exist_ok=True)
             shutil.copy2(template_backends_path, backends_toml_path)
-            console.print("✅ Reset backends.toml from template")
 
             # Reset all individual backend files in backends/ directory
             template_backends_dir = os.path.join(template_inference_dir, "backends")
             target_backends_dir = os.path.join(target_inference_dir, "backends")
             os.makedirs(target_backends_dir, exist_ok=True)
-            reset_backend_files: list[str] = []
             for backend_file in os.listdir(template_backends_dir):
                 if backend_file.endswith(".toml"):
                     src_path = os.path.join(template_backends_dir, backend_file)
                     dst_path = os.path.join(target_backends_dir, backend_file)
                     shutil.copy2(src_path, dst_path)
-                    reset_backend_files.append(backend_file)
-            if reset_backend_files:
-                console.print(f"✅ Reset {len(reset_backend_files)} backend config files from template")
 
             # Reset deck/ directory files (model deck configurations)
             template_deck_dir = os.path.join(template_inference_dir, "deck")
             target_deck_dir = os.path.join(target_inference_dir, "deck")
             os.makedirs(target_deck_dir, exist_ok=True)
-            reset_deck_files: list[str] = []
             for deck_file in os.listdir(template_deck_dir):
                 if deck_file.endswith(".toml"):
                     src_path = os.path.join(template_deck_dir, deck_file)
                     dst_path = os.path.join(target_deck_dir, deck_file)
                     shutil.copy2(src_path, dst_path)
-                    reset_deck_files.append(deck_file)
-            if reset_deck_files:
-                console.print(f"✅ Reset {len(reset_deck_files)} model deck config files from template")
 
             first_time_setup = True  # Treat as first-time setup since we just replaced the files
 

@@ -3,8 +3,6 @@
 import os
 import shutil
 
-import typer
-
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
@@ -61,20 +59,6 @@ def init_config(reset: bool = False, dry_run: bool = False, target_dir: str | No
 
         if dry_run:
             return len(copied_files)
-
-        # Report results
-        if copied_files:
-            typer.echo(f"✅ Copied {len(copied_files)} files to {target_config_dir}:")
-            for file in sorted(copied_files):
-                typer.echo(f"   • {file}")
-
-        if existing_files:
-            typer.echo(f"ℹ️  Skipped {len(existing_files)} existing files (use --reset to overwrite):")
-            for file in sorted(existing_files):
-                typer.echo(f"   • {file}")
-
-        if not copied_files and not existing_files:
-            typer.echo(f"✅ Configuration directory {target_config_dir} is already up to date")
 
     except Exception as exc:
         msg = f"Failed to initialize configuration: {exc}"
