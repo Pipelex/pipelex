@@ -235,7 +235,7 @@ async def pipeline_run_setup(
                     working_memory.add_new_stuff(name=name, stuff=stuff)
 
         # Normalize data URLs to pipelex-storage:// URIs if configured
-        if working_memory and execution_config.is_normalize_data_urls_to_storage:
+        if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:
             working_memory = await normalize_data_urls_to_storage(working_memory)
 
         # TODO: rethink this, it's not forcing
