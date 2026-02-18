@@ -6,7 +6,7 @@ on:
 jobs:
   matrix-test:
     name: Tests check
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, aca-runner]
     strategy:
       fail-fast: false
       matrix:
