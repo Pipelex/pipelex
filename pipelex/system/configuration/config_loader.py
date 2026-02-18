@@ -32,10 +32,16 @@ class ConfigLoader:
     def find_project_root(start_dir: Path) -> Path | None:
         """Walk up from start_dir looking for project root markers.
 
+        Excludes the home directory, which may contain stray marker files
+        (e.g. package.json) but is never a real project root.
+
         Returns the directory containing the marker, or None if not found.
         """
         current = start_dir.resolve()
+        home_dir = Path.home().resolve()
         while True:
+            if current == home_dir:
+                return None
             for marker in PROJECT_ROOT_MARKERS:
                 if (current / marker).exists():
                     return current
