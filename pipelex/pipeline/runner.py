@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from mthds.pipeline import PipelineState
@@ -119,13 +118,6 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
 
         # Use provided config or get default
         execution_config = self.execution_config or get_config().pipelex.pipeline_execution_config
-
-        # If plx_content is not provided but bundle_uri points to a file, read it
-        plx_content = mthds_content
-        if plx_content is None and self.bundle_uri is not None:
-            bundle_path = Path(self.bundle_uri)
-            if bundle_path.is_file():
-                plx_content = bundle_path.read_text(encoding="utf-8")
 
         # Cast inputs: the protocol accepts WorkingMemoryAbstract but pipelex expects WorkingMemory
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
