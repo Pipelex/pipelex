@@ -142,7 +142,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 library_id=self.library_id,
                 library_dirs=self.library_dirs,
                 pipe_code=pipe_code,
-                plx_content=plx_content,
+                mthds_content=mthds_content,
                 bundle_uri=self.bundle_uri,
                 inputs=pipelex_inputs,
                 output_name=output_name,
