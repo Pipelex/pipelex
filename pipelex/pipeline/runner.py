@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
@@ -115,7 +115,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             ``graph_spec``.
 
         """
-        created_at = datetime.now(UTC).isoformat()
+        created_at = datetime.now(timezone.utc).isoformat()
 
         # Use provided config or get default
         execution_config = self.execution_config or get_config().pipelex.pipeline_execution_config
@@ -218,7 +218,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         }
         get_telemetry_manager().track_event(event_name=EventName.PIPELINE_COMPLETE, properties=properties)
 
-        finished_at = datetime.now(UTC).isoformat()
+        finished_at = datetime.now(timezone.utc).isoformat()
         return PipelexPipelineExecuteResponse.from_pipe_output(
             pipe_output=pipe_output,
             pipeline_run_id=pipe_output.pipeline_run_id,
