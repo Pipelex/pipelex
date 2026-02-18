@@ -14,7 +14,7 @@ ProcessedData = "Processed data concept"
 type = "PipeParallel"
 description = "PipeParallel example in PIPE_PARALLEL_TEST_CASES"
 output = "ProcessedData"
-parallels = [
+branches = [
     { pipe = "process_a", result = "result_a" },
     { pipe = "process_b", result = "result_b" },
 ]
@@ -29,7 +29,7 @@ add_each_output = true
                 type="PipeParallel",
                 description="PipeParallel example in PIPE_PARALLEL_TEST_CASES",
                 output="ProcessedData",
-                parallels=[
+                branches=[
                     SubPipeBlueprint(pipe="process_a", result="result_a"),
                     SubPipeBlueprint(pipe="process_b", result="result_b"),
                 ],

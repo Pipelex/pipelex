@@ -200,7 +200,7 @@ def show_pipe_cmd(
         typer.Option(
             "--library-dir",
             "-L",
-            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+            help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times.",
         ),
     ] = None,
 ) -> None:

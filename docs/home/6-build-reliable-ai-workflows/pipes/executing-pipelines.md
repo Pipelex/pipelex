@@ -1,26 +1,26 @@
 # Executing Pipelines
 
-Once your pipes are defined in `.plx` files, you can execute them in multiple ways.
+Once your pipes are defined in `.mthds` files, you can execute them in multiple ways.
 
 ## The Simplest Approach: Run a Bundle File
 
-The easiest way to execute a pipeline is to point directly to your `.plx` bundle file. No library configuration needed.
+The easiest way to execute a pipeline is to point directly to your `.mthds` bundle file. No library configuration needed.
 
 ### Using the CLI
 
 ```bash
 # Run the bundle's main_pipe
-pipelex run path/to/my_bundle.plx
+pipelex run path/to/my_bundle.mthds
 
 # Run a specific pipe from the bundle
-pipelex run path/to/my_bundle.plx --pipe my_specific_pipe
+pipelex run path/to/my_bundle.mthds --pipe my_specific_pipe
 
 # Run with inputs
-pipelex run path/to/my_bundle.plx --inputs inputs.json
+pipelex run path/to/my_bundle.mthds --inputs inputs.json
 ```
 
 !!! tip "Preparing Inputs"
-    You can generate an input template with `pipelex build inputs path/to/my_bundle.plx`, which creates a `results/inputs.json` file with the required input structure.
+    You can generate an input template with `pipelex build inputs path/to/my_bundle.mthds`, which creates a `results/inputs.json` file with the required input structure.
 
 ### Using Python
 
@@ -56,7 +56,7 @@ pipe_output = response.pipe_output
 ```
 
 !!! info "How `main_pipe` Works"
-    When you run a bundle without specifying a `pipe_code`, Pipelex executes the bundle's `main_pipe` (declared at the top of the `.plx` file). If no `main_pipe` is defined and no `pipe_code` is provided, an error is raised.
+    When you run a bundle without specifying a `pipe_code`, Pipelex executes the bundle's `main_pipe` (declared at the top of the `.mthds` file). If no `main_pipe` is defined and no `pipe_code` is provided, an error is raised.
 
     If you provide both `bundle_uri` and `pipe_code`, the explicit `pipe_code` takes priority over `main_pipe`.
 
@@ -82,7 +82,7 @@ When using `PipelexRunner`, you can control library behavior with these construc
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 
-- **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.plx` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
+- **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.mthds` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
 
 - **`mthds_content`**: When provided to `PipelexRunner.execute_pipeline()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
 
@@ -164,7 +164,7 @@ pipe_output = response.pipe_output
 !!! tip "Listing available pipes"
     Use the `pipelex show pipes` command to list all the pipes available in your project.
 
-### Using PLX Content Directly
+### Using MTHDS Content Directly
 
 You can directly pass PLX content as a string to `PipelexRunner.execute_pipeline()`, useful for dynamic pipeline execution without file-based definitions.
 
@@ -235,7 +235,7 @@ Pipelex.make()
 
 # Start the pipeline without waiting
 pipeline_run_id, task = await start_pipeline(
-    bundle_uri="path/to/my_bundle.plx",
+    bundle_uri="path/to/my_bundle.mthds",
     inputs={
         "description": {
             "concept": "ProductDescription",

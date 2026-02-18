@@ -5,7 +5,7 @@ Welcome to the Pipelex Cookbook!
 <!-- PRERELEASE_LINK -->
 [![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
 
-This is your go-to resource for practical examples and ready-to-use recipes to build powerful and reliable AI workflows with Pipelex. Whether you're a beginner looking to get started or an experienced user searching for advanced patterns, you'll find something useful here.
+This is your go-to resource for practical examples and ready-to-use recipes to build powerful and reliable AI methods with Pipelex. Whether you're a beginner looking to get started or an experienced user searching for advanced patterns, you'll find something useful here.
 
 ## Philosophy
 
@@ -34,7 +34,7 @@ Here are some of the examples you can find in the cookbook, organized by categor
 
 *   [**Simple OCR**](./simple-ocr.md): A basic OCR pipeline to extract text from a PDF.
 *   [**Generic Document Extraction**](./extract-generic.md): A powerful pipeline to extract text and images from complex documents.
-*   [**Invoice Extractor**](./invoice-extractor.md): A complete workflow for processing invoices, including reporting.
+*   [**Invoice Extractor**](./invoice-extractor.md): A complete method for processing invoices, including reporting.
 *   [**Proof of Purchase Extraction**](./extract-proof-of-purchase.md): A targeted pipeline for extracting data from receipts.
 
 ### Graphical Extraction

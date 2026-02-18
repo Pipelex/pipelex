@@ -155,7 +155,7 @@ class TestPipeBatchGraph:
         )
 
     async def test_joke_batch_graph_outputs(self, pipe_run_mode: PipeRunMode):
-        """Simple test that runs joke_batch.plx and generates all graph outputs.
+        """Simple test that runs joke_batch.mthds and generates all graph outputs.
 
         This test runs the joke batch pipeline with graph tracing and generates:
         - graph.json (GraphSpec)

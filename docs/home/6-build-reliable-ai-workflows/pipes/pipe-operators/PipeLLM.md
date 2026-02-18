@@ -204,9 +204,9 @@ Analyze the document and explain how it relates to the context: $reference_doc
 
 ## Configuration
 
-`PipeLLM` is configured in your pipeline's `.plx` file.
+`PipeLLM` is configured in your pipeline's `.mthds` file.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter                   | Type                | Description                                                                                                                                                                  | Required |
 | --------------------------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |

@@ -24,7 +24,7 @@ async def extract_generic(pdf_url: str) -> TextAndImagesContent:
     return markdown_and_images
 ```
 
-The `merge_markdown_and_images` function is a great example of how you can add your own Python code to a Pipelex workflow to perform custom processing.
+The `merge_markdown_and_images` function is a great example of how you can add your own Python code to a Pipelex method to perform custom processing.
 
 ```python
 def merge_markdown_and_images(working_memory: WorkingMemory) -> TextAndImagesContent:

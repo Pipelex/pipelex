@@ -1,0 +1,10 @@
+domain      = "refined_concepts_test"
+description = "Test library for refined concept inputs"
+
+[concept.Photo]
+description = "A photograph"
+refines     = "Image"
+
+[concept.Report]
+description = "A report document"
+refines     = "Document"

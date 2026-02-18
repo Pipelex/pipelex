@@ -14,7 +14,7 @@ class PipeParallelInputTestCases:
             description="Test case: valid_with_add_each_output",
             inputs={"data": "native.Text"},
             output="native.Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="process_a", result="result_a"),
                 SubPipeBlueprint(pipe="process_b", result="result_b"),
             ],
@@ -28,7 +28,7 @@ class PipeParallelInputTestCases:
             description="Test case: valid_with_combined_output",
             inputs={"data": "native.Text"},
             output="native.Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="analyze_1", result="analysis_1"),
                 SubPipeBlueprint(pipe="analyze_2", result="analysis_2"),
             ],
@@ -42,7 +42,7 @@ class PipeParallelInputTestCases:
             description="Test case: valid_with_both_output_options",
             inputs={"data": "native.Text"},
             output="native.Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="compute_x", result="x"),
                 SubPipeBlueprint(pipe="compute_y", result="y"),
             ],
@@ -52,12 +52,12 @@ class PipeParallelInputTestCases:
     )
 
     VALID_THREE_PARALLELS: ClassVar[tuple[str, PipeParallelBlueprint]] = (
-        "valid_three_parallels",
+        "valid_three_branches",
         PipeParallelBlueprint(
             description="Test case: valid_three_parallels",
             inputs={"input_data": "native.Text"},
             output="native.Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="branch_1", result="result_1"),
                 SubPipeBlueprint(pipe="branch_2", result="result_2"),
                 SubPipeBlueprint(pipe="branch_3", result="result_3"),
@@ -72,7 +72,7 @@ class PipeParallelInputTestCases:
             description="Test case: valid_multiple_inputs",
             inputs={"text_data": "native.Text", "image_data": "native.Image"},
             output="native.Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="process_text", result="text_result"),
                 SubPipeBlueprint(pipe="process_image", result="image_result"),
             ],
@@ -96,7 +96,7 @@ class PipeParallelInputTestCases:
             "description": "Test case: no_output_options",
             "inputs": {"data": "native.Text"},
             "output": "native.Text",
-            "parallels": [
+            "branches": [
                 {"pipe": "process_a", "result": "result_a"},
                 {"pipe": "process_b", "result": "result_b"},
             ],

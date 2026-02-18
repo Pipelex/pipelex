@@ -19,7 +19,7 @@ The `PageContent` object has the following structure:
 
 ## Configuration
 
-`PipeExtract` is configured in your pipeline's `.plx` file.
+`PipeExtract` is configured in your pipeline's `.mthds` file.
 
 ### OCR Models and Backend System
 
@@ -37,7 +37,7 @@ Common OCR model handles:
 
 OCR presets are defined in your model deck configuration and can include parameters like `max_nb_images` and `image_min_size`.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |

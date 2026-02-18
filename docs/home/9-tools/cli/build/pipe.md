@@ -6,7 +6,7 @@
 !!! tip "Built with Pipelex"
     The Pipe Builder is itself a Pipelex pipeline! This showcases the power of Pipelex: a tool that builds pipelines... using a pipeline.
 
-The Pipe Builder is an AI-powered tool that generates Pipelex pipelines from natural language descriptions. Describe what you want to achieve, and the builder translates your requirements into a working `.plx` file.
+The Pipe Builder is an AI-powered tool that generates Pipelex pipelines from natural language descriptions. Describe what you want to achieve, and the builder translates your requirements into a working `.mthds` file.
 
 !!! info "Deep Dive"
     Want to understand how the Pipe Builder works under the hood? See [Pipe Builder Deep Dive](../../pipe-builder.md) for the full explanation of its multi-step generation process.
@@ -26,7 +26,7 @@ pipelex build pipe <PROMPT> [OPTIONS]
 - `--output-name`, `-o` - Base name for the generated file or directory (without extension)
 - `--output-dir` - Directory where files will be generated
 - `--no-output` - Skip saving the pipeline to file (useful for testing)
-- `--no-extras` - Skip generating `inputs.json` and `runner.py`, only generate the PLX file
+- `--no-extras` - Skip generating `inputs.json` and `runner.py`, only generate the MTHDS file
 - `--builder-pipe` - Builder pipe to use for generating the pipeline (default: `pipe_builder`)
 - `--graph` / `--no-graph` - Generate execution graphs for both build process and built pipeline
 - `--graph-full-data` / `--graph-no-data` - Include or exclude full serialized data in graphs (requires `--graph`)
@@ -37,7 +37,7 @@ The resulting pipeline will be saved in a folder (e.g., `pipeline_01/`) containi
 
 | File | Description |
 |------|-------------|
-| `bundle.plx` | The pipeline definition |
+| `bundle.mthds` | The pipeline definition |
 | `inputs.json` | Template for pipeline inputs |
 | `run_{pipe_code}.py` | Python script to run the pipeline |
 | `structures/` | Generated Pydantic models for your concepts |
@@ -45,7 +45,7 @@ The resulting pipeline will be saved in a folder (e.g., `pipeline_01/`) containi
 | `bundle_view.svg` | SVG visualization of the build process and plan |
 | `__init__.py` | Python package init file |
 
-The HTML and SVG files provide a visual representation of the resulting workflow.
+The HTML and SVG files provide a visual representation of the resulting method.
 
 ## Examples
 
@@ -67,7 +67,7 @@ pipelex build pipe "Extract data from invoices" -o invoice_extractor
 pipelex build pipe "Analyze customer feedback" --output-dir ./pipelines/
 ```
 
-**Generate only the PLX file (no extras):**
+**Generate only the MTHDS file (no extras):**
 
 ```bash
 pipelex build pipe "Summarize documents" --no-extras
@@ -87,7 +87,7 @@ pipelex build pipe "Take a CV in a PDF file and a Job offer text, and analyze if
 pipelex build pipe "Extract structured data from invoice images"
 ```
 
-**Multi-step Workflows:**
+**Multi-step Methods:**
 
 ```bash
 pipelex build pipe "Given an RFP PDF, build a compliance matrix"
@@ -111,12 +111,12 @@ The Pipe Builder is in active development and currently:
 
 After generating your pipeline:
 
-1. **Validate it**: `pipelex validate your_pipe.plx` - See [Validate Commands](../validate.md)
-2. **Run it**: `pipelex run your_pipe.plx` - See [Run Command](../run.md)
-3. **Generate a runner**: `pipelex build runner your_pipe.plx` - See [Build Runner](runner.md)
+1. **Validate it**: `pipelex validate your_pipe.mthds` - See [Validate Commands](../validate.md)
+2. **Run it**: `pipelex run your_pipe.mthds` - See [Run Command](../run.md)
+3. **Generate a runner**: `pipelex build runner your_pipe.mthds` - See [Build Runner](runner.md)
 4. **Generate structures**: `pipelex build structures ./` - See [Build Structures](structures.md)
-5. **Generate input template**: `pipelex build inputs your_pipe.plx` - See [Build Inputs](inputs.md)
-6. **View output structure**: `pipelex build output your_pipe.plx` - See [Build Output](output.md)
+5. **Generate input template**: `pipelex build inputs your_pipe.mthds` - See [Build Inputs](inputs.md)
+6. **View output structure**: `pipelex build output your_pipe.mthds` - See [Build Output](output.md)
 
 ## Related Documentation
 

@@ -629,8 +629,8 @@ class ModelDeck(ConfigModel):
                         msg = (
                             f"Inference model fallback: '{ideal_model_handle}' was not found in the model deck, "
                             f"so it was replaced by '{fallback}'. "
-                            f"As a consequence, the results of the workflow may not have the expected quality, "
-                            f"and the workflow might fail due to feature limitations such as context window size, etc. "
+                            f"As a consequence, the results of the method may not have the expected quality, "
+                            f"and the method might fail due to feature limitations such as context window size, etc. "
                             f"Consider getting access to '{ideal_model_handle}'."
                         )
                         enabled_backends = self._get_enabled_backends()

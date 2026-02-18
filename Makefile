@@ -20,6 +20,7 @@ VENV_PIPELEX := "$(VIRTUAL_ENV)/bin/pipelex"
 VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
+VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
@@ -54,10 +55,14 @@ make update                   - Upgrade dependencies via uv
 make validate                 - Run the setup sequence to validate the config and libraries
 make build                    - Build the wheels
 
-make format                   - format with ruff format
-make lint                     - lint with ruff check
+make format                   - format with ruff and plxt
+make lint                     - lint with ruff and plxt
+make ruff-format              - format with ruff format
+make ruff-lint                - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
+make plxt-format              - Format TOML/MTHDS/PLX files with plxt
+make plxt-lint                - Lint TOML/MTHDS/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
 make up-kit-configs           - Update kit configs from .pipelex/
@@ -67,6 +72,8 @@ make ccs                      - Shorthand -> check-config-sync
 make check-rules              - Verify installed agent rules match kit templates
 make check-urls               - Check all URLs in pipelex/urls.py for broken links (quiet)
 make cu                       - Check URLs with verbose output (shows details)
+make generate-mthds-schema    - Generate JSON Schema for .mthds files
+make gms                      - Shorthand -> generate-mthds-schema
 make update-gateway-models    - Update gateway models reference
 make ugm                      - Shorthand -> update-gateway-models
 make check-gateway-models     - Check gateway models reference is up-to-date
@@ -84,6 +91,8 @@ make merge-check-ruff-lint    - Run ruff merge check without updating files
 make merge-check-ruff-format  - Run ruff merge check without updating files
 make merge-check-mypy         - Run mypy merge check without updating files
 make merge-check-pyright	  - Run pyright merge check without updating files
+make merge-check-plxt-format  - Run plxt format check without modifying files
+make merge-check-plxt-lint    - Run plxt lint check
 
 make v                        - Shorthand -> validate
 make codex-tests              - Run tests for Codex (exit on first failure) (no inference, no codex_disabled)
@@ -119,7 +128,7 @@ make docs-list                - List deployed documentation versions
 make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
 make docs-deploy-specific-version         - Deploy docs for the current version with 'pre-release' alias (CI only)
-make docs-deploy-404          - Deploy 404.html for versionless URL redirects
+make docs-deploy-root          - Deploy root assets (404.html, robots.txt, index.html) to gh-pages
 make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 
 make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
@@ -148,7 +157,7 @@ export HELP
 
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
-	format lint pyright mypy pylint \
+	format lint ruff-format ruff-lint pyright mypy pylint plxt-format plxt-lint \
     rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
@@ -156,13 +165,14 @@ export HELP
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc agent-check agent-test \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
-	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
+	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
+	generate-mthds-schema gms \
 	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
-	docs-deploy-404
+	docs-deploy-root
 
 all help:
 	@echo "$$HELP"
@@ -224,6 +234,12 @@ lock: env
 	@uv lock && \
 	echo uv lock without update;
 
+plxt: env ## Rebuild and reinstall plxt CLI from local vscode-pipelex source
+	$(call PRINT_TITLE,"Reinstalling plxt from source")
+	@. $(VIRTUAL_ENV)/bin/activate && \
+	uv sync --all-extras --reinstall-package plxt && \
+	echo "Reinstalled plxt in ${VIRTUAL_ENV}";
+
 update: env
 	$(call PRINT_TITLE,"Updating all dependencies")
 	@uv lock --upgrade && \
@@ -275,6 +291,15 @@ check-config-sync: env
 
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"
+
+generate-mthds-schema: env
+	$(call PRINT_TITLE,"Generating MTHDS JSON Schema")
+	$(VENV_PIPELEX_DEV) generate-mthds-schema
+
+gms: generate-mthds-schema
+	@echo "> done: gms = generate-mthds-schema"
+
+# TODO: Add check-mthds-schema target (like check-gateway-models) for CI freshness verification
 
 update-gateway-models: env
 	$(call PRINT_TITLE,"Updating gateway models reference")
@@ -664,16 +689,30 @@ cm: cov-missing
 	@echo "> done: cm = cov-missing"
 
 ##########################################################################################
-### LINTING
+### FORMATTING, LINTING, AND TYPECHECKING
 ##########################################################################################
 
-format: env
+ruff-format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
 	$(VENV_RUFF) format . --config pyproject.toml
 
-lint: env
+ruff-lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
 	$(VENV_RUFF) check . --fix --config pyproject.toml
+
+plxt-format: env
+	$(call PRINT_TITLE,"Formatting TOML/MTHDS with plxt")
+	$(VENV_PLXT) fmt
+
+plxt-lint: env
+	$(call PRINT_TITLE,"Linting TOML/MTHDS with plxt")
+	$(VENV_PLXT) lint
+
+format: ruff-format plxt-format
+	@echo "> done: format = ruff-format plxt-format"
+
+lint: ruff-lint plxt-lint
+	@echo "> done: lint = ruff-lint plxt-lint"
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
@@ -712,6 +751,14 @@ merge-check-pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
 	$(VENV_PYLINT) --rcfile pyproject.toml .
 
+merge-check-plxt-format: env
+	$(call PRINT_TITLE,"Checking TOML/MTHDS formatting with plxt")
+	$(VENV_PLXT) fmt --check
+
+merge-check-plxt-lint: env
+	$(call PRINT_TITLE,"Linting TOML/MTHDS with plxt")
+	$(VENV_PLXT) lint
+
 ##########################################################################################
 ### MISCELLANEOUS
 ##########################################################################################
@@ -737,6 +784,31 @@ check-TODOs: env
 
 # Extract version from pyproject.toml for docs deployment
 DOCS_VERSION := $(shell grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
+
+define ROOT_ROBOTS_TXT
+User-agent: *
+Allow: /latest/
+Disallow: /
+Sitemap: https://$(SITE_DOMAIN)/latest/sitemap.xml
+endef
+export ROOT_ROBOTS_TXT
+
+define ROOT_INDEX_HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Redirecting to latest documentation...</title>
+    <meta http-equiv="refresh" content="0;url=/latest/">
+    <link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
+</head>
+<body>
+    <p>Redirecting to <a href="/latest/">latest documentation</a>...</p>
+</body>
+</html>
+endef
+export ROOT_INDEX_HTML
 
 docs: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
@@ -758,24 +830,32 @@ docs-deploy: env
 	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
 	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
 
-docs-deploy-stable: env docs-deploy-404
+docs-deploy-stable: env
 	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
+	$(MAKE) docs-deploy-root
 
-docs-deploy-specific-version: env docs-deploy-404
+docs-deploy-specific-version: env
 	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
+	$(MAKE) docs-deploy-root
 
-docs-deploy-404:
-	$(call PRINT_TITLE,"Deploying 404.html to gh-pages root for versionless URL redirects")
-	@TMPDIR=$$(mktemp -d); \
+docs-deploy-root:
+ifeq ($(SITE_DOMAIN),)
+	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
+endif
+	$(call PRINT_TITLE,"Deploying root assets (404.html, robots.txt, index.html) to gh-pages")
+	@git fetch origin gh-pages:gh-pages 2>/dev/null || true; \
+	TMPDIR=$$(mktemp -d); \
 	trap "cd '$(CURDIR)'; git worktree remove '$$TMPDIR' 2>/dev/null || true; rm -rf '$$TMPDIR'" EXIT; \
 	git worktree add "$$TMPDIR" gh-pages && \
 	cp docs/404.html "$$TMPDIR/404.html" && \
+	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
+	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
 	cd "$$TMPDIR" && \
-	git add 404.html && \
-	(git diff --cached --quiet || git commit -m "Update 404.html for versionless URL redirects") && \
+	git add 404.html robots.txt index.html && \
+	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html)") && \
 	git push origin gh-pages
 
 docs-delete: env

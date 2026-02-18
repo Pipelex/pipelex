@@ -76,7 +76,7 @@ async def _validate_bundle_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    result = await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+    result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
 
     validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in result.pipes]
 
@@ -145,7 +145,7 @@ async def _validate_pipe_in_bundle_core(
     """
     # Validate the bundle to load all its pipes into the library
     # This ensures all dependencies are available
-    await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+    await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
 
     # Now get the specific pipe and dry-run only that one
     the_pipe = get_required_pipe(pipe_code=pipe_code)
@@ -170,7 +170,7 @@ def validate_cmd(
     ] = None,
     bundle: Annotated[
         str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx)"),
+        typer.Option("--bundle", help="Bundle file path (.mthds)"),
     ] = None,
     validate_all: Annotated[
         bool,
@@ -178,7 +178,7 @@ def validate_cmd(
     ] = False,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
     """Validate a pipe, bundle, or all pipes and output JSON results.
@@ -187,7 +187,7 @@ def validate_cmd(
 
     Examples:
         pipelex-agent validate my_pipe
-        pipelex-agent validate my_bundle.plx
+        pipelex-agent validate my_bundle.mthds
         pipelex-agent validate --all -L ./my_pipes
     """
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None

@@ -129,13 +129,13 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         pipe_table.add("add_each_output", pipe_spec.add_each_output)
         if pipe_spec.combined_output:
             pipe_table.add("combined_output", pipe_spec.combined_output)
-        parallels_array = tomlkit.array()
-        for parallel in pipe_spec.parallels:
-            parallel_inline = tomlkit.inline_table()
-            parallel_inline.append("pipe", parallel.pipe_code)
-            parallel_inline.append("result", parallel.result)
-            parallels_array.append(parallel_inline)
-        pipe_table.add("parallels", parallels_array)
+        branches_array = tomlkit.array()
+        for branch in pipe_spec.branches:
+            branch_inline = tomlkit.inline_table()
+            branch_inline.append("pipe", branch.pipe_code)
+            branch_inline.append("result", branch.result)
+            branches_array.append(branch_inline)
+        pipe_table.add("branches", branches_array)
 
     elif isinstance(pipe_spec, PipeConditionSpec):
         pipe_table.add("expression", pipe_spec.jinja2_expression_template)
@@ -189,7 +189,7 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
     # Add type to spec_data if not present
     spec_data["type"] = pipe_type
 
-    # Handle steps/parallels conversion - need to convert pipe to pipe_code
+    # Handle steps/branches conversion - need to convert pipe to pipe_code
     if "steps" in spec_data:
         converted_steps = []
         for step in spec_data["steps"]:
@@ -198,13 +198,13 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
             converted_steps.append(step)
         spec_data["steps"] = converted_steps
 
-    if "parallels" in spec_data:
-        converted_parallels = []
-        for parallel in spec_data["parallels"]:
-            if "pipe" in parallel and "pipe_code" not in parallel:
-                parallel["pipe_code"] = parallel.pop("pipe")
-            converted_parallels.append(parallel)
-        spec_data["parallels"] = converted_parallels
+    if "branches" in spec_data:
+        converted_branches = []
+        for branch in spec_data["branches"]:
+            if "pipe" in branch and "pipe_code" not in branch:
+                branch["pipe_code"] = branch.pop("pipe")
+            converted_branches.append(branch)
+        spec_data["branches"] = converted_branches
 
     # Handle expression -> jinja2_expression_template for PipeCondition
     if pipe_type == "PipeCondition" and "expression" in spec_data:

@@ -1,0 +1,7 @@
+[package]
+address = "github.com/mthds/scoring-lib"
+version = "2.0.0"
+description = "Scoring library for cross-package testing"
+
+[exports.pkg_test_scoring_dep]
+pipes = ["pkg_test_compute_score"]

@@ -41,12 +41,12 @@ async def _generate_inputs_core(
 
     Args:
         pipe_code: The pipe code to generate inputs for.
-        bundle_path: Path to the bundle file (.plx).
+        bundle_path: Path to the bundle file (.mthds).
         output_path: Path to save the generated JSON file.
     """
     if bundle_path:
         try:
-            validate_bundle_result = await validate_bundle(plx_file_path=bundle_path)
+            validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path)
             bundle_blueprint = validate_bundle_result.blueprints[0]
             if not pipe_code:
                 # No pipe code specified, use main_pipe from bundle
@@ -100,7 +100,7 @@ async def _generate_inputs_core(
     if output_path:
         final_output_path = output_path
     elif bundle_path:
-        # Place inputs.json in the same directory as the PLX file
+        # Place inputs.json in the same directory as the MTHDS file
         bundle_dir = bundle_path.parent
         final_output_path = bundle_dir / DEFAULT_INPUTS_FILE_NAME
     else:
@@ -123,14 +123,14 @@ def generate_inputs_cmd(
     ] = None,
     pipe: Annotated[
         str | None,
-        typer.Option("--pipe", help="Pipe code, can be omitted if you specify a bundle (.plx) that declares a main pipe"),
+        typer.Option("--pipe", help="Pipe code, can be omitted if you specify a bundle (.mthds) that declares a main pipe"),
     ] = None,
     library_dir: Annotated[
         list[str] | None,
         typer.Option(
             "--library-dir",
             "-L",
-            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+            help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times.",
         ),
     ] = None,
     output_path: Annotated[
@@ -147,8 +147,8 @@ def generate_inputs_cmd(
 
     Examples:
         pipelex build inputs my_pipe
-        pipelex build inputs my_bundle.plx
-        pipelex build inputs my_bundle.plx --pipe my_pipe
+        pipelex build inputs my_bundle.mthds
+        pipelex build inputs my_bundle.mthds --pipe my_pipe
         pipelex build inputs my_pipe --output custom_inputs.json
         pipelex build inputs my_pipe -L ./my_pipes
     """
@@ -167,7 +167,7 @@ def generate_inputs_cmd(
         target_path = Path(target)
         if target_path.is_dir():
             typer.secho(
-                f"Failed to run: '{target}' is a directory. The inputs command requires a .plx file or a pipe code.",
+                f"Failed to run: '{target}' is a directory. The inputs command requires a .mthds file or a pipe code.",
                 fg=typer.colors.RED,
                 err=True,
             )

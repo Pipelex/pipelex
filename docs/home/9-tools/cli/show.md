@@ -38,7 +38,7 @@ pipelex show pipes
 This includes:
 
 - Internal Pipelex pipes (like the pipe builder)
-- Pipes from your project's `.plx` files
+- Pipes from your project's `.mthds` files
 - Pipes that are part of imported packages
 
 ## Show Pipe Definition

@@ -1,28 +1,28 @@
-# Pipelex (PLX) – Declarative AI Workflow Spec (v0.1.0)
+# Pipelex (MTHDS) – Declarative AI Method Spec (v0.1.0)
 
-**Build deterministic, repeatable AI workflows using declarative TOML syntax.**
+**Build deterministic, repeatable AI methods using declarative TOML syntax.**
 
-The Pipelex Language (PLX) uses a TOML-based syntax to define deterministic, repeatable AI workflows. This specification documents version 0.1.0 of the language and establishes the canonical way to declare domains, concepts, and pipes inside `.plx` bundles.
+The Pipelex Language (MTHDS) uses a TOML-based syntax to define deterministic, repeatable AI methods. This specification documents version 0.1.0 of the language and establishes the canonical way to declare domains, concepts, and pipes inside `.mthds` bundles.
 
 ---
 
 ## Core Idea
 
-Pipelex is a workflow declaration language that gets interpreted at runtime, we already have a Python runtime (see [github.com/pipelex/pipelex](https://github.com/pipelex/pipelex)).
+Pipelex is a method declaration language that gets interpreted at runtime, we already have a Python runtime (see [github.com/pipelex/pipelex](https://github.com/pipelex/pipelex)).
 
-Pipelex lets you declare **what** your AI workflow should accomplish and **how** to execute it step by step. Each `.plx` file represents a bundle where you define:
+Pipelex lets you declare **what** your AI method should accomplish and **how** to execute it step by step. Each `.mthds` file represents a bundle where you define:
 
 - **Concepts** (PascalCase): the structured or unstructured data flowing through your system
-- **Pipes** (snake_case): operations or orchestrators that define your workflow
+- **Pipes** (snake_case): operations or orchestrators that define your method
 - **Domain** (named in snake_case): the topic or field of work this bundle is about
 
-Write once in `.plx` files. Run anywhere. Get the same results every time.
+Write once in `.mthds` files. Run anywhere. Get the same results every time.
 
 ---
 
 ## Semantics
 
-Pipelex workflows are **declarative and deterministic**:
+Pipelex methods are **declarative and deterministic**:
 
 - Pipes are evaluated based on their dependencies, not declaration order
 - Controllers explicitly define execution flow (sequential, parallel, or conditional)
@@ -35,7 +35,7 @@ All concepts are strongly typed. All pipes declare their inputs and outputs. The
 
 **Guarantees:**
 
-- Deterministic workflow execution and outputs
+- Deterministic method execution and outputs
 - Strong typing with validation before runtime
 
 **Not supported in v0.1.0:**
@@ -48,9 +48,9 @@ All concepts are strongly typed. All pipes declare their inputs and outputs. The
 
 ---
 
-## Complete Example: CV Job Matching Workflow
+## Complete Example: CV Job Matching Method
 
-This workflow analyses candidate CVs against job offer requirements to determine match quality.
+This method analyses candidate CVs against job offer requirements to determine match quality.
 
 ```toml
 domain = "cv_job_matching"
@@ -180,5 +180,5 @@ Evaluate how well this candidate matches the job requirements.
 - Processes all candidate CVs in parallel (batch processing)
 - Each CV is extracted and analyzed against the structured job requirements using an LLM
 - Produces a scored match analysis for each candidate with strengths, weaknesses, and hiring recommendations
-- Demonstrates sequential orchestration, parallel processing, nested workflows, and strong typing
+- Demonstrates sequential orchestration, parallel processing, nested methods, and strong typing
 

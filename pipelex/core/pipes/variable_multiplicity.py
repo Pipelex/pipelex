@@ -8,7 +8,7 @@ from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 
 VariableMultiplicity = bool | int
 
-MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?$"
 
 
 class VariableMultiplicityResolution(BaseModel):
@@ -77,8 +77,8 @@ def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityPar
             or if multiplicity is zero or negative (a pipe must produce at least one output)
     """
     # Use strict pattern to validate identifier syntax
-    # Concept must start with letter/underscore, optional domain prefix, optional brackets
-    pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+    # Concept must start with letter/underscore, with zero or more dotted domain segments, optional brackets
+    pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?$"
     match = re.match(pattern, concept_ref_or_code)
 
     if not match:

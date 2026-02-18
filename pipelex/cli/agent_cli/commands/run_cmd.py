@@ -10,7 +10,7 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError, PLXDecodeError
+from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -25,7 +25,7 @@ from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_pat
 
 async def _run_pipeline_core(
     pipe_code: str,
-    plx_content: str | None = None,
+    mthds_content: str | None = None,
     bundle_uri: str | None = None,
     inputs: dict[str, Any] | None = None,
     dry_run: bool = False,
@@ -37,7 +37,7 @@ async def _run_pipeline_core(
 
     Args:
         pipe_code: The pipe code to run.
-        plx_content: PLX content string (optional).
+        mthds_content: MTHDS content string (optional).
         bundle_uri: Bundle file path (optional).
         inputs: Input dictionary for the pipeline.
         dry_run: Whether to run in dry mode (no actual inference).
@@ -66,7 +66,7 @@ async def _run_pipeline_core(
     )
     response = await runner.execute_pipeline(
         pipe_code=pipe_code,
-        mthds_content=plx_content,
+        mthds_content=mthds_content,
         inputs=inputs,
     )
     pipe_output = response.pipe_output
@@ -141,7 +141,7 @@ def run_cmd(
     ] = None,
     bundle: Annotated[
         str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx)"),
+        typer.Option("--bundle", help="Bundle file path (.mthds)"),
     ] = None,
     inputs: Annotated[
         str | None,
@@ -161,7 +161,7 @@ def run_cmd(
     ] = False,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
     """Execute a pipeline and output JSON results.
@@ -170,9 +170,9 @@ def run_cmd(
 
     Examples:
         pipelex-agent run my_pipe --inputs data.json
-        pipelex-agent run my_bundle.plx --pipe my_pipe
+        pipelex-agent run my_bundle.mthds --pipe my_pipe
         pipelex-agent run my_pipe --dry-run --mock-inputs
-        pipelex-agent run my_bundle.plx --graph
+        pipelex-agent run my_bundle.mthds --graph
     """
     # Validate that at least one target is provided
     provided_options = sum([target is not None, pipe is not None, bundle is not None])
@@ -206,13 +206,13 @@ def run_cmd(
     if not pipe_code and not bundle_path:
         agent_error("No pipe code or bundle file specified", "ArgumentError")
 
-    # Load plx content from bundle if provided
-    plx_content: str | None = None
+    # Load MTHDS content from bundle if provided
+    mthds_content: str | None = None
     if bundle_path:
         try:
-            plx_content = Path(bundle_path).read_text(encoding="utf-8")
+            mthds_content = Path(bundle_path).read_text(encoding="utf-8")
             if not pipe_code:
-                bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(plx_content=plx_content)
+                bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
                 main_pipe_code = bundle_blueprint.main_pipe
                 if not main_pipe_code:
                     agent_error(
@@ -224,7 +224,7 @@ def run_cmd(
             agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
         except (OSError, UnicodeDecodeError) as exc:
             agent_error(f"Failed to read bundle file '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
-        except (PipelexInterpreterError, PLXDecodeError) as exc:
+        except (PipelexInterpreterError, MthdsDecodeError) as exc:
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
 
     # Load inputs if provided
@@ -249,7 +249,7 @@ def run_cmd(
         result = asyncio.run(
             _run_pipeline_core(
                 pipe_code=pipe_code,  # type: ignore[arg-type]
-                plx_content=plx_content,
+                mthds_content=mthds_content,
                 bundle_uri=bundle_path,
                 inputs=pipeline_inputs,
                 dry_run=dry_run,

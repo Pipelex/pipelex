@@ -6,7 +6,7 @@ from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.graph.graph_config import GraphConfig
-from pipelex.language.plx_config import PlxConfig
+from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
@@ -169,7 +169,7 @@ class Pipelex(ConfigModel):
 
     structure_config: StructureConfig
     prompting_config: PromptingConfig
-    plx_config: PlxConfig
+    mthds_config: MthdsConfig
 
     dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig

@@ -56,7 +56,7 @@ class HtmlTable(StructuredContent):
         return self
 ```
 
-## The Pipeline Definition: `table.plx`
+## The Pipeline Definition: `table.mthds`
 
 The pipeline uses a two-step "extract and review" pattern. The first pipe does the initial extraction, and the second pipe reviews the generated HTML against the original image to correct any errors. This is a powerful pattern for increasing the reliability of LLM outputs.
 
@@ -88,4 +88,4 @@ Rewrite the entire html table with your potential corrections.
 Make sure you do not forget any text.
 """
 ```
-This self-correction pattern is a key technique for building robust and reliable AI workflows with Pipelex. 
+This self-correction pattern is a key technique for building robust and reliable AI methods with Pipelex. 

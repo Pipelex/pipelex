@@ -105,7 +105,7 @@ def run_command(
     ] = None,
     bundle: Annotated[
         str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx)"),
+        typer.Option("--bundle", help="Bundle file path (.mthds)"),
     ] = None,
     inputs: Annotated[
         str | None,
@@ -125,7 +125,7 @@ def run_command(
     ] = False,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
     """Execute a pipeline and output JSON results."""
@@ -153,7 +153,7 @@ def validate_command(
     ] = None,
     bundle: Annotated[
         str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx)"),
+        typer.Option("--bundle", help="Bundle file path (.mthds)"),
     ] = None,
     validate_all: Annotated[
         bool,
@@ -161,7 +161,7 @@ def validate_command(
     ] = False,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
     """Validate a pipe, bundle, or all pipes and output JSON results."""
@@ -186,7 +186,7 @@ def inputs_command(
     ] = None,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
     """Generate example input JSON for a pipe."""
@@ -231,7 +231,7 @@ def pipe_command(
     pipe_cmd(pipe_type=pipe_type, spec=spec, spec_file=spec_file)
 
 
-@app.command(name="assemble", help="Assemble a complete .plx bundle from TOML parts")
+@app.command(name="assemble", help="Assemble a complete .mthds bundle from TOML parts")
 def assemble_command(
     domain: Annotated[
         str,
@@ -243,7 +243,7 @@ def assemble_command(
     ],
     output: Annotated[
         str,
-        typer.Option("--output", "-o", help="Output file path for the assembled bundle (.plx)"),
+        typer.Option("--output", "-o", help="Output file path for the assembled bundle (.mthds)"),
     ],
     description: Annotated[
         str | None,
@@ -262,7 +262,7 @@ def assemble_command(
         typer.Option("--pipes", "-p", help="TOML file(s) or inline TOML containing pipe definitions"),
     ] = None,
 ) -> None:
-    """Assemble a complete .plx bundle from individual TOML parts."""
+    """Assemble a complete .mthds bundle from individual TOML parts."""
     assemble_cmd(
         domain=domain,
         main_pipe=main_pipe,
@@ -274,11 +274,11 @@ def assemble_command(
     )
 
 
-@app.command(name="graph", help="Generate graph visualization from a .plx bundle")
+@app.command(name="graph", help="Generate graph visualization from a .mthds bundle")
 def graph_command(
     target: Annotated[
         str,
-        typer.Argument(help="Path to a .plx bundle file"),
+        typer.Argument(help="Path to a .mthds bundle file"),
     ],
     graph_format: Annotated[
         GraphFormat,
@@ -286,10 +286,10 @@ def graph_command(
     ] = GraphFormat.REACTFLOW,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
-    """Generate graph visualization from a .plx bundle."""
+    """Generate graph visualization from a .mthds bundle."""
     graph_cmd(target=target, graph_format=graph_format, library_dir=library_dir)
 
 

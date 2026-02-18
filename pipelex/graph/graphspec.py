@@ -49,13 +49,21 @@ class EdgeKind(StrEnum):
     SELECTED_OUTCOME = "selected_outcome"
     BATCH_ITEM = "batch_item"  # list → item extraction during batch iteration
     BATCH_AGGREGATE = "batch_aggregate"  # items → output list aggregation
+    PARALLEL_COMBINE = "parallel_combine"  # branch outputs → combined output in PipeParallel
 
     @property
     def is_data(self) -> bool:
         match self:
             case EdgeKind.DATA:
                 return True
-            case EdgeKind.CONTROL | EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE:
+            case (
+                EdgeKind.CONTROL
+                | EdgeKind.CONTAINS
+                | EdgeKind.SELECTED_OUTCOME
+                | EdgeKind.BATCH_ITEM
+                | EdgeKind.BATCH_AGGREGATE
+                | EdgeKind.PARALLEL_COMBINE
+            ):
                 return False
 
     @property
@@ -63,7 +71,14 @@ class EdgeKind(StrEnum):
         match self:
             case EdgeKind.CONTAINS:
                 return True
-            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE:
+            case (
+                EdgeKind.CONTROL
+                | EdgeKind.DATA
+                | EdgeKind.SELECTED_OUTCOME
+                | EdgeKind.BATCH_ITEM
+                | EdgeKind.BATCH_AGGREGATE
+                | EdgeKind.PARALLEL_COMBINE
+            ):
                 return False
 
     @property
@@ -71,7 +86,7 @@ class EdgeKind(StrEnum):
         match self:
             case EdgeKind.SELECTED_OUTCOME:
                 return True
-            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE:
+            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE | EdgeKind.PARALLEL_COMBINE:
                 return False
 
     @property
@@ -79,7 +94,14 @@ class EdgeKind(StrEnum):
         match self:
             case EdgeKind.BATCH_ITEM:
                 return True
-            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_AGGREGATE:
+            case (
+                EdgeKind.CONTROL
+                | EdgeKind.DATA
+                | EdgeKind.CONTAINS
+                | EdgeKind.SELECTED_OUTCOME
+                | EdgeKind.BATCH_AGGREGATE
+                | EdgeKind.PARALLEL_COMBINE
+            ):
                 return False
 
     @property
@@ -87,7 +109,15 @@ class EdgeKind(StrEnum):
         match self:
             case EdgeKind.BATCH_AGGREGATE:
                 return True
-            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_ITEM:
+            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_ITEM | EdgeKind.PARALLEL_COMBINE:
+                return False
+
+    @property
+    def is_parallel_combine(self) -> bool:
+        match self:
+            case EdgeKind.PARALLEL_COMBINE:
+                return True
+            case EdgeKind.CONTROL | EdgeKind.DATA | EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE:
                 return False
 
 

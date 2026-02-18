@@ -1,4 +1,4 @@
-"""Integration tests for concept-to-concept references in PLX files."""
+"""Integration tests for concept-to-concept references in MTHDS files."""
 
 import tempfile
 from collections.abc import Callable
@@ -14,8 +14,8 @@ class TestConceptToConceptReferences:
 
     def test_load_concepts_with_single_reference(self, load_test_library: Callable[[list[Path]], None]):
         """Test loading concepts where one concept references another."""
-        # Create a temporary PLX file with concept references
-        plx_content = """
+        # Create a temporary MTHDS file with concept references
+        mthds_content = """
 domain = "testapp"
 description = "Test domain for concept references"
 
@@ -35,8 +35,8 @@ total = { type = "number", description = "Invoice total" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             load_test_library([Path(tmp_dir)])
 
@@ -60,7 +60,7 @@ total = { type = "number", description = "Invoice total" }
 
     def test_load_concepts_with_list_of_references(self, load_test_library: Callable[[list[Path]], None]):
         """Test loading concepts where one concept has a list of references to another."""
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain for list of concept references"
 
@@ -81,8 +81,8 @@ total = { type = "number", description = "Invoice total" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             load_test_library([Path(tmp_dir)])
 
@@ -103,8 +103,8 @@ total = { type = "number", description = "Invoice total" }
 
     def test_load_concepts_dependency_order(self, load_test_library: Callable[[list[Path]], None]):
         """Test that concepts are loaded in dependency order (dependencies first)."""
-        # Define concepts in reverse dependency order in the PLX file
-        plx_content = """
+        # Define concepts in reverse dependency order in the MTHDS file
+        mthds_content = """
 domain = "testapp"
 description = "Test domain for dependency ordering"
 
@@ -124,8 +124,8 @@ name = { type = "text", description = "Customer name" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             # This should not raise an error - Customer should be loaded before Invoice
             load_test_library([Path(tmp_dir)])
@@ -142,7 +142,7 @@ name = { type = "text", description = "Customer name" }
 
     def test_load_concepts_chain_dependencies(self, load_test_library: Callable[[list[Path]], None]):
         """Test loading concepts with chain dependencies: A -> B -> C."""
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain for chain dependencies"
 
@@ -168,8 +168,8 @@ city = { type = "text", description = "City" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             load_test_library([Path(tmp_dir)])
 
@@ -187,7 +187,7 @@ city = { type = "text", description = "City" }
 
     def test_cycle_detection_raises_error(self, load_empty_library: Callable[[], str]):
         """Test that cyclic dependencies are detected and raise an error."""
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with cyclic dependencies"
 
@@ -205,8 +205,8 @@ a_ref = { type = "concept", concept_ref = "testapp.A", description = "Reference 
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             library_id = load_empty_library()
             library_manager = get_library_manager()
@@ -220,7 +220,7 @@ a_ref = { type = "concept", concept_ref = "testapp.A", description = "Reference 
 
     def test_cycle_detection_self_reference(self, load_empty_library: Callable[[], str]):
         """Test that a concept referencing itself is detected as a cycle."""
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with self-referencing concept"
 
@@ -233,8 +233,8 @@ parent = { type = "concept", concept_ref = "testapp.Node", description = "Parent
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             library_id = load_empty_library()
             library_manager = get_library_manager()
@@ -247,7 +247,7 @@ parent = { type = "concept", concept_ref = "testapp.Node", description = "Parent
 
     def test_cycle_detection_three_concepts(self, load_empty_library: Callable[[], str]):
         """Test that a cycle through three concepts (A -> B -> C -> A) is detected."""
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with three-concept cycle"
 
@@ -271,8 +271,8 @@ a_ref = { type = "concept", concept_ref = "testapp.A", description = "Reference 
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             library_id = load_empty_library()
             library_manager = get_library_manager()
@@ -285,7 +285,7 @@ a_ref = { type = "concept", concept_ref = "testapp.A", description = "Reference 
 
     def test_cycle_detection_long_chain(self, load_empty_library: Callable[[], str]):
         """Test that a cycle through many concepts (A -> B -> C -> D -> E -> A) is detected."""
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with long chain cycle"
 
@@ -316,8 +316,8 @@ next = { type = "concept", concept_ref = "testapp.A", description = "Back to A" 
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             library_id = load_empty_library()
             library_manager = get_library_manager()
@@ -330,7 +330,7 @@ next = { type = "concept", concept_ref = "testapp.A", description = "Back to A" 
 
     def test_cycle_detection_through_list_field(self, load_empty_library: Callable[[], str]):
         """Test that cycles through list fields are detected."""
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with cycle through list field"
 
@@ -350,8 +350,8 @@ parent = { type = "concept", concept_ref = "testapp.Parent", description = "Refe
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             library_id = load_empty_library()
             library_manager = get_library_manager()
@@ -364,7 +364,7 @@ parent = { type = "concept", concept_ref = "testapp.Parent", description = "Refe
 
     def test_cycle_detection_partial_cycle_in_graph(self, load_empty_library: Callable[[], str]):
         """Test cycle detection when cycle is not at the start (D -> E -> F -> D, with A -> B -> C -> D)."""
-        plx_content = """
+        mthds_content = """
 domain = "testapp"
 description = "Test domain with cycle deeper in the graph"
 
@@ -400,8 +400,8 @@ next = { type = "concept", concept_ref = "testapp.D", description = "Back to D" 
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            plx_path = Path(tmp_dir) / "test_concepts.plx"
-            plx_path.write_text(plx_content, encoding="utf-8")
+            mthds_path = Path(tmp_dir) / "test_concepts.mthds"
+            mthds_path.write_text(mthds_content, encoding="utf-8")
 
             library_id = load_empty_library()
             library_manager = get_library_manager()
@@ -414,7 +414,7 @@ next = { type = "concept", concept_ref = "testapp.D", description = "Back to D" 
 
     def test_cross_domain_concept_reference(self, load_test_library: Callable[[list[Path]], None]):
         """Test loading concepts with cross-domain references."""
-        crm_plx = """
+        crm_mthds = """
 domain = "crm"
 description = "CRM domain"
 
@@ -425,7 +425,7 @@ description = "A CRM customer"
 name = { type = "text", description = "Customer name" }
 """
 
-        accounting_plx = """
+        accounting_mthds = """
 domain = "accounting"
 description = "Accounting domain"
 
@@ -438,11 +438,11 @@ amount = { type = "number", description = "Invoice amount" }
 """
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            crm_path = Path(tmp_dir) / "crm.plx"
-            crm_path.write_text(crm_plx, encoding="utf-8")
+            crm_path = Path(tmp_dir) / "crm.mthds"
+            crm_path.write_text(crm_mthds, encoding="utf-8")
 
-            accounting_path = Path(tmp_dir) / "accounting.plx"
-            accounting_path.write_text(accounting_plx, encoding="utf-8")
+            accounting_path = Path(tmp_dir) / "accounting.mthds"
+            accounting_path.write_text(accounting_mthds, encoding="utf-8")
 
             load_test_library([Path(tmp_dir)])
 

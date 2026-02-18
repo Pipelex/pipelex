@@ -1,11 +1,11 @@
 # Builder
 
-Transforms high-level specifications into valid, executable Pipelex pipeline bundles (`.plx` files). The builder is a spec-to-PLX compiler with built-in iterative repair.
+Transforms high-level specifications into valid, executable Pipelex pipeline bundles (`.mthds` files). The builder is a spec-to-MTHDS compiler with built-in iterative repair.
 
 ## Core Flow
 
 ```
-PipelexBundleSpec  →  to_blueprint()  →  PipelexBundleBlueprint  →  PLX file
+PipelexBundleSpec  →  to_blueprint()  →  PipelexBundleBlueprint  →  MTHDS file
       ↑                                         |
       |                                    validate_bundle()
       |                                         |
@@ -21,7 +21,7 @@ builder.py                     # reconstruct_bundle_with_pipe_fixes() helper
 builder_loop.py                # BuilderLoop — the main orchestration class
 builder_errors.py              # Error types
 exceptions.py                  # Exception types
-conventions.py                 # File naming defaults (bundle.plx, inputs.json)
+conventions.py                 # File naming defaults (bundle.mthds, inputs.json)
 bundle_spec.py                 # PipelexBundleSpec — top-level spec model
 bundle_header_spec.py          # Bundle header info
 runner_code.py                 # Code generation utilities
@@ -91,9 +91,9 @@ The `build` command in `pipelex/cli/agent_cli/commands/build_cmd.py` calls `buil
 
 1. Runs a "builder pipe" (itself a Pipelex pipeline) that generates a `PipelexBundleSpec`
 2. Passes it to `BuilderLoop.build_and_fix()`
-3. Converts the result to PLX via `PlxFactory.make_plx_content()`
+3. Converts the result to MTHDS via `MthdsFactory.make_mthds_content()`
 4. Saves to `pipelex-wip/` with incremental naming
 
 ## Talent System
 
-Talents are abstract capability labels mapped to concrete model presets. Each talent enum (in `talents/`) maps to a `$preset` code used in PLX files. When modifying talents, update both the enum and its preset mapping dict.
+Talents are abstract capability labels mapped to concrete model presets. Each talent enum (in `talents/`) maps to a `$preset` code used in MTHDS files. When modifying talents, update both the enum and its preset mapping dict.

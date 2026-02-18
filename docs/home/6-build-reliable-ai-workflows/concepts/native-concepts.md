@@ -1,12 +1,12 @@
 # Native Concepts
 
-Pipelex includes several built-in native concepts that cover common data types in AI workflows. These concepts come with predefined structures and are automatically available in all pipelines—no setup required.
+Pipelex includes several built-in native concepts that cover common data types in AI methods. These concepts come with predefined structures and are automatically available in all pipelines—no setup required.
 
 For an introduction to concepts, see [Define Your Concepts](define_your_concepts.md).
 
 ## What Are Native Concepts?
 
-Native concepts are ready-to-use building blocks for AI workflows. They represent common data types you'll frequently work with: text, images, documents, numbers, and combinations thereof.
+Native concepts are ready-to-use building blocks for AI methods. They represent common data types you'll frequently work with: text, images, documents, numbers, and combinations thereof.
 
 **Key characteristics:**
 
@@ -133,7 +133,7 @@ class DynamicContent(StuffContent):
     pass
 ```
 
-**Use for:** Workflows where the content structure isn't known in advance.
+**Use for:** Methods where the content structure isn't known in advance.
 
 ### JSONContent
 
@@ -189,7 +189,7 @@ output = "Page"
 
 This extracts each page with both its text/images and a visual representation.
 
-### In Complex Workflows
+### In Complex Methods
 
 ```toml
 [pipe.create_report]
@@ -223,7 +223,7 @@ Refine native concepts when:
 
 - ✅ You need semantic specificity (e.g., `Invoice` vs `Document`)
 - ✅ You want to add custom structure on top of the base structure
-- ✅ Building domain-specific workflows
+- ✅ Building domain-specific methods
 - ✅ Need type safety for specific document types
 
 ## Common Patterns
@@ -286,5 +286,5 @@ Analyze this image: $image"
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics
 - [Inline Structures](inline-structures.md) - Add structure to refined concepts
 - [Python StructuredContent Classes](python-classes.md) - Advanced customization
-- [Writing Workflows Tutorial](../../2-get-started/pipe-builder.md) - Use native concepts in pipelines
+- [Writing Methods Tutorial](../../2-get-started/pipe-builder.md) - Use native concepts in pipelines
 

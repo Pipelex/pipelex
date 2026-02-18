@@ -16,6 +16,7 @@
    - Pyright: Static type checking
    - Ruff: Fix unused imports, lint, format  
    - Mypy: Static type checker
+   - plxt: Format and lint TOML, MTHDS, and PLX files
 
    Always fix any issues reported by these tools before proceeding.
 
@@ -39,6 +40,8 @@
 
 ### Running Tests with Prints
 
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
+
    If anything went wrong, you can run the tests with prints to see the error:
 
    ```bash
@@ -48,6 +51,8 @@
 
 ### Running specific Tests
 
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
+
    ```bash
    make tp TEST=TestClassName
    # or
@@ -56,6 +61,8 @@
    Note: Matches names starting with the provided string.
 
 ### Running Last Failed Tests
+
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
 
    To rerun only the tests that failed in the previous run, use:
 
@@ -81,6 +88,22 @@
    ```
 
    For standard installations, the virtual environment is named `.venv`. Always check this first. On Windows, the path is `.venv\Scripts\` instead of `.venv/bin/`.
+
+### Pipelex Dev CLI (`pipelex-dev`)
+
+   The `pipelex-dev` CLI provides internal development tools that are not distributed with the package. It is available in the virtual environment.
+
+   ```bash
+   .venv/bin/pipelex-dev --help
+   ```
+
+   Key commands:
+
+   - **`generate-mthds-schema`**: Regenerate the MTHDS JSON Schema (`pipelex/language/mthds_schema.json`). Run this after modifying `mthds_schema_generator.py`.
+
+     ```bash
+     .venv/bin/pipelex-dev generate-mthds-schema
+     ```
 
 ## Coding Standards & Best Practices for Python Code
 
@@ -249,7 +272,7 @@ NEVER EVER put more than one TestClass into a test module.
 - Place test files in the appropriate test category directory:
     - `tests/unit/` - for unit tests that test individual functions/classes in isolation
     - `tests/integration/` - for integration tests that test component interactions
-    - `tests/e2e/` - for end-to-end tests that test complete workflows
+    - `tests/e2e/` - for end-to-end tests that test complete methods
 - Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.

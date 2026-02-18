@@ -1,6 +1,6 @@
 # Understanding Multiplicity
 
-Multiplicity in Pipelex defines how many items a particular stuff can comprise in a particular context. This applies to any of the pipe input variables and also to the output of the pipe. This idea is fundamental to building flexible AI workflows that can handle both single items and collections.
+Multiplicity in Pipelex defines how many items a particular stuff can comprise in a particular context. This applies to any of the pipe input variables and also to the output of the pipe. This idea is fundamental to building flexible AI methods that can handle both single items and collections.
 
 This guide explains the philosophy behind multiplicity in Pipelex and how to use it effectively in your pipelines.
 
@@ -23,7 +23,7 @@ Each of these definitions describes a single, coherent entity. The essence of wh
 
 ### Lists Are Circumstantial, Not Essential
 
-The number of items you're working with is a circumstantial detail of your workflow, not part of the concept's identity:
+The number of items you're working with is a circumstantial detail of your method, not part of the concept's identity:
 
 - A pipe that extracts keywords from text might find 3 keywords or 30—but each is still a `Keyword`
 - A pipe that generates product ideas might produce 5 ideas or 10—but each remains a `ProductIdea`
@@ -355,7 +355,7 @@ Use variable input multiplicity when:
 
 - The pipe should handle batches of unknown size
 - You're aggregating or summarizing multiple items
-- The workflow involves collecting items before processing
+- The method involves collecting items before processing
 - You want maximum flexibility in how the pipe is called
 
 ### When to Use Fixed Input (Brackets with Number `[N]`)

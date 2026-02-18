@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Callable
 
 from kajson.kajson_manager import KajsonManager
 from mthds.models.concept import ConceptAbstract
@@ -16,6 +16,7 @@ from pipelex.core.concepts.validation import is_concept_ref_or_code_valid, valid
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.domains.exceptions import DomainCodeError
 from pipelex.core.domains.validation import validate_domain_code
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.image_field_search import search_for_nested_image_fields
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.tools.misc.string_utils import pascal_case_to_sentence
@@ -82,7 +83,13 @@ class Concept(ConceptAbstract):
         return NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept.concept_ref)
 
     @classmethod
-    def are_concept_compatible(cls, concept_1: "Concept", concept_2: "Concept", strict: bool = False) -> bool:
+    def are_concept_compatible(
+        cls,
+        concept_1: "Concept",
+        concept_2: "Concept",
+        strict: bool = False,
+        concept_resolver: Callable[[str], "Concept | None"] | None = None,
+    ) -> bool:
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_1.code):
             return True
         if NativeConceptCode.is_dynamic_concept(concept_code=concept_2.code):
@@ -93,12 +100,31 @@ class Concept(ConceptAbstract):
             return True
 
         # If concept_1 refines concept_2 by string, they are strictly compatible
-        if concept_1.refines is not None and concept_1.refines == concept_2.concept_ref:
-            return True
+        if concept_1.refines is not None:
+            if concept_1.refines == concept_2.concept_ref:
+                return True
+            # Cross-package refines: resolve the aliased ref and compare concept_refs
+            if QualifiedRef.has_cross_package_prefix(concept_1.refines) and concept_resolver is not None:
+                resolved = concept_resolver(concept_1.refines)
+                if resolved is not None and resolved.concept_ref == concept_2.concept_ref:
+                    return True
 
         # If both concepts refine the same concept, they are compatible
-        if concept_1.refines is not None and concept_2.refines is not None and concept_1.refines == concept_2.refines:
-            return True
+        if concept_1.refines is not None and concept_2.refines is not None:
+            refines_1 = concept_1.refines
+            refines_2 = concept_2.refines
+            # Resolve cross-package refines through the resolver
+            if concept_resolver is not None:
+                if QualifiedRef.has_cross_package_prefix(refines_1):
+                    resolved_1 = concept_resolver(refines_1)
+                    if resolved_1 is not None:
+                        refines_1 = resolved_1.concept_ref
+                if QualifiedRef.has_cross_package_prefix(refines_2):
+                    resolved_2 = concept_resolver(refines_2)
+                    if resolved_2 is not None:
+                        refines_2 = resolved_2.concept_ref
+            if refines_1 == refines_2:
+                return True
 
         # Check class-based compatibility
         # This now works even when one or both concepts have refines, since we generate

@@ -235,7 +235,7 @@ def handle_build_validation_failure(exc: ValidateBundleError) -> NoReturn:
     # Display build-specific tips
     console.print(
         "[bold green]💡 Tip:[/bold green] Try rephrasing your prompt or simplifying the pipeline requirements. "
-        "Breaking complex workflows into smaller steps can also help."
+        "Breaking complex methods into smaller steps can also help."
     )
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")

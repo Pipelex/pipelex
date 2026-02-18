@@ -13,4 +13,4 @@ build_app.command("inputs", help="Generate example input JSON for a pipe")(gener
 build_app.command("output", help="Generate example output representation for a pipe (JSON, Python, or TypeScript)")(generate_output_cmd)
 build_app.command("pipe", help="Build a Pipelex bundle with one validation/fix loop correcting deterministic issues")(build_pipe_cmd)
 build_app.command("runner", help="Build the Python code to run a pipe with the necessary inputs")(prepare_runner_cmd)
-build_app.command("structures", help="Generate Python structure files from concept definitions in PLX files")(build_structures_command)
+build_app.command("structures", help="Generate Python structure files from concept definitions in MTHDS files")(build_structures_command)

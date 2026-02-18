@@ -46,7 +46,7 @@ asyncio.run(hello_world())
 
 This example shows the minimal setup needed to run a Pipelex pipeline: initialize Pipelex, execute a pipeline by its code name, and pretty-print the results.
 
-## The Pipeline Definition: `hello_world.plx`
+## The Pipeline Definition: `hello_world.mthds`
 
 The pipeline definition is extremely simple - it's a single LLM call that generates a haiku:
 

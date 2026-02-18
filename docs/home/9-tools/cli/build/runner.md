@@ -10,11 +10,11 @@ pipelex build runner <TARGET> [OPTIONS]
 
 **Arguments:**
 
-- `TARGET` - Bundle file path (`.plx`)
+- `TARGET` - Bundle file path (`.mthds`)
 
 **Options:**
 
-- `--pipe` - Pipe code to use (optional if the `.plx` declares a `main_pipe`)
+- `--pipe` - Pipe code to use (optional if the `.mthds` declares a `main_pipe`)
 - `--output`, `-o` - Path to save the generated Python file (defaults to target's directory)
 - `--library-dirs`, `-L` - Directories to search for pipe definitions. Can be specified multiple times.
 
@@ -23,25 +23,25 @@ pipelex build runner <TARGET> [OPTIONS]
 **Generate runner from a bundle (uses main_pipe):**
 
 ```bash
-pipelex build runner my_bundle.plx
+pipelex build runner my_bundle.mthds
 ```
 
 **Specify which pipe to use from a bundle:**
 
 ```bash
-pipelex build runner my_bundle.plx --pipe my_pipe
+pipelex build runner my_bundle.mthds --pipe my_pipe
 ```
 
 **With additional library directories:**
 
 ```bash
-pipelex build runner my_bundle.plx -L ./shared_pipes/ -L ./common/
+pipelex build runner my_bundle.mthds -L ./shared_pipes/ -L ./common/
 ```
 
 **Custom output path:**
 
 ```bash
-pipelex build runner my_bundle.plx --output custom_runner.py
+pipelex build runner my_bundle.mthds --output custom_runner.py
 ```
 
 ## What Gets Generated

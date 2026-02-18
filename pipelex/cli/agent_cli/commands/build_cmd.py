@@ -40,7 +40,7 @@ def build_cmd(
     """Build a pipeline from a prompt and output JSON with paths.
 
     Outputs to pipelex-wip/ directory with incremental naming (pipeline_01, pipeline_02, etc.).
-    Generates PLX bundle only (no inputs.json or runner.py).
+    Generates MTHDS bundle only (no inputs.json or runner.py).
 
     Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
     """

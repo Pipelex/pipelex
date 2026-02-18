@@ -16,12 +16,13 @@ from pipelex.core.concepts.structure_generation.exceptions import ConceptStructu
 from pipelex.core.concepts.structure_generation.generator import StructureGenerator
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
 
 
 class ConceptDeclarationType(StrEnum):
-    """Enum representing the 5 ways a concept can be declared in PLX files.
+    """Enum representing the 5 ways a concept can be declared in MTHDS files.
 
     Option 1: STRING - Concept is defined as a string
         Example:
@@ -168,6 +169,15 @@ class ConceptFactory:
         concept_ref_or_code: str,
         domain_code: str | None = None,
     ) -> DomainAndConceptCode:
+        # Handle cross-package references (alias->domain.ConceptCode)
+        if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
+            alias, remainder = QualifiedRef.split_cross_package_ref(concept_ref_or_code)
+            ref = QualifiedRef.parse_concept_ref(remainder)
+            if ref.domain_path is None:
+                msg = f"Cross-package concept ref '{concept_ref_or_code}' must include a domain"
+                raise ConceptFactoryError(msg)
+            return DomainAndConceptCode(domain_code=f"{alias}->{ref.domain_path}", concept_code=ref.local_code)
+
         if "." not in concept_ref_or_code and not domain_code:
             msg = f"Not enough information to make a domain and concept code from '{concept_ref_or_code}'"
             raise ConceptFactoryError(msg)
@@ -178,12 +188,14 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code):
-            natice_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
-            return DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code=natice_concept_ref.split(".")[1])
+            native_concept_ref = NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=concept_ref_or_code)
+            ref = QualifiedRef.parse(native_concept_ref)
+            return DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code=ref.local_code)
 
         if "." in concept_ref_or_code:
-            domain_code, concept_code = concept_ref_or_code.rsplit(".")
-            return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_code)
+            ref = QualifiedRef.parse(concept_ref_or_code)
+            assert ref.domain_path is not None
+            return DomainAndConceptCode(domain_code=ref.domain_path, concept_code=ref.local_code)
         elif domain_code:
             return DomainAndConceptCode(domain_code=domain_code, concept_code=concept_ref_or_code)
         else:
@@ -214,6 +226,7 @@ class ConceptFactory:
         it will be normalized to include the native domain prefix (e.g., 'native.Text').
         If the refine is a local concept code without domain (e.g., 'MyCustomConcept'),
         it will be prefixed with the given domain_code.
+        Cross-package refs (e.g., 'alias->domain.Concept') are passed through as-is.
 
         Args:
             refine: The refine string to validate and normalize
@@ -226,6 +239,9 @@ class ConceptFactory:
             ConceptFactoryError: If the refine is invalid
 
         """
+        # Cross-package refs pass through unchanged
+        if QualifiedRef.has_cross_package_prefix(refine):
+            return refine
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=refine):
             return NativeConceptCode.get_validated_native_concept_ref(concept_ref_or_code=refine)
         elif "." in refine:
@@ -362,10 +378,31 @@ class ConceptFactory:
             msg = f"Could not validate refine '{blueprint.refines}' for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
 
+        # Cross-package refines: base class isn't available locally, so generate
+        # a standalone TextContent subclass. The refinement relationship is tracked
+        # in the concept model's refines field for runtime compatibility checks.
+        if QualifiedRef.has_cross_package_prefix(current_refine):
+            try:
+                _, the_generated_class = StructureGenerator().generate_from_structure_blueprint(
+                    class_name=concept_code,
+                    structure_blueprint={},
+                    description=blueprint.description,
+                )
+            except ConceptStructureGeneratorError as exc:
+                msg = (
+                    f"Error generating structure class for concept '{concept_code}' "
+                    f"with cross-package refines '{current_refine}' in domain '{domain_code}': {exc}"
+                )
+                raise ConceptFactoryError(msg) from exc
+
+            KajsonManager.get_class_registry().register_class(the_generated_class)
+            return concept_code, current_refine
+
         # Get the refined concept's structure class name
         # For native concepts, the structure class name is "ConceptCode" + "Content" (e.g., TextContent)
         # For custom concepts, the structure class name is just the concept code (e.g., Customer)
-        refined_concept_code = current_refine.split(".")[1]
+        refined_ref = QualifiedRef.parse(current_refine)
+        refined_concept_code = refined_ref.local_code
         if NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=current_refine):
             refined_structure_class_name = refined_concept_code + "Content"
         else:

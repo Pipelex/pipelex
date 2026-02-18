@@ -13,6 +13,7 @@ The Pipelex CLI is organized into several command groups:
 | [**show**](show.md) | Inspect configuration, pipes, and AI models |
 | [**run**](run.md) | Execute pipelines |
 | [**build**](build/index.md) | Generate pipelines, runners, and structures |
+| [**pkg**](pkg.md) | Package management: initialize manifests, manage dependencies, and lock versions |
 
 ## Usage Tips
 
@@ -23,8 +24,8 @@ The Pipelex CLI is organized into several command groups:
 
 2. **Development Workflow**
 
-    - Write or generate pipelines in `.plx` files
-    - Validate with `pipelex validate your_pipe_code` or `pipelex validate your_bundle.plx` during development
+    - Write or generate pipelines in `.mthds` files
+    - Validate with `pipelex validate your_pipe_code` or `pipelex validate your_bundle.mthds` during development
     - Run `pipelex validate --all` before committing changes
 
 3. **Running Pipelines**

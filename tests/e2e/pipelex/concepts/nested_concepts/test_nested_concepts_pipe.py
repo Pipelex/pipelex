@@ -1,7 +1,7 @@
 """E2E test for pipes with nested concept-to-concept references.
 
 This test verifies that:
-1. Concepts with nested concept references can be loaded from PLX files
+1. Concepts with nested concept references can be loaded from MTHDS files
 2. The dependency graph correctly orders concept loading
 3. Pipes can generate structured output with nested concepts
 4. The generated output contains properly typed nested objects
@@ -31,7 +31,7 @@ class TestNestedConceptsPipe:
         """Test that a pipe can generate an Invoice with nested Customer and LineItem concepts.
 
         This test verifies the complete flow:
-        1. PLX file with concept-to-concept references is loaded
+        1. MTHDS file with concept-to-concept references is loaded
         2. Concepts are loaded in topological order (LineItem, Customer before Invoice)
         3. The LLM generates structured output with proper nested types
         4. The output can be accessed via working_memory.get_stuff_as() with typed models
