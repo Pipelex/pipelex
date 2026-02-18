@@ -6,10 +6,16 @@ from typing import Annotated, Any
 
 import typer
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
+from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat
+from pipelex.config import get_config
+from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.helpers import is_pipelex_file
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.hub import (
     get_library_manager,
     get_required_pipe,
@@ -19,7 +25,10 @@ from pipelex.hub import (
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
+from pipelex.pipeline.exceptions import PipelineExecutionError
+from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 
 
@@ -159,6 +168,106 @@ async def _validate_pipe_in_bundle_core(
     }
 
 
+async def _generate_graph_for_bundle(
+    bundle_path: Path,
+    graph_format: GraphFormat,
+    library_dirs: list[str] | None = None,
+) -> dict[str, Any]:
+    """Generate graph visualization for a validated bundle.
+
+    Performs a dry-run pipeline execution with graph tracing enabled,
+    then renders and saves graph HTML files alongside the bundle.
+
+    Args:
+        bundle_path: Path to the bundle file.
+        graph_format: Which graph format(s) to generate.
+        library_dirs: Optional library directories for pipe resolution.
+
+    Returns:
+        Dictionary with graph_files and graph_output_dir.
+
+    Raises:
+        PipelexInterpreterError: If bundle parsing fails.
+        PipelineExecutionError: If dry-run execution fails.
+    """
+    mthds_content = bundle_path.read_text(encoding="utf-8")
+    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+    main_pipe_code = bundle_blueprint.main_pipe
+    if not main_pipe_code:
+        msg = f"Bundle '{bundle_path}' does not declare a main_pipe, cannot generate graph"
+        raise PipelexInterpreterError(msg)
+    pipe_code: str = main_pipe_code
+
+    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        generate_graph=True,
+        mock_inputs=True,
+    )
+
+    pipe_output = await execute_pipeline(
+        pipe_code=pipe_code,
+        mthds_content=mthds_content,
+        bundle_uri=str(bundle_path),
+        pipe_run_mode=PipeRunMode.DRY,
+        execution_config=execution_config,
+        library_dirs=library_dirs,
+    )
+
+    if not pipe_output.graph_spec:
+        msg = "Pipeline execution did not produce a graph spec"
+        raise PipelexError(msg)
+
+    graph_spec = pipe_output.graph_spec
+    base_graph_config = execution_config.graph_config
+
+    include_mermaidflow: bool
+    include_reactflow: bool
+    match graph_format:
+        case GraphFormat.MERMAIDFLOW:
+            include_mermaidflow = True
+            include_reactflow = False
+        case GraphFormat.REACTFLOW:
+            include_mermaidflow = False
+            include_reactflow = True
+        case GraphFormat.BOTH:
+            include_mermaidflow = True
+            include_reactflow = True
+
+    render_graph_config = base_graph_config.model_copy(
+        update={
+            "data_inclusion": base_graph_config.data_inclusion.model_copy(
+                update={
+                    "stuff_json_content": True,
+                    "stuff_text_content": True,
+                    "stuff_html_content": True,
+                }
+            ),
+            "graphs_inclusion": base_graph_config.graphs_inclusion.model_copy(
+                update={
+                    "graphspec_json": False,
+                    "mermaidflow_mmd": False,
+                    "mermaidflow_html": include_mermaidflow,
+                    "reactflow_viewspec": False,
+                    "reactflow_html": include_reactflow,
+                }
+            ),
+        }
+    )
+
+    graph_outputs = await generate_graph_outputs(
+        graph_spec=graph_spec,
+        graph_config=render_graph_config,
+        pipe_code=pipe_code,
+    )
+
+    output_dir = bundle_path.parent
+    saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
+
+    return {
+        "graph_files": {key: str(path) for key, path in saved_files.items()},
+        "graph_output_dir": str(output_dir),
+    }
+
+
 def validate_cmd(
     target: Annotated[
         str | None,
@@ -176,6 +285,14 @@ def validate_cmd(
         bool,
         typer.Option("--all", "-a", help="Validate all pipes in all libraries"),
     ] = False,
+    graph: Annotated[
+        bool,
+        typer.Option("--graph", "-g", help="On successful bundle validation, save graph HTML files and include their paths in the JSON output"),
+    ] = False,
+    graph_format: Annotated[
+        GraphFormat,
+        typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
+    ] = GraphFormat.REACTFLOW,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
@@ -188,12 +305,16 @@ def validate_cmd(
     Examples:
         pipelex-agent validate my_pipe
         pipelex-agent validate my_bundle.mthds
+        pipelex-agent validate my_bundle.mthds --graph
+        pipelex-agent validate my_bundle.mthds --graph --format both
         pipelex-agent validate --all -L ./my_pipes
     """
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
     # Handle --all flag
     if validate_all:
+        if graph:
+            agent_error("--graph requires a bundle target; it cannot be used with --all", "ArgumentError")
         if target or pipe or bundle:
             agent_error("--all cannot be used with a target, --pipe, or --bundle", "ArgumentError")
 
@@ -265,6 +386,13 @@ def validate_cmd(
     if not pipe_code and not bundle_path:
         agent_error("No pipe code or bundle file specified", "ArgumentError")
 
+    # --graph requires a bundle
+    if graph and not bundle_path:
+        agent_error("--graph requires a bundle target; it cannot be used with a standalone pipe", "ArgumentError")
+
+    # Convert library_dirs to list[str] for graph helper (execute_pipeline expects list[str])
+    library_dir_strings = [str(lib_dir) for lib_dir in library_dirs] if library_dirs else None
+
     make_pipelex_for_agent_cli()
 
     try:
@@ -277,6 +405,29 @@ def validate_cmd(
         else:
             # Validate a standalone pipe
             result = asyncio.run(_validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))  # type: ignore[arg-type]
+
+        # Generate graph if requested and validation succeeded with a bundle
+        if graph and bundle_path:
+            try:
+                graph_result = asyncio.run(
+                    _generate_graph_for_bundle(
+                        bundle_path=bundle_path,
+                        graph_format=graph_format,
+                        library_dirs=library_dir_strings,
+                    )
+                )
+                result.update(graph_result)
+            except PipelineExecutionError as exc:
+                graph_extra: dict[str, Any] = {
+                    "pipe_code": exc.pipe_code,
+                    "pipe_stack": exc.pipe_stack,
+                }
+                if exc.__cause__:
+                    graph_extra["cause_type"] = type(exc.__cause__).__name__
+                    graph_extra["cause_message"] = str(exc.__cause__)
+                agent_error(f"Graph generation failed: {exc.message}", "PipelineExecutionError", cause=exc, **graph_extra)
+            except (PipelexInterpreterError, MthdsDecodeError) as exc:
+                agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
 
         agent_success(result)
 
