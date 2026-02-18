@@ -1,5 +1,6 @@
 domain      = "pipe_img_gen_e2e"
 description = "E2E tests for PipeImgGen operator including text-to-image and img2img"
+main_pipe   = "generate_image_basic_e2e"
 
 # Text-to-Image Pipes
 [pipe.generate_image_basic_e2e]

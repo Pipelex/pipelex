@@ -203,13 +203,24 @@ async def _generate_graph_for_bundle(
         mock_inputs=True,
     )
 
+    # Ensure the bundle's parent directory is included in library_dirs
+    # so execute_pipeline can resolve sibling dependencies
+    bundle_parent_dir = str(bundle_path.parent.resolve())
+    effective_library_dirs: list[str]
+    if library_dirs:
+        effective_library_dirs = list(library_dirs)
+        if bundle_parent_dir not in effective_library_dirs:
+            effective_library_dirs.append(bundle_parent_dir)
+    else:
+        effective_library_dirs = [bundle_parent_dir]
+
     pipe_output = await execute_pipeline(
         pipe_code=pipe_code,
         mthds_content=mthds_content,
         bundle_uri=str(bundle_path),
         pipe_run_mode=PipeRunMode.DRY,
         execution_config=execution_config,
-        library_dirs=library_dirs,
+        library_dirs=effective_library_dirs,
     )
 
     if not pipe_output.graph_spec:
@@ -427,6 +438,10 @@ def validate_cmd(
                     graph_extra["cause_message"] = str(exc.__cause__)
                 agent_error(f"Graph generation failed: {exc.message}", "PipelineExecutionError", cause=exc, **graph_extra)
             except (PipelexInterpreterError, MthdsDecodeError) as exc:
+                agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
+            except typer.Exit:
+                raise
+            except Exception as exc:
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
 
         agent_success(result)

@@ -159,6 +159,14 @@ def validate_command(
         bool,
         typer.Option("--all", "-a", help="Validate all pipes in all libraries"),
     ] = False,
+    graph: Annotated[
+        bool,
+        typer.Option("--graph", "-g", help="Generate execution graph HTML on successful bundle validation"),
+    ] = False,
+    graph_format: Annotated[
+        GraphFormat,
+        typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
+    ] = GraphFormat.REACTFLOW,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
@@ -170,6 +178,8 @@ def validate_command(
         pipe=pipe,
         bundle=bundle,
         validate_all=validate_all,
+        graph=graph,
+        graph_format=graph_format,
         library_dir=library_dir,
     )
 
