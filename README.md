@@ -12,7 +12,7 @@
   <br/>
 
   <h2 align="center">The Reference Runtime for Executing Methods</h2>
-  <p align="center">Pipelex is the reference Python runtime for executing methods, based on the open standard <a href="https://mthds.ai">mthds</a>.<br/>
+  <p align="center">Pipelex is the reference Python runtime for executing methods, based on the <a href="https://mthds.ai">MTHDS</a> open standard.<br/>
 Write business logic, not API calls.</p>
 
   <div>
@@ -325,7 +325,7 @@ asyncio.run(run_pipeline())
 
 ## 💡 What is Pipelex?
 
-Pipelex is the reference Python runtime for executing **repeatable AI methods**, based on the open standard [mthds](https://mthds.ai). Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+Pipelex is the reference Python runtime for executing **repeatable AI methods**, based on the [MTHDS](https://mthds.ai) open standard. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
 
 Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The mthds language (`.mthds` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
 
