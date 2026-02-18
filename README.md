@@ -11,8 +11,8 @@
   <br/>
   <br/>
 
-  <h2 align="center">AI Methods That Agents Build & Run</h2>
-  <p align="center">Pipelex is developing the open standard for repeatable AI methods.<br/>
+  <h2 align="center">The Reference Runtime for Executing Methods</h2>
+  <p align="center">Pipelex is the reference Python runtime for executing methods, based on the open standard <a href="https://mthds.ai">mthds</a>.<br/>
 Write business logic, not API calls.</p>
 
   <div>
@@ -325,9 +325,9 @@ asyncio.run(run_pipeline())
 
 ## 💡 What is Pipelex?
 
-Pipelex is an open-source language that enables you to build and run **repeatable AI methods**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+Pipelex is the reference Python runtime for executing **repeatable AI methods**, based on the open standard [mthds](https://mthds.ai). Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
 
-Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.mthds` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
+Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The mthds language (`.mthds` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
 
 ## 📖 Next Steps
 
@@ -339,7 +339,12 @@ Each pipe processes information using **Concepts** (typing with meaning) to ensu
 
 ## 🔧 IDE Extension
 
-We **highly** recommend installing our extension for `.mthds` files into your IDE. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too. If you're using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
+We **highly** recommend installing our extension for `.mthds` syntax highlighting in your IDE:
+
+- **VS Code**: Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pipelex.pipelex)
+- **Cursor, Windsurf, and other VS Code forks**: Install from the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex), or search for "Pipelex" directly in your extensions tab
+
+Running `pipelex init` will also offer to install the extension automatically if it detects your IDE.
 
 ## 📚 Examples & Cookbook
 
@@ -409,4 +414,4 @@ This project is licensed under the [MIT license](LICENSE). Runtime dependencies 
 
 "Pipelex" is a trademark of Evotis S.A.S.
 
-© 2025 Evotis S.A.S.
+© 2025-2026 Evotis S.A.S.

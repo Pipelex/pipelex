@@ -1,7 +1,7 @@
 [project]
 name = "pipelex"
 version = "0.18.0b3"
-description = "Light client for executing methods"
+description = "The reference runtime (python) for executing methods, based on the open standard mthds (https://mthds.ai)"
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
 license = "MIT"
@@ -136,7 +136,7 @@ deprecateTypingAliases = false
 disableBytesTypePromotions = true
 enableExperimentalFeatures = false
 enableTypeIgnoreComments = true
-extraPaths = ["./tests", "../mthds-python"]
+extraPaths = ["./tests"]
 reportAbstractUsage = "error"
 reportArgumentType = "error"
 reportAssertAlwaysTrue = "error"
