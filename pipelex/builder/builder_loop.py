@@ -70,8 +70,26 @@ class BuilderLoop:
             save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=str(working_memory_path), create_directory=True)
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+        if pipelex_bundle_spec.pipe:
+            log.debug(f"Builder produced spec with pipe keys: {list(pipelex_bundle_spec.pipe.keys())}")
+            log.debug(f"Builder produced spec with main_pipe: '{pipelex_bundle_spec.main_pipe}'")
         pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
         pipelex_bundle_spec = self._strip_namespace_from_pipe_codes(pipelex_bundle_spec=pipelex_bundle_spec)
+
+        if pipelex_bundle_spec.pipe:
+            for pipe_key, pipe_spec in pipelex_bundle_spec.pipe.items():
+                pipe_detail = f"key='{pipe_key}', pipe_code='{pipe_spec.pipe_code}', type={pipe_spec.type}"
+                if isinstance(pipe_spec, PipeBatchSpec):
+                    pipe_detail += f", branch_pipe_code='{pipe_spec.branch_pipe_code}'"
+                elif isinstance(pipe_spec, PipeSequenceSpec):
+                    step_codes = [step.pipe_code for step in pipe_spec.steps]
+                    pipe_detail += f", step_pipe_codes={step_codes}"
+                elif isinstance(pipe_spec, PipeParallelSpec):
+                    branch_codes = [branch.pipe_code for branch in pipe_spec.branches]
+                    pipe_detail += f", branch_pipe_codes={branch_codes}"
+                elif isinstance(pipe_spec, PipeConditionSpec):
+                    pipe_detail += f", outcome_values={list(pipe_spec.outcomes.values())}"
+                log.debug(f"  Pipe spec: {pipe_detail}")
 
         if is_save_first_iteration_enabled:
             try:
@@ -87,10 +105,14 @@ class BuilderLoop:
 
         max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts
         for attempt in range(1, max_attempts + 1):
+            log.debug(f"Fix loop attempt {attempt}/{max_attempts}")
+
             # Phase 1: Create blueprint from spec
+            log.debug("Phase 1: creating blueprint from spec")
             try:
                 bundle_blueprint = pipelex_bundle_spec.to_blueprint()
             except PipelexBundleSpecBlueprintError as exc:
+                log.debug("Phase 1: blueprint creation failed")
                 if attempt < max_attempts:
                     log.info(f"⚠️ Blueprint creation failed on attempt {attempt}/{max_attempts}, fixing undeclared concepts...")
                     pipelex_bundle_spec = await self._fix_undeclared_concept_references(pipelex_bundle_spec=pipelex_bundle_spec)
@@ -100,9 +122,13 @@ class BuilderLoop:
                 msg = f"Failed to create bundle blueprint after {max_attempts} attempts: {exc}"
                 raise PipeBuilderError(msg) from exc
 
+            log.debug("Phase 1: blueprint created successfully")
+
             # Phase 2: Validate the bundle
+            log.debug("Phase 2: validating bundle")
             try:
                 await validate_bundle(blueprints=[bundle_blueprint])
+                log.debug("Phase 2: validation passed")
                 if attempt > 1:
                     log.info(f"✅ Bundle validation passed after fixes (attempt {attempt}/{max_attempts})")
                 break  # Validation passed
@@ -115,6 +141,10 @@ class BuilderLoop:
                         is_save_second_iteration_enabled=is_save_second_iteration_enabled,
                         output_dir=output_dir,
                     )
+                    if pipelex_bundle_spec.pipe:
+                        log.debug(f"After Phase 2 fix: pipe keys={list(pipelex_bundle_spec.pipe.keys())}")
+                    pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
+                    pipelex_bundle_spec = self._strip_namespace_from_pipe_codes(pipelex_bundle_spec=pipelex_bundle_spec)
                 else:
                     log.error(f"❌ Validation failed after {max_attempts} attempts, raising error")
                     raise
@@ -589,26 +619,41 @@ class BuilderLoop:
         pipelex_bundle_spec.pipe = new_pipes
         defined_pipe_codes = set(new_pipes.keys())
 
-        # Pass 2: Strip internal pipe references only when the stripped code
-        # matches a pipe defined in this bundle
+        # Pass 2: Strip internal pipe references when the stripped code matches
+        # a pipe defined in this bundle OR the dotted prefix matches the bundle's
+        # own domain (LLM hallucinating the namespace). Only preserve dotted codes
+        # whose prefix is a genuinely different domain.
+        bundle_domain = pipelex_bundle_spec.domain
+
+        def _should_strip_ref(ref_code: str, stripped_code: str) -> bool:
+            """Decide whether a dotted pipe reference should be stripped.
+
+            Strip if the bare code exists in the bundle's defined pipes, or if
+            the dotted prefix matches the bundle's own domain.
+            """
+            if stripped_code == ref_code:
+                return False
+            ref_domain = get_root_from_dotted_path(ref_code)
+            return stripped_code in defined_pipe_codes or ref_domain == bundle_domain
+
         for pipe_spec in pipelex_bundle_spec.pipe.values():
             if isinstance(pipe_spec, PipeBatchSpec):
                 stripped_branch = strip(pipe_spec.branch_pipe_code)
-                if stripped_branch != pipe_spec.branch_pipe_code and stripped_branch in defined_pipe_codes:
+                if _should_strip_ref(pipe_spec.branch_pipe_code, stripped_branch):
                     log.info(f"Stripped namespace from branch_pipe_code: '{pipe_spec.branch_pipe_code}' → '{stripped_branch}'")
                     pipe_spec.branch_pipe_code = stripped_branch
 
             elif isinstance(pipe_spec, PipeSequenceSpec):
                 for step in pipe_spec.steps:
                     stripped_step = strip(step.pipe_code)
-                    if stripped_step != step.pipe_code and stripped_step in defined_pipe_codes:
+                    if _should_strip_ref(step.pipe_code, stripped_step):
                         log.info(f"Stripped namespace from sequence step pipe_code: '{step.pipe_code}' → '{stripped_step}'")
                         step.pipe_code = stripped_step
 
             elif isinstance(pipe_spec, PipeParallelSpec):
                 for branch in pipe_spec.branches:
                     stripped_branch = strip(branch.pipe_code)
-                    if stripped_branch != branch.pipe_code and stripped_branch in defined_pipe_codes:
+                    if _should_strip_ref(branch.pipe_code, stripped_branch):
                         log.info(f"Stripped namespace from parallel branch pipe_code: '{branch.pipe_code}' → '{stripped_branch}'")
                         branch.pipe_code = stripped_branch
 
@@ -619,7 +664,7 @@ class BuilderLoop:
                         new_outcomes[condition_key] = outcome_value
                     else:
                         stripped_outcome = strip(outcome_value)
-                        if stripped_outcome != outcome_value and stripped_outcome in defined_pipe_codes:
+                        if _should_strip_ref(outcome_value, stripped_outcome):
                             log.info(f"Stripped namespace from condition outcome: '{outcome_value}' → '{stripped_outcome}'")
                             new_outcomes[condition_key] = stripped_outcome
                         else:
@@ -628,10 +673,11 @@ class BuilderLoop:
 
                 if pipe_spec.default_outcome not in special_outcome_values:
                     stripped_default = strip(pipe_spec.default_outcome)
-                    if stripped_default != pipe_spec.default_outcome and stripped_default in defined_pipe_codes:
+                    if _should_strip_ref(pipe_spec.default_outcome, stripped_default):
                         log.info(f"Stripped namespace from default_outcome: '{pipe_spec.default_outcome}' → '{stripped_default}'")
                         pipe_spec.default_outcome = stripped_default
 
+        log.debug(f"After namespace stripping: main_pipe='{pipelex_bundle_spec.main_pipe}', pipe keys={list(pipelex_bundle_spec.pipe.keys())}")
         return pipelex_bundle_spec
 
     def _fix_bundle_validation_error(
@@ -798,10 +844,13 @@ class BuilderLoop:
                             f"🔧 Fixed output concept for PipeCondition '{val_error.pipe_code}': output changed from '{old_output}' → '{new_output}'"
                         )
 
+                case PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX:
+                    log.info(f"⚠️ Invalid pipe code syntax detected for pipe '{val_error.pipe_code}' — will be fixed by namespace stripping")
+                    continue
+
                 case (
                     PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                     | PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE
-                    | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                     | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
                     | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                     | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION

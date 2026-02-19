@@ -124,6 +124,14 @@ class PipeSpec(StructuredContent):
         if normalized_pipe_code != pipe_code:
             log.warning(f"Pipe code '{pipe_code}' contained non-ASCII characters, normalized to '{normalized_pipe_code}'")
 
+        # Strip namespace prefix if present (e.g., "domain.my_pipe" → "my_pipe").
+        # The builder LLM sometimes generates dotted pipe codes; the namespace
+        # comes from the bundle's domain field, not from the pipe code itself.
+        if "." in normalized_pipe_code:
+            bare_pipe_code = normalized_pipe_code.rsplit(".", maxsplit=1)[1]
+            log.warning(f"Pipe code '{normalized_pipe_code}' contains a namespace prefix, stripped to '{bare_pipe_code}'")
+            normalized_pipe_code = bare_pipe_code
+
         if not is_snake_case(normalized_pipe_code):
             msg = f"Invalid pipe code syntax '{normalized_pipe_code}'. Must be in snake_case."
             raise ValueError(msg)

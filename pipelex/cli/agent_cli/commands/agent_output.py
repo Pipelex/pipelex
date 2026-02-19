@@ -1,6 +1,7 @@
 """Helpers for structured JSON output in agent CLI commands."""
 
 import sys
+import traceback
 from typing import Any, NoReturn
 
 import typer
@@ -21,6 +22,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "PipeValidationError": "Check pipe inputs, outputs, and concept references for consistency",
     # Execution errors
     "PipelineExecutionError": "Check 'pipe_stack' to identify which pipe failed and 'cause_type' for the root cause",
+    "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
     "BuildPipeError": "Check 'failure_memory_path' for builder loop failure diagnostics if present",
     # File/input errors
     "FileNotFoundError": "Verify the file path exists and is accessible from the current working directory",
@@ -86,8 +88,39 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "RemoteConfigValidationError": "config",
     # runtime = execution failure
     "PipelineExecutionError": "runtime",
+    "PipeExecutionError": "runtime",
     "BuildPipeError": "runtime",
 }
+
+
+def _build_error_source(exc: BaseException) -> list[str]:
+    """Build a compact source trace from an exception's cause chain.
+
+    Each entry shows where the exception was raised:
+    ``"ExceptionType @ module:line (in function)"``.
+
+    Args:
+        exc: The exception (walks ``__cause__`` chain).
+
+    Returns:
+        List of source location strings, outermost first.
+    """
+    sources: list[str] = []
+    current: BaseException | None = exc
+    while current is not None:
+        tbe = traceback.extract_tb(current.__traceback__)
+        if tbe:
+            frame = tbe[-1]  # default fallback
+            for candidate in reversed(tbe):
+                if "/pipelex/" in candidate.filename and "/.venv/" not in candidate.filename:
+                    frame = candidate
+                    break
+            location = f"{type(current).__name__} @ {frame.filename}:{frame.lineno} (in {frame.name})"
+            sources.append(location)
+        else:
+            sources.append(f"{type(current).__name__} (no traceback)")
+        current = current.__cause__
+    return sources
 
 
 def agent_error(message: str, error_type: str, cause: BaseException | None = None, **extra: Any) -> NoReturn:
@@ -113,6 +146,8 @@ def agent_error(message: str, error_type: str, cause: BaseException | None = Non
     domain = AGENT_ERROR_DOMAINS.get(error_type)
     if domain:
         error_json["error_domain"] = domain
+    if cause is not None:
+        error_json["error_source"] = _build_error_source(cause)
     error_json.update(extra)
     print(clean_json_dumps(error_json, indent=2), file=sys.stderr)
     raise typer.Exit(1) from cause

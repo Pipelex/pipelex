@@ -75,5 +75,5 @@ def make_pipelex_for_agent_cli(
     # Suppress Rich pretty-printing and INFO/DEV/DEBUG log noise so that agent
     # commands only emit structured JSON.  Warnings and errors still reach stderr.
     PrettyPrinter.mode = PrettyPrintMode.SILENT
-    log.set_level(log_level)
+    log.set_level_for_package("pipelex", log_level)
     return pipelex_instance

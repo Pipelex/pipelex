@@ -14,6 +14,7 @@ from pipelex.config import get_config
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
 from pipelex.hub import get_required_pipe
 from pipelex.language.mthds_factory import MthdsFactory
+from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import (
     ensure_directory_for_file_path,
@@ -108,11 +109,11 @@ async def build_pipe_core(
             is_save_second_iteration_enabled=False,
             is_save_working_memory_enabled=False,
         )
-    except PipeBuilderError as exc:
+    except (PipeBuilderError, PipeExecutionError) as exc:
         msg = f"Builder loop: Failed to execute pipeline: {exc}."
         failure_memory_path: Path | None = None
 
-        if exc.working_memory:
+        if isinstance(exc, PipeBuilderError) and exc.working_memory:
             failure_memory_path = get_incremental_file_path(
                 base_path=output_dir or builder_config.default_output_dir,
                 base_name="failure_memory",
