@@ -6,11 +6,17 @@
             <img src="{{ logo_light }}" alt="Pipelex" class="header-logo light-logo">
             <span class="header-title">{{ title | e }}</span>
         </div>
-        <button id="theme-toggle" class="theme-toggle" title="Toggle theme (Dark/Light/System)">
+        <div class="header-actions">
+            <button id="direction-toggle" class="header-btn" title="Toggle layout direction (Left-to-Right / Top-Down)">
+                <span class="direction-icon lr-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></span>
+                <span class="direction-icon tb-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
+            </button>
+            <button id="theme-toggle" class="header-btn theme-toggle" title="Toggle theme (Dark/Light/System)">
             <span class="theme-icon dark-icon">🌙</span>
             <span class="theme-icon light-icon">☀️</span>
             <span class="theme-icon system-icon">💻</span>
         </button>
+        </div>
     </header>
     <div id="root"></div>
 </div>
