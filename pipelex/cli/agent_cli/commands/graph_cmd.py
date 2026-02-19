@@ -23,6 +23,7 @@ from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
 def graph_cmd(
+    ctx: typer.Context,
     target: Annotated[
         str,
         typer.Argument(help="Path to a .mthds bundle file"),
@@ -78,7 +79,7 @@ def graph_cmd(
         agent_error(f"Failed to parse bundle '{target}': {exc}", type(exc).__name__, cause=exc)
 
     # Initialize Pipelex
-    make_pipelex_for_agent_cli(library_dirs=library_dir)
+    make_pipelex_for_agent_cli(library_dirs=library_dir, log_level=ctx.obj["log_level"])
 
     try:
         # Configure execution for dry-run with graph generation

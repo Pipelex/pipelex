@@ -93,6 +93,7 @@ class PrettyRenderable(ABC):
 class PrettyPrintMode(StrEnum):
     RICH = "rich"
     POOR = "poor"
+    SILENT = "silent"
 
 
 def pretty_print(
@@ -186,6 +187,8 @@ class PrettyPrinter:
                 )
             case PrettyPrintMode.POOR:
                 cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle, inner_title=inner_title, console_width=console_width)
+            case PrettyPrintMode.SILENT:
+                return
 
     @classmethod
     def pretty_print_using_rich(

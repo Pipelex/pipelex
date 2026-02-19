@@ -28,6 +28,7 @@ AGENT_OUTPUT_NAME = "pipeline"
 
 
 def build_cmd(
+    ctx: typer.Context,
     prompt: Annotated[
         str,
         typer.Argument(help="Prompt describing what the pipeline should do"),
@@ -44,7 +45,7 @@ def build_cmd(
 
     Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
     """
-    make_pipelex_for_agent_cli()
+    make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
 
     async def run_build():
         return await build_pipe_core(

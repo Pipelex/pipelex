@@ -213,6 +213,7 @@ def _build_talent_mappings_for_category(
 
 
 def agent_models_cmd(
+    ctx: typer.Context,
     model_type: Annotated[
         list[ModelCategory] | None,
         typer.Option("--type", "-t", help="Filter by model category (repeatable): llm, extract, img_gen"),
@@ -228,7 +229,7 @@ def agent_models_cmd(
     that an agent needs to reference when building pipelines.
     """
     try:
-        make_pipelex_for_agent_cli()
+        make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
 
         model_deck = get_model_deck()
         builder_config = get_config().pipelex.builder_config

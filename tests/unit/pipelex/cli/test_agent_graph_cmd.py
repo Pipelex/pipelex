@@ -5,7 +5,7 @@ from __future__ import annotations
 import inspect
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 import typer
@@ -58,6 +58,7 @@ class TestGraphCmd:
 
     def test_valid_mthds_file_produces_success_json(
         self,
+        agent_ctx: Any,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
@@ -69,7 +70,7 @@ class TestGraphCmd:
         self._mock_blueprint(mocker)
         self._mock_execution(mocker)
 
-        graph_cmd(target=str(mthds_file))
+        graph_cmd(ctx=agent_ctx, target=str(mthds_file))
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
@@ -79,6 +80,7 @@ class TestGraphCmd:
 
     def test_valid_mthds_file_calls_asyncio_run_twice(
         self,
+        agent_ctx: Any,
         mocker: MockerFixture,
         tmp_path: Path,
     ) -> None:
@@ -104,12 +106,13 @@ class TestGraphCmd:
             side_effect=[mock_pipe_output, saved_files],
         )
 
-        graph_cmd(target=str(mthds_file))
+        graph_cmd(ctx=agent_ctx, target=str(mthds_file))
 
         assert mock_asyncio_run.call_count == 2
 
     def test_non_mthds_file_produces_error(
         self,
+        agent_ctx: Any,
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
     ) -> None:
@@ -118,7 +121,7 @@ class TestGraphCmd:
         json_file.write_text("{}")
 
         with pytest.raises(typer.Exit) as exc_info:
-            graph_cmd(target=str(json_file))
+            graph_cmd(ctx=agent_ctx, target=str(json_file))
 
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
@@ -128,6 +131,7 @@ class TestGraphCmd:
 
     def test_file_not_found_produces_error(
         self,
+        agent_ctx: Any,
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
     ) -> None:
@@ -135,7 +139,7 @@ class TestGraphCmd:
         missing = tmp_path / "nonexistent.mthds"
 
         with pytest.raises(typer.Exit) as exc_info:
-            graph_cmd(target=str(missing))
+            graph_cmd(ctx=agent_ctx, target=str(missing))
 
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
@@ -144,6 +148,7 @@ class TestGraphCmd:
 
     def test_bundle_without_main_pipe_produces_error(
         self,
+        agent_ctx: Any,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
@@ -160,7 +165,7 @@ class TestGraphCmd:
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            graph_cmd(target=str(mthds_file))
+            graph_cmd(ctx=agent_ctx, target=str(mthds_file))
 
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
@@ -170,6 +175,7 @@ class TestGraphCmd:
 
     def test_no_graph_spec_produces_error(
         self,
+        agent_ctx: Any,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
@@ -192,7 +198,7 @@ class TestGraphCmd:
         mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", return_value=mock_pipe_output)
 
         with pytest.raises(typer.Exit) as exc_info:
-            graph_cmd(target=str(mthds_file))
+            graph_cmd(ctx=agent_ctx, target=str(mthds_file))
 
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
@@ -209,6 +215,7 @@ class TestGraphCmd:
     )
     def test_format_option_produces_success(
         self,
+        agent_ctx: Any,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
@@ -221,7 +228,7 @@ class TestGraphCmd:
         self._mock_blueprint(mocker)
         self._mock_execution(mocker)
 
-        graph_cmd(target=str(mthds_file), graph_format=format_option)
+        graph_cmd(ctx=agent_ctx, target=str(mthds_file), graph_format=format_option)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
@@ -234,6 +241,7 @@ class TestGraphCmd:
 
     def test_direction_forwarded_to_render_graph_from_spec(
         self,
+        agent_ctx: Any,
         mocker: MockerFixture,
         tmp_path: Path,
     ) -> None:
@@ -260,7 +268,7 @@ class TestGraphCmd:
             side_effect=[mock_pipe_output, saved_files],
         )
 
-        graph_cmd(target=str(mthds_file), direction=FlowchartDirection.LEFT_TO_RIGHT)
+        graph_cmd(ctx=agent_ctx, target=str(mthds_file), direction=FlowchartDirection.LEFT_TO_RIGHT)
 
         # Verify direction was forwarded to render_graph_from_spec
         mock_render.assert_called_once()
@@ -269,6 +277,7 @@ class TestGraphCmd:
 
     def test_mthds_parse_error_produces_error(
         self,
+        agent_ctx: Any,
         mocker: MockerFixture,
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
@@ -283,7 +292,7 @@ class TestGraphCmd:
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            graph_cmd(target=str(mthds_file))
+            graph_cmd(ctx=agent_ctx, target=str(mthds_file))
 
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)

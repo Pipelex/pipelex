@@ -263,6 +263,7 @@ async def _generate_graph_for_bundle(
 
 
 def validate_cmd(
+    ctx: typer.Context,
     target: Annotated[
         str | None,
         typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
@@ -309,7 +310,6 @@ def validate_cmd(
         pipelex-agent validate --all -L ./my_pipes
     """
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-
     # Handle --all flag
     if validate_all:
         if graph:
@@ -317,7 +317,7 @@ def validate_cmd(
         if target or pipe or bundle:
             agent_error("--all cannot be used with a target, --pipe, or --bundle", "ArgumentError")
 
-        make_pipelex_for_agent_cli(library_dirs=library_dirs)
+        make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"])
 
         try:
             result = asyncio.run(_validate_all_core(library_dirs=library_dirs))
@@ -392,7 +392,7 @@ def validate_cmd(
     # Convert library_dirs to list[str] for graph helper (execute_pipeline expects list[str])
     library_dir_strings = [str(lib_dir) for lib_dir in library_dirs] if library_dirs else None
 
-    make_pipelex_for_agent_cli()
+    make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
 
     try:
         if bundle_path and pipe_code:

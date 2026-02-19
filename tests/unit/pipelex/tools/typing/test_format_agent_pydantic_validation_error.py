@@ -145,7 +145,7 @@ class TestFormatPydanticValidationErrorForAgent:
 
         message, details = format_pydantic_validation_error_for_agent(exc_info.value)
 
-        # Should have at least 2 errors: missing 'name', missing 'age', extra 'unknown_field'
+        # Should have at least 3 errors: missing 'name', missing 'age', extra 'unknown_field'
         assert details["error_count"] >= 3
         assert len(details["errors"]) == details["error_count"]
         assert "missing_fields" in details["categories"]

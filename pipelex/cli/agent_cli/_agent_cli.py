@@ -63,7 +63,7 @@ def version_callback(value: bool) -> None:
 @app.callback(invoke_without_command=True)
 def app_callback(
     ctx: typer.Context,
-    version: Annotated[
+    version: Annotated[  # noqa: ARG001
         bool,
         typer.Option(
             "--version",
@@ -73,9 +73,16 @@ def app_callback(
             is_eager=True,
         ),
     ] = False,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log verbosity level (debug, verbose, info, warning, error, critical)."),
+    ] = "warning",
 ) -> None:
     """Agent CLI callback - no logo, minimal output."""
-    # No logo, no banner - agent CLI is silent by default
+    from pipelex.tools.log.log_levels import LogLevel  # noqa: PLC0415
+
+    ctx.ensure_object(dict)
+    ctx.obj["log_level"] = LogLevel(log_level.upper())
 
 
 app.command(name="build", help="Build a pipeline from a prompt")(build_cmd)
