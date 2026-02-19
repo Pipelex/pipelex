@@ -11,7 +11,7 @@ from pydantic import ValidationError
 
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
 
 
 def _concept_spec_to_toml(concept_spec: ConceptSpec) -> str:
@@ -192,7 +192,8 @@ def concept_cmd(
         )
 
     except ValidationError as exc:
-        agent_error(format_pydantic_validation_error(exc), "ValidationError", cause=exc)
+        message, details = format_pydantic_validation_error_for_agent(exc)
+        agent_error(message, "ValidationError", cause=exc, validation_details=details)
 
     except Exception as exc:
         agent_error(str(exc), type(exc).__name__, cause=exc)

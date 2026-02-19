@@ -26,7 +26,7 @@ from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.core.pipes.pipe_blueprint import PipeType
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
 
 # Static talent-to-model preset mappings (from pipelex.toml defaults)
 LLM_TALENT_TO_MODEL: dict[str, str] = {
@@ -297,11 +297,12 @@ def pipe_cmd(
             }
         )
 
+    except ValidationError as exc:
+        message, details = format_pydantic_validation_error_for_agent(exc)
+        agent_error(message, "ValidationError", cause=exc, validation_details=details)
+
     except ValueError as exc:
         agent_error(str(exc), "ValueError", cause=exc)
-
-    except ValidationError as exc:
-        agent_error(format_pydantic_validation_error(exc), "ValidationError", cause=exc)
 
     except Exception as exc:
         agent_error(str(exc), type(exc).__name__, cause=exc)
