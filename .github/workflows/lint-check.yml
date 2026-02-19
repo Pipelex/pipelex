@@ -5,7 +5,7 @@ on:
 
 jobs:
 # --------------------------------------------------------------------------
-# 1.  Parallel lint jobs — all on Python 3.11 (lint tools hard-target 3.11)
+# 1.  Ruff — single job (target-version = min supported, set in pyproject.toml)
 # --------------------------------------------------------------------------
   lint-ruff:
     name: Lint (ruff)
@@ -25,9 +25,16 @@ jobs:
       - name: Run ruff lint merge check
         run: make merge-check-ruff-lint
 
-  lint-pyright:
-    name: Lint (pyright)
+# --------------------------------------------------------------------------
+# 2.  Type checking — matrix over supported Python versions
+# --------------------------------------------------------------------------
+  lint-typecheck:
+    name: Typecheck (py${{ matrix.python-version }})
     runs-on: [aca-runner-lint]
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
 
@@ -37,24 +44,15 @@ jobs:
       - name: Install dependencies
         run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
 
-      - name: Run pyright merge check
-        run: make merge-check-pyright
+      - name: Run pyright merge check (Python ${{ matrix.python-version }})
+        run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make merge-check-pyright
 
-  lint-mypy:
-    name: Lint (mypy)
-    runs-on: [aca-runner-lint]
-    env:
-      VIRTUAL_ENV: ${{ github.workspace }}/.venv
+      - name: Run mypy merge check (Python ${{ matrix.python-version }})
+        run: LINT_PYTHON_VERSION=${{ matrix.python-version }} make merge-check-mypy
 
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install dependencies
-        run: PYTHON_VERSION=3.11 TEST_PROFILE=ci make install
-
-      - name: Run mypy merge check
-        run: make merge-check-mypy
-
+# --------------------------------------------------------------------------
+# 3.  Config sync — single job, version-independent
+# --------------------------------------------------------------------------
   lint-config-sync:
     name: Lint (config-sync)
     runs-on: [aca-runner-lint]
@@ -71,20 +69,19 @@ jobs:
         run: make check-config-sync
 
 # --------------------------------------------------------------------------
-# 2.  Aggregator job — the *single* required status check
+# 4.  Aggregator job — the *single* required status check
 # --------------------------------------------------------------------------
   lint-all:
     name: Lint (all)
     runs-on: ubuntu-latest
-    needs: [lint-ruff, lint-pyright, lint-mypy, lint-config-sync]
+    needs: [lint-ruff, lint-typecheck, lint-config-sync]
     if: always()
 
     steps:
       - name: Fail if any lint job failed
         run: |
           if [ "${{ needs.lint-ruff.result }}" != "success" ] || \
-             [ "${{ needs.lint-pyright.result }}" != "success" ] || \
-             [ "${{ needs.lint-mypy.result }}" != "success" ] || \
+             [ "${{ needs.lint-typecheck.result }}" != "success" ] || \
              [ "${{ needs.lint-config-sync.result }}" != "success" ]; then
             echo "::error::At least one lint job failed."
             exit 1
