@@ -3,6 +3,10 @@ name: Tests check
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
 # --------------------------------------------------------------------------
 # 1.  Test matrix — one job per supported Python version

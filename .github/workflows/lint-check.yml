@@ -3,6 +3,10 @@ name: Lint check
 on:
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref }}
+  cancel-in-progress: true
+
 jobs:
 # --------------------------------------------------------------------------
 # 1.  Ruff — single job (target-version = min supported, set in pyproject.toml)
