@@ -11,14 +11,9 @@ class ConcretePipeBlueprint(PipeBlueprint):
 class TestPipeBlueprintValidation:
     def test_validate_pipe_type_correct(self):
         for pipe_type_enum in PipeType:
-            match pipe_type_enum:
-                case PipeType.PIPE_FUNC | PipeType.PIPE_IMG_GEN | PipeType.PIPE_COMPOSE | PipeType.PIPE_LLM | PipeType.PIPE_EXTRACT:
-                    category = PipeCategory.PIPE_OPERATOR
-                case PipeType.PIPE_BATCH | PipeType.PIPE_CONDITION | PipeType.PIPE_PARALLEL | PipeType.PIPE_SEQUENCE:
-                    category = PipeCategory.PIPE_CONTROLLER
             blueprint = ConcretePipeBlueprint(
                 type=pipe_type_enum,
-                pipe_category=category,
+                pipe_category=pipe_type_enum.category,
                 description="lorem ipsum",
                 output="Text",
             )
