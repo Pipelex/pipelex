@@ -63,24 +63,17 @@ class TestConfigResolution:
 
         assert result == project_dir.resolve()
 
-    def test_find_project_root_no_markers(self, tmp_path: Path) -> None:
-        """A directory tree with no markers returns None."""
+    def test_find_project_root_no_markers(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """A directory tree with no markers returns None when home is reached."""
         deep_dir = tmp_path / "no_project" / "a" / "b" / "c"
         deep_dir.mkdir(parents=True)
 
+        # Mock home to be tmp_path so the walk stops there instead of finding real markers
+        mocker.patch.object(Path, "home", return_value=tmp_path)
+
         result = ConfigLoader.find_project_root(deep_dir)
 
-        # Should walk all the way up to filesystem root and return None
-        # (unless the real filesystem has markers above tmp_path, which it does)
-        # So we test indirectly: if the deep_dir itself has no marker ancestors under tmp_path,
-        # the function will eventually find real system markers. We test the negative case more carefully.
-        # Instead, test with a mocked scenario.
-        assert result is None or result.resolve() not in {
-            deep_dir.resolve(),
-            (tmp_path / "no_project" / "a" / "b").resolve(),
-            (tmp_path / "no_project" / "a").resolve(),
-            (tmp_path / "no_project").resolve(),
-        }
+        assert result is None
 
     def test_find_project_root_stops_at_nearest_marker(self, tmp_path: Path) -> None:
         """When multiple markers exist in the tree, the nearest one wins."""

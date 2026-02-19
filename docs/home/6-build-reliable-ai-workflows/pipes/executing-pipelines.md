@@ -32,7 +32,7 @@ Pipelex.make()
 
 # Run the bundle's main_pipe
 runner = PipelexRunner(
-    bundle_uri="path/to/my_bundle.plx",
+    bundle_uri="path/to/my_bundle.mthds",
 )
 response = await runner.execute_pipeline(
     inputs={
@@ -46,7 +46,7 @@ pipe_output = response.pipe_output
 
 # Or run a specific pipe from the bundle
 runner = PipelexRunner(
-    bundle_uri="path/to/my_bundle.plx",
+    bundle_uri="path/to/my_bundle.mthds",
 )
 response = await runner.execute_pipeline(
     pipe_code="my_specific_pipe",

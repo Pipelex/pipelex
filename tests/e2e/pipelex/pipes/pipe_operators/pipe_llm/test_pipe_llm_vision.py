@@ -27,13 +27,13 @@ class TestPipeLLMVision:
             },
         )
 
-        # Get the result as text
-        result_text = pipeline_response.pipe_output.main_stuff_as_str
-
         # Basic assertions
         assert pipeline_response.pipe_output is not None
         assert pipeline_response.pipe_output.working_memory is not None
         assert pipeline_response.pipe_output.main_stuff is not None
+
+        # Get the result as text
+        result_text = pipeline_response.pipe_output.main_stuff_as_str
         assert result_text is not None
         assert len(result_text) > 0
 
