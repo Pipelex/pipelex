@@ -13,8 +13,10 @@ import typer
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat, graph_cmd
+from pipelex.cli.agent_cli.commands.graph_cmd import graph_cmd
 from pipelex.core.interpreter.exceptions import MthdsDecodeError
+from pipelex.graph.graph_rendering import GraphFormat
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 GRAPH_CMD_MODULE = "pipelex.cli.agent_cli.commands.graph_cmd"
 
@@ -32,7 +34,7 @@ class TestGraphCmd:
         )
 
     def _mock_execution(self, mocker: MockerFixture, *, graph_spec_present: bool = True) -> None:
-        """Mock the Pipelex init, execute_pipeline, graph generation, and teardown."""
+        """Mock the Pipelex init, execute_pipeline, render_graph_from_spec, and teardown."""
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
 
@@ -45,19 +47,14 @@ class TestGraphCmd:
         else:
             mock_pipe_output.graph_spec = None
 
-        mock_graph_outputs = mocker.MagicMock()
+        saved_files = {"reactflow_html": Path("graph/reactflow.html")}
 
         # Patch async functions with non-async mocks so no coroutines are created (avoids "coroutine never awaited" warnings)
         mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mocker.MagicMock())
-        mocker.patch(f"{GRAPH_CMD_MODULE}.generate_graph_outputs", new=mocker.MagicMock())
+        mocker.patch(f"{GRAPH_CMD_MODULE}.render_graph_from_spec", new=mocker.MagicMock())
 
-        # asyncio.run is called twice: first for execute_pipeline, then for generate_graph_outputs
-        mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", side_effect=[mock_pipe_output, mock_graph_outputs])
-
-        mocker.patch(
-            f"{GRAPH_CMD_MODULE}.save_graph_outputs_to_dir",
-            return_value={"reactflow_html": Path("graph/reactflow.html")},
-        )
+        # asyncio.run is called twice: first for execute_pipeline, then for render_graph_from_spec
+        mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", side_effect=[mock_pipe_output, saved_files])
 
     def test_valid_mthds_file_produces_success_json(
         self,
@@ -85,7 +82,7 @@ class TestGraphCmd:
         mocker: MockerFixture,
         tmp_path: Path,
     ) -> None:
-        """Valid .mthds file should call asyncio.run twice (execute_pipeline + generate_graph_outputs)."""
+        """Valid .mthds file should call asyncio.run twice (execute_pipeline + render_graph_from_spec)."""
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
@@ -97,18 +94,14 @@ class TestGraphCmd:
 
         # Patch async functions with non-async mocks so no coroutines are created (avoids "coroutine never awaited" warnings)
         mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mocker.MagicMock())
-        mocker.patch(f"{GRAPH_CMD_MODULE}.generate_graph_outputs", new=mocker.MagicMock())
+        mocker.patch(f"{GRAPH_CMD_MODULE}.render_graph_from_spec", new=mocker.MagicMock())
 
         mock_pipe_output = mocker.MagicMock()
         mock_pipe_output.graph_spec = mocker.MagicMock()
+        saved_files = {"reactflow_html": Path("graph/reactflow.html")}
         mock_asyncio_run = mocker.patch(
             f"{GRAPH_CMD_MODULE}.asyncio.run",
-            side_effect=[mock_pipe_output, mocker.MagicMock()],
-        )
-
-        mocker.patch(
-            f"{GRAPH_CMD_MODULE}.save_graph_outputs_to_dir",
-            return_value={"reactflow_html": Path("graph/reactflow.html")},
+            side_effect=[mock_pipe_output, saved_files],
         )
 
         graph_cmd(target=str(mthds_file))
@@ -238,6 +231,41 @@ class TestGraphCmd:
         sig = inspect.signature(graph_cmd)
         default = sig.parameters["graph_format"].default
         assert default == GraphFormat.REACTFLOW
+
+    def test_direction_forwarded_to_render_graph_from_spec(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """Direction option should be forwarded to render_graph_from_spec via asyncio.run."""
+        mthds_file = tmp_path / "bundle.mthds"
+        mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
+
+        self._mock_blueprint(mocker)
+
+        mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
+        mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
+        mocker.patch(f"{GRAPH_CMD_MODULE}.get_config")
+
+        mock_execute = mocker.MagicMock()
+        mock_render = mocker.MagicMock()
+        mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mock_execute)
+        mocker.patch(f"{GRAPH_CMD_MODULE}.render_graph_from_spec", new=mock_render)
+
+        mock_pipe_output = mocker.MagicMock()
+        mock_pipe_output.graph_spec = mocker.MagicMock()
+        saved_files = {"reactflow_html": Path("graph/reactflow.html")}
+        mocker.patch(
+            f"{GRAPH_CMD_MODULE}.asyncio.run",
+            side_effect=[mock_pipe_output, saved_files],
+        )
+
+        graph_cmd(target=str(mthds_file), direction=FlowchartDirection.LEFT_TO_RIGHT)
+
+        # Verify direction was forwarded to render_graph_from_spec
+        mock_render.assert_called_once()
+        _, render_kwargs = mock_render.call_args
+        assert render_kwargs["direction"] == FlowchartDirection.LEFT_TO_RIGHT
 
     def test_mthds_parse_error_produces_error(
         self,

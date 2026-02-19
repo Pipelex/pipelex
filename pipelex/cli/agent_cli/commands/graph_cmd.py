@@ -13,21 +13,13 @@ from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpr
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
+from pipelex.graph.graph_rendering import GraphFormat, render_graph_from_spec
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
-from pipelex.types import StrEnum
-
-
-class GraphFormat(StrEnum):
-    """Selectable graph output formats."""
-
-    MERMAIDFLOW = "mermaidflow"
-    REACTFLOW = "reactflow"
-    BOTH = "both"
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
 def graph_cmd(
@@ -39,6 +31,10 @@ def graph_cmd(
         GraphFormat,
         typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
     ] = GraphFormat.REACTFLOW,
+    direction: Annotated[
+        FlowchartDirection | None,
+        typer.Option("--direction", help="Flowchart direction (default: TB)"),
+    ] = None,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
@@ -54,6 +50,7 @@ def graph_cmd(
     Examples:
         pipelex-agent graph bundle.mthds
         pipelex-agent graph bundle.mthds --format mermaidflow
+        pipelex-agent graph bundle.mthds --direction LR
         pipelex-agent graph bundle.mthds -L ./my_pipes/
     """
     input_path = Path(target)
@@ -106,9 +103,8 @@ def graph_cmd(
 
         graph_spec = pipe_output.graph_spec
 
-        # Build render config with format selection
-        base_graph_config = execution_config.graph_config
-
+        # Render and save graph files alongside the bundle
+        output_dir = input_path.parent
         include_mermaidflow: bool
         include_reactflow: bool
         match graph_format:
@@ -122,38 +118,17 @@ def graph_cmd(
                 include_mermaidflow = True
                 include_reactflow = True
 
-        render_graph_config = base_graph_config.model_copy(
-            update={
-                "data_inclusion": base_graph_config.data_inclusion.model_copy(
-                    update={
-                        "stuff_json_content": True,
-                        "stuff_text_content": True,
-                        "stuff_html_content": True,
-                    }
-                ),
-                "graphs_inclusion": base_graph_config.graphs_inclusion.model_copy(
-                    update={
-                        "graphspec_json": False,
-                        "mermaidflow_mmd": False,
-                        "mermaidflow_html": include_mermaidflow,
-                        "reactflow_viewspec": False,
-                        "reactflow_html": include_reactflow,
-                    }
-                ),
-            }
-        )
-
-        graph_outputs = asyncio.run(
-            generate_graph_outputs(
+        saved_files = asyncio.run(
+            render_graph_from_spec(
                 graph_spec=graph_spec,
-                graph_config=render_graph_config,
+                graph_config=execution_config.graph_config,
+                include_mermaidflow=include_mermaidflow,
+                include_reactflow=include_reactflow,
+                output_dir=output_dir,
                 pipe_code=pipe_code,
+                direction=direction,
             )
         )
-
-        # Save graph files alongside the bundle
-        output_dir = input_path.parent
-        saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
 
         agent_success(
             {
@@ -161,6 +136,7 @@ def graph_cmd(
                 "output_dir": str(output_dir),
                 "files": {key: str(path) for key, path in saved_files.items()},
                 "pipe_code": pipe_code,
+                "direction": str(direction) if direction else None,
             }
         )
 

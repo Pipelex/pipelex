@@ -9,13 +9,12 @@ import typer
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
-from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
+from pipelex.graph.graph_rendering import GraphFormat, render_graph_from_spec
 from pipelex.hub import (
     get_library_manager,
     get_required_pipe,
@@ -30,6 +29,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
 from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
 async def _validate_all_core(
@@ -172,6 +172,7 @@ async def _generate_graph_for_bundle(
     bundle_path: Path,
     graph_format: GraphFormat,
     library_dirs: list[str] | None = None,
+    direction: FlowchartDirection | None = None,
 ) -> dict[str, Any]:
     """Generate graph visualization for a validated bundle.
 
@@ -182,6 +183,7 @@ async def _generate_graph_for_bundle(
         bundle_path: Path to the bundle file.
         graph_format: Which graph format(s) to generate.
         library_dirs: Optional library directories for pipe resolution.
+        direction: Flowchart layout direction (default: None, uses TB).
 
     Returns:
         Dictionary with graph_files and graph_output_dir.
@@ -228,7 +230,6 @@ async def _generate_graph_for_bundle(
         raise PipelexError(msg)
 
     graph_spec = pipe_output.graph_spec
-    base_graph_config = execution_config.graph_config
 
     include_mermaidflow: bool
     include_reactflow: bool
@@ -243,39 +244,21 @@ async def _generate_graph_for_bundle(
             include_mermaidflow = True
             include_reactflow = True
 
-    render_graph_config = base_graph_config.model_copy(
-        update={
-            "data_inclusion": base_graph_config.data_inclusion.model_copy(
-                update={
-                    "stuff_json_content": True,
-                    "stuff_text_content": True,
-                    "stuff_html_content": True,
-                }
-            ),
-            "graphs_inclusion": base_graph_config.graphs_inclusion.model_copy(
-                update={
-                    "graphspec_json": False,
-                    "mermaidflow_mmd": False,
-                    "mermaidflow_html": include_mermaidflow,
-                    "reactflow_viewspec": False,
-                    "reactflow_html": include_reactflow,
-                }
-            ),
-        }
-    )
-
-    graph_outputs = await generate_graph_outputs(
-        graph_spec=graph_spec,
-        graph_config=render_graph_config,
-        pipe_code=pipe_code,
-    )
-
     output_dir = bundle_path.parent
-    saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
+    saved_files = await render_graph_from_spec(
+        graph_spec=graph_spec,
+        graph_config=execution_config.graph_config,
+        include_mermaidflow=include_mermaidflow,
+        include_reactflow=include_reactflow,
+        output_dir=output_dir,
+        pipe_code=pipe_code,
+        direction=direction,
+    )
 
     return {
         "graph_files": {key: str(path) for key, path in saved_files.items()},
         "graph_output_dir": str(output_dir),
+        "direction": str(direction) if direction else None,
     }
 
 
@@ -304,6 +287,10 @@ def validate_cmd(
         GraphFormat,
         typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
     ] = GraphFormat.REACTFLOW,
+    direction: Annotated[
+        FlowchartDirection | None,
+        typer.Option("--direction", help="Flowchart direction (default: TB)"),
+    ] = None,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
@@ -318,6 +305,7 @@ def validate_cmd(
         pipelex-agent validate my_bundle.mthds
         pipelex-agent validate my_bundle.mthds --graph
         pipelex-agent validate my_bundle.mthds --graph --format both
+        pipelex-agent validate my_bundle.mthds --graph --direction LR
         pipelex-agent validate --all -L ./my_pipes
     """
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
@@ -425,6 +413,7 @@ def validate_cmd(
                         bundle_path=bundle_path,
                         graph_format=graph_format,
                         library_dirs=library_dir_strings,
+                        direction=direction,
                     )
                 )
                 result.update(graph_result)

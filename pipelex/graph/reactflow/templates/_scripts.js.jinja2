@@ -707,6 +707,7 @@ function GraphViewer() {
 
     // Re-layout when direction changes, then fit the view
     React.useEffect(() => {
+        if (!needsLayout) return;  // Orchestration graphs have pre-computed positions
         const relayouted = getLayoutedElements(initialData.nodes, initialData.edges, direction);
         setNodes(relayouted.nodes);
         setEdges(relayouted.edges);
