@@ -10,6 +10,7 @@ PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"
 
 # The "?" is used to make the variable optional, so that it can be overridden by the user.
 PYTHON_VERSION ?= 3.13
+LINT_PYTHON_VERSION ?=
 # Note: VENV_* variables include quotes to handle paths with spaces (e.g., "My Projects/pipelex")
 VENV_PYTHON := "$(VIRTUAL_ENV)/bin/python"
 VENV_PYTEST := "$(VIRTUAL_ENV)/bin/pytest"
@@ -741,11 +742,11 @@ merge-check-ruff-lint: env check-unused-imports
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml
+	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml $(if $(LINT_PYTHON_VERSION),--pythonversion $(LINT_PYTHON_VERSION))
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	$(VENV_MYPY) --config-file pyproject.toml $(if $(LINT_PYTHON_VERSION),--python-version $(LINT_PYTHON_VERSION))
 
 merge-check-pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")

@@ -31,7 +31,7 @@ from pipelex.language.mthds_factory import MthdsFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -299,12 +299,15 @@ def build_pipe_cmd(
 
                         # pass empty library_dirs to avoid loading any libraries set at env var or instance level:
                         # we don't want any other pipeline to interfere with the pipeline we just built
-                        built_pipe_output = await execute_pipeline(
-                            mthds_content=mthds_content,
+                        built_runner = PipelexRunner(
                             pipe_run_mode=PipeRunMode.DRY,
                             execution_config=built_pipe_execution_config,
                             library_dirs=[],
                         )
+                        built_pipe_response = await built_runner.execute_pipeline(
+                            mthds_content=mthds_content,
+                        )
+                        built_pipe_output = built_pipe_response.pipe_output
                         if built_pipe_output.graph_spec:
                             pipeline_graph_dir = graphs_dir / "pipeline_graph"
                             log.verbose(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")

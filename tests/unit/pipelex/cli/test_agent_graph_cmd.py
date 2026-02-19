@@ -32,7 +32,7 @@ class TestGraphCmd:
         )
 
     def _mock_execution(self, mocker: MockerFixture, *, graph_spec_present: bool = True) -> None:
-        """Mock the Pipelex init, execute_pipeline, graph generation, and teardown."""
+        """Mock the Pipelex init, PipelexRunner, graph generation, and teardown."""
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
 
@@ -44,15 +44,17 @@ class TestGraphCmd:
             mock_pipe_output.graph_spec = mocker.MagicMock()
         else:
             mock_pipe_output.graph_spec = None
+        mock_response = mocker.MagicMock()
+        mock_response.pipe_output = mock_pipe_output
 
         mock_graph_outputs = mocker.MagicMock()
 
         # Patch async functions with non-async mocks so no coroutines are created (avoids "coroutine never awaited" warnings)
-        mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mocker.MagicMock())
+        mocker.patch(f"{GRAPH_CMD_MODULE}.PipelexRunner")
         mocker.patch(f"{GRAPH_CMD_MODULE}.generate_graph_outputs", new=mocker.MagicMock())
 
-        # asyncio.run is called twice: first for execute_pipeline, then for generate_graph_outputs
-        mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", side_effect=[mock_pipe_output, mock_graph_outputs])
+        # asyncio.run is called twice: first for runner.execute_pipeline, then for generate_graph_outputs
+        mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", side_effect=[mock_response, mock_graph_outputs])
 
         mocker.patch(
             f"{GRAPH_CMD_MODULE}.save_graph_outputs_to_dir",
@@ -96,14 +98,16 @@ class TestGraphCmd:
         mocker.patch(f"{GRAPH_CMD_MODULE}.get_config")
 
         # Patch async functions with non-async mocks so no coroutines are created (avoids "coroutine never awaited" warnings)
-        mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mocker.MagicMock())
+        mocker.patch(f"{GRAPH_CMD_MODULE}.PipelexRunner")
         mocker.patch(f"{GRAPH_CMD_MODULE}.generate_graph_outputs", new=mocker.MagicMock())
 
         mock_pipe_output = mocker.MagicMock()
         mock_pipe_output.graph_spec = mocker.MagicMock()
+        mock_response = mocker.MagicMock()
+        mock_response.pipe_output = mock_pipe_output
         mock_asyncio_run = mocker.patch(
             f"{GRAPH_CMD_MODULE}.asyncio.run",
-            side_effect=[mock_pipe_output, mocker.MagicMock()],
+            side_effect=[mock_response, mocker.MagicMock()],
         )
 
         mocker.patch(
@@ -192,11 +196,13 @@ class TestGraphCmd:
         mocker.patch(f"{GRAPH_CMD_MODULE}.get_config")
 
         # Patch async function with non-async mock so no coroutine is created (avoids "coroutine never awaited" warning)
-        mocker.patch(f"{GRAPH_CMD_MODULE}.execute_pipeline", new=mocker.MagicMock())
+        mocker.patch(f"{GRAPH_CMD_MODULE}.PipelexRunner")
 
         mock_pipe_output = mocker.MagicMock()
         mock_pipe_output.graph_spec = None
-        mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", return_value=mock_pipe_output)
+        mock_response = mocker.MagicMock()
+        mock_response.pipe_output = mock_pipe_output
+        mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", return_value=mock_response)
 
         with pytest.raises(typer.Exit) as exc_info:
             graph_cmd(target=str(mthds_file))

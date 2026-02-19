@@ -26,7 +26,13 @@ class PromptImageDetail(StrEnum):
 
     @property
     def as_openai_detail(self) -> Literal["high", "low", "auto"]:
-        return self.value
+        match self:
+            case PromptImageDetail.HIGH:
+                return "high"
+            case PromptImageDetail.LOW:
+                return "low"
+            case PromptImageDetail.AUTO:
+                return "auto"
 
 
 class PromptImageUri(BaseModel):

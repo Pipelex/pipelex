@@ -1,7 +1,7 @@
-from abc import ABC
 from typing import Any, TypeVar, final
 
 from kajson import kajson
+from mthds.models.stuff import StuffContentAbstract
 from rich.json import JSON
 from typing_extensions import override
 
@@ -12,7 +12,7 @@ from pipelex.tools.typing.pydantic_utils import CustomBaseModel
 StuffContentType = TypeVar("StuffContentType", bound="StuffContent")
 
 
-class StuffContent(PrettyRenderable, CustomBaseModel, ABC):
+class StuffContent(PrettyRenderable, CustomBaseModel, StuffContentAbstract):
     @override
     def __str__(self) -> str:
         return self.rendered_plain()

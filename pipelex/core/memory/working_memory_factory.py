@@ -1,8 +1,8 @@
 import shortuuid
+from mthds.models.pipeline_inputs import PipelineInputs
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.client.protocol import PipelineInputs
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.core.memory.exceptions import WorkingMemoryFactoryError
 from pipelex.core.memory.working_memory import MAIN_STUFF_NAME, StuffDict, WorkingMemory

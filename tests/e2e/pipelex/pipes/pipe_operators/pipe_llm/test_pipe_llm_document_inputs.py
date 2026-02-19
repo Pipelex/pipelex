@@ -7,7 +7,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from tests.cases.documents import DocumentTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_document_inputs import (
     DocumentListAnalysisE2E,
@@ -28,36 +28,32 @@ class TestDocumentInputsE2E:
 
     async def test_direct_single_document(self, pipe_run_mode: PipeRunMode) -> None:
         """Test single direct document input with local PDF file."""
-        pipe_output = await execute_pipeline(
+        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
             pipe_code="summarize_single_document_e2e",
-            library_dirs=LIBRARY_DIRS,
             inputs={
                 "document": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2),
             },
-            pipe_run_mode=pipe_run_mode,
         )
 
-        assert pipe_output.main_stuff is not None
+        assert pipeline_response.pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
-            result = pipe_output.main_stuff_as(content_type=DocumentSummaryE2E)
+            result = pipeline_response.pipe_output.main_stuff_as(content_type=DocumentSummaryE2E)
             pretty_print(result, title="Direct Document Summary")
             assert len(result.summary) > 10
             assert result.document_type.lower() in {"job offer", "job", "offer", "employment", "contract"}
 
     async def test_direct_single_document_by_url(self, pipe_run_mode: PipeRunMode) -> None:
         """Test single direct document input with remote URL."""
-        pipe_output = await execute_pipeline(
+        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
             pipe_code="summarize_single_document_e2e",
-            library_dirs=LIBRARY_DIRS,
             inputs={
                 "document": DocumentContent(url=DocumentTestCases.PDF_FILE_URL_1),
             },
-            pipe_run_mode=pipe_run_mode,
         )
 
-        assert pipe_output.main_stuff is not None
+        assert pipeline_response.pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
-            result = pipe_output.main_stuff_as(content_type=DocumentSummaryE2E)
+            result = pipeline_response.pipe_output.main_stuff_as(content_type=DocumentSummaryE2E)
             pretty_print(result, title="Document Summary (URL)")
             assert len(result.summary) > 10
 
@@ -70,16 +66,14 @@ class TestDocumentInputsE2E:
             ]
         )
 
-        pipe_output = await execute_pipeline(
+        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
             pipe_code="analyze_document_list_e2e",
-            library_dirs=LIBRARY_DIRS,
             inputs={"documents": documents},
-            pipe_run_mode=pipe_run_mode,
         )
 
-        assert pipe_output.main_stuff is not None
+        assert pipeline_response.pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
-            analysis = pipe_output.main_stuff_as(content_type=DocumentListAnalysisE2E)
+            analysis = pipeline_response.pipe_output.main_stuff_as(content_type=DocumentListAnalysisE2E)
             pretty_print(analysis, title="Document List Analysis")
             assert analysis.document_count == 2
 
@@ -88,38 +82,34 @@ class TestDocumentInputsE2E:
         collection_a = ListContent[DocumentContent](items=[DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2)])
         collection_b = ListContent[DocumentContent](items=[DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_3)])
 
-        pipe_output = await execute_pipeline(
+        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
             pipe_code="compare_document_lists_e2e",
-            library_dirs=LIBRARY_DIRS,
             inputs={
                 "collection_a": collection_a,
                 "collection_b": collection_b,
             },
-            pipe_run_mode=pipe_run_mode,
         )
 
-        assert pipe_output.main_stuff is not None
+        assert pipeline_response.pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
-            analysis = pipe_output.main_stuff_as(content_type=DocumentListAnalysisE2E)
+            analysis = pipeline_response.pipe_output.main_stuff_as(content_type=DocumentListAnalysisE2E)
             pretty_print(analysis, title="Document Lists Comparison")
             # Should count both collections
             assert analysis.document_count == 2
 
     async def test_mixed_document_and_image_inputs(self, pipe_run_mode: PipeRunMode) -> None:
         """Test combining document with image input."""
-        pipe_output = await execute_pipeline(
+        pipeline_response = await PipelexRunner(library_dirs=LIBRARY_DIRS, pipe_run_mode=pipe_run_mode).execute_pipeline(
             pipe_code="mixed_document_image_inputs_e2e",
-            library_dirs=LIBRARY_DIRS,
             inputs={
                 "document": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2),
                 "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG),
             },
-            pipe_run_mode=pipe_run_mode,
         )
 
-        assert pipe_output.main_stuff is not None
+        assert pipeline_response.pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
-            result = pipe_output.main_stuff_as(content_type=MixedMediaAnalysisE2E)
+            result = pipeline_response.pipe_output.main_stuff_as(content_type=MixedMediaAnalysisE2E)
             pretty_print(result, title="Mixed Document + Image Analysis")
             assert result.can_see_both is True
             assert len(result.document_summary) > 10

@@ -1,9 +1,9 @@
 from typing import Any, cast
 
 import shortuuid
+from mthds.models.pipeline_inputs import StuffContentOrData
 from pydantic import BaseModel, ValidationError, field_validator
 
-from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode

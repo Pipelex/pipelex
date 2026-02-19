@@ -26,13 +26,15 @@ pipelex run path/to/my_bundle.mthds --inputs inputs.json
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 
 Pipelex.make()
 
 # Run the bundle's main_pipe
-pipe_output = await execute_pipeline(
+runner = PipelexRunner(
     bundle_uri="path/to/my_bundle.mthds",
+)
+response = await runner.execute_pipeline(
     inputs={
         "my_input": {
             "concept": "Text",
@@ -40,13 +42,17 @@ pipe_output = await execute_pipeline(
         },
     },
 )
+pipe_output = response.pipe_output
 
 # Or run a specific pipe from the bundle
-pipe_output = await execute_pipeline(
+runner = PipelexRunner(
     bundle_uri="path/to/my_bundle.mthds",
+)
+response = await runner.execute_pipeline(
     pipe_code="my_specific_pipe",
     inputs={...},
 )
+pipe_output = response.pipe_output
 ```
 
 !!! info "How `main_pipe` Works"
@@ -72,13 +78,13 @@ When executing pipelines programmatically, Pipelex can load pipe **libraries** -
 
 #### Library Parameters
 
-When using `execute_pipeline` or `start_pipeline`, you can control library behavior with these parameters:
+When using `PipelexRunner`, you can control library behavior with these constructor parameters:
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 
 - **`library_dirs`**: A list of directory paths to load pipe definitions from. **These directories must contain both your `.mthds` files AND any Python files defining `StructuredContent` classes** (e.g., `*_struct.py` files). If not specified, Pipelex falls back to the `PIPELEXPATH` environment variable, then to the current working directory.
 
-- **`mthds_content`**: When provided, Pipelex will load only this MTHDS content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
+- **`mthds_content`**: When provided to `PipelexRunner.execute_pipeline()`, Pipelex will load only this content into the library, bypassing directory scanning. This is useful for dynamic pipeline execution without file-based definitions.
 
 !!! info "Python Structure Classes"
     If your concepts use Python `StructuredContent` classes instead of inline structures, those Python files must be in the directories specified by `library_dirs`. Pipelex auto-discovers and registers these classes during library loading. Learn more about [Python StructuredContent Classes](../concepts/python-classes.md).
@@ -97,13 +103,14 @@ This approach loads pipe definitions from directories and executes a specific pi
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 
 # First, initialize Pipelex (this loads all pipeline definitions)
 Pipelex.make()
 
 # Execute the pipeline and wait for the result
-pipe_output = await execute_pipeline(
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     pipe_code="description_to_tagline",
     inputs={
         "description": {
@@ -112,15 +119,18 @@ pipe_output = await execute_pipeline(
         },
     },
 )
+pipe_output = response.pipe_output
 ```
 
 **Loading from specific directories**:
 
 ```python
 # Load pipes from specific directories
-pipe_output = await execute_pipeline(
-    pipe_code="description_to_tagline",
+runner = PipelexRunner(
     library_dirs=["./pipelines", "./shared_pipes"],
+)
+response = await runner.execute_pipeline(
+    pipe_code="description_to_tagline",
     inputs={
         "description": {
             "concept": "ProductDescription",
@@ -128,16 +138,19 @@ pipe_output = await execute_pipeline(
         },
     },
 )
+pipe_output = response.pipe_output
 ```
 
 **Using a custom library ID**:
 
 ```python
 # Use a custom library ID for managing multiple library instances
-pipe_output = await execute_pipeline(
-    pipe_code="description_to_tagline",
+runner = PipelexRunner(
     library_id="my_marketing_library",
     library_dirs=["./marketing_pipes"],
+)
+response = await runner.execute_pipeline(
+    pipe_code="description_to_tagline",
     inputs={
         "description": {
             "concept": "ProductDescription",
@@ -145,6 +158,7 @@ pipe_output = await execute_pipeline(
         },
     },
 )
+pipe_output = response.pipe_output
 ```
 
 !!! tip "Listing available pipes"
@@ -152,11 +166,11 @@ pipe_output = await execute_pipeline(
 
 ### Using MTHDS Content Directly
 
-You can directly pass MTHDS content as a string to `execute_pipeline`, useful for dynamic pipeline execution without file-based definitions.
+You can directly pass PLX content as a string to `PipelexRunner.execute_pipeline()`, useful for dynamic pipeline execution without file-based definitions.
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 
 my_pipe_content = """
 domain = "marketing"
@@ -181,7 +195,8 @@ Generate a catchy tagline based on the above description. The tagline should be 
 
 Pipelex.make()
 
-pipe_output = await execute_pipeline(
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     mthds_content=my_pipe_content,
     inputs={
         "description": {
@@ -190,6 +205,7 @@ pipe_output = await execute_pipeline(
         },
     },
 )
+pipe_output = response.pipe_output
 ```
 
 !!! note "Pipe Code Resolution"

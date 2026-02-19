@@ -18,7 +18,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.types import StrEnum
 
 
@@ -90,16 +90,19 @@ def graph_cmd(
             mock_inputs=True,
         )
 
-        pipe_output = asyncio.run(
-            execute_pipeline(
+        runner = PipelexRunner(
+            bundle_uri=target,
+            pipe_run_mode=PipeRunMode.DRY,
+            execution_config=execution_config,
+            library_dirs=library_dir,
+        )
+        response = asyncio.run(
+            runner.execute_pipeline(
                 pipe_code=pipe_code,
                 mthds_content=mthds_content,
-                bundle_uri=target,
-                pipe_run_mode=PipeRunMode.DRY,
-                execution_config=execution_config,
-                library_dirs=library_dir,
             )
         )
+        pipe_output = response.pipe_output
 
         if not pipe_output.graph_spec:
             agent_error("Pipeline execution did not produce a graph spec", "GraphSpecMissingError")

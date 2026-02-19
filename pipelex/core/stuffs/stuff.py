@@ -2,7 +2,8 @@
 from typing import Any, cast, get_args, get_origin
 
 from kajson import kajson
-from pydantic import ConfigDict, ValidationError
+from mthds.models.stuff import DictStuffAbstract, StuffAbstract
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
@@ -23,14 +24,7 @@ from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
 
 
-class Stuff(PrettyRenderable, CustomBaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    stuff_code: str
-    stuff_name: str | None = None
-    concept: Concept
-    content: StuffContent
-
+class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffContent]):
     def make_artefact(self) -> StuffArtefact:
         """Create a Jinja2-compatible artefact from this Stuff.
 
@@ -247,13 +241,9 @@ class Stuff(PrettyRenderable, CustomBaseModel):
         self.content.pretty_print_content(title=title)
 
 
-class DictStuff(CustomBaseModel):
+class DictStuff(CustomBaseModel, DictStuffAbstract):
     """Stuff with content as dict[str, Any] instead of StuffContent.
 
     This is used for serialization where the content needs to be a plain dict.
     Has the exact same structure as Stuff but with dict content.
     """
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-    concept: str
-    content: Any
