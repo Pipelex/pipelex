@@ -6,7 +6,7 @@ on:
 jobs:
   matrix-test:
     name: Tests check
-    runs-on: [self-hosted, aca-runner]
+    runs-on: [aca-runner-test]
     strategy:
       fail-fast: false
       matrix:
@@ -19,17 +19,6 @@ jobs:
       ENV: dev
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v4
-        with:
-          python-version: ${{ matrix.python-version }}
-
-      - name: Check UV installation
-        run: make check-uv
-
-      - name: Verify UV installation
-        run: uv --version
 
       - name: Install dependencies
         run: PYTHON_VERSION=${{ matrix.python-version }} make install
