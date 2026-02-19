@@ -59,12 +59,24 @@ class OpenAIImgGenFactory:
     @classmethod
     def quality_for_gpt_image_1(cls, quality: Quality) -> GptImage1QualityType:
         """This method only converts the Quality string value as a Literal, as expected by the OpenAI API"""
-        return quality.value
+        match quality:
+            case Quality.LOW:
+                return "low"
+            case Quality.MEDIUM:
+                return "medium"
+            case Quality.HIGH:
+                return "high"
 
     @classmethod
     def background_for_gpt_image_1(cls, background: Background) -> GptImage1BackgroundType:
         """This method only converts the Background string value as a Literal, as expected by the OpenAI API"""
-        return background.value
+        match background:
+            case Background.TRANSPARENT:
+                return "transparent"
+            case Background.OPAQUE:
+                return "opaque"
+            case Background.AUTO:
+                return "auto"
 
     @classmethod
     def output_compression_for_gpt_image_1(cls) -> int:

@@ -2391,16 +2391,16 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.0.1"
+version = "0.0.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
     { name = "httpx" },
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/65/03/440ef52bb67159e3f3f7efc08879a917cbb7039f0037a008fd7f1c7c40cd/mthds-0.0.1.tar.gz", hash = "sha256:e84f82eae611443ff9e4fca6a13c91ef17daacf5bd9a664023286b6b39ee42dd", size = 60075, upload-time = "2026-02-17T17:50:40.016Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b4/1c/207fed4b05c8dbcfe6f6c0802b0c59cdc683466f02f95625475248e1ff20/mthds-0.0.2.tar.gz", hash = "sha256:273aaec6e8332f462f772c1bd58cf5baaea4a69224de2fa024b08ebe7ed005f1", size = 60229, upload-time = "2026-02-19T13:38:28.094Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/3a/7c/45cec5ffbe5051cb2d72f94fbc2aefaaa3158bdc1c849809c9ffe1e6057f/mthds-0.0.1-py3-none-any.whl", hash = "sha256:3550ce58c84b943bbe09d7f5f2ff454728dce8b823253322ecf682c638ff4a3c", size = 11823, upload-time = "2026-02-17T17:50:38.252Z" },
+    { url = "https://files.pythonhosted.org/packages/6c/52/c831b1c6bb0a2b7ecaf21de099132eb4c1a1277569ad7ae214da86dd5583/mthds-0.0.2-py3-none-any.whl", hash = "sha256:168210f289f67cc1fd831ddc4bb46f2d65de6c48b5932406bc31459be94f312e", size = 11818, upload-time = "2026-02-19T13:38:26.447Z" },
 ]
 
 [[package]]
@@ -3424,7 +3424,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.14" },
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = ">=0.0.1" },
+    { name = "mthds", specifier = ">=0.0.2" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=1.108.1" },

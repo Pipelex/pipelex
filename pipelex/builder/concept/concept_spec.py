@@ -351,7 +351,7 @@ class ConceptSpec(StructuredContent):
                 | ConceptStructureSpecFieldType.NUMBER
                 | ConceptStructureSpecFieldType.DATE
             ):
-                return field_spec.type.value
+                return field_spec.type
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

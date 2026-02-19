@@ -11,19 +11,18 @@ class ConcretePipeBlueprint(PipeBlueprint):
 class TestPipeBlueprintValidation:
     def test_validate_pipe_type_correct(self):
         for pipe_type_enum in PipeType:
-            pipe_type = pipe_type_enum.value
-            match pipe_type:
-                case "PipeFunc" | "PipeImgGen" | "PipeCompose" | "PipeLLM" | "PipeExtract":
-                    category = "PipeOperator"
-                case "PipeBatch" | "PipeCondition" | "PipeParallel" | "PipeSequence":
-                    category = "PipeController"
+            match pipe_type_enum:
+                case PipeType.PIPE_FUNC | PipeType.PIPE_IMG_GEN | PipeType.PIPE_COMPOSE | PipeType.PIPE_LLM | PipeType.PIPE_EXTRACT:
+                    category = PipeCategory.PIPE_OPERATOR
+                case PipeType.PIPE_BATCH | PipeType.PIPE_CONDITION | PipeType.PIPE_PARALLEL | PipeType.PIPE_SEQUENCE:
+                    category = PipeCategory.PIPE_CONTROLLER
             blueprint = ConcretePipeBlueprint(
-                type=pipe_type,
+                type=pipe_type_enum,
                 pipe_category=category,
                 description="lorem ipsum",
                 output="Text",
             )
-            assert blueprint.type == pipe_type
+            assert blueprint.type == pipe_type_enum
 
     def test_validate_pipe_type_incorrect(self):
         invalid_types = ["InvalidType", "PipeTest", "RandomPipe", "NotAPipe", ""]
@@ -39,19 +38,18 @@ class TestPipeBlueprintValidation:
 
     def test_validate_pipe_category_correct(self):
         for category_enum in PipeCategory:
-            category = category_enum.value
-            match category:
-                case "PipeOperator":
-                    pipe_type = "PipeLLM"
-                case "PipeController":
-                    pipe_type = "PipeSequence"
+            match category_enum:
+                case PipeCategory.PIPE_OPERATOR:
+                    pipe_type = PipeType.PIPE_LLM
+                case PipeCategory.PIPE_CONTROLLER:
+                    pipe_type = PipeType.PIPE_SEQUENCE
             blueprint = ConcretePipeBlueprint(
                 type=pipe_type,
-                pipe_category=category,
+                pipe_category=category_enum,
                 description="lorem ipsum",
                 output="Text",
             )
-            assert blueprint.pipe_category == category
+            assert blueprint.pipe_category == category_enum
 
     def test_validate_pipe_category_incorrect(self):
         invalid_categories = ["InvalidCategory", "Operator", "Controller", "PipeOp", "RandomCategory", ""]
