@@ -150,6 +150,7 @@ def _display_diff(existing: str, expected: str, console: Console) -> None:
         console.print()
         for line in diff[:50]:  # Limit output to first 50 lines
             line = line.rstrip("\n")
+            # TODO: consider using rich.markup.escape()
             if line.startswith("+") and not line.startswith("+++"):
                 console.print(f"[green]{line}[/green]")
             elif line.startswith("-") and not line.startswith("---"):
