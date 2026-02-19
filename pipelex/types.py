@@ -11,6 +11,6 @@ except ImportError:  # Python 3.10
 try:
     from importlib.resources.abc import Traversable  # Python 3.11+
 except ModuleNotFoundError:  # Python 3.10
-    from importlib.abc import Traversable  # type: ignore[assignment, no-redef]
+    from importlib.abc import Traversable  # type: ignore[assignment, no-redef, attr-defined]
 
 __all__ = ["Self", "StrEnum", "Traversable"]
