@@ -189,6 +189,10 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
     # Add type to spec_data if not present
     spec_data["type"] = pipe_type
 
+    # Accept "code" as an alias for "pipe_code"
+    if "code" in spec_data and "pipe_code" not in spec_data:
+        spec_data["pipe_code"] = spec_data.pop("code")
+
     # Handle steps/branches conversion - need to convert pipe to pipe_code
     if "steps" in spec_data:
         converted_steps = []
@@ -216,9 +220,9 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
 
 def pipe_cmd(
     pipe_type: Annotated[
-        str,
+        str | None,
         typer.Option("--type", "-t", help=f"Pipe type. Must be one of: {PipeType.value_list()}"),
-    ],
+    ] = None,
     spec: Annotated[
         str | None,
         typer.Option("--spec", "-s", help="JSON string with pipe specification"),
@@ -283,16 +287,25 @@ def pipe_cmd(
     except json.JSONDecodeError as exc:
         agent_error(f"Invalid JSON: {exc.msg}", "JSONDecodeError", cause=exc)
 
+    # Resolve pipe type: CLI option takes precedence, then extract from spec JSON
+    resolved_pipe_type: str
+    if pipe_type is not None:
+        resolved_pipe_type = pipe_type
+    elif "type" in spec_data:
+        resolved_pipe_type = spec_data.pop("type")
+    else:
+        agent_error("Pipe type must be provided either via --type or as 'type' in the JSON spec", "ArgumentError")
+
     # Validate and convert spec
     try:
-        pipe_spec = _parse_pipe_spec_from_json(pipe_type, spec_data)
+        pipe_spec = _parse_pipe_spec_from_json(resolved_pipe_type, spec_data)
         toml_content = _pipe_spec_to_toml(pipe_spec)
 
         agent_success(
             {
                 "success": True,
                 "pipe_code": pipe_spec.pipe_code,
-                "pipe_type": pipe_type,
+                "pipe_type": resolved_pipe_type,
                 "toml": toml_content,
             }
         )
