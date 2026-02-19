@@ -289,7 +289,7 @@ def validate_cmd(
     ] = GraphFormat.REACTFLOW,
     direction: Annotated[
         FlowchartDirection | None,
-        typer.Option("--direction", help="Flowchart direction (default: TB)"),
+        typer.Option("--direction", help="Flowchart direction"),
     ] = None,
     library_dir: Annotated[
         list[str] | None,

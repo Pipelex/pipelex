@@ -112,7 +112,7 @@ def graph_render_cmd(
     ] = None,
     direction: Annotated[
         FlowchartDirection | None,
-        typer.Option("--direction", help="Flowchart direction (default: TB)"),
+        typer.Option("--direction", help="Flowchart direction"),
     ] = None,
     mermaidflow: Annotated[
         bool,
