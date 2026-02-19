@@ -71,6 +71,7 @@ class BuilderLoop:
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
         pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
+        pipelex_bundle_spec = self._strip_namespace_from_pipe_codes(pipelex_bundle_spec=pipelex_bundle_spec)
 
         if is_save_first_iteration_enabled:
             try:
@@ -94,6 +95,7 @@ class BuilderLoop:
                     log.info(f"⚠️ Blueprint creation failed on attempt {attempt}/{max_attempts}, fixing undeclared concepts...")
                     pipelex_bundle_spec = await self._fix_undeclared_concept_references(pipelex_bundle_spec=pipelex_bundle_spec)
                     pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
+                    pipelex_bundle_spec = self._strip_namespace_from_pipe_codes(pipelex_bundle_spec=pipelex_bundle_spec)
                     continue
                 msg = f"Failed to create bundle blueprint after {max_attempts} attempts: {exc}"
                 raise PipeBuilderError(msg) from exc
@@ -515,6 +517,121 @@ class BuilderLoop:
         for code in to_remove:
             del pipelex_bundle_spec.concept[code]
             log.info(f"Stripped native concept declaration '{code}' (native concepts are built-in)")
+        return pipelex_bundle_spec
+
+    @staticmethod
+    def _strip_dotted_pipe_code(pipe_code: str) -> str:
+        """Extract bare pipe code from a potentially dotted pipe code.
+
+        If the code contains a dot, return the part after the last dot.
+        Otherwise, return the code unchanged.
+
+        Args:
+            pipe_code: A pipe code like "my_pipe" or "domain.my_pipe" or "a.b.my_pipe"
+
+        Returns:
+            The bare pipe code (part after last dot, or unchanged if no dot)
+        """
+        if "." in pipe_code:
+            return pipe_code.rsplit(".", maxsplit=1)[1]
+        return pipe_code
+
+    @staticmethod
+    def _strip_namespace_from_pipe_codes(pipelex_bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
+        """Strip namespace prefixes from pipe definition codes and internal pipe references.
+
+        The builder LLM sometimes generates dotted pipe codes (e.g., 'domain.my_pipe')
+        for pipe definitions and internal references. Pipe definition codes must be bare
+        snake_case since the namespace comes from the bundle's domain field.
+
+        Pipe definition keys and pipe_code fields are always stripped (unconditionally).
+        Internal pipe references in controllers (branch_pipe_code, steps, branches,
+        outcomes) are only stripped when the stripped code matches a pipe defined in
+        the same bundle — otherwise the reference may legitimately point to a pipe
+        in another domain.
+
+        Affected fields:
+        - Pipe dict keys (unconditional)
+        - main_pipe (unconditional)
+        - PipeSpec.pipe_code inside each pipe value (unconditional)
+        - PipeBatchSpec.branch_pipe_code (conditional on bundle membership)
+        - PipeSequenceSpec.steps[*].pipe_code (conditional on bundle membership)
+        - PipeParallelSpec.branches[*].pipe_code (conditional on bundle membership)
+        - PipeConditionSpec.outcomes values and default_outcome (conditional on bundle membership)
+        """
+        strip = BuilderLoop._strip_dotted_pipe_code
+        special_outcome_values = SpecialOutcome.value_list()
+
+        # Strip main_pipe (unconditional — it always refers to a pipe in this bundle)
+        stripped_main = strip(pipelex_bundle_spec.main_pipe)
+        if stripped_main != pipelex_bundle_spec.main_pipe:
+            log.info(f"Stripped namespace from main_pipe: '{pipelex_bundle_spec.main_pipe}' → '{stripped_main}'")
+            pipelex_bundle_spec.main_pipe = stripped_main
+
+        if not pipelex_bundle_spec.pipe:
+            return pipelex_bundle_spec
+
+        # Pass 1: Strip pipe dict keys and pipe_code fields (unconditional for definitions),
+        # and build the set of defined bare pipe codes for reference resolution
+        new_pipes: dict[str, PipeSpecUnion] = {}
+        for key, pipe_spec in pipelex_bundle_spec.pipe.items():
+            stripped_key = strip(key)
+            if stripped_key != key:
+                log.info(f"Stripped namespace from pipe key: '{key}' → '{stripped_key}'")
+
+            stripped_pipe_code = strip(pipe_spec.pipe_code)
+            if stripped_pipe_code != pipe_spec.pipe_code:
+                log.info(f"Stripped namespace from pipe_code: '{pipe_spec.pipe_code}' → '{stripped_pipe_code}'")
+                pipe_spec.pipe_code = stripped_pipe_code
+
+            new_pipes[stripped_key] = pipe_spec
+
+        pipelex_bundle_spec.pipe = new_pipes
+        defined_pipe_codes = set(new_pipes.keys())
+
+        # Pass 2: Strip internal pipe references only when the stripped code
+        # matches a pipe defined in this bundle
+        for pipe_spec in pipelex_bundle_spec.pipe.values():
+            if isinstance(pipe_spec, PipeBatchSpec):
+                stripped_branch = strip(pipe_spec.branch_pipe_code)
+                if stripped_branch != pipe_spec.branch_pipe_code and stripped_branch in defined_pipe_codes:
+                    log.info(f"Stripped namespace from branch_pipe_code: '{pipe_spec.branch_pipe_code}' → '{stripped_branch}'")
+                    pipe_spec.branch_pipe_code = stripped_branch
+
+            elif isinstance(pipe_spec, PipeSequenceSpec):
+                for step in pipe_spec.steps:
+                    stripped_step = strip(step.pipe_code)
+                    if stripped_step != step.pipe_code and stripped_step in defined_pipe_codes:
+                        log.info(f"Stripped namespace from sequence step pipe_code: '{step.pipe_code}' → '{stripped_step}'")
+                        step.pipe_code = stripped_step
+
+            elif isinstance(pipe_spec, PipeParallelSpec):
+                for branch in pipe_spec.branches:
+                    stripped_branch = strip(branch.pipe_code)
+                    if stripped_branch != branch.pipe_code and stripped_branch in defined_pipe_codes:
+                        log.info(f"Stripped namespace from parallel branch pipe_code: '{branch.pipe_code}' → '{stripped_branch}'")
+                        branch.pipe_code = stripped_branch
+
+            elif isinstance(pipe_spec, PipeConditionSpec):
+                new_outcomes: dict[str, str] = {}
+                for condition_key, outcome_value in pipe_spec.outcomes.items():
+                    if outcome_value in special_outcome_values:
+                        new_outcomes[condition_key] = outcome_value
+                    else:
+                        stripped_outcome = strip(outcome_value)
+                        if stripped_outcome != outcome_value and stripped_outcome in defined_pipe_codes:
+                            log.info(f"Stripped namespace from condition outcome: '{outcome_value}' → '{stripped_outcome}'")
+                            new_outcomes[condition_key] = stripped_outcome
+                        else:
+                            new_outcomes[condition_key] = outcome_value
+                pipe_spec.outcomes = new_outcomes
+
+                if pipe_spec.default_outcome not in special_outcome_values:
+                    stripped_default = strip(pipe_spec.default_outcome)
+                    if stripped_default != pipe_spec.default_outcome and stripped_default in defined_pipe_codes:
+                        log.info(f"Stripped namespace from default_outcome: '{pipe_spec.default_outcome}' → '{stripped_default}'")
+                        pipe_spec.default_outcome = stripped_default
+
         return pipelex_bundle_spec
 
     def _fix_bundle_validation_error(
