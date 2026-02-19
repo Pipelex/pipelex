@@ -2,6 +2,7 @@
 
 ### Changed
 
+- **CI Runner Optimization**: Split self-hosted runners into dedicated test (D32) and lint (D4) pools with pre-baked Docker image (Python 3.10-3.14, UV, dependency cache) for faster job startup.
 - **MTHDS Light Client Extraction**: The light client protocol (runner, pipeline models, pipe output abstractions) has been extracted from pipelex into the new [`mthds`](https://github.com/mthds-ai/mthds-python) package on PyPI. Pipelex now depends on `mthds>=0.0.1` and implements its `RunnerProtocol`.
 - **Global/Local Config Split**: `pipelex init` now creates configuration in `~/.pipelex/` (global) by default. Use `pipelex init --local` to create project-level overrides in `{project_root}/.pipelex/`. Config loading merges: package defaults → global → project → overrides.
 - **IDE Extension Detection**: Extension check now uses `code --list-extensions` / `cursor --list-extensions` for reliable detection instead of folder scanning. Shows separate marketplace links for VS Code (Microsoft Marketplace) and Cursor (Open VSX Registry).
