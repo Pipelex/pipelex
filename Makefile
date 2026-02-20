@@ -62,8 +62,8 @@ make ruff-format              - format with ruff format
 make ruff-lint                - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
-make plxt-format              - Format TOML/MTHDS/PLX files with plxt
-make plxt-lint                - Lint TOML/MTHDS/PLX files with plxt
+make plxt-format              - Format MTHDS/TOML/PLX files with plxt
+make plxt-lint                - Lint MTHDS/TOML/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
 make up-kit-configs           - Update kit configs from .pipelex/
@@ -709,11 +709,11 @@ ruff-lint: env
 	$(VENV_RUFF) check . --fix --config pyproject.toml
 
 plxt-format: env
-	$(call PRINT_TITLE,"Formatting TOML/MTHDS with plxt")
+	$(call PRINT_TITLE,"Formatting MTHDS/TOML with plxt")
 	$(VENV_PLXT) fmt
 
 plxt-lint: env
-	$(call PRINT_TITLE,"Linting TOML/MTHDS with plxt")
+	$(call PRINT_TITLE,"Linting MTHDS/TOML with plxt")
 	$(VENV_PLXT) lint
 
 format: ruff-format plxt-format
@@ -760,11 +760,11 @@ merge-check-pylint: env
 	$(VENV_PYLINT) --rcfile pyproject.toml .
 
 merge-check-plxt-format: env
-	$(call PRINT_TITLE,"Checking TOML/MTHDS formatting with plxt")
+	$(call PRINT_TITLE,"Checking MTHDS/TOML formatting with plxt")
 	$(VENV_PLXT) fmt --check
 
 merge-check-plxt-lint: env
-	$(call PRINT_TITLE,"Linting TOML/MTHDS with plxt")
+	$(call PRINT_TITLE,"Linting MTHDS/TOML with plxt")
 	$(VENV_PLXT) lint
 
 ##########################################################################################
