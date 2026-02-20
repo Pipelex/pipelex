@@ -373,6 +373,9 @@ def validate_cmd(
             availability_extra["pipe_stack"] = exc.pipe_stack
         agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
 
+    except typer.Exit:
+        raise
+
     except Exception as exc:
         agent_error(str(exc), type(exc).__name__, cause=exc)
 
