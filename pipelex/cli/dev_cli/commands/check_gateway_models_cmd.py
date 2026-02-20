@@ -6,6 +6,7 @@ import sys
 from difflib import unified_diff
 from typing import TYPE_CHECKING
 
+from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.cli.dev_cli.commands.gateway_models_generator import (
@@ -76,10 +77,10 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
         model_specs = fetch_gateway_model_specs()
     except RemoteConfigFetchError as exc:
         if quiet:
-            console.print(f"[red]✗ Gateway models check: FAILED[/red] - {exc}")
+            console.print(f"[red]✗ Gateway models check: FAILED[/red] - {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] Failed to fetch remote configuration\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] Failed to fetch remote configuration\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]Gateway Models Check: FAILED[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -89,10 +90,10 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
         sys.exit(1)
     except RemoteConfigValidationError as exc:
         if quiet:
-            console.print(f"[red]✗ Gateway models check: FAILED[/red] - {exc}")
+            console.print(f"[red]✗ Gateway models check: FAILED[/red] - {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] Invalid remote configuration\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] Invalid remote configuration\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]Gateway Models Check: FAILED[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -113,10 +114,10 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
         # Handle race condition where file is deleted after exists() check
         # or other filesystem errors (permissions, etc.)
         if quiet:
-            console.print(f"[red]✗ Gateway models check: FAILED[/red] - File system error: {exc}")
+            console.print(f"[red]✗ Gateway models check: FAILED[/red] - File system error: {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] File system error while reading reference files\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] File system error while reading reference files\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]Gateway Models Check: FAILED[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -207,14 +208,15 @@ def _display_diff(existing: str, expected: str, console: Console) -> None:
         console.print()
         for line in diff[:50]:  # Limit output to first 50 lines
             line = line.rstrip("\n")
+            escaped_line = escape(line)
             if line.startswith("+") and not line.startswith("+++"):
-                console.print(f"[green]{line}[/green]")
+                console.print(f"[green]{escaped_line}[/green]")
             elif line.startswith("-") and not line.startswith("---"):
-                console.print(f"[red]{line}[/red]")
+                console.print(f"[red]{escaped_line}[/red]")
             elif line.startswith("@@"):
-                console.print(f"[cyan]{line}[/cyan]")
+                console.print(f"[cyan]{escaped_line}[/cyan]")
             else:
-                console.print(line)
+                console.print(escaped_line)
         if len(diff) > 50:
             console.print(f"[dim]... and {len(diff) - 50} more lines[/dim]")
         console.print()

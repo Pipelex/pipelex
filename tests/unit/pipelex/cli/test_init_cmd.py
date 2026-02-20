@@ -90,6 +90,7 @@ class TestInitCmd:
         assert result == 1
 
     def test_do_init_config_nested_directory_structure(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Verify init_config copies non-inference files and skips the inference/ directory."""
         # Setup complex nested structure
         kit_configs_dir = tmp_path / "kit" / "configs"
         kit_configs_dir.mkdir(parents=True)
@@ -115,13 +116,14 @@ class TestInitCmd:
         # Execute
         result = init_config(reset=False)
 
-        # Verify all files and directories were created
+        # Verify non-inference files were created
         assert (target_dir / "pipelex.toml").exists()
-        assert (target_dir / "inference").is_dir()
-        assert (target_dir / "inference" / "backends.toml").exists()
-        assert (target_dir / "inference" / "backends").is_dir()
-        assert (target_dir / "inference" / "backends" / "openai.toml").exists()
-        assert result == 3
+
+        # Verify inference/ directory was NOT copied (managed by the inference init step)
+        assert not (target_dir / "inference").exists()
+
+        # Verify correct number of files copied (only pipelex.toml)
+        assert result == 1
 
     def test_do_init_config_handles_permission_error(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories
@@ -193,7 +195,8 @@ class TestInitCmd:
         count_dry = init_config(reset=False, dry_run=True)
 
         # Verify count is correct but files were NOT actually copied
-        assert count_dry == 2
+        # Only pipelex.toml counted (inference/ directory is skipped by init_config)
+        assert count_dry == 1
         assert not (target_dir / "pipelex.toml").exists()
         assert not (target_dir / "inference").exists()
 

@@ -207,7 +207,12 @@ body {
     color: var(--color-text-muted);
     font-weight: 500;
 }
-.theme-toggle {
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.header-btn {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -221,12 +226,14 @@ body {
     font-size: 16px;
     line-height: 1;
 }
-.theme-toggle:hover {
+.header-btn:hover {
     background: var(--color-accent);
     border-color: var(--color-accent);
 }
 .theme-icon { display: none; }
 .theme-icon.active { display: inline; }
+.direction-icon { display: none; color: var(--color-text); }
+.direction-icon.active { display: inline-flex; align-items: center; justify-content: center; }
 .stat-item {
     display: flex;
     align-items: center;

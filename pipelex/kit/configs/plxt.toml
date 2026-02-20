@@ -1,7 +1,7 @@
 # =============================================================================
 # Pipelex TOML Configuration for pipelex-demo
 # =============================================================================
-# Configures TOML/MTHDS formatting and linting behaviour for this project.
+# Configures MTHDS/TOML formatting and linting behaviour for this project.
 # Powered by the Pipelex extension (plxt / taplo engine).
 #
 # Docs: https://taplo.tamasfe.dev/configuration/
@@ -100,7 +100,7 @@ include = ["**/*.toml"]
 include = ["**/*.mthds", "**/*.plx"]
 
 [rule.schema]
-path = "pipelex/language/mthds_schema.json"
+path = ".pipelex/mthds_schema.json"
 
 # Per-rule formatting overrides — all at defaults so you can tweak them
 # independently of .toml files.

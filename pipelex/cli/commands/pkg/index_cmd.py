@@ -2,6 +2,7 @@ from pathlib import Path
 
 import typer
 from rich import box
+from rich.markup import escape
 from rich.table import Table
 
 from pipelex.core.packages.exceptions import IndexBuildError
@@ -23,7 +24,7 @@ def do_pkg_index(cache: bool = False) -> None:
         else:
             index = build_index_from_project(Path.cwd())
     except IndexBuildError as exc:
-        console.print(f"[red]Index build error: {exc}[/red]")
+        console.print(f"[red]Index build error: {escape(str(exc))}[/red]")
         raise typer.Exit(code=1) from exc
 
     if not index.entries:

@@ -3,6 +3,8 @@
 import os
 from typing import Any
 
+from rich.markup import escape
+
 from pipelex import log
 from pipelex.cli.commands.init.ide_extension import suggest_extension_install_if_needed
 from pipelex.cli.commands.init.ui.backends_ui import (
@@ -155,5 +157,5 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
         display_selected_backends(console, selected_indices, backend_options)
 
     except Exception as exc:
-        console.print(f"[yellow]⚠ Warning: Failed to customize backends: {exc}[/yellow]")
+        console.print(f"[yellow]⚠ Warning: Failed to customize backends: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/backends.toml later[/dim]")

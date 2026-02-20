@@ -12,6 +12,10 @@ from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 # Includes git-ignored files plus telemetry.toml (created when user is prompted).
 INIT_SKIP_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | {TELEMETRY_CONFIG_FILE_NAME, ".DS_Store"}
 
+# Directories to skip when copying configs to user's .pipelex directory.
+# The inference directory is managed by the inference init step independently.
+INIT_SKIP_DIRS: frozenset[str] = frozenset({"inference"})
+
 
 def init_config(reset: bool = False, dry_run: bool = False, target_dir: str | None = None) -> int:
     """Initialize pipelex configuration in the .pipelex directory. Does not install telemetry, just the main config and inference backends.
@@ -45,6 +49,8 @@ def init_config(reset: bool = False, dry_run: bool = False, target_dir: str | No
                     continue
 
                 if os.path.isdir(src_item):
+                    if item in INIT_SKIP_DIRS:
+                        continue
                     if not dry_run:
                         os.makedirs(dst_item, exist_ok=True)
                     copy_directory_structure(src_item, dst_item, relative_item, dry_run)

@@ -2,9 +2,6 @@ from typing import TYPE_CHECKING, Any
 
 from pydantic import Field
 
-if TYPE_CHECKING:
-    from instructor import Mode as InstructorMode
-
 from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenModelRules
 from pipelex.cogt.llm.structured_output import StructureMethod
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
@@ -14,6 +11,9 @@ from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.usage.cost_category import CostsByCategoryDict
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.typing.pydantic_utils import empty_dict_factory_of, empty_list_factory_of
+
+if TYPE_CHECKING:
+    from instructor import Mode as InstructorMode
 
 
 class InferenceModelSpec(ConfigModel):

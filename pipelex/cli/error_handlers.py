@@ -3,6 +3,7 @@ from typing import NoReturn
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from pipelex.cogt.exceptions import ModelDeckPresetValidatonError
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -50,13 +51,13 @@ def handle_model_choice_error(exc: PipeOperatorModelChoiceError, context: ErrorC
     """
     console = get_console()
     console.print(f"\n[bold red]❌ {context} failed because of a model choice could not be interpreted correctly[/bold red]\n")
-    console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{exc.pipe_code}'[/yellow] [dim]({exc.pipe_type})[/dim]")
-    console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{exc.model_type}'[/yellow]")
-    console.print(f"[bold cyan]Model Choice:[/bold cyan] [yellow]'{exc.model_choice}'[/yellow]")
-    console.print(f"\n[bold red]Error:[/bold red]        {exc.message}\n")
+    console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]")
+    console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{escape(exc.model_type)}'[/yellow]")
+    console.print(f"[bold cyan]Model Choice:[/bold cyan] [yellow]'{escape(str(exc.model_choice))}'[/yellow]")
+    console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
     console.print(
         f"[bold green]💡 Tip:[/bold green] Check your model configuration in [cyan].pipelex/inference/[/cyan] "
-        f"or specify a different model in the [yellow]'{exc.pipe_code}'[/yellow] pipe."
+        f"or specify a different model in the [yellow]'{escape(exc.pipe_code)}'[/yellow] pipe."
     )
     console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
@@ -72,18 +73,18 @@ def handle_model_availability_error(exc: PipeOperatorModelAvailabilityError, con
     """
     console = get_console()
     console.print(f"\n[bold red]❌ {context} failed because a model wasn't available[/bold red]\n")
-    console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{exc.pipe_code}'[/yellow] [dim]({exc.pipe_type})[/dim]")
-    console.print(f"[bold cyan]Model:[/bold cyan]        [yellow]'{exc.model_handle}'[/yellow]")
+    console.print(f"[bold cyan]Pipe:[/bold cyan]         [yellow]'{escape(exc.pipe_code)}'[/yellow] [dim]({escape(exc.pipe_type)})[/dim]")
+    console.print(f"[bold cyan]Model:[/bold cyan]        [yellow]'{escape(exc.model_handle)}'[/yellow]")
     if exc.fallback_list:
-        fallbacks_str = ", ".join([f"[yellow]{fb}[/yellow]" for fb in exc.fallback_list])
+        fallbacks_str = ", ".join([f"[yellow]{escape(fb)}[/yellow]" for fb in exc.fallback_list])
         console.print(f"[bold cyan]Fallbacks:[/bold cyan]    {fallbacks_str}")
     if len(exc.pipe_stack) > 1:
-        stack_str = " [dim]→[/dim] ".join([f"[yellow]{p}[/yellow]" for p in exc.pipe_stack])
+        stack_str = " [dim]→[/dim] ".join([f"[yellow]{escape(p)}[/yellow]" for p in exc.pipe_stack])
         console.print(f"[bold cyan]Pipe Stack:[/bold cyan]   {stack_str}")
-    console.print(f"\n[bold red]Error:[/bold red]        {exc}\n")
+    console.print(f"\n[bold red]Error:[/bold red]        {escape(str(exc))}\n")
     console.print(
         f"[bold green]💡 Tip:[/bold green] Check your model configuration in [cyan].pipelex/inference/[/cyan] "
-        f"or specify a different model in the [yellow]'{exc.pipe_code}'[/yellow] pipe."
+        f"or specify a different model in the [yellow]'{escape(exc.pipe_code)}'[/yellow] pipe."
     )
     console.print(f"[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
@@ -99,24 +100,25 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
     """
     console = get_console()
     console.print(f"\n[bold red]❌ {context} failed due to model deck preset validation error[/bold red]\n")
-    console.print(f"[bold cyan]Preset ID:[/bold cyan]    [yellow]'{exc.preset_id}'[/yellow]")
-    console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{exc.model_type}'[/yellow]")
-    console.print(f"[bold cyan]Model Handle:[/bold cyan] [yellow]'{exc.model_handle}'[/yellow]")
+    console.print(f"[bold cyan]Preset ID:[/bold cyan]    [yellow]'{escape(exc.preset_id)}'[/yellow]")
+    console.print(f"[bold cyan]Model Type:[/bold cyan]   [yellow]'{escape(exc.model_type)}'[/yellow]")
+    console.print(f"[bold cyan]Model Handle:[/bold cyan] [yellow]'{escape(exc.model_handle)}'[/yellow]")
     if exc.enabled_backends:
-        backends_str = ", ".join([f"[yellow]{b}[/yellow]" for b in sorted(exc.enabled_backends)])
+        backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
         console.print(f"[bold cyan]Enabled Backends:[/bold cyan] {backends_str}")
-    console.print(f"\n[bold red]Error:[/bold red]        {exc.message}\n")
-    backends_str = ", ".join([f"[yellow]{b}[/yellow]" for b in sorted(exc.enabled_backends)])
+    console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
     console.print(
-        f"[bold green]💡 Tip:[/bold green] The preset [yellow]'{exc.preset_id}'[/yellow] references model handle "
-        f"[yellow]'{exc.model_handle}'[/yellow] which is not available in any enabled backend.\n"
-        f"The enabled backends are: {backends_str}."
+        f"[bold green]💡 Tip:[/bold green] The preset [yellow]'{escape(exc.preset_id)}'[/yellow] references model handle "
+        f"[yellow]'{escape(exc.model_handle)}'[/yellow] which is not available in any enabled backend."
     )
+    if exc.enabled_backends:
+        backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
+        console.print(f"The enabled backends are: {backends_str}.")
     console.print(
         "[bold]Possible solutions:[/bold]\n"
         "  1. Update the preset to use a different model\n"
-        f"  2. Configure model '{exc.model_handle}' in one of your enabled backends\n"
-        f"  3. Enable a backend that supports [yellow]'{exc.model_handle}'[/yellow]"
+        f"  2. Configure model '{escape(exc.model_handle)}' in one of your enabled backends\n"
+        f"  3. Enable a backend that supports [yellow]'{escape(exc.model_handle)}'[/yellow]"
     )
     console.print(f"\n[dim]Learn more about the inference backend system: {URLs.backend_provider_docs}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
@@ -139,21 +141,21 @@ def _display_validation_error_details(console: Console, exc: ValidateBundleError
 
             # Display key identification info
             if blueprint_error.pipe_code:
-                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{blueprint_error.pipe_code}[/yellow]")
+                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{escape(blueprint_error.pipe_code)}[/yellow]")
             if blueprint_error.domain_code:
-                console.print(f"   [cyan]Domain:[/cyan] [green]{blueprint_error.domain_code}[/green]")
+                console.print(f"   [cyan]Domain:[/cyan] [green]{escape(blueprint_error.domain_code)}[/green]")
 
             # Variables
             if blueprint_error.variable_names:
-                variables_str = ", ".join([f"[yellow]{v}[/yellow]" for v in blueprint_error.variable_names])
+                variables_str = ", ".join([f"[yellow]{escape(v)}[/yellow]" for v in blueprint_error.variable_names])
                 console.print(f"   [cyan]Variables:[/cyan] {variables_str}")
 
             # Error message
-            console.print(f"   [cyan]→[/cyan] {blueprint_error.message}")
+            console.print(f"   [cyan]→[/cyan] {escape(blueprint_error.message)}")
 
             # Source file
             if blueprint_error.source:
-                console.print(f"   [dim]└─ Source: {blueprint_error.source}[/dim]")
+                console.print(f"   [dim]└─ Source: {escape(blueprint_error.source)}[/dim]")
 
             console.print()
 
@@ -165,34 +167,34 @@ def _display_validation_error_details(console: Console, exc: ValidateBundleError
 
             # Display key identification info
             if pipe_error.pipe_code:
-                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{pipe_error.pipe_code}[/yellow]")
+                console.print(f"   [cyan]Pipe:[/cyan] [yellow]{escape(pipe_error.pipe_code)}[/yellow]")
             if pipe_error.concept_code:
-                console.print(f"   [cyan]Concept:[/cyan] [yellow]{pipe_error.concept_code}[/yellow]")
+                console.print(f"   [cyan]Concept:[/cyan] [yellow]{escape(pipe_error.concept_code)}[/yellow]")
             if pipe_error.domain_code:
-                console.print(f"   [cyan]Domain:[/cyan] [green]{pipe_error.domain_code}[/green]")
+                console.print(f"   [cyan]Domain:[/cyan] [green]{escape(pipe_error.domain_code)}[/green]")
 
             # Field name if present
             if pipe_error.field_name:
-                console.print(f"   [cyan]Field:[/cyan] [yellow]{pipe_error.field_name}[/yellow]")
+                console.print(f"   [cyan]Field:[/cyan] [yellow]{escape(pipe_error.field_name)}[/yellow]")
 
             # Variables
             if pipe_error.variable_names:
-                variables_str = ", ".join([f"[yellow]{v}[/yellow]" for v in pipe_error.variable_names])
+                variables_str = ", ".join([f"[yellow]{escape(v)}[/yellow]" for v in pipe_error.variable_names])
                 console.print(f"   [cyan]Variables:[/cyan] {variables_str}")
 
             # Error message
-            console.print(f"   [cyan]→[/cyan] {pipe_error.message}")
+            console.print(f"   [cyan]→[/cyan] {escape(pipe_error.message)}")
 
             # Field path as secondary info
             if pipe_error.field_path:
-                console.print(f"   [dim]└─ Path: {pipe_error.field_path}[/dim]")
+                console.print(f"   [dim]└─ Path: {escape(pipe_error.field_path)}[/dim]")
 
             console.print()
 
     # Display dry run error message
     if exc.dry_run_error_message:
         console.print("[bold cyan]Dry Run Error:[/bold cyan]\n")
-        console.print(f"[yellow]{exc.dry_run_error_message}[/yellow]\n")
+        console.print(f"[yellow]{escape(exc.dry_run_error_message)}[/yellow]\n")
 
 
 def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | None = None) -> NoReturn:
@@ -206,7 +208,7 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
     console.print("\n[bold red]❌ Bundle validation failed[/bold red]\n")
 
     if bundle_path:
-        console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{bundle_path}[/yellow]\n")
+        console.print(f"[bold cyan]Bundle:[/bold cyan] [yellow]{escape(str(bundle_path))}[/yellow]\n")
 
     _display_validation_error_details(console=console, exc=exc)
 
@@ -372,7 +374,7 @@ def handle_remote_config_fetch_error(exc: RemoteConfigFetchError) -> NoReturn:
     )
 
     console.print("[bold cyan]Error details:[/bold cyan]")
-    console.print(f"  {exc}\n")
+    console.print(f"  {escape(str(exc))}\n")
 
     console.print("[bold green]💡 To fix:[/bold green]")
     console.print("  • Check your internet connection")
@@ -408,7 +410,7 @@ def handle_remote_config_validation_error(exc: RemoteConfigValidationError) -> N
     )
 
     console.print("[bold cyan]Error details:[/bold cyan]")
-    console.print(f"  {exc}\n")
+    console.print(f"  {escape(str(exc))}\n")
 
     console.print("[bold red]🚨 Please report this![/bold red]")
     console.print("  This error shouldn't happen and we want to fix it ASAP.")

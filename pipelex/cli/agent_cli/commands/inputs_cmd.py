@@ -77,6 +77,7 @@ async def _inputs_core(
 
 
 def inputs_cmd(
+    ctx: typer.Context,
     target: Annotated[
         str | None,
         typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
@@ -130,7 +131,7 @@ def inputs_cmd(
         agent_error("No pipe code or bundle file specified", "ArgumentError")
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-    make_pipelex_for_agent_cli(library_dirs=library_dirs)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"])
 
     try:
         result = asyncio.run(_inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs))

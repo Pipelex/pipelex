@@ -131,6 +131,7 @@ async def _run_pipeline_core(
 
 
 def run_cmd(
+    ctx: typer.Context,
     target: Annotated[
         str | None,
         typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
@@ -243,7 +244,7 @@ def run_cmd(
             except JsonTypeError as exc:
                 agent_error(f"Input file must be a valid JSON dictionary: {inputs}", "JsonTypeError", cause=exc)
 
-    make_pipelex_for_agent_cli()
+    make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
 
     try:
         result = asyncio.run(

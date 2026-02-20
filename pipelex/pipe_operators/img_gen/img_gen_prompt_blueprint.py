@@ -12,9 +12,6 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
-
-if TYPE_CHECKING:
-    from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_rendering import render_template
@@ -26,6 +23,9 @@ from pipelex.tools.jinja2.jinja2_models import Jinja2ContextKey
 from pipelex.tools.misc.context_provider_abstract import ContextProviderAbstract, ContextProviderError
 from pipelex.tools.misc.dict_utils import substitute_nested_in_context
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+
+if TYPE_CHECKING:
+    from pipelex.cogt.image.prompt_image import PromptImage
 
 
 class ImgGenPromptBlueprintValueError(ValueError):

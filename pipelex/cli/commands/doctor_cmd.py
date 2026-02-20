@@ -22,9 +22,6 @@ from pipelex.cogt.exceptions import InferenceBackendLibraryError
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.models.model_manager import ModelManager
-
-if TYPE_CHECKING:
-    from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.config import get_config
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import PipelexHub, get_console, set_pipelex_hub
@@ -44,6 +41,9 @@ from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+
+if TYPE_CHECKING:
+    from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 
 
 class BackendFileReport(BaseModel):

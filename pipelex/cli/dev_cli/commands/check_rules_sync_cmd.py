@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.hub import get_console
@@ -55,7 +56,7 @@ def check_rules_sync_cmd(show_diff: bool = True, quiet: bool = False) -> None:
         case AgentTarget.AGENTS | AgentTarget.CLAUDE:
             target_key = preferred_target
             if target_key not in kit_index.agent_rules.targets:
-                console.print(f"[red]Target '{preferred_target}' not found in index.toml[/red]")
+                console.print(f"[red]Target '{escape(preferred_target)}' not found in index.toml[/red]")
                 sys.exit(1)
             targets_to_check = {target_key: kit_index.agent_rules.targets[target_key]}
 

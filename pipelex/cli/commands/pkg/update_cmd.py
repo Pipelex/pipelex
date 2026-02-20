@@ -2,6 +2,7 @@ from pathlib import Path
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 
 from pipelex.core.packages.dependency_resolver import resolve_all_dependencies
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
@@ -46,14 +47,14 @@ def _display_lock_diff(console: Console, old_lock: LockFile, new_lock: LockFile)
 
     for address in sorted(added):
         version = new_lock.packages[address].version
-        console.print(f"  [green]+ {address}@{version}[/green]")
+        console.print(f"  [green]+ {escape(address)}@{escape(version)}[/green]")
 
     for address in sorted(removed):
         version = old_lock.packages[address].version
-        console.print(f"  [red]- {address}@{version}[/red]")
+        console.print(f"  [red]- {escape(address)}@{escape(version)}[/red]")
 
     for line in updated:
-        console.print(f"  [yellow]{line}[/yellow]")
+        console.print(f"  [yellow]{escape(line)}[/yellow]")
 
 
 def do_pkg_update() -> None:
@@ -71,7 +72,7 @@ def do_pkg_update() -> None:
     try:
         manifest = parse_methods_toml(content)
     except ManifestError as exc:
-        console.print(f"[red]Could not parse {MANIFEST_FILENAME}: {exc.message}[/red]")
+        console.print(f"[red]Could not parse {MANIFEST_FILENAME}: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     # Read existing lock for diff comparison
@@ -87,13 +88,13 @@ def do_pkg_update() -> None:
     try:
         resolved = resolve_all_dependencies(manifest, cwd)
     except (DependencyResolveError, TransitiveDependencyError) as exc:
-        console.print(f"[red]Dependency resolution failed: {exc.message}[/red]")
+        console.print(f"[red]Dependency resolution failed: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     try:
         new_lock = generate_lock_file(manifest, resolved)
     except LockFileError as exc:
-        console.print(f"[red]Lock file generation failed: {exc.message}[/red]")
+        console.print(f"[red]Lock file generation failed: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     # Write lock file

@@ -15,6 +15,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **StuffArtefact & Image Rendering** - How template access and image extraction work
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
+- **Init CLI Flows** - How `pipelex init` sets up the configuration directory
 - **Technical Design Decisions** - Why we chose X over Y
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
@@ -32,3 +33,4 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-code-braces: StuffArtefact & Image Rendering](./stuffartefact-and-image-rendering.md){ .md-button }
 - [:material-test-tube: Test Profile Configuration](./test-profile-configuration.md){ .md-button }
 - [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }
+- [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }

@@ -3,6 +3,7 @@ from pathlib import Path
 import typer
 from rich import box
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from pipelex.core.packages.exceptions import GraphBuildError, IndexBuildError
@@ -29,12 +30,12 @@ def _parse_concept_id(raw: str) -> ConceptId:
     console = get_console()
 
     if "::" not in raw:
-        console.print(f"[red]Invalid concept format: '{raw}'[/red]")
+        console.print(f"[red]Invalid concept format: '{escape(raw)}'[/red]")
         console.print("[dim]Expected format: package_address::concept_ref (e.g. __native__::native.Text)[/dim]")
         raise typer.Exit(code=1)
 
     if raw.count("::") > 1:
-        console.print(f"[red]Invalid concept format: '{raw}' contains multiple '::' separators.[/red]")
+        console.print(f"[red]Invalid concept format: '{escape(raw)}' contains multiple '::' separators.[/red]")
         console.print("[dim]Expected format: package_address::concept_ref (e.g. __native__::native.Text)[/dim]")
         raise typer.Exit(code=1)
 
@@ -43,7 +44,7 @@ def _parse_concept_id(raw: str) -> ConceptId:
     concept_ref = raw[separator_index + 2 :]
 
     if not package_address or not concept_ref:
-        console.print(f"[red]Invalid concept format: '{raw}' — both package_address and concept_ref must be non-empty.[/red]")
+        console.print(f"[red]Invalid concept format: '{escape(raw)}' — both package_address and concept_ref must be non-empty.[/red]")
         console.print("[dim]Expected format: package_address::concept_ref (e.g. __native__::native.Text)[/dim]")
         raise typer.Exit(code=1)
 
@@ -85,7 +86,7 @@ def do_pkg_graph(
         else:
             index = build_index_from_project(Path.cwd())
     except IndexBuildError as exc:
-        console.print(f"[red]Index build error: {exc}[/red]")
+        console.print(f"[red]Index build error: {escape(str(exc))}[/red]")
         raise typer.Exit(code=1) from exc
 
     if not index.entries:
@@ -95,7 +96,7 @@ def do_pkg_graph(
     try:
         graph = build_know_how_graph(index)
     except GraphBuildError as exc:
-        console.print(f"[red]Graph build error: {exc}[/red]")
+        console.print(f"[red]Graph build error: {escape(str(exc))}[/red]")
         raise typer.Exit(code=1) from exc
 
     engine = KnowHowQueryEngine(graph)
@@ -116,7 +117,7 @@ def _handle_from(console: Console, engine: KnowHowQueryEngine, raw_concept: str)
     pipes = engine.query_what_can_i_do(concept_id)
 
     if not pipes:
-        console.print(f"[yellow]No pipes accept concept '{raw_concept}'.[/yellow]")
+        console.print(f"[yellow]No pipes accept concept '{escape(raw_concept)}'.[/yellow]")
         return
 
     table = Table(title=f"Pipes accepting {raw_concept}", box=box.ROUNDED, show_header=True)
@@ -145,7 +146,7 @@ def _handle_to(console: Console, engine: KnowHowQueryEngine, raw_concept: str) -
     pipes = engine.query_what_produces(concept_id)
 
     if not pipes:
-        console.print(f"[yellow]No pipes produce concept '{raw_concept}'.[/yellow]")
+        console.print(f"[yellow]No pipes produce concept '{escape(raw_concept)}'.[/yellow]")
         return
 
     table = Table(title=f"Pipes producing {raw_concept}", box=box.ROUNDED, show_header=True)
@@ -184,13 +185,13 @@ def _handle_from_to(
     chains = engine.query_i_have_i_need(from_id, to_id, max_depth=max_depth)
 
     if not chains:
-        console.print(f"[yellow]No pipe chains found from '{raw_from}' to '{raw_to}' (max depth {max_depth}).[/yellow]")
+        console.print(f"[yellow]No pipe chains found from '{escape(raw_from)}' to '{escape(raw_to)}' (max depth {max_depth}).[/yellow]")
         return
 
     if compose:
         _print_compose_output(console, graph, chains, from_id, to_id)
     else:
-        console.print(f"[bold]Pipe chains from {raw_from} to {raw_to}:[/bold]\n")
+        console.print(f"[bold]Pipe chains from {escape(raw_from)} to {escape(raw_to)}:[/bold]\n")
         for chain_index, chain in enumerate(chains, start=1):
             steps = " -> ".join(chain)
             console.print(f"  {chain_index}. {steps}")
@@ -244,6 +245,8 @@ def _handle_check(console: Console, engine: KnowHowQueryEngine, check_arg: str) 
     compatible_params = engine.check_compatibility(source_key, target_key)
 
     if compatible_params:
-        console.print(f"[green]Compatible![/green] Output of '{source_key}' can feed into '{target_key}' via: {', '.join(compatible_params)}")
+        console.print(
+            f"[green]Compatible![/green] Output of '{escape(source_key)}' can feed into '{escape(target_key)}' via: {', '.join(compatible_params)}"
+        )
     else:
-        console.print(f"[yellow]Not compatible.[/yellow] Output of '{source_key}' does not match any input of '{target_key}'.")
+        console.print(f"[yellow]Not compatible.[/yellow] Output of '{escape(source_key)}' does not match any input of '{escape(target_key)}'.")

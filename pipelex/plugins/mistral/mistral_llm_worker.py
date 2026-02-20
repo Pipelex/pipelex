@@ -3,10 +3,6 @@ from typing import TYPE_CHECKING, Any
 from mistralai import Mistral
 from mistralai.models import MistralPromptMode, TextChunk, ThinkChunk
 from mistralai.types import UNSET
-
-if TYPE_CHECKING:
-    from mistralai.models import ChatCompletionResponse
-    from mistralai.types import OptionalNullable
 from typing_extensions import override
 
 from pipelex import log
@@ -21,6 +17,10 @@ from pipelex.plugins.mistral.mistral_exceptions import MistralWorkerConfiguratio
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+if TYPE_CHECKING:
+    from mistralai.models import ChatCompletionResponse
+    from mistralai.types import OptionalNullable
 
 
 class MistralLLMWorker(LLMWorkerInternalAbstract):

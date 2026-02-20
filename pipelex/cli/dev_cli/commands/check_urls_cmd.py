@@ -8,6 +8,7 @@ import sys
 
 import httpx
 from pydantic import BaseModel
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
@@ -167,9 +168,9 @@ def check_urls_cmd(quiet: bool = False, timeout: int = DEFAULT_TIMEOUT) -> None:
     if not quiet:
         for result in results:
             if result.is_ok:
-                console.print(f"  [dim]{result.name}[/dim] [green]✓[/green] {result.status_code}")
+                console.print(f"  [dim]{escape(result.name)}[/dim] [green]✓[/green] {result.status_code}")
             else:
-                console.print(f"  [dim]{result.name}[/dim] [red]✗[/red] {result.error_message}")
+                console.print(f"  [dim]{escape(result.name)}[/dim] [red]✗[/red] {escape(result.error_message or '')}")
 
     # Count successes and failures
     ok_count = sum(1 for result in results if result.is_ok)

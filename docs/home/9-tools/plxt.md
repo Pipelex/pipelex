@@ -113,8 +113,8 @@ The following Make targets are available for convenience:
 
 | Target | Description |
 |--------|-------------|
-| `make plxt-format` | Format all TOML/MTHDS/PLX files |
-| `make plxt-lint` | Lint all TOML/MTHDS/PLX files |
+| `make plxt-format` | Format all MTHDS/TOML/PLX files |
+| `make plxt-lint` | Lint all MTHDS/TOML/PLX files |
 | `make merge-check-plxt-format` | Check formatting without modifying files |
 | `make merge-check-plxt-lint` | Run lint check |
 

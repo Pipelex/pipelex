@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Annotated
 
-if TYPE_CHECKING:
-    from pathlib import Path
-
 import typer
 from posthog import tag
 
@@ -26,6 +23,9 @@ from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 COMMAND = "which"
 

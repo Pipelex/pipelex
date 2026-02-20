@@ -19,7 +19,7 @@ from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.config import get_config
-from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
+from pipelex.graph.graph_rendering import render_graph_from_spec
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_console, get_telemetry_manager
 from pipelex.pipelex import Pipelex
@@ -66,52 +66,21 @@ def _do_graph_render(
     include_mermaidflow = mermaidflow or (not mermaidflow and not reactflow)
     include_reactflow = reactflow or (not mermaidflow and not reactflow)
 
-    async def render_and_save() -> dict[str, Path]:
-        """Generate graph outputs and save to directory."""
-        base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+    base_graph_config = get_config().pipelex.pipeline_execution_config.graph_config
+    flow_direction = direction or FlowchartDirection.TOP_DOWN
 
-        # Enable all content formats (JSON, text, HTML) so the interactive HTML
-        # viewers can display data panels alongside the graph visualization
-        new_data_inclusion = base_graph_config.data_inclusion.model_copy(
-            update={
-                "stuff_json_content": True,
-                "stuff_text_content": True,
-                "stuff_html_content": True,
-            }
-        )
-
-        # Only generate the final HTML files requested by the user — skip intermediate
-        # formats (graphspec JSON, Mermaid .mmd source, ReactFlow viewspec JSON) that
-        # are only useful during pipeline execution, not for standalone rendering
-        new_graphs_inclusion = base_graph_config.graphs_inclusion.model_copy(
-            update={
-                "graphspec_json": False,
-                "mermaidflow_mmd": False,
-                "mermaidflow_html": include_mermaidflow,
-                "reactflow_viewspec": False,
-                "reactflow_html": include_reactflow,
-            }
-        )
-        graph_config = base_graph_config.model_copy(
-            update={
-                "data_inclusion": new_data_inclusion,
-                "graphs_inclusion": new_graphs_inclusion,
-            }
-        )
-
-        flow_direction = direction or FlowchartDirection.TOP_DOWN
-
-        graph_outputs = await generate_graph_outputs(
+    saved_files = asyncio.run(
+        render_graph_from_spec(
             graph_spec=graph_spec,
-            graph_config=graph_config,
+            graph_config=base_graph_config,
+            include_mermaidflow=include_mermaidflow,
+            include_reactflow=include_reactflow,
+            output_dir=output_dir,
             title=snake_to_title_case(input_file.stem),
             direction=flow_direction,
             include_subgraphs=subgraphs,
         )
-
-        return save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
-
-    saved_files = asyncio.run(render_and_save())
+    )
 
     # Report saved files
     for file_path in saved_files.values():
@@ -143,7 +112,7 @@ def graph_render_cmd(
     ] = None,
     direction: Annotated[
         FlowchartDirection | None,
-        typer.Option("--direction", help="Flowchart direction (default: TB)"),
+        typer.Option("--direction", help="Flowchart direction"),
     ] = None,
     mermaidflow: Annotated[
         bool,

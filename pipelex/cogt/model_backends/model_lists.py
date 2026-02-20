@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 
+from rich.markup import escape
+
 from pipelex.cli.exceptions import PipelexCLIError
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_console, get_models_manager
@@ -194,10 +196,12 @@ class ModelLister:
         if not any_listed and unsupported_sdks:
             console = get_console()
             if not flat:
-                console.print(f"\n[yellow]Note: Backend '{backend_name}' has models using SDKs that we don't support for remote listing:[/yellow]")
+                console.print(
+                    f"\n[yellow]Note: Backend '{escape(backend_name)}' has models using SDKs that we don't support for remote listing:[/yellow]"
+                )
                 for sdk in unsupported_sdks:
                     console.print(f"  • {sdk} ({len(models_by_sdk[sdk])} configured model(s))")
                 console.print("\n[dim]Configured models are still available for use in pipelines.[/dim]\n")
             else:
                 # In flat mode, just print a simple comment
-                console.print(f"# Note: Backend '{backend_name}' has {len(unsupported_sdks)} SDK(s) that we don't support for remote listing")
+                console.print(f"# Note: Backend '{escape(backend_name)}' has {len(unsupported_sdks)} SDK(s) that we don't support for remote listing")

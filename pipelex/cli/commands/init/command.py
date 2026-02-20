@@ -5,6 +5,7 @@ import shutil
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.prompt import Confirm
 
 from pipelex.cli.commands.init.backends import (
@@ -186,9 +187,6 @@ def execute_initialization(
         target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
 
     """
-    # Track if backends were just copied during config initialization
-    backends_just_copied_during_config = False
-
     # Step 1: Initialize config if needed
     if needs_config:
         # Check if backends.toml exists before copying
@@ -197,11 +195,11 @@ def execute_initialization(
         console.print()
         init_config(reset=reset, target_dir=target_config_dir)
 
-        # If backends.toml was just created (freshly copied), always prompt for backend selection
+        # init_config skips the inference/ directory (handled independently by the inference step).
+        # Detect first-time setup: if backends.toml didn't exist before, inference needs to be set up.
         backends_exists_now = path_exists(backends_toml_path)
-        backends_just_copied_during_config = not backends_existed_before and backends_exists_now
 
-        if backends_just_copied_during_config or (check_inference and backends_exists_now):
+        if not backends_existed_before or (check_inference and backends_exists_now):
             needs_inference = True
 
         # If we're NOT going to run customize_backends_config (which handles gateway terms),
@@ -209,15 +207,15 @@ def execute_initialization(
         if not needs_inference and backends_existed_before:
             _check_gateway_terms_if_needed(console, backends_toml_path)
 
-    # Determine if this is truly a first-time setup (either tracked from before or just copied now)
-    first_time_setup = is_first_time_backends_setup or backends_just_copied_during_config
+    # Determine if this is truly a first-time setup
+    first_time_setup = is_first_time_backends_setup
 
     # Step 2: Set up inference backends if needed
     if needs_inference:
         console.print()
 
-        # If reset is True and we didn't already copy via config init, copy the template files
-        if reset and not backends_just_copied_during_config:
+        # Copy the inference template files when resetting (init_config skips inference/)
+        if reset:
             template_inference_dir = os.path.join(str(get_kit_configs_dir()), "inference")
             effective_config_dir = target_config_dir or config_manager.pipelex_config_dir
             target_inference_dir = os.path.join(effective_config_dir, "inference")
@@ -246,6 +244,13 @@ def execute_initialization(
                     src_path = os.path.join(template_deck_dir, deck_file)
                     dst_path = os.path.join(target_deck_dir, deck_file)
                     shutil.copy2(src_path, dst_path)
+
+            # Reset routing_profiles.toml
+            template_routing_path = os.path.join(template_inference_dir, "routing_profiles.toml")
+            target_routing_path = os.path.join(target_inference_dir, "routing_profiles.toml")
+            if os.path.exists(template_routing_path):
+                shutil.copy2(template_routing_path, target_routing_path)
+                console.print("✅ Reset routing_profiles.toml from template")
 
             first_time_setup = True  # Treat as first-time setup since we just replaced the files
 
@@ -439,7 +444,7 @@ def init_cmd(
         # Re-raise Exit exceptions
         raise
     except Exception as exc:
-        console.print(f"\n[red]⚠ Warning: Initialization failed: {exc}[/red]", style="bold")
+        console.print(f"\n[red]⚠ Warning: Initialization failed: {escape(str(exc))}[/red]", style="bold")
         if needs_config:
             console.print("[red]Please run 'pipelex init config' manually.[/red]")
         return

@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.cli.dev_cli.commands.gateway_models_generator import (
@@ -41,10 +42,10 @@ def update_gateway_models_cmd(quiet: bool = False) -> None:
         model_specs = fetch_gateway_model_specs()
     except RemoteConfigFetchError as exc:
         if quiet:
-            console.print(f"[red]✗ Gateway models update: FAILED[/red] - {exc}")
+            console.print(f"[red]✗ Gateway models update: FAILED[/red] - {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] Failed to fetch remote configuration\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] Failed to fetch remote configuration\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]Gateway Models Update: FAILED[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -54,10 +55,10 @@ def update_gateway_models_cmd(quiet: bool = False) -> None:
         sys.exit(1)
     except RemoteConfigValidationError as exc:
         if quiet:
-            console.print(f"[red]✗ Gateway models update: FAILED[/red] - {exc}")
+            console.print(f"[red]✗ Gateway models update: FAILED[/red] - {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] Invalid remote configuration\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] Invalid remote configuration\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]Gateway Models Update: FAILED[/bold red]",
                 border_style="red",
                 padding=(1, 2),

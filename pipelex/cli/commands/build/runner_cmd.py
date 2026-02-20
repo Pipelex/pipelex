@@ -2,9 +2,6 @@ import asyncio
 from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
-if TYPE_CHECKING:
-    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-
 import click
 import typer
 from posthog import tag
@@ -34,6 +31,9 @@ from pipelex.tools.misc.file_utils import (
     ensure_directory_for_file_path,
     save_text_to_path,
 )
+
+if TYPE_CHECKING:
+    from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
 COMMAND = "build"
 SUB_COMMAND_RUNNER = "runner"

@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import typer
+from rich.markup import escape
 
 from pipelex.core.packages.dependency_resolver import resolve_all_dependencies
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
@@ -25,19 +26,19 @@ def do_pkg_lock() -> None:
     try:
         manifest = parse_methods_toml(content)
     except ManifestError as exc:
-        console.print(f"[red]Could not parse {MANIFEST_FILENAME}: {exc.message}[/red]")
+        console.print(f"[red]Could not parse {MANIFEST_FILENAME}: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     try:
         resolved = resolve_all_dependencies(manifest, cwd)
     except (DependencyResolveError, TransitiveDependencyError) as exc:
-        console.print(f"[red]Dependency resolution failed: {exc.message}[/red]")
+        console.print(f"[red]Dependency resolution failed: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     try:
         lock = generate_lock_file(manifest, resolved)
     except LockFileError as exc:
-        console.print(f"[red]Lock file generation failed: {exc.message}[/red]")
+        console.print(f"[red]Lock file generation failed: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     lock_content = serialize_lock_file(lock)

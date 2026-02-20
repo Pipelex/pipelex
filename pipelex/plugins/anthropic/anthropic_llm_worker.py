@@ -5,9 +5,6 @@ from anthropic.types import OutputConfigParam, ThinkingConfigParam
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
 
-if TYPE_CHECKING:
-    from anthropic.types import Message
-
 from pipelex import log
 from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -31,6 +28,9 @@ from pipelex.plugins.anthropic.anthropic_factory import (
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+
+if TYPE_CHECKING:
+    from anthropic.types import Message
 
 
 @pydantic_dataclass

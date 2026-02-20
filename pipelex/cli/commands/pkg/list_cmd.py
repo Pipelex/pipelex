@@ -2,6 +2,7 @@ from pathlib import Path
 
 import typer
 from rich import box
+from rich.markup import escape
 from rich.table import Table
 
 from pipelex.core.packages.discovery import MANIFEST_FILENAME, find_package_manifest
@@ -22,7 +23,7 @@ def do_pkg_list() -> None:
     try:
         manifest = find_package_manifest(dummy_bundle_path)
     except ManifestError as exc:
-        console.print(f"[red]Error reading METHODS.toml: {exc.message}[/red]")
+        console.print(f"[red]Error reading METHODS.toml: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     if manifest is None:
