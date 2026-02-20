@@ -147,6 +147,19 @@ class BuilderLoop:
                     pipelex_bundle_spec = self._strip_namespace_from_pipe_codes(pipelex_bundle_spec=pipelex_bundle_spec)
                 else:
                     log.error(f"❌ Validation failed after {max_attempts} attempts, raising error")
+                    # Save the last bundle state so the user can inspect/fix it manually
+                    try:
+                        mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                        failed_bundle_path = get_incremental_file_path(
+                            base_path=output_dir or "results/pipe-builder",
+                            base_name="failed_bundle",
+                            extension="mthds",
+                        )
+                        save_text_to_path(text=mthds_content, path=str(failed_bundle_path), create_directory=True)
+                        log.warning(f"Last bundle state saved to: {failed_bundle_path}")
+                        exc.failed_bundle_path = str(failed_bundle_path)
+                    except Exception as save_exc:
+                        log.warning(f"Could not save failed bundle state: {save_exc}")
                     raise
 
         return pipelex_bundle_spec, pipe_output.graph_spec

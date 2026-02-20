@@ -74,6 +74,8 @@ def build_cmd(
         validate_extra: dict[str, Any] = {"validation_errors": validation_errors}
         if exc.dry_run_error_message:
             validate_extra["dry_run_error"] = exc.dry_run_error_message
+        if exc.failed_bundle_path:
+            validate_extra["failed_bundle_path"] = exc.failed_bundle_path
         agent_error(exc.message, "ValidateBundleError", cause=exc, **validate_extra)
 
     except PipeOperatorModelChoiceError as exc:
