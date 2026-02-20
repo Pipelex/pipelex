@@ -13,8 +13,8 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
-from pipelex.pipeline.execute import execute_pipeline
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.pipeline.runner import PipelexRunner
 from tests.integration.pipelex.pipes.controller.pipe_sequence.pipe_sequence import Document, ProductRating
 
 
@@ -67,10 +67,12 @@ async def test_review_analysis_sequence_with_batching(
         )
         working_memory = WorkingMemoryFactory.make_from_single_stuff(document_stuff)
         # Execute the pipeline
-        pipe_output = await execute_pipeline(
+        runner = PipelexRunner()
+        response = await runner.execute_pipeline(
             pipe_code="analyze_reviews_sequence",
             inputs=working_memory,
         )
+        pipe_output = response.pipe_output
 
     # Basic output validation
     assert pipe_output is not None

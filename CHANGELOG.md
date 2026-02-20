@@ -1,3 +1,19 @@
+## [Unreleased]
+
+### Changed
+
+- **CI Runner Optimization**: Split self-hosted runners into dedicated test (D32) and lint (D4) pools with pre-baked Docker image (Python 3.10-3.14, UV, dependency cache) for faster job startup.
+- **MTHDS Light Client Extraction**: The light client protocol (runner, pipeline models, pipe output abstractions) has been extracted from pipelex into the new [`mthds`](https://github.com/mthds-ai/mthds-python) package on PyPI. Pipelex now depends on `mthds>=0.0.1` and implements its `RunnerProtocol`.
+- **Global/Local Config Split**: `pipelex init` now creates configuration in `~/.pipelex/` (global) by default. Use `pipelex init --local` to create project-level overrides in `{project_root}/.pipelex/`. Config loading merges: package defaults → global → project → overrides.
+- **IDE Extension Detection**: Extension check now uses `code --list-extensions` / `cursor --list-extensions` for reliable detection instead of folder scanning. Shows separate marketplace links for VS Code (Microsoft Marketplace) and Cursor (Open VSX Registry).
+- **Quieter `pipelex init`**: Removed verbose file listing and reset messages from config initialization output.
+
+### Fixed
+
+- **`find_project_root` Home Directory Bug**: The project root walker no longer considers the home directory (`~`) as a project root, even if it contains stray marker files like `package.json`.
+- **Python 3.10 Compatibility**: Fixed `datetime.UTC` import (Python 3.11+) to use `datetime.timezone.utc`.
+
+
 ## [v0.17.6] - 2026-02-14
 
 ### Added

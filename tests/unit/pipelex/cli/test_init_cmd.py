@@ -28,16 +28,14 @@ class TestInitCmd:
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(target_dir)
-
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
-        mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        init_config(reset=False)
+        result = init_config(reset=False)
 
-        # Verify
+        # Verify file was copied and count is correct
         assert (target_dir / "pipelex.toml").exists()
-        mock_echo.assert_any_call(f"✅ Copied 1 files to {target_dir}:")
+        assert result == 1
 
     def test_do_init_config_skips_existing_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories with existing file
@@ -54,24 +52,18 @@ class TestInitCmd:
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(target_dir)
-
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
-        mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        init_config(reset=False)
+        result = init_config(reset=False)
 
         # Verify existing file was not overwritten
         content = (target_dir / "pipelex.toml").read_text()
         assert "version = '0.9'" in content
 
-        # Verify new file was copied
+        # Verify new file was copied and only 1 file was copied (existing was skipped)
         assert (target_dir / "new_file.toml").exists()
-
-        # Verify messages
-        calls = [call.args[0] for call in mock_echo.call_args_list]
-        assert any("✅ Copied 1 files to" in call for call in calls)
-        assert any("ℹ️  Skipped 1 existing files" in call for call in calls)
+        assert result == 1
 
     def test_do_init_config_reset_overwrites_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories with existing file
@@ -87,21 +79,15 @@ class TestInitCmd:
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(target_dir)
-
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
-        mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        init_config(reset=True)
+        result = init_config(reset=True)
 
         # Verify file was overwritten
         content = (target_dir / "pipelex.toml").read_text()
         assert "version = '1.0'" in content
-
-        # Verify no skipped files message
-        calls = [call.args[0] for call in mock_echo.call_args_list]
-        assert any("✅ Copied 1 files to" in call for call in calls)
-        assert not any("ℹ️  Skipped" in call for call in calls)
+        assert result == 1
 
     def test_do_init_config_nested_directory_structure(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Verify init_config copies non-inference files and skips the inference/ directory."""
@@ -125,12 +111,10 @@ class TestInitCmd:
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(target_dir)
-
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
-        mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        init_config(reset=False)
+        result = init_config(reset=False)
 
         # Verify non-inference files were created
         assert (target_dir / "pipelex.toml").exists()
@@ -139,8 +123,7 @@ class TestInitCmd:
         assert not (target_dir / "inference").exists()
 
         # Verify correct number of files copied (only pipelex.toml)
-        calls = [call.args[0] for call in mock_echo.call_args_list]
-        assert any("✅ Copied 1 files to" in call for call in calls)
+        assert result == 1
 
     def test_do_init_config_handles_permission_error(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup directories
@@ -155,7 +138,6 @@ class TestInitCmd:
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(target_dir)
-
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
         mocker.patch("shutil.copy2", side_effect=PermissionError("Permission denied"))
 
@@ -177,21 +159,16 @@ class TestInitCmd:
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
         mock_config_manager.pipelex_config_dir = str(target_dir)
-
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
-        mock_echo = mocker.patch("typer.echo")
 
         # Execute
-        init_config(reset=False)
+        result = init_config(reset=False)
 
         # Verify directory was created and file was copied
         assert target_dir.exists()
         assert target_dir.is_dir()
         assert (target_dir / "pipelex.toml").exists()
-
-        # Verify success message
-        calls = [call.args[0] for call in mock_echo.call_args_list]
-        assert any("✅ Copied 1 files to" in call for call in calls)
+        assert result == 1
 
     def test_do_init_config_dry_run_does_not_copy_files(self, tmp_path: Path, mocker: MockerFixture) -> None:
         # Setup template directories
@@ -243,7 +220,6 @@ class TestInitCmd:
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         mock_customize = mocker.patch("pipelex.cli.commands.init.backends.customize_backends_config")
-        mocker.patch("typer.echo")
 
         # Execute
         init_config(reset=False)
@@ -268,7 +244,6 @@ class TestInitCmd:
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         mock_customize = mocker.patch("pipelex.cli.commands.init.backends.customize_backends_config")
-        mocker.patch("typer.echo")
 
         # Execute
         init_config(reset=False)

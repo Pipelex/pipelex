@@ -5,7 +5,7 @@ import pytest
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.urls import URLs
 from tests.cases.documents import DocumentTestCases
 from tests.cases.images import ImageTestCases
@@ -33,15 +33,18 @@ class TestFilenameHtmlE2E:
         assert ImageContent(url=URLs.png_example_1).filename is None
         assert DocumentContent(url=URLs.pdf_example_1).filename is None
 
-        pipe_output = await execute_pipeline(
-            pipe_code="describe_with_filenames_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
+            pipe_run_mode=pipe_run_mode,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="describe_with_filenames_e2e",
             inputs={
                 "image": image_content,
                 "document": document_content,
             },
-            pipe_run_mode=pipe_run_mode,
         )
+        pipe_output = response.pipe_output
 
         assert pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:

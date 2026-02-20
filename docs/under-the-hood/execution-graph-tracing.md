@@ -29,7 +29,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 
 | Scenario | CLI | API | Result |
 |----------|-----|-----|--------|
-| Generate execution graph | `pipelex run my_pipe --graph` | `execute_pipeline(..., execution_config.is_generate_graph=True)` | GraphSpec JSON + HTML viewers |
+| Generate execution graph | `pipelex run my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
 | Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
 | Dry run with graph | `--dry-run --graph` | `dry_run_pipe_with_graph(pipe)` | Graph of mock execution |
@@ -60,14 +60,17 @@ pipelex run my_pipe --dry-run --graph --mock-inputs
 ### API
 
 ```python
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipe_run.dry_run_with_graph import dry_run_pipe_with_graph
 
 # Execute with graph tracing via config
-result = await execute_pipeline(
-    pipe_code="my_pipe",
+runner = PipelexRunner(
     execution_config=config.with_graph_config_overrides(generate_graph=True),
 )
+response = await runner.execute_pipeline(
+    pipe_code="my_pipe",
+)
+pipe_output = response.pipe_output
 
 # Dry run directly returns GraphSpec
 graph_spec = await dry_run_pipe_with_graph(pipe)

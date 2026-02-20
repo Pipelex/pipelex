@@ -123,16 +123,22 @@ def app_callback(
     check_readiness()
 
 
-@app.command(name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")
+@app.command(name="init", help="Initialize Pipelex configuration in ~/.pipelex (global) or project .pipelex (--local)")
 def init_command(
     focus: Annotated[InitFocus, typer.Argument(help="What to initialize: 'config', 'telemetry', or 'all'")] = InitFocus.ALL,
+    local: Annotated[
+        bool, typer.Option("--local", "-l", help="Create project-level .pipelex/ at the detected project root instead of global ~/.pipelex/")
+    ] = False,
 ) -> None:
     """Initialize Pipelex configuration and telemetry.
+
+    By default, creates global configuration in ~/.pipelex/.
+    Use --local to create project-level overrides in {project_root}/.pipelex/.
 
     Note: Config updates are not yet supported. This command always performs a full
     reset of the configuration.
     """
-    init_cmd(focus=focus)
+    init_cmd(focus=focus, local=local)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and suggest fixes")

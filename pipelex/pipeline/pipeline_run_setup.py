@@ -1,8 +1,9 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from mthds.models.pipeline_inputs import PipelineInputs
+
 from pipelex import log
-from pipelex.client.protocol import PipelineInputs
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory

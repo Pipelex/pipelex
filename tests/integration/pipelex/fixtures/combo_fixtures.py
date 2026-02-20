@@ -26,7 +26,7 @@ from pytest import MonkeyPatch
 
 from pipelex.hub import get_console
 from pipelex.pipelex import Pipelex
-from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.integration.pipelex.fixtures.model_selection import (
@@ -57,16 +57,16 @@ def _setup_routing_for_backend(backend_name: str) -> tuple[MonkeyPatch, Path]:
     # Set up routing BEFORE Pipelex.make()
     routing_profile_name = f"all_{backend_name}"
     routing_monkeypatch = MonkeyPatch()
-    routing_profiles_path = Path(ConfigPaths.ROUTING_PROFILES_FILE_PATH)
+    routing_profiles_path = Path(config_manager.routing_profiles_file_path)
     routing_profiles_doc = load_toml_with_tomlkit(str(routing_profiles_path))
     routing_profiles_doc["active"] = routing_profile_name
     routing_override_dir = Path(tempfile.mkdtemp(prefix="pipelex-routing-override-"))
     routing_override_path = routing_override_dir / routing_profiles_path.name
     save_toml_to_path(routing_profiles_doc, str(routing_override_path))
     routing_monkeypatch.setattr(
-        ConfigPaths,
-        "ROUTING_PROFILES_FILE_PATH",
-        str(routing_override_path),
+        type(config_manager),
+        "routing_profiles_file_path",
+        property(lambda _self: str(routing_override_path)),
     )
     get_console().print(f"[cyan]Routing to backend:[/cyan] {backend_name}")
 

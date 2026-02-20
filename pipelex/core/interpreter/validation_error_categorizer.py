@@ -9,14 +9,6 @@ from pipelex.core.bundles.exceptions import (
 )
 from pipelex.core.interpreter.helpers import ValidationErrorScope, get_error_scope
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.types import StrEnum
-
-
-class ErrorCatKey(StrEnum):
-    LOC = "loc"
-    MSG = "msg"
-    TYPE = "type"
-
 
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
@@ -190,8 +182,8 @@ def categorize_blueprint_validation_error(
     domain = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD)) if blueprint_dict else None
     source = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD)) if blueprint_dict else None
 
-    loc = error.get(ErrorCatKey.LOC.value, ())
-    message = error.get(ErrorCatKey.MSG.value, "Unknown validation error")
+    loc = error["loc"]
+    message = error["msg"]
 
     # Extract pipe code from location if available (e.g., ('pipes', 'extract_details_of_task', ...))
     pipe_code: str | None = None

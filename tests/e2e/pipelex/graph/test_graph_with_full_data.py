@@ -22,7 +22,7 @@ from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases
@@ -114,16 +114,19 @@ class TestGraphWithFullData:
         )
 
         # Run pipeline with graph tracing and full data capture
-        pipe_output = await execute_pipeline(
-            pipe_code="cv_job_matcher",
+        runner = PipelexRunner(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_operators/pipe_compose"],
+            pipe_run_mode=pipe_run_mode,
+            execution_config=exec_config,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="cv_job_matcher",
             inputs={
                 "cv_pdf": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_CV),
                 "job_offer_pdf": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2),
             },
-            pipe_run_mode=pipe_run_mode,
-            execution_config=exec_config,
         )
+        pipe_output = response.pipe_output
 
         # Basic assertions
         assert pipe_output is not None

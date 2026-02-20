@@ -30,7 +30,7 @@ from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
 from pipelex.tools.misc.file_utils import get_incremental_directory_path
@@ -299,15 +299,18 @@ def run_cmd(
         )
 
         try:
-            pipe_output = await execute_pipeline(
-                pipe_code=pipe_code,
-                mthds_content=mthds_content,
+            runner = PipelexRunner(
                 bundle_uri=bundle_path,
-                inputs=pipeline_inputs,
                 pipe_run_mode=pipe_run_mode,
                 execution_config=execution_config,
                 library_dirs=library_dir,
             )
+            response = await runner.execute_pipeline(
+                pipe_code=pipe_code,
+                mthds_content=mthds_content,
+                inputs=pipeline_inputs,
+            )
+            pipe_output = response.pipe_output
         except PipelineExecutionError as exc:
             typer.secho(f"Failed to execute pipeline '{exc.pipe_code}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc

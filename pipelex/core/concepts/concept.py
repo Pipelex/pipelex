@@ -1,7 +1,8 @@
 from typing import Any, Callable
 
 from kajson.kajson_manager import KajsonManager
-from pydantic import BaseModel, ConfigDict, field_validator
+from mthds.models.concept import ConceptAbstract
+from pydantic import field_validator
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
@@ -22,16 +23,7 @@ from pipelex.tools.misc.string_utils import pascal_case_to_sentence
 from pipelex.tools.typing.class_utils import are_classes_equivalent, has_compatible_field
 
 
-class Concept(BaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    code: str
-    domain_code: str
-    description: str
-    structure_class_name: str
-    # TODO: rethink this refines field here.
-    refines: str | None = None
-
+class Concept(ConceptAbstract):
     @field_validator("code")
     @classmethod
     def validate_code(cls, code: str) -> str:
@@ -74,10 +66,6 @@ class Concept(BaseModel):
         # Invalid refines value
         msg = f"Refines '{refines}' must be a valid concept ref (domain.ConceptCode) or concept code (PascalCase)"
         raise ConceptValueError(msg)
-
-    @property
-    def concept_ref(self) -> str:
-        return f"{self.domain_code}.{self.code}"
 
     @property
     def simple_concept_ref(self) -> str:

@@ -5,7 +5,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from tests.cases import ImageTestCases
 
 LIBRARY_DIRS = ["tests/e2e/pipelex/pipes/pipe_operators/pipe_img_gen"]
@@ -20,11 +20,14 @@ class TestPipeImgGen:
 
     async def test_generate_image_basic(self, pipe_run_mode: PipeRunMode):
         """Test basic text-to-image generation with a simple prompt."""
-        pipe_output = await execute_pipeline(
-            pipe_code="generate_image_basic_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="generate_image_basic_e2e",
+        )
+        pipe_output = response.pipe_output
 
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
@@ -38,11 +41,14 @@ class TestPipeImgGen:
     @pytest.mark.xfail(reason="Negative prompt is not supported by most models and when it is, it doesn't work well", strict=False)
     async def test_generate_image_with_negative_prompt(self, pipe_run_mode: PipeRunMode):
         """Test text-to-image generation with negative prompt."""
-        pipe_output = await execute_pipeline(
-            pipe_code="generate_image_with_negative_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
             pipe_run_mode=pipe_run_mode,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="generate_image_with_negative_e2e",
+        )
+        pipe_output = response.pipe_output
 
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
@@ -55,12 +61,15 @@ class TestPipeImgGen:
 
     async def test_generate_image_from_text(self, pipe_run_mode: PipeRunMode):
         """Test image generation with dynamic prompt from input."""
-        pipe_output = await execute_pipeline(
-            pipe_code="generate_image_from_input_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
-            inputs={"image_prompt": "A serene Japanese garden with cherry blossoms"},
             pipe_run_mode=pipe_run_mode,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="generate_image_from_input_e2e",
+            inputs={"image_prompt": "A serene Japanese garden with cherry blossoms"},
+        )
+        pipe_output = response.pipe_output
 
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
@@ -85,12 +94,15 @@ class TestPipeImgGen:
         image_uri: str,
     ):
         """Test img2img with a single input image."""
-        pipe_output = await execute_pipeline(
-            pipe_code="img2img_single_input_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
-            inputs={"source_image": ImageContent(url=image_uri)},
             pipe_run_mode=pipe_run_mode,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="img2img_single_input_e2e",
+            inputs={"source_image": ImageContent(url=image_uri)},
+        )
+        pipe_output = response.pipe_output
 
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
@@ -115,12 +127,15 @@ class TestPipeImgGen:
         image_uri: str,
     ):
         """Test img2img style transfer transformation."""
-        pipe_output = await execute_pipeline(
-            pipe_code="img2img_style_transfer_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
-            inputs={"source_image": ImageContent(url=image_uri)},
             pipe_run_mode=pipe_run_mode,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="img2img_style_transfer_e2e",
+            inputs={"source_image": ImageContent(url=image_uri)},
+        )
+        pipe_output = response.pipe_output
 
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
@@ -147,15 +162,18 @@ class TestPipeImgGen:
         subject_image_uri: str,
     ):
         """Test blending two images: style from one and subject from the other."""
-        pipe_output = await execute_pipeline(
-            pipe_code="img2img_blend_two_images_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
+            pipe_run_mode=pipe_run_mode,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="img2img_blend_two_images_e2e",
             inputs={
                 "style_image": ImageContent(url=style_image_uri),
                 "subject_image": ImageContent(url=subject_image_uri),
             },
-            pipe_run_mode=pipe_run_mode,
         )
+        pipe_output = response.pipe_output
 
         assert pipe_output is not None
         assert pipe_output.working_memory is not None

@@ -27,7 +27,7 @@ from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
@@ -206,7 +206,7 @@ async def _generate_graph_for_bundle(
     )
 
     # Ensure the bundle's parent directory is included in library_dirs
-    # so execute_pipeline can resolve sibling dependencies
+    # so PipelexRunner can resolve sibling dependencies
     bundle_parent_dir = str(bundle_path.parent.resolve())
     effective_library_dirs: list[str]
     if library_dirs:
@@ -216,14 +216,17 @@ async def _generate_graph_for_bundle(
     else:
         effective_library_dirs = [bundle_parent_dir]
 
-    pipe_output = await execute_pipeline(
-        pipe_code=pipe_code,
-        mthds_content=mthds_content,
+    runner = PipelexRunner(
         bundle_uri=str(bundle_path),
         pipe_run_mode=PipeRunMode.DRY,
         execution_config=execution_config,
         library_dirs=effective_library_dirs,
     )
+    response = await runner.execute_pipeline(
+        pipe_code=pipe_code,
+        mthds_content=mthds_content,
+    )
+    pipe_output = response.pipe_output
 
     if not pipe_output.graph_spec:
         msg = "Pipeline execution did not produce a graph spec"
@@ -389,7 +392,7 @@ def validate_cmd(
     if graph and not bundle_path:
         agent_error("--graph requires a bundle target; it cannot be used with a standalone pipe", "ArgumentError")
 
-    # Convert library_dirs to list[str] for graph helper (execute_pipeline expects list[str])
+    # Convert library_dirs to list[str] for graph helper (PipelexRunner expects list[str])
     library_dir_strings = [str(lib_dir) for lib_dir in library_dirs] if library_dirs else None
 
     make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
