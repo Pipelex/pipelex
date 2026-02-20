@@ -216,12 +216,26 @@ class TestGraphCmd:
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
-        mock_asyncio_run = self._mock_generate_graph_for_bundle(mocker, direction="left_to_right")
+        mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
+        mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
+
+        result = {
+            "graph_files": {"reactflow_html": "graph/reactflow.html"},
+            "graph_output_dir": "mock_output",
+            "pipe_code": "my_pipe",
+            "direction": "left_to_right",
+        }
+        mock_generate = mocker.patch(
+            f"{GRAPH_CMD_MODULE}.generate_graph_for_bundle",
+            new=mocker.AsyncMock(return_value=result),
+        )
 
         graph_cmd(ctx=agent_ctx, target=str(mthds_file), direction=FlowchartDirection.LEFT_TO_RIGHT)
 
-        # Verify asyncio.run was called with a coroutine from generate_graph_for_bundle
-        mock_asyncio_run.assert_called_once()
+        # Verify generate_graph_for_bundle was called with the correct direction
+        mock_generate.assert_called_once()
+        call_kwargs = mock_generate.call_args
+        assert call_kwargs.kwargs.get("direction") == FlowchartDirection.LEFT_TO_RIGHT
 
     def test_mthds_parse_error_produces_error(
         self,

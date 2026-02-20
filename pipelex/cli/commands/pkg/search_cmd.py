@@ -157,7 +157,7 @@ def _handle_accepts_search(
     if not pipes:
         console.print(f"[yellow]No pipes accept concept '{escape(concept_code)}' ({escape(concept_id.concept_ref)}).[/yellow]")
         return
-    _display_type_search_pipes(pipes, f"Pipes that accept '{concept_code}'", console)
+    _display_type_search_pipes(pipes, f"Pipes that accept '{escape(concept_code)}'", console)
 
 
 def _handle_produces_search(
@@ -183,7 +183,7 @@ def _handle_produces_search(
     if not pipes:
         console.print(f"[yellow]No pipes produce concept '{escape(concept_code)}' ({escape(concept_id.concept_ref)}).[/yellow]")
         return
-    _display_type_search_pipes(pipes, f"Pipes that produce '{concept_code}'", console)
+    _display_type_search_pipes(pipes, f"Pipes that produce '{escape(concept_code)}'", console)
 
 
 def _do_type_search(

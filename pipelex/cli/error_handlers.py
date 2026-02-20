@@ -107,12 +107,13 @@ def handle_model_deck_preset_error(exc: ModelDeckPresetValidatonError, context: 
         backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
         console.print(f"[bold cyan]Enabled Backends:[/bold cyan] {backends_str}")
     console.print(f"\n[bold red]Error:[/bold red]        {escape(exc.message)}\n")
-    backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
     console.print(
         f"[bold green]💡 Tip:[/bold green] The preset [yellow]'{escape(exc.preset_id)}'[/yellow] references model handle "
-        f"[yellow]'{escape(exc.model_handle)}'[/yellow] which is not available in any enabled backend.\n"
-        f"The enabled backends are: {backends_str}."
+        f"[yellow]'{escape(exc.model_handle)}'[/yellow] which is not available in any enabled backend."
     )
+    if exc.enabled_backends:
+        backends_str = ", ".join([f"[yellow]{escape(b)}[/yellow]" for b in sorted(exc.enabled_backends)])
+        console.print(f"The enabled backends are: {backends_str}.")
     console.print(
         "[bold]Possible solutions:[/bold]\n"
         "  1. Update the preset to use a different model\n"
