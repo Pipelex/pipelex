@@ -146,7 +146,8 @@ This document outlines the core coding standards, best practices, and quality co
 
     - Import all necessary libraries at the top of the file
     - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
-    - Do not bother with ordering the imports, our Ruff linter will handle it for us.
+    - Do not bother with ordering the imports or removing unused imports, our Ruff linter will handle it for us.
+    - `if TYPE_CHECKING:` blocks must always be the **last** block in the imports section, placed after all regular imports.
 
 #### **Removing unused imports**
 

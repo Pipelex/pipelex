@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 
+from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipeline.exceptions import PipelineExecutionError
+
 if TYPE_CHECKING:
     from pathlib import Path
 
     from pytest_mock import MockerFixture
-
-from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.exceptions import PipelineExecutionError
 
 VALIDATE_CMD_MODULE = "pipelex.cli.agent_cli.commands.validate_cmd"
 

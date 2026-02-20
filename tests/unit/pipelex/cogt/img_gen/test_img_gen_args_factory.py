@@ -10,9 +10,6 @@ from typing import TYPE_CHECKING, cast
 
 import pytest
 
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
-
 from pipelex.cogt.exceptions import ImgGenParameterError
 from pipelex.cogt.image.prompt_image import PromptImage, PromptImageUri
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
@@ -33,6 +30,9 @@ from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.filetype_utils import FileType
 from pipelex.tools.uri.prepared_file import PreparedFileBase64
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestImgGenArgsFactory:

@@ -3,9 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
-
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend import PipelexBackend
@@ -13,6 +10,9 @@ from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestInitCommandIntegration:
