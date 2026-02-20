@@ -698,6 +698,7 @@ function GraphViewer() {
     const [selectedNodeId, setSelectedNodeId] = React.useState(null);
     const [direction, setDirection] = React.useState(initialDirection);
     const reactFlowRef = React.useRef(null);
+    const prevDirectionRef = React.useRef(initialDirection);
 
     // Expose setLayoutDirection so the header button can trigger re-layout
     React.useEffect(() => {
@@ -707,7 +708,9 @@ function GraphViewer() {
 
     // Re-layout when direction changes, then fit the view
     React.useEffect(() => {
-        if (!needsLayout) return;  // Orchestration graphs have pre-computed positions
+        // Skip the initial mount — only re-layout on actual direction changes
+        if (prevDirectionRef.current === direction) return;
+        prevDirectionRef.current = direction;
         const relayouted = getLayoutedElements(initialData.nodes, initialData.edges, direction);
         setNodes(relayouted.nodes);
         setEdges(relayouted.edges);

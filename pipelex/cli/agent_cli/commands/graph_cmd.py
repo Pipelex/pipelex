@@ -51,7 +51,7 @@ def graph_cmd(
     Examples:
         pipelex-agent graph bundle.mthds
         pipelex-agent graph bundle.mthds --format mermaidflow
-        pipelex-agent graph bundle.mthds --direction LR
+        pipelex-agent graph bundle.mthds --direction left_to_right
         pipelex-agent graph bundle.mthds -L ./my_pipes/
     """
     input_path = Path(target)

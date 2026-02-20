@@ -9,6 +9,7 @@ from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec_union import PipeSpecUnion
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
+from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 
 
 def _make_bundle(
@@ -385,10 +386,10 @@ class TestBuilderLoopNamespaceStripping:
                     jinja2_expression_template="{{ status }}",
                     outcomes={
                         "good": "scoring.handle_good",
-                        "bad": "fail",
-                        "neutral": "continue",
+                        "bad": SpecialOutcome.FAIL,
+                        "neutral": SpecialOutcome.CONTINUE,
                     },
-                    default_outcome="fail",
+                    default_outcome=SpecialOutcome.FAIL,
                 ),
                 "handle_good": PipeLLMSpec.model_construct(
                     pipe_code="handle_good",
@@ -409,9 +410,9 @@ class TestBuilderLoopNamespaceStripping:
         cond_spec = result.pipe["main_cond"]
         assert isinstance(cond_spec, PipeConditionSpec)
         assert cond_spec.outcomes["good"] == "handle_good"
-        assert cond_spec.outcomes["bad"] == "fail"
-        assert cond_spec.outcomes["neutral"] == "continue"
-        assert cond_spec.default_outcome == "fail"
+        assert cond_spec.outcomes["bad"] == SpecialOutcome.FAIL
+        assert cond_spec.outcomes["neutral"] == SpecialOutcome.CONTINUE
+        assert cond_spec.default_outcome == SpecialOutcome.FAIL
 
     # --- Tests for cross-domain references left intact ---
 

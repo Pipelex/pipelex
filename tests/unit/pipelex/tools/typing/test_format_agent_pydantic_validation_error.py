@@ -1,3 +1,4 @@
+import json
 from typing import Any, ClassVar, Literal
 
 import pytest
@@ -137,6 +138,26 @@ class TestFormatPydanticValidationErrorForAgent:
         assert isinstance(error["input_value"], str)
         assert "NonSerializable" in error["input_value"]
         assert "Validation failed" in message
+
+    def test_context_with_non_serializable_values_is_json_safe(self) -> None:
+        """Test that context values containing non-JSON-serializable objects are serialized safely."""
+
+        class _ConstrainedModel(BaseModel):
+            score: int = Field(..., ge=10)
+
+        with pytest.raises(ValidationError) as exc_info:
+            _ConstrainedModel.model_validate({"score": 5})
+
+        _message, details = format_pydantic_validation_error_for_agent(exc_info.value)
+
+        # The entire details dict must be JSON-serializable (no TypeError)
+        serialized = json.dumps(details)
+        assert isinstance(serialized, str)
+
+        # Context should contain the 'ge' constraint value, serialized
+        error = details["errors"][0]
+        assert "context" in error
+        assert isinstance(error["context"], dict)
 
     def test_multiple_errors_all_reported(self) -> None:
         """Test that all errors are reported with correct error_count."""

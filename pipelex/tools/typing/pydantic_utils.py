@@ -177,6 +177,22 @@ def _serialize_input_value(value: Any) -> Any:
     return repr(value)
 
 
+def _serialize_context(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Serialize a pydantic error context dict so every value is JSON-safe.
+
+    Pydantic context dicts can contain non-JSON-serializable objects (type objects,
+    enum instances, etc.). This applies _serialize_input_value() to each value.
+
+    Args:
+        ctx: The context dict from a pydantic validation error.
+
+    Returns:
+        A dict with all values guaranteed to be JSON-serializable.
+
+    """
+    return {key: _serialize_input_value(value) for key, value in ctx.items()}
+
+
 def format_pydantic_validation_error_for_agent(exc: ValidationError) -> tuple[str, dict[str, Any]]:
     """Format a Pydantic ValidationError into a concise message and structured details dict for agent CLI output.
 
@@ -214,7 +230,7 @@ def format_pydantic_validation_error_for_agent(exc: ValidationError) -> tuple[st
             "error_type": err["type"],
             "message": err["msg"],
             "input_value": _serialize_input_value(err.get("input")),
-            "context": err.get("ctx", {}),
+            "context": _serialize_context(err.get("ctx", {})),
         }
         errors.append(error_detail)
 

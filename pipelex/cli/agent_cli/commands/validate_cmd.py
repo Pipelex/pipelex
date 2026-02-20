@@ -309,7 +309,7 @@ def validate_cmd(
         pipelex-agent validate my_bundle.mthds
         pipelex-agent validate my_bundle.mthds --graph
         pipelex-agent validate my_bundle.mthds --graph --format both
-        pipelex-agent validate my_bundle.mthds --graph --direction LR
+        pipelex-agent validate my_bundle.mthds --graph --direction left_to_right
         pipelex-agent validate --all -L ./my_pipes
     """
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None

@@ -79,10 +79,18 @@ def app_callback(
     ] = "warning",
 ) -> None:
     """Agent CLI callback - no logo, minimal output."""
+    from pipelex.cli.agent_cli.commands.agent_output import agent_error  # noqa: PLC0415
     from pipelex.tools.log.log_levels import LogLevel  # noqa: PLC0415
 
     ctx.ensure_object(dict)
-    ctx.obj["log_level"] = LogLevel(log_level.upper())
+    try:
+        ctx.obj["log_level"] = LogLevel(log_level.upper())
+    except ValueError:
+        valid_values = ", ".join(level.value.lower() for level in LogLevel)
+        agent_error(
+            f"Invalid log level '{log_level}'. Valid values: {valid_values}",
+            "ArgumentError",
+        )
 
 
 app.command(name="build", help="Build a pipeline from a prompt")(build_cmd)
