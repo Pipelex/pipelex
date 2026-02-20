@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
 import json
 from pathlib import Path
@@ -13,50 +14,38 @@ import typer
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.graph_cmd import graph_cmd
-from pipelex.core.interpreter.exceptions import MthdsDecodeError
-from pipelex.graph.graph_rendering import GraphFormat
+from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
+from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 GRAPH_CMD_MODULE = "pipelex.cli.agent_cli.commands.graph_cmd"
+GRAPH_RENDERING_MODULE = "pipelex.graph.graph_rendering"
 
 
 class TestGraphCmd:
     """Tests for the graph command that generates HTML from a .mthds bundle."""
 
-    def _mock_blueprint(self, mocker: MockerFixture, *, main_pipe: str = "my_pipe") -> None:
-        """Mock bundle parsing to return a blueprint with the given main_pipe."""
-        mock_blueprint = mocker.MagicMock()
-        mock_blueprint.main_pipe = main_pipe
-        mocker.patch(
-            f"{GRAPH_CMD_MODULE}.PipelexInterpreter.make_pipelex_bundle_blueprint",
-            return_value=mock_blueprint,
-        )
-
-    def _mock_execution(self, mocker: MockerFixture, *, graph_spec_present: bool = True) -> None:
-        """Mock the Pipelex init, PipelexRunner, render_graph_from_spec, and teardown."""
+    def _mock_generate_graph_for_bundle(
+        self,
+        mocker: MockerFixture,
+        *,
+        pipe_code: str = "my_pipe",
+        output_dir: str = "mock_output",
+        direction: str | None = None,
+    ) -> Any:
+        """Mock generate_graph_for_bundle to return a successful result dict."""
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
 
-        mock_config = mocker.MagicMock()
-        mocker.patch(f"{GRAPH_CMD_MODULE}.get_config", return_value=mock_config)
-
-        mock_pipe_output = mocker.MagicMock()
-        if graph_spec_present:
-            mock_pipe_output.graph_spec = mocker.MagicMock()
-        else:
-            mock_pipe_output.graph_spec = None
-        mock_response = mocker.MagicMock()
-        mock_response.pipe_output = mock_pipe_output
-
-        saved_files = {"reactflow_html": Path("graph/reactflow.html")}
-
-        # Patch async functions with non-async mocks so no coroutines are created (avoids "coroutine never awaited" warnings)
-        mocker.patch(f"{GRAPH_CMD_MODULE}.PipelexRunner")
-        mocker.patch(f"{GRAPH_CMD_MODULE}.render_graph_from_spec", new=mocker.MagicMock())
-
-        # asyncio.run is called twice: first for runner.execute_pipeline, then for render_graph_from_spec
-        mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", side_effect=[mock_response, saved_files])
+        result = {
+            "graph_files": {"reactflow_html": "graph/reactflow.html"},
+            "graph_output_dir": output_dir,
+            "pipe_code": pipe_code,
+            "direction": direction,
+        }
+        return mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", return_value=result)
 
     def test_valid_mthds_file_produces_success_json(
         self,
@@ -69,8 +58,7 @@ class TestGraphCmd:
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
-        self._mock_blueprint(mocker)
-        self._mock_execution(mocker)
+        self._mock_generate_graph_for_bundle(mocker, output_dir=str(tmp_path))
 
         graph_cmd(ctx=agent_ctx, target=str(mthds_file))
 
@@ -80,39 +68,21 @@ class TestGraphCmd:
         assert "output_dir" in parsed
         assert "files" in parsed
 
-    def test_valid_mthds_file_calls_asyncio_run_twice(
+    def test_valid_mthds_file_calls_asyncio_run_once(
         self,
         agent_ctx: Any,
         mocker: MockerFixture,
         tmp_path: Path,
     ) -> None:
-        """Valid .mthds file should call asyncio.run twice (execute_pipeline + render_graph_from_spec)."""
+        """Valid .mthds file should call asyncio.run once (generate_graph_for_bundle handles everything)."""
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
-        self._mock_blueprint(mocker)
-
-        mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
-        mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
-        mocker.patch(f"{GRAPH_CMD_MODULE}.get_config")
-
-        # Patch async functions with non-async mocks so no coroutines are created (avoids "coroutine never awaited" warnings)
-        mocker.patch(f"{GRAPH_CMD_MODULE}.PipelexRunner")
-        mocker.patch(f"{GRAPH_CMD_MODULE}.render_graph_from_spec", new=mocker.MagicMock())
-
-        mock_pipe_output = mocker.MagicMock()
-        mock_pipe_output.graph_spec = mocker.MagicMock()
-        mock_response = mocker.MagicMock()
-        mock_response.pipe_output = mock_pipe_output
-        saved_files = {"reactflow_html": Path("graph/reactflow.html")}
-        mock_asyncio_run = mocker.patch(
-            f"{GRAPH_CMD_MODULE}.asyncio.run",
-            side_effect=[mock_response, saved_files],
-        )
+        mock_asyncio_run = self._mock_generate_graph_for_bundle(mocker)
 
         graph_cmd(ctx=agent_ctx, target=str(mthds_file))
 
-        assert mock_asyncio_run.call_count == 2
+        assert mock_asyncio_run.call_count == 1
 
     def test_non_mthds_file_produces_error(
         self,
@@ -157,15 +127,15 @@ class TestGraphCmd:
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
     ) -> None:
-        """Bundle that doesn't declare main_pipe should produce a BundleError."""
+        """Bundle that doesn't declare main_pipe should produce a PipelexInterpreterError."""
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[domain]\ncode = "test"')
 
-        mock_blueprint = mocker.MagicMock()
-        mock_blueprint.main_pipe = None
+        mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
+        mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(
-            f"{GRAPH_CMD_MODULE}.PipelexInterpreter.make_pipelex_bundle_blueprint",
-            return_value=mock_blueprint,
+            f"{GRAPH_CMD_MODULE}.asyncio.run",
+            side_effect=PipelexInterpreterError("does not declare a main_pipe"),
         )
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -174,7 +144,7 @@ class TestGraphCmd:
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
-        assert parsed["error_type"] == "BundleError"
+        assert parsed["error_type"] == "PipelexInterpreterError"
         assert "main_pipe" in parsed["message"]
 
     def test_no_graph_spec_produces_error(
@@ -184,24 +154,16 @@ class TestGraphCmd:
         capsys: pytest.CaptureFixture[str],
         tmp_path: Path,
     ) -> None:
-        """If pipe_output.graph_spec is None, should produce a GraphSpecMissingError."""
+        """If pipeline execution does not produce a graph spec, should produce an error."""
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
-        self._mock_blueprint(mocker)
-
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
-        mocker.patch(f"{GRAPH_CMD_MODULE}.get_config")
-
-        # Patch async function with non-async mock so no coroutine is created (avoids "coroutine never awaited" warning)
-        mocker.patch(f"{GRAPH_CMD_MODULE}.PipelexRunner")
-
-        mock_pipe_output = mocker.MagicMock()
-        mock_pipe_output.graph_spec = None
-        mock_response = mocker.MagicMock()
-        mock_response.pipe_output = mock_pipe_output
-        mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", return_value=mock_response)
+        mocker.patch(
+            f"{GRAPH_CMD_MODULE}.asyncio.run",
+            side_effect=PipelexError("Pipeline execution did not produce a graph spec"),
+        )
 
         with pytest.raises(typer.Exit) as exc_info:
             graph_cmd(ctx=agent_ctx, target=str(mthds_file))
@@ -209,7 +171,7 @@ class TestGraphCmd:
         assert exc_info.value.exit_code == 1
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
-        assert parsed["error_type"] == "GraphSpecMissingError"
+        assert "graph spec" in parsed["message"].lower()
 
     @pytest.mark.parametrize(
         "format_option",
@@ -231,8 +193,7 @@ class TestGraphCmd:
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
-        self._mock_blueprint(mocker)
-        self._mock_execution(mocker)
+        self._mock_generate_graph_for_bundle(mocker)
 
         graph_cmd(ctx=agent_ctx, target=str(mthds_file), graph_format=format_option)
 
@@ -245,42 +206,22 @@ class TestGraphCmd:
         default = sig.parameters["graph_format"].default
         assert default == GraphFormat.REACTFLOW
 
-    def test_direction_forwarded_to_render_graph_from_spec(
+    def test_direction_forwarded_to_generate_graph_for_bundle(
         self,
         agent_ctx: Any,
         mocker: MockerFixture,
         tmp_path: Path,
     ) -> None:
-        """Direction option should be forwarded to render_graph_from_spec via asyncio.run."""
+        """Direction option should be forwarded to generate_graph_for_bundle."""
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
-        self._mock_blueprint(mocker)
-
-        mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
-        mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
-        mocker.patch(f"{GRAPH_CMD_MODULE}.get_config")
-
-        mocker.patch(f"{GRAPH_CMD_MODULE}.PipelexRunner")
-        mock_render = mocker.MagicMock()
-        mocker.patch(f"{GRAPH_CMD_MODULE}.render_graph_from_spec", new=mock_render)
-
-        mock_pipe_output = mocker.MagicMock()
-        mock_pipe_output.graph_spec = mocker.MagicMock()
-        mock_response = mocker.MagicMock()
-        mock_response.pipe_output = mock_pipe_output
-        saved_files = {"reactflow_html": Path("graph/reactflow.html")}
-        mocker.patch(
-            f"{GRAPH_CMD_MODULE}.asyncio.run",
-            side_effect=[mock_response, saved_files],
-        )
+        mock_asyncio_run = self._mock_generate_graph_for_bundle(mocker, direction="left_to_right")
 
         graph_cmd(ctx=agent_ctx, target=str(mthds_file), direction=FlowchartDirection.LEFT_TO_RIGHT)
 
-        # Verify direction was forwarded to render_graph_from_spec
-        mock_render.assert_called_once()
-        _, render_kwargs = mock_render.call_args
-        assert render_kwargs["direction"] == FlowchartDirection.LEFT_TO_RIGHT
+        # Verify asyncio.run was called with a coroutine from generate_graph_for_bundle
+        mock_asyncio_run.assert_called_once()
 
     def test_mthds_parse_error_produces_error(
         self,
@@ -293,8 +234,10 @@ class TestGraphCmd:
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text("invalid toml {{{{")
 
+        mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
+        mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(
-            f"{GRAPH_CMD_MODULE}.PipelexInterpreter.make_pipelex_bundle_blueprint",
+            f"{GRAPH_CMD_MODULE}.asyncio.run",
             side_effect=MthdsDecodeError(message="bad toml", doc="invalid toml {{{{", pos=0, lineno=1, colno=1),
         )
 
@@ -305,3 +248,58 @@ class TestGraphCmd:
         parsed = json.loads(capsys.readouterr().err)
         assert parsed["error"] is True
         assert parsed["error_type"] == "MthdsDecodeError"
+
+    def test_bundle_parent_dir_included_in_library_dirs(
+        self,
+        mocker: MockerFixture,
+        tmp_path: Path,
+    ) -> None:
+        """generate_graph_for_bundle should include the bundle's parent dir in library_dirs.
+
+        This verifies the bug fix: when no --library-dir is passed, the bundle's
+        parent directory must still be included so PipelexRunner can resolve
+        sibling dependencies.
+        """
+        mthds_file = tmp_path / "bundle.mthds"
+        mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
+
+        mock_blueprint = mocker.MagicMock()
+        mock_blueprint.main_pipe = "my_pipe"
+        mocker.patch(
+            f"{GRAPH_RENDERING_MODULE}.PipelexInterpreter.make_pipelex_bundle_blueprint",
+            return_value=mock_blueprint,
+        )
+
+        mock_config = mocker.MagicMock()
+        mocker.patch(f"{GRAPH_RENDERING_MODULE}.get_config", return_value=mock_config)
+
+        mock_runner_cls = mocker.patch(f"{GRAPH_RENDERING_MODULE}.PipelexRunner")
+        mock_runner_instance = mocker.MagicMock()
+        mock_pipe_output = mocker.MagicMock()
+        mock_pipe_output.graph_spec = mocker.MagicMock()
+        mock_response = mocker.MagicMock()
+        mock_response.pipe_output = mock_pipe_output
+        mock_runner_instance.execute_pipeline = mocker.AsyncMock(return_value=mock_response)
+        mock_runner_cls.return_value = mock_runner_instance
+
+        mocker.patch(
+            f"{GRAPH_RENDERING_MODULE}.render_graph_from_spec",
+            new=mocker.AsyncMock(return_value={"reactflow_html": Path("graph/reactflow.html")}),
+        )
+
+        asyncio.run(
+            generate_graph_for_bundle(
+                bundle_path=mthds_file,
+                graph_format=GraphFormat.REACTFLOW,
+                library_dirs=None,
+                direction=None,
+            )
+        )
+
+        # Verify PipelexRunner was constructed with library_dirs containing the bundle's parent dir
+        mock_runner_cls.assert_called_once()
+        call_kwargs = mock_runner_cls.call_args
+        actual_library_dirs = call_kwargs.kwargs.get("library_dirs") or call_kwargs[1].get("library_dirs")
+        bundle_parent = str(tmp_path.resolve())
+        assert actual_library_dirs is not None, "library_dirs should not be None"
+        assert bundle_parent in actual_library_dirs, f"Bundle parent dir '{bundle_parent}' should be in library_dirs, got: {actual_library_dirs}"

@@ -5,10 +5,17 @@ Used by both the regular CLI and the agent CLI.
 """
 
 from pathlib import Path
+from typing import Any
 
+from pipelex.base_exceptions import PipelexError
+from pipelex.config import get_config
+from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.types import StrEnum
 
@@ -83,3 +90,102 @@ async def render_graph_from_spec(
     )
 
     return save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
+
+
+async def generate_graph_for_bundle(
+    bundle_path: Path,
+    graph_format: GraphFormat,
+    library_dirs: list[str] | None = None,
+    direction: FlowchartDirection | None = None,
+) -> dict[str, Any]:
+    """Generate graph visualization for a bundle via dry-run pipeline execution.
+
+    Reads the bundle, parses main_pipe, performs a dry-run with graph tracing,
+    then renders and saves graph HTML files alongside the bundle.
+
+    Args:
+        bundle_path: Path to the .mthds bundle file.
+        graph_format: Which graph format(s) to generate.
+        library_dirs: Optional library directories for pipe resolution.
+        direction: Flowchart layout direction (default: None, uses TB).
+
+    Returns:
+        Dictionary with graph_files, graph_output_dir, and direction.
+
+    Raises:
+        PipelexInterpreterError: If bundle parsing fails or main_pipe is missing.
+        PipelexError: If pipeline execution does not produce a graph spec.
+        PipelineExecutionError: If dry-run execution fails.
+    """
+    mthds_content = bundle_path.read_text(encoding="utf-8")
+    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+    main_pipe_code = bundle_blueprint.main_pipe
+    if not main_pipe_code:
+        msg = f"Bundle '{bundle_path}' does not declare a main_pipe, cannot generate graph"
+        raise PipelexInterpreterError(msg)
+    pipe_code: str = main_pipe_code
+
+    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        generate_graph=True,
+        mock_inputs=True,
+    )
+
+    # Ensure the bundle's parent directory is included in library_dirs
+    # so PipelexRunner can resolve sibling dependencies
+    bundle_parent_dir = str(bundle_path.parent.resolve())
+    effective_library_dirs: list[str]
+    if library_dirs:
+        effective_library_dirs = list(library_dirs)
+        if bundle_parent_dir not in effective_library_dirs:
+            effective_library_dirs.append(bundle_parent_dir)
+    else:
+        effective_library_dirs = [bundle_parent_dir]
+
+    runner = PipelexRunner(
+        bundle_uri=str(bundle_path),
+        pipe_run_mode=PipeRunMode.DRY,
+        execution_config=execution_config,
+        library_dirs=effective_library_dirs,
+    )
+    response = await runner.execute_pipeline(
+        pipe_code=pipe_code,
+        mthds_content=mthds_content,
+    )
+    pipe_output = response.pipe_output
+
+    if not pipe_output.graph_spec:
+        msg = "Pipeline execution did not produce a graph spec"
+        raise PipelexError(msg)
+
+    graph_spec = pipe_output.graph_spec
+
+    include_mermaidflow: bool
+    include_reactflow: bool
+    match graph_format:
+        case GraphFormat.MERMAIDFLOW:
+            include_mermaidflow = True
+            include_reactflow = False
+        case GraphFormat.REACTFLOW:
+            include_mermaidflow = False
+            include_reactflow = True
+        case GraphFormat.BOTH:
+            include_mermaidflow = True
+            include_reactflow = True
+
+    output_dir = bundle_path.parent
+    saved_files = await render_graph_from_spec(
+        graph_spec=graph_spec,
+        graph_config=execution_config.graph_config,
+        include_mermaidflow=include_mermaidflow,
+        include_reactflow=include_reactflow,
+        output_dir=output_dir,
+        pipe_code=pipe_code,
+        direction=direction,
+    )
+
+    return {
+        "graph_files": {key: str(path) for key, path in saved_files.items()},
+        "graph_output_dir": str(output_dir),
+        "pipe_code": pipe_code,
+        "direction": str(direction) if direction else None,
+    }

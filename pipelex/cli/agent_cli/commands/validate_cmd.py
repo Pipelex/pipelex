@@ -6,15 +6,12 @@ from typing import Annotated, Any
 
 import typer
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
-from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.helpers import is_pipelex_file
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.graph.graph_rendering import GraphFormat, render_graph_from_spec
+from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle
 from pipelex.hub import (
     get_library_manager,
     get_required_pipe,
@@ -24,10 +21,8 @@ from pipelex.hub import (
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
@@ -165,103 +160,6 @@ async def _validate_pipe_in_bundle_core(
         "bundle_path": str(bundle_path),
         "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
         "total_pipes": 1,
-    }
-
-
-async def _generate_graph_for_bundle(
-    bundle_path: Path,
-    graph_format: GraphFormat,
-    library_dirs: list[str] | None = None,
-    direction: FlowchartDirection | None = None,
-) -> dict[str, Any]:
-    """Generate graph visualization for a validated bundle.
-
-    Performs a dry-run pipeline execution with graph tracing enabled,
-    then renders and saves graph HTML files alongside the bundle.
-
-    Args:
-        bundle_path: Path to the bundle file.
-        graph_format: Which graph format(s) to generate.
-        library_dirs: Optional library directories for pipe resolution.
-        direction: Flowchart layout direction (default: None, uses TB).
-
-    Returns:
-        Dictionary with graph_files and graph_output_dir.
-
-    Raises:
-        PipelexInterpreterError: If bundle parsing fails.
-        PipelineExecutionError: If dry-run execution fails.
-    """
-    mthds_content = bundle_path.read_text(encoding="utf-8")
-    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
-    main_pipe_code = bundle_blueprint.main_pipe
-    if not main_pipe_code:
-        msg = f"Bundle '{bundle_path}' does not declare a main_pipe, cannot generate graph"
-        raise PipelexInterpreterError(msg)
-    pipe_code: str = main_pipe_code
-
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
-        generate_graph=True,
-        mock_inputs=True,
-    )
-
-    # Ensure the bundle's parent directory is included in library_dirs
-    # so PipelexRunner can resolve sibling dependencies
-    bundle_parent_dir = str(bundle_path.parent.resolve())
-    effective_library_dirs: list[str]
-    if library_dirs:
-        effective_library_dirs = list(library_dirs)
-        if bundle_parent_dir not in effective_library_dirs:
-            effective_library_dirs.append(bundle_parent_dir)
-    else:
-        effective_library_dirs = [bundle_parent_dir]
-
-    runner = PipelexRunner(
-        bundle_uri=str(bundle_path),
-        pipe_run_mode=PipeRunMode.DRY,
-        execution_config=execution_config,
-        library_dirs=effective_library_dirs,
-    )
-    response = await runner.execute_pipeline(
-        pipe_code=pipe_code,
-        mthds_content=mthds_content,
-    )
-    pipe_output = response.pipe_output
-
-    if not pipe_output.graph_spec:
-        msg = "Pipeline execution did not produce a graph spec"
-        raise PipelexError(msg)
-
-    graph_spec = pipe_output.graph_spec
-
-    include_mermaidflow: bool
-    include_reactflow: bool
-    match graph_format:
-        case GraphFormat.MERMAIDFLOW:
-            include_mermaidflow = True
-            include_reactflow = False
-        case GraphFormat.REACTFLOW:
-            include_mermaidflow = False
-            include_reactflow = True
-        case GraphFormat.BOTH:
-            include_mermaidflow = True
-            include_reactflow = True
-
-    output_dir = bundle_path.parent
-    saved_files = await render_graph_from_spec(
-        graph_spec=graph_spec,
-        graph_config=execution_config.graph_config,
-        include_mermaidflow=include_mermaidflow,
-        include_reactflow=include_reactflow,
-        output_dir=output_dir,
-        pipe_code=pipe_code,
-        direction=direction,
-    )
-
-    return {
-        "graph_files": {key: str(path) for key, path in saved_files.items()},
-        "graph_output_dir": str(output_dir),
-        "direction": str(direction) if direction else None,
     }
 
 
@@ -412,7 +310,7 @@ def validate_cmd(
         if graph and bundle_path:
             try:
                 graph_result = asyncio.run(
-                    _generate_graph_for_bundle(
+                    generate_graph_for_bundle(
                         bundle_path=bundle_path,
                         graph_format=graph_format,
                         library_dirs=library_dir_strings,
