@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import typer
+from rich.markup import escape
 
 from pipelex.core.packages.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
@@ -37,7 +38,7 @@ def do_pkg_init(force: bool = False) -> None:
     if errors:
         console.print("[yellow]Some files could not be parsed:[/yellow]")
         for error in errors:
-            console.print(f"  {error}")
+            console.print(f"  {escape(error)}")
 
     # Build exports from collected domain/pipe data, placing main_pipe first
     exports = build_domain_exports_from_scan(domain_pipes, domain_main_pipes)

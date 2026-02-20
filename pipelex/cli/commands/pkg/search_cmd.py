@@ -3,6 +3,7 @@ from pathlib import Path
 import typer
 from rich import box
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -98,7 +99,7 @@ def _display_ambiguous_concepts(
     console: Console,
 ) -> None:
     """Display a table of ambiguous concept matches and a hint to refine the query."""
-    console.print(f"[yellow]Ambiguous concept '{concept_str}' — matches {len(matches)} concepts:[/yellow]")
+    console.print(f"[yellow]Ambiguous concept '{escape(concept_str)}' — matches {len(matches)} concepts:[/yellow]")
     table = Table(box=box.ROUNDED, show_header=True)
     table.add_column("Package", style="cyan")
     table.add_column("Concept Code")
@@ -143,7 +144,7 @@ def _handle_accepts_search(
     """Resolve concept fuzzy and find pipes that accept it."""
     matches = _resolve_concept_fuzzy(concept_str, index)
     if not matches:
-        console.print(f"[yellow]No concept matching '{concept_str}' found.[/yellow]")
+        console.print(f"[yellow]No concept matching '{escape(concept_str)}' found.[/yellow]")
         return
     if len(matches) > 1:
         _display_ambiguous_concepts(matches, concept_str, console)
@@ -154,7 +155,7 @@ def _handle_accepts_search(
     if domain_filter is not None:
         pipes = [pipe_node for pipe_node in pipes if pipe_node.domain_code == domain_filter]
     if not pipes:
-        console.print(f"[yellow]No pipes accept concept '{concept_code}' ({concept_id.concept_ref}).[/yellow]")
+        console.print(f"[yellow]No pipes accept concept '{escape(concept_code)}' ({escape(concept_id.concept_ref)}).[/yellow]")
         return
     _display_type_search_pipes(pipes, f"Pipes that accept '{concept_code}'", console)
 
@@ -169,7 +170,7 @@ def _handle_produces_search(
     """Resolve concept fuzzy and find pipes that produce it."""
     matches = _resolve_concept_fuzzy(concept_str, index)
     if not matches:
-        console.print(f"[yellow]No concept matching '{concept_str}' found.[/yellow]")
+        console.print(f"[yellow]No concept matching '{escape(concept_str)}' found.[/yellow]")
         return
     if len(matches) > 1:
         _display_ambiguous_concepts(matches, concept_str, console)
@@ -180,7 +181,7 @@ def _handle_produces_search(
     if domain_filter is not None:
         pipes = [pipe_node for pipe_node in pipes if pipe_node.domain_code == domain_filter]
     if not pipes:
-        console.print(f"[yellow]No pipes produce concept '{concept_code}' ({concept_id.concept_ref}).[/yellow]")
+        console.print(f"[yellow]No pipes produce concept '{escape(concept_code)}' ({escape(concept_id.concept_ref)}).[/yellow]")
         return
     _display_type_search_pipes(pipes, f"Pipes that produce '{concept_code}'", console)
 
@@ -196,7 +197,7 @@ def _do_type_search(
     try:
         graph = build_know_how_graph(index)
     except GraphBuildError as exc:
-        console.print(f"[red]Graph build error: {exc}[/red]")
+        console.print(f"[red]Graph build error: {escape(str(exc))}[/red]")
         raise typer.Exit(code=1) from exc
 
     engine = KnowHowQueryEngine(graph)
@@ -239,7 +240,7 @@ def do_pkg_search(
         else:
             index = build_index_from_project(Path.cwd())
     except IndexBuildError as exc:
-        console.print(f"[red]Index build error: {exc}[/red]")
+        console.print(f"[red]Index build error: {escape(str(exc))}[/red]")
         raise typer.Exit(code=1) from exc
 
     if not index.entries:
@@ -260,7 +261,7 @@ def do_pkg_search(
     matching_pipes = _search_pipes(index, query, domain) if show_pipes else []
 
     if not matching_concepts and not matching_pipes:
-        console.print(f"[yellow]No results matching '{query}'.[/yellow]")
+        console.print(f"[yellow]No results matching '{escape(query)}'.[/yellow]")
         return
 
     if matching_concepts:

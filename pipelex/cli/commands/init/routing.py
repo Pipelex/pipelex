@@ -3,6 +3,7 @@
 import os
 from typing import Any, cast
 
+from rich.markup import escape
 from rich.prompt import Confirm
 from tomlkit import table
 
@@ -202,5 +203,5 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         console.print("[dim]You can further customize which models get used on which backend by editing the routes section.[/dim]")
 
     except Exception as exc:
-        console.print(f"[yellow]⚠ Warning: Failed to customize routing profile: {exc}[/yellow]")
+        console.print(f"[yellow]⚠ Warning: Failed to customize routing profile: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/routing_profiles.toml later[/dim]")

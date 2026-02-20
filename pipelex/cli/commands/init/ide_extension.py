@@ -4,6 +4,7 @@ import shutil
 import subprocess  # noqa: S404
 
 from rich.console import Console
+from rich.markup import escape
 from rich.prompt import Confirm
 
 EXTENSION_ID = "Pipelex.pipelex"
@@ -75,13 +76,13 @@ def _install_extension(ide_name: str, cmd: str, console: Console) -> bool:
             console.print(f"  [green]✓ Installed in {ide_name}[/green]")
             return True
         else:
-            console.print(f"  [red]✗ Failed to install in {ide_name}: {result.stderr.strip()}[/red]")
+            console.print(f"  [red]✗ Failed to install in {ide_name}: {escape(result.stderr.strip())}[/red]")
             return False
     except subprocess.TimeoutExpired:
         console.print(f"  [red]✗ Installation timed out for {ide_name}[/red]")
         return False
     except OSError as exc:
-        console.print(f"  [red]✗ Could not run '{cmd}' for {ide_name}: {exc}[/red]")
+        console.print(f"  [red]✗ Could not run '{cmd}' for {ide_name}: {escape(str(exc))}[/red]")
         return False
 
 

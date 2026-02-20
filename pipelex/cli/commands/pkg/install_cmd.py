@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import typer
+from rich.markup import escape
 
 from pipelex.core.packages.dependency_resolver import resolve_remote_dependency
 from pipelex.core.packages.exceptions import DependencyResolveError, IntegrityError
@@ -25,7 +26,7 @@ def do_pkg_install() -> None:
     try:
         lock_file = parse_lock_file(lock_content)
     except LockFileError as exc:
-        console.print(f"[red]Could not parse {LOCK_FILENAME}: {exc.message}[/red]")
+        console.print(f"[red]Could not parse {LOCK_FILENAME}: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     if not lock_file.packages:
@@ -49,7 +50,7 @@ def do_pkg_install() -> None:
         try:
             resolve_remote_dependency(dep)
         except DependencyResolveError as exc:
-            console.print(f"[red]Failed to fetch '{address}@{locked.version}': {exc.message}[/red]")
+            console.print(f"[red]Failed to fetch '{escape(address)}@{escape(locked.version)}': {escape(exc.message)}[/red]")
             raise typer.Exit(code=1) from exc
 
         fetched_count += 1
@@ -58,7 +59,7 @@ def do_pkg_install() -> None:
     try:
         verify_lock_file(lock_file)
     except IntegrityError as exc:
-        console.print(f"[red]Integrity verification failed: {exc.message}[/red]")
+        console.print(f"[red]Integrity verification failed: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     console.print(f"[green]Installed {fetched_count} package(s), {cached_count} already cached.[/green]")

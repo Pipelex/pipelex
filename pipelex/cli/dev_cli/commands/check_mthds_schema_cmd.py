@@ -7,6 +7,7 @@ import sys
 from difflib import unified_diff
 from typing import TYPE_CHECKING
 
+from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.cli.dev_cli.commands.generate_mthds_schema_cmd import MTHDS_SCHEMA_PATH
@@ -56,10 +57,10 @@ def check_mthds_schema_cmd(show_diff: bool = True, quiet: bool = False) -> None:
         schema = generate_mthds_schema()
     except Exception as exc:
         if quiet:
-            console.print(f"[red]✗ MTHDS schema check: FAILED[/red] - Schema generation error: {exc}")
+            console.print(f"[red]✗ MTHDS schema check: FAILED[/red] - Schema generation error: {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] Failed to generate MTHDS schema\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] Failed to generate MTHDS schema\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]MTHDS Schema Check: FAILED[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -75,10 +76,10 @@ def check_mthds_schema_cmd(show_diff: bool = True, quiet: bool = False) -> None:
         existing_content = MTHDS_SCHEMA_PATH.read_text(encoding="utf-8")
     except OSError as exc:
         if quiet:
-            console.print(f"[red]✗ MTHDS schema check: FAILED[/red] - File system error: {exc}")
+            console.print(f"[red]✗ MTHDS schema check: FAILED[/red] - File system error: {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] File system error while reading schema file\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] File system error while reading schema file\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]MTHDS Schema Check: FAILED[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -150,15 +151,15 @@ def _display_diff(existing: str, expected: str, console: Console) -> None:
         console.print()
         for line in diff[:50]:  # Limit output to first 50 lines
             line = line.rstrip("\n")
-            # TODO: consider using rich.markup.escape()
+            escaped_line = escape(line)
             if line.startswith("+") and not line.startswith("+++"):
-                console.print(f"[green]{line}[/green]")
+                console.print(f"[green]{escaped_line}[/green]")
             elif line.startswith("-") and not line.startswith("---"):
-                console.print(f"[red]{line}[/red]")
+                console.print(f"[red]{escaped_line}[/red]")
             elif line.startswith("@@"):
-                console.print(f"[cyan]{line}[/cyan]")
+                console.print(f"[cyan]{escaped_line}[/cyan]")
             else:
-                console.print(line)
+                console.print(escaped_line)
         if len(diff) > 50:
             console.print(f"[dim]... and {len(diff) - 50} more lines[/dim]")
         console.print()

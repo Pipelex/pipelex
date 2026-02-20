@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from rich.markup import escape
 from rich.panel import Panel
 
 from pipelex.hub import get_console
@@ -78,10 +79,10 @@ def check_config_sync_cmd(
     except OSError as exc:
         # Handle race condition where directories are deleted/modified after existence checks
         if quiet:
-            console.print(f"[red]✗ Config sync check: FAILED[/red] - File system error: {exc}")
+            console.print(f"[red]✗ Config sync check: FAILED[/red] - File system error: {escape(str(exc))}")
         else:
             console.print()
-            console.print(f"[red]✗[/red] File system error while comparing directories: {exc}")
+            console.print(f"[red]✗[/red] File system error while comparing directories: {escape(str(exc))}")
             console.print()
         sys.exit(1)
 

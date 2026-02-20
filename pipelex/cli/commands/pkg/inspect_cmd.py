@@ -2,6 +2,7 @@ from pathlib import Path
 
 import typer
 from rich import box
+from rich.markup import escape
 from rich.table import Table
 
 from pipelex.core.packages.exceptions import IndexBuildError
@@ -24,7 +25,7 @@ def do_pkg_inspect(address: str, cache: bool = False) -> None:
         else:
             index = build_index_from_project(Path.cwd())
     except IndexBuildError as exc:
-        console.print(f"[red]Index build error: {exc}[/red]")
+        console.print(f"[red]Index build error: {escape(str(exc))}[/red]")
         raise typer.Exit(code=1) from exc
 
     if not index.entries:
@@ -34,8 +35,8 @@ def do_pkg_inspect(address: str, cache: bool = False) -> None:
     entry = index.get_entry(address)
     if entry is None:
         available = ", ".join(sorted(index.entries.keys()))
-        console.print(f"[red]Package '{address}' not found.[/red]")
-        console.print(f"[dim]Available packages: {available}[/dim]")
+        console.print(f"[red]Package '{escape(address)}' not found.[/red]")
+        console.print(f"[dim]Available packages: {escape(available)}[/dim]")
         raise typer.Exit(code=1)
 
     # Package info table

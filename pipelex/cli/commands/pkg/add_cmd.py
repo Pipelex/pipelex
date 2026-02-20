@@ -2,6 +2,7 @@ import re
 from pathlib import Path
 
 import typer
+from rich.markup import escape
 
 from pipelex.core.packages.discovery import MANIFEST_FILENAME
 from pipelex.core.packages.exceptions import ManifestError
@@ -60,18 +61,18 @@ def do_pkg_add(
     try:
         manifest = parse_methods_toml(content)
     except ManifestError as exc:
-        console.print(f"[red]Could not parse {MANIFEST_FILENAME}: {exc.message}[/red]")
+        console.print(f"[red]Could not parse {MANIFEST_FILENAME}: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     # Auto-derive alias if not provided
     if alias is None:
         alias = derive_alias_from_address(address)
-        console.print(f"[dim]Auto-derived alias: {alias}[/dim]")
+        console.print(f"[dim]Auto-derived alias: {escape(alias)}[/dim]")
 
     # Check alias uniqueness
     existing_aliases = {dep.alias for dep in manifest.dependencies}
     if alias in existing_aliases:
-        console.print(f"[red]Dependency alias '{alias}' already exists in {MANIFEST_FILENAME}.[/red]")
+        console.print(f"[red]Dependency alias '{escape(alias)}' already exists in {MANIFEST_FILENAME}.[/red]")
         raise typer.Exit(code=1)
 
     # Create and validate the dependency
@@ -83,7 +84,7 @@ def do_pkg_add(
             path=path,
         )
     except ValueError as exc:
-        console.print(f"[red]Invalid dependency: {exc}[/red]")
+        console.print(f"[red]Invalid dependency: {escape(str(exc))}[/red]")
         raise typer.Exit(code=1) from exc
 
     # Add to manifest and write back
@@ -92,4 +93,4 @@ def do_pkg_add(
     manifest_path.write_text(toml_content, encoding="utf-8")
 
     path_info = f" (path: {path})" if path else ""
-    console.print(f"[green]Added dependency '{alias}' -> {address} @ {version}{path_info}[/green]")
+    console.print(f"[green]Added dependency '{escape(alias)}' -> {escape(address)} @ {escape(version)}{escape(path_info)}[/green]")

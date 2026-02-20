@@ -4,6 +4,7 @@ from pathlib import Path
 import typer
 from rich import box
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from pipelex.core.packages.exceptions import PublishValidationError
@@ -23,7 +24,7 @@ def do_pkg_publish(tag: bool = False) -> None:
     try:
         result = validate_for_publish(package_root)
     except PublishValidationError as exc:
-        console.print(f"[red]Error: {exc.message}[/red]")
+        console.print(f"[red]Error: {escape(exc.message)}[/red]")
         raise typer.Exit(code=1) from exc
 
     _display_results(console, result)
@@ -92,9 +93,9 @@ def _create_git_tag(console: Console, package_root: Path, version: str) -> None:
             timeout=10,
             cwd=package_root,
         )
-        console.print(f"[green]Created git tag '{version_tag}'[/green]")
+        console.print(f"[green]Created git tag '{escape(version_tag)}'[/green]")
     except subprocess.CalledProcessError as exc:
-        console.print(f"[red]Failed to create git tag: {exc.stderr.strip()}[/red]")
+        console.print(f"[red]Failed to create git tag: {escape(exc.stderr.strip())}[/red]")
         raise typer.Exit(code=1) from exc
     except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
         console.print("[red]Failed to create git tag: git not available[/red]")

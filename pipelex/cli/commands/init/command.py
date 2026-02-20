@@ -5,6 +5,7 @@ import shutil
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.prompt import Confirm
 
 from pipelex.cli.commands.init.backends import (
@@ -443,7 +444,7 @@ def init_cmd(
         # Re-raise Exit exceptions
         raise
     except Exception as exc:
-        console.print(f"\n[red]⚠ Warning: Initialization failed: {exc}[/red]", style="bold")
+        console.print(f"\n[red]⚠ Warning: Initialization failed: {escape(str(exc))}[/red]", style="bold")
         if needs_config:
             console.print("[red]Please run 'pipelex init config' manually.[/red]")
         return
