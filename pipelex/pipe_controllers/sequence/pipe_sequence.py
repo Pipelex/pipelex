@@ -142,7 +142,7 @@ class PipeSequence(PipeController):
                     except InputStuffSpecNotFoundError as exc:
                         msg = (
                             f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
-                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
+                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs.format_for_display()}"
                         )
                         raise PipeSequenceValueError(msg) from exc
                     needed_inputs.add_stuff_spec(
