@@ -160,7 +160,7 @@ export HELP
 
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
-	format lint ruff-format ruff-lint pyright mypy pylint plxt-format plxt-lint \
+	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
     rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \

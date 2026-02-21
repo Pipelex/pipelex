@@ -78,7 +78,7 @@ When executing pipelines programmatically, Pipelex can load pipe **libraries** -
 
 #### Library Parameters
 
-When using `PipelexRunner`, you can control library behavior with these constructor parameters:
+When using `PipelexRunner`, you can control library behavior with these parameters:
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 

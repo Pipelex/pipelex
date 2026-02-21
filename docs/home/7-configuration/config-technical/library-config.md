@@ -196,7 +196,7 @@ runner3 = PipelexRunner(
     library_dirs=[],  # Empty list disables directory-based loading
 )
 response3 = await runner3.execute_pipeline(
-    mthds_content=my_plx_string,
+    mthds_content=my_mthds_string,
     inputs={"input": "value"},
 )
 pipe_output3 = response3.pipe_output

@@ -89,20 +89,20 @@ flowchart TD
     COPY_INF --> CUST_BE[customize_backends_config<br/>Interactive backend selection]
     CUST_BE --> CHK_RT{check_routing?}
     CHK_RT -- "No (auto-route)" --> CUST_RT[customize_routing_profile<br/>Auto-routing based on selection]
-    CHK_RT -- "Yes (focus=routing)" --> S25
-    CUST_RT --> S25
+    CHK_RT -- "Yes (focus=routing)" --> S3
+    CUST_RT --> S3
 
-    S2 -- No --> S25
+    S2 -- No --> S3
 
-    S25{needs_routing?}
-    S25 -- Yes --> ROUTE[customize_routing_profile<br/>Standalone routing setup]
-    S25 -- No --> S3
+    S3{needs_routing?}
+    S3 -- Yes --> ROUTE[customize_routing_profile<br/>Standalone routing setup]
+    S3 -- No --> S4
 
-    ROUTE --> S3
+    ROUTE --> S4
 
-    S3{needs_telemetry?}
-    S3 -- Yes --> TELEM[setup_telemetry<br/>Copy telemetry template]
-    S3 -- No --> DONE2([Done])
+    S4{needs_telemetry?}
+    S4 -- Yes --> TELEM[setup_telemetry<br/>Copy telemetry template]
+    S4 -- No --> DONE2([Done])
 
     TELEM --> DONE2
 ```
@@ -111,7 +111,7 @@ flowchart TD
 
 ## Implementation
 
-### Step 1: Determine Needs
+### Determine Needs
 
 `determine_needs()` evaluates the current state of `.pipelex/` to decide which steps are required:
 
@@ -136,7 +136,7 @@ The `check_*` flags are derived from the `focus` parameter:
 !!! info "Routing is separate from inference"
     `check_routing` is only `True` for `focus=routing`. When `focus=all`, routing is handled automatically as part of the inference step (Step 2), not as a standalone step.
 
-### Step 2: Config Step — `init_config()`
+### Step 1: Config Step — `init_config()`
 
 Copies the config template tree from `kit/configs/` to `.pipelex/`, with two skip mechanisms:
 
@@ -197,13 +197,13 @@ Then runs interactive customization:
 1. `customize_backends_config()` — prompts user to select backends, handles gateway terms
 2. `customize_routing_profile()` — auto-configures routing based on selected backends (**only when `check_routing` is `False`**, i.e. when routing is not the specific focus)
 
-When `focus=routing`, the inference step skips routing entirely because Step 2.5 handles it as a standalone operation.
+When `focus=routing`, the inference step skips routing entirely because Step 3 handles it as a standalone operation.
 
-### Step 2.5: Routing Step
+### Step 3: Routing Step
 
 If `needs_routing` is `True` (only for `focus=routing`), runs `customize_routing_profile()` as a standalone step.
 
-### Step 3: Telemetry Step
+### Step 4: Telemetry Step
 
 Copies the `telemetry.toml` template and prints instructions. No interactive prompts.
 
