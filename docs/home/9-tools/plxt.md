@@ -46,13 +46,13 @@ exclude = [
 
 | Extension | Description |
 |-----------|-------------|
+| `.mthds` | Method definitions |
+| `.plx` | Method definitions (legacy extension) |
 | `.toml` | Standard TOML configuration files |
-| `.mthds` | Pipelex pipeline method definitions |
-| `.plx` | Pipelex pipeline execution files |
 
 ### Key Formatting Options
 
-The `[formatting]` section in `toml_config.toml` controls the global formatting behavior. Each option can be overridden per file type using `[[rule]]` sections.
+The `[formatting]` section in `plxt.toml` controls the global formatting behavior. Each option can be overridden per file type using `[[rule]]` sections.
 
 | Option | Default | Description |
 |--------|---------|-------------|
