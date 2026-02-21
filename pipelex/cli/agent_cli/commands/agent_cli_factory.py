@@ -76,4 +76,5 @@ def make_pipelex_for_agent_cli(
     # commands only emit structured JSON.  Warnings and errors still reach stderr.
     PrettyPrinter.mode = PrettyPrintMode.SILENT
     log.set_level_for_package("pipelex", log_level)
+    log.redirect_to_stderr()
     return pipelex_instance

@@ -1,5 +1,9 @@
 import logging
+import sys
 from typing import Any
+
+from rich.console import Console
+from rich.logging import RichHandler
 
 from pipelex.tools.log.log_config import LogConfig, LogMode
 from pipelex.tools.log.log_dispatch import LogDispatch
@@ -132,6 +136,17 @@ class Log:
     ########################################################
     # Public methods
     ########################################################
+
+    def redirect_to_stderr(self):
+        """Redirect the root logger's rich handler to stderr.
+
+        Used by the agent CLI to ensure no log output pollutes stdout.
+        """
+        if self.rich_handler is not None:
+            if not isinstance(self.rich_handler, RichHandler):
+                msg = "Rich handler is not properly set."
+                raise RuntimeError(msg)
+            self.rich_handler.console = Console(file=sys.stderr)
 
     def set_level_by_int(self, level_int: int):
         """Set the log level using an integer value.
