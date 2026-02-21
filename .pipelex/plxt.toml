@@ -100,7 +100,7 @@ include = ["**/*.toml"]
 include = ["**/*.mthds", "**/*.plx"]
 
 [rule.schema]
-path = ".pipelex/mthds_schema.json"
+url = "https://pipelex-web.s3.amazonaws.com/tests/mthds_schema.json"
 
 # Per-rule formatting overrides — all at defaults so you can tweak them
 # independently of .toml files.
