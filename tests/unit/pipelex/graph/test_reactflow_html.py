@@ -1,11 +1,13 @@
 """Unit tests for the ReactFlow HTML generator."""
 
+import re
 from datetime import datetime, timezone
 
 import pytest
 
 from pipelex.config import get_config
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
+from pipelex.graph.csp import CSP_NONCE_SENTINEL
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec, NodeKind, NodeSpec, NodeStatus, PipelineRef
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
@@ -190,3 +192,55 @@ class TestReactFlowHtml:
         assert "dagre" in html
         assert "getLayoutedElements" in html
         assert "rankdir" in html
+
+    def test_html_contains_csp_nonce_on_inline_script(self, rf_config: ReactFlowRenderingConfig) -> None:
+        """Verify the inline script tag has the CSP nonce sentinel."""
+        viewspec = ViewSpec(created_at=datetime.now(timezone.utc), graph_id="test_graph")
+        html = generate_reactflow_html(viewspec, rf_config)
+
+        # The main inline <script nonce="..."> (not type="application/json")
+        pattern = rf'<script nonce="{re.escape(CSP_NONCE_SENTINEL)}">'
+        assert re.search(pattern, html), "Inline <script> should have the CSP nonce sentinel"
+
+    def test_html_contains_csp_nonce_on_inline_style(self, rf_config: ReactFlowRenderingConfig) -> None:
+        """Verify the inline style tag has the CSP nonce sentinel."""
+        viewspec = ViewSpec(created_at=datetime.now(timezone.utc), graph_id="test_graph")
+        html = generate_reactflow_html(viewspec, rf_config)
+
+        assert f'<style nonce="{CSP_NONCE_SENTINEL}">' in html
+
+    def test_html_contains_csp_nonce_on_cdn_scripts(self, rf_config: ReactFlowRenderingConfig) -> None:
+        """Verify CDN script tags have the CSP nonce sentinel."""
+        viewspec = ViewSpec(created_at=datetime.now(timezone.utc), graph_id="test_graph")
+        cdn_config = rf_config.model_copy(update={"is_use_cdn": True})
+        html = generate_reactflow_html(viewspec, cdn_config)
+
+        # All CDN <script src="..."> tags should have nonce
+        cdn_scripts = re.findall(r'<script [^>]*src="https?://[^"]*"[^>]*>', html)
+        assert len(cdn_scripts) >= 5, f"Expected at least 5 CDN script tags, found {len(cdn_scripts)}"
+        for tag in cdn_scripts:
+            assert f'nonce="{CSP_NONCE_SENTINEL}"' in tag, f"CDN script missing nonce: {tag}"
+
+    def test_json_data_scripts_have_no_nonce(self, rf_config: ReactFlowRenderingConfig) -> None:
+        """Verify application/json script tags do NOT have a nonce attribute."""
+        viewspec = ViewSpec(created_at=datetime.now(timezone.utc), graph_id="test_graph")
+        graphspec = GraphSpec(
+            graph_id="test_graph",
+            created_at=datetime.now(timezone.utc),
+            pipeline_ref=PipelineRef(),
+            nodes=[],
+            edges=[],
+        )
+        html = generate_reactflow_html(viewspec, rf_config, graphspec=graphspec)
+
+        json_scripts = re.findall(r'<script type="application/json"[^>]*>', html)
+        assert len(json_scripts) >= 1, "Expected at least 1 JSON data script tag"
+        for tag in json_scripts:
+            assert "nonce" not in tag, f"JSON data script should not have nonce: {tag}"
+
+    def test_html_has_no_csp_meta_tag(self, rf_config: ReactFlowRenderingConfig) -> None:
+        """Verify no CSP meta tag is present (standalone HTML should be CSP-free)."""
+        viewspec = ViewSpec(created_at=datetime.now(timezone.utc), graph_id="test_graph")
+        html = generate_reactflow_html(viewspec, rf_config)
+
+        assert "Content-Security-Policy" not in html

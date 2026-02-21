@@ -9,6 +9,7 @@ from typing import Any
 from kajson import dumps
 
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.graph.csp import CSP_NONCE_SENTINEL
 from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
 from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 
@@ -41,6 +42,7 @@ def render_mermaid_html(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
         templating_context={
+            "csp_nonce": CSP_NONCE_SENTINEL,
             "title": title,
             "mermaid_code": mermaid_code,
             "theme": theme,
@@ -72,6 +74,7 @@ async def render_mermaid_html_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
         templating_context={
+            "csp_nonce": CSP_NONCE_SENTINEL,
             "title": title,
             "mermaid_code": mermaid_code,
             "theme": theme,
@@ -115,6 +118,7 @@ async def render_mermaid_html_with_data_async(
 
     # Pre-serialize the data to JSON for embedding in the template
     context: dict[str, Any] = {
+        "csp_nonce": CSP_NONCE_SENTINEL,
         "title": title,
         "mermaid_code": mermaid_code,
         "stuff_data_json": dumps(stuff_data or {}),
