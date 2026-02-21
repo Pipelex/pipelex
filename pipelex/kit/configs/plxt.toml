@@ -125,6 +125,3 @@ align_entries = true
 # indent_string = "  "
 # trailing_newline = true
 # allowed_blank_lines = 2
-# indent_string = "  "
-# trailing_newline = true
-# allowed_blank_lines = 2
