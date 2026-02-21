@@ -146,6 +146,17 @@ class TestMthdsSchemaGeneration:
         for ref_value in refs:
             assert "#/$defs/" not in ref_value, f"$ref should use #/definitions/, got: {ref_value}"
 
+    def test_pipe_condition_outcomes_is_required(self, schema: dict[str, Any]) -> None:
+        """Verify outcomes appears in PipeConditionBlueprint's required array."""
+        definitions = schema.get("definitions", {})
+        condition_def = definitions.get("PipeConditionBlueprint", {})
+        required = condition_def.get("required", [])
+        assert "outcomes" in required
+
+    def test_no_x_schema_required_markers_in_output(self, schema: dict[str, Any]) -> None:
+        """Verify x-schema-required markers are cleaned from the final schema."""
+        _assert_key_absent_recursive(schema, "x-schema-required", "x-schema-required marker should be removed from output")
+
     def test_construct_field_schema_has_all_methods(self, schema: dict[str, Any]) -> None:
         """Verify the construct field schema covers all 4 composition methods."""
         definitions = schema.get("definitions", {})

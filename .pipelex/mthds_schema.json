@@ -945,7 +945,8 @@
       "required": [
         "description",
         "output",
-        "default_outcome"
+        "default_outcome",
+        "outcomes"
       ],
       "title": "PipeConditionBlueprint",
       "type": "object"
