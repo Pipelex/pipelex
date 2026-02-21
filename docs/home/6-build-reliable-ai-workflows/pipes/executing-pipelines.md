@@ -166,7 +166,7 @@ pipe_output = response.pipe_output
 
 ### Using MTHDS Content Directly
 
-You can directly pass PLX content as a string to `PipelexRunner.execute_pipeline()`, useful for dynamic pipeline execution without file-based definitions.
+You can directly pass MTHDS content as a string to `PipelexRunner.execute_pipeline()`, useful for dynamic pipeline execution without file-based definitions.
 
 ```python
 from pipelex.pipelex import Pipelex
