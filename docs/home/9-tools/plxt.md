@@ -20,7 +20,7 @@ You can verify the installation with:
 
 ## Configuration
 
-`plxt` reads its configuration from `.pipelex/toml_config.toml` at the root of your project. This file controls file discovery, formatting rules, and per-file-type overrides.
+`plxt` reads its configuration from `.pipelex/plxt.toml` at the root of your project. This file controls file discovery, formatting rules, and per-file-type overrides.
 
 ### File Discovery
 
@@ -46,13 +46,13 @@ exclude = [
 
 | Extension | Description |
 |-----------|-------------|
+| `.mthds` | Method definitions |
+| `.plx` | Method definitions (legacy extension) |
 | `.toml` | Standard TOML configuration files |
-| `.mthds` | Pipelex pipeline method definitions |
-| `.plx` | Pipelex pipeline execution files |
 
 ### Key Formatting Options
 
-The `[formatting]` section in `toml_config.toml` controls the global formatting behavior. Each option can be overridden per file type using `[[rule]]` sections.
+The `[formatting]` section in `plxt.toml` controls the global formatting behavior. Each option can be overridden per file type using `[[rule]]` sections.
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -65,7 +65,7 @@ The `[formatting]` section in `toml_config.toml` controls the global formatting 
 | `trailing_newline` | `true` | Ensure files end with a newline character |
 | `reorder_keys` | `false` | Sort top-level keys alphabetically |
 
-For the full list of options, see the comments in `.pipelex/toml_config.toml` or the [taplo configuration reference](https://taplo.tamasfe.dev/configuration/).
+For the full list of options, see the comments in `.pipelex/plxt.toml`.
 
 ### Per-File-Type Rules
 

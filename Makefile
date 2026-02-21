@@ -239,8 +239,8 @@ lock: env
 
 plxt: env ## Rebuild and reinstall plxt CLI from local vscode-pipelex source
 	$(call PRINT_TITLE,"Reinstalling plxt from source")
-	@. $(VIRTUAL_ENV)/bin/activate && \
-	uv sync --all-extras --reinstall-package plxt && \
+	@. "$(VIRTUAL_ENV)/bin/activate" && \
+	uv sync --all-extras --reinstall-package pipelex-tools && \
 	echo "Reinstalled plxt in ${VIRTUAL_ENV}";
 
 update: env
