@@ -14,13 +14,13 @@ from pipelex.pipeline.runner import PipelexRunner
 @pytest.mark.asyncio
 class TestPipeLLMTextSimple:
     @pytest.mark.parametrize(
-        ("topic", "pipe_code"),
+        ("variant", "pipe_code"),
         [
             ("using_setting", "write_haiku_e2e_using_setting"),
             ("using_preset", "write_haiku_e2e_using_preset"),
         ],
     )
-    async def test_write_haiku(self, pipe_run_mode: PipeRunMode, topic: str, pipe_code: str):
+    async def test_write_haiku(self, pipe_run_mode: PipeRunMode, variant: str, pipe_code: str) -> None:
         """Test a simple text-to-text PipeLLM pipe that writes a haiku."""
         pipeline_response = await PipelexRunner(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_operators"], pipe_run_mode=pipe_run_mode
@@ -40,9 +40,9 @@ class TestPipeLLMTextSimple:
         assert result_text is not None
         assert len(result_text.strip()) > 0
 
-        pretty_print(result_text, title=f"Haiku about '{topic}'")
+        pretty_print(result_text, title=f"Haiku ({variant})")
 
         # In live mode, verify haiku structure (3 non-empty lines)
-        if pipe_run_mode == PipeRunMode.LIVE:
+        if pipe_run_mode.is_live:
             lines = [line for line in result_text.strip().splitlines() if line.strip()]
             assert len(lines) == 3, f"Expected 3 lines in haiku, got {len(lines)}: {result_text}"
