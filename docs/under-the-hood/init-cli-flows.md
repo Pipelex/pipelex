@@ -136,7 +136,7 @@ The `check_*` flags are derived from the `focus` parameter:
 !!! info "Routing is separate from inference"
     `check_routing` is only `True` for `focus=routing`. When `focus=all`, routing is handled automatically as part of the inference step (Step 2), not as a standalone step.
 
-### Step 2: Config Step — `init_config()`
+### Step 1: Config Step — `init_config()`
 
 Copies the config template tree from `kit/configs/` to `.pipelex/`, with two skip mechanisms:
 
