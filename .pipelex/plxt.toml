@@ -100,7 +100,11 @@ include = ["**/*.toml"]
 include = ["**/*.mthds", "**/*.plx"]
 
 [rule.schema]
-url = "https://pipelex-web.s3.amazonaws.com/tests/mthds_schema.json"
+sources = [
+  ".pipelex/mthds_schema.json",
+  "~/.pipelex/mthds_schema.json",
+  "https://pipelex-config.s3.eu-west-3.amazonaws.com/mthds_schema_1.json",
+]
 
 # Per-rule formatting overrides — all at defaults so you can tweak them
 # independently of .toml files.
@@ -118,6 +122,9 @@ align_entries = true
 # column_width = 80
 # indent_tables = false
 # indent_entries = false
+# indent_string = "  "
+# trailing_newline = true
+# allowed_blank_lines = 2
 # indent_string = "  "
 # trailing_newline = true
 # allowed_blank_lines = 2

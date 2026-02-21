@@ -616,6 +616,11 @@
               "type": "integer"
             },
             {
+              "enum": [
+                "auto"
+              ]
+            },
+            {
               "type": "null"
             }
           ],
