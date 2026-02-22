@@ -47,6 +47,10 @@ class InferenceModelSpecBlueprint(ConfigModel):
     @field_validator("costs", mode="before")
     @staticmethod
     def validate_costs(value: dict[str, float]) -> CostsByCategoryDict:
+        negative_costs = {key: val for key, val in value.items() if val < 0}
+        if negative_costs:
+            msg = f"Cost values must not be negative, got: {negative_costs}"
+            raise ValueError(msg)
         return ConfigModel.transform_dict_of_floats_str_to_enum(
             input_dict=value,
             key_enum_cls=CostCategory,

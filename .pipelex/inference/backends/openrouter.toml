@@ -27,7 +27,7 @@ structure_method = "instructor/openai_tools"
 thinking_mode = "none"
 
 ################################################################################
-# LLMs (333 models)
+# LANGUAGE MODELS
 ################################################################################
 
 # --- ai21 ----------------------------------------------------------------
@@ -1544,13 +1544,11 @@ costs = { input = 0.15, output = 0.6 }
 max_tokens = 2000000
 inputs = ["text", "images", "audio", "pdf", "video"]
 outputs = ["text", "image", "structured"]
-costs = { input = -1000000, output = -1000000 }
 
 ["openrouter/bodybuilder"]
 max_tokens = 128000
 inputs = ["text"]
 outputs = ["text"]
-costs = { input = -1000000, output = -1000000 }
 
 ["openrouter/free"]
 max_tokens = 200000
@@ -2145,7 +2143,7 @@ outputs = ["text", "structured"]
 costs = { input = 0.95, output = 2.55 }
 
 ################################################################################
-# IMAGE GENERATORS (14 models)
+# IMAGE GENERATION MODELS
 ################################################################################
 
 # --- black-forest-labs ---------------------------------------------------
