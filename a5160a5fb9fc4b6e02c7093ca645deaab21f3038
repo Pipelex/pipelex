@@ -1,0 +1,31 @@
+.gitignore
+  d4f360ee7c62beaa 71-73
+Makefile
+  d4f360ee7c62beaa 286,385
+pipelex/cli/dev_cli/commands/generate_mthds_schema_cmd.py
+  d4f360ee7c62beaa 14-15,25
+CLAUDE.md
+  d4f360ee7c62beaa 102
+pipelex/kit/paths.py
+  d4f360ee7c62beaa 27
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "a5160a5fb9fc4b6e02c7093ca645deaab21f3038",
+  "prompts": {
+    "d4f360ee7c62beaa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b347324c-e74d-4b19-9204-6def36aae853",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 24,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}
