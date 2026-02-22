@@ -1,6 +1,6 @@
 ################################################################################
 # OPENROUTER MODELS
-# Generated from https://openrouter.ai/api/v1/models (337 models)
+# Generated from OpenRouter API (337 chat models + 10 image models)
 ################################################################################
 
 ################################################################################
@@ -12,6 +12,10 @@ model_type = "llm"
 sdk = "openai"
 structure_method = "instructor/openai_tools"
 thinking_mode = "none"
+
+################################################################################
+# LLMs (333 models)
+################################################################################
 
 # --- ai21 ----------------------------------------------------------------
 
@@ -485,12 +489,6 @@ inputs = ["pdf", "images", "text", "audio", "video"]
 outputs = ["text", "structured"]
 costs = { input = 0.3, output = 2.5 }
 
-["google/gemini-2.5-flash-image"]
-max_tokens = 32768
-inputs = ["images", "text"]
-outputs = ["image", "text"]
-costs = { input = 0.3, output = 2.5 }
-
 ["google/gemini-2.5-flash-lite"]
 max_tokens = 1048576
 inputs = ["text", "images", "pdf", "audio", "video"]
@@ -526,12 +524,6 @@ max_tokens = 1048576
 inputs = ["text", "images", "pdf", "audio", "video"]
 outputs = ["text", "structured"]
 costs = { input = 0.5, output = 3 }
-
-["google/gemini-3-pro-image-preview"]
-max_tokens = 65536
-inputs = ["images", "text"]
-outputs = ["image", "text"]
-costs = { input = 2, output = 12 }
 
 ["google/gemini-3-pro-preview"]
 max_tokens = 1048576
@@ -1345,18 +1337,6 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10 }
 
-["openai/gpt-5-image"]
-max_tokens = 400000
-inputs = ["images", "text", "pdf"]
-outputs = ["image", "text", "structured"]
-costs = { input = 10, output = 10 }
-
-["openai/gpt-5-image-mini"]
-max_tokens = 400000
-inputs = ["pdf", "images", "text"]
-outputs = ["image", "text", "structured"]
-costs = { input = 2.5, output = 2 }
-
 ["openai/gpt-5-mini"]
 max_tokens = 400000
 inputs = ["text", "images", "pdf"]
@@ -2150,4 +2130,129 @@ max_tokens = 204800
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.95, output = 2.55 }
-structure_method = "instructor/json"
+
+################################################################################
+# IMAGE GENERATORS (14 models)
+################################################################################
+
+# --- black-forest-labs ---------------------------------------------------
+
+["black-forest-labs/flux.2-flex"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 67344
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["black-forest-labs/flux.2-klein-4b"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 40960
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["black-forest-labs/flux.2-max"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 46864
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["black-forest-labs/flux.2-pro"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 46864
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+# --- bytedance-seed ------------------------------------------------------
+
+["bytedance-seed/seedream-4.5"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 4096
+inputs = ["images", "text"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+# --- google --------------------------------------------------------------
+
+["google/gemini-2.5-flash-image"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 32768
+inputs = ["images", "text"]
+outputs = ["image", "text"]
+costs = { input = 0.3, output = 2.5 }
+
+["google/gemini-3-pro-image-preview"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 65536
+inputs = ["images", "text"]
+outputs = ["image", "text"]
+costs = { input = 2, output = 12 }
+
+# --- openai --------------------------------------------------------------
+
+["openai/gpt-5-image"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 400000
+inputs = ["images", "text", "pdf"]
+outputs = ["image", "text", "structured"]
+costs = { input = 10, output = 10 }
+
+["openai/gpt-5-image-mini"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 400000
+inputs = ["pdf", "images", "text"]
+outputs = ["image", "text", "structured"]
+costs = { input = 2.5, output = 2 }
+
+# --- sourceful -----------------------------------------------------------
+
+["sourceful/riverflow-v2-fast"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["sourceful/riverflow-v2-fast-preview"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["sourceful/riverflow-v2-max-preview"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["sourceful/riverflow-v2-pro"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["sourceful/riverflow-v2-standard-preview"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
