@@ -9,7 +9,7 @@ from posthog import tag
 
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
-from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.builder_loop import BuilderLoop, maybe_generate_manifest_for_output
 from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.builder.runner_code import generate_runner_code
@@ -22,15 +22,16 @@ from pipelex.cli.error_handlers import (
     handle_model_choice_error,
 )
 from pipelex.config import get_config
+from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.hub import get_console, get_report_delegate, get_required_pipe, get_telemetry_manager
-from pipelex.language.plx_factory import PlxFactory
+from pipelex.language.mthds_factory import MthdsFactory
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipelex import PACKAGE_VERSION, Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventProperty
@@ -99,7 +100,7 @@ def build_pipe_cmd(
     ] = False,
     no_extras: Annotated[
         bool,
-        typer.Option("--no-extras", help="Skip generating inputs.json and runner.py, only generate the PLX file"),
+        typer.Option("--no-extras", help="Skip generating inputs.json and runner.py, only generate the MTHDS file"),
     ] = False,
     bundle_view: Annotated[
         bool,
@@ -168,42 +169,47 @@ def build_pipe_cmd(
         base_dir = output_dir or builder_config.default_output_dir
 
         # Determine output path and whether to generate extras
-        bundle_file_name = Path(f"{builder_config.default_bundle_file_name}.plx")
+        bundle_file_name = Path(f"{builder_config.default_bundle_file_name}{MTHDS_EXTENSION}")
 
         if no_extras:
-            # Generate single file: {base_dir}/{name}_01.plx
+            # Generate single file: {base_dir}/{name}_01.mthds
             name = output_name or builder_config.default_bundle_file_name
-            plx_file_path = get_incremental_file_path(
+            mthds_file_path = get_incremental_file_path(
                 base_path=base_dir,
                 base_name=name,
-                extension="plx",
+                extension="mthds",
             )
             extras_output_dir = ""  # Not used in no_extras mode
         else:
-            # Generate directory with extras: {base_dir}/{name}_01/bundle.plx + extras
+            # Generate directory with extras: {base_dir}/{name}_01/bundle.mthds + extras
             dir_name = output_name or builder_config.default_directory_base_name
             extras_output_dir = get_incremental_directory_path(
                 base_path=base_dir,
                 base_name=dir_name,
             )
-            plx_file_path = Path(extras_output_dir) / bundle_file_name
+            mthds_file_path = Path(extras_output_dir) / bundle_file_name
 
-        # Save the PLX file
-        ensure_directory_for_file_path(file_path=str(plx_file_path))
+        # Save the MTHDS file
+        ensure_directory_for_file_path(file_path=str(mthds_file_path))
         try:
-            plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+            mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
         except PipelexBundleSpecBlueprintError as exc:
             typer.secho(f"❌ Failed to convert bundle spec to blueprint: {exc}", fg=typer.colors.RED)
             raise typer.Exit(1) from exc
-        save_text_to_path(text=plx_content, path=str(plx_file_path))
-        log.verbose(f"Pipelex bundle saved to: {plx_file_path}")
+        save_text_to_path(text=mthds_content, path=str(mthds_file_path))
+        log.verbose(f"Pipelex bundle saved to: {mthds_file_path}")
 
         if no_extras:
             end_time = time.time()
             console = get_console()
             console.print(f"\n[green]✓[/green] [bold]Pipeline built successfully ({end_time - start_time:.1f}s)[/bold]")
-            console.print(f"  Output: {plx_file_path}")
+            console.print(f"  Output: {mthds_file_path}")
             return
+
+        # Generate METHODS.toml if multiple domains exist in output dir
+        manifest_path = maybe_generate_manifest_for_output(output_dir=Path(extras_output_dir))
+        if manifest_path:
+            log.verbose(f"Package manifest generated: {manifest_path}")
 
         # Generate extras (inputs and runner)
         main_pipe_code = pipelex_bundle_spec.main_pipe
@@ -293,12 +299,15 @@ def build_pipe_cmd(
 
                         # pass empty library_dirs to avoid loading any libraries set at env var or instance level:
                         # we don't want any other pipeline to interfere with the pipeline we just built
-                        built_pipe_output = await execute_pipeline(
-                            plx_content=plx_content,
+                        built_runner = PipelexRunner(
                             pipe_run_mode=PipeRunMode.DRY,
                             execution_config=built_pipe_execution_config,
                             library_dirs=[],
                         )
+                        built_pipe_response = await built_runner.execute_pipeline(
+                            mthds_content=mthds_content,
+                        )
+                        built_pipe_output = built_pipe_response.pipe_output
                         if built_pipe_output.graph_spec:
                             pipeline_graph_dir = graphs_dir / "pipeline_graph"
                             log.verbose(f"Saving pipeline graph for pipe {main_pipe_code} to {pipeline_graph_dir}")
@@ -319,7 +328,7 @@ def build_pipe_cmd(
                 console = get_console()
                 console.print(f"\n[green]✓[/green] [bold]Pipeline built successfully ({end_time - start_time:.1f}s)[/bold]")
                 console.print(f"  Output saved to [bold magenta]{extras_output_dir}[/bold magenta]:")
-                console.print(f"    [green]✓[/green] bundle.plx → {domain_code} → main pipe [red]{main_pipe_code}[/red]")
+                console.print(f"    [green]✓[/green] bundle.mthds → {domain_code} → main pipe [red]{main_pipe_code}[/red]")
                 if saved_bundle_view_formats:
                     console.print(f"    [green]✓[/green] bundle_view: {', '.join(saved_bundle_view_formats)}")
                 if saved_structure_names:

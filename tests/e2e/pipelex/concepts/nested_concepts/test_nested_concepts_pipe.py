@@ -1,7 +1,7 @@
 """E2E test for pipes with nested concept-to-concept references.
 
 This test verifies that:
-1. Concepts with nested concept references can be loaded from PLX files
+1. Concepts with nested concept references can be loaded from MTHDS files
 2. The dependency graph correctly orders concept loading
 3. Pipes can generate structured output with nested concepts
 4. The generated output contains properly typed nested objects
@@ -14,7 +14,7 @@ import pytest
 from pipelex import pretty_print
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__customer import Customer
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__invoice import Invoice
 from tests.e2e.pipelex.concepts.nested_concepts.generated_models.nested_concepts_test__line_item import LineItem
@@ -31,21 +31,24 @@ class TestNestedConceptsPipe:
         """Test that a pipe can generate an Invoice with nested Customer and LineItem concepts.
 
         This test verifies the complete flow:
-        1. PLX file with concept-to-concept references is loaded
+        1. MTHDS file with concept-to-concept references is loaded
         2. Concepts are loaded in topological order (LineItem, Customer before Invoice)
         3. The LLM generates structured output with proper nested types
         4. The output can be accessed via working_memory.get_stuff_as() with typed models
         """
-        pipe_output = await execute_pipeline(
-            pipe_code="generate_invoice",
+        runner = PipelexRunner(
             library_dirs=["tests/e2e/pipelex/concepts/nested_concepts"],
+            pipe_run_mode=pipe_run_mode,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="generate_invoice",
             inputs={
                 "description_text": TextContent(
                     text="Create an invoice for John Smith (john.smith@example.com) who ordered 3 widgets at $10 each and 2 gadgets at $25 each."
                 ),
             },
-            pipe_run_mode=pipe_run_mode,
         )
+        pipe_output = response.pipe_output
 
         # Verify the concept metadata
         assert pipe_output.main_stuff.concept.code == "Invoice"

@@ -1,8 +1,9 @@
 from typing import TypeVar
 
-from pydantic import BaseModel, Field
+from mthds.models.pipe_output import PipeOutputAbstract
+from pydantic import Field
 
-from pipelex.core.memory.working_memory import DictWorkingMemory, WorkingMemory
+from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
@@ -16,13 +17,7 @@ from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 
 
-class DictPipeOutput(BaseModel):
-    working_memory: DictWorkingMemory
-    graph_spec: GraphSpec | None = None
-    pipeline_run_id: str
-
-
-class PipeOutput(BaseModel):
+class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     graph_spec: GraphSpec | None = None

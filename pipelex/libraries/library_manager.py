@@ -17,6 +17,11 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.packages.dependency_resolver import ResolvedDependency, resolve_all_dependencies
+from pipelex.core.packages.discovery import find_package_manifest
+from pipelex.core.packages.exceptions import DependencyResolveError, ManifestError
+from pipelex.core.packages.manifest import MTHDS_STANDARD_VERSION, MthdsPackageManifest
+from pipelex.core.packages.visibility import PackageVisibilityChecker, check_visibility_for_blueprints
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -30,11 +35,12 @@ from pipelex.libraries.library import Library
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
-    get_pipelex_plx_files_from_dirs,
+    get_pipelex_mthds_files_from_dirs,
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
+from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
@@ -46,7 +52,7 @@ class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
-        self._pipe_source_map: dict[str, Path] = {}  # pipe_code -> source .plx file
+        self._pipe_source_map: dict[str, Path] = {}  # pipe_code -> source .mthds file
 
     ############################################################
     # Manager lifecycle
@@ -122,7 +128,7 @@ class LibraryManager(LibraryManagerAbstract):
             pipe_code: The pipe code to look up.
 
         Returns:
-            Path to the .plx file the pipe was loaded from, or None if unknown.
+            Path to the .mthds file the pipe was loaded from, or None if unknown.
         """
         return self._pipe_source_map.get(pipe_code)
 
@@ -146,25 +152,25 @@ class LibraryManager(LibraryManagerAbstract):
             library_dirs = []
 
         all_dirs: list[Path] = []
-        all_plx_paths: list[Path] = []
+        all_mthds_paths: list[Path] = []
         all_dirs.extend(library_dirs)
-        all_plx_paths.extend(get_pipelex_plx_files_from_dirs(set(library_dirs)))
+        all_mthds_paths.extend(get_pipelex_mthds_files_from_dirs(set(library_dirs)))
 
         if library_file_paths:
-            all_plx_paths.extend(library_file_paths)
+            all_mthds_paths.extend(library_file_paths)
 
         # Combine and deduplicate
         seen_absolute_paths: set[str] = set()
-        valid_plx_paths: list[Path] = []
-        for plx_path in all_plx_paths:
+        valid_mthds_paths: list[Path] = []
+        for mthds_path in all_mthds_paths:
             try:
-                absolute_path = str(plx_path.resolve())
+                absolute_path = str(mthds_path.resolve())
             except (OSError, RuntimeError):
                 # For paths that can't be resolved (e.g., in zipped packages), use string representation
-                absolute_path = str(plx_path)
+                absolute_path = str(mthds_path)
 
             if absolute_path not in seen_absolute_paths:
-                valid_plx_paths.append(plx_path)
+                valid_mthds_paths.append(mthds_path)
                 seen_absolute_paths.add(absolute_path)
 
         # Import modules and register in global registries
@@ -188,9 +194,9 @@ class LibraryManager(LibraryManagerAbstract):
         )
         log.verbose(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
-        # Load PLX files into the specific library
-        log.verbose(f"Loading plx files from: {[str(p) for p in valid_plx_paths]}")
-        return self._load_plx_files_into_library(library_id=library_id, valid_plx_paths=valid_plx_paths)
+        # Load MTHDS files into the specific library
+        log.verbose(f"Loading MTHDS files from: {[str(p) for p in valid_mthds_paths]}")
+        return self._load_mthds_files_into_library(library_id=library_id, valid_mthds_paths=valid_mthds_paths)
 
     @override
     def load_libraries_concepts_only(
@@ -207,8 +213,8 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             library_id: The ID of the library to load into
-            library_dirs: List of directories containing PLX files
-            library_file_paths: List of specific PLX file paths to load
+            library_dirs: List of directories containing MTHDS files
+            library_file_paths: List of specific MTHDS file paths to load
 
         Returns:
             List of all concepts that were loaded
@@ -222,25 +228,25 @@ class LibraryManager(LibraryManagerAbstract):
             library_dirs = []
 
         all_dirs: list[Path] = []
-        all_plx_paths: list[Path] = []
+        all_mthds_paths: list[Path] = []
         all_dirs.extend(library_dirs)
-        all_plx_paths.extend(get_pipelex_plx_files_from_dirs(set(library_dirs)))
+        all_mthds_paths.extend(get_pipelex_mthds_files_from_dirs(set(library_dirs)))
 
         if library_file_paths:
-            all_plx_paths.extend(library_file_paths)
+            all_mthds_paths.extend(library_file_paths)
 
         # Combine and deduplicate
         seen_absolute_paths: set[str] = set()
-        valid_plx_paths: list[Path] = []
-        for plx_path in all_plx_paths:
+        valid_mthds_paths: list[Path] = []
+        for mthds_path in all_mthds_paths:
             try:
-                absolute_path = str(plx_path.resolve())
+                absolute_path = str(mthds_path.resolve())
             except (OSError, RuntimeError):
                 # For paths that can't be resolved (e.g., in zipped packages), use string representation
-                absolute_path = str(plx_path)
+                absolute_path = str(mthds_path)
 
             if absolute_path not in seen_absolute_paths:
-                valid_plx_paths.append(plx_path)
+                valid_mthds_paths.append(mthds_path)
                 seen_absolute_paths.add(absolute_path)
 
         # Import modules and register in global registries
@@ -260,19 +266,19 @@ class LibraryManager(LibraryManagerAbstract):
         )
         log.debug(f"Auto-registered {num_registered} StructuredContent classes from loaded modules")
 
-        # Load PLX files as concepts only (no pipes)
-        log.debug(f"Loading concepts only from plx files: {[str(p) for p in valid_plx_paths]}")
+        # Load MTHDS files as concepts only (no pipes)
+        log.debug(f"Loading concepts only from MTHDS files: {[str(p) for p in valid_mthds_paths]}")
         library = self.get_library(library_id=library_id)
         all_concepts: list[Concept] = []
-        for plx_path in valid_plx_paths:
+        for mthds_path in valid_mthds_paths:
             # Track loaded path (resolve if possible)
             try:
-                resolved_path = plx_path.resolve()
+                resolved_path = mthds_path.resolve()
             except (OSError, RuntimeError):
-                resolved_path = plx_path
-            library.loaded_plx_paths.append(resolved_path)
+                resolved_path = mthds_path
+            library.loaded_mthds_paths.append(resolved_path)
 
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_path)
+            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
             concepts = self.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
             all_concepts.extend(concepts)
 
@@ -284,7 +290,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             library_id: The ID of the library to load into
-            blueprints: List of parsed PLX blueprints to load
+            blueprints: List of parsed MTHDS blueprints to load
 
         Returns:
             List of all pipes that were loaded
@@ -370,7 +376,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         Args:
             library_id: The ID of the library to load into
-            blueprints: List of parsed PLX blueprints to load
+            blueprints: List of parsed MTHDS blueprints to load
 
         Returns:
             List of all concepts that were loaded
@@ -418,7 +424,7 @@ class LibraryManager(LibraryManagerAbstract):
         later by _rebuild_models_with_forward_refs().
 
         Args:
-            blueprints: List of parsed PLX blueprints to load
+            blueprints: List of parsed MTHDS blueprints to load
 
         Returns:
             List of loaded concepts
@@ -491,51 +497,334 @@ class LibraryManager(LibraryManagerAbstract):
     # Private helper methods
     ############################################################
 
-    def _load_plx_files_into_library(self, library_id: str, valid_plx_paths: list[Path]) -> list[PipeAbstract]:
-        """Load PLX files into a specific library.
+    def _load_mthds_files_into_library(self, library_id: str, valid_mthds_paths: list[Path]) -> list[PipeAbstract]:
+        """Load MTHDS files into a specific library.
 
         This method:
-        1. Parses blueprints from PLX files
-        2. Loads blueprints into the specified library
+        1. Parses blueprints from MTHDS files
+        2. Finds and loads dependency packages (if manifest has dependencies with local paths)
+        3. Loads blueprints into the specified library
 
         Args:
             library_id: The ID of the library to load into
-            valid_plx_paths: List of PLX file paths to load
+            valid_mthds_paths: List of MTHDS file paths to load
         """
         blueprints: list[PipelexBundleBlueprint] = []
-        for plx_file_path in valid_plx_paths:
+        for mthds_file_path in valid_mthds_paths:
             try:
-                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=plx_file_path)
-                blueprint.source = str(plx_file_path)
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_file_path)
+                blueprint.source = str(mthds_file_path)
             except FileNotFoundError as file_not_found_error:
-                msg = f"Could not find PLX bundle at '{plx_file_path}'"
+                msg = f"Could not find MTHDS bundle at '{mthds_file_path}'"
                 raise LibraryLoadingError(msg) from file_not_found_error
             except PipelexInterpreterError as interpreter_error:
                 # Forward BLUEPRINT validation errors from interpreter
-                msg = f"Could not load PLX bundle from '{plx_file_path}' because of: {interpreter_error.message}"
+                msg = f"Could not load MTHDS bundle from '{mthds_file_path}' because of: {interpreter_error.message}"
                 raise LibraryLoadingError(
                     message=msg,
                     blueprint_validation_errors=interpreter_error.validation_errors,
                 ) from interpreter_error
             blueprints.append(blueprint)
 
+        # Find manifest and run package visibility validation
+        manifest = self._check_package_visibility(blueprints=blueprints, mthds_paths=valid_mthds_paths)
+
+        # Warn if the package requires a newer MTHDS standard version
+        if manifest is not None and manifest.mthds_version is not None:
+            self._warn_if_mthds_version_unsatisfied(
+                mthds_version_constraint=manifest.mthds_version,
+                package_address=manifest.address,
+            )
+
+        # Load dependency packages if manifest has local-path dependencies
+        if manifest is not None and manifest.dependencies:
+            package_root = self._find_package_root(mthds_paths=valid_mthds_paths)
+            if package_root is not None:
+                self._load_dependency_packages(
+                    library_id=library_id,
+                    manifest=manifest,
+                    package_root=package_root,
+                )
+
         # Store resolved absolute paths for duplicate detection in the library
         library = self.get_library(library_id=library_id)
-        for plx_file_path in valid_plx_paths:
+        for mthds_file_path in valid_mthds_paths:
             try:
-                resolved_path = plx_file_path.resolve()
+                resolved_path = mthds_file_path.resolve()
             except (OSError, RuntimeError):
-                resolved_path = plx_file_path
-            library.loaded_plx_paths.append(resolved_path)
+                resolved_path = mthds_file_path
+            library.loaded_mthds_paths.append(resolved_path)
 
         try:
             return self.load_from_blueprints(library_id=library_id, blueprints=blueprints)
         except ValidationError as validation_error:
-            validation_error_msg = report_validation_error(category="plx", validation_error=validation_error)
-            msg = f"Could not load blueprints from {[str(pth) for pth in valid_plx_paths]} because of: {validation_error_msg}"
+            validation_error_msg = report_validation_error(category="mthds", validation_error=validation_error)
+            msg = f"Could not load blueprints from {[str(pth) for pth in valid_mthds_paths]} because of: {validation_error_msg}"
             raise LibraryError(
                 message=msg,
             ) from validation_error
+
+    def _warn_if_mthds_version_unsatisfied(
+        self,
+        mthds_version_constraint: str,
+        package_address: str,
+    ) -> None:
+        """Emit a warning if the current MTHDS standard version does not satisfy the package's constraint."""
+        try:
+            constraint = parse_constraint(mthds_version_constraint)
+            current_version = parse_version(MTHDS_STANDARD_VERSION)
+        except SemVerError as exc:
+            log.warning(f"Could not parse mthds_version constraint '{mthds_version_constraint}' for package '{package_address}': {exc}")
+            return
+
+        if not version_satisfies(current_version, constraint):
+            log.warning(
+                f"Package '{package_address}' requires MTHDS standard version "
+                f"'{mthds_version_constraint}', but the current version is "
+                f"'{MTHDS_STANDARD_VERSION}'. Some features may not work correctly."
+            )
+
+    def _check_package_visibility(
+        self,
+        blueprints: list[PipelexBundleBlueprint],
+        mthds_paths: list[Path],
+    ) -> MthdsPackageManifest | None:
+        """Check package visibility if a METHODS.toml manifest exists.
+
+        Walks up from the first bundle path to find a METHODS.toml manifest.
+        If found, validates all cross-domain pipe references against the exports.
+
+        Args:
+            blueprints: The parsed bundle blueprints
+            mthds_paths: The MTHDS file paths that were loaded
+
+        Returns:
+            The manifest if found, or None
+        """
+        if not mthds_paths:
+            return None
+
+        # Try to find a manifest from the first bundle path
+        try:
+            manifest = find_package_manifest(mthds_paths[0])
+        except ManifestError as exc:
+            log.warning(f"Could not parse METHODS.toml: {exc.message}")
+            # Still enforce reserved domains even when manifest is unparseable
+            checker = PackageVisibilityChecker(manifest=None, bundles=blueprints)
+            reserved_errors = checker.validate_reserved_domains()
+            if reserved_errors:
+                error_messages = [err.message for err in reserved_errors]
+                joined_errors = "\n  - ".join(error_messages)
+                msg = f"Reserved domain violations found:\n  - {joined_errors}"
+                raise LibraryLoadingError(msg) from exc
+            return None
+
+        if manifest is None:
+            # Still enforce reserved domains even for standalone bundles
+            checker = PackageVisibilityChecker(manifest=None, bundles=blueprints)
+            reserved_errors = checker.validate_reserved_domains()
+            if reserved_errors:
+                error_messages = [err.message for err in reserved_errors]
+                joined_errors = "\n  - ".join(error_messages)
+                msg = f"Reserved domain violations found:\n  - {joined_errors}"
+                raise LibraryLoadingError(msg)
+            return None
+
+        visibility_errors = check_visibility_for_blueprints(manifest=manifest, blueprints=blueprints)
+        if visibility_errors:
+            error_messages = [err.message for err in visibility_errors]
+            joined_errors = "\n  - ".join(error_messages)
+            msg = f"Package visibility violations found:\n  - {joined_errors}"
+            raise LibraryLoadingError(msg)
+
+        return manifest
+
+    def _find_package_root(self, mthds_paths: list[Path]) -> Path | None:
+        """Find the package root directory by walking up from the first .mthds file.
+
+        The package root is the directory containing METHODS.toml.
+
+        Args:
+            mthds_paths: The MTHDS file paths
+
+        Returns:
+            The package root path, or None
+        """
+        if not mthds_paths:
+            return None
+
+        current = mthds_paths[0].parent.resolve()
+        while True:
+            manifest_path = current / "METHODS.toml"
+            if manifest_path.is_file():
+                return current
+
+            git_dir = current / ".git"
+            if git_dir.exists():
+                return None
+
+            parent = current.parent
+            if parent == current:
+                return None
+            current = parent
+
+    def _load_dependency_packages(
+        self,
+        library_id: str,
+        manifest: MthdsPackageManifest,
+        package_root: Path,
+    ) -> None:
+        """Load dependency packages into the library.
+
+        Resolves local-path dependencies, parses their blueprints, and loads
+        their concepts and exported pipes into isolated child libraries.
+        Aliased entries are also added to the main library for backward-compatible lookups.
+
+        Args:
+            library_id: The library to load into
+            manifest: The consuming package's manifest
+            package_root: The root directory of the consuming package
+        """
+        try:
+            resolved_deps = resolve_all_dependencies(manifest=manifest, package_root=package_root)
+        except DependencyResolveError as exc:
+            msg = f"Failed to resolve dependencies: {exc}"
+            raise LibraryLoadingError(msg) from exc
+
+        library = self.get_library(library_id=library_id)
+
+        for resolved_dep in resolved_deps:
+            self._load_single_dependency(
+                library=library,
+                resolved_dep=resolved_dep,
+            )
+
+        # Wire concept resolver after all deps are loaded so cross-package
+        # refinement checks can traverse into child libraries
+        library.concept_library.set_concept_resolver(library.resolve_concept)
+
+    def _load_single_dependency(
+        self,
+        library: Library,
+        resolved_dep: ResolvedDependency,
+    ) -> None:
+        """Load a single resolved dependency into an isolated child library.
+
+        Creates a child Library for the dependency, loads domains/concepts/pipes
+        into it, registers it in library.dependency_libraries, and adds aliased
+        entries to the main library for backward-compatible cross-package lookups.
+
+        Args:
+            library: The main library to load into
+            resolved_dep: The resolved dependency info
+        """
+        alias = resolved_dep.alias
+
+        # Parse dependency blueprints
+        dep_blueprints: list[PipelexBundleBlueprint] = []
+        for mthds_path in resolved_dep.mthds_files:
+            try:
+                blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=mthds_path)
+                blueprint.source = str(mthds_path)
+            except (FileNotFoundError, PipelexInterpreterError) as exc:
+                log.warning(f"Could not parse dependency '{alias}' bundle '{mthds_path}': {exc}")
+                continue
+            dep_blueprints.append(blueprint)
+
+        if not dep_blueprints:
+            log.warning(f"No valid blueprints found for dependency '{alias}'")
+            return
+
+        # Warn if the dependency requires a newer MTHDS standard version
+        if resolved_dep.manifest is not None and resolved_dep.manifest.mthds_version is not None:
+            self._warn_if_mthds_version_unsatisfied(
+                mthds_version_constraint=resolved_dep.manifest.mthds_version,
+                package_address=resolved_dep.address,
+            )
+
+        # Create isolated child library for this dependency
+        child_library = LibraryFactory.make_empty()
+
+        # Load domains into child library
+        all_domains: list[Domain] = []
+        for blueprint in dep_blueprints:
+            domain = DomainFactory.make_from_blueprint(
+                blueprint=DomainBlueprint(
+                    source=blueprint.source,
+                    code=blueprint.domain,
+                    description=blueprint.description or "",
+                    system_prompt=blueprint.system_prompt,
+                ),
+            )
+            all_domains.append(domain)
+        child_library.domain_library.add_domains(domains=all_domains)
+
+        # Load concepts into child library
+        dep_concepts = self._load_concepts_from_blueprints(dep_blueprints)
+        child_library.concept_library.add_concepts(concepts=dep_concepts)
+
+        # Collect main_pipes for auto-export
+        main_pipes: set[str] = set()
+        for blueprint in dep_blueprints:
+            if blueprint.main_pipe:
+                main_pipes.add(blueprint.main_pipe)
+
+        # Determine if we filter by exports or load all.
+        # exported_pipe_codes is None when no manifest exists (all pipes public),
+        # or a set (possibly empty) when a manifest defines exports.
+        if resolved_dep.exported_pipe_codes is None:
+            # No manifest: all pipes are public, no filtering
+            has_exports = False
+            all_exported: set[str] = set()
+        else:
+            # Manifest exists: filter to exported pipes + main_pipes
+            has_exports = True
+            all_exported = resolved_dep.exported_pipe_codes | main_pipes
+
+        # Temporarily register dep concepts in main library for pipe construction
+        # (PipeFactory resolves concepts through the hub's current library)
+        temp_concept_refs: list[str] = []
+        for concept in dep_concepts:
+            if not library.concept_library.is_concept_exists(concept_ref=concept.concept_ref):
+                library.concept_library.add_new_concept(concept=concept)
+                temp_concept_refs.append(concept.concept_ref)
+
+        # Load exported pipes into child library, ensuring temp concepts are
+        # always cleaned up even if an unexpected exception occurs
+        try:
+            concept_codes = [concept.code for concept in dep_concepts]
+            for blueprint in dep_blueprints:
+                if blueprint.pipe is None:
+                    continue
+                for pipe_code, pipe_blueprint in blueprint.pipe.items():
+                    # If manifest has exports, only load exported pipes
+                    if has_exports and pipe_code not in all_exported:
+                        continue
+                    try:
+                        pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                            domain_code=blueprint.domain,
+                            pipe_code=pipe_code,
+                            blueprint=pipe_blueprint,
+                            concept_codes_from_the_same_domain=concept_codes,
+                        )
+                        child_library.pipe_library.add_new_pipe(pipe=pipe)
+                    except (PipeLibraryError, ValidationError) as exc:
+                        log.warning(f"Could not load dependency '{alias}' pipe '{pipe_code}': {exc}")
+        finally:
+            # Remove temporary concept entries from main library
+            library.concept_library.remove_concepts_by_concept_refs(concept_refs=temp_concept_refs)
+
+        # Register child library for isolation
+        library.dependency_libraries[alias] = child_library
+
+        # Add aliased entries to main library for backward-compatible cross-package lookups
+        for concept in dep_concepts:
+            library.concept_library.add_dependency_concept(alias=alias, concept=concept)
+
+        for pipe in child_library.pipe_library.get_pipes():
+            library.pipe_library.add_dependency_pipe(alias=alias, pipe=pipe)
+
+        log.verbose(f"Loaded dependency '{alias}': {len(dep_concepts)} concepts, pipes from {len(dep_blueprints)} bundles")
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

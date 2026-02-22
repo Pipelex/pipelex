@@ -50,7 +50,7 @@ class TestPipeBatchSimple:
 
         pipe_batch_blueprint = PipeBatchBlueprint(
             description="Simple batch processing test",
-            branch_pipe_code="uppercase_transformer",  # This exists in the PLX file
+            branch_pipe_code="uppercase_transformer",  # This exists in the MTHDS file
             inputs={
                 "text_list": concept_1.concept_ref,
             },

@@ -1,9 +1,40 @@
-## [v0.17.6] - 2026-02-14
+## [Unreleased]
 
 ### Added
 
-- **Claude Code GitHub Actions**: Added `claude.yml` workflow for interactive Claude Code assistance on issues and PR comments, and `claude-code-review.yml` workflow for automated code review on pull requests.
+- **Package Management System:** Introduced a full package manager for MTHDS with `METHODS.toml` manifests, `methods.lock` lockfile generation, local path and remote Git-based dependency resolution (MVS), a local package cache (`~/.mthds/packages`), and a new `pipelex pkg` CLI command group (`init`, `list`, `add`, `lock`, `install`, `update`, `publish`, `search`, `inspect`, `graph`).
+- **Hierarchical Domains:** Support for dot-separated domain namespaces (e.g., `legal.contracts.shareholder`) and cross-package references via `alias->domain.pipe` syntax.
+- **PipelexRunner:** Introduced the `PipelexRunner` class as the primary entry point for executing pipelines, replacing `PipelexClient` and standalone `execute_pipeline`/`start_pipeline` functions.
+- **Linting & Formatting:** Integrated `plxt` (Pipelex Tools) for formatting and linting `.mthds` and `.toml` files, including CI/CD checks alongside `ruff`.
+- **JSON Schema:** Automatic generation of `mthds_schema.json` for standard definition, IDE validation, and auto-completion.
+- **Dev CLI:** Added `pipelex-dev` CLI for internal development tasks (e.g., schema generation).
+- **CSP Nonce Support:** Added Content Security Policy nonce support for generated HTML graphs (Mermaid/ReactFlow) to enable secure rendering in VS Code webviews.
 
+### Changed
+
+- **CI Runner Optimization**: Split self-hosted runners into dedicated test (D32) and lint (D4) pools with pre-baked Docker image (Python 3.10-3.14, UV, dependency cache) for faster job startup.
+- **MTHDS Light Client Extraction**: The light client protocol (runner, pipeline models, pipe output abstractions) has been extracted from pipelex into the new [`mthds`](https://github.com/mthds-ai/mthds-python) package on PyPI. Pipelex now depends on `mthds>=0.0.1` and implements its `RunnerProtocol`.
+- **Global/Local Config Split**: `pipelex init` now creates configuration in `~/.pipelex/` (global) by default. Use `pipelex init --local` to create project-level overrides in `{project_root}/.pipelex/`. Config loading merges: package defaults → global → project → overrides.
+- **IDE Extension Detection**: Extension check now uses `code --list-extensions` / `cursor --list-extensions` for reliable detection instead of folder scanning. Shows separate marketplace links for VS Code (Microsoft Marketplace) and Cursor (Open VSX Registry).
+- **Quieter `pipelex init`**: Removed verbose file listing and reset messages from config initialization output.
+- **File Extension:** Pipeline definitions now use `.mthds` instead of `.plx`; the project refers to "Methods" (MTHDS) rather than "Pipelex workflows".
+- **Syntax:** In `PipeParallel` definitions, `parallels` field renamed to `branches`; `plx_config` in `pipelex.toml` renamed to `mthds_config`.
+- **Documentation:** Comprehensive update to reflect `.mthds` file format, package management, and new project structure.
+
+### Fixed
+
+- **`find_project_root` Home Directory Bug**: The project root walker no longer considers the home directory (`~`) as a project root, even if it contains stray marker files like `package.json`.
+- **Python 3.10 Compatibility**: Fixed `datetime.UTC` import (Python 3.11+) to use `datetime.timezone.utc`.
+- **Graph Rendering:** Fixed dashed edge rendering for `PipeBatch` and `PipeParallel` relationships.
+
+### Removed
+
+- **Legacy Client & Execution Modules:** Removed `PipelexClient`, protocol files, and standalone `pipelex.pipeline.execute`/`pipelex.pipeline.start` modules (replaced by `PipelexRunner` and `mthds` package).
+- **Legacy Config:** Removed `plx_config.py` and `.plx`-specific configuration references.
+
+### Security
+
+- **CSP Nonce Support:** Added Content Security Policy nonce for generated HTML graph outputs.
 
 ## [v0.18.0b3] - 2026-02-11
 
@@ -240,6 +271,12 @@
 - **⚠️ Breaking — Pipe I/O Specification**: The output (and inputs) of a pipe is now a `StuffSpec` object that holds the concept and the multiplicity.
 - **Naming Convention**: Renamed `domain` to `domain_code` where relevant.
 - **Dry Run Methods**: Refactored the dry run methods of the `PipeAbstract` class.
+
+## [v0.17.6] - 2026-02-14
+
+### Added
+
+- **Claude Code GitHub Actions**: Added `claude.yml` workflow for interactive Claude Code assistance on issues and PR comments, and `claude-code-review.yml` workflow for automated code review on pull requests.
 
 ## [v0.17.5] - 2026-01-16
 

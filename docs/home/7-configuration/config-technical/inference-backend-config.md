@@ -438,7 +438,7 @@ default-large-context-text = "gemini-2.5-flash"
 default-small = "gemini-2.5-flash-lite"
 ```
 
-When using aliases in `.plx` files or other configurations, prefix them with `@`:
+When using aliases in `.mthds` files or other configurations, prefix them with `@`:
 
 ```toml
 model = "@best-claude"           # References the best-claude alias
@@ -468,7 +468,7 @@ vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
 vision-diagram = { model = "@default-premium-vision", temperature = 0.3 }
 ```
 
-When using presets in `.plx` files, prefix them with `$`:
+When using presets in `.mthds` files, prefix them with `$`:
 
 ```toml
 model = "$engineering-structured"   # Uses preset for structured extraction
@@ -486,7 +486,7 @@ Extract presets combine document extraction model selection with optimized param
 extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50 }
 ```
 
-You can also use aliases directly in `.plx` files for document extraction:
+You can also use aliases directly in `.mthds` files for document extraction:
 
 ```toml
 model = "@default-extract-document"   # Uses default document extraction alias
@@ -505,7 +505,7 @@ gen-image-fast = { model = "@default-small", quality = "low" }
 gen-image-high-quality = { model = "@default-premium", quality = "high" }
 ```
 
-When using image generation presets in `.plx` files, prefix them with `$`:
+When using image generation presets in `.mthds` files, prefix them with `$`:
 
 ```toml
 model = "$gen-image"              # Uses default image generation preset
@@ -558,7 +558,7 @@ small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
 document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
 ```
 
-When using waterfalls in `.plx` files, prefix them with `~`:
+When using waterfalls in `.mthds` files, prefix them with `~`:
 
 ```toml
 model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.0-pro, then gpt-5.2

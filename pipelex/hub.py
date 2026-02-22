@@ -523,7 +523,7 @@ def get_pipe_source(pipe_code: str) -> Path | None:
         pipe_code: The pipe code to look up.
 
     Returns:
-        Path to the .plx file the pipe was loaded from, or None if unknown.
+        Path to the .mthds file the pipe was loaded from, or None if unknown.
     """
     return get_pipelex_hub().get_library_manager().get_pipe_source(pipe_code=pipe_code)
 

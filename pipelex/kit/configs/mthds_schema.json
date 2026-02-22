@@ -1,0 +1,1712 @@
+{
+  "additionalProperties": false,
+  "properties": {
+    "domain": {
+      "title": "Domain",
+      "type": "string"
+    },
+    "description": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Description"
+    },
+    "system_prompt": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "System Prompt"
+    },
+    "main_pipe": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Main Pipe"
+    },
+    "concept": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "$ref": "#/definitions/ConceptBlueprint"
+              },
+              {
+                "type": "string"
+              }
+            ]
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Concept"
+    },
+    "pipe": {
+      "anyOf": [
+        {
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "$ref": "#/definitions/PipeFuncBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeImgGenBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeComposeBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeLLMBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeExtractBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeBatchBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeConditionBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeParallelBlueprint"
+              },
+              {
+                "$ref": "#/definitions/PipeSequenceBlueprint"
+              }
+            ]
+          },
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Pipe"
+    }
+  },
+  "required": [
+    "domain"
+  ],
+  "title": "MTHDS File Schema",
+  "type": "object",
+  "definitions": {
+    "AspectRatio": {
+      "enum": [
+        "square",
+        "landscape_4_3",
+        "landscape_3_2",
+        "landscape_16_9",
+        "landscape_21_9",
+        "portrait_3_4",
+        "portrait_2_3",
+        "portrait_9_16",
+        "portrait_9_21"
+      ],
+      "title": "AspectRatio",
+      "type": "string"
+    },
+    "Background": {
+      "enum": [
+        "transparent",
+        "opaque",
+        "auto"
+      ],
+      "title": "Background",
+      "type": "string"
+    },
+    "ConceptBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "structure": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "additionalProperties": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "$ref": "#/definitions/ConceptStructureBlueprint"
+                  }
+                ]
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Structure"
+        },
+        "refines": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Refines"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "ConceptBlueprint",
+      "type": "object"
+    },
+    "ConceptStructureBlueprint": {
+      "properties": {
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ConceptStructureBlueprintFieldType"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "key_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Key Type"
+        },
+        "value_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value Type"
+        },
+        "item_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item Type"
+        },
+        "concept_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Concept Ref"
+        },
+        "item_concept_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Item Concept Ref"
+        },
+        "choices": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Choices"
+        },
+        "default_value": {
+          "anyOf": [
+            {},
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Default Value"
+        },
+        "required": {
+          "default": false,
+          "title": "Required",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "ConceptStructureBlueprint",
+      "type": "object"
+    },
+    "ConceptStructureBlueprintFieldType": {
+      "enum": [
+        "text",
+        "list",
+        "dict",
+        "integer",
+        "boolean",
+        "number",
+        "date",
+        "concept"
+      ],
+      "title": "ConceptStructureBlueprintFieldType",
+      "type": "string"
+    },
+    "ConstructBlueprint": {
+      "title": "ConstructBlueprint",
+      "description": "Construct section defining how to compose a StructuredContent from working memory fields.",
+      "type": "object",
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "description": "Fixed string value"
+          },
+          {
+            "type": "number",
+            "description": "Fixed numeric value"
+          },
+          {
+            "type": "boolean",
+            "description": "Fixed boolean value"
+          },
+          {
+            "type": "array",
+            "description": "Fixed array value"
+          },
+          {
+            "type": "object",
+            "description": "Variable reference from working memory",
+            "properties": {
+              "from": {
+                "type": "string",
+                "description": "Path to variable in working memory"
+              },
+              "list_to_dict_keyed_by": {
+                "type": "string",
+                "description": "Convert list to dict keyed by this attribute"
+              }
+            },
+            "required": [
+              "from"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "description": "Jinja2 template string",
+            "properties": {
+              "template": {
+                "type": "string",
+                "description": "Jinja2 template string (with $ preprocessing)"
+              }
+            },
+            "required": [
+              "template"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "description": "Nested construct",
+            "additionalProperties": {
+              "$ref": "#/definitions/ConstructFieldBlueprint"
+            },
+            "minProperties": 1
+          }
+        ]
+      },
+      "minProperties": 1
+    },
+    "ConstructFieldBlueprint": {
+      "title": "ConstructFieldBlueprint",
+      "anyOf": [
+        {
+          "type": "string",
+          "description": "Fixed string value"
+        },
+        {
+          "type": "number",
+          "description": "Fixed numeric value"
+        },
+        {
+          "type": "boolean",
+          "description": "Fixed boolean value"
+        },
+        {
+          "type": "array",
+          "description": "Fixed array value"
+        },
+        {
+          "type": "object",
+          "description": "Variable reference from working memory",
+          "properties": {
+            "from": {
+              "type": "string",
+              "description": "Path to variable in working memory"
+            },
+            "list_to_dict_keyed_by": {
+              "type": "string",
+              "description": "Convert list to dict keyed by this attribute"
+            }
+          },
+          "required": [
+            "from"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Jinja2 template string",
+          "properties": {
+            "template": {
+              "type": "string",
+              "description": "Jinja2 template string (with $ preprocessing)"
+            }
+          },
+          "required": [
+            "template"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "Nested construct",
+          "additionalProperties": {
+            "$ref": "#/definitions/ConstructFieldBlueprint"
+          },
+          "minProperties": 1
+        }
+      ]
+    },
+    "ConstructFieldMethod": {
+      "description": "Method used to compose a field value.",
+      "enum": [
+        "fixed",
+        "from_var",
+        "template",
+        "nested"
+      ],
+      "title": "ConstructFieldMethod",
+      "type": "string"
+    },
+    "ExtractSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "max_nb_images": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Nb Images"
+        },
+        "image_min_size": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image Min Size"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "title": "ExtractSetting",
+      "type": "object"
+    },
+    "ImageFormat": {
+      "enum": [
+        "png",
+        "jpeg",
+        "webp"
+      ],
+      "title": "ImageFormat",
+      "type": "string"
+    },
+    "ImgGenSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "quality": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Quality"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "nb_steps": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": true,
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nb Steps"
+        },
+        "guidance_scale": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": true,
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Guidance Scale"
+        },
+        "is_moderated": {
+          "default": false,
+          "title": "Is Moderated",
+          "type": "boolean"
+        },
+        "safety_tolerance": {
+          "anyOf": [
+            {
+              "maximum": 6,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Safety Tolerance"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        }
+      },
+      "required": [
+        "model"
+      ],
+      "title": "ImgGenSetting",
+      "type": "object"
+    },
+    "LLMSetting": {
+      "additionalProperties": false,
+      "properties": {
+        "model": {
+          "title": "Model",
+          "type": "string"
+        },
+        "temperature": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Temperature",
+          "type": "number"
+        },
+        "max_tokens": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "enum": [
+                "auto"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Tokens"
+        },
+        "image_detail": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PromptImageDetail"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "prompting_target": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/PromptingTarget"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reasoning_effort": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ReasoningEffort"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "reasoning_budget": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": true,
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Reasoning Budget"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        }
+      },
+      "required": [
+        "model",
+        "temperature"
+      ],
+      "title": "LLMSetting",
+      "type": "object"
+    },
+    "ModelReference": {
+      "description": "A parsed model reference with explicit kind and name.\n\nArgs:\n    kind: The type of reference (preset, alias, waterfall, or handle)\n    name: The actual name of the model/preset/alias/waterfall (without prefix)\n    raw: The original input string (for error messages)",
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/ModelReferenceKind"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "raw": {
+          "title": "Raw",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "name",
+        "raw"
+      ],
+      "title": "ModelReference",
+      "type": "object"
+    },
+    "ModelReferenceKind": {
+      "description": "The kind of model reference.",
+      "enum": [
+        "preset",
+        "alias",
+        "waterfall",
+        "handle"
+      ],
+      "title": "ModelReferenceKind",
+      "type": "string"
+    },
+    "PipeBatchBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeBatch",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeBatch"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "branch_pipe_code": {
+          "title": "Branch Pipe Code",
+          "type": "string"
+        },
+        "input_list_name": {
+          "title": "Input List Name",
+          "type": "string"
+        },
+        "input_item_name": {
+          "title": "Input Item Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "description",
+        "output",
+        "branch_pipe_code",
+        "input_list_name",
+        "input_item_name"
+      ],
+      "title": "PipeBatchBlueprint",
+      "type": "object"
+    },
+    "PipeComposeBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeCompose",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeCompose"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "template": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/TemplateBlueprint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Template"
+        },
+        "construct": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ConstructBlueprint"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "description",
+        "output"
+      ],
+      "title": "PipeComposeBlueprint",
+      "type": "object"
+    },
+    "PipeConditionBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeCondition",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeCondition"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "expression_template": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expression Template"
+        },
+        "expression": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expression"
+        },
+        "outcomes": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Outcomes",
+          "type": "object"
+        },
+        "default_outcome": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/SpecialOutcome"
+            }
+          ],
+          "title": "Default Outcome"
+        },
+        "add_alias_from_expression_to": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Add Alias From Expression To"
+        }
+      },
+      "required": [
+        "description",
+        "output",
+        "default_outcome"
+      ],
+      "title": "PipeConditionBlueprint",
+      "type": "object"
+    },
+    "PipeExtractBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeExtract",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeExtract"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ExtractSetting"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ModelReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "max_page_images": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Page Images"
+        },
+        "page_image_captions": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page Image Captions"
+        },
+        "page_views": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page Views"
+        },
+        "page_views_dpi": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Page Views Dpi"
+        }
+      },
+      "required": [
+        "description",
+        "output"
+      ],
+      "title": "PipeExtractBlueprint",
+      "type": "object"
+    },
+    "PipeFuncBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeFunc",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeFunc"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "function_name": {
+          "description": "The name of the function to call.",
+          "title": "Function Name",
+          "type": "string"
+        }
+      },
+      "required": [
+        "description",
+        "output",
+        "function_name"
+      ],
+      "title": "PipeFuncBlueprint",
+      "type": "object"
+    },
+    "PipeImgGenBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeImgGen",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeImgGen"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        },
+        "negative_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Negative Prompt"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImgGenSetting"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ModelReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "aspect_ratio": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/AspectRatio"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "is_raw": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Is Raw"
+        },
+        "seed": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "auto"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Seed"
+        },
+        "background": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Background"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "output_format": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImageFormat"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "description",
+        "output",
+        "prompt"
+      ],
+      "title": "PipeImgGenBlueprint",
+      "type": "object"
+    },
+    "PipeLLMBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeLLM",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeLLM"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "model": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LLMSetting"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ModelReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model"
+        },
+        "model_to_structure": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/LLMSetting"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "$ref": "#/definitions/ModelReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model To Structure"
+        },
+        "system_prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "System Prompt"
+        },
+        "prompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt"
+        },
+        "structuring_method": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/StructuringMethod"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "description",
+        "output"
+      ],
+      "title": "PipeLLMBlueprint",
+      "type": "object"
+    },
+    "PipeParallelBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeParallel",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeParallel"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "branches": {
+          "items": {
+            "$ref": "#/definitions/SubPipeBlueprint"
+          },
+          "title": "Branches",
+          "type": "array"
+        },
+        "add_each_output": {
+          "default": false,
+          "title": "Add Each Output",
+          "type": "boolean"
+        },
+        "combined_output": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Combined Output"
+        }
+      },
+      "required": [
+        "description",
+        "output",
+        "branches"
+      ],
+      "title": "PipeParallelBlueprint",
+      "type": "object"
+    },
+    "PipeSequenceBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "default": "PipeSequence",
+          "title": "Type",
+          "type": "string",
+          "enum": [
+            "PipeSequence"
+          ]
+        },
+        "description": {
+          "title": "Description",
+          "type": "string"
+        },
+        "inputs": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Inputs"
+        },
+        "output": {
+          "title": "Output",
+          "type": "string"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/definitions/SubPipeBlueprint"
+          },
+          "title": "Steps",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description",
+        "output",
+        "steps"
+      ],
+      "title": "PipeSequenceBlueprint",
+      "type": "object"
+    },
+    "PromptImageDetail": {
+      "enum": [
+        "high",
+        "low",
+        "auto"
+      ],
+      "title": "PromptImageDetail",
+      "type": "string"
+    },
+    "PromptingTarget": {
+      "enum": [
+        "openai",
+        "anthropic",
+        "mistral",
+        "gemini",
+        "fal"
+      ],
+      "title": "PromptingTarget",
+      "type": "string"
+    },
+    "Quality": {
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "title": "Quality",
+      "type": "string"
+    },
+    "ReasoningEffort": {
+      "enum": [
+        "none",
+        "minimal",
+        "low",
+        "medium",
+        "high",
+        "max"
+      ],
+      "title": "ReasoningEffort",
+      "type": "string"
+    },
+    "SpecialOutcome": {
+      "enum": [
+        "fail",
+        "continue"
+      ],
+      "title": "SpecialOutcome",
+      "type": "string"
+    },
+    "StructuringMethod": {
+      "enum": [
+        "direct",
+        "preliminary_text"
+      ],
+      "title": "StructuringMethod",
+      "type": "string"
+    },
+    "SubPipeBlueprint": {
+      "additionalProperties": false,
+      "properties": {
+        "pipe": {
+          "title": "Pipe",
+          "type": "string"
+        },
+        "result": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Result"
+        },
+        "nb_output": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Nb Output"
+        },
+        "multiple_output": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Multiple Output"
+        },
+        "batch_over": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Batch Over"
+        },
+        "batch_as": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Batch As"
+        }
+      },
+      "required": [
+        "pipe"
+      ],
+      "title": "SubPipeBlueprint",
+      "type": "object"
+    },
+    "TagStyle": {
+      "enum": [
+        "no_tag",
+        "ticks",
+        "xml",
+        "square_brackets"
+      ],
+      "title": "TagStyle",
+      "type": "string"
+    },
+    "TemplateBlueprint": {
+      "properties": {
+        "template": {
+          "description": "Raw template source",
+          "title": "Template",
+          "type": "string"
+        },
+        "templating_style": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TemplatingStyle"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Style of prompting to use (typically for different LLMs)"
+        },
+        "category": {
+          "$ref": "#/definitions/TemplateCategory",
+          "description": "Category of the template (could also be HTML, MARKDOWN, MERMAID, etc.), influences template rendering rules"
+        },
+        "extra_context": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Additional context variables for template rendering",
+          "title": "Extra Context"
+        }
+      },
+      "required": [
+        "template",
+        "category"
+      ],
+      "title": "TemplateBlueprint",
+      "type": "object"
+    },
+    "TemplateCategory": {
+      "enum": [
+        "basic",
+        "expression",
+        "html",
+        "markdown",
+        "mermaid",
+        "llm_prompt",
+        "img_gen_prompt"
+      ],
+      "title": "TemplateCategory",
+      "type": "string"
+    },
+    "TemplatingStyle": {
+      "properties": {
+        "tag_style": {
+          "$ref": "#/definitions/TagStyle"
+        },
+        "text_format": {
+          "$ref": "#/definitions/TextFormat",
+          "default": "plain"
+        }
+      },
+      "required": [
+        "tag_style"
+      ],
+      "title": "TemplatingStyle",
+      "type": "object"
+    },
+    "TextFormat": {
+      "enum": [
+        "plain",
+        "markdown",
+        "html",
+        "json"
+      ],
+      "title": "TextFormat",
+      "type": "string"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-04/schema#",
+  "$comment": "Generated from PipelexBundleBlueprint v0.18.0b3. Do not edit manually.",
+  "x-taplo": {
+    "initKeys": [
+      "domain"
+    ]
+  }
+}

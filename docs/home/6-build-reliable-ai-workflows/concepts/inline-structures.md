@@ -1,6 +1,6 @@
 # Inline Structure Definition
 
-Define structured concepts directly in your `.plx` files using pipelex syntax. This is the **recommended approach** for most use cases, offering rapid development without Python boilerplate.
+Define structured concepts directly in your `.mthds` files using pipelex syntax. This is the **recommended approach** for most use cases, offering rapid development without Python boilerplate.
 
 For an introduction to concepts themselves, see [Define Your Concepts](define_your_concepts.md). For advanced features requiring Python classes, see [Python StructuredContent Classes](python-classes.md).
 
@@ -246,11 +246,11 @@ The `pipelex build structures` command generates Python classes from your inline
 ### Usage
 
 ```bash
-# Generate from a directory of .plx files
+# Generate from a directory of .mthds files
 pipelex build structures ./my_pipelines/
 
-# Generate from a specific .plx file
-pipelex build structures ./my_pipeline/bundle.plx
+# Generate from a specific .mthds file
+pipelex build structures ./my_pipeline/bundle.mthds
 
 # Specify output directory
 pipelex build structures ./my_pipelines/ -o ./generated/
@@ -306,5 +306,5 @@ See [Python StructuredContent Classes](python-classes.md) for advanced features.
 
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
 - [Python StructuredContent Classes](python-classes.md) - Advanced features with Python
-- [Writing Workflows Tutorial](../../2-get-started/pipe-builder.md) - Get started with structured outputs
+- [Writing Methods Tutorial](../../2-get-started/pipe-builder.md) - Get started with structured outputs
 

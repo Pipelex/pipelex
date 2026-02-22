@@ -13,7 +13,7 @@ from pipelex.cogt.models.model_deck import ModelDeck, ModelDeckBlueprint
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
-from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 
@@ -59,16 +59,16 @@ class ModelManager(ModelManagerAbstract):
     ) -> None:
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
-            backends_library_path=ConfigPaths.BACKENDS_FILE_PATH,
-            backends_dir_path=ConfigPaths.BACKENDS_DIR_PATH,
+            backends_library_path=config_manager.backends_file_path,
+            backends_dir_path=config_manager.backends_dir_path,
             gateway_model_specs=gateway_model_specs,
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
-            routing_profile_library_path=ConfigPaths.ROUTING_PROFILES_FILE_PATH,
+            routing_profile_library_path=config_manager.routing_profiles_file_path,
             enabled_backends=enabled_backends,
         )
-        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=ConfigPaths.MODEL_DECKS_DIR_PATH)
+        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=config_manager.model_decks_dir_path)
         deck_blueprint = load_model_deck_blueprint(model_deck_paths=model_deck_paths)
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 

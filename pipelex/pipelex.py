@@ -50,7 +50,7 @@ from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
+from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
@@ -96,7 +96,7 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: type[ConfigRoot] | None = None,
     ) -> None:
         self.is_pipelex_service_enabled = False  # Will be set during setup
-        self.config_dir_path = config_dir_path or ConfigPaths.DEFAULT_CONFIG_DIR_PATH
+        self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
         self.pipelex_hub = PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
 

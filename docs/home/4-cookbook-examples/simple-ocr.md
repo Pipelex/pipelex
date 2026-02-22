@@ -2,7 +2,7 @@
 
 This example demonstrates a basic OCR (Optical Character Recognition) pipeline. It takes a PDF file as input, extracts the text from each page, and saves the content.
 
-This is a fundamental building block for many document processing workflows.
+This is a fundamental building block for many document processing methods.
 
 ## Get the code
 

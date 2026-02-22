@@ -11,7 +11,7 @@ from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, NodeSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, save_text_to_path
 from tests.cases import DocumentTestCases
 from tests.conftest import TEST_OUTPUTS_DIR
@@ -48,9 +48,13 @@ class TestPipeBatchGraph:
         )
 
         # Run PipeBatch pipeline with graph tracing
-        pipe_output = await execute_pipeline(
-            pipe_code="batch_analyze_cvs_for_job_offer",
+        runner = PipelexRunner(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
+            pipe_run_mode=pipe_run_mode,
+            execution_config=exec_config,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="batch_analyze_cvs_for_job_offer",
             inputs={
                 "cvs": [
                     DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_CV),
@@ -58,9 +62,8 @@ class TestPipeBatchGraph:
                 ],
                 "job_offer_pdf": DocumentContent(url=DocumentTestCases.PDF_FILE_PATH_2),
             },
-            pipe_run_mode=pipe_run_mode,
-            execution_config=exec_config,
         )
+        pipe_output = response.pipe_output
 
         # Basic assertions
         assert pipe_output is not None
@@ -152,7 +155,7 @@ class TestPipeBatchGraph:
         )
 
     async def test_joke_batch_graph_outputs(self, pipe_run_mode: PipeRunMode):
-        """Simple test that runs joke_batch.plx and generates all graph outputs.
+        """Simple test that runs joke_batch.mthds and generates all graph outputs.
 
         This test runs the joke batch pipeline with graph tracing and generates:
         - graph.json (GraphSpec)
@@ -182,12 +185,15 @@ class TestPipeBatchGraph:
         exec_config = exec_config.model_copy(update={"graph_config": graph_config})
 
         # Run joke batch pipeline
-        pipe_output = await execute_pipeline(
-            pipe_code="generate_jokes_from_topics",
+        runner = PipelexRunner(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_batch"],
             pipe_run_mode=pipe_run_mode,
             execution_config=exec_config,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="generate_jokes_from_topics",
+        )
+        pipe_output = response.pipe_output
 
         # Basic assertions
         assert pipe_output is not None

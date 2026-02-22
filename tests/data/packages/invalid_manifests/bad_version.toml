@@ -1,0 +1,4 @@
+[package]
+address = "github.com/org/repo"
+version = "not-a-version"
+description = "Test package with invalid version"

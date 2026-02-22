@@ -1,0 +1,19 @@
+domain      = "base_domain"
+description = "Base domain with root Person concept"
+
+# Root concept with structure - this is the base of the inheritance chain
+[concept.Person]
+description = "A person with basic information"
+
+[concept.Person.structure]
+first_name = { type = "text", required = true, description = "First name" }
+last_name  = { type = "text", required = true, description = "Last name" }
+
+# Concepts refining native concepts in the base domain
+[concept.Biography]
+description = "A biographical text about a person"
+refines     = "Text"
+
+[concept.Portrait]
+description = "A portrait image of a person"
+refines     = "native.Image"

@@ -28,6 +28,7 @@ AGENT_OUTPUT_NAME = "pipeline"
 
 
 def build_cmd(
+    ctx: typer.Context,
     prompt: Annotated[
         str,
         typer.Argument(help="Prompt describing what the pipeline should do"),
@@ -40,11 +41,11 @@ def build_cmd(
     """Build a pipeline from a prompt and output JSON with paths.
 
     Outputs to pipelex-wip/ directory with incremental naming (pipeline_01, pipeline_02, etc.).
-    Generates PLX bundle only (no inputs.json or runner.py).
+    Generates MTHDS bundle only (no inputs.json or runner.py).
 
     Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
     """
-    make_pipelex_for_agent_cli()
+    make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
 
     async def run_build():
         return await build_pipe_core(
@@ -73,6 +74,8 @@ def build_cmd(
         validate_extra: dict[str, Any] = {"validation_errors": validation_errors}
         if exc.dry_run_error_message:
             validate_extra["dry_run_error"] = exc.dry_run_error_message
+        if exc.failed_bundle_path:
+            validate_extra["failed_bundle_path"] = exc.failed_bundle_path
         agent_error(exc.message, "ValidateBundleError", cause=exc, **validate_extra)
 
     except PipeOperatorModelChoiceError as exc:

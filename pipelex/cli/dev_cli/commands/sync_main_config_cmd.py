@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
@@ -122,9 +123,9 @@ def sync_main_config_cmd(
             except OSError as exc:
                 # Handle race condition where file is deleted/modified after exists() check
                 if quiet:
-                    console.print(f"[red]Error:[/red] File system error syncing kit config: {exc}")
+                    console.print(f"[red]Error:[/red] File system error syncing kit config: {escape(str(exc))}")
                 else:
-                    console.print(f"  [red]Error:[/red] File system error syncing kit config: {exc}")
+                    console.print(f"  [red]Error:[/red] File system error syncing kit config: {escape(str(exc))}")
                 sys.exit(1)
         else:
             if not quiet:
@@ -141,9 +142,9 @@ def sync_main_config_cmd(
             except OSError as exc:
                 # Handle race condition where file is deleted/modified after exists() check
                 if quiet:
-                    console.print(f"[red]Error:[/red] File system error syncing project config: {exc}")
+                    console.print(f"[red]Error:[/red] File system error syncing project config: {escape(str(exc))}")
                 else:
-                    console.print(f"  [red]Error:[/red] File system error syncing project config: {exc}")
+                    console.print(f"  [red]Error:[/red] File system error syncing project config: {escape(str(exc))}")
                 sys.exit(1)
         else:
             if not quiet:

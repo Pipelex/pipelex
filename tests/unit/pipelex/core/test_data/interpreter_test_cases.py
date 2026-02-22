@@ -6,7 +6,7 @@ from tests.unit.pipelex.core.test_data.concepts.refining_concepts import REFININ
 from tests.unit.pipelex.core.test_data.concepts.simple_concepts import SIMPLE_CONCEPT_TEST_CASES
 from tests.unit.pipelex.core.test_data.concepts.structured_concepts import STRUCTURED_CONCEPT_TEST_CASES
 from tests.unit.pipelex.core.test_data.domain.simple_domains import DOMAIN_TEST_CASES
-from tests.unit.pipelex.core.test_data.errors.invalid_plx import ERROR_TEST_CASES
+from tests.unit.pipelex.core.test_data.errors.invalid_mthds import ERROR_TEST_CASES
 from tests.unit.pipelex.core.test_data.pipes.controllers.batch.pipe_batch import PIPE_BATCH_TEST_CASES
 from tests.unit.pipelex.core.test_data.pipes.controllers.condition.pipe_condition import PIPE_CONDITION_TEST_CASES
 from tests.unit.pipelex.core.test_data.pipes.controllers.parallel.pipe_parallel import PIPE_PARALLEL_TEST_CASES
@@ -19,10 +19,10 @@ from tests.unit.pipelex.core.test_data.pipes.operators.llm.pipe_llm import PIPE_
 
 
 class InterpreterTestCases:
-    """Test cases for PipelexInterpreter with PLX content and expected blueprints."""
+    """Test cases for PipelexInterpreter with MTHDS content and expected blueprints."""
 
     # Aggregate all valid test cases from organized modules
-    VALID_TEST_CASES: ClassVar[list[tuple[str, str, PipelexBundleBlueprint]]] = [  # test_name,plx_content,blueprint
+    VALID_TEST_CASES: ClassVar[list[tuple[str, str, PipelexBundleBlueprint]]] = [  # test_name,mthds_content,blueprint
         # Domain tests
         *DOMAIN_TEST_CASES,
         # Concept tests

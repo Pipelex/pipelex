@@ -1,0 +1,25 @@
+domain      = "test_integration4"
+description = "Test pipe for capitalizing text to uppercase"
+
+[pipe]
+[pipe.capitalize_text]
+type = "PipeLLM"
+description = "Transform text to uppercase"
+inputs = { input_text = "Text" }
+output = "Text"
+prompt = """Transform the following text to uppercase:
+
+@input_text.text
+
+Return only the uppercase text, nothing else."""
+
+[pipe.add_prefix]
+type = "PipeLLM"
+description = "Add PROCESSED prefix to text"
+inputs = { capitalized_text = "Text" }
+output = "Text"
+prompt = """Add the prefix "PROCESSED: " to the beginning of the following text:
+
+@capitalized_text.text
+
+Return only the prefixed text, nothing else."""

@@ -1,0 +1,11 @@
+[package]
+address = "github.com/mthds/multi-dep-app"
+version = "1.0.0"
+description = "Consumer depending on both scoring and analytics"
+
+[dependencies]
+scoring_dep = { address = "github.com/mthds/scoring-lib", version = "2.0.0", path = "../scoring_dep" }
+analytics_dep = { address = "github.com/mthds/analytics-lib", version = "1.0.0", path = "../analytics_dep" }
+
+[exports.pkg_test_multi_dep]
+pipes = ["pkg_test_multi_analyze"]

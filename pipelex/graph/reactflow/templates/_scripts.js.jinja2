@@ -3,6 +3,10 @@ const initialTheme = {{ initial_theme | tojson }};
 let currentThemeIndex = themes.indexOf(localStorage.getItem('pipelex-theme') || initialTheme);
 if (currentThemeIndex === -1) currentThemeIndex = 0;
 
+// Layout direction toggle
+const initialDirection = {{ layout_direction | tojson }};
+let currentDirection = initialDirection;
+
 const palette = {{ initial_palette | tojson }};
 
 function applyPalette(palette) {
@@ -27,6 +31,21 @@ document.getElementById('theme-toggle').addEventListener('click', () => {
 // Apply initial theme and palette immediately
 applyTheme(themes[currentThemeIndex]);
 applyPalette(palette);
+
+// Apply direction icon: show the direction we will switch TO (opposite of current)
+function applyDirectionIcon(direction) {
+    document.querySelectorAll('.direction-icon').forEach(icon => icon.classList.remove('active'));
+    const targetIcon = document.querySelector(direction === 'LR' ? '.tb-icon' : '.lr-icon');
+    if (targetIcon) targetIcon.classList.add('active');
+}
+applyDirectionIcon(currentDirection);
+
+// Set up direction toggle button
+document.getElementById('direction-toggle').addEventListener('click', () => {
+    currentDirection = currentDirection === 'LR' ? 'TB' : 'LR';
+    applyDirectionIcon(currentDirection);
+    if (window.setLayoutDirection) window.setLayoutDirection(currentDirection);
+});
 
 // Parse embedded ViewSpec
 const viewspecElement = document.getElementById('pipelex-viewspec');
@@ -435,6 +454,33 @@ function buildDataflowGraph(graphspec, analysis) {
     //   batch_item: batch_controller → stuff_item, batch_aggregate: stuff_item → batch_controller
     // (showBatchController is declared earlier in the function)
 
+    // Create PARALLEL_COMBINE edges from GraphSpec
+    // These show branch outputs flowing into the combined output
+    for (const edge of graphspec.edges) {
+        if (edge.kind !== 'parallel_combine') continue;
+
+        if (!edge.source_stuff_digest || !edge.target_stuff_digest) continue;
+        const sourceId = `stuff_${edge.source_stuff_digest}`;
+        const targetId = `stuff_${edge.target_stuff_digest}`;
+
+        edges.push({
+            id: edge.id,
+            source: sourceId,
+            target: targetId,
+            type: {{ edge_type | tojson }},
+            animated: false,
+            style: {
+                stroke: 'var(--color-parallel-combine)',
+                strokeWidth: 2,
+                strokeDasharray: '5,5',
+            },
+            markerEnd: {
+                type: MarkerType?.ArrowClosed || 'arrowclosed',
+                color: 'var(--color-parallel-combine)',
+            },
+        });
+    }
+
     for (const edge of graphspec.edges) {
         if (edge.kind !== 'batch_item' && edge.kind !== 'batch_aggregate') {
             continue;
@@ -644,12 +690,37 @@ function GraphViewer() {
     // Apply layout
     const needsLayout = initialData.nodes.some(n => !n.position || (n.position.x === 0 && n.position.y === 0));
     const layouted = needsLayout
-        ? getLayoutedElements(initialData.nodes, initialData.edges, '{{ layout_direction }}')
+        ? getLayoutedElements(initialData.nodes, initialData.edges, initialDirection)
         : initialData;
 
     const [nodes, setNodes, onNodesChange] = useNodesState(layouted.nodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(layouted.edges);
     const [selectedNodeId, setSelectedNodeId] = React.useState(null);
+    const [direction, setDirection] = React.useState(initialDirection);
+    const reactFlowRef = React.useRef(null);
+    const prevDirectionRef = React.useRef(initialDirection);
+
+    // Expose setLayoutDirection so the header button can trigger re-layout
+    React.useEffect(() => {
+        window.setLayoutDirection = setDirection;
+        return () => { window.setLayoutDirection = null; };
+    }, [setDirection]);
+
+    // Re-layout when direction changes, then fit the view
+    React.useEffect(() => {
+        // Skip the initial mount — only re-layout on actual direction changes
+        if (prevDirectionRef.current === direction) return;
+        prevDirectionRef.current = direction;
+        const relayouted = getLayoutedElements(initialData.nodes, initialData.edges, direction);
+        setNodes(relayouted.nodes);
+        setEdges(relayouted.edges);
+        // Wait for React to render the new positions, then fit view
+        setTimeout(() => {
+            if (reactFlowRef.current) {
+                reactFlowRef.current.fitView({ padding: 0.1 });
+            }
+        }, 50);
+    }, [direction]);
 
     // Expose function to clear node selection globally
     React.useEffect(() => {
@@ -902,24 +973,24 @@ function GraphViewer() {
         );
     }
 
-    {% if pan_to_top %}
-    // Pan to show the top of the graph after initial fit
+    // Store ReactFlow instance for programmatic viewport control
     const onInit = (reactFlowInstance) => {
+        reactFlowRef.current = reactFlowInstance;
+        {% if pan_to_top %}
+        // Pan to show the top of the graph after initial fit
         setTimeout(() => {
-            // Find the topmost node position
             const currentNodes = reactFlowInstance.getNodes();
             if (currentNodes.length === 0) return;
             const minY = Math.min(...currentNodes.map(n => n.position.y));
             const viewport = reactFlowInstance.getViewport();
-            // Adjust viewport to show the top with some padding
             reactFlowInstance.setViewport({
                 x: viewport.x,
                 y: -minY * viewport.zoom + 80,
                 zoom: viewport.zoom
             });
         }, 100);
+        {% endif %}
     };
-    {% endif %}
 
     return React.createElement('div', { className: 'react-flow-container' },
         React.createElement(ReactFlow, {
@@ -928,7 +999,7 @@ function GraphViewer() {
             onNodesChange: onNodesChange,
             onEdgesChange: onEdgesChange,
             onNodeClick: onNodeClick,
-            {% if pan_to_top %}onInit: onInit,{% endif %}
+            onInit: onInit,
             fitView: true,
             fitViewOptions: { padding: 0.1, minZoom: {{ initial_zoom | tojson }} },
             defaultEdgeOptions: { type: {{ edge_type | tojson }} },

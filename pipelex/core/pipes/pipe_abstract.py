@@ -82,6 +82,13 @@ class PipeAbstract(ABC, BaseModel):
     @field_validator("code", mode="before")
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:
+        # Strip namespace prefix if present (e.g., "domain.my_pipe" → "my_pipe").
+        # The builder LLM sometimes generates dotted pipe codes; the namespace
+        # comes from the bundle's domain field, not from the pipe code itself.
+        if "." in code:
+            bare_code = code.rsplit(".", maxsplit=1)[1]
+            log.warning(f"Runtime pipe code '{code}' contains a namespace prefix, stripped to '{bare_code}'")
+            code = bare_code
         if not is_snake_case(code):
             msg = f"Invalid pipe code syntax '{code}'. Must be in snake_case."
             raise ValueError(msg)

@@ -9,7 +9,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from tests.cases import ImageTestCases
 from tests.e2e.pipelex.pipes.pipe_operators.pipe_llm.pipe_llm_image_inputs import (
     ImageDescriptionE2E,
@@ -30,14 +30,17 @@ class TestImageInputsE2E:
 
     async def test_direct_single_image(self, pipe_run_mode: PipeRunMode) -> None:
         """Test single direct image input."""
-        pipe_output = await execute_pipeline(
-            pipe_code="describe_single_image_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
+            pipe_run_mode=pipe_run_mode,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="describe_single_image_e2e",
             inputs={
                 "image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG),
             },
-            pipe_run_mode=pipe_run_mode,
         )
+        pipe_output = response.pipe_output
 
         assert pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
@@ -54,12 +57,15 @@ class TestImageInputsE2E:
             ]
         )
 
-        pipe_output = await execute_pipeline(
-            pipe_code="analyze_image_list_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
-            inputs={"images": images},
             pipe_run_mode=pipe_run_mode,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="analyze_image_list_e2e",
+            inputs={"images": images},
+        )
+        pipe_output = response.pipe_output
 
         assert pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
@@ -72,15 +78,18 @@ class TestImageInputsE2E:
         collection_a = ListContent[ImageContent](items=[ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG)])
         collection_b = ListContent[ImageContent](items=[ImageContent(url=ImageTestCases.LOGO_TINY_PNG_DATA_URL)])
 
-        pipe_output = await execute_pipeline(
-            pipe_code="compare_image_lists_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
+            pipe_run_mode=pipe_run_mode,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="compare_image_lists_e2e",
             inputs={
                 "collection_a": collection_a,
                 "collection_b": collection_b,
             },
-            pipe_run_mode=pipe_run_mode,
         )
+        pipe_output = response.pipe_output
 
         assert pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
@@ -100,12 +109,15 @@ class TestImageInputsE2E:
             page_view=ImageContent(url=ImageTestCases.LOGO_TINY_PNG_DATA_URL),
         )
 
-        pipe_output = await execute_pipeline(
-            pipe_code="describe_page_with_images_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
-            inputs={"page": page_content},
             pipe_run_mode=pipe_run_mode,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="describe_page_with_images_e2e",
+            inputs={"page": page_content},
+        )
+        pipe_output = response.pipe_output
 
         assert pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
@@ -126,12 +138,15 @@ class TestImageInputsE2E:
             page_view=ImageContent(url=ImageTestCases.LOGO_TINY_PNG_DATA_URL),
         )
 
-        pipe_output = await execute_pipeline(
-            pipe_code="describe_page_text_only_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
-            inputs={"page": page_content},
             pipe_run_mode=pipe_run_mode,
         )
+        response = await runner.execute_pipeline(
+            pipe_code="describe_page_text_only_e2e",
+            inputs={"page": page_content},
+        )
+        pipe_output = response.pipe_output
 
         assert pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:
@@ -150,15 +165,18 @@ class TestImageInputsE2E:
             page_view=ImageContent(url=ImageTestCases.LOGO_TINY_PNG_DATA_URL),
         )
 
-        pipe_output = await execute_pipeline(
-            pipe_code="mixed_image_inputs_e2e",
+        runner = PipelexRunner(
             library_dirs=LIBRARY_DIRS,
+            pipe_run_mode=pipe_run_mode,
+        )
+        response = await runner.execute_pipeline(
+            pipe_code="mixed_image_inputs_e2e",
             inputs={
                 "direct_image": ImageContent(url=LLMVisionTestCases.URL_CLOUDFRONT_ALAN_TURING_JPG),
                 "page": page_content,
             },
-            pipe_run_mode=pipe_run_mode,
         )
+        pipe_output = response.pipe_output
 
         assert pipe_output.main_stuff is not None
         if pipe_run_mode.is_live:

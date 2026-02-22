@@ -44,7 +44,7 @@ class OptimizedTweet(TextContent):
     pass
 ```
 
-## The Pipeline Definition: `tech_tweet.plx`
+## The Pipeline Definition: `tech_tweet.mthds`
 
 This pipeline uses a two-step "analyze and optimize" sequence. The first pipe analyzes the draft tweet for common pitfalls, and the second pipe rewrites the tweet based on the analysis and a provided writing style. This is a powerful pattern for refining generated content.
 

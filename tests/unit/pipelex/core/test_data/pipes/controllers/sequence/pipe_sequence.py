@@ -37,7 +37,39 @@ steps = [
     ),
 )
 
+PIPE_SEQUENCE_WITH_CROSS_DOMAIN_REF = (
+    "pipe_sequence_with_cross_domain_ref",
+    """domain = "orchestration"
+description = "Domain with cross-domain pipe ref in sequence"
+
+[pipe.orchestrate]
+type = "PipeSequence"
+description = "Orchestrate with cross-domain pipe"
+output = "Text"
+steps = [
+    { pipe = "scoring.compute_score", result = "score" },
+    { pipe = "format_result", result = "final" },
+]
+""",
+    PipelexBundleBlueprint(
+        domain="orchestration",
+        description="Domain with cross-domain pipe ref in sequence",
+        pipe={
+            "orchestrate": PipeSequenceBlueprint(
+                type="PipeSequence",
+                description="Orchestrate with cross-domain pipe",
+                output="Text",
+                steps=[
+                    SubPipeBlueprint(pipe="scoring.compute_score", result="score"),
+                    SubPipeBlueprint(pipe="format_result", result="final"),
+                ],
+            ),
+        },
+    ),
+)
+
 # Export all PipeSequence test cases
 PIPE_SEQUENCE_TEST_CASES = [
     PIPE_SEQUENCE,
+    PIPE_SEQUENCE_WITH_CROSS_DOMAIN_REF,
 ]

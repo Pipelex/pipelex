@@ -5,6 +5,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
@@ -19,7 +20,7 @@ from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
-from pipelex.pipe_operators.compose.exceptions import PipeComposeError
+from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -282,12 +283,58 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             log.verbose(f"PipeCompose: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
             content_generator_used = get_content_generator()
 
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
+        if self.is_construct_mode:
+            try:
+                return await self._live_run_operator_pipe(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                    content_generator=content_generator_used,
+                )
+            except PipeComposeError as exc:
+                # Construct mode can fail with mock data (e.g., description-only concepts
+                # produce empty classes without the fields that dotted paths reference).
+                # Only fall back for value errors from the composer (e.g., unresolvable dotted paths),
+                # not for type incompatibility or validation errors which are legitimate failures.
+                if not isinstance(exc.__cause__, StructuredContentComposerValueError):
+                    raise
+                # Only swallow the error when running with mock inputs (e.g., graph generation).
+                # With real inputs (e.g., pipelex validate), unresolvable paths are real bugs.
+                if not get_config().pipelex.pipeline_execution_config.is_mock_inputs:
+                    raise
+                return self._make_mock_construct_output(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    output_name=output_name,
+                )
+        else:
+            return await self._live_run_operator_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+                output_name=output_name,
+                content_generator=content_generator_used,
+            )
+
+    def _make_mock_construct_output(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        output_name: str | None,
+    ) -> PipeComposeOutput:
+        """Create a mock output for construct mode when composition fails during dry run."""
+        output_class = get_class_registry().get_required_subclass(
+            name=self.output.concept.structure_class_name,
+            base_class=StuffContent,
+        )
+        factory = DryRunFactory.make_dry_run_factory(output_class)
+        the_content = factory.build()
+        output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
+        working_memory.set_new_main_stuff(stuff=output_stuff, name=output_name)
+        return PipeComposeOutput(
             working_memory=working_memory,
-            pipe_run_params=pipe_run_params,
-            output_name=output_name,
-            content_generator=content_generator_used,
+            pipeline_run_id=job_metadata.pipeline_run_id,
         )
 
     @override

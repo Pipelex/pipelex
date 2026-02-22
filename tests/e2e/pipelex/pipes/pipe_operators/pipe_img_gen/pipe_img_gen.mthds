@@ -1,0 +1,56 @@
+domain      = "pipe_img_gen_e2e"
+description = "E2E tests for PipeImgGen operator including text-to-image and img2img"
+main_pipe   = "generate_image_basic_e2e"
+
+# Text-to-Image Pipes
+[pipe.generate_image_basic_e2e]
+type        = "PipeImgGen"
+description = "Generate a single image from a text prompt"
+output      = "Image"
+prompt      = "A colorful landscape with mountains and a river at sunset"
+model       = "$gen-image-testing"
+
+# [pipe.generate_image_with_negative_e2e]
+# type = "PipeImgGen"
+# description = "Generate an image with negative prompt"
+# output = "Image"
+# prompt = "A professional portrait of a business person in an office"
+# negative_prompt = "male wearing a suit"
+# model = "qwen-image"
+
+[pipe.generate_image_from_input_e2e]
+type        = "PipeImgGen"
+description = "Generate an image from a dynamic text prompt"
+inputs      = { image_prompt = "Text" }
+output      = "Image"
+prompt      = "$image_prompt"
+model       = "$gen-image-testing"
+
+# img2img Pipes
+[pipe.img2img_single_input_e2e]
+type        = "PipeImgGen"
+description = "Edit an image based on a text prompt"
+inputs      = { source_image = "Image" }
+output      = "Image"
+prompt      = "Add a colorful sunset sky in the background. $source_image"
+model       = "$gen-image-testing-img2img"
+
+[pipe.img2img_style_transfer_e2e]
+type        = "PipeImgGen"
+description = "Transform an image into a different artistic style"
+inputs      = { source_image = "Image" }
+output      = "Image"
+prompt      = "Transform this image into a watercolor painting style. $source_image"
+model       = "$gen-image-testing-img2img"
+
+[pipe.img2img_blend_two_images_e2e]
+type = "PipeImgGen"
+description = "Blend two images: use the style of one and the subject of the other"
+inputs = { style_image = "Image", subject_image = "Image" }
+output = "Image"
+prompt = """
+Blend these two images:
+use the graphic style and atmosphere from $style_image
+and the subject matter from $subject_image. Create a cohesive result.
+"""
+model = "$gen-image-testing-img2img"

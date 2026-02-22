@@ -11,6 +11,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
+from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.compose.exceptions import PipeComposeError
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
@@ -30,13 +31,22 @@ class DryRunError(PipelexError):
 class DryRunStatus(StrEnum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
+    SKIPPED = "SKIPPED"
 
     @property
     def is_failure(self) -> bool:
         match self:
             case DryRunStatus.FAILURE:
                 return True
+            case DryRunStatus.SUCCESS | DryRunStatus.SKIPPED:
+                return False
+
+    @property
+    def is_success(self) -> bool:
+        match self:
             case DryRunStatus.SUCCESS:
+                return True
+            case DryRunStatus.FAILURE | DryRunStatus.SKIPPED:
                 return False
 
 
@@ -56,6 +66,11 @@ async def dry_run_pipe(pipe: PipeAbstract, raise_on_failure: bool = False) -> Dr
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
         )
+    except PipeNotFoundError as not_found_error:
+        # Cross-package pipe dependencies may not be loaded; skip gracefully during dry-run
+        error_message = f"Skipped dry run for pipe '{pipe.code}': unresolved dependency: {not_found_error}"
+        log.verbose(error_message)
+        return DryRunOutput(pipe_code=pipe.code, status=DryRunStatus.SKIPPED, error_message=error_message)
     except (PipeStackOverflowError, ValidationError, PipeComposeError) as exc:
         formatted_error = format_pydantic_validation_error(exc) if isinstance(exc, ValidationError) else str(exc)
         if pipe.code in get_config().pipelex.dry_run_config.allowed_to_fail_pipes:
@@ -99,18 +114,21 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
 
     successful_pipes: list[str] = []
     failed_pipes: list[str] = []
+    skipped_pipes: list[str] = []
     for pipe_code, dry_run_output in results.items():
         match dry_run_output.status:
             case DryRunStatus.SUCCESS:
                 successful_pipes.append(pipe_code)
             case DryRunStatus.FAILURE:
                 failed_pipes.append(pipe_code)
+            case DryRunStatus.SKIPPED:
+                skipped_pipes.append(pipe_code)
 
     unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
 
     log.verbose(
         f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, "
-        f"{len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
+        f"{len(skipped_pipes)} skipped, {len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
     )
     if unexpected_failures:
         unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])

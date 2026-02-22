@@ -90,3 +90,29 @@ class TestParseConceptWithMultiplicity:
 
         with pytest.raises(ValueError, match="Invalid concept specification syntax"):
             parse_concept_with_multiplicity("domain.Concept[-5]")
+
+    # ========== Hierarchical domain tests ==========
+
+    def test_valid_hierarchical_domain_concept(self):
+        """Test parsing concept with hierarchical domain (multiple dot segments)."""
+        result = parse_concept_with_multiplicity("legal.contracts.NonCompeteClause")
+        assert result.concept_ref_or_code == "legal.contracts.NonCompeteClause"
+        assert result.multiplicity is None
+
+    def test_valid_hierarchical_domain_concept_with_variable_list(self):
+        """Test parsing hierarchical domain concept with empty brackets []."""
+        result = parse_concept_with_multiplicity("legal.contracts.NonCompeteClause[]")
+        assert result.concept_ref_or_code == "legal.contracts.NonCompeteClause"
+        assert result.multiplicity is True
+
+    def test_valid_hierarchical_domain_concept_with_fixed_count(self):
+        """Test parsing hierarchical domain concept with fixed count [N]."""
+        result = parse_concept_with_multiplicity("legal.contracts.NonCompeteClause[5]")
+        assert result.concept_ref_or_code == "legal.contracts.NonCompeteClause"
+        assert result.multiplicity == 5
+
+    def test_valid_deep_hierarchical_domain(self):
+        """Test parsing concept with deeply nested domain."""
+        result = parse_concept_with_multiplicity("a.b.c.d.Entity[]")
+        assert result.concept_ref_or_code == "a.b.c.d.Entity"
+        assert result.multiplicity is True

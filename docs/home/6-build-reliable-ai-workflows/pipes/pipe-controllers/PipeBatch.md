@@ -16,9 +16,9 @@ This is the ideal controller for processing collections of documents, images, or
 
 ## Configuration
 
-`PipeBatch` is configured in your pipeline's `.plx` file.
+`PipeBatch` is configured in your pipeline's `.mthds` file.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter          | Type         | Description                                                                                                                                      | Required |
 | ------------------ | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------- |

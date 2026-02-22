@@ -118,7 +118,17 @@ class PipeSpec(StructuredContent):
 
     @classmethod
     def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
-        # First, normalize Unicode to ASCII to prevent homograph attacks
+        # Strip namespace prefix if present (e.g., "domain.my_pipe" → "my_pipe").
+        # The builder LLM sometimes generates dotted pipe codes; the namespace
+        # comes from the bundle's domain field, not from the pipe code itself.
+        # This must happen BEFORE ASCII normalization, because normalize_to_ascii()
+        # strips dots (keeping only alphanumeric + underscore).
+        if "." in pipe_code:
+            bare_pipe_code = pipe_code.rsplit(".", maxsplit=1)[1]
+            log.warning(f"Pipe code '{pipe_code}' contains a namespace prefix, stripped to '{bare_pipe_code}'")
+            pipe_code = bare_pipe_code
+
+        # Normalize Unicode to ASCII to prevent homograph attacks
         normalized_pipe_code = normalize_to_ascii(pipe_code)
 
         if normalized_pipe_code != pipe_code:

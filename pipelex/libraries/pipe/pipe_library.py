@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.types import Self
@@ -53,13 +54,51 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
-        return self.root.get(pipe_code)
+        # Direct lookup first (bare code or exact match)
+        pipe = self.root.get(pipe_code)
+        if pipe is not None:
+            return pipe
+        # Cross-package: "alias->domain.pipe_code" -> lookup "alias->pipe_code"
+        if QualifiedRef.has_cross_package_prefix(pipe_code):
+            alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
+            try:
+                ref = QualifiedRef.parse(remainder)
+            except QualifiedRefError:
+                return None
+            pipe = self.root.get(f"{alias}->{ref.local_code}")
+            if pipe is not None and ref.is_qualified and pipe.domain_code != ref.domain_path:
+                return None
+            return pipe
+        # If it's a domain-qualified ref (e.g. "scoring.compute_score"), try the local code
+        if "." in pipe_code:
+            try:
+                ref = QualifiedRef.parse(pipe_code)
+            except QualifiedRefError:
+                return None
+            pipe = self.root.get(ref.local_code)
+            if pipe is not None and ref.is_qualified and pipe.domain_code != ref.domain_path:
+                return None
+            return pipe
+        return None
+
+    def add_dependency_pipe(self, alias: str, pipe: PipeAbstract) -> None:
+        """Add a pipe from a dependency package with an aliased key.
+
+        Args:
+            alias: The dependency alias
+            pipe: The pipe to add
+        """
+        key = f"{alias}->{pipe.code}"
+        if key in self.root:
+            msg = f"Dependency pipe '{key}' already exists in the library"
+            raise PipeLibraryError(msg)
+        self.root[key] = pipe
 
     @override
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
-            msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in plx file in an imported package."
+            msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in MTHDS file in an imported package."
             raise PipeNotFoundError(msg)
         return the_pipe
 

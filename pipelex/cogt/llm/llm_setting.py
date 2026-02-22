@@ -1,6 +1,6 @@
 from typing import Annotated, Literal, Union
 
-from pydantic import BeforeValidator, Field, field_validator, model_validator
+from pydantic import BeforeValidator, Field, WithJsonSchema, field_validator, model_validator
 
 from pipelex.cogt.image.prompt_image import PromptImageDetail
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
@@ -17,7 +17,10 @@ class LLMSettingValueError(ValueError):
 class LLMSetting(ConfigModel):
     model: str
     temperature: float = Field(..., ge=0, le=1)
-    max_tokens: int | None = None
+    max_tokens: Annotated[
+        int | None,
+        WithJsonSchema({"anyOf": [{"type": "integer"}, {"enum": ["auto"]}, {"type": "null"}], "default": None}),
+    ] = None
     image_detail: PromptImageDetail | None = Field(default=None, strict=False)
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
     reasoning_effort: ReasoningEffort | None = Field(default=None, strict=False)

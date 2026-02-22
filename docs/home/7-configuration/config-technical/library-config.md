@@ -1,8 +1,8 @@
 # Pipeline Discovery and Loading
 
-When running pipelines, Pipelex needs to find your `.plx` bundle files. There are two approaches:
+When running pipelines, Pipelex needs to find your `.mthds` bundle files. There are two approaches:
 
-1. **Point to the bundle file directly** - The simplest option. Just pass the path to your `.plx` file. No configuration needed.
+1. **Point to the bundle file directly** - The simplest option. Just pass the path to your `.mthds` file. No configuration needed.
 
 2. **Configure library directories** - For larger projects. Pipelex scans directories to discover all bundles, letting you reference pipes by code.
 
@@ -10,35 +10,43 @@ Most users should start with the first approach.
 
 ## The Simplest Way: Use the Bundle Path Directly
 
-If you just want to run a pipe from a single `.plx` file, **you don't need any library configuration**. Simply point to your bundle file:
+If you just want to run a pipe from a single `.mthds` file, **you don't need any library configuration**. Simply point to your bundle file:
 
 ```bash
 # CLI: run the bundle's main_pipe
-pipelex run path/to/my_bundle.plx
+pipelex run path/to/my_bundle.mthds
 
 # CLI: run a specific pipe from the bundle
-pipelex run path/to/my_bundle.plx --pipe my_pipe
+pipelex run path/to/my_bundle.mthds --pipe my_pipe
 ```
 
 ```python
+from pipelex.pipeline.runner import PipelexRunner
+
 # Python: run the bundle's main_pipe
-pipe_output = await execute_pipeline(
-    bundle_uri="path/to/my_bundle.plx",
+runner = PipelexRunner(
+    bundle_uri="path/to/my_bundle.mthds",
+)
+response = await runner.execute_pipeline(
     inputs={...},
 )
+pipe_output = response.pipe_output
 
 # Python: run a specific pipe from the bundle
-pipe_output = await execute_pipeline(
-    bundle_uri="path/to/my_bundle.plx",
+runner = PipelexRunner(
+    bundle_uri="path/to/my_bundle.mthds",
+)
+response = await runner.execute_pipeline(
     pipe_code="my_pipe",
     inputs={...},
 )
+pipe_output = response.pipe_output
 ```
 
 This is the recommended approach for newcomers and simple projects. Pipelex reads the file directly - no discovery needed.
 
 !!! tip "When to use library directories"
-    The library directory configuration below is useful when you have **multiple bundles across different directories** and want to reference pipes by code without specifying the bundle path each time. For most use cases, pointing to the `.plx` file directly is simpler.
+    The library directory configuration below is useful when you have **multiple bundles across different directories** and want to reference pipes by code without specifying the bundle path each time. For most use cases, pointing to the `.mthds` file directly is simpler.
 
 ---
 
@@ -46,7 +54,7 @@ This is the recommended approach for newcomers and simple projects. Pipelex read
 
 When you initialize Pipelex with `Pipelex.make()`, the system:
 
-1. **Scans your project directory** for all `.plx` files
+1. **Scans your project directory** for all `.mthds` files
 2. **Discovers Python structure classes** that inherit from `StructuredContent`
 3. **Loads pipeline definitions** including domains, concepts, and pipes
 4. **Registers custom functions** decorated with `@pipe_func()`
@@ -55,7 +63,7 @@ All of this happens automatically - no configuration needed.
 
 ## Configuring Library Directories
 
-When executing pipelines, Pipelex needs to know where to find your `.plx` files and Python structure classes. You can configure this using a **3-tier priority system** that gives you flexibility from global defaults to per-execution overrides.
+When executing pipelines, Pipelex needs to know where to find your `.mthds` files and Python structure classes. You can configure this using a **3-tier priority system** that gives you flexibility from global defaults to per-execution overrides.
 
 ### The 3-Tier Priority System
 
@@ -68,7 +76,7 @@ Pipelex resolves library directories using this priority order (highest to lowes
 | **3 (Fallback)** | `PIPELEXPATH` environment variable | System-wide or shell session default |
 
 !!! info "Empty List is Valid"
-    Passing an empty list `[]` to `library_dirs` is a valid explicit value that **disables** directory-based library loading. This is useful when using `plx_content` directly without needing files from the filesystem.
+    Passing an empty list `[]` to `library_dirs` is a valid explicit value that **disables** directory-based library loading. This is useful when using `mthds_content` directly without needing files from the filesystem.
 
 ### Using the PIPELEXPATH Environment Variable
 
@@ -119,7 +127,7 @@ pipelex run my_pipe -L /path/to/pipelines
 pipelex run my_pipe -L /path/to/shared_pipes -L /path/to/project_pipes
 
 # Combined with other options
-pipelex run my_bundle.plx --inputs data.json -L /path/to/pipelines
+pipelex run my_bundle.mthds --inputs data.json -L /path/to/pipelines
 
 # Available on multiple commands
 pipelex validate --all -L /path/to/pipelines/dir
@@ -132,31 +140,33 @@ pipelex which my_pipe -L /path/to/pipelines/dir
 
 ### Setting Instance Defaults with `Pipelex.make()`
 
-For Python applications, you can set a default library directory when initializing Pipelex. This default will be used for all subsequent `execute_pipeline` calls unless overridden.
+For Python applications, you can set a default library directory when initializing Pipelex. This default will be used for all subsequent `PipelexRunner.execute_pipeline()` calls unless overridden.
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 
 # Set instance-level defaults at initialization
 Pipelex.make(
     library_dirs=["/path/to/shared_pipes", "/path/to/project_pipes"]
 )
 
-# All execute_pipeline calls will use these directories by default
-pipe_output = await execute_pipeline(
+# All PipelexRunner.execute_pipeline() calls will use these directories by default
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     pipe_code="my_pipe",
     inputs={"input": "value"},
 )
+pipe_output = response.pipe_output
 ```
 
-### Per-Call Override with `execute_pipeline`
+### Per-Runner Override with `PipelexRunner`
 
-For maximum flexibility, you can override library directories on each `execute_pipeline` call:
+For maximum flexibility, you can override library directories on each `PipelexRunner` instance:
 
 ```python
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 
 # Initialize with default directories
 Pipelex.make(
@@ -164,24 +174,32 @@ Pipelex.make(
 )
 
 # Use the default directories
-output1 = await execute_pipeline(
+runner1 = PipelexRunner()
+response1 = await runner1.execute_pipeline(
     pipe_code="default_pipe",
     inputs={"input": "value"},
 )
+pipe_output1 = response1.pipe_output
 
 # Override for a specific execution
-output2 = await execute_pipeline(
-    pipe_code="special_pipe",
+runner2 = PipelexRunner(
     library_dirs=["/path/to/special_pipes"],  # Overrides instance default
+)
+response2 = await runner2.execute_pipeline(
+    pipe_code="special_pipe",
     inputs={"input": "value"},
 )
+pipe_output2 = response2.pipe_output
 
-# Disable directory loading (use only plx_content)
-output3 = await execute_pipeline(
-    plx_content=my_plx_string,
+# Disable directory loading (use only mthds_content)
+runner3 = PipelexRunner(
     library_dirs=[],  # Empty list disables directory-based loading
+)
+response3 = await runner3.execute_pipeline(
+    mthds_content=my_mthds_string,
     inputs={"input": "value"},
 )
+pipe_output3 = response3.pipe_output
 ```
 
 ### Priority Resolution Examples
@@ -194,11 +212,15 @@ export PIPELEXPATH="/shared/pipes"
 ```
 
 ```python
+from pipelex.pipeline.runner import PipelexRunner
+
 # Python: No library_dirs specified anywhere
 Pipelex.make()  # No library_dirs
 
 # Uses PIPELEXPATH: /shared/pipes
-output = await execute_pipeline(pipe_code="my_pipe", inputs={...})
+runner = PipelexRunner()
+response = await runner.execute_pipeline(pipe_code="my_pipe", inputs={...})
+pipe_output = response.pipe_output
 ```
 
 **Example 2: Instance default overrides PIPELEXPATH**
@@ -209,24 +231,33 @@ export PIPELEXPATH="/shared/pipes"
 ```
 
 ```python
+from pipelex.pipeline.runner import PipelexRunner
+
 # Python: Instance default set
 Pipelex.make(library_dirs=["/project/pipes"])
 
 # Uses instance default: /project/pipes (PIPELEXPATH ignored)
-output = await execute_pipeline(pipe_code="my_pipe", inputs={...})
+runner = PipelexRunner()
+response = await runner.execute_pipeline(pipe_code="my_pipe", inputs={...})
+pipe_output = response.pipe_output
 ```
 
 **Example 3: Per-call override takes highest priority**
 
 ```python
+from pipelex.pipeline.runner import PipelexRunner
+
 Pipelex.make(library_dirs=["/default/pipes"])
 
-# Uses per-call value: /special/pipes
-output = await execute_pipeline(
-    pipe_code="my_pipe",
+# Uses per-runner value: /special/pipes
+runner = PipelexRunner(
     library_dirs=["/special/pipes"],  # Highest priority
+)
+response = await runner.execute_pipeline(
+    pipe_code="my_pipe",
     inputs={...},
 )
+pipe_output = response.pipe_output
 ```
 
 ### Best Practices
@@ -237,9 +268,9 @@ output = await execute_pipeline(
 
 3. **Use per-call `library_dirs` for exceptions**: Override only when a specific execution needs different directories.
 
-4. **Use empty list `[]` for isolated execution**: When you want to execute only from `plx_content` without loading any file-based definitions.
+4. **Use empty list `[]` for isolated execution**: When you want to execute only from `mthds_content` without loading any file-based definitions.
 
-5. **Include structure class directories**: Remember that `library_dirs` must contain both `.plx` files AND Python files defining `StructuredContent` classes.
+5. **Include structure class directories**: Remember that `library_dirs` must contain both `.mthds` files AND Python files defining `StructuredContent` classes.
 
 ## Excluded Directories
 
@@ -255,11 +286,11 @@ To improve performance and avoid loading unnecessary files, Pipelex automaticall
 - `.env` - Environment files
 - `results` - Common output directory
 
-Files in these directories will not be scanned, even if they contain `.plx` files or structure classes.
+Files in these directories will not be scanned, even if they contain `.mthds` files or structure classes.
 
 ## Project Organization
 
-**Golden rule:** Put `.plx` files where they make sense in YOUR project. Pipelex finds them automatically.
+**Golden rule:** Put `.mthds` files where they make sense in YOUR project. Pipelex finds them automatically.
 
 ### Common Patterns
 
@@ -273,11 +304,11 @@ your_project/
 │   ├── finance/
 │   │   ├── models.py
 │   │   ├── services.py
-│   │   ├── invoices.plx          # With finance code
+│   │   ├── invoices.mthds          # With finance code
 │   │   └── invoices_struct.py
 │   └── legal/
 │       ├── models.py
-│       ├── contracts.plx         # With legal code
+│       ├── contracts.mthds         # With legal code
 │       └── contracts_struct.py
 ├── .pipelex/
 └── requirements.txt
@@ -297,9 +328,9 @@ Group all pipelines in one place:
 your_project/
 ├── my_project/
 │   ├── pipelines/          # All pipelines here
-│   │   ├── finance.plx
+│   │   ├── finance.mthds
 │   │   ├── finance_struct.py
-│   │   ├── legal.plx
+│   │   ├── legal.mthds
 │   │   └── legal_struct.py
 │   └── core/
 └── .pipelex/
@@ -321,10 +352,10 @@ your_project/
 ├── my_project/
 │   ├── features/
 │   │   ├── document_processing/
-│   │   │   ├── extract.plx
+│   │   │   ├── extract.mthds
 │   │   │   └── extract_struct.py
 │   │   └── image_generation/
-│   │       ├── generate.plx
+│   │       ├── generate.mthds
 │   │       └── generate_struct.py
 │   └── main.py
 └── .pipelex/
@@ -337,11 +368,11 @@ your_project/
 ├── my_project/
 │   ├── finance/
 │   │   ├── pipelines/
-│   │   │   └── invoices.plx
+│   │   │   └── invoices.mthds
 │   │   └── invoice_struct.py
 │   ├── legal/
 │   │   ├── pipelines/
-│   │   │   └── contracts.plx
+│   │   │   └── contracts.mthds
 │   │   └── contract_struct.py
 │   └── main.py
 └── .pipelex/
@@ -352,7 +383,7 @@ your_project/
 ```
 your_project/
 ├── my_project/
-│   ├── invoice_processing.plx
+│   ├── invoice_processing.mthds
 │   ├── invoice_struct.py
 │   └── main.py
 └── .pipelex/
@@ -364,14 +395,14 @@ Pipelex loads your pipelines in a specific order to ensure dependencies are reso
 
 ### 1. Domain Loading
 
-- Loads domain definitions from all `.plx` files
+- Loads domain definitions from all `.mthds` files
 - Each domain must be defined exactly once
 - Supports system prompts and structure templates per domain
 
 ### 2. Concept Loading
 
 - Loads native concepts (Text, Image, PDF, etc.)
-- Loads custom concepts from `.plx` files
+- Loads custom concepts from `.mthds` files
 - Validates concept definitions and relationships
 - Links concepts to Python structure classes by name
 
@@ -383,7 +414,7 @@ Pipelex loads your pipelines in a specific order to ensure dependencies are reso
 
 ### 4. Pipe Loading
 
-- Loads pipe definitions from `.plx` files
+- Loads pipe definitions from `.mthds` files
 - Validates pipe configurations
 - Links pipes with their respective domains
 - Resolves input/output concept references
@@ -441,9 +472,9 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### 1. Organization
 
-- Keep related concepts and pipes in the same `.plx` file
+- Keep related concepts and pipes in the same `.mthds` file
 - Use meaningful domain codes that reflect functionality
-- Match Python file names with PLX file names (`finance.plx` → `finance.py`)
+- Match Python file names with MTHDS file names (`finance.mthds` → `finance.py`)
 - Group complex pipelines using subdirectories
 
 ### 2. Structure Classes
@@ -452,7 +483,7 @@ pipelex show pipe YOUR_PIPE_CODE
 - Name classes to match concept names exactly
 - Use `_struct.py` suffix for files containing structure classes (e.g., `finance_struct.py`)
 - Inherit from `StructuredContent` or its subclasses
-- Place structure class files near their corresponding `.plx` files
+- Place structure class files near their corresponding `.mthds` files
 - **Keep modules clean**: Avoid module-level code that executes on import (Pipelex imports modules during auto-discovery)
 
 ### 3. Custom Functions
@@ -474,11 +505,11 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### Pipelines Not Found
 
-**Problem:** Pipelex doesn't find your `.plx` files.
+**Problem:** Pipelex doesn't find your `.mthds` files.
 
 **Solutions:**
 
-1. Ensure files have the `.plx` extension
+1. Ensure files have the `.mthds` extension
 2. Check that files are not in excluded directories
 3. Verify file permissions allow reading
 4. Run `pipelex show pipes` to see what was discovered

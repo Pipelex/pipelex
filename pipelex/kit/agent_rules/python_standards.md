@@ -2,6 +2,15 @@
 
 This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
 
+## Python Version Compatibility
+
+    - The project supports Python 3.10+ (`requires-python = ">=3.10,<3.15"`). Never use features introduced after Python 3.10 without a compatibility fallback.
+    - Common pitfalls:
+      - `datetime.UTC` was added in Python 3.11. Use `datetime.timezone.utc` instead.
+      - `StrEnum` was added in Python 3.11. Always import it from `pipelex.types` which handles retrocompatibility.
+      - `type` statement (PEP 695) was added in Python 3.12. Use `TypeAlias` from `typing` instead.
+      - `ExceptionGroup` / `except*` was added in Python 3.11. Avoid unless using the `exceptiongroup` backport.
+
 ## Variables, loops and indexes
 
     - Variable names should have a minimum length of 3 characters. No exceptions: name your `for` loop indexes like `index_foobar`, your exceptions `exc` or more specific like `validation_error` when there are several layers of exceptions, and use `for key, value in ...` for key/value pairs.
@@ -30,7 +39,8 @@ This document outlines the core coding standards, best practices, and quality co
 
     - Import all necessary libraries at the top of the file
     - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
-    - Do not bother with ordering the imports, our Ruff linter will handle it for us.
+    - Do not bother with ordering the imports or removing unused imports, our Ruff linter will handle it for us.
+    - `if TYPE_CHECKING:` blocks must always be the **last** block in the imports section, placed after all regular imports.
 
 ### **Removing unused imports**
 

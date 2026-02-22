@@ -22,7 +22,7 @@ class PipelexBundleSpec(StructuredContent):
 
     Represents the top-level structure of a Pipelex bundle, which defines a domain
     with its concepts, pipes, and configuration. Bundles are the primary unit of
-    organization for Pipelex workflows, loaded from TOML files.
+    organization for Pipelex methods, loaded from TOML files.
 
     Attributes:
         domain: The domain identifier for this bundle in snake_case format.

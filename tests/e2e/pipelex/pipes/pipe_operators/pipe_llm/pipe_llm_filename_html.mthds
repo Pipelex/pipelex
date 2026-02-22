@@ -1,0 +1,45 @@
+domain      = "pipe_llm_filename_html_e2e"
+description = "E2E tests for filename in PipeCompose HTML template"
+
+[concept]
+InputDescriptionsE2E = "Descriptions of the image and document inputs"
+
+[pipe.describe_with_filenames_e2e]
+type = "PipeSequence"
+description = "Describe inputs then compose HTML with filenames"
+inputs = { image = "Image", document = "Document" }
+output = "Html"
+steps = [
+  { pipe = "describe_inputs_e2e", result = "descriptions" },
+  { pipe = "compose_filename_html_e2e", result = "filename_html" },
+]
+
+[pipe.describe_inputs_e2e]
+type = "PipeLLM"
+description = "Describe the image and document in one sentence each"
+inputs = { image = "Image", document = "Document" }
+output = "InputDescriptionsE2E"
+model = "$vision-cheap"
+prompt = """
+Describe each input in one sentence.
+
+Image: $image
+Document: $document
+"""
+
+[pipe.compose_filename_html_e2e]
+type        = "PipeCompose"
+description = "Compose HTML with filenames and descriptions"
+inputs      = { image = "Image", document = "Document", descriptions = "InputDescriptionsE2E" }
+output      = "Html"
+
+[pipe.compose_filename_html_e2e.template]
+category = "html"
+template = """
+<div class="filename-report">
+  <h2>Image</h2>
+  <p><b>$image.filename</b>: $descriptions.image_description</p>
+  <h2>Document</h2>
+  <p><b>$document.filename</b>: $descriptions.document_description</p>
+</div>
+"""

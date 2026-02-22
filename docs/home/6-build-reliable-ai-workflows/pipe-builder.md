@@ -3,7 +3,7 @@
 Pipelex provides powerful tools to automatically generate complete, working pipelines from natural language requirements. This feature leverages AI to translate your ideas into fully functional pipeline code, dramatically speeding up development.
 
 !!! tip "Pipe Builder Requirements"
-    For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BlackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key or see [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) for details. Otherwise, you can also create the workflows yourself, following our [documentation guide](./kick-off-a-pipelex-workflow-project.md).
+    For now, the pipe builder requires access to **Claude 4.5 Sonnet**, either through Pipelex Inference, or using your own key through Anthropic, Amazon Bedrock or BlackboxAI. Don't hesitate to join our [Discord](https://go.pipelex.com/discord) to get a key or see [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) for details. Otherwise, you can also create the methods yourself, following our [documentation guide](./kick-off-a-methods-project.md).
 
 ## Overview
 
@@ -23,7 +23,7 @@ This command runs a validation/fix loop to ensure the generated pipeline is corr
 
 By default, the build command creates a numbered directory with three files:
 
-1. **`bundle.plx`** - Your complete pipeline definition with domain, concepts, and pipes
+1. **`bundle.mthds`** - Your complete pipeline definition with domain, concepts, and pipes
 2. **`inputs.json`** - A pre-filled template showing the inputs your pipeline expects
 3. **`run_{pipe_code}.py`** - A ready-to-run Python script you can customize and execute
 
@@ -39,7 +39,7 @@ pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 pipelex build pipe "Take a photo as input, and render the opposite of the photo" \
   -o photo_inverter
 
-# Single file only: creates results/photo_inverter_01.plx
+# Single file only: creates results/photo_inverter_01.mthds
 pipelex build pipe "Take a photo as input, and render the opposite of the photo" \
   -o photo_inverter --no-extras
 
@@ -52,7 +52,7 @@ pipelex build pipe "Take a photo as input, and render the opposite of the photo"
 
 - `-o, --output-name`: Base name for the generated file or directory (without extension)
 - `--output-dir`: Directory where files will be generated (default: `results`)
-- `--no-extras`: Skip generating `inputs.json` and runner, only generate the `.plx` bundle
+- `--no-extras`: Skip generating `inputs.json` and runner, only generate the `.mthds` bundle
 - `--no-output`: Build the pipeline but don't save any files
 
 ## Quick Start Example
@@ -97,7 +97,7 @@ When you run a build command, Pipelex automatically creates:
 - **Domain definition**: The namespace for your pipeline
 - **Concepts**: Structured data types for inputs and outputs
 - **Pipes**: The processing steps and LLM operations
-- **Python structures**: When structured output is needed (saved alongside the `.plx` file with `_struct.py` suffix)
+- **Python structures**: When structured output is needed (saved alongside the `.mthds` file with `_struct.py` suffix)
 
 All generated pipelines follow Pipelex best practices and conventions automatically.
 
@@ -105,10 +105,10 @@ All generated pipelines follow Pipelex best practices and conventions automatica
 
 After generating your pipeline:
 
-1. **Review the generated `.plx` file** to understand the structure
+1. **Review the generated `.mthds` file** to understand the structure
 2. **Test the pipeline** using the generated example code
 3. **Iterate if needed** by modifying the natural language description and regenerating
-4. **Customize** the pipeline by editing the `.plx` file directly for fine-tuning
+4. **Customize** the pipeline by editing the `.mthds` file directly for fine-tuning
 
 ## How It Works
 
@@ -169,7 +169,7 @@ For each pipe signature, generates the complete specification:
 Finally, the builder:
 - Names the domain based on your brief
 - Assembles all concepts and pipes into a complete bundle
-- Generates the `.plx` file with proper syntax
+- Generates the `.mthds` file with proper syntax
 - Creates Python structure files (`*_struct.py`) when needed
 - Validates the pipeline and fixes deterministic issues
 
@@ -177,9 +177,8 @@ Finally, the builder:
 
 Want to see how the Pipe Builder works internally? Check out the source code:
 
-- **Main pipeline**: [`pipelex/builder/builder.plx`](https://github.com/pipelex/pipelex/tree/main/pipelex/builder/builder.plx)
-- **Pipe design**: [`pipelex/builder/pipe/pipe_design.plx`](https://github.com/pipelex/pipelex/tree/main/pipelex/builder/pipe/pipe_design.plx)
-- **Concept building**: [`pipelex/builder/concept/concept.plx`](https://github.com/pipelex/pipelex/tree/main/pipelex/builder/concept/concept.plx)
+- **Main pipeline**: [`pipelex/builder/builder.mthds`](https://github.com/pipelex/pipelex/tree/main/pipelex/builder/builder.mthds)
+- **Pipe design**: [`pipelex/builder/pipe/pipe_design.mthds`](https://github.com/pipelex/pipelex/tree/main/pipelex/builder/pipe/pipe_design.mthds)
 
 The Pipe Builder is a great example of a complex, multi-stage Pipelex pipeline in action.
 

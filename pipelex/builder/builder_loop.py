@@ -2,6 +2,8 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+from mthds.models.pipeline_inputs import PipelineInputs
+
 from pipelex import builder, log
 from pipelex.builder.builder import (
     PipelexBundleSpec,
@@ -16,17 +18,21 @@ from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
-from pipelex.client.protocol import PipelineInputs
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.packages.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
+from pipelex.core.packages.discovery import MANIFEST_FILENAME
+from pipelex.core.packages.manifest import MthdsPackageManifest
+from pipelex.core.packages.manifest_parser import serialize_manifest_to_toml
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_required_pipe
-from pipelex.language.plx_factory import PlxFactory
+from pipelex.language.mthds_factory import MthdsFactory
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import get_incremental_file_path, save_text_to_path
@@ -49,12 +55,15 @@ class BuilderLoop:
         output_dir: str | None = None,
     ) -> tuple[PipelexBundleSpec, GraphSpec | None]:
         # TODO: Doesn't make sense to be able to put a builder_pipe code but hardcoding the Path to the builder pipe.
-        pipe_output = await execute_pipeline(
-            pipe_code=builder_pipe,
+        runner = PipelexRunner(
             library_dirs=[str(Path(builder.__file__).parent)],
-            inputs=inputs,
             execution_config=execution_config,
         )
+        response = await runner.execute_pipeline(
+            pipe_code=builder_pipe,
+            inputs=inputs,
+        )
+        pipe_output = response.pipe_output
 
         if is_save_working_memory_enabled:
             working_memory_path = get_incremental_file_path(
@@ -65,37 +74,65 @@ class BuilderLoop:
             save_as_json_to_path(object_to_save=pipe_output.working_memory.smart_dump(), path=str(working_memory_path), create_directory=True)
 
         pipelex_bundle_spec = pipe_output.working_memory.get_stuff_as(name="pipelex_bundle_spec", content_type=PipelexBundleSpec)
+        if pipelex_bundle_spec.pipe:
+            log.debug(f"Builder produced spec with pipe keys: {list(pipelex_bundle_spec.pipe.keys())}")
+            log.debug(f"Builder produced spec with main_pipe: '{pipelex_bundle_spec.main_pipe}'")
         pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
+        pipelex_bundle_spec = self._strip_namespace_from_pipe_codes(pipelex_bundle_spec=pipelex_bundle_spec)
+
+        if pipelex_bundle_spec.pipe:
+            for pipe_key, pipe_spec in pipelex_bundle_spec.pipe.items():
+                pipe_detail = f"key='{pipe_key}', pipe_code='{pipe_spec.pipe_code}', type={pipe_spec.type}"
+                if isinstance(pipe_spec, PipeBatchSpec):
+                    pipe_detail += f", branch_pipe_code='{pipe_spec.branch_pipe_code}'"
+                elif isinstance(pipe_spec, PipeSequenceSpec):
+                    step_codes = [step.pipe_code for step in pipe_spec.steps]
+                    pipe_detail += f", step_pipe_codes={step_codes}"
+                elif isinstance(pipe_spec, PipeParallelSpec):
+                    branch_codes = [branch.pipe_code for branch in pipe_spec.branches]
+                    pipe_detail += f", branch_pipe_codes={branch_codes}"
+                elif isinstance(pipe_spec, PipeConditionSpec):
+                    pipe_detail += f", outcome_values={list(pipe_spec.outcomes.values())}"
+                log.debug(f"  Pipe spec: {pipe_detail}")
 
         if is_save_first_iteration_enabled:
             try:
-                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 first_iteration_path = get_incremental_file_path(
                     base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_1st_iteration",
-                    extension="plx",
+                    extension="mthds",
                 )
-                save_text_to_path(text=plx_content, path=str(first_iteration_path), create_directory=True)
+                save_text_to_path(text=mthds_content, path=str(first_iteration_path), create_directory=True)
             except PipelexBundleSpecBlueprintError as exc:
-                log.warning(f"Could not save first iteration PLX: {exc}")
+                log.warning(f"Could not save first iteration MTHDS: {exc}")
 
         max_attempts = get_config().pipelex.builder_config.fix_loop_max_attempts
         for attempt in range(1, max_attempts + 1):
+            log.debug(f"Fix loop attempt {attempt}/{max_attempts}")
+
             # Phase 1: Create blueprint from spec
+            log.debug("Phase 1: creating blueprint from spec")
             try:
                 bundle_blueprint = pipelex_bundle_spec.to_blueprint()
             except PipelexBundleSpecBlueprintError as exc:
+                log.debug("Phase 1: blueprint creation failed")
                 if attempt < max_attempts:
                     log.info(f"⚠️ Blueprint creation failed on attempt {attempt}/{max_attempts}, fixing undeclared concepts...")
                     pipelex_bundle_spec = await self._fix_undeclared_concept_references(pipelex_bundle_spec=pipelex_bundle_spec)
                     pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
+                    pipelex_bundle_spec = self._strip_namespace_from_pipe_codes(pipelex_bundle_spec=pipelex_bundle_spec)
                     continue
                 msg = f"Failed to create bundle blueprint after {max_attempts} attempts: {exc}"
                 raise PipeBuilderError(msg) from exc
 
+            log.debug("Phase 1: blueprint created successfully")
+
             # Phase 2: Validate the bundle
+            log.debug("Phase 2: validating bundle")
             try:
                 await validate_bundle(blueprints=[bundle_blueprint])
+                log.debug("Phase 2: validation passed")
                 if attempt > 1:
                     log.info(f"✅ Bundle validation passed after fixes (attempt {attempt}/{max_attempts})")
                 break  # Validation passed
@@ -108,8 +145,25 @@ class BuilderLoop:
                         is_save_second_iteration_enabled=is_save_second_iteration_enabled,
                         output_dir=output_dir,
                     )
+                    if pipelex_bundle_spec.pipe:
+                        log.debug(f"After Phase 2 fix: pipe keys={list(pipelex_bundle_spec.pipe.keys())}")
+                    pipelex_bundle_spec = self._strip_native_concept_declarations(pipelex_bundle_spec=pipelex_bundle_spec)
+                    pipelex_bundle_spec = self._strip_namespace_from_pipe_codes(pipelex_bundle_spec=pipelex_bundle_spec)
                 else:
                     log.error(f"❌ Validation failed after {max_attempts} attempts, raising error")
+                    # Save the last bundle state so the user can inspect/fix it manually
+                    try:
+                        mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                        failed_bundle_path = get_incremental_file_path(
+                            base_path=output_dir or "results/pipe-builder",
+                            base_name="failed_bundle",
+                            extension="mthds",
+                        )
+                        save_text_to_path(text=mthds_content, path=str(failed_bundle_path), create_directory=True)
+                        log.warning(f"Last bundle state saved to: {failed_bundle_path}")
+                        exc.failed_bundle_path = str(failed_bundle_path)
+                    except Exception as save_exc:
+                        log.warning(f"Could not save failed bundle state: {save_exc}")
                     raise
 
         return pipelex_bundle_spec, pipe_output.graph_spec
@@ -130,29 +184,32 @@ class BuilderLoop:
         if pipelex_bundle_spec.pipe:
             for pipe_code, pipe_spec in pipelex_bundle_spec.pipe.items():
                 source = f"pipe '{pipe_code}'"
-                # Parse output
+                # Parse output — skip cross-package refs
                 output_parse = parse_concept_with_multiplicity(pipe_spec.output)
                 output_concept = output_parse.concept_ref_or_code
-                if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                    bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
-                    concept_references.append((bare_code, source, "output"))
+                if not QualifiedRef.has_cross_package_prefix(output_concept):
+                    if "." not in output_concept or output_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                        bare_code = output_concept.split(".")[-1] if "." in output_concept else output_concept
+                        concept_references.append((bare_code, source, "output"))
 
-                # Parse inputs
+                # Parse inputs — skip cross-package refs
                 if pipe_spec.inputs:
                     for input_name, input_concept_str in pipe_spec.inputs.items():
                         input_parse = parse_concept_with_multiplicity(input_concept_str)
                         input_concept = input_parse.concept_ref_or_code
-                        if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                            bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
-                            concept_references.append((bare_code, source, f"input '{input_name}'"))
+                        if not QualifiedRef.has_cross_package_prefix(input_concept):
+                            if "." not in input_concept or input_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                                bare_code = input_concept.split(".")[-1] if "." in input_concept else input_concept
+                                concept_references.append((bare_code, source, f"input '{input_name}'"))
 
-                # Parse PipeParallel combined_output
+                # Parse PipeParallel combined_output — skip cross-package refs
                 if isinstance(pipe_spec, PipeParallelSpec) and pipe_spec.combined_output:
                     combined_parse = parse_concept_with_multiplicity(pipe_spec.combined_output)
                     combined_concept = combined_parse.concept_ref_or_code
-                    if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
-                        bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
-                        concept_references.append((bare_code, source, "combined_output"))
+                    if not QualifiedRef.has_cross_package_prefix(combined_concept):
+                        if "." not in combined_concept or combined_concept.split(".")[0] == pipelex_bundle_spec.domain:
+                            bare_code = combined_concept.split(".")[-1] if "." in combined_concept else combined_concept
+                            concept_references.append((bare_code, source, "combined_output"))
 
         # Collect concept references from concept definitions (refines, structure concept_ref, item_concept_ref)
         if pipelex_bundle_spec.concept:
@@ -161,26 +218,28 @@ class BuilderLoop:
                     continue
                 source = f"concept '{concept_code}'"
 
-                # Check refines
+                # Check refines — skip cross-package refs
                 if concept_spec_or_name.refines:
                     ref = concept_spec_or_name.refines
-                    if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                    if not QualifiedRef.has_cross_package_prefix(ref) and ("." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain):
                         bare_code = ref.split(".")[-1] if "." in ref else ref
                         concept_references.append((bare_code, source, "refines"))
 
-                # Check structure fields
+                # Check structure fields — skip cross-package refs
                 if concept_spec_or_name.structure:
                     for field_name, field_spec in concept_spec_or_name.structure.items():
                         if field_spec.concept_ref:
                             ref = field_spec.concept_ref
-                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
-                                bare_code = ref.split(".")[-1] if "." in ref else ref
-                                concept_references.append((bare_code, source, f"structure.{field_name}.concept_ref"))
+                            if not QualifiedRef.has_cross_package_prefix(ref):
+                                if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                    bare_code = ref.split(".")[-1] if "." in ref else ref
+                                    concept_references.append((bare_code, source, f"structure.{field_name}.concept_ref"))
                         if field_spec.item_concept_ref:
                             ref = field_spec.item_concept_ref
-                            if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
-                                bare_code = ref.split(".")[-1] if "." in ref else ref
-                                concept_references.append((bare_code, source, f"structure.{field_name}.item_concept_ref"))
+                            if not QualifiedRef.has_cross_package_prefix(ref):
+                                if "." not in ref or ref.split(".")[0] == pipelex_bundle_spec.domain:
+                                    bare_code = ref.split(".")[-1] if "." in ref else ref
+                                    concept_references.append((bare_code, source, f"structure.{field_name}.item_concept_ref"))
 
         # Step 2: Determine which are undeclared
         declared_concepts: set[str] = set()
@@ -255,11 +314,14 @@ class BuilderLoop:
             undeclared_concepts = "\n".join(lines)
             log.info(f"🤖 Generating ConceptSpec definitions for {len(undeclared)} undeclared concept(s) via LLM...")
 
-            concept_fixer_output = await execute_pipeline(
-                pipe_code="generate_missing_concepts",
+            concept_fixer_runner = PipelexRunner(
                 library_dirs=[str(Path(builder.__file__).parent / "concept")],
+            )
+            concept_fixer_response = await concept_fixer_runner.execute_pipeline(
+                pipe_code="generate_missing_concepts",
                 inputs={"undeclared_concepts": undeclared_concepts},
             )
+            concept_fixer_output = concept_fixer_response.pipe_output
 
             generated_concepts_list = concept_fixer_output.working_memory.get_stuff_as_list(
                 name="generate_missing_concepts",
@@ -313,7 +375,7 @@ class BuilderLoop:
             if isinstance(pipe_spec, PipeSequenceSpec):
                 sub_pipe_codes = [step.pipe_code for step in pipe_spec.steps]
             elif isinstance(pipe_spec, PipeParallelSpec):
-                sub_pipe_codes = [parallel.pipe_code for parallel in pipe_spec.parallels]
+                sub_pipe_codes = [branch.pipe_code for branch in pipe_spec.branches]
             elif isinstance(pipe_spec, PipeBatchSpec):
                 sub_pipe_codes = [pipe_spec.branch_pipe_code]
             elif isinstance(pipe_spec, PipeConditionSpec):
@@ -368,15 +430,18 @@ class BuilderLoop:
         """Extract a bare concept code only if the reference is local.
 
         A reference is considered local if it has no domain prefix or if
-        its domain prefix matches the bundle domain.
+        its domain prefix matches the bundle domain. Cross-package refs
+        (containing '->') are never local.
 
         Args:
             concept_ref_or_code: A concept reference like "Document", "my_domain.Document", or "external.Document"
             domain: The bundle's domain
 
         Returns:
-            The bare concept code if local, or None if external
+            The bare concept code if local, or None if external or cross-package
         """
+        if QualifiedRef.has_cross_package_prefix(concept_ref_or_code):
+            return None
         if "." not in concept_ref_or_code:
             return concept_ref_or_code
         prefix, bare_code = concept_ref_or_code.rsplit(".", maxsplit=1)
@@ -502,6 +567,137 @@ class BuilderLoop:
         for code in to_remove:
             del pipelex_bundle_spec.concept[code]
             log.info(f"Stripped native concept declaration '{code}' (native concepts are built-in)")
+        return pipelex_bundle_spec
+
+    @staticmethod
+    def _strip_dotted_pipe_code(pipe_code: str) -> str:
+        """Extract bare pipe code from a potentially dotted pipe code.
+
+        If the code contains a dot, return the part after the last dot.
+        Otherwise, return the code unchanged.
+
+        Args:
+            pipe_code: A pipe code like "my_pipe" or "domain.my_pipe" or "a.b.my_pipe"
+
+        Returns:
+            The bare pipe code (part after last dot, or unchanged if no dot)
+        """
+        if "." in pipe_code:
+            return pipe_code.rsplit(".", maxsplit=1)[1]
+        return pipe_code
+
+    @staticmethod
+    def _strip_namespace_from_pipe_codes(pipelex_bundle_spec: PipelexBundleSpec) -> PipelexBundleSpec:
+        """Strip namespace prefixes from pipe definition codes and internal pipe references.
+
+        The builder LLM sometimes generates dotted pipe codes (e.g., 'domain.my_pipe')
+        for pipe definitions and internal references. Pipe definition codes must be bare
+        snake_case since the namespace comes from the bundle's domain field.
+
+        Pipe definition keys and pipe_code fields are always stripped (unconditionally).
+        Internal pipe references in controllers (branch_pipe_code, steps, branches,
+        outcomes) are only stripped when the stripped code matches a pipe defined in
+        the same bundle — otherwise the reference may legitimately point to a pipe
+        in another domain.
+
+        Affected fields:
+        - Pipe dict keys (unconditional)
+        - main_pipe (unconditional)
+        - PipeSpec.pipe_code inside each pipe value (unconditional)
+        - PipeBatchSpec.branch_pipe_code (conditional on bundle membership)
+        - PipeSequenceSpec.steps[*].pipe_code (conditional on bundle membership)
+        - PipeParallelSpec.branches[*].pipe_code (conditional on bundle membership)
+        - PipeConditionSpec.outcomes values and default_outcome (conditional on bundle membership)
+        """
+        strip = BuilderLoop._strip_dotted_pipe_code
+        special_outcome_values = SpecialOutcome.value_list()
+
+        # Strip main_pipe (unconditional — it always refers to a pipe in this bundle)
+        stripped_main = strip(pipelex_bundle_spec.main_pipe)
+        if stripped_main != pipelex_bundle_spec.main_pipe:
+            log.info(f"Stripped namespace from main_pipe: '{pipelex_bundle_spec.main_pipe}' → '{stripped_main}'")
+            pipelex_bundle_spec.main_pipe = stripped_main
+
+        if not pipelex_bundle_spec.pipe:
+            return pipelex_bundle_spec
+
+        # Pass 1: Strip pipe dict keys and pipe_code fields (unconditional for definitions),
+        # and build the set of defined bare pipe codes for reference resolution
+        new_pipes: dict[str, PipeSpecUnion] = {}
+        for key, pipe_spec in pipelex_bundle_spec.pipe.items():
+            stripped_key = strip(key)
+            if stripped_key != key:
+                log.info(f"Stripped namespace from pipe key: '{key}' → '{stripped_key}'")
+
+            stripped_pipe_code = strip(pipe_spec.pipe_code)
+            if stripped_pipe_code != pipe_spec.pipe_code:
+                log.info(f"Stripped namespace from pipe_code: '{pipe_spec.pipe_code}' → '{stripped_pipe_code}'")
+                pipe_spec.pipe_code = stripped_pipe_code
+
+            new_pipes[stripped_key] = pipe_spec
+
+        pipelex_bundle_spec.pipe = new_pipes
+        defined_pipe_codes = set(new_pipes.keys())
+
+        # Pass 2: Strip internal pipe references when the stripped code matches
+        # a pipe defined in this bundle OR the dotted prefix matches the bundle's
+        # own domain (LLM hallucinating the namespace). Only preserve dotted codes
+        # whose prefix is a genuinely different domain.
+        bundle_domain = pipelex_bundle_spec.domain
+
+        def _should_strip_ref(ref_code: str, stripped_code: str) -> bool:
+            """Decide whether a dotted pipe reference should be stripped.
+
+            Strip if the bare code exists in the bundle's defined pipes, or if
+            the dotted prefix matches the bundle's own domain.
+            """
+            if stripped_code == ref_code:
+                return False
+            ref_domain = get_root_from_dotted_path(ref_code)
+            return stripped_code in defined_pipe_codes or ref_domain == bundle_domain
+
+        for pipe_spec in pipelex_bundle_spec.pipe.values():
+            if isinstance(pipe_spec, PipeBatchSpec):
+                stripped_branch = strip(pipe_spec.branch_pipe_code)
+                if _should_strip_ref(pipe_spec.branch_pipe_code, stripped_branch):
+                    log.info(f"Stripped namespace from branch_pipe_code: '{pipe_spec.branch_pipe_code}' → '{stripped_branch}'")
+                    pipe_spec.branch_pipe_code = stripped_branch
+
+            elif isinstance(pipe_spec, PipeSequenceSpec):
+                for step in pipe_spec.steps:
+                    stripped_step = strip(step.pipe_code)
+                    if _should_strip_ref(step.pipe_code, stripped_step):
+                        log.info(f"Stripped namespace from sequence step pipe_code: '{step.pipe_code}' → '{stripped_step}'")
+                        step.pipe_code = stripped_step
+
+            elif isinstance(pipe_spec, PipeParallelSpec):
+                for branch in pipe_spec.branches:
+                    stripped_branch = strip(branch.pipe_code)
+                    if _should_strip_ref(branch.pipe_code, stripped_branch):
+                        log.info(f"Stripped namespace from parallel branch pipe_code: '{branch.pipe_code}' → '{stripped_branch}'")
+                        branch.pipe_code = stripped_branch
+
+            elif isinstance(pipe_spec, PipeConditionSpec):
+                new_outcomes: dict[str, str] = {}
+                for condition_key, outcome_value in pipe_spec.outcomes.items():
+                    if outcome_value in special_outcome_values:
+                        new_outcomes[condition_key] = outcome_value
+                    else:
+                        stripped_outcome = strip(outcome_value)
+                        if _should_strip_ref(outcome_value, stripped_outcome):
+                            log.info(f"Stripped namespace from condition outcome: '{outcome_value}' → '{stripped_outcome}'")
+                            new_outcomes[condition_key] = stripped_outcome
+                        else:
+                            new_outcomes[condition_key] = outcome_value
+                pipe_spec.outcomes = new_outcomes
+
+                if pipe_spec.default_outcome not in special_outcome_values:
+                    stripped_default = strip(pipe_spec.default_outcome)
+                    if _should_strip_ref(pipe_spec.default_outcome, stripped_default):
+                        log.info(f"Stripped namespace from default_outcome: '{pipe_spec.default_outcome}' → '{stripped_default}'")
+                        pipe_spec.default_outcome = stripped_default
+
+        log.debug(f"After namespace stripping: main_pipe='{pipelex_bundle_spec.main_pipe}', pipe keys={list(pipelex_bundle_spec.pipe.keys())}")
         return pipelex_bundle_spec
 
     def _fix_bundle_validation_error(
@@ -668,10 +864,13 @@ class BuilderLoop:
                             f"🔧 Fixed output concept for PipeCondition '{val_error.pipe_code}': output changed from '{old_output}' → '{new_output}'"
                         )
 
+                case PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX:
+                    log.info(f"⚠️ Invalid pipe code syntax detected for pipe '{val_error.pipe_code}' — will be fixed by namespace stripping")
+                    continue
+
                 case (
                     PipeValidationErrorType.LLM_OUTPUT_CANNOT_BE_IMAGE
                     | PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE
-                    | PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX
                     | PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
                     | PipeValidationErrorType.CIRCULAR_DEPENDENCY_ERROR
                     | PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION
@@ -693,15 +892,15 @@ class BuilderLoop:
         # Save second iteration if we made any changes (pipes or concepts)
         if (fixed_pipes or added_concepts) and is_save_second_iteration_enabled:
             try:
-                plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+                mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
                 second_iteration_path = get_incremental_file_path(
                     base_path=output_dir or "results/pipe-builder",
                     base_name="generated_pipeline_2nd_iteration",
-                    extension="plx",
+                    extension="mthds",
                 )
-                save_text_to_path(text=plx_content, path=str(second_iteration_path))
+                save_text_to_path(text=mthds_content, path=str(second_iteration_path))
             except PipelexBundleSpecBlueprintError as exc:
-                log.warning(f"Could not save second iteration PLX: {exc}")
+                log.warning(f"Could not save second iteration MTHDS: {exc}")
 
         return pipelex_bundle_spec
 
@@ -910,3 +1109,47 @@ class BuilderLoop:
         field_spec.choices = None
 
         return True
+
+
+def maybe_generate_manifest_for_output(output_dir: Path) -> Path | None:
+    """Generate a METHODS.toml if the output directory contains multiple domains.
+
+    Scans all .mthds files in the output directory, parses their headers to
+    extract domain and main_pipe information, and generates a METHODS.toml
+    if multiple distinct domains are found.
+
+    Args:
+        output_dir: Directory to scan for .mthds files
+
+    Returns:
+        Path to the generated METHODS.toml, or None if not generated
+    """
+    mthds_files = sorted(output_dir.rglob("*.mthds"))
+    if not mthds_files:
+        return None
+
+    # Parse each bundle to extract domain and pipe info
+    domain_pipes, domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info(mthds_files)
+    for error in errors:
+        log.warning(f"Could not parse {error}")
+
+    # Only generate manifest when multiple domains are present
+    if len(domain_pipes) < 2:
+        return None
+
+    # Build exports: include main_pipe and all pipes from each domain
+    exports = build_domain_exports_from_scan(domain_pipes, domain_main_pipes)
+
+    dir_name = output_dir.name.replace("-", "_").replace(" ", "_").lower()
+    manifest = MthdsPackageManifest(
+        address=f"example.com/yourorg/{dir_name}",
+        version="0.1.0",
+        description=f"Package generated from {len(mthds_files)} .mthds file(s)",
+        exports=exports,
+    )
+
+    manifest_path = output_dir / MANIFEST_FILENAME
+    toml_content = serialize_manifest_to_toml(manifest)
+    manifest_path.write_text(toml_content, encoding="utf-8")
+
+    return manifest_path

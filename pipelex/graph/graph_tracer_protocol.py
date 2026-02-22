@@ -126,6 +126,22 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def register_controller_output(
+        self,
+        node_id: str,
+        output_spec: IOSpec,
+    ) -> None:
+        """Register an additional output for a controller node.
+
+        This allows controllers like PipeParallel to explicitly register their
+        branch outputs so that DATA edges flow from the controller to downstream consumers.
+
+        Args:
+            node_id: The controller node ID.
+            output_spec: The IOSpec describing the output.
+        """
+        ...
+
     def register_batch_item_extraction(
         self,
         list_stuff_code: str,
@@ -160,6 +176,24 @@ class GraphTracerProtocol(Protocol):
             batch_controller_node_id: The node_id of the PipeBatch controller that will produce the output list.
                 If provided, this will be used as the target node for BATCH_AGGREGATE edges instead of
                 looking up the producer from stuff_producer_map (which may be overwritten by parent controllers).
+        """
+        ...
+
+    def register_parallel_combine(
+        self,
+        combined_stuff_code: str,
+        branch_stuff_codes: list[str],
+        parallel_controller_node_id: str,
+    ) -> None:
+        """Register that branch outputs are combined into a single output in PipeParallel.
+
+        Creates PARALLEL_COMBINE edges from each branch output stuff node
+        to the combined output stuff node.
+
+        Args:
+            combined_stuff_code: The stuff_code of the combined output.
+            branch_stuff_codes: The stuff_codes of the individual branch outputs.
+            parallel_controller_node_id: The node_id of the PipeParallel controller.
         """
         ...
 
@@ -236,6 +270,14 @@ class GraphTracerNoOp(GraphTracerProtocol):
         pass
 
     @override
+    def register_controller_output(
+        self,
+        node_id: str,
+        output_spec: IOSpec,
+    ) -> None:
+        pass
+
+    @override
     def register_batch_item_extraction(
         self,
         list_stuff_code: str,
@@ -252,5 +294,14 @@ class GraphTracerNoOp(GraphTracerProtocol):
         item_stuff_code: str,
         item_index: int,
         batch_controller_node_id: str | None = None,
+    ) -> None:
+        pass
+
+    @override
+    def register_parallel_combine(
+        self,
+        combined_stuff_code: str,
+        branch_stuff_codes: list[str],
+        parallel_controller_node_id: str,
     ) -> None:
         pass

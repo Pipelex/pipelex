@@ -1,6 +1,7 @@
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
 from pipelex.core.stuffs.html_content import HtmlContent
@@ -160,8 +161,9 @@ class NativeConceptCode(StrEnum):
             return False
 
         if "." in concept_ref_or_code:
-            domain_code, concept_code = concept_ref_or_code.split(".", 1)
-            return SpecialDomain.is_native(domain_code=domain_code) and concept_code in cls.values_list()
+            ref = QualifiedRef.parse(concept_ref_or_code)
+            assert ref.domain_path is not None
+            return SpecialDomain.is_native(domain_code=ref.domain_path) and ref.local_code in cls.values_list()
         return concept_ref_or_code in cls.values_list()
 
     @classmethod
@@ -179,8 +181,9 @@ class NativeConceptCode(StrEnum):
         """
         if "." not in concept_ref:
             return False
-        domain_code, concept_code = concept_ref.split(".", 1)
-        return SpecialDomain.is_native(domain_code=domain_code) and concept_code in cls.values_list()
+        ref = QualifiedRef.parse(concept_ref)
+        assert ref.domain_path is not None
+        return SpecialDomain.is_native(domain_code=ref.domain_path) and ref.local_code in cls.values_list()
 
     @classmethod
     def validate_native_concept_ref_or_code(cls, concept_ref_or_code: str) -> None:

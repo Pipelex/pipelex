@@ -27,12 +27,12 @@ class TestPipeParallelSimple:
     ):
         """Test PipeParallel running three text analysis pipes in parallel."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
-        # Create PipeParallel instance - pipes are loaded from PLX files
+        # Create PipeParallel instance - pipes are loaded from MTHDS files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
                 SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
@@ -151,7 +151,7 @@ class TestPipeParallelSimple:
             description="Parallel text analysis pipeline for short text",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
                 SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),

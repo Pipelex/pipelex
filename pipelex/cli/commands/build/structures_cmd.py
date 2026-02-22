@@ -293,7 +293,7 @@ def generate_structures_from_blueprints(
 def build_structures_command(
     target: Annotated[
         str,
-        typer.Argument(help="Target directory to scan for .plx files, or a specific .plx file"),
+        typer.Argument(help="Target directory to scan for .mthds files, or a specific .mthds file"),
     ],
     output_dir: Annotated[
         str | None,
@@ -304,7 +304,7 @@ def build_structures_command(
         typer.Option(
             "--library-dir",
             "-L",
-            help="Directory to search for pipe definitions (.plx files). Can be specified multiple times.",
+            help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times.",
         ),
     ] = None,
     force: Annotated[
@@ -316,14 +316,14 @@ def build_structures_command(
         ),
     ] = False,
 ) -> None:
-    """Generate Python structure classes from concept definitions in .plx files.
+    """Generate Python structure classes from concept definitions in .mthds files.
 
     Examples:
-        pipelex build structures my_bundle.plx
+        pipelex build structures my_bundle.mthds
         pipelex build structures ./my_pipes/
-        pipelex build structures my_bundle.plx -o ./generated/
-        pipelex build structures my_bundle.plx -L ./shared_pipes/
-        pipelex build structures my_bundle.plx --force
+        pipelex build structures my_bundle.mthds -o ./generated/
+        pipelex build structures my_bundle.mthds -L ./shared_pipes/
+        pipelex build structures my_bundle.mthds --force
     """
 
     def _build_structures_cmd():
@@ -337,19 +337,19 @@ def build_structures_command(
         library_dirs_paths, _ = resolve_library_dirs(library_dir)
 
         # Determine if target is a file or directory
-        is_plx_file = target_path.is_file() and is_pipelex_file(target_path)
+        is_mthds_file = target_path.is_file() and is_pipelex_file(target_path)
         pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD, library_dirs=library_dir)
 
         try:
-            if is_plx_file:
-                # Single PLX file: output to parent directory
+            if is_mthds_file:
+                # Single MTHDS file: output to parent directory
                 base_dir = target_path.parent
                 output_directory = Path(output_dir) if output_dir else base_dir / "structures"
 
                 typer.echo(f"🔍 Loading concepts from bundle: {target_path}")
 
                 # Load concepts only (no pipes)
-                load_result = load_concepts_only(plx_file_path=target_path, library_dirs=library_dirs_paths)
+                load_result = load_concepts_only(mthds_file_path=target_path, library_dirs=library_dirs_paths)
                 # THIS IS A HACK, while waiting class/func registries to be in libraries.
                 get_class_registry().teardown()
                 get_func_registry().teardown()
@@ -367,9 +367,9 @@ def build_structures_command(
                     skip_existing_check=force,
                 )
             else:
-                # Directory: scan for all PLX files
+                # Directory: scan for all MTHDS files
                 if not target_path.is_dir():
-                    typer.secho(f"❌ Target is not a directory or .plx file: {target_path}", fg=typer.colors.RED, err=True)
+                    typer.secho(f"❌ Target is not a directory or .mthds file: {target_path}", fg=typer.colors.RED, err=True)
                     raise typer.Exit(1)
 
                 output_directory = Path(output_dir) if output_dir else target_path / "structures"

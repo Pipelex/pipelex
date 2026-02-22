@@ -6,7 +6,7 @@ from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.graph.graph_config import GraphConfig
-from pipelex.language.plx_config import PlxConfig
+from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
@@ -16,21 +16,6 @@ from pipelex.types import Self, StrEnum
 
 
 class ConfigPaths:
-    DEFAULT_CONFIG_DIR_PATH = "./.pipelex"
-    INFERENCE_DIR_NAME = "inference"
-    INFERENCE_DIR_PATH = f"{DEFAULT_CONFIG_DIR_PATH}/{INFERENCE_DIR_NAME}"
-    BACKENDS_FILE_NAME = "backends.toml"
-    BACKENDS_FILE_PATH = f"{INFERENCE_DIR_PATH}/{BACKENDS_FILE_NAME}"
-    BACKENDS_DIR_NAME = "backends"
-    BACKENDS_DIR_PATH = f"{INFERENCE_DIR_PATH}/{BACKENDS_DIR_NAME}"
-    ROUTING_PROFILES_FILE_NAME = "routing_profiles.toml"
-    ROUTING_PROFILES_FILE_PATH = f"{INFERENCE_DIR_PATH}/{ROUTING_PROFILES_FILE_NAME}"
-    MODEL_DECKS_DIR_NAME = "deck"
-    MODEL_DECKS_DIR_PATH = f"{INFERENCE_DIR_PATH}/{MODEL_DECKS_DIR_NAME}"
-    BASE_DECK_FILE_NAME = "base_deck.toml"
-    BASE_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{BASE_DECK_FILE_NAME}"
-    OVERRIDES_DECK_FILE_NAME = "overrides.toml"
-    OVERRIDES_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{OVERRIDES_DECK_FILE_NAME}"
     # Dev-only config (not synced with kit)
     DEV_CONFIG_DIR_PATH = "./.pipelex-dev"
 
@@ -184,7 +169,7 @@ class Pipelex(ConfigModel):
 
     structure_config: StructureConfig
     prompting_config: PromptingConfig
-    plx_config: PlxConfig
+    mthds_config: MthdsConfig
 
     dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig

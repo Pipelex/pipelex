@@ -147,7 +147,7 @@ class TestImageInputsInference:
         assert pipe_output.main_stuff is not None
 
         if pipe_run_mode.is_live:
-            # Verify that the output is the Analysis concept from the PLX file
+            # Verify that the output is the Analysis concept from the MTHDS file
             assert pipe_output.main_stuff.concept.code == "Analysis"
 
     async def test_compare_two_image_collections(
@@ -198,7 +198,7 @@ class TestImageInputsInference:
         assert pipe_output.main_stuff is not None
 
         if pipe_run_mode.is_live:
-            # Verify that the output is the Analysis concept from the PLX file
+            # Verify that the output is the Analysis concept from the MTHDS file
             assert pipe_output.main_stuff.concept.code == "Analysis"
 
     @pytest.mark.parametrize(("_topic", "data_url"), ImageTestCases.DATA_URL_VISION_TEST_CASES)

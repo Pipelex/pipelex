@@ -51,9 +51,9 @@ class GanttChart(StructuredContent):
     milestones: Optional[List[Milestone]]
 ```
 
-## The Pipeline Definition: `gantt.plx`
+## The Pipeline Definition: `gantt.mthds`
 
-The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex workflow from simple, reusable components.
+The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex method from simple, reusable components.
 
 ```toml
 [pipe.extract_gantt_by_steps]
@@ -92,7 +92,7 @@ Here is the name of the task you have to extract the dates for:
 @gantt_task_name
 """
 ```
-This demonstrates the "divide and conquer" approach that Pipelex encourages. By breaking down a complex problem into smaller steps, each step can be handled by a specialized pipe, making the overall workflow more robust and easier to debug. 
+This demonstrates the "divide and conquer" approach that Pipelex encourages. By breaking down a complex problem into smaller steps, each step can be handled by a specialized pipe, making the overall method more robust and easier to debug. 
 
 ## Flowchart
 

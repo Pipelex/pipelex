@@ -4,8 +4,8 @@ from typing import Any, cast
 from pydantic import ValidationError
 
 from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.exceptions import PipelexServiceConfigValidationError
 from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PIPELEX_SERVICE_CONFIG_FILE_NAME,
@@ -48,7 +48,7 @@ def is_pipelex_gateway_enabled() -> bool:
     Returns:
         True if pipelex_gateway is enabled, False otherwise.
     """
-    backends_toml = load_toml_from_path_if_exists(ConfigPaths.BACKENDS_FILE_PATH)
+    backends_toml = load_toml_from_path_if_exists(config_manager.backends_file_path)
     if backends_toml is None:
         return False
 

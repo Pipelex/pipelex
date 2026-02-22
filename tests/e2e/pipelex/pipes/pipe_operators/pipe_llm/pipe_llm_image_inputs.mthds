@@ -1,0 +1,98 @@
+domain      = "pipe_llm_image_inputs_e2e"
+description = "E2E tests for image input handling in PipeLLM"
+
+[concept]
+ImageDescriptionE2E  = "Description of an image"
+ImageListAnalysisE2E = "Analysis of multiple images"
+PageDescriptionE2E   = "Description of a page"
+
+# Scenario 1: Direct image
+[pipe.describe_single_image_e2e]
+type = "PipeLLM"
+description = "Describe a single image"
+inputs = { image = "Image" }
+output = "ImageDescriptionE2E"
+model = "$vision-cheap"
+prompt = """
+Describe what you see in this image in 1-2 sentences: $image
+Be concise.
+"""
+
+# Scenario 2: Image list
+[pipe.analyze_image_list_e2e]
+type = "PipeLLM"
+description = "Analyze a list of images"
+inputs = { images = "Image[]" }
+output = "ImageListAnalysisE2E"
+model = "$vision-cheap"
+prompt = """
+Count how many images there are and describe each briefly:
+$images
+Be concise.
+"""
+
+# Scenario 3: Multiple image lists
+[pipe.compare_image_lists_e2e]
+type = "PipeLLM"
+description = "Compare two image collections"
+inputs = { collection_a = "Image[]", collection_b = "Image[]" }
+output = "ImageListAnalysisE2E"
+model = "$vision-cheap"
+prompt = """
+Compare these two collections.
+
+Collection A:
+$collection_a
+
+Collection B:
+$collection_b
+
+Describe which collection contains what.
+Be concise.
+"""
+
+# Scenario 4: Nested images WITH filter (CRITICAL)
+[pipe.describe_page_with_images_e2e]
+type = "PipeLLM"
+description = "Describe a page including its images"
+inputs = { page = "Page" }
+output = "PageDescriptionE2E"
+model = "$vision-cheap"
+prompt = """
+Describe this page content including any images.
+{{ page | with_images }}
+
+Be concise.
+"""
+
+# Scenario 5: Nested images WITHOUT filter (CRITICAL)
+[pipe.describe_page_text_only_e2e]
+type = "PipeLLM"
+description = "Describe a page based on text only"
+inputs = { page = "Page" }
+output = "PageDescriptionE2E"
+model = "$vision-cheap"
+prompt = """
+Describe this page based on the text content.
+@page
+
+Be concise.
+"""
+
+# Scenario 6: Mixed direct and nested
+[pipe.mixed_image_inputs_e2e]
+type = "PipeLLM"
+description = "Analyze direct image and page together"
+inputs = { direct_image = "Image", page = "Page" }
+output = "PageDescriptionE2E"
+model = "$vision-cheap"
+prompt = """
+Provide a combined description of all content below.
+
+Direct image: $direct_image
+
+Page content:
+{{ page | with_images }}
+
+Be concise.
+"""

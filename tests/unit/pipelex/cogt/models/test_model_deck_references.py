@@ -18,7 +18,7 @@ from pipelex.cogt.models.model_deck import (
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
-from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.tools.misc.file_utils import find_files_in_dir
 from pipelex.tools.misc.toml_utils import load_toml_from_path_if_exists
@@ -35,7 +35,7 @@ class TestModelDeckReferences:
     @pytest.fixture(scope="class")
     def model_deck_blueprint(self) -> ModelDeckBlueprint:
         """Load actual model deck blueprint from TOML files."""
-        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=ConfigPaths.MODEL_DECKS_DIR_PATH)
+        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=config_manager.model_decks_dir_path)
         return load_model_deck_blueprint(model_deck_paths=model_deck_paths)
 
     @pytest.fixture(scope="class")
@@ -91,7 +91,7 @@ class TestModelDeckReferences:
             Mapping of model_handle -> ModelType
         """
         known_handles: dict[str, ModelType] = {}
-        backends_dir = ConfigPaths.BACKENDS_DIR_PATH
+        backends_dir = config_manager.backends_dir_path
 
         toml_files = find_files_in_dir(backends_dir, pattern="*.toml", is_recursive=False)
         for toml_path in toml_files:

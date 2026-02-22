@@ -9,10 +9,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
+from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
 from pipelex.hub import get_console
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
@@ -156,7 +158,7 @@ def _collect_all_model_availability() -> dict[str, Any]:
         "text_extractor": {},
     }
 
-    backends_dir = Path(ConfigPaths.BACKENDS_DIR_PATH)
+    backends_dir = Path(config_manager.backends_dir_path)
 
     # Process each backend TOML file
     for backend_file in sorted(backends_dir.glob("*.toml")):
@@ -603,7 +605,7 @@ def preprocess_test_models_cmd(
         console.print()
 
     # Collect model availability
-    backends_dir = Path(ConfigPaths.BACKENDS_DIR_PATH)
+    backends_dir = Path(config_manager.backends_dir_path)
     if not backends_dir.exists():
         if quiet:
             console.print(f"[red]✗ Preprocessing failed:[/red] Backends directory not found: {backends_dir}")
@@ -630,10 +632,10 @@ def preprocess_test_models_cmd(
     except OSError as exc:
         # File system errors (permissions, disk issues, etc.)
         if quiet:
-            console.print(f"[red]✗ Preprocessing failed:[/red] File system error - {exc}")
+            console.print(f"[red]✗ Preprocessing failed:[/red] File system error - {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] File system error while reading backend configurations\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] File system error while reading backend configurations\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]File System Error[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -648,10 +650,10 @@ def preprocess_test_models_cmd(
     except Exception as exc:
         # Catch-all for unexpected errors
         if quiet:
-            console.print(f"[red]✗ Preprocessing failed:[/red] {exc}")
+            console.print(f"[red]✗ Preprocessing failed:[/red] {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] Unexpected error while collecting model availability\n\n[dim]{type(exc).__name__}: {exc}[/dim]",
+                f"[red]✗[/red] Unexpected error while collecting model availability\n\n[dim]{type(exc).__name__}: {escape(str(exc))}[/dim]",
                 title="[bold red]Preprocessing Failed[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -679,11 +681,11 @@ def preprocess_test_models_cmd(
     except TomlError as exc:
         # TOML parsing error in config file
         if quiet:
-            console.print(f"[red]✗ Preprocessing failed:[/red] TOML syntax error - {exc.message}")
+            console.print(f"[red]✗ Preprocessing failed:[/red] TOML syntax error - {escape(exc.message)}")
         else:
             error_panel = Panel(
                 f"[red]✗[/red] TOML syntax error in configuration file\n\n"
-                f"[dim]{exc.message}[/dim]\n\n"
+                f"[dim]{escape(exc.message)}[/dim]\n\n"
                 f"Check these files for syntax errors:\n"
                 f"  • [cyan]{TEST_PROFILES_PATH}[/cyan]\n"
                 f"  • [cyan]{TEST_PROFILES_OVERRIDE_PATH}[/cyan] (if it exists)",
@@ -702,10 +704,10 @@ def preprocess_test_models_cmd(
         # Profile not found error
         error_message = str(exc)
         if quiet:
-            console.print(f"[red]✗ Preprocessing failed:[/red] {error_message}")
+            console.print(f"[red]✗ Preprocessing failed:[/red] {escape(error_message)}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] {error_message}\n\n[dim]The specified profile does not exist in the configuration.[/dim]",
+                f"[red]✗[/red] {escape(error_message)}\n\n[dim]The specified profile does not exist in the configuration.[/dim]",
                 title="[bold red]Profile Not Found[/bold red]",
                 border_style="red",
                 padding=(1, 2),
@@ -721,10 +723,10 @@ def preprocess_test_models_cmd(
     except OSError as exc:
         # File system errors (file deleted, permissions, etc.)
         if quiet:
-            console.print(f"[red]✗ Preprocessing failed:[/red] File system error - {exc}")
+            console.print(f"[red]✗ Preprocessing failed:[/red] File system error - {escape(str(exc))}")
         else:
             error_panel = Panel(
-                f"[red]✗[/red] File system error while reading test profiles\n\n[dim]{exc}[/dim]",
+                f"[red]✗[/red] File system error while reading test profiles\n\n[dim]{escape(str(exc))}[/dim]",
                 title="[bold red]File System Error[/bold red]",
                 border_style="red",
                 padding=(1, 2),

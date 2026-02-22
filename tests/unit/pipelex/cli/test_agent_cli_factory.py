@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
 
 import pytest
@@ -22,10 +23,21 @@ from pipelex.system.pipelex_service.exceptions import (
     RemoteConfigValidationError,
 )
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
+from pipelex.tools.misc.pretty import PrettyPrinter
 
 
 class TestMakePipelexForAgentCli:
     """Tests for make_pipelex_for_agent_cli JSON error output."""
+
+    @pytest.fixture(autouse=True)
+    def _restore_globals(self):
+        """Restore PrettyPrinter.mode and root log level after tests that call the factory successfully."""
+        original_mode = PrettyPrinter.mode
+        root_logger = logging.getLogger()
+        original_level: int = root_logger.level
+        yield
+        PrettyPrinter.mode = original_mode
+        root_logger.setLevel(original_level)
 
     def test_successful_initialization(self, mocker: MockerFixture) -> None:
         """Should return the Pipelex instance when make() succeeds."""

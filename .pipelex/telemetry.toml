@@ -29,11 +29,11 @@ api_key = "${POSTHOG_API_KEY}" # Get from PostHog Project Settings
 geoip = true # Enable GeoIP lookup
 debug = false # Enable PostHog debug mode
 redact_properties = [
-    "prompt",
-    "system_prompt",
-    "response",
-    "file_path",
-    "url",
+  "prompt",
+  "system_prompt",
+  "response",
+  "file_path",
+  "url",
 ] # Event properties to redact
 
 # AI span tracing to YOUR PostHog (does NOT affect Langfuse/OTLP - they receive full data)

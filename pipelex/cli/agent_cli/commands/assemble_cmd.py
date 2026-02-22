@@ -69,7 +69,7 @@ def assemble_cmd(
     ],
     output: Annotated[
         str,
-        typer.Option("--output", "-o", help="Output file path for the assembled bundle (.plx)"),
+        typer.Option("--output", "-o", help="Output file path for the assembled bundle (.mthds)"),
     ],
     description: Annotated[
         str | None,
@@ -88,7 +88,7 @@ def assemble_cmd(
         typer.Option("--pipes", "-p", help="TOML file(s) or inline TOML containing pipe definitions"),
     ] = None,
 ) -> None:
-    """Assemble a complete .plx bundle from individual TOML parts.
+    """Assemble a complete .mthds bundle from individual TOML parts.
 
     Combines domain configuration, concepts, and pipes into a single valid
     Pipelex bundle file. Each --concepts and --pipes argument can be either
@@ -98,11 +98,11 @@ def assemble_cmd(
 
     Examples:
         pipelex-agent assemble --domain my_domain --main-pipe main
-            --concepts concepts.toml --pipes pipes.toml --output bundle.plx
+            --concepts concepts.toml --pipes pipes.toml --output bundle.mthds
 
         pipelex-agent assemble --domain my_domain --main-pipe main
             --concepts '[concept.MyInput]' --pipes '[pipe.main]'
-            --output bundle.plx
+            --output bundle.mthds
     """
     try:
         # Create base document with domain header

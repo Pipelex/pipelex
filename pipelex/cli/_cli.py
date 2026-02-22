@@ -11,6 +11,7 @@ from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cli.commands.pkg.app import pkg_app
 from pipelex.cli.commands.run_cmd import run_cmd
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate_cmd import validate_cmd
@@ -26,7 +27,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["init", "doctor", "build", "validate", "run", "graph", "show", "which"]
+        return ["init", "doctor", "build", "validate", "run", "graph", "show", "which", "pkg"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -122,16 +123,22 @@ def app_callback(
     check_readiness()
 
 
-@app.command(name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")
+@app.command(name="init", help="Initialize Pipelex configuration in ~/.pipelex (global) or project .pipelex (--local)")
 def init_command(
     focus: Annotated[InitFocus, typer.Argument(help="What to initialize: 'config', 'telemetry', or 'all'")] = InitFocus.ALL,
+    local: Annotated[
+        bool, typer.Option("--local", "-l", help="Create project-level .pipelex/ at the detected project root instead of global ~/.pipelex/")
+    ] = False,
 ) -> None:
     """Initialize Pipelex configuration and telemetry.
+
+    By default, creates global configuration in ~/.pipelex/.
+    Use --local to create project-level overrides in {project_root}/.pipelex/.
 
     Note: Config updates are not yet supported. This command always performs a full
     reset of the configuration.
     """
-    init_cmd(focus=focus)
+    init_cmd(focus=focus, local=local)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and suggest fixes")
@@ -143,12 +150,13 @@ def doctor_command(
 
 
 app.add_typer(
-    build_app, name="build", help="Generate AI workflows from natural language requirements: pipelines in .plx format and python code to run them"
+    build_app, name="build", help="Generate AI methods from natural language requirements: pipelines in .mthds format and python code to run them"
 )
 app.command(name="validate", help="Validate pipes: static validation for syntax and dependencies, dry-run execution for logic and consistency")(
     validate_cmd
 )
-app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.plx)")(run_cmd)
+app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.mthds)")(run_cmd)
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)
+app.add_typer(pkg_app, name="pkg", help="Package management: initialize and inspect METHODS.toml manifests")

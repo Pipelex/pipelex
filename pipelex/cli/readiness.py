@@ -6,6 +6,8 @@ import os
 import sys
 from pathlib import Path
 
+from rich.markup import escape
+
 import pipelex
 from pipelex.cli.exceptions import ReadinessCheckError
 from pipelex.hub import get_console
@@ -83,12 +85,12 @@ def check_readiness() -> None:
         if found_venvs:
             console.print("[bold cyan]Found virtual environment(s) in your project:[/bold cyan]")
             for venv_name in found_venvs:
-                console.print(f"  • [green]{venv_name}[/green]")
+                console.print(f"  • [green]{escape(venv_name)}[/green]")
             console.print()
             console.print("[bold green]To activate your virtual environment:[/bold green]")
             venv_example = found_venvs[0]
-            console.print(f"  [cyan]source {venv_example}/bin/activate[/cyan]  [dim]# On macOS/Linux[/dim]")
-            console.print(f"  [cyan]{venv_example}\\Scripts\\activate[/cyan]     [dim]# On Windows[/dim]\n")
+            console.print(f"  [cyan]source {escape(venv_example)}/bin/activate[/cyan]  [dim]# On macOS/Linux[/dim]")
+            console.print(f"  [cyan]{escape(venv_example)}\\Scripts\\activate[/cyan]     [dim]# On Windows[/dim]\n")
         else:
             console.print("[bold green]To create and activate a virtual environment:[/bold green]")
             console.print("  [cyan]python -m venv .venv[/cyan]")

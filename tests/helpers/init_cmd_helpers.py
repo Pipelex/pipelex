@@ -181,6 +181,13 @@ class MockedInitEnvironment:
         """Mock config_manager to use tmp_path."""
         self.mock_config_manager = self.mocker.MagicMock()
         self.mock_config_manager.pipelex_config_dir = str(self.pipelex_dir)
+        self.mock_config_manager.global_config_dir = str(self.pipelex_dir)
+        self.mock_config_manager.project_config_dir = str(self.pipelex_dir)
+        self.mock_config_manager.project_root = str(self.tmp_path)
+        self.mock_config_manager.backends_file_path = str(self.inference_dir / "backends.toml")
+        self.mock_config_manager.backends_dir_path = str(self.inference_dir / "backends")
+        self.mock_config_manager.routing_profiles_file_path = str(self.inference_dir / "routing_profiles.toml")
+        self.mock_config_manager.model_decks_dir_path = str(self.inference_dir / "deck")
 
         # Patch all locations where config_manager is used
         self.mocker.patch("pipelex.cli.commands.init.command.config_manager", self.mock_config_manager)

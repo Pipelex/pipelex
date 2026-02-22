@@ -11,7 +11,7 @@ from pipelex.cli.agent_cli.commands.assemble_cmd import assemble_cmd
 from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
-from pipelex.cli.agent_cli.commands.graph_cmd import GraphFormat, graph_cmd
+from pipelex.cli.agent_cli.commands.graph_cmd import graph_cmd
 from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
@@ -63,7 +63,7 @@ def version_callback(value: bool) -> None:
 @app.callback(invoke_without_command=True)
 def app_callback(
     ctx: typer.Context,
-    version: Annotated[
+    version: Annotated[  # noqa: ARG001
         bool,
         typer.Option(
             "--version",
@@ -73,233 +73,33 @@ def app_callback(
             is_eager=True,
         ),
     ] = False,
+    log_level: Annotated[
+        str,
+        typer.Option("--log-level", help="Log verbosity level (debug, verbose, info, warning, error, critical)."),
+    ] = "warning",
 ) -> None:
     """Agent CLI callback - no logo, minimal output."""
-    # No logo, no banner - agent CLI is silent by default
+    from pipelex.cli.agent_cli.commands.agent_output import agent_error  # noqa: PLC0415
+    from pipelex.tools.log.log_levels import LogLevel  # noqa: PLC0415
+
+    ctx.ensure_object(dict)
+    try:
+        ctx.obj["log_level"] = LogLevel(log_level.upper())
+    except ValueError:
+        valid_values = ", ".join(level.value.lower() for level in LogLevel)
+        agent_error(
+            f"Invalid log level '{log_level}'. Valid values: {valid_values}",
+            "ArgumentError",
+        )
 
 
-@app.command(name="build", help="Build a pipeline from a prompt")
-def build_command(
-    prompt: Annotated[
-        str,
-        typer.Argument(help="Prompt describing what the pipeline should do"),
-    ],
-    builder_pipe: Annotated[
-        str,
-        typer.Option("--builder-pipe", help="Builder pipe to use for generating the pipeline"),
-    ] = "pipe_builder",
-) -> None:
-    """Build a pipeline from a prompt and output JSON with paths."""
-    build_cmd(prompt=prompt, builder_pipe=builder_pipe)
-
-
-@app.command(name="run", help="Execute a pipeline and output JSON results")
-def run_command(
-    target: Annotated[
-        str | None,
-        typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
-    ] = None,
-    pipe: Annotated[
-        str | None,
-        typer.Option("--pipe", help="Pipe code to run"),
-    ] = None,
-    bundle: Annotated[
-        str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx)"),
-    ] = None,
-    inputs: Annotated[
-        str | None,
-        typer.Option("--inputs", "-i", help="Path to JSON file with inputs or inline JSON"),
-    ] = None,
-    dry_run: Annotated[
-        bool,
-        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
-    ] = False,
-    mock_inputs: Annotated[
-        bool,
-        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
-    ] = False,
-    graph: Annotated[
-        bool,
-        typer.Option("--graph", help="Generate execution graph visualizations (saved alongside output)"),
-    ] = False,
-    library_dir: Annotated[
-        list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
-    ] = None,
-) -> None:
-    """Execute a pipeline and output JSON results."""
-    run_cmd(
-        target=target,
-        pipe=pipe,
-        bundle=bundle,
-        inputs=inputs,
-        dry_run=dry_run,
-        mock_inputs=mock_inputs,
-        graph=graph,
-        library_dir=library_dir,
-    )
-
-
-@app.command(name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")
-def validate_command(
-    target: Annotated[
-        str | None,
-        typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
-    ] = None,
-    pipe: Annotated[
-        str | None,
-        typer.Option("--pipe", help="Pipe code to validate"),
-    ] = None,
-    bundle: Annotated[
-        str | None,
-        typer.Option("--bundle", help="Bundle file path (.plx)"),
-    ] = None,
-    validate_all: Annotated[
-        bool,
-        typer.Option("--all", "-a", help="Validate all pipes in all libraries"),
-    ] = False,
-    library_dir: Annotated[
-        list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
-    ] = None,
-) -> None:
-    """Validate a pipe, bundle, or all pipes and output JSON results."""
-    validate_cmd(
-        target=target,
-        pipe=pipe,
-        bundle=bundle,
-        validate_all=validate_all,
-        library_dir=library_dir,
-    )
-
-
-@app.command(name="inputs", help="Generate example input JSON for a pipe")
-def inputs_command(
-    target: Annotated[
-        str | None,
-        typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
-    ] = None,
-    pipe: Annotated[
-        str | None,
-        typer.Option("--pipe", help="Pipe code to get inputs for"),
-    ] = None,
-    library_dir: Annotated[
-        list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
-    ] = None,
-) -> None:
-    """Generate example input JSON for a pipe."""
-    inputs_cmd(
-        target=target,
-        pipe=pipe,
-        library_dir=library_dir,
-    )
-
-
-@app.command(name="concept", help="Structure a concept from JSON spec and output TOML")
-def concept_command(
-    spec: Annotated[
-        str | None,
-        typer.Option("--spec", "-s", help="JSON string with concept specification"),
-    ] = None,
-    spec_file: Annotated[
-        str | None,
-        typer.Option("--spec-file", "-f", help="Path to JSON file with concept specification"),
-    ] = None,
-) -> None:
-    """Structure a concept from JSON spec and output TOML."""
-    concept_cmd(spec=spec, spec_file=spec_file)
-
-
-@app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")
-def pipe_command(
-    pipe_type: Annotated[
-        str,
-        typer.Option("--type", "-t", help="Pipe type (e.g., PipeLLM, PipeSequence)"),
-    ],
-    spec: Annotated[
-        str | None,
-        typer.Option("--spec", "-s", help="JSON string with pipe specification"),
-    ] = None,
-    spec_file: Annotated[
-        str | None,
-        typer.Option("--spec-file", "-f", help="Path to JSON file with pipe specification"),
-    ] = None,
-) -> None:
-    """Structure a pipe from JSON spec and output TOML."""
-    pipe_cmd(pipe_type=pipe_type, spec=spec, spec_file=spec_file)
-
-
-@app.command(name="assemble", help="Assemble a complete .plx bundle from TOML parts")
-def assemble_command(
-    domain: Annotated[
-        str,
-        typer.Option("--domain", "-d", help="Domain code for the bundle (snake_case)"),
-    ],
-    main_pipe: Annotated[
-        str,
-        typer.Option("--main-pipe", "-m", help="Main pipe code for the bundle"),
-    ],
-    output: Annotated[
-        str,
-        typer.Option("--output", "-o", help="Output file path for the assembled bundle (.plx)"),
-    ],
-    description: Annotated[
-        str | None,
-        typer.Option("--description", help="Description of the bundle"),
-    ] = None,
-    system_prompt: Annotated[
-        str | None,
-        typer.Option("--system-prompt", help="Default system prompt for LLM pipes"),
-    ] = None,
-    concepts: Annotated[
-        list[str] | None,
-        typer.Option("--concepts", "-c", help="TOML file(s) or inline TOML containing concept definitions"),
-    ] = None,
-    pipes: Annotated[
-        list[str] | None,
-        typer.Option("--pipes", "-p", help="TOML file(s) or inline TOML containing pipe definitions"),
-    ] = None,
-) -> None:
-    """Assemble a complete .plx bundle from individual TOML parts."""
-    assemble_cmd(
-        domain=domain,
-        main_pipe=main_pipe,
-        output=output,
-        description=description,
-        system_prompt=system_prompt,
-        concepts=concepts,
-        pipes=pipes,
-    )
-
-
-@app.command(name="graph", help="Generate graph visualization from a .plx bundle")
-def graph_command(
-    target: Annotated[
-        str,
-        typer.Argument(help="Path to a .plx bundle file"),
-    ],
-    graph_format: Annotated[
-        GraphFormat,
-        typer.Option("--format", "-f", help="Graph format to generate: mermaidflow, reactflow, or both"),
-    ] = GraphFormat.REACTFLOW,
-    library_dir: Annotated[
-        list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
-    ] = None,
-) -> None:
-    """Generate graph visualization from a .plx bundle."""
-    graph_cmd(target=target, graph_format=graph_format, library_dir=library_dir)
-
-
-@app.command(name="models", help="List available model presets, aliases, and talent mappings")
-def models_command() -> None:
-    """List available model presets, aliases, waterfalls, and talent mappings as JSON."""
-    agent_models_cmd()
-
-
-@app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")
-def doctor_command() -> None:
-    """Check Pipelex configuration health and output JSON report."""
-    agent_doctor_cmd()
+app.command(name="build", help="Build a pipeline from a prompt")(build_cmd)
+app.command(name="run", help="Execute a pipeline and output JSON results")(run_cmd)
+app.command(name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")(validate_cmd)
+app.command(name="inputs", help="Generate example input JSON for a pipe")(inputs_cmd)
+app.command(name="concept", help="Structure a concept from JSON spec and output TOML")(concept_cmd)
+app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")(pipe_cmd)
+app.command(name="assemble", help="Assemble a complete .mthds bundle from TOML parts")(assemble_cmd)
+app.command(name="graph", help="Generate graph visualization from a .mthds bundle")(graph_cmd)
+app.command(name="models", help="List available model presets, aliases, and talent mappings")(agent_models_cmd)
+app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")(agent_doctor_cmd)

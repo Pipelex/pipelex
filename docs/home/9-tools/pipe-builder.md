@@ -3,7 +3,7 @@
 !!! warning "Beta Feature"
     The Pipe Builder is currently in beta and progressing fast. Expect frequent improvements and changes.
 
-The Pipe Builder is an AI-powered tool that generates complete Pipelex pipelines from natural language descriptions. Describe what you want to achieve, and the builder creates a production-ready `.plx` file with concepts, pipes, and all the necessary structure.
+The Pipe Builder is an AI-powered tool that generates complete Pipelex pipelines from natural language descriptions. Describe what you want to achieve, and the builder creates a production-ready `.mthds` file with concepts, pipes, and all the necessary structure.
 
 ## What It Does
 
@@ -13,9 +13,9 @@ The Pipe Builder takes a brief description like:
 
 And generates:
 
-- **Domain concepts** - Data structures for your workflow (e.g., `CVAnalysis`, `InterviewQuestion`)
+- **Domain concepts** - Data structures for your method (e.g., `CVAnalysis`, `InterviewQuestion`)
 - **Pipe operators** - LLM calls, extractions, image generation steps
-- **Pipe controllers** - Sequences, batches, parallels, conditions to orchestrate the flow
+- **Pipe controllers** - Sequences, batches, parallel branches, conditions to orchestrate the flow
 - **A complete bundle** - Ready to validate and run
 
 ## How It Works
@@ -89,7 +89,7 @@ Finally, everything is assembled into a complete Pipelex bundle:
 
 ## The Builder Pipeline
 
-The Pipe Builder is defined in [`pipelex/builder/builder.plx`](https://github.com/Pipelex/pipelex/blob/main/pipelex/builder/builder.plx). The main orchestrator is a `PipeSequence` called `pipe_builder` that chains together:
+The Pipe Builder is defined in [`pipelex/builder/builder.mthds`](https://github.com/Pipelex/pipelex/blob/main/pipelex/builder/builder.mthds). The main orchestrator is a `PipeSequence` called `pipe_builder` that chains together:
 
 ```
 draft_the_plan → draft_the_concepts → structure_concepts → draft_flow → review_flow → design_pipe_signatures → write_bundle_header → detail_pipe_spec (batched) → assemble_pipelex_bundle_spec

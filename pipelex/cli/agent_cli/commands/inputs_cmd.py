@@ -33,7 +33,7 @@ async def _inputs_core(
 
     Args:
         pipe_code: The pipe code to generate inputs for.
-        bundle_path: Path to the bundle file (.plx).
+        bundle_path: Path to the bundle file (.mthds).
         library_dirs: List of library directories to search for pipe definitions.
 
     Returns:
@@ -44,7 +44,7 @@ async def _inputs_core(
         NoInputsRequiredError: If the pipe has no inputs.
     """
     if bundle_path:
-        validate_bundle_result = await validate_bundle(plx_file_path=bundle_path, library_dirs=library_dirs)
+        validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
         bundle_blueprint = validate_bundle_result.blueprints[0]
         if not pipe_code:
             main_pipe_code = bundle_blueprint.main_pipe
@@ -77,6 +77,7 @@ async def _inputs_core(
 
 
 def inputs_cmd(
+    ctx: typer.Context,
     target: Annotated[
         str | None,
         typer.Argument(help="Pipe code or bundle file path (auto-detected)"),
@@ -87,7 +88,7 @@ def inputs_cmd(
     ] = None,
     library_dir: Annotated[
         list[str] | None,
-        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.plx files)"),
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
     """Generate example input JSON for a pipe and output JSON results.
@@ -96,8 +97,8 @@ def inputs_cmd(
 
     Examples:
         pipelex-agent inputs my_pipe
-        pipelex-agent inputs my_bundle.plx
-        pipelex-agent inputs my_bundle.plx --pipe my_pipe
+        pipelex-agent inputs my_bundle.mthds
+        pipelex-agent inputs my_bundle.mthds --pipe my_pipe
         pipelex-agent inputs my_pipe -L ./my_pipes
     """
     # Validate that at least one target is provided
@@ -112,7 +113,7 @@ def inputs_cmd(
         target_path = Path(target)
         if target_path.is_dir():
             agent_error(
-                f"'{target}' is a directory. The inputs command requires a .plx file or a pipe code.",
+                f"'{target}' is a directory. The inputs command requires a .mthds file or a pipe code.",
                 "ArgumentError",
             )
 
@@ -130,7 +131,7 @@ def inputs_cmd(
         agent_error("No pipe code or bundle file specified", "ArgumentError")
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-    make_pipelex_for_agent_cli(library_dirs=library_dirs)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"])
 
     try:
         result = asyncio.run(_inputs_core(pipe_code=pipe_code, bundle_path=bundle_path, library_dirs=library_dirs))

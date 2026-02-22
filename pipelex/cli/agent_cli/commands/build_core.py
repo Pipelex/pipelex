@@ -7,12 +7,14 @@ from pydantic import BaseModel
 
 from pipelex import log
 from pipelex.builder.builder_errors import PipeBuilderError
-from pipelex.builder.builder_loop import BuilderLoop
+from pipelex.builder.builder_loop import BuilderLoop, maybe_generate_manifest_for_output
 from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.builder.exceptions import PipelexBundleSpecBlueprintError
 from pipelex.config import get_config
+from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
 from pipelex.hub import get_required_pipe
-from pipelex.language.plx_factory import PlxFactory
+from pipelex.language.mthds_factory import MthdsFactory
+from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.tools.misc.file_utils import (
     ensure_directory_for_file_path,
@@ -27,7 +29,7 @@ class BuildPipeResult(BaseModel):
     """Result of building a pipe, containing output paths and metadata."""
 
     output_dir: Path
-    plx_file: Path
+    mthds_file: Path
     inputs_file: Path | None = None
     main_pipe_code: str
     domain: str
@@ -44,7 +46,7 @@ class BuildPipeResult(BaseModel):
         """
         result: dict[str, Any] = {
             "output_dir": str(self.output_dir),
-            "plx_file": str(self.plx_file),
+            "mthds_file": str(self.mthds_file),
             "main_pipe_code": self.main_pipe_code,
             "domain": self.domain,
         }
@@ -107,11 +109,11 @@ async def build_pipe_core(
             is_save_second_iteration_enabled=False,
             is_save_working_memory_enabled=False,
         )
-    except PipeBuilderError as exc:
+    except (PipeBuilderError, PipeExecutionError) as exc:
         msg = f"Builder loop: Failed to execute pipeline: {exc}."
         failure_memory_path: Path | None = None
 
-        if exc.working_memory:
+        if isinstance(exc, PipeBuilderError) and exc.working_memory:
             failure_memory_path = get_incremental_file_path(
                 base_path=output_dir or builder_config.default_output_dir,
                 base_name="failure_memory",
@@ -128,24 +130,29 @@ async def build_pipe_core(
     # Determine base output directory
     base_dir = output_dir or builder_config.default_output_dir
 
-    # Determine output path - always generate directory with bundle.plx
+    # Determine output path - always generate directory with bundle.mthds
     dir_name = output_name or builder_config.default_directory_base_name
-    bundle_file_name = Path(f"{builder_config.default_bundle_file_name}.plx")
+    bundle_file_name = Path(f"{builder_config.default_bundle_file_name}{MTHDS_EXTENSION}")
 
     extras_output_dir = get_incremental_directory_path(
         base_path=base_dir,
         base_name=dir_name,
     )
-    plx_file_path = Path(extras_output_dir) / bundle_file_name
+    mthds_file_path = Path(extras_output_dir) / bundle_file_name
 
-    # Save the PLX file
-    ensure_directory_for_file_path(file_path=str(plx_file_path))
+    # Save the MTHDS file
+    ensure_directory_for_file_path(file_path=str(mthds_file_path))
     try:
-        plx_content = PlxFactory.make_plx_content(blueprint=pipelex_bundle_spec.to_blueprint())
+        mthds_content = MthdsFactory.make_mthds_content(blueprint=pipelex_bundle_spec.to_blueprint())
     except PipelexBundleSpecBlueprintError as exc:
         msg = f"Failed to convert bundle spec to blueprint: {exc}"
         raise BuildPipeError(message=msg) from exc
-    save_text_to_path(text=plx_content, path=str(plx_file_path))
+    save_text_to_path(text=mthds_content, path=str(mthds_file_path))
+
+    # Generate METHODS.toml if multiple domains exist in output dir
+    manifest_path = maybe_generate_manifest_for_output(output_dir=Path(extras_output_dir))
+    if manifest_path:
+        log.verbose(f"Package manifest generated: {manifest_path}")
 
     main_pipe_code = pipelex_bundle_spec.main_pipe or ""
     domain = pipelex_bundle_spec.domain or ""
@@ -170,7 +177,7 @@ async def build_pipe_core(
 
     return BuildPipeResult(
         output_dir=Path(extras_output_dir),
-        plx_file=plx_file_path,
+        mthds_file=mthds_file_path,
         inputs_file=inputs_file_path,
         main_pipe_code=main_pipe_code,
         domain=domain,

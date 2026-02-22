@@ -165,7 +165,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
     Args:
         pipe: The pipe to generate runner code for
         output_multiplicity: Whether the output is a list (e.g., Text[])
-        library_dir: Directory containing the PLX bundles to load
+        library_dir: Directory containing the MTHDS bundles to load
     """
     # Get output information
     structure_class_name = pipe.output.concept.structure_class_name
@@ -230,7 +230,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         [
             "",
             "from pipelex.pipelex import Pipelex",
-            "from pipelex.pipeline.execute import execute_pipeline",
+            "from pipelex.pipeline.runner import PipelexRunner",
         ]
     )
 
@@ -266,7 +266,8 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
         "",
         "",
         f"async def run_{pipe.code}() -> {return_type}:",
-        "    pipe_output = await execute_pipeline(",
+        "    runner = PipelexRunner()",
+        "    response = await runner.execute_pipeline(",
         f'        pipe_code="{pipe.code}",',
     ]
 
@@ -282,6 +283,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, 
     function_lines.extend(
         [
             "    )",
+            "    pipe_output = response.pipe_output",
             f"    return {result_call}",
             "",
             "",

@@ -11,7 +11,7 @@ class TestPipeParallelBlueprint:
             description="lorem ipsum",
             inputs={"data": "Text"},
             output="Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="process_a", result="result_a"),
                 SubPipeBlueprint(pipe="process_b", result="result_b"),
             ],
@@ -23,7 +23,7 @@ class TestPipeParallelBlueprint:
             description="lorem ipsum",
             inputs={"data": "Text"},
             output="Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="step1", result="result1"),
                 SubPipeBlueprint(pipe="step2", result="result2"),
                 SubPipeBlueprint(pipe="step3", result="result3"),
@@ -37,7 +37,7 @@ class TestPipeParallelBlueprint:
             description="lorem ipsum",
             inputs={"data": "Text"},
             output="Text",
-            parallels=[SubPipeBlueprint(pipe="process", result="result")],
+            branches=[SubPipeBlueprint(pipe="process", result="result")],
             combined_output="Text",
         )
         assert blueprint.combined_output == "Text"
@@ -46,7 +46,7 @@ class TestPipeParallelBlueprint:
             description="lorem ipsum",
             inputs={"data": "Text"},
             output="Text",
-            parallels=[SubPipeBlueprint(pipe="process", result="result")],
+            branches=[SubPipeBlueprint(pipe="process", result="result")],
             combined_output="Number",
         )
         assert blueprint.combined_output == "Number"
@@ -57,7 +57,7 @@ class TestPipeParallelBlueprint:
                 description="lorem ipsum",
                 inputs={"data": "Text"},
                 output="Text",
-                parallels=[SubPipeBlueprint(pipe="process", result="result")],
+                branches=[SubPipeBlueprint(pipe="process", result="result")],
                 combined_output="InvalidConcept!",
             )
         assert "Combined output 'InvalidConcept!' is not a valid concept string or code" in str(exc_info.value)
@@ -67,7 +67,7 @@ class TestPipeParallelBlueprint:
             description="lorem ipsum",
             inputs={"data": "Text"},
             output="Text",
-            parallels=[SubPipeBlueprint(pipe="process", result="result")],
+            branches=[SubPipeBlueprint(pipe="process", result="result")],
             add_each_output=True,
         )
         assert blueprint.add_each_output is True
@@ -76,7 +76,7 @@ class TestPipeParallelBlueprint:
             description="lorem ipsum",
             inputs={"data": "Text"},
             output="Text",
-            parallels=[SubPipeBlueprint(pipe="process", result="result")],
+            branches=[SubPipeBlueprint(pipe="process", result="result")],
             combined_output="Text",
         )
         assert blueprint.combined_output == "Text"
@@ -85,7 +85,7 @@ class TestPipeParallelBlueprint:
             description="lorem ipsum",
             inputs={"data": "Text"},
             output="Text",
-            parallels=[SubPipeBlueprint(pipe="process", result="result")],
+            branches=[SubPipeBlueprint(pipe="process", result="result")],
             add_each_output=True,
             combined_output="Text",
         )
@@ -98,7 +98,7 @@ class TestPipeParallelBlueprint:
                 description="lorem ipsum",
                 inputs={"data": "Text"},
                 output="Text",
-                parallels=[SubPipeBlueprint(pipe="process", result="result")],
+                branches=[SubPipeBlueprint(pipe="process", result="result")],
                 add_each_output=False,
                 combined_output=None,
             )
