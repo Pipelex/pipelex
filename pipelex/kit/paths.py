@@ -24,11 +24,7 @@ GIT_IGNORED_CONFIG_FILES: frozenset[str] = frozenset(
 # Files excluded from config sync checks but still copied during `pipelex init config`.
 # These are auto-generated files that are bundled in kit/configs as a valid starting point
 # but may be regenerated locally and legitimately differ from the kit version.
-CONFIG_SYNC_EXCLUDED_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES | frozenset(
-    {
-        "mthds_schema.json",  # Auto-generated from MTHDS blueprint classes
-    }
-)
+CONFIG_SYNC_EXCLUDED_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES
 
 # Directories that should not be synced between .pipelex and kit/configs.
 # These are runtime directories created locally:
