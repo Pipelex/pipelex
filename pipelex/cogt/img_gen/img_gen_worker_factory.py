@@ -6,6 +6,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.exceptions import MissingDependencyError
 from pipelex.hub import get_models_manager, get_plugin_manager
 from pipelex.plugins.blackboxai.blackboxai_completions_factory import BlackboxaiCompletionsFactory
+from pipelex.plugins.openrouter.openrouter_completions_factory import OpenRouterCompletionsFactory
 from pipelex.plugins.plugin_sdk_registry import Plugin
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.exceptions import CredentialsError
@@ -122,10 +123,10 @@ class ImgGenWorkerFactory:
                     ),
                 )
 
-                openai_completions_factory = BlackboxaiCompletionsFactory(is_http_url_enabled=True)
+                bbai_completions_factory = BlackboxaiCompletionsFactory(is_http_url_enabled=True)
 
                 img_gen_worker = OpenAICompletionsImgGenWorker(
-                    openai_completions_factory=openai_completions_factory,
+                    openai_completions_factory=bbai_completions_factory,
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
@@ -181,6 +182,26 @@ class ImgGenWorkerFactory:
 
                 img_gen_worker = OpenAICompletionsImgGenWorker(
                     openai_completions_factory=gateway_completions_factory,
+                    sdk_instance=img_gen_sdk_instance,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
+            case "openrouter_img_gen":
+                from pipelex.plugins.openai.openai_client_factory import OpenAIClientFactory  # noqa: PLC0415
+                from pipelex.plugins.openai.openai_completions_img_gen_worker import OpenAICompletionsImgGenWorker  # noqa: PLC0415
+
+                img_gen_sdk_instance = plugin_sdk_registry.get_sdk_instance(plugin=plugin) or plugin_sdk_registry.set_sdk_instance(
+                    plugin=plugin,
+                    sdk_instance=OpenAIClientFactory.make_openai_client(
+                        plugin=plugin,
+                        backend=backend,
+                    ),
+                )
+
+                openrouter_completions_factory = OpenRouterCompletionsFactory(is_http_url_enabled=True)
+
+                img_gen_worker = OpenAICompletionsImgGenWorker(
+                    openai_completions_factory=openrouter_completions_factory,
                     sdk_instance=img_gen_sdk_instance,
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
