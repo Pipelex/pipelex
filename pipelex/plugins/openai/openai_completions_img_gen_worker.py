@@ -94,7 +94,8 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         base64_extracted_mime_type: str | None = None
         if hasattr(openai_message, "images"):
             images = cast("list[dict[str, Any]]", openai_message.images)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
-            if image_obj := images[0]:
+            if images:
+                image_obj = images[0]
                 if image_url := image_obj.get("image_url"):
                     if the_url := image_url.get("url"):
                         extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=the_url)
