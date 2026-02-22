@@ -1,0 +1,23 @@
+pipelex/plugins/openai/openai_completions_img_gen_worker.py
+  fdd6bb6d67787b25 98-105
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "358d7057cb5ef8f30d070302ce15fa8e8dd876ea",
+  "prompts": {
+    "fdd6bb6d67787b25": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e41cb4c6-5adb-46e6-bdf9-5ae4b900c1b8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 3,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
