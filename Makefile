@@ -283,6 +283,7 @@ up-kit-configs:
 		--exclude='storage' \
 		--exclude='x_custom_llm_deck.toml' \
 		--exclude='x_custom_extract_deck.toml' \
+		--exclude='mthds_schema.json' \
 		.pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
@@ -381,6 +382,7 @@ cleanderived:
 	find . -type d -wholename './.reports/*' -exec rm -rf {} + && \
 	rm -f tests/integration/pipelex/fixtures/_generated_model_sets.py && \
 	rm -f .pipelex-dev/model_availability.json && \
+	rm -rf derived/ && \
 	echo "Cleaned up derived files and directories";
 
 cleanenv:
