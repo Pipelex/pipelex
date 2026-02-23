@@ -1,9 +1,9 @@
 from pathlib import Path
 
+from mthds.packages.dependency_resolver import ResolvedDependency
+from mthds.packages.manifest import MthdsPackageManifest
 from pytest_mock import MockerFixture
 
-from pipelex.core.packages.dependency_resolver import ResolvedDependency
-from pipelex.core.packages.manifest import MthdsPackageManifest
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager import LibraryManager
 

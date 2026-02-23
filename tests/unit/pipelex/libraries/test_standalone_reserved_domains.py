@@ -1,10 +1,10 @@
 from pathlib import Path
 
 import pytest
+from mthds.packages.exceptions import ManifestError
 from pytest_mock import MockerFixture
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
-from pipelex.core.packages.exceptions import ManifestError
 from pipelex.libraries.exceptions import LibraryLoadingError
 from pipelex.libraries.library_manager import LibraryManager
 

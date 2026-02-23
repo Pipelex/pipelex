@@ -4,6 +4,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.kajson_manager import KajsonManager
+from mthds.packages.dependency_resolver import ResolvedDependency, resolve_all_dependencies
+from mthds.packages.discovery import find_package_manifest
+from mthds.packages.exceptions import DependencyResolveError, ManifestError
+from mthds.packages.manifest import MTHDS_STANDARD_VERSION, MthdsPackageManifest
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
@@ -17,11 +21,6 @@ from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.core.packages.dependency_resolver import ResolvedDependency, resolve_all_dependencies
-from pipelex.core.packages.discovery import find_package_manifest
-from pipelex.core.packages.exceptions import DependencyResolveError, ManifestError
-from pipelex.core.packages.manifest import MTHDS_STANDARD_VERSION, MthdsPackageManifest
-from pipelex.core.packages.visibility import PackageVisibilityChecker, check_visibility_for_blueprints
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
@@ -38,6 +37,7 @@ from pipelex.libraries.library_utils import (
     get_pipelex_mthds_files_from_dirs,
 )
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+from pipelex.libraries.visibility_utils import check_visibility_for_blueprints, make_visibility_checker
 from pipelex.system.registries.class_registry_utils import ClassRegistryUtils
 from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
@@ -610,7 +610,7 @@ class LibraryManager(LibraryManagerAbstract):
         except ManifestError as exc:
             log.warning(f"Could not parse METHODS.toml: {exc.message}")
             # Still enforce reserved domains even when manifest is unparseable
-            checker = PackageVisibilityChecker(manifest=None, bundles=blueprints)
+            checker = make_visibility_checker(manifest=None, blueprints=blueprints)
             reserved_errors = checker.validate_reserved_domains()
             if reserved_errors:
                 error_messages = [err.message for err in reserved_errors]
@@ -621,7 +621,7 @@ class LibraryManager(LibraryManagerAbstract):
 
         if manifest is None:
             # Still enforce reserved domains even for standalone bundles
-            checker = PackageVisibilityChecker(manifest=None, bundles=blueprints)
+            checker = make_visibility_checker(manifest=None, blueprints=blueprints)
             reserved_errors = checker.validate_reserved_domains()
             if reserved_errors:
                 error_messages = [err.message for err in reserved_errors]
