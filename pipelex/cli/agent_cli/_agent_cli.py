@@ -16,6 +16,14 @@ from pipelex.cli.agent_cli.commands.graph_cmd import graph_cmd
 from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
 from pipelex.cli.agent_cli.commands.lint_cmd import lint_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
+from pipelex.cli.agent_cli.commands.mthds_add_cmd import mthds_add_cmd
+from pipelex.cli.agent_cli.commands.mthds_init_cmd import mthds_init_cmd
+from pipelex.cli.agent_cli.commands.mthds_install_cmd import mthds_install_cmd
+from pipelex.cli.agent_cli.commands.mthds_list_cmd import mthds_list_cmd
+from pipelex.cli.agent_cli.commands.mthds_lock_cmd import mthds_lock_cmd
+from pipelex.cli.agent_cli.commands.mthds_publish_cmd import mthds_publish_cmd
+from pipelex.cli.agent_cli.commands.mthds_update_cmd import mthds_update_cmd
+from pipelex.cli.agent_cli.commands.mthds_validate_cmd import mthds_validate_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run_cmd import run_cmd
 from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
@@ -28,7 +36,28 @@ class PipelexAgentCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["build", "run", "validate", "fmt", "lint", "inputs", "concept", "pipe", "assemble", "graph", "models", "doctor"]
+        return [
+            "build",
+            "run",
+            "validate",
+            "fmt",
+            "lint",
+            "inputs",
+            "concept",
+            "pipe",
+            "assemble",
+            "graph",
+            "models",
+            "doctor",
+            "mthds-init",
+            "mthds-list",
+            "mthds-add",
+            "mthds-lock",
+            "mthds-install",
+            "mthds-update",
+            "mthds-publish",
+            "mthds-validate",
+        ]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -107,3 +136,11 @@ app.command(name="assemble", help="Assemble a complete .mthds bundle from TOML p
 app.command(name="graph", help="Generate graph visualization from a .mthds bundle")(graph_cmd)
 app.command(name="models", help="List available model presets, aliases, and talent mappings")(agent_models_cmd)
 app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")(agent_doctor_cmd)
+app.command(name="mthds-init", help="Initialize a METHODS.toml package manifest")(mthds_init_cmd)
+app.command(name="mthds-list", help="Display the package manifest (METHODS.toml)")(mthds_list_cmd)
+app.command(name="mthds-add", help="Add a dependency to METHODS.toml")(mthds_add_cmd)
+app.command(name="mthds-lock", help="Resolve dependencies and generate methods.lock")(mthds_lock_cmd)
+app.command(name="mthds-install", help="Install dependencies from methods.lock")(mthds_install_cmd)
+app.command(name="mthds-update", help="Re-resolve dependencies and update methods.lock")(mthds_update_cmd)
+app.command(name="mthds-publish", help="Publish package for distribution")(mthds_publish_cmd)
+app.command(name="mthds-validate", help="Validate METHODS.toml via runner")(mthds_validate_cmd)

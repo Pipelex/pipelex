@@ -35,6 +35,15 @@ commands/
   graph_cmd.py                 # graph — render execution graph HTML
   models_cmd.py                # models — list presets, aliases, talent mappings
   doctor_cmd.py                # doctor — config health check
+  mthds_passthrough.py         # Shared helper for mthds subprocess delegation
+  mthds_init_cmd.py            # mthds-init — initialize METHODS.toml
+  mthds_list_cmd.py            # mthds-list — display package manifest
+  mthds_add_cmd.py             # mthds-add — add dependency
+  mthds_lock_cmd.py            # mthds-lock — resolve deps, generate lock
+  mthds_install_cmd.py         # mthds-install — install from lock
+  mthds_update_cmd.py          # mthds-update — re-resolve deps
+  mthds_publish_cmd.py         # mthds-publish — publish package
+  mthds_validate_cmd.py        # mthds-validate — validate manifest/pipes
 ```
 
 ## Commands
@@ -53,10 +62,18 @@ commands/
 | `graph` | Generates graph visualization (HTML) from a .mthds bundle via dry-run |
 | `models` | Lists available model presets, aliases, waterfalls, and talent mappings |
 | `doctor` | Checks config, credentials, models health |
+| `mthds-init` | Initialize a METHODS.toml package manifest (delegates to mthds) |
+| `mthds-list` | Display the package manifest (delegates to mthds) |
+| `mthds-add` | Add a dependency to METHODS.toml (delegates to mthds) |
+| `mthds-lock` | Resolve dependencies and generate methods.lock (delegates to mthds) |
+| `mthds-install` | Install dependencies from methods.lock (delegates to mthds) |
+| `mthds-update` | Re-resolve dependencies and update methods.lock (delegates to mthds) |
+| `mthds-publish` | Publish package for distribution (delegates to mthds) |
+| `mthds-validate` | Validate METHODS.toml and optionally run deeper validation (delegates to mthds) |
 
 ## Key Patterns
 
-- **Output contract**: Every command returns via `agent_success(dict)` or `agent_error(message, error_type, cause)`. Never print outside these. Exception: `fmt` and `lint` are raw passthrough to `plxt` — they bypass `agent_success()`/`agent_error()` intentionally so the hook script can parse plxt's native output.
+- **Output contract**: Every command returns via `agent_success(dict)` or `agent_error(message, error_type, cause)`. Never print outside these. Exception: `fmt` and `lint` are raw passthrough to `plxt`, and `mthds-*` commands are raw passthrough to `mthds` — they bypass `agent_success()`/`agent_error()` intentionally so the calling tool can parse native output.
 - **Error classification**: Each error type maps to a domain (`input`, `config`, `runtime`), a hint string, and a `retryable` flag. See `AGENT_ERROR_HINTS` dict in `agent_output.py`.
 - **Init**: All commands that need Pipelex use `make_pipelex_for_agent_cli(library_dirs)`. It catches init errors and routes them through `agent_error()`.
 - **Async core**: Build, run, validate are async — commands use `asyncio.run()`.
