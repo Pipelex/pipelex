@@ -1,0 +1,25 @@
+pipelex/pipeline/input_normalizer.py
+  dfebcc5ee252aaef 13,220,222-224
+pipelex/cli/commands/run_cmd.py
+  dfebcc5ee252aaef 436-441
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.4",
+  "base_commit_sha": "ec4e5c341312170f7d9f02c08c1c7841aa6bab7d",
+  "prompts": {
+    "dfebcc5ee252aaef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "69a8165e-9881-4f46-9004-e478693ce306",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 1,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}
