@@ -6,6 +6,12 @@ from dotenv import load_dotenv
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.placeholder import value_is_placeholder
 
+# Load global credentials first (~/.pipelex/.env)
+_global_env_path = Path.home() / ".pipelex" / ".env"
+if _global_env_path.is_file():
+    load_dotenv(dotenv_path=str(_global_env_path), override=True)
+
+# Load project-level .env second (overrides global)
 load_dotenv(dotenv_path=".env", override=True)
 
 # Environment variable for specifying library directories (PATH-style, colon-separated on Unix, semicolon on Windows)

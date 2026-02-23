@@ -9,6 +9,7 @@ class InitFocus(StrEnum):
     ALL = "all"
     AGREEMENT = "agreement"
     CONFIG = "config"
+    CREDENTIALS = "credentials"
     INFERENCE = "inference"
     ROUTING = "routing"
     TELEMETRY = "telemetry"

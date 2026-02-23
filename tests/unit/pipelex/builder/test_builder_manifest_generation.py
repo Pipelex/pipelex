@@ -1,9 +1,10 @@
 import shutil
 from pathlib import Path
 
+from mthds.packages.discovery import MANIFEST_FILENAME
+from mthds.packages.manifest_parser import parse_methods_toml
+
 from pipelex.builder.builder_loop import maybe_generate_manifest_for_output
-from pipelex.core.packages.discovery import MANIFEST_FILENAME
-from pipelex.core.packages.manifest_parser import parse_methods_toml
 
 # Path to the physical test data
 PACKAGES_DATA_DIR = Path(__file__).resolve().parent.parent.parent.parent / "data" / "packages"

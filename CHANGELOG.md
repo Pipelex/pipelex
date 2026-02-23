@@ -2,6 +2,8 @@
 
 ### Added
 
+- **Persistent Credential Storage (`~/.pipelex/.env`)**: `pipelex init` now prompts for missing API keys after backend selection and saves them to `~/.pipelex/.env` with `0600` permissions. Credentials are loaded automatically at startup (global defaults, overridden by project `.env`).
+- **`pipelex init credentials` Command**: New standalone focus to re-enter API keys without resetting configuration. Scans enabled backends, detects missing env vars, and prompts only for those.
 - **Package Management System:** Introduced a full package manager for MTHDS with `METHODS.toml` manifests, `methods.lock` lockfile generation, local path and remote Git-based dependency resolution (MVS), a local package cache (`~/.mthds/packages`), and a new `pipelex pkg` CLI command group (`init`, `list`, `add`, `lock`, `install`, `update`, `publish`, `search`, `inspect`, `graph`).
 - **Hierarchical Domains:** Support for dot-separated domain namespaces (e.g., `legal.contracts.shareholder`) and cross-package references via `alias->domain.pipe` syntax.
 - **PipelexRunner:** Introduced the `PipelexRunner` class as the primary entry point for executing pipelines, replacing `PipelexClient` and standalone `execute_pipeline`/`start_pipeline` functions.
@@ -18,6 +20,7 @@
 - **Global/Local Config Split**: `pipelex init` now creates configuration in `~/.pipelex/` (global) by default. Use `pipelex init --local` to create project-level overrides in `{project_root}/.pipelex/`. Config loading merges: package defaults → global → project → overrides.
 - **IDE Extension Detection**: Extension check now uses `code --list-extensions` / `cursor --list-extensions` for reliable detection instead of folder scanning. Shows separate marketplace links for VS Code (Microsoft Marketplace) and Cursor (Open VSX Registry).
 - **Quieter `pipelex init`**: Removed verbose file listing and reset messages from config initialization output.
+- **`pipelex init` Help Text**: Detailed focus option descriptions now shown in `pipelex init --help` explaining each focus (`all`, `config`, `credentials`, `inference`, `routing`, `telemetry`, `agreement`).
 - **File Extension:** Pipeline definitions now use `.mthds` instead of `.plx`; the project refers to "Methods" (MTHDS) rather than "Pipelex workflows".
 - **Syntax:** In `PipeParallel` definitions, `parallels` field renamed to `branches`; `plx_config` in `pipelex.toml` renamed to `mthds_config`.
 - **Documentation:** Comprehensive update to reflect `.mthds` file format, package management, and new project structure.
