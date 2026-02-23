@@ -433,6 +433,12 @@ def run_cmd(
     except typer.Exit:
         raise
 
+    except PipelexError as exc:
+        console = get_console()
+        console.print("\n[bold red]Failed to execute pipeline[/bold red]\n")
+        console.print(f"  {exc.message}\n")
+        raise typer.Exit(1) from exc
+
     except Exception as exc:
         log.error(f"Error executing pipeline: {exc}")
         console = get_console()
