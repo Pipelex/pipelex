@@ -1,6 +1,8 @@
 {
   "permissions": {
     "allow": [
+      "Bash(pipelex-agent:*)",
+      "Bash(.venv/bin/pipelex-agent:*)",
       "Bash(.venv/bin/pytest:*)",
       "Bash(pytest:*)",
       "Bash(make fix-unused-imports)",

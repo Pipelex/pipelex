@@ -11,8 +11,10 @@ from pipelex.cli.agent_cli.commands.assemble_cmd import assemble_cmd
 from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
+from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
 from pipelex.cli.agent_cli.commands.graph_cmd import graph_cmd
 from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
+from pipelex.cli.agent_cli.commands.lint_cmd import lint_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run_cmd import run_cmd
@@ -26,7 +28,7 @@ class PipelexAgentCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
-        return ["build", "run", "validate", "inputs", "concept", "pipe", "assemble", "graph", "models", "doctor"]
+        return ["build", "run", "validate", "fmt", "lint", "inputs", "concept", "pipe", "assemble", "graph", "models", "doctor"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -96,6 +98,8 @@ def app_callback(
 app.command(name="build", help="Build a pipeline from a prompt")(build_cmd)
 app.command(name="run", help="Execute a pipeline and output JSON results")(run_cmd)
 app.command(name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")(validate_cmd)
+app.command(name="fmt", help="Format a .mthds, .toml, or .plx file in-place")(fmt_cmd)
+app.command(name="lint", help="Lint a .mthds, .toml, or .plx file")(lint_cmd)
 app.command(name="inputs", help="Generate example input JSON for a pipe")(inputs_cmd)
 app.command(name="concept", help="Structure a concept from JSON spec and output TOML")(concept_cmd)
 app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")(pipe_cmd)

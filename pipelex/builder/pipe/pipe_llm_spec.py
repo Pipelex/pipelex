@@ -61,7 +61,12 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
     @field_validator("llm_talent", mode="before")
     @classmethod
     def validate_llm_talent(cls, llm_value: str) -> LLMTalent:
-        return LLMTalent(llm_value)
+        try:
+            return LLMTalent(llm_value)
+        except ValueError:
+            valid = [talent.value for talent in LLMTalent]
+            msg = f"'{llm_value}' is not a valid LLMTalent. Valid values: {valid}"
+            raise ValueError(msg) from None
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

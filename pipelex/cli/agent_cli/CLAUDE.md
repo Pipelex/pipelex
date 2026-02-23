@@ -25,6 +25,9 @@ commands/
   build_cmd.py                 # build — generate pipeline from prompt
   run_cmd.py                   # run — execute pipeline
   validate_cmd.py              # validate — verify pipes/bundles/libraries
+  fmt_cmd.py                   # fmt — format file via plxt passthrough
+  lint_cmd.py                  # lint — lint file via plxt passthrough
+  plxt_passthrough.py          # Shared helper for plxt subprocess delegation
   inputs_cmd.py                # inputs — generate example input JSON
   concept_cmd.py               # concept — JSON spec → concept TOML
   pipe_cmd.py                  # pipe — JSON spec → pipe TOML
@@ -39,8 +42,10 @@ commands/
 | Command | Does |
 |---------|------|
 | `build` | Runs BuilderLoop to generate a `.mthds` from a natural language prompt |
-| `run` | Executes a pipeline, returns JSON with main_stuff + working_memory |
+| `run` | Executes a pipeline, returns JSON with main_stuff + working_memory. Supports directory mode (auto-detects bundle, inputs, library dir). Graph visualizations on by default (`--no-graph` to disable). |
 | `validate` | Dry-runs pipes/bundles, returns validation status per pipe |
+| `fmt` | Formats a .mthds/.toml/.plx file in-place (delegates to plxt) |
+| `lint` | Lints a .mthds/.toml/.plx file for errors (delegates to plxt) |
 | `inputs` | Generates example input JSON for a given pipe |
 | `concept` | Converts a JSON concept spec into TOML |
 | `pipe` | Converts a JSON pipe spec (typed) into TOML |
@@ -51,7 +56,7 @@ commands/
 
 ## Key Patterns
 
-- **Output contract**: Every command returns via `agent_success(dict)` or `agent_error(message, error_type, cause)`. Never print outside these.
+- **Output contract**: Every command returns via `agent_success(dict)` or `agent_error(message, error_type, cause)`. Never print outside these. Exception: `fmt` and `lint` are raw passthrough to `plxt` — they bypass `agent_success()`/`agent_error()` intentionally so the hook script can parse plxt's native output.
 - **Error classification**: Each error type maps to a domain (`input`, `config`, `runtime`), a hint string, and a `retryable` flag. See `AGENT_ERROR_HINTS` dict in `agent_output.py`.
 - **Init**: All commands that need Pipelex use `make_pipelex_for_agent_cli(library_dirs)`. It catches init errors and routes them through `agent_error()`.
 - **Async core**: Build, run, validate are async — commands use `asyncio.run()`.
