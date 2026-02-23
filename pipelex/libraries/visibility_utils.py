@@ -14,7 +14,7 @@ from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 def _blueprint_to_metadata(blueprint: PipelexBundleBlueprint) -> BundleMetadata:
     """Convert a PipelexBundleBlueprint to BundleMetadata.
 
-    Extracts domain, main_pipe, pipe codes, and pipe references from the
+    Extracts domain, main_pipe, and pipe references from the
     blueprint for use with the mthds visibility checker.
 
     Args:
@@ -23,14 +23,11 @@ def _blueprint_to_metadata(blueprint: PipelexBundleBlueprint) -> BundleMetadata:
     Returns:
         A BundleMetadata instance.
     """
-    pipe_codes: list[str] = list(blueprint.pipe.keys()) if blueprint.pipe else []
     pipe_references: list[tuple[str, str]] = blueprint.collect_pipe_references()
 
     return BundleMetadata(
         domain=blueprint.domain,
         main_pipe=blueprint.main_pipe,
-        pipe_codes=pipe_codes,
-        source=blueprint.source or "",
         pipe_references=pipe_references,
     )
 
