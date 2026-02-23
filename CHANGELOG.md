@@ -1,5 +1,10 @@
 ## [Unreleased]
 
+### Added
+
+- **Persistent Credential Storage (`~/.pipelex/.env`)**: `pipelex init` now prompts for missing API keys after backend selection and saves them to `~/.pipelex/.env` with `0600` permissions. Credentials are loaded automatically at startup (global defaults, overridden by project `.env`).
+- **`pipelex init credentials` Command**: New standalone focus to re-enter API keys without resetting configuration. Scans enabled backends, detects missing env vars, and prompts only for those.
+
 ### Changed
 
 - **CI Runner Optimization**: Split self-hosted runners into dedicated test (D32) and lint (D4) pools with pre-baked Docker image (Python 3.10-3.14, UV, dependency cache) for faster job startup.
@@ -7,6 +12,7 @@
 - **Global/Local Config Split**: `pipelex init` now creates configuration in `~/.pipelex/` (global) by default. Use `pipelex init --local` to create project-level overrides in `{project_root}/.pipelex/`. Config loading merges: package defaults → global → project → overrides.
 - **IDE Extension Detection**: Extension check now uses `code --list-extensions` / `cursor --list-extensions` for reliable detection instead of folder scanning. Shows separate marketplace links for VS Code (Microsoft Marketplace) and Cursor (Open VSX Registry).
 - **Quieter `pipelex init`**: Removed verbose file listing and reset messages from config initialization output.
+- **`pipelex init` Help Text**: Detailed focus option descriptions now shown in `pipelex init --help` explaining each focus (`all`, `config`, `credentials`, `inference`, `routing`, `telemetry`, `agreement`).
 
 ### Fixed
 
