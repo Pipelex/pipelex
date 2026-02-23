@@ -92,7 +92,18 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         actual_url: str | None = None
         base64_str: str | None = None
         base64_extracted_mime_type: str | None = None
-        if (content := openai_message.content) and content.startswith("http"):
+        if hasattr(openai_message, "images"):
+            images = cast("list[dict[str, Any]]", openai_message.images)  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+            if images:
+                image_obj = images[0]
+                if image_url := image_obj.get("image_url"):
+                    if the_url := image_url.get("url"):
+                        extracted = extract_base64_str_from_base64_url_if_possible(possibly_base64_url=the_url)
+                        if not extracted:
+                            msg = "No base64 string found in ImgGenCompletions response message (images)"
+                            raise ImgGenGenerationError(msg)
+                        base64_str, base64_extracted_mime_type = extracted
+        elif (content := openai_message.content) and content.startswith("http"):
             # OpenAI response message is a URL, this happens with blackboxai and pipelex_gateway which have a fixed output format.
             # Otherwise we won't know what format the image is in.
             if image_format is None:

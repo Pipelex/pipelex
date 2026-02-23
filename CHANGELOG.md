@@ -9,6 +9,7 @@
 - **JSON Schema:** Automatic generation of `mthds_schema.json` for standard definition, IDE validation, and auto-completion.
 - **Dev CLI:** Added `pipelex-dev` CLI for internal development tasks (e.g., schema generation).
 - **CSP Nonce Support:** Added Content Security Policy nonce support for generated HTML graphs (Mermaid/ReactFlow) to enable secure rendering in VS Code webviews.
+- **OpenRouter Backend:** Added OpenRouter as an inference backend with 337 chat model definitions and 14 image generation models.
 
 ### Changed
 
@@ -26,6 +27,7 @@
 - **`find_project_root` Home Directory Bug**: The project root walker no longer considers the home directory (`~`) as a project root, even if it contains stray marker files like `package.json`.
 - **Python 3.10 Compatibility**: Fixed `datetime.UTC` import (Python 3.11+) to use `datetime.timezone.utc`.
 - **Graph Rendering:** Fixed dashed edge rendering for `PipeBatch` and `PipeParallel` relationships.
+- **Image Generation Response Parsing:** Hardened image response parsing to handle varied provider response formats more robustly.
 
 ### Removed
 
