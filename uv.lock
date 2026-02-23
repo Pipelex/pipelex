@@ -2391,8 +2391,8 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.0.2"
-source = { editable = "../../mthds-ai/mthds-python" }
+version = "0.0.3"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
     { name = "httpx" },
@@ -2402,26 +2402,12 @@ dependencies = [
     { name = "tomli", marker = "python_full_version < '3.11'" },
     { name = "tomlkit" },
     { name = "typer" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'" },
+    { name = "typing-extensions" },
 ]
-
-[package.metadata]
-requires-dist = [
-    { name = "backports-strenum", marker = "python_full_version < '3.11'", specifier = ">=1.3.0" },
-    { name = "httpx", specifier = ">=0.23.0,<1.0.0" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
-    { name = "pydantic", specifier = ">=2.10.6,<3.0.0" },
-    { name = "pylint", marker = "extra == 'dev'", specifier = "==4.0.4" },
-    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.408" },
-    { name = "rich", specifier = ">=13.0.0" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = "==0.14.13" },
-    { name = "semantic-version", specifier = ">=2.10.0,<3.0.0" },
-    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=2.0.0,<3.0.0" },
-    { name = "tomlkit", specifier = ">=0.12.0" },
-    { name = "typer", specifier = ">=0.9.0" },
-    { name = "typing-extensions", marker = "python_full_version < '3.11'", specifier = ">=4.0.0" },
+sdist = { url = "https://files.pythonhosted.org/packages/81/ea/90d2a398f3d45edc0c6ba5004922403f8e561d7dbbe91230320ea4b06efa/mthds-0.0.3.tar.gz", hash = "sha256:72a6e1475ae943cce4061d4748b2263258898c3cf7b01e167b83eb3fc9452c97", size = 99278, upload-time = "2026-02-23T17:48:09.25Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/56/b1/66de8f7b6614d18d2b4a2407c8cf00d2df4592acd878897a68ecba228477/mthds-0.0.3-py3-none-any.whl", hash = "sha256:e6dcb2ecee29a46af31b39a3bf44b9314bc62ddff8b95f60af0a3649e754d2e5", size = 53528, upload-time = "2026-02-23T17:48:08.034Z" },
 ]
-provides-extras = ["dev"]
 
 [[package]]
 name = "multidict"
@@ -3444,7 +3430,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.14" },
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", editable = "../../mthds-ai/mthds-python" },
+    { name = "mthds", specifier = ">=0.0.3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=1.108.1" },

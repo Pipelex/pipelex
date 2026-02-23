@@ -128,11 +128,11 @@ class TestInitCredentials:
             "pipelex.cli.commands.init.credentials.config_manager",
             global_config_dir=str(tmp_path),
         )
+        mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
         prompt_credentials(mock_console, str(backends_toml))
         # Should print "already set" message, no Prompt.ask calls
         mock_console.print.assert_called()
-        mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_prompt.assert_not_called()
 
     def test_prompt_credentials_writes_entered_values(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -224,8 +224,7 @@ class TestInitCredentials:
             "pipelex.cli.commands.init.credentials.config_manager",
             global_config_dir=str(tmp_path),
         )
+        mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
         prompt_credentials(mock_console, str(backends_toml))
-        # No print calls about credentials since no vars are required
-        mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_prompt.assert_not_called()
