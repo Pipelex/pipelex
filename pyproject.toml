@@ -110,7 +110,7 @@ build-backend = "hatchling.build"
 
 [tool.mypy]
 check_untyped_defs = true
-exclude = "^.*\\.venv/.*$"
+exclude = ["^.*\\.venv/.*$", "^typings/backports/strenum/__init__\\.pyi$"]
 mypy_path = ".:typings"
 packages = ["pipelex", "tests"]
 plugins = ["pydantic.mypy"]
