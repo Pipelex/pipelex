@@ -160,7 +160,7 @@ export HELP
 
 .PHONY: \
 	all help env env-verbose check-uv check-uv-verbose lock install update build \
-	format lint ruff-format ruff-lint pyright mypy pylint plxt-format plxt-lint \
+	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
     rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
@@ -239,8 +239,8 @@ lock: env
 
 plxt: env ## Rebuild and reinstall plxt CLI from local vscode-pipelex source
 	$(call PRINT_TITLE,"Reinstalling plxt from source")
-	@. $(VIRTUAL_ENV)/bin/activate && \
-	uv sync --all-extras --reinstall-package plxt && \
+	@. "$(VIRTUAL_ENV)/bin/activate" && \
+	uv sync --all-extras --reinstall-package pipelex-tools && \
 	echo "Reinstalled plxt in ${VIRTUAL_ENV}";
 
 update: env
@@ -283,6 +283,7 @@ up-kit-configs:
 		--exclude='storage' \
 		--exclude='x_custom_llm_deck.toml' \
 		--exclude='x_custom_extract_deck.toml' \
+		--exclude='mthds_schema.json' \
 		.pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
@@ -381,6 +382,7 @@ cleanderived:
 	find . -type d -wholename './.reports/*' -exec rm -rf {} + && \
 	rm -f tests/integration/pipelex/fixtures/_generated_model_sets.py && \
 	rm -f .pipelex-dev/model_availability.json && \
+	rm -rf derived/ && \
 	echo "Cleaned up derived files and directories";
 
 cleanenv:

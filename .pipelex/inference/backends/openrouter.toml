@@ -1,0 +1,2269 @@
+################################################################################
+# OpenRouter Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for OpenRouter models.
+# It contains model definitions for various LLM and image generation models
+# accessible through the OpenRouter API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots or colons must be quoted (e.g., ["anthropic/claude-3.5-sonnet"])
+# - Model costs are in USD per million tokens (input/output)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+structure_method = "instructor/openai_tools"
+thinking_mode = "none"
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- ai21 ----------------------------------------------------------------
+
+["ai21/jamba-large-1.7"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
+# --- aion-labs -----------------------------------------------------------
+
+["aion-labs/aion-1.0"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 4, output = 8 }
+
+["aion-labs/aion-1.0-mini"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.7, output = 1.4 }
+
+["aion-labs/aion-rp-llama-3.1-8b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.8, output = 1.6 }
+
+# --- alfredpros ----------------------------------------------------------
+
+["alfredpros/codellama-7b-instruct-solidity"]
+max_tokens = 4096
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.8, output = 1.2 }
+
+# --- alibaba -------------------------------------------------------------
+
+["alibaba/tongyi-deepresearch-30b-a3b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.09, output = 0.45 }
+
+# --- allenai -------------------------------------------------------------
+
+["allenai/molmo-2-8b"]
+max_tokens = 36864
+inputs = ["text", "images", "video"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.2 }
+
+["allenai/olmo-2-0325-32b-instruct"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.05, output = 0.2 }
+
+["allenai/olmo-3-32b-think"]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.15, output = 0.5 }
+
+["allenai/olmo-3-7b-instruct"]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.1, output = 0.2 }
+
+["allenai/olmo-3-7b-think"]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.12, output = 0.2 }
+
+["allenai/olmo-3.1-32b-instruct"]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 0.6 }
+
+["allenai/olmo-3.1-32b-think"]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.15, output = 0.5 }
+
+# --- alpindale -----------------------------------------------------------
+
+["alpindale/goliath-120b"]
+max_tokens = 6144
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 3.75, output = 7.5 }
+
+# --- amazon --------------------------------------------------------------
+
+["amazon/nova-2-lite-v1"]
+max_tokens = 1000000
+inputs = ["text", "images", "video", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 2.5 }
+
+["amazon/nova-lite-v1"]
+max_tokens = 300000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.06, output = 0.24 }
+
+["amazon/nova-micro-v1"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.035, output = 0.14 }
+
+["amazon/nova-premier-v1"]
+max_tokens = 1000000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 12.5 }
+
+["amazon/nova-pro-v1"]
+max_tokens = 300000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.8, output = 3.2 }
+
+# --- anthracite-org ------------------------------------------------------
+
+["anthracite-org/magnum-v4-72b"]
+max_tokens = 16384
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 3, output = 5 }
+
+# --- anthropic -----------------------------------------------------------
+
+["anthropic/claude-3-haiku"]
+max_tokens = 200000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 1.25 }
+
+["anthropic/claude-3.5-haiku"]
+max_tokens = 200000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.8, output = 4 }
+
+["anthropic/claude-3.5-sonnet"]
+max_tokens = 200000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 6, output = 30 }
+
+["anthropic/claude-3.7-sonnet"]
+max_tokens = 200000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+["anthropic/claude-3.7-sonnet:thinking"]
+max_tokens = 200000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+["anthropic/claude-haiku-4.5"]
+max_tokens = 200000
+inputs = ["images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 1, output = 5 }
+
+["anthropic/claude-opus-4"]
+max_tokens = 200000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 15, output = 75 }
+
+["anthropic/claude-opus-4.1"]
+max_tokens = 200000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 15, output = 75 }
+
+["anthropic/claude-opus-4.5"]
+max_tokens = 200000
+inputs = ["pdf", "images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 5, output = 25 }
+
+["anthropic/claude-opus-4.6"]
+max_tokens = 1000000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 5, output = 25 }
+
+["anthropic/claude-sonnet-4"]
+max_tokens = 1000000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+["anthropic/claude-sonnet-4.5"]
+max_tokens = 1000000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+["anthropic/claude-sonnet-4.6"]
+max_tokens = 1000000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+# --- arcee-ai ------------------------------------------------------------
+
+["arcee-ai/coder-large"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.5, output = 0.8 }
+
+["arcee-ai/maestro-reasoning"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.9, output = 3.3 }
+
+["arcee-ai/spotlight"]
+max_tokens = 131072
+inputs = ["images", "text"]
+outputs = ["text"]
+costs = { input = 0.18, output = 0.18 }
+
+["arcee-ai/trinity-large-preview:free"]
+max_tokens = 131000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["arcee-ai/trinity-mini"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.045, output = 0.15 }
+
+["arcee-ai/trinity-mini:free"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["arcee-ai/virtuoso-large"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.75, output = 1.2 }
+
+# --- baidu ---------------------------------------------------------------
+
+["baidu/ernie-4.5-21b-a3b"]
+max_tokens = 120000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.07, output = 0.28 }
+
+["baidu/ernie-4.5-21b-a3b-thinking"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.07, output = 0.28 }
+
+["baidu/ernie-4.5-300b-a47b"]
+max_tokens = 123000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.28, output = 1.1 }
+
+["baidu/ernie-4.5-vl-28b-a3b"]
+max_tokens = 30000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.14, output = 0.56 }
+
+["baidu/ernie-4.5-vl-424b-a47b"]
+max_tokens = 123000
+inputs = ["images", "text"]
+outputs = ["text"]
+costs = { input = 0.42, output = 1.25 }
+
+# --- bytedance -----------------------------------------------------------
+
+["bytedance/ui-tars-1.5-7b"]
+max_tokens = 128000
+inputs = ["images", "text"]
+outputs = ["text"]
+costs = { input = 0.1, output = 0.2 }
+
+# --- bytedance-seed ------------------------------------------------------
+
+["bytedance-seed/seed-1.6"]
+max_tokens = 262144
+inputs = ["images", "text", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 2 }
+
+["bytedance-seed/seed-1.6-flash"]
+max_tokens = 262144
+inputs = ["images", "text", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.075, output = 0.3 }
+
+# --- cognitivecomputations -----------------------------------------------
+
+["cognitivecomputations/dolphin-mistral-24b-venice-edition:free"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+# --- cohere --------------------------------------------------------------
+
+["cohere/command-a"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 2.5, output = 10 }
+
+["cohere/command-r-08-2024"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.6 }
+
+["cohere/command-r-plus-08-2024"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10 }
+
+["cohere/command-r7b-12-2024"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.0375, output = 0.15 }
+
+# --- deepcogito ----------------------------------------------------------
+
+["deepcogito/cogito-v2.1-671b"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 1.25, output = 1.25 }
+
+# --- deepseek ------------------------------------------------------------
+
+["deepseek/deepseek-chat"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.32, output = 0.89 }
+
+["deepseek/deepseek-chat-v3-0324"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.19, output = 0.87 }
+
+["deepseek/deepseek-chat-v3.1"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.75 }
+
+["deepseek/deepseek-r1"]
+max_tokens = 64000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.7, output = 2.5 }
+
+["deepseek/deepseek-r1-0528"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.75 }
+
+["deepseek/deepseek-r1-0528:free"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+["deepseek/deepseek-r1-distill-llama-70b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.7, output = 0.8 }
+
+["deepseek/deepseek-r1-distill-qwen-32b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.29, output = 0.29 }
+
+["deepseek/deepseek-v3.1-terminus"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.21, output = 0.79 }
+
+["deepseek/deepseek-v3.1-terminus:exacto"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.21, output = 0.79 }
+
+["deepseek/deepseek-v3.2"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.26, output = 0.38 }
+
+["deepseek/deepseek-v3.2-exp"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.27, output = 0.41 }
+
+["deepseek/deepseek-v3.2-speciale"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.4, output = 1.2 }
+
+# --- eleutherai ----------------------------------------------------------
+
+["eleutherai/llemma_7b"]
+max_tokens = 4096
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.8, output = 1.2 }
+
+# --- essentialai ---------------------------------------------------------
+
+["essentialai/rnj-1-instruct"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.15, output = 0.15 }
+
+# --- google --------------------------------------------------------------
+
+["google/gemini-2.0-flash-001"]
+max_tokens = 1048576
+inputs = ["text", "images", "pdf", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+["google/gemini-2.0-flash-lite-001"]
+max_tokens = 1048576
+inputs = ["text", "images", "pdf", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.075, output = 0.3 }
+
+["google/gemini-2.5-flash"]
+max_tokens = 1048576
+inputs = ["pdf", "images", "text", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 2.5 }
+
+["google/gemini-2.5-flash-lite"]
+max_tokens = 1048576
+inputs = ["text", "images", "pdf", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+["google/gemini-2.5-flash-lite-preview-09-2025"]
+max_tokens = 1048576
+inputs = ["text", "images", "pdf", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+["google/gemini-2.5-pro"]
+max_tokens = 1048576
+inputs = ["text", "images", "pdf", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["google/gemini-2.5-pro-preview"]
+max_tokens = 1048576
+inputs = ["pdf", "images", "text", "audio"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["google/gemini-2.5-pro-preview-05-06"]
+max_tokens = 1048576
+inputs = ["text", "images", "pdf", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["google/gemini-3-flash-preview"]
+max_tokens = 1048576
+inputs = ["text", "images", "pdf", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.5, output = 3 }
+
+["google/gemini-3-pro-preview"]
+max_tokens = 1048576
+inputs = ["text", "images", "pdf", "audio", "video"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 12 }
+
+["google/gemini-3.1-pro-preview"]
+max_tokens = 1048576
+inputs = ["audio", "pdf", "images", "text", "video"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 12 }
+
+["google/gemma-2-27b-it"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.65, output = 0.65 }
+
+["google/gemma-2-9b-it"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.03, output = 0.09 }
+
+["google/gemma-3-12b-it"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.04, output = 0.13 }
+
+["google/gemma-3-12b-it:free"]
+max_tokens = 32768
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+["google/gemma-3-27b-it"]
+max_tokens = 128000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.04, output = 0.15 }
+
+["google/gemma-3-27b-it:free"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["google/gemma-3-4b-it"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.04, output = 0.08 }
+
+["google/gemma-3-4b-it:free"]
+max_tokens = 32768
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+["google/gemma-3n-e2b-it:free"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+["google/gemma-3n-e4b-it"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.02, output = 0.04 }
+
+["google/gemma-3n-e4b-it:free"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+# --- gryphe --------------------------------------------------------------
+
+["gryphe/mythomax-l2-13b"]
+max_tokens = 4096
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.06, output = 0.06 }
+
+# --- ibm-granite ---------------------------------------------------------
+
+["ibm-granite/granite-4.0-h-micro"]
+max_tokens = 131000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.017, output = 0.11 }
+
+# --- inception -----------------------------------------------------------
+
+["inception/mercury"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 1 }
+
+["inception/mercury-coder"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 1 }
+
+# --- inflection ----------------------------------------------------------
+
+["inflection/inflection-3-pi"]
+max_tokens = 8000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 2.5, output = 10 }
+
+["inflection/inflection-3-productivity"]
+max_tokens = 8000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 2.5, output = 10 }
+
+# --- kwaipilot -----------------------------------------------------------
+
+["kwaipilot/kat-coder-pro"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.207, output = 0.828 }
+
+# --- liquid --------------------------------------------------------------
+
+["liquid/lfm-2.2-6b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.01, output = 0.02 }
+
+["liquid/lfm-2.5-1.2b-instruct:free"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+["liquid/lfm-2.5-1.2b-thinking:free"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+["liquid/lfm2-8b-a1b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.01, output = 0.02 }
+
+# --- mancer --------------------------------------------------------------
+
+["mancer/weaver"]
+max_tokens = 8000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.75, output = 1 }
+
+# --- meituan -------------------------------------------------------------
+
+["meituan/longcat-flash-chat"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.8 }
+
+# --- meta-llama ----------------------------------------------------------
+
+["meta-llama/llama-3-70b-instruct"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.51, output = 0.74 }
+
+["meta-llama/llama-3-8b-instruct"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.03, output = 0.04 }
+
+["meta-llama/llama-3.1-405b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 4, output = 4 }
+
+["meta-llama/llama-3.1-405b-instruct"]
+max_tokens = 131000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 4, output = 4 }
+
+["meta-llama/llama-3.1-70b-instruct"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 0.4 }
+
+["meta-llama/llama-3.1-8b-instruct"]
+max_tokens = 16384
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.02, output = 0.05 }
+
+["meta-llama/llama-3.2-11b-vision-instruct"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.049, output = 0.049 }
+
+["meta-llama/llama-3.2-1b-instruct"]
+max_tokens = 60000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.027, output = 0.2 }
+
+["meta-llama/llama-3.2-3b-instruct"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.02, output = 0.02 }
+
+["meta-llama/llama-3.2-3b-instruct:free"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+["meta-llama/llama-3.3-70b-instruct"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.32 }
+
+["meta-llama/llama-3.3-70b-instruct:free"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["meta-llama/llama-4-maverick"]
+max_tokens = 1048576
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.6 }
+
+["meta-llama/llama-4-scout"]
+max_tokens = 327680
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.08, output = 0.3 }
+
+["meta-llama/llama-guard-2-8b"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.2 }
+
+["meta-llama/llama-guard-3-8b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.02, output = 0.06 }
+
+["meta-llama/llama-guard-4-12b"]
+max_tokens = 163840
+inputs = ["images", "text"]
+outputs = ["text"]
+costs = { input = 0.18, output = 0.18 }
+
+# --- microsoft -----------------------------------------------------------
+
+["microsoft/phi-4"]
+max_tokens = 16384
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.06, output = 0.14 }
+
+["microsoft/wizardlm-2-8x22b"]
+max_tokens = 65535
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.62, output = 0.62 }
+
+# --- minimax -------------------------------------------------------------
+
+["minimax/minimax-01"]
+max_tokens = 1000192
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.2, output = 1.1 }
+
+["minimax/minimax-m1"]
+max_tokens = 1000000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2.2 }
+
+["minimax/minimax-m2"]
+max_tokens = 196608
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.255, output = 1 }
+
+["minimax/minimax-m2-her"]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.3, output = 1.2 }
+
+["minimax/minimax-m2.1"]
+max_tokens = 196608
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.27, output = 0.95 }
+
+["minimax/minimax-m2.5"]
+max_tokens = 196608
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 1.1 }
+
+# --- mistralai -----------------------------------------------------------
+
+["mistralai/codestral-2508"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 0.9 }
+
+["mistralai/devstral-2512"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2 }
+
+["mistralai/devstral-medium"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2 }
+
+["mistralai/devstral-small"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.3 }
+
+["mistralai/ministral-14b-2512"]
+max_tokens = 262144
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 0.2 }
+
+["mistralai/ministral-3b-2512"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.1 }
+
+["mistralai/ministral-8b-2512"]
+max_tokens = 262144
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.15 }
+
+["mistralai/mistral-7b-instruct"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.2 }
+
+["mistralai/mistral-7b-instruct-v0.1"]
+max_tokens = 2824
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.11, output = 0.19 }
+
+["mistralai/mistral-7b-instruct-v0.2"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.2 }
+
+["mistralai/mistral-7b-instruct-v0.3"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.2 }
+
+["mistralai/mistral-large"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 6 }
+
+["mistralai/mistral-large-2407"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 6 }
+
+["mistralai/mistral-large-2411"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 6 }
+
+["mistralai/mistral-large-2512"]
+max_tokens = 262144
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.5, output = 1.5 }
+
+["mistralai/mistral-medium-3"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2 }
+
+["mistralai/mistral-medium-3.1"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2 }
+
+["mistralai/mistral-nemo"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.02, output = 0.04 }
+
+["mistralai/mistral-saba"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 0.6 }
+
+["mistralai/mistral-small-24b-instruct-2501"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.08 }
+
+["mistralai/mistral-small-3.1-24b-instruct"]
+max_tokens = 128000
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.35, output = 0.56 }
+
+["mistralai/mistral-small-3.1-24b-instruct:free"]
+max_tokens = 128000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["mistralai/mistral-small-3.2-24b-instruct"]
+max_tokens = 131072
+inputs = ["images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 0.06, output = 0.18 }
+
+["mistralai/mistral-small-creative"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.3 }
+
+["mistralai/mixtral-8x22b-instruct"]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 6 }
+
+["mistralai/mixtral-8x7b-instruct"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.54, output = 0.54 }
+
+["mistralai/pixtral-large-2411"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 6 }
+
+["mistralai/voxtral-small-24b-2507"]
+max_tokens = 32000
+inputs = ["text", "audio"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.3 }
+
+# --- moonshotai ----------------------------------------------------------
+
+["moonshotai/kimi-k2"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.5, output = 2.4 }
+
+["moonshotai/kimi-k2-0905"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2 }
+
+["moonshotai/kimi-k2-0905:exacto"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.6, output = 2.5 }
+
+["moonshotai/kimi-k2-thinking"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.47, output = 2 }
+
+["moonshotai/kimi-k2.5"]
+max_tokens = 262144
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.45, output = 2.2 }
+
+# --- morph ---------------------------------------------------------------
+
+["morph/morph-v3-fast"]
+max_tokens = 81920
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.8, output = 1.2 }
+
+["morph/morph-v3-large"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.9, output = 1.9 }
+
+# --- neversleep ----------------------------------------------------------
+
+["neversleep/llama-3.1-lumimaid-8b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.09, output = 0.6 }
+
+["neversleep/noromaid-20b"]
+max_tokens = 4096
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 1, output = 1.75 }
+
+# --- nex-agi -------------------------------------------------------------
+
+["nex-agi/deepseek-v3.1-nex-n1"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.27, output = 1 }
+
+# --- nousresearch --------------------------------------------------------
+
+["nousresearch/hermes-2-pro-llama-3-8b"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.14, output = 0.14 }
+
+["nousresearch/hermes-3-llama-3.1-405b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 1, output = 1 }
+
+["nousresearch/hermes-3-llama-3.1-405b:free"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0, output = 0 }
+
+["nousresearch/hermes-3-llama-3.1-70b"]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.3, output = 0.3 }
+
+["nousresearch/hermes-4-405b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 1, output = 3 }
+
+["nousresearch/hermes-4-70b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.13, output = 0.4 }
+
+# --- nvidia --------------------------------------------------------------
+
+["nvidia/llama-3.1-nemotron-70b-instruct"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.2, output = 1.2 }
+
+["nvidia/llama-3.1-nemotron-ultra-253b-v1"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.6, output = 1.8 }
+
+["nvidia/llama-3.3-nemotron-super-49b-v1.5"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+["nvidia/nemotron-3-nano-30b-a3b"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.2 }
+
+["nvidia/nemotron-3-nano-30b-a3b:free"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["nvidia/nemotron-nano-12b-v2-vl"]
+max_tokens = 131072
+inputs = ["images", "text", "video"]
+outputs = ["text"]
+costs = { input = 0.07, output = 0.2 }
+
+["nvidia/nemotron-nano-12b-v2-vl:free"]
+max_tokens = 128000
+inputs = ["images", "text", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["nvidia/nemotron-nano-9b-v2"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.04, output = 0.16 }
+
+["nvidia/nemotron-nano-9b-v2:free"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+# --- openai --------------------------------------------------------------
+
+["openai/gpt-3.5-turbo"]
+max_tokens = 16385
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.5, output = 1.5 }
+
+["openai/gpt-3.5-turbo-0613"]
+max_tokens = 4095
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1, output = 2 }
+
+["openai/gpt-3.5-turbo-16k"]
+max_tokens = 16385
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 4 }
+
+["openai/gpt-3.5-turbo-instruct"]
+max_tokens = 4095
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 1.5, output = 2 }
+
+["openai/gpt-4"]
+max_tokens = 8191
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 30, output = 60 }
+
+["openai/gpt-4-0314"]
+max_tokens = 8191
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 30, output = 60 }
+
+["openai/gpt-4-1106-preview"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 10, output = 30 }
+
+["openai/gpt-4-turbo"]
+max_tokens = 128000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 10, output = 30 }
+
+["openai/gpt-4-turbo-preview"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 10, output = 30 }
+
+["openai/gpt-4.1"]
+max_tokens = 1047576
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
+["openai/gpt-4.1-mini"]
+max_tokens = 1047576
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.6 }
+
+["openai/gpt-4.1-nano"]
+max_tokens = 1047576
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.4 }
+
+["openai/gpt-4o"]
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10 }
+
+["openai/gpt-4o-2024-05-13"]
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 5, output = 15 }
+
+["openai/gpt-4o-2024-08-06"]
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10 }
+
+["openai/gpt-4o-2024-11-20"]
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 10 }
+
+["openai/gpt-4o-audio-preview"]
+max_tokens = 128000
+inputs = ["audio", "text"]
+outputs = ["text", "audio", "structured"]
+costs = { input = 2.5, output = 10 }
+
+["openai/gpt-4o-mini"]
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.6 }
+
+["openai/gpt-4o-mini-2024-07-18"]
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.6 }
+
+["openai/gpt-4o-mini-search-preview"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.15, output = 0.6 }
+
+["openai/gpt-4o-search-preview"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 2.5, output = 10 }
+
+["openai/gpt-4o:extended"]
+max_tokens = 128000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 6, output = 18 }
+
+["openai/gpt-5"]
+max_tokens = 400000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["openai/gpt-5-chat"]
+max_tokens = 128000
+inputs = ["pdf", "images", "text"]
+outputs = ["text"]
+costs = { input = 1.25, output = 10 }
+
+["openai/gpt-5-codex"]
+max_tokens = 400000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["openai/gpt-5-mini"]
+max_tokens = 400000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 2 }
+
+["openai/gpt-5-nano"]
+max_tokens = 400000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.4 }
+
+["openai/gpt-5-pro"]
+max_tokens = 400000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 15, output = 120 }
+
+["openai/gpt-5.1"]
+max_tokens = 400000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["openai/gpt-5.1-chat"]
+max_tokens = 128000
+inputs = ["pdf", "images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["openai/gpt-5.1-codex"]
+max_tokens = 400000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["openai/gpt-5.1-codex-max"]
+max_tokens = 400000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10 }
+
+["openai/gpt-5.1-codex-mini"]
+max_tokens = 400000
+inputs = ["images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 2 }
+
+["openai/gpt-5.2"]
+max_tokens = 400000
+inputs = ["pdf", "images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14 }
+
+["openai/gpt-5.2-chat"]
+max_tokens = 128000
+inputs = ["pdf", "images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14 }
+
+["openai/gpt-5.2-codex"]
+max_tokens = 400000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14 }
+
+["openai/gpt-5.2-pro"]
+max_tokens = 400000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 21, output = 168 }
+
+["openai/gpt-audio"]
+max_tokens = 128000
+inputs = ["text", "audio"]
+outputs = ["text", "audio"]
+costs = { input = 2.5, output = 10 }
+
+["openai/gpt-audio-mini"]
+max_tokens = 128000
+inputs = ["text", "audio"]
+outputs = ["text", "audio"]
+costs = { input = 0.6, output = 2.4 }
+
+["openai/gpt-oss-120b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.039, output = 0.19 }
+
+["openai/gpt-oss-120b:exacto"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.039, output = 0.19 }
+
+["openai/gpt-oss-120b:free"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["openai/gpt-oss-20b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.03, output = 0.14 }
+
+["openai/gpt-oss-20b:free"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["openai/gpt-oss-safeguard-20b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.075, output = 0.3 }
+
+["openai/o1"]
+max_tokens = 200000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 15, output = 60 }
+
+["openai/o1-pro"]
+max_tokens = 200000
+inputs = ["text", "images", "pdf"]
+outputs = ["text"]
+costs = { input = 150, output = 600 }
+
+["openai/o3"]
+max_tokens = 200000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
+["openai/o3-deep-research"]
+max_tokens = 200000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 10, output = 40 }
+
+["openai/o3-mini"]
+max_tokens = 200000
+inputs = ["text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+
+["openai/o3-mini-high"]
+max_tokens = 200000
+inputs = ["text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+
+["openai/o3-pro"]
+max_tokens = 200000
+inputs = ["text", "pdf", "images"]
+outputs = ["text", "structured"]
+costs = { input = 20, output = 80 }
+
+["openai/o4-mini"]
+max_tokens = 200000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+
+["openai/o4-mini-deep-research"]
+max_tokens = 200000
+inputs = ["pdf", "images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 2, output = 8 }
+
+["openai/o4-mini-high"]
+max_tokens = 200000
+inputs = ["images", "text", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.1, output = 4.4 }
+
+# --- opengvlab -----------------------------------------------------------
+
+["opengvlab/internvl3-78b"]
+max_tokens = 32768
+inputs = ["images", "text"]
+outputs = ["text"]
+costs = { input = 0.15, output = 0.6 }
+
+# --- openrouter ----------------------------------------------------------
+
+["openrouter/auto"]
+max_tokens = 2000000
+inputs = ["text", "images", "audio", "pdf", "video"]
+outputs = ["text", "image", "structured"]
+
+["openrouter/bodybuilder"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text"]
+
+["openrouter/free"]
+max_tokens = 200000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+# --- perplexity ----------------------------------------------------------
+
+["perplexity/sonar"]
+max_tokens = 127072
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 1, output = 1 }
+
+["perplexity/sonar-deep-research"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 2, output = 8 }
+
+["perplexity/sonar-pro"]
+max_tokens = 200000
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 3, output = 15 }
+
+["perplexity/sonar-pro-search"]
+max_tokens = 200000
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 3, output = 15 }
+
+["perplexity/sonar-reasoning-pro"]
+max_tokens = 128000
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 2, output = 8 }
+
+# --- prime-intellect -----------------------------------------------------
+
+["prime-intellect/intellect-3"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 1.1 }
+
+# --- qwen ----------------------------------------------------------------
+
+["qwen/qwen-2.5-72b-instruct"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.12, output = 0.39 }
+
+["qwen/qwen-2.5-7b-instruct"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.04, output = 0.1 }
+
+["qwen/qwen-2.5-coder-32b-instruct"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.2 }
+
+["qwen/qwen-2.5-vl-7b-instruct"]
+max_tokens = 32768
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.2 }
+
+["qwen/qwen-max"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.6, output = 6.4 }
+
+["qwen/qwen-plus"]
+max_tokens = 1000000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.2 }
+
+["qwen/qwen-plus-2025-07-28"]
+max_tokens = 1000000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.2 }
+
+["qwen/qwen-plus-2025-07-28:thinking"]
+max_tokens = 1000000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 1.2 }
+
+["qwen/qwen-turbo"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.2 }
+
+["qwen/qwen-vl-max"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.8, output = 3.2 }
+
+["qwen/qwen-vl-plus"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.21, output = 0.63 }
+
+["qwen/qwen2.5-coder-7b-instruct"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.03, output = 0.09 }
+
+["qwen/qwen2.5-vl-32b-instruct"]
+max_tokens = 128000
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.2, output = 0.6 }
+
+["qwen/qwen2.5-vl-72b-instruct"]
+max_tokens = 32000
+inputs = ["text", "images"]
+outputs = ["text"]
+costs = { input = 0.25, output = 0.75 }
+
+["qwen/qwen3-14b"]
+max_tokens = 40960
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.06, output = 0.24 }
+
+["qwen/qwen3-235b-a22b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.455, output = 1.82 }
+
+["qwen/qwen3-235b-a22b-2507"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.071, output = 0.1 }
+
+["qwen/qwen3-235b-a22b-thinking-2507"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["qwen/qwen3-30b-a3b"]
+max_tokens = 40960
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.08, output = 0.28 }
+
+["qwen/qwen3-30b-a3b-instruct-2507"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.09, output = 0.3 }
+
+["qwen/qwen3-30b-a3b-thinking-2507"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.051, output = 0.34 }
+
+["qwen/qwen3-32b"]
+max_tokens = 40960
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.08, output = 0.24 }
+
+["qwen/qwen3-4b:free"]
+max_tokens = 40960
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["qwen/qwen3-8b"]
+max_tokens = 32000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.05, output = 0.4 }
+
+["qwen/qwen3-coder"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.22, output = 1 }
+
+["qwen/qwen3-coder-30b-a3b-instruct"]
+max_tokens = 160000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.07, output = 0.27 }
+
+["qwen/qwen3-coder-flash"]
+max_tokens = 1000000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 1.5 }
+
+["qwen/qwen3-coder-next"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.12, output = 0.75 }
+
+["qwen/qwen3-coder-plus"]
+max_tokens = 1000000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1, output = 5 }
+
+["qwen/qwen3-coder:exacto"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.22, output = 1.8 }
+
+["qwen/qwen3-coder:free"]
+max_tokens = 262000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["qwen/qwen3-max"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.2, output = 6 }
+
+["qwen/qwen3-max-thinking"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.2, output = 6 }
+
+["qwen/qwen3-next-80b-a3b-instruct"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.09, output = 1.1 }
+
+["qwen/qwen3-next-80b-a3b-instruct:free"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["qwen/qwen3-next-80b-a3b-thinking"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 1.2 }
+
+["qwen/qwen3-vl-235b-a22b-instruct"]
+max_tokens = 262144
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 0.88 }
+
+["qwen/qwen3-vl-235b-a22b-thinking"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["qwen/qwen3-vl-30b-a3b-instruct"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.13, output = 0.52 }
+
+["qwen/qwen3-vl-30b-a3b-thinking"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["qwen/qwen3-vl-32b-instruct"]
+max_tokens = 131072
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.104, output = 0.416 }
+
+["qwen/qwen3-vl-8b-instruct"]
+max_tokens = 131072
+inputs = ["images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 0.08, output = 0.5 }
+
+["qwen/qwen3-vl-8b-thinking"]
+max_tokens = 131072
+inputs = ["images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 0.117, output = 1.365 }
+
+["qwen/qwen3.5-397b-a17b"]
+max_tokens = 262144
+inputs = ["text", "images", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 1 }
+
+["qwen/qwen3.5-plus-02-15"]
+max_tokens = 1000000
+inputs = ["text", "images", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 2.4 }
+
+["qwen/qwq-32b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.4 }
+
+# --- raifle --------------------------------------------------------------
+
+["raifle/sorcererlm-8x22b"]
+max_tokens = 16000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 4.5, output = 4.5 }
+
+# --- relace --------------------------------------------------------------
+
+["relace/relace-apply-3"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.85, output = 1.25 }
+
+["relace/relace-search"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1, output = 3 }
+
+# --- sao10k --------------------------------------------------------------
+
+["sao10k/l3-euryale-70b"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 1.48, output = 1.48 }
+
+["sao10k/l3-lunaris-8b"]
+max_tokens = 8192
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.04, output = 0.05 }
+
+["sao10k/l3.1-70b-hanami-x1"]
+max_tokens = 16000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 3, output = 3 }
+
+["sao10k/l3.1-euryale-70b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.65, output = 0.75 }
+
+["sao10k/l3.3-euryale-70b"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.65, output = 0.75 }
+
+# --- stepfun -------------------------------------------------------------
+
+["stepfun/step-3.5-flash"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.3 }
+
+["stepfun/step-3.5-flash:free"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+# --- switchpoint ---------------------------------------------------------
+
+["switchpoint/router"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.85, output = 3.4 }
+
+# --- tencent -------------------------------------------------------------
+
+["tencent/hunyuan-a13b-instruct"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.14, output = 0.57 }
+
+# --- thedrummer ----------------------------------------------------------
+
+["thedrummer/cydonia-24b-v4.1"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.3, output = 0.5 }
+
+["thedrummer/rocinante-12b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.17, output = 0.43 }
+
+["thedrummer/skyfall-36b-v2"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.55, output = 0.8 }
+
+["thedrummer/unslopnemo-12b"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.4, output = 0.4 }
+
+# --- tngtech -------------------------------------------------------------
+
+["tngtech/deepseek-r1t2-chimera"]
+max_tokens = 163840
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.25, output = 0.85 }
+
+# --- undi95 --------------------------------------------------------------
+
+["undi95/remm-slerp-l2-13b"]
+max_tokens = 6144
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.45, output = 0.65 }
+
+# --- upstage -------------------------------------------------------------
+
+["upstage/solar-pro-3:free"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+# --- writer --------------------------------------------------------------
+
+["writer/palmyra-x5"]
+max_tokens = 1040000
+inputs = ["text"]
+outputs = ["text"]
+costs = { input = 0.6, output = 6 }
+
+# --- x-ai ----------------------------------------------------------------
+
+["x-ai/grok-3"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+["x-ai/grok-3-beta"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+["x-ai/grok-3-mini"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 0.5 }
+
+["x-ai/grok-3-mini-beta"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 0.5 }
+
+["x-ai/grok-4"]
+max_tokens = 256000
+inputs = ["images", "text"]
+outputs = ["text", "structured"]
+costs = { input = 3, output = 15 }
+
+["x-ai/grok-4-fast"]
+max_tokens = 2000000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 0.5 }
+
+["x-ai/grok-4.1-fast"]
+max_tokens = 2000000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 0.5 }
+
+["x-ai/grok-code-fast-1"]
+max_tokens = 256000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 1.5 }
+
+# --- xiaomi --------------------------------------------------------------
+
+["xiaomi/mimo-v2-flash"]
+max_tokens = 262144
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.09, output = 0.29 }
+
+# --- z-ai ----------------------------------------------------------------
+
+["z-ai/glm-4-32b"]
+max_tokens = 128000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.1, output = 0.1 }
+
+["z-ai/glm-4.5"]
+max_tokens = 131000
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.55, output = 2 }
+
+["z-ai/glm-4.5-air"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.13, output = 0.85 }
+
+["z-ai/glm-4.5-air:free"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0, output = 0 }
+
+["z-ai/glm-4.5v"]
+max_tokens = 65536
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.6, output = 1.8 }
+
+["z-ai/glm-4.6"]
+max_tokens = 202752
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.35, output = 1.71 }
+
+["z-ai/glm-4.6:exacto"]
+max_tokens = 204800
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.44, output = 1.76 }
+
+["z-ai/glm-4.6v"]
+max_tokens = 131072
+inputs = ["images", "text", "video"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 0.9 }
+
+["z-ai/glm-4.7"]
+max_tokens = 202752
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.38, output = 1.7 }
+
+["z-ai/glm-4.7-flash"]
+max_tokens = 202752
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.06, output = 0.4 }
+
+["z-ai/glm-5"]
+max_tokens = 204800
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.95, output = 2.55 }
+
+################################################################################
+# IMAGE GENERATION MODELS
+################################################################################
+
+# --- black-forest-labs ---------------------------------------------------
+
+["black-forest-labs/flux.2-flex"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 67344
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["black-forest-labs/flux.2-klein-4b"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 40960
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["black-forest-labs/flux.2-max"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 46864
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["black-forest-labs/flux.2-pro"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 46864
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+# --- bytedance-seed ------------------------------------------------------
+
+["bytedance-seed/seedream-4.5"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 4096
+inputs = ["images", "text"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+# --- google --------------------------------------------------------------
+
+["google/gemini-2.5-flash-image"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 32768
+inputs = ["images", "text"]
+outputs = ["image", "text"]
+costs = { input = 0.3, output = 2.5 }
+
+["google/gemini-3-pro-image-preview"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 65536
+inputs = ["images", "text"]
+outputs = ["image", "text"]
+costs = { input = 2, output = 12 }
+
+# --- openai --------------------------------------------------------------
+
+["openai/gpt-5-image"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 400000
+inputs = ["images", "text", "pdf"]
+outputs = ["image", "text", "structured"]
+costs = { input = 10, output = 10 }
+
+["openai/gpt-5-image-mini"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 400000
+inputs = ["pdf", "images", "text"]
+outputs = ["image", "text", "structured"]
+costs = { input = 2.5, output = 2 }
+
+# --- sourceful -----------------------------------------------------------
+
+["sourceful/riverflow-v2-fast"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["sourceful/riverflow-v2-fast-preview"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["sourceful/riverflow-v2-max-preview"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["sourceful/riverflow-v2-pro"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }
+
+["sourceful/riverflow-v2-standard-preview"]
+model_type = "img_gen"
+sdk = "openrouter_img_gen"
+max_tokens = 8192
+inputs = ["text", "images"]
+outputs = ["image"]
+costs = { input = 0, output = 0 }

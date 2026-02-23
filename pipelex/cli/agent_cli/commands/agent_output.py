@@ -108,6 +108,10 @@ def _build_error_source(exc: BaseException) -> list[str]:
     sources: list[str] = []
     current: BaseException | None = exc
     while current is not None:
+        if current.__traceback__ is None:
+            sources.append(f"{type(current).__name__} (no traceback)")
+            current = current.__cause__
+            continue
         tbe = traceback.extract_tb(current.__traceback__)
         if tbe:
             frame = tbe[-1]  # default fallback

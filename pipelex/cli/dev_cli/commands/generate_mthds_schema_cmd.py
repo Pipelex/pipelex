@@ -11,9 +11,8 @@ from rich.panel import Panel
 from pipelex.hub import get_console
 from pipelex.language.mthds_schema_generator import generate_mthds_schema
 
-# Path to the generated schema file, in the .pipelex/ config directory
-# (synced to pipelex/kit/configs/ via `make up-kit-configs`)
-MTHDS_SCHEMA_PATH = Path(".pipelex/mthds_schema.json")
+# Path to the generated schema file, in the derived/ directory (gitignored)
+MTHDS_SCHEMA_PATH = Path("derived/mthds_schema.json")
 
 
 def generate_mthds_schema_cmd(output: Path | None = None, quiet: bool = False) -> None:
@@ -23,7 +22,7 @@ def generate_mthds_schema_cmd(output: Path | None = None, quiet: bool = False) -
     The schema enables IDE validation and autocompletion in the vscode-pipelex extension.
 
     Args:
-        output: Custom output path. Defaults to .pipelex/mthds_schema.json.
+        output: Custom output path. Defaults to derived/mthds_schema.json.
         quiet: If True, output only a single validation line.
     """
     console = get_console()

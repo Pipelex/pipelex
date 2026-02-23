@@ -179,7 +179,6 @@ Want to see how the Pipe Builder works internally? Check out the source code:
 
 - **Main pipeline**: [`pipelex/builder/builder.mthds`](https://github.com/pipelex/pipelex/tree/main/pipelex/builder/builder.mthds)
 - **Pipe design**: [`pipelex/builder/pipe/pipe_design.mthds`](https://github.com/pipelex/pipelex/tree/main/pipelex/builder/pipe/pipe_design.mthds)
-- **Concept building**: [`pipelex/builder/concept/concept.mthds`](https://github.com/pipelex/pipelex/tree/main/pipelex/builder/concept/concept.mthds)
 
 The Pipe Builder is a great example of a complex, multi-stage Pipelex pipeline in action.
 

@@ -72,6 +72,10 @@ default = "ollama"
 description = "Use OpenAI backend for all its supported models"
 default = "openai"
 
+[profiles.all_openrouter]
+description = "Use OpenRouter backend for all its supported models"
+default = "openrouter"
+
 [profiles.all_portkey]
 description = "Use Portkey backend for all its supported models"
 default = "portkey"

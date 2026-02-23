@@ -4,6 +4,14 @@
 
 - **Persistent Credential Storage (`~/.pipelex/.env`)**: `pipelex init` now prompts for missing API keys after backend selection and saves them to `~/.pipelex/.env` with `0600` permissions. Credentials are loaded automatically at startup (global defaults, overridden by project `.env`).
 - **`pipelex init credentials` Command**: New standalone focus to re-enter API keys without resetting configuration. Scans enabled backends, detects missing env vars, and prompts only for those.
+- **Package Management System:** Introduced a full package manager for MTHDS with `METHODS.toml` manifests, `methods.lock` lockfile generation, local path and remote Git-based dependency resolution (MVS), a local package cache (`~/.mthds/packages`), and a new `pipelex pkg` CLI command group (`init`, `list`, `add`, `lock`, `install`, `update`, `publish`, `search`, `inspect`, `graph`).
+- **Hierarchical Domains:** Support for dot-separated domain namespaces (e.g., `legal.contracts.shareholder`) and cross-package references via `alias->domain.pipe` syntax.
+- **PipelexRunner:** Introduced the `PipelexRunner` class as the primary entry point for executing pipelines, replacing `PipelexClient` and standalone `execute_pipeline`/`start_pipeline` functions.
+- **Linting & Formatting:** Integrated `plxt` (Pipelex Tools) for formatting and linting `.mthds` and `.toml` files, including CI/CD checks alongside `ruff`.
+- **JSON Schema:** Automatic generation of `mthds_schema.json` for standard definition, IDE validation, and auto-completion.
+- **Dev CLI:** Added `pipelex-dev` CLI for internal development tasks (e.g., schema generation).
+- **CSP Nonce Support:** Added Content Security Policy nonce support for generated HTML graphs (Mermaid/ReactFlow) to enable secure rendering in VS Code webviews.
+- **OpenRouter Backend:** Added OpenRouter as an inference backend with 337 chat model definitions and 14 image generation models.
 
 ### Changed
 
@@ -13,19 +21,25 @@
 - **IDE Extension Detection**: Extension check now uses `code --list-extensions` / `cursor --list-extensions` for reliable detection instead of folder scanning. Shows separate marketplace links for VS Code (Microsoft Marketplace) and Cursor (Open VSX Registry).
 - **Quieter `pipelex init`**: Removed verbose file listing and reset messages from config initialization output.
 - **`pipelex init` Help Text**: Detailed focus option descriptions now shown in `pipelex init --help` explaining each focus (`all`, `config`, `credentials`, `inference`, `routing`, `telemetry`, `agreement`).
+- **File Extension:** Pipeline definitions now use `.mthds` instead of `.plx`; the project refers to "Methods" (MTHDS) rather than "Pipelex workflows".
+- **Syntax:** In `PipeParallel` definitions, `parallels` field renamed to `branches`; `plx_config` in `pipelex.toml` renamed to `mthds_config`.
+- **Documentation:** Comprehensive update to reflect `.mthds` file format, package management, and new project structure.
 
 ### Fixed
 
 - **`find_project_root` Home Directory Bug**: The project root walker no longer considers the home directory (`~`) as a project root, even if it contains stray marker files like `package.json`.
 - **Python 3.10 Compatibility**: Fixed `datetime.UTC` import (Python 3.11+) to use `datetime.timezone.utc`.
+- **Graph Rendering:** Fixed dashed edge rendering for `PipeBatch` and `PipeParallel` relationships.
+- **Image Generation Response Parsing:** Hardened image response parsing to handle varied provider response formats more robustly.
 
+### Removed
 
-## [v0.17.6] - 2026-02-14
+- **Legacy Client & Execution Modules:** Removed `PipelexClient`, protocol files, and standalone `pipelex.pipeline.execute`/`pipelex.pipeline.start` modules (replaced by `PipelexRunner` and `mthds` package).
+- **Legacy Config:** Removed `plx_config.py` and `.plx`-specific configuration references.
 
-### Added
+### Security
 
-- **Claude Code GitHub Actions**: Added `claude.yml` workflow for interactive Claude Code assistance on issues and PR comments, and `claude-code-review.yml` workflow for automated code review on pull requests.
-
+- **CSP Nonce Support:** Added Content Security Policy nonce for generated HTML graph outputs.
 
 ## [v0.18.0b3] - 2026-02-11
 
@@ -262,6 +276,12 @@
 - **⚠️ Breaking — Pipe I/O Specification**: The output (and inputs) of a pipe is now a `StuffSpec` object that holds the concept and the multiplicity.
 - **Naming Convention**: Renamed `domain` to `domain_code` where relevant.
 - **Dry Run Methods**: Refactored the dry run methods of the `PipeAbstract` class.
+
+## [v0.17.6] - 2026-02-14
+
+### Added
+
+- **Claude Code GitHub Actions**: Added `claude.yml` workflow for interactive Claude Code assistance on issues and PR comments, and `claude-code-review.yml` workflow for automated code review on pull requests.
 
 ## [v0.17.5] - 2026-01-16
 

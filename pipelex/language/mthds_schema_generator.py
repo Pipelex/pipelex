@@ -52,6 +52,7 @@ def generate_mthds_schema() -> dict[str, Any]:
     )
 
     schema = _remove_internal_fields(schema)
+    schema = _promote_schema_required_fields(schema)
     schema = _convert_to_draft4(schema)
     schema = _patch_construct_schema(schema)
 
@@ -97,6 +98,33 @@ def _remove_from_required(schema_obj: dict[str, Any], field_names: set[str]) -> 
         schema_obj["required"] = [req for req in required if req not in field_names]
         if not schema_obj["required"]:
             del schema_obj["required"]
+
+
+def _promote_schema_required_fields(schema: dict[str, Any]) -> dict[str, Any]:
+    """Promote fields marked with x-schema-required into their parent's required array.
+
+    Fields annotated with WithJsonSchema({"x-schema-required": True}) are collected
+    and added to the parent schema's `required` list. The marker is then removed
+    from the property schema so it doesn't leak into the final output.
+    """
+    schema = copy.deepcopy(schema)
+    defs_key = "$defs" if "$defs" in schema else "definitions"
+
+    for schema_obj in [schema, *schema.get(defs_key, {}).values()]:
+        properties = schema_obj.get("properties", {})
+        promoted: list[str] = []
+        for field_name, field_schema in properties.items():
+            if field_schema.get("x-schema-required") is True:
+                promoted.append(field_name)
+                del field_schema["x-schema-required"]
+        if promoted:
+            required = schema_obj.get("required", [])
+            for field_name in promoted:
+                if field_name not in required:
+                    required.append(field_name)
+            schema_obj["required"] = required
+
+    return schema
 
 
 def _convert_to_draft4(schema: dict[str, Any]) -> dict[str, Any]:

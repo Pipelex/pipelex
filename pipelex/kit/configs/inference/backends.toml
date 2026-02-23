@@ -72,6 +72,12 @@ display_name = "OpenAI"
 enabled = true
 api_key = "${OPENAI_API_KEY}"
 
+[openrouter]
+display_name = "OpenRouter"
+enabled = true
+endpoint = "https://openrouter.ai/api/v1"
+api_key = "${OPENROUTER_API_KEY}"
+
 [portkey]
 display_name = "Portkey"
 enabled = true

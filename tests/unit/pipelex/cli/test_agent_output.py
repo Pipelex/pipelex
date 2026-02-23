@@ -10,6 +10,7 @@ import typer
 
 from pipelex.cli.agent_cli.commands.agent_output import (
     AGENT_ERROR_HINTS,
+    _build_error_source,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
     agent_error,
     agent_success,
     extract_validation_errors,
@@ -202,3 +203,60 @@ class TestAgentOutput:
         exc = ValidateBundleError(message="no details")
         result = extract_validation_errors(exc)
         assert result == []
+
+    # -------------------------------------------------------------------------
+    # _build_error_source tests
+    # -------------------------------------------------------------------------
+
+    def test_build_error_source_with_none_traceback(self) -> None:
+        """_build_error_source should handle exceptions with no traceback (constructed but never raised)."""
+        exc = RuntimeError("constructed, not raised")
+        assert exc.__traceback__ is None
+
+        sources = _build_error_source(exc)
+        assert len(sources) == 1
+        assert "RuntimeError" in sources[0]
+        assert "no traceback" in sources[0]
+
+    def test_build_error_source_with_chained_none_tracebacks(self) -> None:
+        """_build_error_source should handle a cause chain where all exceptions lack tracebacks."""
+        cause = ValueError("root cause")
+        outer = RuntimeError("wrapper")
+        outer.__cause__ = cause
+        assert cause.__traceback__ is None
+        assert outer.__traceback__ is None
+
+        sources = _build_error_source(outer)
+        assert len(sources) == 2
+        assert "RuntimeError" in sources[0]
+        assert "no traceback" in sources[0]
+        assert "ValueError" in sources[1]
+        assert "no traceback" in sources[1]
+
+    def test_build_error_source_with_real_traceback(self) -> None:
+        """_build_error_source should extract location info from a raised exception."""
+        try:
+            msg = "actually raised"
+            raise RuntimeError(msg)
+        except RuntimeError as exc:
+            sources = _build_error_source(exc)
+
+        assert len(sources) == 1
+        assert "RuntimeError" in sources[0]
+        assert "no traceback" not in sources[0]
+        assert "test_agent_output.py" in sources[0]
+
+    def test_agent_error_with_no_traceback_cause(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """agent_error should emit valid JSON even when cause has no traceback."""
+        cause = RuntimeError("constructed, not raised")
+        assert cause.__traceback__ is None
+
+        with pytest.raises(typer.Exit) as exc_info:
+            agent_error("something broke", "RuntimeError", cause=cause)
+        assert exc_info.value.exit_code == 1
+
+        parsed = json.loads(capsys.readouterr().err)
+        assert parsed["error"] is True
+        assert "error_source" in parsed
+        assert len(parsed["error_source"]) == 1
+        assert "no traceback" in parsed["error_source"][0]

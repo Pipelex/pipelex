@@ -11,8 +11,8 @@ jobs:
 # --------------------------------------------------------------------------
 # 1.  Ruff — single job (target-version = min supported, set in pyproject.toml)
 # --------------------------------------------------------------------------
-  lint-ruff:
-    name: Lint (ruff)
+  lint-ruff-plxt:
+    name: Lint (ruff + plxt)
     runs-on: [aca-runner-lint]
     env:
       VIRTUAL_ENV: ${{ github.workspace }}/.venv
@@ -28,6 +28,12 @@ jobs:
 
       - name: Run ruff lint merge check
         run: make merge-check-ruff-lint
+
+      - name: Run plxt format merge check
+        run: make merge-check-plxt-format
+
+      - name: Run plxt lint merge check
+        run: make merge-check-plxt-lint
 
 # --------------------------------------------------------------------------
 # 2.  Type checking — matrix over supported Python versions
@@ -78,13 +84,13 @@ jobs:
   lint-all:
     name: Lint (all)
     runs-on: ubuntu-latest
-    needs: [lint-ruff, lint-typecheck, lint-config-sync]
+    needs: [lint-ruff-plxt, lint-typecheck, lint-config-sync]
     if: always()
 
     steps:
       - name: Fail if any lint job failed
         run: |
-          if [ "${{ needs.lint-ruff.result }}" != "success" ] || \
+          if [ "${{ needs.lint-ruff-plxt.result }}" != "success" ] || \
              [ "${{ needs.lint-typecheck.result }}" != "success" ] || \
              [ "${{ needs.lint-config-sync.result }}" != "success" ]; then
             echo "::error::At least one lint job failed."

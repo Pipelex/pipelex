@@ -78,7 +78,7 @@ When executing pipelines programmatically, Pipelex can load pipe **libraries** -
 
 #### Library Parameters
 
-When using `PipelexRunner`, you can control library behavior with these constructor parameters:
+When using `PipelexRunner`, you can control library behavior with these parameters:
 
 - **`library_id`**: A unique identifier for the library instance. If not specified, it defaults to the `pipeline_run_id` (a unique ID generated for each pipeline execution).
 
@@ -166,7 +166,7 @@ pipe_output = response.pipe_output
 
 ### Using MTHDS Content Directly
 
-You can directly pass PLX content as a string to `PipelexRunner.execute_pipeline()`, useful for dynamic pipeline execution without file-based definitions.
+You can directly pass MTHDS content as a string to `PipelexRunner.execute_pipeline()`, useful for dynamic pipeline execution without file-based definitions.
 
 ```python
 from pipelex.pipelex import Pipelex

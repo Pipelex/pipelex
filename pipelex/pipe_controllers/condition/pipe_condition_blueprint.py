@@ -1,6 +1,6 @@
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, WithJsonSchema, field_validator, model_validator
 from typing_extensions import override
 
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
@@ -16,7 +16,16 @@ class PipeConditionBlueprint(PipeBlueprint):
     pipe_category: Literal["PipeController"] = "PipeController"
     expression_template: str | None = None
     expression: str | None = None
-    outcomes: OutcomeMap = Field(default_factory=OutcomeMap)
+    outcomes: Annotated[
+        OutcomeMap,
+        WithJsonSchema(
+            {
+                "additionalProperties": {"type": "string"},
+                "type": "object",
+                "x-schema-required": True,
+            }
+        ),
+    ] = Field(default_factory=OutcomeMap)
     default_outcome: str | SpecialOutcome
     add_alias_from_expression_to: str | None = None
 

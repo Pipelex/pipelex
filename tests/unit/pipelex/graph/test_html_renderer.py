@@ -1,7 +1,10 @@
 """Unit tests for the HTML renderer module."""
 
+import re
+
 import pytest
 
+from pipelex.graph.csp import CSP_NONCE_SENTINEL
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
 from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
@@ -122,5 +125,33 @@ class TestRenderMermaidHtml:
     def test_html_styling_included(self) -> None:
         """Test that some basic styling is included."""
         result = render_mermaid_html(self.SAMPLE_MERMAID_CODE)
-        assert "<style>" in result
+        assert "<style" in result
         assert "</style>" in result
+
+    def test_html_contains_csp_nonce_on_inline_script(self) -> None:
+        """Verify the inline script tag has the CSP nonce sentinel."""
+        result = render_mermaid_html(self.SAMPLE_MERMAID_CODE)
+
+        pattern = rf'<script nonce="{re.escape(CSP_NONCE_SENTINEL)}">'
+        assert re.search(pattern, result), "Inline <script> should have the CSP nonce sentinel"
+
+    def test_html_contains_csp_nonce_on_inline_style(self) -> None:
+        """Verify the inline style tag has the CSP nonce sentinel."""
+        result = render_mermaid_html(self.SAMPLE_MERMAID_CODE)
+
+        assert f'<style nonce="{CSP_NONCE_SENTINEL}">' in result
+
+    def test_html_contains_csp_nonce_on_cdn_scripts(self) -> None:
+        """Verify the CDN mermaid script tag has the CSP nonce sentinel."""
+        result = render_mermaid_html(self.SAMPLE_MERMAID_CODE)
+
+        cdn_scripts = re.findall(r'<script [^>]*src="https?://[^"]*"[^>]*>', result)
+        assert len(cdn_scripts) >= 1, "Expected at least 1 CDN script tag"
+        for tag in cdn_scripts:
+            assert f'nonce="{CSP_NONCE_SENTINEL}"' in tag, f"CDN script missing nonce: {tag}"
+
+    def test_html_has_no_csp_meta_tag(self) -> None:
+        """Verify no CSP meta tag is present (standalone HTML should be CSP-free)."""
+        result = render_mermaid_html(self.SAMPLE_MERMAID_CODE)
+
+        assert "Content-Security-Policy" not in result

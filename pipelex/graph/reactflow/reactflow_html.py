@@ -7,6 +7,7 @@ ReactFlow viewers that can render ViewSpec graphs interactively.
 import json
 
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.graph.csp import CSP_NONCE_SENTINEL
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow.viewspec import ViewSpec
@@ -56,6 +57,7 @@ def generate_reactflow_html(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
         templating_context={
+            "csp_nonce": CSP_NONCE_SENTINEL,
             "title": title or config.default_title,
             "logo_dark": URLs.logo_white_on_transparent,
             "logo_light": URLs.logo_black_on_transparent,
@@ -119,6 +121,7 @@ async def generate_reactflow_html_async(
         template_source=template_source,
         template_category=TemplateCategory.HTML,
         templating_context={
+            "csp_nonce": CSP_NONCE_SENTINEL,
             "title": title or config.default_title,
             "logo_dark": URLs.logo_white_on_transparent,
             "logo_light": URLs.logo_black_on_transparent,
