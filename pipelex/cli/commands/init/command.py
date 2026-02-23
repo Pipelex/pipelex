@@ -14,6 +14,7 @@ from pipelex.cli.commands.init.backends import (
     get_selected_backend_keys,
 )
 from pipelex.cli.commands.init.config_files import init_config
+from pipelex.cli.commands.init.credentials import prompt_credentials
 from pipelex.cli.commands.init.routing import customize_routing_profile
 from pipelex.cli.commands.init.telemetry import setup_telemetry
 from pipelex.cli.commands.init.ui.gateway_ui import (
@@ -116,6 +117,7 @@ def confirm_initialization(
     needs_inference: bool,
     needs_routing: bool,
     needs_telemetry: bool,
+    check_credentials: bool,
     reset: bool,
     focus: InitFocus,
 ) -> bool:
@@ -127,6 +129,7 @@ def confirm_initialization(
         needs_inference: Whether inference setup is needed.
         needs_routing: Whether routing setup is needed.
         needs_telemetry: Whether telemetry setup is needed.
+        check_credentials: Whether credential prompting will happen.
         reset: Whether this is a reset operation.
         focus: The initialization focus area.
 
@@ -137,7 +140,7 @@ def confirm_initialization(
         typer.Exit: If user cancels initialization.
     """
     console.print()
-    console.print(build_initialization_panel(needs_config, needs_inference, needs_routing, needs_telemetry, reset))
+    console.print(build_initialization_panel(needs_config, needs_inference, needs_routing, needs_telemetry, reset, check_credentials))
 
     if not Confirm.ask("[bold]Continue with initialization?[/bold]", default=True):
         console.print("\n[yellow]Initialization cancelled.[/yellow]")
@@ -147,7 +150,7 @@ def confirm_initialization(
                     init_cmd_str = "pipelex init agreement"
                 case InitFocus.ALL:
                     init_cmd_str = "pipelex init"
-                case InitFocus.CONFIG | InitFocus.INFERENCE | InitFocus.ROUTING | InitFocus.TELEMETRY:
+                case InitFocus.CONFIG | InitFocus.CREDENTIALS | InitFocus.INFERENCE | InitFocus.ROUTING | InitFocus.TELEMETRY:
                     init_cmd_str = f"pipelex init {focus}"
             console.print(f"[dim]You can initialize later by running:[/dim] [cyan]{init_cmd_str}[/cyan]")
         console.print()
@@ -162,6 +165,7 @@ def execute_initialization(
     needs_inference: bool,
     needs_routing: bool,
     needs_telemetry: bool,
+    check_credentials: bool,
     reset: bool,
     check_inference: bool,
     check_routing: bool,
@@ -178,6 +182,7 @@ def execute_initialization(
         needs_inference: Whether to set up inference backends.
         needs_routing: Whether to set up routing profiles.
         needs_telemetry: Whether to set up telemetry.
+        check_credentials: Whether to prompt for missing credentials.
         reset: Whether this is a reset operation.
         check_inference: Whether inference was in focus.
         check_routing: Whether routing was in focus.
@@ -262,7 +267,11 @@ def execute_initialization(
             if selected_backend_keys:
                 customize_routing_profile(selected_backend_keys)
 
-    # Step 2.5: Set up routing profile if specifically requested
+    # Step 2.5: Prompt for missing credentials
+    if check_credentials:
+        prompt_credentials(console, backends_toml_path)
+
+    # Step 3: Set up routing profile if specifically requested
     if needs_routing:
         console.print()
 
@@ -280,7 +289,7 @@ def execute_initialization(
         else:
             console.print("[yellow]⚠ Warning: No backends enabled. Please run 'pipelex init inference' first.[/yellow]")
 
-    # Step 3: Set up telemetry if needed
+    # Step 4: Set up telemetry if needed
     if needs_telemetry:
         setup_telemetry(console, telemetry_config_path)
 
@@ -343,13 +352,13 @@ def init_cmd(
     skip_confirmation: bool = False,
     local: bool = False,
 ):
-    """Initialize Pipelex configuration, inference backends, routing, and telemetry.
+    """Initialize Pipelex configuration, inference backends, credentials, routing, and telemetry.
 
     Note: Config updates are not yet supported. This command always performs a full reset
     of the configuration, overwriting any existing files.
 
     Args:
-        focus: What to initialize - 'agreement', 'config', 'inference', 'routing', 'telemetry', or 'all' (default)
+        focus: What to initialize - 'all', 'agreement', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
         local: If True, create project-level .pipelex/ at the detected project root. Otherwise, create global ~/.pipelex/.
     """
@@ -358,6 +367,18 @@ def init_cmd(
     # Handle agreement-only flow separately (no reset needed)
     if focus == InitFocus.AGREEMENT:
         _init_agreement(console)
+        return
+
+    # Handle credentials-only flow separately (no reset needed)
+    if focus == InitFocus.CREDENTIALS:
+        backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
+        if not path_exists(backends_toml_path):
+            console.print()
+            console.print("[yellow]No backends.toml found. Please run 'pipelex init' first.[/yellow]")
+            console.print()
+            return
+        prompt_credentials(console, backends_toml_path)
+        console.print()
         return
 
     # Config updates are not yet supported - always reset
@@ -383,6 +404,7 @@ def init_cmd(
 
     # Determine what to check based on focus parameter
     check_config = focus in {InitFocus.ALL, InitFocus.CONFIG}
+    check_credentials = focus in {InitFocus.ALL, InitFocus.CONFIG, InitFocus.INFERENCE}
     check_inference = focus in {InitFocus.ALL, InitFocus.INFERENCE}
     check_routing = focus == InitFocus.ROUTING
     check_telemetry = focus in {InitFocus.ALL, InitFocus.TELEMETRY}
@@ -417,6 +439,7 @@ def init_cmd(
                 needs_inference=needs_inference,
                 needs_routing=needs_routing,
                 needs_telemetry=needs_telemetry,
+                check_credentials=check_credentials,
                 reset=reset,
                 focus=focus,
             )
@@ -431,6 +454,7 @@ def init_cmd(
             needs_inference=needs_inference,
             needs_routing=needs_routing,
             needs_telemetry=needs_telemetry,
+            check_credentials=check_credentials,
             reset=reset,
             check_inference=check_inference,
             check_routing=check_routing,

@@ -122,20 +122,35 @@ def app_callback(
     check_readiness()
 
 
-@app.command(name="init", help="Initialize Pipelex configuration in ~/.pipelex (global) or project .pipelex (--local)")
+@app.command(name="init", help="Initialize Pipelex configuration, backends, credentials, routing, and telemetry")
 def init_command(
-    focus: Annotated[InitFocus, typer.Argument(help="What to initialize: 'config', 'telemetry', or 'all'")] = InitFocus.ALL,
+    focus: Annotated[
+        InitFocus,
+        typer.Argument(
+            help="What to initialize: 'all' (default), 'config', 'credentials', 'inference', 'routing', 'telemetry', or 'agreement'",
+        ),
+    ] = InitFocus.ALL,
     local: Annotated[
         bool, typer.Option("--local", "-l", help="Create project-level .pipelex/ at the detected project root instead of global ~/.pipelex/")
     ] = False,
 ) -> None:
-    """Initialize Pipelex configuration and telemetry.
+    """Initialize Pipelex configuration in ~/.pipelex (global) or project .pipelex (--local).
 
-    By default, creates global configuration in ~/.pipelex/.
-    Use --local to create project-level overrides in {project_root}/.pipelex/.
+    Focus options:
 
-    Note: Config updates are not yet supported. This command always performs a full
-    reset of the configuration.
+      all          Full setup: config files, backends, credentials, routing, telemetry (default)
+
+      config       Reset configuration files and prompt for missing API keys
+
+      credentials  Prompt for missing API keys only (reads enabled backends, saves to ~/.pipelex/.env)
+
+      inference    Reset inference backends selection and prompt for missing API keys
+
+      routing      Reset routing profile
+
+      telemetry    Reset telemetry preferences
+
+      agreement    Review/accept Pipelex Gateway terms of service
     """
     init_cmd(focus=focus, local=local)
 
