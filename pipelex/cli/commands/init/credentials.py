@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from rich.console import Console
+from rich.markup import escape
 from rich.prompt import Prompt
 
 from pipelex.system.configuration.config_loader import config_manager
@@ -134,7 +135,9 @@ def prompt_credentials(console: Console, backends_toml_path: str) -> None:
     collected_count = 0
     for var_name, backend_names in sorted(missing_vars.items()):
         backends_str = ", ".join(backend_names)
-        value = Prompt.ask(f"  [bold]{var_name}[/bold] [dim](required by {backends_str})[/dim]", default="", console=console)
+        value = Prompt.ask(
+            f"  [bold]{escape(var_name)}[/bold] [dim](required by {escape(backends_str)})[/dim]", default="", console=console, password=True
+        )
         if value:
             entries[var_name] = value
             os.environ[var_name] = value
