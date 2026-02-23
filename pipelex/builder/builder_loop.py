@@ -3,6 +3,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.packages.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
+from mthds.packages.discovery import MANIFEST_FILENAME
+from mthds.packages.manifest import MthdsPackageManifest
+from mthds.packages.manifest_parser import serialize_manifest_to_toml
 
 from pipelex import builder, log
 from pipelex.builder.builder import (
@@ -20,10 +24,6 @@ from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.packages.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
-from pipelex.core.packages.discovery import MANIFEST_FILENAME
-from pipelex.core.packages.manifest import MthdsPackageManifest
-from pipelex.core.packages.manifest_parser import serialize_manifest_to_toml
 from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeCategory
 from pipelex.core.pipes.variable_multiplicity import format_concept_with_multiplicity, parse_concept_with_multiplicity
@@ -1129,7 +1129,7 @@ def maybe_generate_manifest_for_output(output_dir: Path) -> Path | None:
         return None
 
     # Parse each bundle to extract domain and pipe info
-    domain_pipes, domain_main_pipes, _blueprints, errors = scan_bundles_for_domain_info(mthds_files)
+    domain_pipes, domain_main_pipes, errors = scan_bundles_for_domain_info(mthds_files)
     for error in errors:
         log.warning(f"Could not parse {error}")
 
