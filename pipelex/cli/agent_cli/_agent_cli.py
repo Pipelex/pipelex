@@ -21,7 +21,6 @@ from pipelex.cli.agent_cli.commands.mthds_init_cmd import mthds_init_cmd
 from pipelex.cli.agent_cli.commands.mthds_install_cmd import mthds_install_cmd
 from pipelex.cli.agent_cli.commands.mthds_list_cmd import mthds_list_cmd
 from pipelex.cli.agent_cli.commands.mthds_lock_cmd import mthds_lock_cmd
-from pipelex.cli.agent_cli.commands.mthds_publish_cmd import mthds_publish_cmd
 from pipelex.cli.agent_cli.commands.mthds_update_cmd import mthds_update_cmd
 from pipelex.cli.agent_cli.commands.mthds_validate_cmd import mthds_validate_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
@@ -55,7 +54,6 @@ class PipelexAgentCLI(TyperGroup):
             "mthds-lock",
             "mthds-install",
             "mthds-update",
-            "mthds-publish",
             "mthds-validate",
         ]
 
@@ -142,5 +140,4 @@ app.command(name="mthds-add", help="Add a dependency to METHODS.toml")(mthds_add
 app.command(name="mthds-lock", help="Resolve dependencies and generate methods.lock")(mthds_lock_cmd)
 app.command(name="mthds-install", help="Install dependencies from methods.lock")(mthds_install_cmd)
 app.command(name="mthds-update", help="Re-resolve dependencies and update methods.lock")(mthds_update_cmd)
-app.command(name="mthds-publish", help="Publish package for distribution")(mthds_publish_cmd)
 app.command(name="mthds-validate", help="Validate METHODS.toml via runner")(mthds_validate_cmd)

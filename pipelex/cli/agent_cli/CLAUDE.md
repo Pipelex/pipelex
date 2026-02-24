@@ -42,7 +42,6 @@ commands/
   mthds_lock_cmd.py            # mthds-lock — resolve deps, generate lock
   mthds_install_cmd.py         # mthds-install — install from lock
   mthds_update_cmd.py          # mthds-update — re-resolve deps
-  mthds_publish_cmd.py         # mthds-publish — publish package
   mthds_validate_cmd.py        # mthds-validate — validate manifest/pipes
 ```
 
@@ -68,7 +67,6 @@ commands/
 | `mthds-lock` | Resolve dependencies and generate methods.lock (delegates to mthds) |
 | `mthds-install` | Install dependencies from methods.lock (delegates to mthds) |
 | `mthds-update` | Re-resolve dependencies and update methods.lock (delegates to mthds) |
-| `mthds-publish` | Publish package for distribution (delegates to mthds) |
 | `mthds-validate` | Validate METHODS.toml and optionally run deeper validation (delegates to mthds) |
 
 ## Key Patterns
