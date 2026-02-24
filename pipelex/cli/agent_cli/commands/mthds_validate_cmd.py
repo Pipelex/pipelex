@@ -41,8 +41,8 @@ def mthds_validate_cmd(
         args.append("--all")
     if runner is not None:
         args.extend(["--runner", runner])
-    if extra_args:
-        args.extend(extra_args)
     if directory is not None:
         args.extend(["--directory", directory])
+    if extra_args:
+        args.extend(extra_args)
     run_mthds(args)
