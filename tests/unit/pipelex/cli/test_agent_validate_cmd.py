@@ -43,13 +43,19 @@ class TestValidateCmd:
         mocker.patch(f"{VALIDATE_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{VALIDATE_CMD_MODULE}.Pipelex.teardown_if_needed")
 
-        # First asyncio.run succeeds (bundle validation), second fails (graph generation)
+        # Bundle validation succeeds
         validation_result: dict[str, Any] = {
             "success": True,
             "bundle_path": str(mthds_file),
             "validated_pipes": [{"pipe_code": "my_pipe", "status": "SUCCESS"}],
             "total_pipes": 1,
         }
+        mocker.patch(
+            f"{VALIDATE_CMD_MODULE}._validate_bundle_core",
+            new=mocker.AsyncMock(return_value=validation_result),
+        )
+
+        # Graph generation fails
         graph_error = PipelineExecutionError(
             message="Graph rendering blew up",
             run_mode=PipeRunMode.DRY,
@@ -58,8 +64,8 @@ class TestValidateCmd:
             pipe_stack=["my_pipe"],
         )
         mocker.patch(
-            f"{VALIDATE_CMD_MODULE}.asyncio.run",
-            side_effect=[validation_result, graph_error],
+            f"{VALIDATE_CMD_MODULE}.generate_graph_for_bundle",
+            new=mocker.AsyncMock(side_effect=graph_error),
         )
 
         with pytest.raises(typer.Exit) as exc_info:
