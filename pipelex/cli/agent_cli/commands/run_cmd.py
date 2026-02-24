@@ -95,12 +95,7 @@ async def _run_pipeline_core(
         output_dir = Path(bundle_uri).parent
     else:
         output_dir = Path("pipelex-wip")
-
-    # Save output JSON next to the bundle (mirrors graph naming: dry_run.html / live_run.html)
-    output_filename = "dry_run.json" if dry_run else "live_run.json"
-    output_path = output_dir / output_filename
-    output_path.write_text(clean_json_dumps(result, indent=2), encoding="utf-8")
-    result["output_file"] = str(output_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # Generate and save graph visualizations if requested
     if graph and pipe_output.graph_spec:
@@ -140,6 +135,12 @@ async def _run_pipeline_core(
             final_path = reactflow_path.parent / graph_filename
             reactflow_path.rename(final_path)
             result["graph_files"] = {"graph_html": str(final_path)}
+
+    # Save output JSON after all result fields are populated
+    output_filename = "dry_run.json" if dry_run else "live_run.json"
+    output_path = output_dir / output_filename
+    output_path.write_text(clean_json_dumps(result, indent=2), encoding="utf-8")
+    result["output_file"] = str(output_path)
 
     return result
 
