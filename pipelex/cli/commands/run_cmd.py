@@ -286,7 +286,10 @@ def run_cmd(
 
         # Execute pipeline
         inputs_description = f" with inputs '{inputs}'" if inputs and not inputs.startswith("{") else ""
-        typer.secho(f"\n🚀 Executing {source_description}{inputs_description}...\n", fg=typer.colors.GREEN, bold=True)
+        if dry_run:
+            typer.secho(f"\n🧪 Dry-running {source_description}{inputs_description}...\n", fg=typer.colors.YELLOW, bold=True)
+        else:
+            typer.secho(f"\n🚀 Executing {source_description}{inputs_description}...\n", fg=typer.colors.GREEN, bold=True)
 
         # Determine pipe run mode
         pipe_run_mode = PipeRunMode.DRY if dry_run else None
@@ -401,7 +404,10 @@ def run_cmd(
 
         # Print completion recap
         console = get_console()
-        console.print("\n[green]✓[/green] [bold]Pipeline execution completed successfully[/bold]")
+        if dry_run:
+            console.print("\n[yellow]✓[/yellow] [bold]Dry run completed successfully[/bold]")
+        else:
+            console.print("\n[green]✓[/green] [bold]Pipeline execution completed successfully[/bold]")
         if output_path:
             console.print(f"  Output saved to [bold magenta]{output_path}[/bold magenta]:")
             if saved_graphs:
