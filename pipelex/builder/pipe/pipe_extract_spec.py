@@ -57,7 +57,12 @@ class PipeExtractSpec(PipeSpec):
     @field_validator("extract_talent", mode="before")
     @classmethod
     def validate_extract_talent(cls, extract_talent_value: str) -> ExtractTalent:
-        return ExtractTalent(extract_talent_value)
+        try:
+            return ExtractTalent(extract_talent_value)
+        except ValueError:
+            valid = [talent.value for talent in ExtractTalent]
+            msg = f"'{extract_talent_value}' is not a valid ExtractTalent. Valid values: {valid}"
+            raise ValueError(msg) from None
 
     @field_validator("inputs", mode="before")
     @classmethod

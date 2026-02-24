@@ -41,8 +41,12 @@ class PipeImgGenSpec(PipeSpec):
     def validate_img_gen_talent(cls, img_gen_talent_value: str | None) -> ImgGenTalent | None:
         if img_gen_talent_value is None:
             return None
-        else:
+        try:
             return ImgGenTalent(img_gen_talent_value)
+        except ValueError:
+            valid = [talent.value for talent in ImgGenTalent]
+            msg = f"'{img_gen_talent_value}' is not a valid ImgGenTalent. Valid values: {valid}"
+            raise ValueError(msg) from None
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

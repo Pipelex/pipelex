@@ -44,6 +44,7 @@ dependencies = [
   "pydantic>=2.10.6,<3.0.0",
   "python-dotenv>=1.0.1",
   "PyYAML>=6.0.2",
+  "reportlab>=4.0,<5",                                  # for generating synthetic PDFs
   "rich>=13.8.1",
   "semantic-version>=2.10.0",
   "shortuuid>=1.0.13",
@@ -110,7 +111,7 @@ build-backend = "hatchling.build"
 
 [tool.mypy]
 check_untyped_defs = true
-exclude = "^.*\\.venv/.*$"
+exclude = ["^.*\\.venv/.*$", "^typings/backports/strenum/__init__\\.pyi$"]
 mypy_path = ".:typings"
 packages = ["pipelex", "tests"]
 plugins = ["pydantic.mypy"]

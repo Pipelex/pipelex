@@ -264,6 +264,10 @@ def agent_models_cmd(
             "aliases": aliases,
             "waterfalls": waterfalls,
             "talent_mappings": talent,
+            "talent_mappings_usage_hint": (
+                "Use the talent name (key) as the value for llm_talent / extract_talent / img_gen_talent"
+                " in pipe specs passed to 'pipelex-agent pipe --spec'"
+            ),
         }
 
         agent_success(result)

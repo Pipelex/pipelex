@@ -24,6 +24,9 @@ from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
+from pipelex.builder.talents.extract_talent import ExtractTalent
+from pipelex.builder.talents.img_gen_talent import ImgGenTalent
+from pipelex.builder.talents.llm_talent import LLMTalent
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
@@ -51,6 +54,15 @@ EXTRACT_TALENT_TO_MODEL: dict[str, str] = {
     "pdf-basic-text-extractor": "@default-text-from-pdf",
     "image-text-extractor": "@default-extract-image",
     "full-document-extractor": "@default-extract-document",
+}
+
+# Maps pipe types to their talent field names and valid values.
+# Used to enrich validation errors with field_hints so the agent knows
+# what values are valid when a talent field is missing or wrong.
+PIPE_TYPE_TALENT_HINTS: dict[str, dict[str, list[str]]] = {
+    "PipeLLM": {"llm_talent": [talent.value for talent in LLMTalent]},
+    "PipeExtract": {"extract_talent": [talent.value for talent in ExtractTalent]},
+    "PipeImgGen": {"img_gen_talent": [talent.value for talent in ImgGenTalent]},
 }
 
 
@@ -247,7 +259,7 @@ def pipe_cmd(
         "description": "What the pipe does",
         "inputs": {"input_name": "ConceptName"},
         "output": "OutputConcept",
-        "llm_talent": "CREATIVE_WRITER",
+        "llm_talent": "creative-writer",
         "prompt": "Your prompt with @block and $inline vars"
     }
 
@@ -312,7 +324,8 @@ def pipe_cmd(
 
     except ValidationError as exc:
         message, details = format_pydantic_validation_error_for_agent(exc)
-        agent_error(message, "ValidationError", cause=exc, validation_details=details)
+        field_hints = PIPE_TYPE_TALENT_HINTS.get(resolved_pipe_type, {})
+        agent_error(message, "ValidationError", cause=exc, validation_details=details, field_hints=field_hints)
 
     except ValueError as exc:
         agent_error(str(exc), "ValueError", cause=exc)

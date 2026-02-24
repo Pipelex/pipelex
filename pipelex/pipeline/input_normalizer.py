@@ -10,6 +10,7 @@ from typing import Any, cast
 
 import shortuuid
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.document_content import DocumentContent
@@ -216,7 +217,11 @@ async def _normalize_url_content(
             return content
 
         # Read local file, detect type, upload to storage
-        raw_bytes = await load_binary_async(resolved_uri.path)
+        try:
+            raw_bytes = await load_binary_async(resolved_uri.path)
+        except FileNotFoundError as exc:
+            msg = f"Input file not found: '{resolved_uri.path}'"
+            raise PipelexError(msg) from exc
         file_type = detect_file_type_from_bytes(raw_bytes)
         key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
         storage_uri = await storage.store(data=raw_bytes, key=key, content_type=file_type.mime)
