@@ -24,6 +24,10 @@ def mthds_add_cmd(
         str | None,
         typer.Option("--path", "-p", help="Local filesystem path to the dependency"),
     ] = None,
+    directory: Annotated[
+        str | None,
+        typer.Option("--directory", "-d", help="Package directory (defaults to current directory)"),
+    ] = None,
 ) -> None:
     """Add a dependency to METHODS.toml.
 
@@ -37,4 +41,6 @@ def mthds_add_cmd(
         args.extend(["--version", version])
     if path is not None:
         args.extend(["--path", path])
+    if directory is not None:
+        args.extend(["--directory", directory])
     run_mthds(args)

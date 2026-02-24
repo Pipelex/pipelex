@@ -24,6 +24,10 @@ def mthds_validate_cmd(
         list[str] | None,
         typer.Argument(help="Additional arguments passed through to the runner"),
     ] = None,
+    directory: Annotated[
+        str | None,
+        typer.Option("--directory", "-d", help="Package directory (defaults to current directory)"),
+    ] = None,
 ) -> None:
     """Validate METHODS.toml and optionally run deeper validation via a runner.
 
@@ -39,4 +43,6 @@ def mthds_validate_cmd(
         args.extend(["--runner", runner])
     if extra_args:
         args.extend(extra_args)
+    if directory is not None:
+        args.extend(["--directory", directory])
     run_mthds(args)
