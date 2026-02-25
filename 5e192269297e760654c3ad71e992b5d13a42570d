@@ -1,0 +1,27 @@
+pipelex/cli/agent_cli/commands/run/_run_core_api.py
+  b8fbfafc037ad904 56
+pipelex/cli/agent_cli/commands/run/stdin_resolver.py
+  b8fbfafc037ad904 91
+pipelex/cli/agent_cli/commands/run/_run_core.py
+  b8fbfafc037ad904 79
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "5e192269297e760654c3ad71e992b5d13a42570d",
+  "prompts": {
+    "b8fbfafc037ad904": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "154c094a-a161-4d94-9822-bdab93104120",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
