@@ -828,24 +828,29 @@ docs-check: env
 	$(call PRINT_TITLE,"Checking documentation build with mkdocs")
 	$(VENV_MKDOCS) build --strict
 
+docs-serve-versioned: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
 docs-serve-versioned: env
 	$(call PRINT_TITLE,"Serving versioned documentation with mike")
 	$(VENV_MIKE) serve
 
+docs-list: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
 docs-list: env
 	$(call PRINT_TITLE,"Listing deployed documentation versions")
 	$(VENV_MIKE) list
 
+docs-deploy: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
 docs-deploy: env
 	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
 	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
 
+docs-deploy-stable: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
 docs-deploy-stable: env
 	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
 	$(MAKE) docs-deploy-root
 
+docs-deploy-specific-version-pre-release: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
 docs-deploy-specific-version-pre-release: env
 	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
@@ -855,7 +860,7 @@ docs-deploy-root:
 ifeq ($(SITE_DOMAIN),)
 	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
 endif
-	$(call PRINT_TITLE,"Deploying root assets (404.html, robots.txt, index.html) to gh-pages")
+	$(call PRINT_TITLE,"Deploying root assets to gh-pages")
 	@git fetch origin gh-pages:gh-pages 2>/dev/null || true; \
 	TMPDIR=$$(mktemp -d); \
 	trap "cd '$(CURDIR)'; git worktree remove '$$TMPDIR' 2>/dev/null || true; rm -rf '$$TMPDIR'" EXIT; \
@@ -868,6 +873,7 @@ endif
 	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html)") && \
 	git push origin gh-pages
 
+docs-delete: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
 docs-delete: env
 ifndef VERSION
 	$(error VERSION is required. Usage: make docs-delete VERSION=x.y.z)
