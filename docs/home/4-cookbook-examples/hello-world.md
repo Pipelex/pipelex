@@ -68,7 +68,6 @@ Write a haiku about Hello World.
 
 1.  Clone the cookbook repository:
     ```bash
-    # PRERELEASE_LINK
     git clone https://github.com/Pipelex/pipelex-cookbook.git
     cd pipelex-cookbook
     ```
@@ -79,7 +78,6 @@ Write a haiku about Hello World.
 3.  Set up your environment variables by copying `.env.example` to `.env` and adding your API keys.
 4.  Run the example:
     ```bash
-    # PRERELEASE_LINK
     python examples/a_quick_start/hello_world.py
     ```
 
