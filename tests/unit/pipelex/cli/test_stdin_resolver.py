@@ -287,3 +287,48 @@ class TestStdinResolver:
         with pytest.raises(typer.Exit) as exc_info:
             parse_cli_inputs(inputs_arg="/nonexistent/path/to/file.json")
         assert exc_info.value.exit_code == 1
+
+    # -------------------------------------------------------------------------
+    # auto_inputs_path precedence tests
+    # -------------------------------------------------------------------------
+
+    def test_stdin_beats_auto_detected_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+        """When stdin has data and auto_inputs_path is set, stdin wins."""
+        auto_file = tmp_path / "inputs.json"
+        auto_file.write_text('{"from_auto": true}')
+
+        stdin_data = json.dumps({"from_stdin": True})
+        mock_stdin = io.StringIO(stdin_data)
+        mock_stdin.isatty = lambda: False  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", mock_stdin)
+
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        assert result == {"from_stdin": True}
+
+    def test_explicit_inputs_beats_stdin_and_auto(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+        """When inputs_arg, stdin, and auto_inputs_path are all set, inputs_arg wins."""
+        auto_file = tmp_path / "inputs.json"
+        auto_file.write_text('{"from_auto": true}')
+
+        stdin_data = json.dumps({"from_stdin": True})
+        mock_stdin = io.StringIO(stdin_data)
+        mock_stdin.isatty = lambda: False  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", mock_stdin)
+
+        result = parse_cli_inputs(
+            inputs_arg='{"from_arg": true}',
+            auto_inputs_path=str(auto_file),
+        )
+        assert result == {"from_arg": True}
+
+    def test_auto_detected_path_used_when_no_stdin(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+        """When stdin is a TTY and auto_inputs_path is set, auto path is used."""
+        auto_file = tmp_path / "inputs.json"
+        auto_file.write_text('{"from_auto": true}')
+
+        mock_stdin = io.StringIO("")
+        mock_stdin.isatty = lambda: True  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", mock_stdin)
+
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        assert result == {"from_auto": True}

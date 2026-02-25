@@ -113,19 +113,23 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
 def parse_cli_inputs(
     inputs_arg: str | None,
     stdin_fallback: bool = True,
+    auto_inputs_path: str | None = None,
 ) -> dict[str, Any] | None:
-    """Parse pipeline inputs from CLI --inputs argument or stdin fallback.
+    """Parse pipeline inputs from CLI --inputs argument, stdin, or auto-detected path.
 
     Resolution order:
 
     1. If ``inputs_arg`` is provided: parse as inline JSON (starts with ``{``) or file path.
     2. If ``inputs_arg`` is None and ``stdin_fallback`` is True and stdin is not a TTY:
        read JSON from stdin and resolve envelope format if present.
-    3. Otherwise return None (no inputs).
+    3. If ``auto_inputs_path`` is provided: parse it as a file path (lowest priority fallback).
+    4. Otherwise return None (no inputs).
 
     Args:
         inputs_arg: The ``--inputs`` CLI argument value, or None.
         stdin_fallback: Whether to attempt reading from stdin when ``inputs_arg`` is None.
+        auto_inputs_path: Auto-detected inputs file path (e.g. from a directory target).
+            Only used as a last-resort fallback when both ``inputs_arg`` and stdin are absent.
 
     Returns:
         Parsed inputs dict, or None if no inputs are available.
@@ -135,6 +139,9 @@ def parse_cli_inputs(
 
     if stdin_fallback and not sys.stdin.isatty():
         return _read_stdin_inputs()
+
+    if auto_inputs_path is not None:
+        return _parse_inputs_arg(auto_inputs_path)
 
     return None
 

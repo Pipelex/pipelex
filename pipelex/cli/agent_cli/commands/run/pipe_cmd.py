@@ -87,6 +87,7 @@ def run_pipe_cmd(
     # Determine pipe_code and bundle_path from arguments
     pipe_code: str | None = None
     bundle_path: str | None = None
+    auto_inputs_path: str | None = None
 
     if target:
         target_path = Path(target)
@@ -112,10 +113,9 @@ def run_pipe_cmd(
                     )
                 bundle_path = str(mthds_files[0])
 
-            # Auto-detect inputs if --inputs not explicitly provided
+            # Auto-detect inputs file (used as low-priority fallback)
             inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
-            if not inputs and inputs_file.is_file():
-                inputs = str(inputs_file)
+            auto_inputs_path = str(inputs_file) if inputs_file.is_file() else None
 
             # Add directory as library dir (prepend to user-supplied list)
             target_dir_str = str(target_path)
@@ -178,7 +178,7 @@ def run_pipe_cmd(
             agent_error(f"Failed to parse bundle '{bundle_path}': {exc}", type(exc).__name__, cause=exc)
 
     # Load inputs: --inputs flag takes priority, then stdin fallback
-    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True)
+    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True, auto_inputs_path=auto_inputs_path)
 
     runner_type: RunnerType = ctx.obj["runner"]
 

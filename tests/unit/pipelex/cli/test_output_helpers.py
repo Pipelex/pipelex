@@ -74,3 +74,34 @@ class TestBuildRunOutput:
         assert "main_stuff" in result
         assert "working_memory" in result
         assert result != compact
+
+    def test_full_with_memory_includes_extra_metadata(self) -> None:
+        """With with_memory=True and extra_metadata, metadata is merged into the envelope."""
+        main_stuff: dict[str, Any] = {"json": {"key": "val"}, "markdown": "# val"}
+        working_memory: dict[str, Any] = {"root": {"stuff_a": {"concept": "Text"}}}
+        extra: dict[str, Any] = {"pipeline_run_id": "run-123", "pipeline_state": "COMPLETED"}
+        result = build_run_output(
+            with_memory=True,
+            main_stuff_json=main_stuff,
+            working_memory_dump=working_memory,
+            compact_result={"key": "val"},
+            extra_metadata=extra,
+        )
+        assert result["main_stuff"] == main_stuff
+        assert result["working_memory"] == working_memory
+        assert result["pipeline_run_id"] == "run-123"
+        assert result["pipeline_state"] == "COMPLETED"
+
+    def test_compact_ignores_extra_metadata(self) -> None:
+        """With with_memory=False, extra_metadata is not included in compact output."""
+        compact: dict[str, Any] = {"clauses": [{"id": 1}]}
+        extra: dict[str, Any] = {"pipeline_run_id": "run-456", "pipeline_state": "COMPLETED"}
+        result = build_run_output(
+            with_memory=False,
+            main_stuff_json={"json": compact},
+            working_memory_dump={"root": {}},
+            compact_result=compact,
+            extra_metadata=extra,
+        )
+        assert result == compact
+        assert "pipeline_run_id" not in result
