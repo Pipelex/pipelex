@@ -537,7 +537,7 @@ class LibraryManager(LibraryManagerAbstract):
             )
 
         # Load dependency packages if manifest has local-path dependencies
-        if manifest is not None and manifest.dependencies:
+        if manifest is not None and getattr(manifest, "dependencies", None):
             package_root = self._find_package_root(mthds_paths=valid_mthds_paths)
             if package_root is not None:
                 self._load_dependency_packages(
