@@ -138,7 +138,9 @@ def parse_cli_inputs(
         return _parse_inputs_arg(inputs_arg)
 
     if stdin_fallback and not sys.stdin.isatty():
-        return _read_stdin_inputs()
+        stdin_inputs = _read_stdin_inputs()
+        if stdin_inputs is not None:
+            return stdin_inputs
 
     if auto_inputs_path is not None:
         return _parse_inputs_arg(auto_inputs_path)

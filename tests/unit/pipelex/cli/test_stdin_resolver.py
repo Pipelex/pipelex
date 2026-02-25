@@ -321,6 +321,18 @@ class TestStdinResolver:
         )
         assert result == {"from_arg": True}
 
+    def test_empty_stdin_falls_back_to_auto_inputs_path(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
+        """When stdin is non-TTY but empty and auto_inputs_path is set, auto path is used."""
+        auto_file = tmp_path / "inputs.json"
+        auto_file.write_text('{"from_auto": true}')
+
+        mock_stdin = io.StringIO("")
+        mock_stdin.isatty = lambda: False  # type: ignore[assignment]
+        monkeypatch.setattr("sys.stdin", mock_stdin)
+
+        result = parse_cli_inputs(inputs_arg=None, auto_inputs_path=str(auto_file))
+        assert result == {"from_auto": True}
+
     def test_auto_detected_path_used_when_no_stdin(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Any) -> None:
         """When stdin is a TTY and auto_inputs_path is set, auto path is used."""
         auto_file = tmp_path / "inputs.json"
