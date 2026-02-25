@@ -98,7 +98,6 @@ async def _validate_pipe_or_bundle(
         except ValidateBundleError as bundle_error:
             handle_validate_bundle_error(bundle_error, bundle_path=bundle_path)
     elif pipe_code:
-        typer.echo(f"Validating pipe '{pipe_code}'...")
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
         set_current_library(library_id=library_id)
@@ -108,6 +107,7 @@ async def _validate_pipe_or_bundle(
             library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
         pipe = get_required_pipe(pipe_code=pipe_code)
+        typer.echo(f"Validating pipe '{pipe_code}'...")
         get_telemetry_manager().track_event(EventName.PIPE_DRY_RUN, properties={EventProperty.PIPE_TYPE: pipe.type})
         await dry_run_pipe(
             pipe,

@@ -45,6 +45,7 @@ def inputs_method_cmd(
     pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
+        library_dirs=library_dir,
     )
     bundle_path: Path | None = None
     if method.mthds_files:

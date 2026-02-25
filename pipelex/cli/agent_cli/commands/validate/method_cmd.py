@@ -48,6 +48,7 @@ def validate_method_cmd(
     pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
+        library_dirs=library_dir,
     )
     if not method.mthds_files:
         agent_error(f"Method '{name}' has no .mthds bundle files.", "MethodError")

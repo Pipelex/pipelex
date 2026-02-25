@@ -55,6 +55,7 @@ def _find_method_by_exported_pipe(pipe_code: str) -> InstalledMethod:
 def resolve_method_target(
     method_name: str,
     pipe_override: str | None = None,
+    library_dirs: list[str] | None = None,
 ) -> tuple[str, list[str], InstalledMethod]:
     """Resolve a method name to (pipe_code, library_dirs, method).
 
@@ -65,6 +66,7 @@ def resolve_method_target(
     Args:
         method_name: The installed method name to resolve.
         pipe_override: Optional pipe code override (takes precedence over main_pipe).
+        library_dirs: Additional directories to search for methods.
 
     Returns:
         A tuple of (pipe_code, library_dirs, installed_method) for execution.
@@ -73,7 +75,7 @@ def resolve_method_target(
         typer.Exit: On resolution errors with user-friendly messages.
     """
     try:
-        method = find_method_by_name(method_name)
+        method = find_method_by_name(method_name, library_dirs=library_dirs)
     except MethodNotFoundError as exc:
         typer.secho(
             f"Method '{method_name}' is not installed. Check installed methods with: ls ~/.mthds/methods/ or ls .mthds/methods/",

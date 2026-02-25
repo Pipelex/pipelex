@@ -42,6 +42,7 @@ def build_inputs_method_cmd(
     pipe_code, method_library_dirs, _ = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
+        library_dirs=library_dir,
     )
 
     effective_library_dir = list(method_library_dirs)

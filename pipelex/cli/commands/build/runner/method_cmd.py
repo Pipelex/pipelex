@@ -40,6 +40,7 @@ def build_runner_method_cmd(
     pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
+        library_dirs=library_dirs,
     )
     if not method.mthds_files:
         typer.secho(
