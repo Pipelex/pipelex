@@ -1,7 +1,7 @@
 from typing import ClassVar
 
 from markupsafe import escape
-from mthds.models.pipeline_inputs import StuffContentOrData
+from mthds.client.models.pipeline_inputs import StuffContentOrData
 from pydantic import Field
 
 from pipelex.core.concepts.concept_factory import ConceptFactory

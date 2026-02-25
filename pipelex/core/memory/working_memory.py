@@ -1,7 +1,7 @@
 from operator import attrgetter
 from typing import Any, cast
 
-from mthds.models.working_memory import WorkingMemoryAbstract
+from mthds.client.models.working_memory import WorkingMemoryAbstract
 from pydantic import Field, model_validator
 from typing_extensions import override
 

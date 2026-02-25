@@ -1,7 +1,7 @@
 from typing import Any, Callable
 
 from kajson.kajson_manager import KajsonManager
-from mthds.models.concept import ConceptAbstract
+from mthds.client.models.concept import ConceptAbstract
 from pydantic import field_validator
 
 from pipelex import log

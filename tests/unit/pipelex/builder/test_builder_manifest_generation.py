@@ -1,8 +1,8 @@
 import shutil
 from pathlib import Path
 
-from mthds.packages.discovery import MANIFEST_FILENAME
-from mthds.packages.manifest_parser import parse_methods_toml
+from mthds.package.discovery import MANIFEST_FILENAME
+from mthds.package.manifest.parser import parse_methods_toml
 
 from pipelex.builder.builder_loop import maybe_generate_manifest_for_output
 
@@ -32,7 +32,7 @@ class TestBuilderManifestGeneration:
 
         # Check that main_pipe entries are exported
         exported_pipes: list[str] = []
-        for domain_export in manifest.exports:
+        for domain_export in manifest.exports.values():
             exported_pipes.extend(domain_export.pipes)
         assert "pkg_test_extract_clause" in exported_pipes
         assert "pkg_test_compute_weighted_score" in exported_pipes
@@ -60,8 +60,8 @@ class TestBuilderManifestGeneration:
 
         # Build a lookup of domain -> pipes
         domain_pipes: dict[str, list[str]] = {}
-        for domain_export in manifest.exports:
-            domain_pipes[domain_export.domain_path] = domain_export.pipes
+        for domain_path, domain_export in manifest.exports.items():
+            domain_pipes[domain_path] = domain_export.pipes
 
         # contracts.mthds has main_pipe = "pkg_test_extract_clause"
         assert "pkg_test_extract_clause" in domain_pipes.get("pkg_test_legal.contracts", [])
