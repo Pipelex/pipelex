@@ -4,10 +4,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.kajson_manager import KajsonManager
-from mthds.packages.dependency_resolver import ResolvedDependency, resolve_all_dependencies
-from mthds.packages.discovery import find_package_manifest
-from mthds.packages.exceptions import DependencyResolveError, ManifestError
-from mthds.packages.manifest import MTHDS_STANDARD_VERSION, MthdsPackageManifest
+from mthds.package.dependency_resolver import ResolvedDependency, resolve_all_dependencies
+from mthds.package.discovery import find_package_manifest
+from mthds.package.exceptions import DependencyResolveError, ManifestError
+from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
@@ -588,7 +588,7 @@ class LibraryManager(LibraryManagerAbstract):
         self,
         blueprints: list[PipelexBundleBlueprint],
         mthds_paths: list[Path],
-    ) -> MthdsPackageManifest | None:
+    ) -> MethodsManifest | None:
         """Check package visibility if a METHODS.toml manifest exists.
 
         Walks up from the first bundle path to find a METHODS.toml manifest.
@@ -671,7 +671,7 @@ class LibraryManager(LibraryManagerAbstract):
     def _load_dependency_packages(
         self,
         library_id: str,
-        manifest: MthdsPackageManifest,
+        manifest: MethodsManifest,
         package_root: Path,
     ) -> None:
         """Load dependency packages into the library.

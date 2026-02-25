@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
-from mthds.models.pipeline_inputs import StuffContentOrData
+from mthds.client.models.pipeline_inputs import StuffContentOrData
 
 from pipelex import log, pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory

@@ -121,8 +121,25 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
             pipe_table.add("prompt", pipe_spec.prompt)
 
     elif isinstance(pipe_spec, PipeComposeSpec):
-        pipe_table.add("target_format", pipe_spec.target_format)
-        pipe_table.add("template", pipe_spec.template)
+        if pipe_spec.construct_spec is not None:
+            # Construct mode: serialize the construct block as a nested TOML table
+            construct_table = tomlkit.table()
+            for field_name, field_value in pipe_spec.construct_spec.items():
+                if isinstance(field_value, dict):
+                    field_inline = tomlkit.inline_table()
+                    inner_dict: dict[str, Any] = field_value
+                    for key, value in inner_dict.items():
+                        field_inline.append(key, value)
+                    construct_table.add(field_name, field_inline)
+                else:
+                    construct_table.add(field_name, field_value)
+            pipe_table.add("construct", construct_table)
+        else:
+            # Template mode — guard optional fields like other pipe types do
+            if pipe_spec.target_format is not None:
+                pipe_table.add("target_format", str(pipe_spec.target_format))
+            if pipe_spec.template is not None:
+                pipe_table.add("template", pipe_spec.template)
 
     elif isinstance(pipe_spec, PipeSequenceSpec):
         steps_array = tomlkit.array()

@@ -45,7 +45,10 @@ class TestGraphCmd:
             "pipe_code": pipe_code,
             "direction": direction,
         }
-        return mocker.patch(f"{GRAPH_CMD_MODULE}.asyncio.run", return_value=result)
+        return mocker.patch(
+            f"{GRAPH_CMD_MODULE}.generate_graph_for_bundle",
+            new=mocker.AsyncMock(return_value=result),
+        )
 
     def test_valid_mthds_file_produces_success_json(
         self,
@@ -68,21 +71,21 @@ class TestGraphCmd:
         assert "output_dir" in parsed
         assert "files" in parsed
 
-    def test_valid_mthds_file_calls_asyncio_run_once(
+    def test_valid_mthds_file_calls_generate_graph_once(
         self,
         agent_ctx: Any,
         mocker: MockerFixture,
         tmp_path: Path,
     ) -> None:
-        """Valid .mthds file should call asyncio.run once (generate_graph_for_bundle handles everything)."""
+        """Valid .mthds file should call generate_graph_for_bundle once."""
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
-        mock_asyncio_run = self._mock_generate_graph_for_bundle(mocker)
+        mock_generate = self._mock_generate_graph_for_bundle(mocker)
 
         graph_cmd(ctx=agent_ctx, target=str(mthds_file))
 
-        assert mock_asyncio_run.call_count == 1
+        assert mock_generate.call_count == 1
 
     def test_non_mthds_file_produces_error(
         self,
@@ -134,8 +137,8 @@ class TestGraphCmd:
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(
-            f"{GRAPH_CMD_MODULE}.asyncio.run",
-            side_effect=PipelexInterpreterError("does not declare a main_pipe"),
+            f"{GRAPH_CMD_MODULE}.generate_graph_for_bundle",
+            new=mocker.AsyncMock(side_effect=PipelexInterpreterError("does not declare a main_pipe")),
         )
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -161,8 +164,8 @@ class TestGraphCmd:
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(
-            f"{GRAPH_CMD_MODULE}.asyncio.run",
-            side_effect=PipelexError("Pipeline execution did not produce a graph spec"),
+            f"{GRAPH_CMD_MODULE}.generate_graph_for_bundle",
+            new=mocker.AsyncMock(side_effect=PipelexError("Pipeline execution did not produce a graph spec")),
         )
 
         with pytest.raises(typer.Exit) as exc_info:
@@ -251,8 +254,8 @@ class TestGraphCmd:
         mocker.patch(f"{GRAPH_CMD_MODULE}.make_pipelex_for_agent_cli")
         mocker.patch(f"{GRAPH_CMD_MODULE}.Pipelex.teardown_if_needed")
         mocker.patch(
-            f"{GRAPH_CMD_MODULE}.asyncio.run",
-            side_effect=MthdsDecodeError(message="bad toml", doc="invalid toml {{{{", pos=0, lineno=1, colno=1),
+            f"{GRAPH_CMD_MODULE}.generate_graph_for_bundle",
+            new=mocker.AsyncMock(side_effect=MthdsDecodeError(message="bad toml", doc="invalid toml {{{{", pos=0, lineno=1, colno=1)),
         )
 
         with pytest.raises(typer.Exit) as exc_info:
