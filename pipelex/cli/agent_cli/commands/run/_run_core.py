@@ -93,6 +93,11 @@ async def run_pipeline_core(
         output_dir = Path("pipelex-wip")
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    # Side-effect metadata (file paths) is tracked separately so it never
+    # leaks into the compact stdout output.  It is written to the on-disk
+    # JSON file and, when with_memory is True, included in the returned dict.
+    side_effects: dict[str, Any] = {}
+
     # Generate and save graph visualizations if requested
     if graph and pipe_output.graph_spec:
         graph_config = execution_config.graph_config
@@ -130,12 +135,18 @@ async def run_pipeline_core(
         if reactflow_path:
             final_path = reactflow_path.parent / graph_filename
             reactflow_path.rename(final_path)
-            result["graph_files"] = {"graph_html": str(final_path)}
+            side_effects["graph_files"] = {"graph_html": str(final_path)}
 
-    # Save output JSON after all result fields are populated
+    # Save output JSON (includes side-effect paths for on-disk reference)
     output_filename = "dry_run.json" if dry_run else "live_run.json"
     output_path = output_dir / output_filename
-    output_path.write_text(clean_json_dumps(result, indent=2), encoding="utf-8")
-    result["output_file"] = str(output_path)
+    disk_output = {**result, **side_effects}
+    output_path.write_text(clean_json_dumps(disk_output, indent=2), encoding="utf-8")
+    side_effects["output_file"] = str(output_path)
+
+    # In full mode, include side-effect metadata in the returned output;
+    # in compact mode, keep stdout clean (concept JSON only).
+    if with_memory:
+        result.update(side_effects)
 
     return result
