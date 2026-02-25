@@ -55,7 +55,6 @@ async def _execute_run(
 
     Shared between the ``method`` and ``pipe`` subcommands.
     """
-    source_description: str
     mthds_content: str | None = None
     if bundle_path:
         try:
@@ -73,18 +72,13 @@ async def _execute_run(
                     typer.secho(msg, fg=typer.colors.RED, err=True)
                     raise typer.Exit(1)
                 pipe_code = main_pipe_code
-                source_description = f"bundle '{bundle_path}' • main pipe: '{pipe_code}'"
-            else:
-                source_description = f"bundle '{bundle_path}' • pipe: '{pipe_code}'"
         except FileNotFoundError as exc:
             typer.secho(f"Failed to load bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
         except (PipelexInterpreterError, MthdsDecodeError) as exc:
             typer.secho(f"Failed to parse bundle '{bundle_path}': {exc}", fg=typer.colors.RED, err=True)
             raise typer.Exit(1) from exc
-    elif pipe_code:
-        source_description = f"pipe '{pipe_code}'"
-    else:
+    elif not pipe_code:
         typer.secho("Failed to run: no pipe code specified", fg=typer.colors.RED, err=True)
         raise typer.Exit(1)
 
@@ -107,13 +101,6 @@ async def _execute_run(
             except JsonTypeError as json_type_error_exc:
                 typer.secho(f"Failed to parse input file '{inputs}': must be a valid JSON dictionary", fg=typer.colors.RED, err=True)
                 raise typer.Exit(1) from json_type_error_exc
-
-    # Execute pipeline
-    inputs_description = f" with inputs '{inputs}'" if inputs and not inputs.startswith("{") else ""
-    if dry_run:
-        typer.secho(f"\n🧪 Dry-running {source_description}{inputs_description}...\n", fg=typer.colors.YELLOW, bold=True)
-    else:
-        typer.secho(f"\n🚀 Executing {source_description}{inputs_description}...\n", fg=typer.colors.GREEN, bold=True)
 
     # Determine pipe run mode
     pipe_run_mode = PipeRunMode.DRY if dry_run else None
