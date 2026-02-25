@@ -194,14 +194,15 @@ def find_method_by_name(
         methods = discover_installed_methods()
 
     # Merge in methods discovered from library dirs, deduplicating by resolved path
+    all_methods = list(methods)
     if library_dirs:
-        seen_paths = {method.path.resolve() for method in methods}
+        seen_paths = {method.path.resolve() for method in all_methods}
         for lib_method in discover_methods_from_library_dirs(library_dirs):
             if lib_method.path.resolve() not in seen_paths:
-                methods.append(lib_method)
+                all_methods.append(lib_method)
                 seen_paths.add(lib_method.path.resolve())
 
-    matches = [method for method in methods if method.name == method_name]
+    matches = [method for method in all_methods if method.name == method_name]
 
     if len(matches) == 0:
         msg = f"No installed method named '{method_name}' found."
