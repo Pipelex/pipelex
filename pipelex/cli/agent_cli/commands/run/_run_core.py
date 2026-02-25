@@ -76,7 +76,7 @@ async def run_pipeline_core(
 
     compact_result: dict[str, Any] | None = None
     if main_stuff:
-        compact_result = json.loads(await main_stuff.content.rendered_json_async())
+        compact_result = json.loads(main_stuff_json["json"])
 
     result = build_run_output(
         with_memory=with_memory,

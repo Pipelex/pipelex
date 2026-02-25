@@ -88,7 +88,7 @@ def resolve_stdin_inputs(stdin_data: dict[str, Any]) -> dict[str, Any]:
     resolved: dict[str, Any] = {}
     for stuff_name, stuff_data_raw in root.items():
         # Skip the main_stuff alias entry — we want the real named stuffs
-        if stuff_name == MAIN_STUFF_KEY and stuff_name in aliases:
+        if stuff_name == MAIN_STUFF_KEY:
             continue
 
         if not isinstance(stuff_data_raw, dict):

@@ -53,7 +53,7 @@ async def run_pipeline_core_api(
     compact_result: dict[str, Any] | None = None
     if main_stuff is not None:
         content: Any = main_stuff.content
-        compact_result = cast("dict[str, Any]", content) if isinstance(content, dict) else {}
+        compact_result = cast("dict[str, Any]", content) if isinstance(content, dict) else {"result": content}
 
     return build_run_output(
         with_memory=with_memory,
