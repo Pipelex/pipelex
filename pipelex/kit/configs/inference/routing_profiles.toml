@@ -8,47 +8,25 @@
 # Support: https://go.pipelex.com/discord
 # =========================================================================================
 
-# Which profile to use (change this to switch routing)
-active = "pipelex_first"
+# Note: The internal backend (software-only models) is always available regardless of
+# which routing profile you select. See the documentation for details.
 
-# We recommend using the "pipelex_first" profile to get a head start with all models.
-# The Pipelex Inference backend is currently not recommended for production use,
-# but it's great for development and testing.
-# To use the Pipelex Inference backend (pipelex_first profile):
-# 1. Join our Discord community to get your free API key (no credit card required):
-#    Visit https://go.pipelex.com/discord and request your key in the appropriate channel
-# 2. Set the environment variable: export PIPELEX_INFERENCE_API_KEY="your-api-key"
-# 3. The .pipelex/inference/backends.toml is already configured with api_key = "${PIPELEX_INFERENCE_API_KEY}"
-# which will get the key from the environment variable.
+# Which profile to use (change this to switch routing)
+active = "all_pipelex_gateway"
+
+# We recommend using the "all_pipelex_gateway" profile to get a head start with all models.
+# To use the Pipelex Gateway backend:
+# 1. Get your API key at https://app.pipelex.com (free credits included)
+# 2. Add it to your .env file: PIPELEX_GATEWAY_API_KEY=your-key-here
+# 3. Run `pipelex init` and accept the Gateway terms of service
 
 # =========================================================================================
 # Routing Profiles
 # =========================================================================================
 
-[profiles.pipelex_first]
-description = "Use Pipelex Inference backend for all its supported models"
-default = "pipelex_inference"
-fallback_order = [
-    "pipelex_inference",
-    "azure_openai",
-    "bedrock",
-    "blackboxai",
-    "mistral",
-    "fal",
-]
-
-[profiles.pipelex_first.routes]
-# Pattern matching: "model-pattern" = "backend-name"
-"gpt-*" = "pipelex_inference"
-"claude-*" = "pipelex_inference"
-"grok-*" = "pipelex_inference"
-"gemini-*" = "pipelex_inference"
-
-[profiles.pipelex_first.optional_routes] # Each optional route is considered only if its backend is available
-"*-sdxl" = "fal"
-"flux-*" = "fal"
-"gpt-image-1" = "openai"
-"mistral-ocr" = "mistral"
+[profiles.all_pipelex_gateway]
+description = "Use Pipelex Gateway for all its supported models"
+default = "pipelex_gateway"
 
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
@@ -78,6 +56,10 @@ default = "google"
 description = "Use groq backend for all its supported models"
 default = "groq"
 
+[profiles.all_huggingface]
+description = "Use HuggingFace backend for all its supported models"
+default = "huggingface"
+
 [profiles.all_mistral]
 description = "Use Mistral backend for all its supported models"
 default = "mistral"
@@ -90,13 +72,29 @@ default = "ollama"
 description = "Use OpenAI backend for all its supported models"
 default = "openai"
 
-[profiles.all_pipelex_inference]
-description = "Use Pipelex Inference backend for all its supported models"
-default = "pipelex_inference"
+[profiles.all_openrouter]
+description = "Use OpenRouter backend for all its supported models"
+default = "openrouter"
+
+[profiles.all_portkey]
+description = "Use Portkey backend for all its supported models"
+default = "portkey"
+
+[profiles.all_scaleway]
+description = "Use Scaleway backend for all its supported models"
+default = "scaleway"
+
+[profiles.all_vertexai]
+description = "Use Vertex AI backend for all its supported models"
+default = "vertexai"
 
 [profiles.all_xai]
 description = "Use xAI backend for all its supported models"
 default = "xai"
+
+[profiles.all_internal]
+description = "Use internal backend for all its supported models"
+default = "internal"
 
 # =========================================================================================
 # Custom Profiles
@@ -119,7 +117,7 @@ default = "xai"
 # =========================================================================================
 [profiles.example_routing_using_patterns]
 description = "Example routing profile using patterns"
-default = "pipelex_inference"
+default = "pipelex_gateway"
 
 [profiles.example_routing_using_patterns.routes]
 # Pattern matching: "model-pattern" = "backend-name"
@@ -139,17 +137,17 @@ default = "pipelex_inference"
 description = "Example routing profile using specific models"
 
 [profiles.example_routing_using_specific_models.routes]
-"gpt-5-nano" = "pipelex_inference"
+"gpt-5-nano" = "pipelex_gateway"
 "gpt-4o-mini" = "blackboxai"
 "gpt-5-mini" = "openai"
 "gpt-5-chat" = "azure_openai"
 
-"claude-4-sonnet" = "pipelex_inference"
+"claude-4-sonnet" = "pipelex_gateway"
 "claude-3.7-sonnet" = "blackboxai"
 
-"gemini-2.5-flash-lite" = "pipelex_inference"
+"gemini-2.5-flash-lite" = "pipelex_gateway"
 "gemini-2.5-flash" = "blackboxai"
 "gemini-2.5-pro" = "vertexai"
 
-"grok-3" = "pipelex_inference"
+"grok-3" = "pipelex_gateway"
 "grok-3-mini" = "xai"

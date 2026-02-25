@@ -14,13 +14,14 @@ from pipelex.cogt.content_generation.assignment_models import (
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
 from pipelex.cogt.content_generation.extract_generate import extract_gen_pages
+from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.content_generation.img_gen_generate import img_gen_image_list, img_gen_single_image
 from pipelex.cogt.content_generation.llm_generate import llm_gen_object, llm_gen_object_list, llm_gen_text
 from pipelex.cogt.content_generation.templating_generate import templating_gen_text
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
@@ -30,11 +31,18 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
+from pipelex.core.stuffs.image_content import ImageContent
+from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class ContentGenerator(ContentGeneratorProtocol):
+    def __init__(self, generated_content_factory: GeneratedContentFactory) -> None:
+        self._generated_content_factory = generated_content_factory
+
     @override
     @update_job_metadata
     async def make_llm_text(
@@ -195,6 +203,35 @@ class ContentGenerator(ContentGeneratorProtocol):
         return cast("list[BaseModelTypeVar]", obj_list)
 
     @override
+    async def make_image_content(
+        self,
+        job_metadata: JobMetadata,
+        generated_image_raw_details: GeneratedImageRawDetails,
+        img_gen_prompt: ImgGenPrompt | None,
+    ) -> ImageContent:
+        image_content = await self._generated_content_factory.make_image_content(
+            primary_id=job_metadata.user_id,
+            secondary_id=job_metadata.pipeline_run_id,
+            raw_details=generated_image_raw_details,
+        )
+        if img_gen_prompt:
+            image_content.source_prompt = img_gen_prompt.positive_text
+            image_content.source_negative_prompt = img_gen_prompt.negative_text
+        return image_content
+
+    @override
+    async def make_page_contents(
+        self,
+        job_metadata: JobMetadata,
+        extract_output: ExtractOutput,
+    ) -> list[PageContent]:
+        return await self._generated_content_factory.make_page_contents(
+            primary_id=job_metadata.user_id,
+            secondary_id=job_metadata.pipeline_run_id,
+            extract_output=extract_output,
+        )
+
+    @override
     @update_job_metadata
     async def make_single_image(
         self,
@@ -203,19 +240,25 @@ class ContentGenerator(ContentGeneratorProtocol):
         img_gen_prompt: ImgGenPrompt,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> GeneratedImage:
+    ) -> ImageContent:
         img_gen_config = get_config().cogt.img_gen_config
+        img_gen_job_params = img_gen_job_params or img_gen_config.make_default_img_gen_job_params()
+        img_gen_job_config = img_gen_job_config or img_gen_config.img_gen_job_config
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
             img_gen_handle=img_gen_handle,
             img_gen_prompt=img_gen_prompt,
-            img_gen_job_params=img_gen_job_params or img_gen_config.make_default_img_gen_job_params(),
-            img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
+            img_gen_job_params=img_gen_job_params,
+            img_gen_job_config=img_gen_job_config,
             nb_images=1,
         )
-        generated_image = await img_gen_single_image(img_gen_assignment=img_gen_assignment)
-        log.verbose(f"{self.__class__.__name__} generated image: {generated_image}")
-        return generated_image
+        generated_image_raw_details = await img_gen_single_image(img_gen_assignment=img_gen_assignment)
+        log.verbose(f"{self.__class__.__name__} generated image raw details: {generated_image_raw_details}")
+        return await self.make_image_content(
+            job_metadata=job_metadata,
+            img_gen_prompt=img_gen_prompt,
+            generated_image_raw_details=generated_image_raw_details,
+        )
 
     @override
     @update_job_metadata
@@ -227,7 +270,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         nb_images: int,
         img_gen_job_params: ImgGenJobParams | None = None,
         img_gen_job_config: ImgGenJobConfig | None = None,
-    ) -> list[GeneratedImage]:
+    ) -> list[ImageContent]:
         img_gen_config = get_config().cogt.img_gen_config
         img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
@@ -237,9 +280,16 @@ class ContentGenerator(ContentGeneratorProtocol):
             img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
             nb_images=nb_images,
         )
-        generated_image_list = await img_gen_image_list(img_gen_assignment=img_gen_assignment)
-        log.verbose(f"{self.__class__.__name__} generated image list: {generated_image_list}")
-        return generated_image_list
+        generated_images_as_raw_details = await img_gen_image_list(img_gen_assignment=img_gen_assignment)
+        log.verbose(f"{self.__class__.__name__} generated image list: {generated_images_as_raw_details}")
+        return [
+            await self.make_image_content(
+                job_metadata=job_metadata,
+                generated_image_raw_details=raw_details,
+                img_gen_prompt=img_gen_prompt,
+            )
+            for raw_details in generated_images_as_raw_details
+        ]
 
     @override
     async def make_templated_text(
@@ -258,6 +308,35 @@ class ContentGenerator(ContentGeneratorProtocol):
         return await templating_gen_text(templating_assignment=templating_assignment)
 
     @override
+    async def make_render_page_views(
+        self,
+        job_metadata: JobMetadata,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
+        extract_job_config: ExtractJobConfig | None = None,
+    ) -> list[ImageContent]:
+        if not extract_input.document_uri:
+            msg = "PDF URI is required to render page views"
+            raise ValueError(msg)
+        job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
+        page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
+        page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.document_uri, dpi=page_views_dpi)
+        page_view_images_resolved: list[ImageContent] = []
+        for page_view_image in page_view_images:
+            image_content = await self.make_image_content(
+                job_metadata=job_metadata,
+                generated_image_raw_details=GeneratedImageRawDetails.make_from_pil_image(
+                    pil_image=page_view_image,
+                    image_format=ImageFormat.PNG,
+                ),
+                img_gen_prompt=None,
+            )
+            page_view_images_resolved.append(image_content)
+
+        return page_view_images_resolved
+
+    @override
     async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
@@ -265,12 +344,37 @@ class ContentGenerator(ContentGeneratorProtocol):
         extract_handle: str,
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
-    ) -> ExtractOutput:
+    ) -> list[PageContent]:
+        extract_job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
+        extract_job_config = extract_job_config or ExtractJobConfig()
         extract_assignment = ExtractAssignment(
             job_metadata=job_metadata,
             extract_input=extract_input,
             extract_handle=extract_handle,
-            extract_job_params=extract_job_params or ExtractJobParams.make_default_extract_job_params(),
-            extract_job_config=extract_job_config or ExtractJobConfig(),
+            extract_job_params=extract_job_params,
+            extract_job_config=extract_job_config,
         )
-        return await extract_gen_pages(extract_assignment=extract_assignment)
+        extract_output = await extract_gen_pages(extract_assignment=extract_assignment)
+        page_contents = await self.make_page_contents(
+            job_metadata=job_metadata,
+            extract_output=extract_output,
+        )
+        if extract_job_params and extract_job_params.should_include_page_views:
+            page_view_contents: list[ImageContent] = []
+            if extract_input.document_uri:
+                page_view_contents = await self.make_render_page_views(
+                    extract_input=extract_input,
+                    extract_handle=extract_handle,
+                    job_metadata=job_metadata,
+                    extract_job_params=extract_job_params,
+                    extract_job_config=extract_job_config,
+                )
+            elif extract_input.image_uri:
+                page_view_contents = [ImageContent(url=extract_input.image_uri)]
+            if len(page_view_contents) != len(page_contents):
+                msg = f"Number of page view contents ({len(page_view_contents)}) does not match number of page contents ({len(page_contents)})"
+                raise ValueError(msg)
+            for page_content in page_contents:
+                page_content.page_view = page_view_contents.pop(0)
+
+        return page_contents

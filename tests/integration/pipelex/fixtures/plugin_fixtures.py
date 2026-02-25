@@ -25,14 +25,3 @@ def plugin_for_openai(request: pytest.FixtureRequest) -> Plugin:
 def plugin_for_anthropic(request: pytest.FixtureRequest) -> Plugin:
     assert isinstance(request.param, Plugin)
     return request.param
-
-
-@pytest.fixture(
-    params=[
-        # None,
-        "https://inference.pipelex.com/v1",
-    ],
-)
-def openai_endpoint(request: pytest.FixtureRequest) -> str | None:
-    assert isinstance(request.param, str) or request.param is None
-    return request.param

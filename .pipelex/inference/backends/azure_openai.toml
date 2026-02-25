@@ -22,9 +22,10 @@
 
 [defaults]
 model_type = "llm"
-sdk = "azure_openai"
+sdk = "azure_openai_responses"
 prompting_target = "openai"
-structure_method = "instructor/openai_tools"
+structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -68,28 +69,32 @@ model_id = "o1-mini-2024-09-12"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 3.0, output = 12.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o1]
 model_id = "o1-2024-12-17"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 15.0, output = 60.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o3-mini]
 model_id = "o3-mini-2025-01-31"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o3]
 model_id = "o3-2025-04-16"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 # --- GPT-5 Series -------------------------------------------------------------
 [gpt-5-mini]
@@ -97,28 +102,32 @@ model_id = "gpt-5-mini-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-nano]
 model_id = "gpt-5-nano-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.4 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-chat]
 model_id = "gpt-5-chat-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5]
 model_id = "gpt-5-2025-08-07"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 # --- GPT-5.1 Series -------------------------------------------------------------
 ["gpt-5.1"]
@@ -126,14 +135,40 @@ model_id = "gpt-5.1-2025-11-13"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 ["gpt-5.1-chat"]
 model_id = "gpt-5.1-chat-2025-11-13"
 inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+["gpt-5.1-codex"]
+model_id = "gpt-5.1-codex-2025-11-13"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+# --- GPT-5.2 Series -------------------------------------------------------------
+["gpt-5.2"]
+model_id = "gpt-5.2-2025-12-11"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.0 }
+thinking_mode = "manual"
+
+["gpt-5.2-chat"]
+model_id = "gpt-5.2-chat-2025-12-11"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 ################################################################################
 # IMAGE GENERATION MODELS
@@ -141,9 +176,52 @@ constraints = ["temperature_must_be_1"]
 
 # --- OpenAI Image Generation --------------------------------------------------
 [gpt-image-1]
-sdk = "azure_rest"
+sdk = "azure_rest_img_gen"
 model_type = "img_gen"
 model_id = "gpt-image-1-2025-04-15"
 inputs = ["text"]
 outputs = ["image"]
-costs = { input = 0.04, output = 0.0 }
+costs = { input = 10, output = 40 }
+
+[gpt-image-1.rules]
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "gpt"
+inference = "gpt"
+safety_checker = "unavailable"
+output_format = "gpt"
+
+[gpt-image-1-mini]
+sdk = "azure_rest_img_gen"
+model_type = "img_gen"
+model_id = "gpt-image-1-mini-2025-10-06"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 2.5, output = 8 }
+
+[gpt-image-1-mini.rules]
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "gpt"
+inference = "gpt"
+safety_checker = "unavailable"
+output_format = "gpt"
+
+["gpt-image-1.5"]
+sdk = "azure_rest_img_gen"
+model_type = "img_gen"
+model_id = "gpt-image-1.5-2025-12-16"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 8, output = 32 }
+
+["gpt-image-1.5".rules]
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "gpt"
+inference = "gpt"
+safety_checker = "unavailable"
+output_format = "gpt"

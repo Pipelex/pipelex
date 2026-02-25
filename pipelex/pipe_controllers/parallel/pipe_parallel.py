@@ -8,17 +8,18 @@ from pipelex import log
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError
-from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_pipeline_tracker, get_required_pipe
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
+from pipelex.graph.graphspec import IOSpec
+from pipelex.hub import get_required_pipe
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunError
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import Self
@@ -59,18 +60,18 @@ class PipeParallel(PipeController):
         return set()
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
         # If we've already visited this pipe, stop recursion
         if self.code in visited_pipes:
-            return InputRequirementsFactory.make_empty()
+            return InputStuffSpecsFactory.make_empty()
 
         # Add this pipe to visited set for recursive calls
         visited_pipes_with_current = visited_pipes | {self.code}
 
-        needed_inputs = InputRequirementsFactory.make_empty()
+        needed_inputs = InputStuffSpecsFactory.make_empty()
 
         for sub_pipe in self.parallel_sub_pipes:
             pipe = get_required_pipe(pipe_code=sub_pipe.pipe_code)
@@ -78,24 +79,24 @@ class PipeParallel(PipeController):
             pipe_needed_inputs = pipe.needed_inputs(visited_pipes_with_current)
             if sub_pipe.batch_params:
                 try:
-                    requirement = pipe_needed_inputs.get_required_input_requirement(variable_name=sub_pipe.batch_params.input_item_stuff_name)
-                except PipeInputNotFoundError as exc:
+                    stuff_spec = pipe_needed_inputs.get_required_stuff_spec(variable_name=sub_pipe.batch_params.input_item_stuff_name)
+                except InputStuffSpecNotFoundError as exc:
                     msg = (
                         f"Batch input item named '{sub_pipe.batch_params.input_item_stuff_name}' is not "
                         f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
                     )
                     raise PipeValidationError(message=msg) from exc
-                needed_inputs.add_requirement(
+                needed_inputs.add_stuff_spec(
                     variable_name=sub_pipe.batch_params.input_list_stuff_name,
-                    concept=requirement.concept,
+                    concept=stuff_spec.concept,
                     multiplicity=True,
                 )
-                for input_name, requirement in pipe_needed_inputs.items:
+                for input_name, stuff_spec in pipe_needed_inputs.items:
                     if input_name != sub_pipe.batch_params.input_item_stuff_name:
-                        needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+                        needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
             else:
-                for input_name, requirement in pipe_needed_inputs.items:
-                    needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+                for input_name, stuff_spec in pipe_needed_inputs.items:
+                    needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
         return needed_inputs
 
     @model_validator(mode="after")
@@ -128,7 +129,7 @@ class PipeParallel(PipeController):
         return {sub_pipe.pipe_code for sub_pipe in self.parallel_sub_pipes}
 
     @override
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
@@ -163,19 +164,19 @@ class PipeParallel(PipeController):
             sub_pipe_output_name = self.parallel_sub_pipes[output_index].output_name
             if not sub_pipe_output_name:
                 msg = "PipeParallel requires a result specified for each parallel sub pipe"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
             if self.add_each_output:
                 working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
             output_stuff_content_items.append(output_stuff.content)
             if sub_pipe_output_name in output_stuffs:
                 # TODO: check that at the blueprint / factory level
                 msg = f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
             output_stuffs[sub_pipe_output_name] = output_stuff
             if sub_pipe_output_name in output_stuff_contents:
                 # TODO: check that at the blueprint / factory level
                 msg = f"PipeParallel requires unique output names for each parallel sub pipe, but {sub_pipe_output_name} is already used"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
             log.verbose(f"PipeParallel '{self.code}': output_stuff_contents[{sub_pipe_output_name}]: {output_stuff_contents[sub_pipe_output_name]}")
 
@@ -189,13 +190,22 @@ class PipeParallel(PipeController):
                 stuff=combined_output_stuff,
                 name=output_name,
             )
-            for stuff in output_stuffs.values():
-                get_pipeline_tracker().add_aggregate_step(
-                    from_stuff=stuff,
-                    to_stuff=combined_output_stuff,
-                    pipe_layer=pipe_run_params.pipe_layers,
-                    comment="PipeParallel on output_stuffs",
-                )
+
+            # Register parallel combine edges BEFORE register_branch_outputs, because
+            # register_parallel_combine snapshots the original branch producers from
+            # _stuff_producer_map before register_controller_output overrides them
+            self._register_parallel_combine_with_graph_tracer(
+                job_metadata=job_metadata,
+                combined_stuff=combined_output_stuff,
+                branch_stuffs=output_stuffs,
+            )
+
+        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
+        self._register_branch_outputs_with_graph_tracer(
+            job_metadata=job_metadata,
+            output_stuffs=output_stuffs,
+        )
+
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -209,34 +219,15 @@ class PipeParallel(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        """Dry run implementation for PipeParallel.
-        Validates that all required inputs are present and that all parallel sub-pipes can be dry run.
-        """
-        log.verbose(f"PipeParallel: dry run controller pipe: {self.code}")
-        if pipe_run_params.run_mode != PipeRunMode.DRY:
-            msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
-
-        # 1. Validate that all required inputs are present in the working memory
-        needed_inputs = self.needed_inputs()
-        missing_input_names: list[str] = []
-        for named_input_requirement in needed_inputs.named_input_requirements:
-            if not working_memory.get_optional_stuff(named_input_requirement.variable_name):
-                missing_input_names.append(named_input_requirement.variable_name)
-
-        if missing_input_names:
-            msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): missing required inputs: {missing_input_names}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
-
-        # 2. Validate that all sub-pipes exist
+        # 1. Validate that all sub-pipes exist
         for sub_pipe in self.parallel_sub_pipes:
             try:
                 get_required_pipe(pipe_code=sub_pipe.pipe_code)
             except PipeNotFoundError as exc:
                 msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe.pipe_code}' not found"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode) from exc
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        # 3. Run all sub-pipes in dry mode
+        # 2. Run all sub-pipes in dry mode
         tasks: list[Coroutine[Any, Any, PipeOutput]] = []
 
         for sub_pipe in self.parallel_sub_pipes:
@@ -251,7 +242,7 @@ class PipeParallel(PipeController):
 
         pipe_outputs = await asyncio.gather(*tasks)
 
-        # 4. Process outputs as in the regular run
+        # 3. Process outputs as in the regular run
         output_stuffs: dict[str, Stuff] = {}
         output_stuff_contents: dict[str, StuffContent] = {}
 
@@ -261,7 +252,7 @@ class PipeParallel(PipeController):
             if not sub_pipe_output_name:
                 sub_pipe_code = self.parallel_sub_pipes[output_index].pipe_code
                 msg = f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe_code}' output name not specified"
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
             if self.add_each_output:
                 working_memory.add_new_stuff(name=sub_pipe_output_name, stuff=output_stuff)
@@ -271,12 +262,12 @@ class PipeParallel(PipeController):
                 msg = (
                     f"Dry run failed for pipe '{self.code}' (PipeParallel): sub-pipe '{sub_pipe_code}' duplicate output name '{sub_pipe_output_name}'"
                 )
-                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
+                raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
             output_stuffs[sub_pipe_output_name] = output_stuff
             output_stuff_contents[sub_pipe_output_name] = output_stuff.content
 
-        # 5. Handle combined output if specified
+        # 4. Handle combined output if specified
         if self.combined_output:
             combined_output_stuff = StuffFactory.combine_stuffs(
                 concept=self.combined_output,
@@ -287,7 +278,102 @@ class PipeParallel(PipeController):
                 stuff=combined_output_stuff,
                 name=output_name,
             )
+
+            # Register parallel combine edges BEFORE register_branch_outputs, because
+            # register_parallel_combine snapshots the original branch producers from
+            # _stuff_producer_map before register_controller_output overrides them
+            self._register_parallel_combine_with_graph_tracer(
+                job_metadata=job_metadata,
+                combined_stuff=combined_output_stuff,
+                branch_stuffs=output_stuffs,
+            )
+
+        # Register branch outputs with graph tracer so DATA edges flow from PipeParallel to downstream consumers
+        self._register_branch_outputs_with_graph_tracer(
+            job_metadata=job_metadata,
+            output_stuffs=output_stuffs,
+        )
+
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
         )
+
+    def _register_branch_outputs_with_graph_tracer(
+        self,
+        job_metadata: JobMetadata,
+        output_stuffs: dict[str, "Stuff"],
+    ) -> None:
+        """Register branch outputs with the graph tracer.
+
+        This re-registers each branch output's stuff_code as produced by the PipeParallel
+        node, overriding the sub-pipe's registration so that DATA edges flow from
+        PipeParallel to downstream consumers.
+
+        Args:
+            job_metadata: The job metadata containing graph context.
+            output_stuffs: Mapping of output_name to the branch output Stuff.
+        """
+        graph_context = job_metadata.graph_context
+        if graph_context is None:
+            return
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is None or graph_context.parent_node_id is None:
+            return
+        for output_name_key, output_stuff in output_stuffs.items():
+            output_spec = IOSpec(
+                name=output_name_key,
+                concept=output_stuff.concept.code,
+                content_type=output_stuff.content.content_type,
+                digest=output_stuff.stuff_code,
+                data=output_stuff.content.smart_dump() if graph_context.data_inclusion.stuff_json_content else None,
+                data_text=output_stuff.content.rendered_pretty_text() if graph_context.data_inclusion.stuff_text_content else None,
+                data_html=output_stuff.content.rendered_pretty_html() if graph_context.data_inclusion.stuff_html_content else None,
+            )
+            tracer_manager.register_controller_output(
+                graph_id=graph_context.graph_id,
+                node_id=graph_context.parent_node_id,
+                output_spec=output_spec,
+            )
+
+    def _register_parallel_combine_with_graph_tracer(
+        self,
+        job_metadata: JobMetadata,
+        combined_stuff: "Stuff",
+        branch_stuffs: dict[str, "Stuff"],
+    ) -> None:
+        """Register parallel combine edges (branch outputs → combined output).
+
+        Creates PARALLEL_COMBINE edges showing how individual branch results
+        are merged into the combined output.
+
+        Args:
+            job_metadata: The job metadata containing graph context.
+            combined_stuff: The combined output Stuff.
+            branch_stuffs: Mapping of output_name to the branch output Stuff.
+        """
+        graph_context = job_metadata.graph_context
+        if graph_context is None:
+            return
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is None or graph_context.parent_node_id is None:
+            return
+        branch_stuff_codes = [stuff.stuff_code for stuff in branch_stuffs.values()]
+        tracer_manager.register_parallel_combine(
+            graph_id=graph_context.graph_id,
+            combined_stuff_code=combined_stuff.stuff_code,
+            branch_stuff_codes=branch_stuff_codes,
+            parallel_controller_node_id=graph_context.parent_node_id,
+        )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

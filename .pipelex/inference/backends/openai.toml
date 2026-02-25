@@ -22,9 +22,10 @@
 
 [defaults]
 model_type = "llm"
-sdk = "openai"
+sdk = "openai_responses"
 prompting_target = "openai"
-structure_method = "instructor/openai_tools"
+structure_method = "instructor/openai_responses_tools"
+thinking_mode = "none"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -39,130 +40,161 @@ costs = { input = 0.5, output = 1.5 }
 
 # --- GPT-4 Series -------------------------------------------------------------
 [gpt-4]
-model_id = "gpt-4"
+inputs = ["text"]
+outputs = ["text"]
 costs = { input = 30.0, output = 60.0 }
 
 [gpt-4-turbo]
-model_id = "gpt-4-turbo"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 10.0, output = 30.0 }
 
 # --- GPT-4o Series ------------------------------------------------------------
 [gpt-4o-2024-11-20]
-model_id = "gpt-4o-2024-11-20"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 2.5, output = 10.0 }
 
 [gpt-4o]
-model_id = "gpt-4o"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 2.5, output = 10.0 }
 
 [gpt-4o-mini-2024-07-18]
-model_id = "gpt-4o-mini-2024-07-18"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
 [gpt-4o-mini]
-model_id = "gpt-4o-mini"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.15, output = 0.6 }
 
 # --- GPT-4.1 Series -----------------------------------------------------------
 ["gpt-4.1"]
-model_id = "gpt-4.1"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 2, output = 8 }
 
 ["gpt-4.1-mini"]
-model_id = "gpt-4.1-mini"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.4, output = 1.6 }
 
 ["gpt-4.1-nano"]
-model_id = "gpt-4.1-nano"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.4 }
 
 # --- o Series ----------------------------------------------------------------
-[o1-mini]
-model_id = "o1-mini"
-inputs = ["text"]
-outputs = ["text"]
-costs = { input = 3.0, output = 12.0 }
-constraints = ["temperature_must_be_1"]
-
 [o1]
-model_id = "o1"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 15.0, output = 60.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o3-mini]
-model_id = "o3-mini"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o3]
-model_id = "o3"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 10.0, output = 40.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [o4-mini]
-model_id = "o4-mini"
 inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 1.1, output = 4.4 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 # --- GPT-5 Series -------------------------------------------------------------
 [gpt-5]
-model_id = "gpt-5"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-mini]
-model_id = "gpt-5-mini"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.25, output = 2.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-nano]
-model_id = "gpt-5-nano"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 0.05, output = 0.4 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 [gpt-5-chat]
 model_id = "gpt-5-chat-latest"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text"]
 costs = { input = 1.25, output = 10.0 }
-constraints = ["temperature_must_be_1"]
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+[gpt-5-codex]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 # --- GPT-5.1 Series -------------------------------------------------------------
 ["gpt-5.1"]
-model_id = "gpt-5.1"
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.25, output = 10.0 }
+thinking_mode = "manual"
+
+["gpt-5.1-chat"]
+model_id = "gpt-5.1-chat-latest"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+["gpt-5.1-codex"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+["gpt-5.1-codex-max"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.25, output = 10.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+# --- GPT-5.2 Series -------------------------------------------------------------
+["gpt-5.2"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.0 }
+thinking_mode = "manual"
+
+["gpt-5.2-chat"]
+model_id = "gpt-5.2-chat-latest"
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
 
 ################################################################################
 # IMAGE GENERATION MODELS
@@ -170,8 +202,23 @@ costs = { input = 1.25, output = 10.0 }
 
 # --- OpenAI Image Generation --------------------------------------------------
 [gpt-image-1]
+sdk = "openai_img_gen"
 model_type = "img_gen"
-model_id = "gpt-image-1"
 inputs = ["text"]
 outputs = ["image"]
-costs = { input = 0.04, output = 0.0 }
+costs = { input = 10, output = 40 }
+
+[gpt-image-1-mini]
+sdk = "openai_img_gen"
+model_type = "img_gen"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 2.5, output = 8 }
+
+["gpt-image-1.5"]
+sdk = "openai_img_gen"
+model_type = "img_gen"
+model_id = "gpt-image-1.5"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 8, output = 32 }

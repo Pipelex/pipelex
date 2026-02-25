@@ -51,7 +51,7 @@ invoice = pipe_output.main_stuff_as(content_type=Invoice)
 
 ### Option 2: Inline Structure
 
-If the output concept was defined with [inline structures](../concepts/inline-structures.md) directly in the `.plx` file, the generated class is not importable. Use the `PipeOutput` accessor methods instead:
+If the output concept was defined with [inline structures](../concepts/inline-structures.md) directly in the `.mthds` file, the generated class is not importable. Use the `PipeOutput` accessor methods instead:
 
 ```python
 pipe_output = await execute_pipeline(
@@ -176,6 +176,6 @@ This allows you to access intermediate results from multi-step pipelines. See [W
 
 - [Working Memory](working-memory.md) - Understanding data flow between pipes
 - [Executing Pipelines](executing-pipelines.md) - How to run pipelines
-- [Inline Structures](../concepts/inline-structures.md) - Defining structures in `.plx` files
+- [Inline Structures](../concepts/inline-structures.md) - Defining structures in `.mthds` files
 - [Python StructuredContent Classes](../concepts/python-classes.md) - Defining structures in Python
 

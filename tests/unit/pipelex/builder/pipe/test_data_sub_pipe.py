@@ -11,6 +11,13 @@ class SubPipeTestCases:
         SubPipeBlueprint(pipe="process_data", result="processed_data"),
     )
 
+    SUB_PIPE_WITH_BATCH = (
+        "sub_pipe_with_batch",
+        SubPipeSpec(pipe_code="process_item", result="processed_items", batch_over="items", batch_as="item"),
+        SubPipeBlueprint(pipe="process_item", result="processed_items", batch_over="items", batch_as="item"),
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, SubPipeSpec, SubPipeBlueprint]]] = [
         SIMPLE_SUB_PIPE,
+        SUB_PIPE_WITH_BATCH,
     ]

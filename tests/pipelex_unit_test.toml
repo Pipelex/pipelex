@@ -1,7 +1,11 @@
 
+[pipelex.storage_config]
+method = "local"
+
 [cogt.model_deck_config]
 # Allow tests to run with restrictive routing profiles that don't support all presets
 missing_presets_reaction = "none"
 
 [pipelex.feature_config]
+# Enable reporting manager so that it can be tested
 is_reporting_enabled = true

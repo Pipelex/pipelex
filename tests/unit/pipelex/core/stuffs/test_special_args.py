@@ -53,7 +53,7 @@ class TestSpecialArgsStuff:
         These don't conflict because internal metadata fields use underscore prefixes.
         """
         load_empty_library()
-        domain = "test"
+        domain_code = "test"
         concept_library = get_concept_library()
 
         # Create a ConceptBlueprint with a structure containing the field name
@@ -69,9 +69,9 @@ class TestSpecialArgsStuff:
 
         # Make a Concept using ConceptFactory
         concept = ConceptFactory.make_from_blueprint(
-            domain=domain,
+            domain_code=domain_code,
             concept_code=f"Concept{field_name.replace('_', '').title()}",
-            blueprint=concept_blueprint,
+            blueprint_or_string_description=concept_blueprint,
         )
 
         concept_library.add_new_concept(concept)

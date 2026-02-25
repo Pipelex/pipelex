@@ -7,10 +7,10 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker, get_model_deck, get_report_delegate
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
 
 
-@pytest.mark.asyncio
 def test_llm_report_without_running_anything():
     get_report_delegate().generate_report()
 
@@ -20,13 +20,13 @@ def test_llm_report_without_running_anything():
 @pytest.mark.asyncio(loop_scope="class")
 class TestLLMReport:
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
-    async def test_llm_report_single(self, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
-        llm_worker, llm_job = self._get_async_worker_and_job(llm_preset_id=llm_preset_id, prompt_text=prompt_text)
+    async def test_llm_report_single(self, job_metadata: JobMetadata, llm_preset_id: str, topic: str, prompt_text: str):  # noqa: ARG002
+        llm_worker, llm_job = self._get_async_worker_and_job(llm_preset_id=llm_preset_id, prompt_text=prompt_text, job_metadata=job_metadata)
         generated_text = await llm_worker.gen_text(llm_job=llm_job)
         assert generated_text
         pretty_print(generated_text)
 
-    def _get_async_worker_and_job(self, llm_preset_id: str, prompt_text: str):
+    def _get_async_worker_and_job(self, llm_preset_id: str, prompt_text: str, job_metadata: JobMetadata):
         llm_setting = get_model_deck().get_llm_setting(llm_choice=llm_preset_id)
         pretty_print(llm_setting, title=llm_preset_id)
         pretty_print(prompt_text)
@@ -36,24 +36,24 @@ class TestLLMReport:
             llm_prompt=LLMPrompt(
                 user_text=prompt_text,
             ),
+            job_metadata=job_metadata,
             llm_job_config=LLMJobConfig(
-                is_streaming_enabled=False,
                 max_retries=3,
             ),
             llm_job_params=llm_job_params,
         )
         return llm_worker, llm_job
 
-    async def test_llm_report_multiple(self):
+    async def test_llm_report_multiple(self, job_metadata: JobMetadata):
         nb_generations = 3
         prompt_text = LLMTestCases.USER_TEXT_HAIKU
         llm_preset_ids = [
-            "llm_for_testing_gen_text",
-            "llm_for_testing_gen_object",
+            "$testing-text",
+            "$testing-structured",
         ]
         tasks: list[asyncio.Task[str]] = []
         for llm_preset_id in llm_preset_ids:
-            llm_worker, llm_job = self._get_async_worker_and_job(llm_preset_id=llm_preset_id, prompt_text=prompt_text)
+            llm_worker, llm_job = self._get_async_worker_and_job(llm_preset_id=llm_preset_id, prompt_text=prompt_text, job_metadata=job_metadata)
             job_params_base = llm_job.job_params
             max_tokens = 30
             for _ in range(nb_generations):

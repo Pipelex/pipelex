@@ -7,6 +7,7 @@ import tomlkit
 
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.file_utils import path_exists
+from pipelex.tools.misc.json_utils import deep_update
 
 
 class TomlError(ToolError):
@@ -82,3 +83,17 @@ def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str) ->
     """
     with open(path, "w", encoding="utf-8") as file:
         tomlkit.dump(data, file)  # type: ignore[arg-type]
+
+
+def load_toml_from_path_and_merge_with_overrides(paths: list[str]) -> dict[str, Any]:
+    """Load and merge toml files from paths if they exist, merged in sequence.
+
+    Returns:
+        dict[str, Any]: The merged dictionary
+    """
+    merged_dict: dict[str, Any] = {}
+    for path in paths:
+        if one_dict := load_toml_from_path_if_exists(path):
+            deep_update(merged_dict, one_dict)
+
+    return merged_dict

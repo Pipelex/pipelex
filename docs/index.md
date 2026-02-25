@@ -6,9 +6,9 @@ title: "What is Pipelex?"
 
 # What is Pipelex?
 
-Pipelex is an open-source language that enables agents to build and run **repeatable AI workflows**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+Pipelex is an open-source language that enables agents to build and run **repeatable AI methods**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
 
-Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.plx` files) is simple and human-readable, even for non-technical users.
+Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.mthds` files) is simple and human-readable, even for non-technical users.
 
 Each step can be structured and validated, so you benefit from the reliability of software, and the intelligence of AI.
 
@@ -16,20 +16,20 @@ Each step can be structured and validated, so you benefit from the reliability o
 
 ## Key Features
 
-### 🔄 Repeatable AI Workflows
-Build workflows that produce consistent, reliable results every time they run.
+### 🔄 Repeatable AI Methods
+Build methods that produce consistent, reliable results every time they run.
 
 ### 🧩 Concept-Driven Design
 Use semantic typing (Concepts) to ensure each step of your pipeline makes sense and connects logically.
 
 ### 📝 Human-Readable Language
-Write workflows in `.plx` files that are easy to read, edit, and maintain—even for non-developers.
+Write methods in `.mthds` files that are easy to read, edit, and maintain—even for non-developers.
 
 ### 🤖 AI-Assisted Development
-Generate and iterate on workflows using natural language with your favorite AI coding assistant.
+Generate and iterate on methods using natural language with your favorite AI coding assistant.
 
 ### 🔧 Production-Ready
-Validate, test, and deploy AI workflows with the same confidence as traditional software.
+Validate, test, and deploy AI methods with the same confidence as traditional software.
 
 ---
 
@@ -46,7 +46,7 @@ Pipelex solves these problems by:
 
 - **Breaking down complexity** into focused, manageable steps
 - **Ensuring consistency** through structured validation
-- **Enabling iteration** with clear, editable workflows
+- **Enabling iteration** with clear, editable methods
 - **Facilitating collaboration** with human-readable syntax
 
 ---
@@ -61,4 +61,4 @@ Ready to get started?
 
 **Explore Examples:**
 
-[![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
+[![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/main)

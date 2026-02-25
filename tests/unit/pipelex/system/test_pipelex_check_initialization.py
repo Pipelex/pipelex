@@ -8,11 +8,17 @@ if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
 from pipelex.system.configuration.config_check import check_is_initialized
-from pipelex.system.configuration.configs import ConfigPaths
 
 
 class TestPipelexCheckInitialization:
     """Test the check_is_initialized function from config_check module."""
+
+    def _mock_config_manager_paths(self, mocker: MockerFixture, backends_file: str, routing_file: str) -> None:
+        """Mock config_manager properties used by config_check."""
+        mock_manager = mocker.MagicMock()
+        mock_manager.backends_file_path = backends_file
+        mock_manager.routing_profiles_file_path = routing_file
+        mocker.patch("pipelex.system.configuration.config_check.config_manager", mock_manager)
 
     def test_check_is_initialized_returns_true_when_all_files_exist(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test that check_is_initialized returns True when all required files exist."""
@@ -24,9 +30,8 @@ class TestPipelexCheckInitialization:
         backends_file.write_text("[backends]\nconfig = 'value'")
         routing_file.write_text("[routing]\nconfig = 'value'")
 
-        # Mock ConfigPaths to point to temp directory
-        mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
-        mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
+        # Mock config_manager to point to temp directory
+        self._mock_config_manager_paths(mocker, str(backends_file), str(routing_file))
 
         # Test
         result = check_is_initialized()
@@ -43,9 +48,8 @@ class TestPipelexCheckInitialization:
         routing_file = config_dir / "routing_profiles.toml"
         routing_file.write_text("[routing]\nconfig = 'value'")
 
-        # Mock ConfigPaths to point to temp directory
-        mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
-        mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
+        # Mock config_manager to point to temp directory
+        self._mock_config_manager_paths(mocker, str(backends_file), str(routing_file))
 
         # Test
         result = check_is_initialized(print_warning_if_not=False)
@@ -62,9 +66,8 @@ class TestPipelexCheckInitialization:
         routing_file = config_dir / "routing_profiles.toml"
         backends_file.write_text("[backends]\nconfig = 'value'")
 
-        # Mock ConfigPaths to point to temp directory
-        mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
-        mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
+        # Mock config_manager to point to temp directory
+        self._mock_config_manager_paths(mocker, str(backends_file), str(routing_file))
 
         # Test
         result = check_is_initialized(print_warning_if_not=False)
@@ -80,9 +83,8 @@ class TestPipelexCheckInitialization:
         backends_file = config_dir / "backends.toml"
         routing_file = config_dir / "routing_profiles.toml"
 
-        # Mock ConfigPaths to point to temp directory
-        mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
-        mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
+        # Mock config_manager to point to temp directory
+        self._mock_config_manager_paths(mocker, str(backends_file), str(routing_file))
 
         # Test
         result = check_is_initialized(print_warning_if_not=False)
@@ -98,9 +100,8 @@ class TestPipelexCheckInitialization:
         backends_file = config_dir / "backends.toml"
         routing_file = config_dir / "routing_profiles.toml"
 
-        # Mock ConfigPaths to point to temp directory
-        mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
-        mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
+        # Mock config_manager to point to temp directory
+        self._mock_config_manager_paths(mocker, str(backends_file), str(routing_file))
 
         # Mock console.print to suppress output during test
         mock_console = mocker.MagicMock()
@@ -123,9 +124,8 @@ class TestPipelexCheckInitialization:
         backends_file.write_text("[backends]\nconfig = 'value'")
         routing_file.write_text("[routing]\nconfig = 'value'")
 
-        # Mock ConfigPaths to point to temp directory
-        mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
-        mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
+        # Mock config_manager to point to temp directory
+        self._mock_config_manager_paths(mocker, str(backends_file), str(routing_file))
 
         # Test
         result = check_is_initialized(print_warning_if_not=True)
@@ -142,9 +142,8 @@ class TestPipelexCheckInitialization:
         routing_file = config_dir / "routing_profiles.toml"
         routing_file.write_text("[routing]\nconfig = 'value'")
 
-        # Mock ConfigPaths to point to temp directory
-        mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
-        mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
+        # Mock config_manager to point to temp directory
+        self._mock_config_manager_paths(mocker, str(backends_file), str(routing_file))
 
         # Mock console.print to suppress output during test
         mocker.patch("pipelex.system.configuration.config_check.get_console", return_value=mocker.MagicMock())
@@ -164,9 +163,8 @@ class TestPipelexCheckInitialization:
         routing_file = config_dir / "routing_profiles.toml"
         backends_file.write_text("[backends]\nconfig = 'value'")
 
-        # Mock ConfigPaths to point to temp directory
-        mocker.patch.object(ConfigPaths, "BACKENDS_FILE_PATH", str(backends_file))
-        mocker.patch.object(ConfigPaths, "ROUTING_PROFILES_FILE_PATH", str(routing_file))
+        # Mock config_manager to point to temp directory
+        self._mock_config_manager_paths(mocker, str(backends_file), str(routing_file))
 
         # Mock console.print to suppress output during test
         mocker.patch("pipelex.system.configuration.config_check.get_console", return_value=mocker.MagicMock())

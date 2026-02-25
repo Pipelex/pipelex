@@ -1,12 +1,12 @@
 # The Pipelex Paradigm
 
-Pipelex is an **open-source Python framework** for defining and running **repeatable AI workflows**.
+Pipelex is an **open-source Python framework** for defining and running **repeatable AI methods**.
 
 Here's what we've learned: LLMs are powerful, but asking them to do everything in one prompt is like asking a brilliant colleague to solve ten problems while juggling. The more complexity you pack into a single prompt, the more reliability drops. You've seen it: the perfect prompt that works 90% of the time until it doesn't.
 
 The solution is straightforward: break complex tasks into focused steps. But without proper tooling, you end up with spaghetti code and prompts scattered across your codebase.
 
-Pipelex introduces **knowledge pipelines**: a way to capture these workflow steps as **composable pipes**. Each pipe follows one rule: **knowledge in, knowledge out**. Unlike rigid templates, each pipe uses AI's full intelligence to handle variation while guaranteeing consistent output structure. You get **deterministic structure with adaptive intelligence**, the reliability of software with the flexibility of AI.
+Pipelex introduces **knowledge pipelines**: a way to capture these method steps as **composable pipes**. Each pipe follows one rule: **knowledge in, knowledge out**. Unlike rigid templates, each pipe uses AI's full intelligence to handle variation while guaranteeing consistent output structure. You get **deterministic structure with adaptive intelligence**, the reliability of software with the flexibility of AI.
 
 ## Working with Knowledge and Using Concepts to Make Sense
 

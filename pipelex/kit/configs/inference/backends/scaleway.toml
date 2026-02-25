@@ -1,0 +1,68 @@
+################################################################################
+# Groq Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Scaleway models.
+# It contains model definitions for various LLM models accessible through
+# the Groq API, including text-only and vision-capable models.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots or slashes must be quoted (e.g., ["meta-llama/llama-4-scout"])
+# - Model costs are in USD per million tokens (input/output)
+# - Vision models support max 5 images per request, 33MP max resolution
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "openai"
+structure_method = "instructor/json"
+thinking_mode = "none"
+
+# --- DeepSeek Models ----------------------------------------------------------
+[deepseek-r1-distill-llama-70b]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.90, output = 0.90 }
+
+# --- Meta Llama 3.x Series ----------------------------------------------------
+["llama-3.1-8b-instruct"]
+max_tokens = 131072
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 0.2 }
+
+["llama-3.3-70b-instruct"]
+max_tokens = 32768
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.90, output = 0.90 }
+
+# --- OpenAI GPT-OSS Models ----------------------------------------------------
+[gpt-oss-120b]
+max_tokens = 65536
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.60 }
+
+# --- Qwen 3 -------------------------------------------------------------------
+[qwen3-235b-a22b-instruct-2507]
+max_tokens = 40960
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.75, output = 2.25 }
+
+[qwen3-coder-30b-a3b-instruct]
+max_tokens = 40960
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.20, output = 0.80 }

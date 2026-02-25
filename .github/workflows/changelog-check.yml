@@ -9,30 +9,24 @@ on:
 jobs:
   check-changelog:
     runs-on: ubuntu-latest
-    if: startsWith(github.head_ref, 'release/v')  # Only run on release branches
     steps:
       - uses: actions/checkout@v4
 
       - name: Check Changelog Version
         run: |
-          # Get the current branch name and extract version
-          BRANCH_NAME=${GITHUB_HEAD_REF}
-          
-          if [[ $BRANCH_NAME =~ ^release/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            VERSION="${BASH_REMATCH[1]}"
-            echo "Checking release branch v$VERSION against changelog..."
-            
-            # Look for the version in the changelog
-            if ! grep -q "## \[v$VERSION\] -" CHANGELOG.md; then
-              echo "❌ Error: No changelog entry found for version v$VERSION"
-              echo "The following versions are in the changelog:"
-              grep -E "^## \[v[0-9]+\.[0-9]+\.[0-9]+\]" CHANGELOG.md
-              echo "Please add a changelog entry for v$VERSION before merging this release to main"
-              exit 1
-            else
-              echo "✅ Changelog entry found for version v$VERSION"
-            fi
-          else
-            echo "❌ Error: Branch name $BRANCH_NAME does not match expected format 'release/vX.Y.Z'"
+          # Get version from pyproject.toml
+          VERSION=$(grep -m 1 'version = ' pyproject.toml | cut -d '"' -f 2)
+          echo "Version from pyproject.toml: $VERSION"
+
+          # Look for the version in the changelog
+          if ! grep -q "## \[v$VERSION\] -" CHANGELOG.md; then
+            echo "❌ Error: No changelog entry found for version v$VERSION"
+            echo ""
+            echo "The following versions are in the changelog:"
+            grep -E "^## \[v[0-9]+" CHANGELOG.md | head -10
+            echo ""
+            echo "Please add a changelog entry: ## [v$VERSION] - YYYY-MM-DD"
             exit 1
-          fi 
+          else
+            echo "✅ Changelog entry found for version v$VERSION"
+          fi

@@ -6,7 +6,9 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, LLMJobParams
 from pipelex.cogt.llm.llm_job_factory import LLMJobFactory
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.builder.concept.integration_test_data import ConceptSpecGenerationTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 @pytest.mark.llm
@@ -22,15 +24,16 @@ class TestConceptSpecGeneration:
     @pytest.mark.parametrize(("topic", "user_prompt"), ConceptSpecGenerationTestCases.TEST_CASES)
     async def test_generate_concept_spec(
         self,
+        job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
-        llm_handle: str,
+        llm_combo: ModelCombo,
         topic: str,
         user_prompt: str,
     ):
-        log.info(f"Testing {topic} with llm_handle '{llm_handle}'")
+        log.info(f"Testing {topic} with llm_handle '{llm_combo.handle}'")
 
         # Get the LLM worker
-        llm_worker = get_llm_worker(llm_handle=llm_handle)
+        llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
 
         # Skip if object generation is not supported
         if not llm_worker.is_gen_object_supported:
@@ -44,8 +47,8 @@ class TestConceptSpecGeneration:
                 system_text="You are an expert at generating concept specifications for a data modeling system.",
                 user_text=user_prompt,
             ),
+            job_metadata=job_metadata,
             llm_job_config=LLMJobConfig(
-                is_streaming_enabled=False,
                 max_retries=3,
             ),
             llm_job_params=llm_job_params,
@@ -55,7 +58,7 @@ class TestConceptSpecGeneration:
         generated_concept_spec = await llm_worker.gen_object(llm_job=llm_job, schema=ConceptSpec)
 
         # Display the result
-        pretty_print(generated_concept_spec, title=f"Generated ConceptSpec for '{topic}' using {llm_handle}")
+        pretty_print(generated_concept_spec, title=f"Generated ConceptSpec for '{topic}' using {llm_combo.handle}")
 
         # Basic validation: if we got here without exceptions, the ConceptSpec was created successfully
         # The Pydantic validation and field validators have already run

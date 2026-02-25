@@ -15,6 +15,7 @@ from pipelex.pipe_operators.func.pipe_func_blueprint import PipeFuncBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.registries.func_registry import func_registry
 from tests.cases.source_code import wrap_lines
 
@@ -35,6 +36,7 @@ class TestPipeFunc:
 
     async def test_wrap_lines_pipe_func(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_empty_library: Callable[[], None],
     ):
@@ -71,6 +73,7 @@ if __name__ == "__main__":
                 blueprint=pipe_func_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
             working_memory=working_memory,
         )
 
@@ -93,7 +96,7 @@ if __name__ == "__main__":
         wrapped_text_str = wrapped_text.text
 
         # In DRY mode, we get mock content, so we only check basic structure
-        if pipe_run_mode == PipeRunMode.DRY:
+        if pipe_run_mode.is_dry:
             # In dry mode, just verify we have text content and it's non-empty
             assert isinstance(wrapped_text_str, str)
             assert len(wrapped_text_str) > 0

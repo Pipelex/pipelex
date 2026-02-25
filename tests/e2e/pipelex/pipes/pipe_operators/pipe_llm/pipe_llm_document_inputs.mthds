@@ -1,0 +1,70 @@
+domain      = "pipe_llm_document_inputs_e2e"
+description = "E2E tests for document input handling in PipeLLM"
+
+[concept]
+DocumentSummaryE2E      = "Summary of a document"
+DocumentListAnalysisE2E = "Analysis of multiple documents"
+MixedMediaAnalysisE2E   = "Analysis of documents and images together"
+
+# Scenario 1: Direct document
+[pipe.summarize_single_document_e2e]
+type = "PipeLLM"
+description = "Summarize a single document"
+inputs = { document = "Document" }
+output = "DocumentSummaryE2E"
+model = "$vision-cheap"
+prompt = """
+Summarize this document in 2-3 sentences: $document
+Be concise.
+"""
+
+# Scenario 2: Document list
+[pipe.analyze_document_list_e2e]
+type = "PipeLLM"
+description = "Analyze a list of documents"
+inputs = { documents = "Document[]" }
+output = "DocumentListAnalysisE2E"
+model = "$vision-cheap"
+prompt = """
+Analyze these documents. Count how many there are and summarize each briefly:
+$documents
+Be concise.
+"""
+
+# Scenario 3: Multiple document lists
+[pipe.compare_document_lists_e2e]
+type = "PipeLLM"
+description = "Compare two document collections"
+inputs = { collection_a = "Document[]", collection_b = "Document[]" }
+output = "DocumentListAnalysisE2E"
+model = "$vision-cheap"
+prompt = """
+Compare these two document collections.
+
+Collection A:
+$collection_a
+
+Collection B:
+$collection_b
+
+Describe what each collection contains.
+Be concise.
+"""
+
+# Scenario 4: Mixed document and image inputs
+[pipe.mixed_document_image_inputs_e2e]
+type = "PipeLLM"
+description = "Analyze document and image together"
+inputs = { document = "Document", image = "Image" }
+output = "MixedMediaAnalysisE2E"
+model = "$vision-cheap"
+prompt = """
+Analyze both the document and the image.
+
+Document: $document
+
+Image: $image
+
+Describe what you see in each.
+Be concise.
+"""

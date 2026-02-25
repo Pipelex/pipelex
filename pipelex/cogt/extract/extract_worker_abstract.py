@@ -4,6 +4,7 @@ from typing import Any
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.exceptions import ExtractCapabilityError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
@@ -32,9 +33,33 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
     def desc(self) -> str:
         return f"Extraction using {self.inference_model.desc}"
 
+    @property
+    def is_pdf_supported(self) -> bool:
+        return self.inference_model.is_pdf_supported_for_extract
+
+    @property
+    def is_image_supported(self) -> bool:
+        return self.inference_model.is_image_supported_for_extract
+
+    @property
+    def is_caption_supported(self) -> bool:
+        return self.inference_model.is_caption_supported_for_extract
+
     def _check_can_perform_job(self, extract_job: ExtractJob):
         # This can be overridden by subclasses for specific checks
-        pass
+        extract_input = extract_job.extract_input
+        if extract_input.image_uri:
+            if not self.inference_model.is_image_supported_for_extract:
+                msg = f"Extract engine '{self.inference_model.tag}' does not support image extraction."
+                raise ExtractCapabilityError(msg)
+        elif extract_input.document_uri:
+            if not self.inference_model.is_pdf_supported_for_extract:
+                msg = f"Extract engine '{self.inference_model.tag}' does not support PDF extraction."
+                raise ExtractCapabilityError(msg)
+        if extract_job.job_params.should_caption_images:
+            if not self.inference_model.is_caption_supported_for_extract:
+                msg = f"Extract engine '{self.inference_model.tag}' does not support image captioning."
+                raise ExtractCapabilityError(msg)
 
     async def extract_pages(
         self,

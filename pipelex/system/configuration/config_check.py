@@ -2,14 +2,14 @@ from rich.panel import Panel
 
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.hub import get_console
-from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.urls import URLs
 
 
 def check_is_initialized(print_warning_if_not: bool = True) -> bool:
-    backends_toml_path = ConfigPaths.BACKENDS_FILE_PATH
-    routing_profiles_toml_path = ConfigPaths.ROUTING_PROFILES_FILE_PATH
+    backends_toml_path = config_manager.backends_file_path
+    routing_profiles_toml_path = config_manager.routing_profiles_file_path
 
     # Check critical files
     config_exists = init_config(reset=False, dry_run=True) == 0

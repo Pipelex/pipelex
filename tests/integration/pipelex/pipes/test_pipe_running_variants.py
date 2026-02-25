@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import log, pretty_print
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -26,8 +25,8 @@ class TestPipeRunningVariants:
     @pytest.mark.parametrize(("topic", "stuff", "pipe_code"), PipeTestCases.STUFF_AND_PIPE)
     async def test_pipe_from_stuff(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
         topic: str,
         stuff: Stuff,
         pipe_code: str,
@@ -41,15 +40,15 @@ class TestPipeRunningVariants:
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=job_metadata,
             ),
         )
 
     @pytest.mark.parametrize(("topic", "pipe_code"), PipeTestCases.NO_INPUT)
     async def test_pipe_no_input(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
         topic: str,
         pipe_code: str,
         load_test_library: Callable[[list[Path]], None],
@@ -61,20 +60,20 @@ class TestPipeRunningVariants:
                 pipe=get_required_pipe(pipe_code=pipe_code),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=WorkingMemoryFactory.make_empty(),
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=job_metadata,
             ),
         )
 
         stuff = pipe_output.main_stuff
         pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
-        pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
-        pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
+        pretty_print(await stuff.content.rendered_html_async(), title=f"{topic}: run pipe '{pipe_code}' in html")
+        pretty_print(await stuff.content.rendered_markdown_async(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
 
     @pytest.mark.parametrize(("topic", "pipe_code", "output_multiplicity"), PipeTestCases.NO_INPUT_PARALLEL1)
     async def test_pipe_batch_no_input(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
         topic: str,
         pipe_code: str,
         output_multiplicity: VariableMultiplicity | None,
@@ -89,21 +88,21 @@ class TestPipeRunningVariants:
                     pipe_run_mode=pipe_run_mode,
                     output_multiplicity=output_multiplicity,
                 ),
-                job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=job_metadata,
                 working_memory=WorkingMemoryFactory.make_empty(),
             ),
         )
 
         stuff = pipe_output.main_stuff
         pretty_print(stuff, title=f"{topic}: run pipe '{pipe_code}'")
-        pretty_print(stuff.content.rendered_html(), title=f"{topic}: run pipe '{pipe_code}' in html")
-        pretty_print(stuff.content.rendered_markdown(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
+        pretty_print(await stuff.content.rendered_html_async(), title=f"{topic}: run pipe '{pipe_code}' in html")
+        pretty_print(await stuff.content.rendered_markdown_async(), title=f"{topic}: run pipe '{pipe_code}' in markdown")
 
     @pytest.mark.parametrize(("pipe_code", "exception", "expected_error_message"), PipeTestCases.FAILURE_PIPES)
     async def test_pipe_infinite_loop(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
-        request: FixtureRequest,
         pipe_code: str,
         exception: type[Exception],
         expected_error_message: str,
@@ -119,7 +118,7 @@ class TestPipeRunningVariants:
                         pipe_stack_limit=6,
                         pipe_run_mode=pipe_run_mode,
                     ),
-                    job_metadata=JobMetadata(job_name=request.node.originalname),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                    job_metadata=job_metadata,
                 ),
             )
         pretty_print(exc.value, title="exception")

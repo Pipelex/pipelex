@@ -1,8 +1,9 @@
 """Routing profile configuration logic for the init command."""
 
 import os
-from typing import Any
+from typing import Any, cast
 
+from rich.markup import escape
 from rich.prompt import Confirm
 from tomlkit import table
 
@@ -14,11 +15,54 @@ from pipelex.cli.commands.init.ui.routing_ui import (
     prompt_fallback_order,
     prompt_primary_backend,
 )
+from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
+
+
+def _migrate_profile_to_official_backend(profile: dict[str, Any]) -> None:
+    """Migrate a routing profile from legacy pipelex_inference to pipelex_gateway.
+
+    Updates default, fallback_order, routes, and optional_routes in place.
+
+    Args:
+        profile: The profile dict to migrate (modified in place).
+    """
+    legacy_backend = PipelexBackend.LEGACY_INFERENCE.value
+    official_backend = PipelexBackend.GATEWAY.value
+
+    # Update default
+    if profile.get("default") == legacy_backend:
+        profile["default"] = official_backend
+
+    # Update fallback_order
+    if "fallback_order" in profile:
+        old_fallback: list[str] = list(profile["fallback_order"])
+        new_fallback: list[str] = []
+        for backend in old_fallback:
+            if backend == legacy_backend:
+                new_fallback.append(official_backend)
+            else:
+                new_fallback.append(backend)
+        profile["fallback_order"] = new_fallback
+
+    # Update routes
+    if "routes" in profile:
+        routes: dict[str, str] = profile["routes"]
+        patterns_to_update = [pattern for pattern, backend in routes.items() if backend == legacy_backend]
+        for pattern in patterns_to_update:
+            routes[pattern] = official_backend
+
+    # Update optional_routes
+    if "optional_routes" in profile:
+        optional_routes: dict[str, str] = profile["optional_routes"]
+        optional_patterns_to_update = [pattern for pattern, backend in optional_routes.items() if backend == legacy_backend]
+        for pattern in optional_patterns_to_update:
+            optional_routes[pattern] = official_backend
 
 
 def customize_routing_profile(selected_backend_keys: list[str]) -> None:
@@ -47,11 +91,21 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
         backend_options = get_backend_options_from_toml(template_backends_path, backends_toml_path)
 
-        # Case 1: pipelex_inference is enabled - keep pipelex_first
-        if "pipelex_inference" in selected_backend_keys:
-            toml_doc["active"] = "pipelex_first"
+        # Case 1: pipelex_gateway is enabled - use all_pipelex_gateway
+        if PipelexBackend.GATEWAY in selected_backend_keys:
+            profiles: dict[str, dict[str, Any]] = toml_doc.get("profiles") or {}  # type: ignore[assignment]
+
+            # Migrate legacy pipelex_first profile to all_pipelex_gateway
+            if PipelexRoutingProfile.PIPELEX_FIRST in profiles:
+                legacy_profile = cast("dict[str, Any]", profiles[PipelexRoutingProfile.PIPELEX_FIRST])
+                _migrate_profile_to_official_backend(legacy_profile)
+                # Rename the profile from pipelex_first to all_pipelex_gateway
+                profiles[PipelexRoutingProfile.ALL_PIPELEX_GATEWAY] = legacy_profile
+                del profiles[PipelexRoutingProfile.PIPELEX_FIRST]
+
+            toml_doc["active"] = PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
             save_toml_to_path(toml_doc, routing_profiles_toml_path)
-            display_routing_profile_result(console, "pipelex_first", created=False)
+            display_routing_profile_result(console, PipelexRoutingProfile.ALL_PIPELEX_GATEWAY, created=False)
             return
 
         # Case 2: Only one backend selected - use all_{backend_key} profile
@@ -88,7 +142,7 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
             display_routing_profile_result(console, profile_name, created=not profile_exists)
             return
 
-        # Case 3: Multiple backends (no pipelex_inference) - create/update custom_routing profile
+        # Case 3: Multiple backends (no pipelex_gateway) - create/update custom_routing profile
         console.print()
         console.print("[cyan]Setting up routing for multiple backends...[/cyan]")
         console.print()
@@ -149,5 +203,5 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         console.print("[dim]You can further customize which models get used on which backend by editing the routes section.[/dim]")
 
     except Exception as exc:
-        console.print(f"[yellow]⚠ Warning: Failed to customize routing profile: {exc}[/yellow]")
+        console.print(f"[yellow]⚠ Warning: Failed to customize routing profile: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/routing_profiles.toml later[/dim]")

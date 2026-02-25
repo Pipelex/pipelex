@@ -1,81 +1,106 @@
 # Telemetry
 
-## What is Telemetry?
+Pipelex supports two independent telemetry streams that serve different purposes. Understanding how they work helps you make informed decisions about data collection.
 
-Pipelex collects optional, anonymous usage data to help improve the product. This helps us understand how Pipelex is being used and identify areas for improvement.
+## Two Telemetry Streams
 
-## First Run Experience
+### 1. Gateway Telemetry (Pipelex-Controlled)
 
-When you run most Pipelex commands for the first time (after running `pipelex init`), you'll be prompted to configure your telemetry preferences:
+When you use **Pipelex Gateway** as your inference backend, identified telemetry is **automatically enabled**. This telemetry is tied to your Gateway API key (hashed for security) and operates independently from your `telemetry.toml` settings.
 
-```
-======================================================================
-Telemetry Configuration
-======================================================================
+**What we collect:**
 
-Pipelex can collect anonymous usage data to help improve the product.
+- Model names used (e.g., `gpt-5.2`, `claude-4.5-sonnet`) and parameters
+- Pipe types (e.g., `PipeLLM`, `PipeSequence`, etc.)
+- Token counts (input/output)
+- Latency metrics
+- Error rates (without error details)
 
-Please choose your telemetry preference:
-  [1]  off          - No telemetry data collected
-  [2]  anonymous    - Anonymous usage data only
-  [3]  identified   - Usage data with user identification
-  [q]  quit         - Exit without configuring
+**What we do NOT collect:**
 
-Enter your choice:
-```
+- Your prompts or completions
+- Your pipe codes or output class names
+- File contents or business data
 
-## Telemetry Modes
+This telemetry allows us to:
 
-### Off
+- Monitor and improve service quality
+- Enforce fair usage limits and prevent abuse
+- Provide you with usage insights and better support
 
-No telemetry data is collected. Pipelex will not send any data to our servers.
+!!! info "Gateway Telemetry is Optional"
+    Using Pipelex Gateway is entirely optional. If you prefer not to send telemetry to Pipelex servers, simply use your own API keys with direct provider backends (OpenAI, Anthropic, Azure, Bedrock, etc.).
 
-### Anonymous
+### 2. Custom Telemetry (User-Controlled)
 
-Anonymous usage data only. This includes:
+Custom telemetry is configured in `.pipelex/telemetry.toml` and allows you to send observability data to **your own** analytics and monitoring systems:
 
-- Command usage (which commands are run)
-- Pipeline execution statistics (success/failure rates, performance metrics)
-- Feature usage patterns
+- **PostHog**: Event tracking and AI span tracing with privacy controls
+- **Langfuse**: Full LLM observability (receives full span data)
+- **OTLP**: Send spans to any OpenTelemetry-compatible backend (receives full span data)
 
-This mode does **not** include:
+Custom telemetry is completely independent from Gateway telemetry—you can use both, either, or neither.
 
-- Personal identification
-- Your prompts or system prompts
-- LLM responses
-- File paths or URLs
-- Any sensitive information
+## Quick Setup
 
-### Identified
-
-Same as anonymous mode, but includes a user identifier. This helps us provide better support and understand user journeys across sessions.
-
-If you choose this mode, you can optionally provide a `user_id` in the configuration file.
-
-## DO_NOT_TRACK Support
-
-Pipelex respects the `DO_NOT_TRACK` environment variable. If you have `DO_NOT_TRACK` set in your environment (to any value except `false` or `0`), telemetry will be automatically disabled regardless of your configuration settings.
+When you run `pipelex init`, a default `telemetry.toml` configuration file is created:
 
 ```bash
-# Disable telemetry via environment variable
+pipelex init telemetry
+```
+
+This creates `.pipelex/telemetry.toml` with all options disabled by default. Edit this file to enable your preferred telemetry destinations.
+
+### Example: Enable PostHog Tracing
+
+```toml
+[custom_posthog]
+mode = "anonymous"  # or "identified" with user_id
+endpoint = "${POSTHOG_ENDPOINT}"
+api_key = "${POSTHOG_API_KEY}"
+
+[custom_posthog.tracing]
+enabled = true
+
+[custom_posthog.tracing.capture]
+content = false        # Don't capture prompts/completions
+pipe_codes = true      # Include pipe codes in span names
+```
+
+### Example: Enable Langfuse
+
+```toml
+[langfuse]
+enabled = true
+public_key = "${LANGFUSE_PUBLIC_KEY}"
+secret_key = "${LANGFUSE_SECRET_KEY}"
+```
+
+## DO_NOT_TRACK Global Override
+
+The `DO_NOT_TRACK` environment variable provides a universal way to disable **all** telemetry:
+
+```bash
 export DO_NOT_TRACK=1
 ```
 
-## Changing Your Settings
+When set, this disables:
 
-You can change your telemetry settings at any time:
+- Gateway telemetry (but note: Gateway won't work without telemetry)
+- All custom telemetry destinations
 
-1. **Via configuration file**: Edit `.pipelex/telemetry.toml` directly (see [Telemetry Configuration](../../home/7-configuration/config-practical/telemetry-config.md))
-2. **Trigger the prompt again**: Delete `.pipelex/telemetry.toml`, and the prompt will appear next time you run a command
+!!! warning "Gateway Requires Telemetry"
+    If you set `DO_NOT_TRACK=1` while using Pipelex Gateway, the Gateway will not function. Use direct provider backends instead if you need to disable all telemetry.
 
 ## Privacy
 
 We take your privacy seriously:
 
-- Sensitive data (prompts, responses, file paths, URLs) is automatically redacted
-- You have full control over what level of telemetry you're comfortable with
+- **Gateway telemetry** never collects prompts, completions, or business data
+- **Custom telemetry** gives you full control over what data is captured
+- PostHog tracing includes privacy controls to redact sensitive content
 - All telemetry can be completely disabled
-- Our telemetry infrastructure uses PostHog, hosted in the EU
 
-For detailed configuration options, see [Telemetry Configuration](../../home/7-configuration/config-practical/telemetry-config.md).
+For detailed configuration options, see [Telemetry Configuration](../7-configuration/config-practical/telemetry-config.md).
 
+For more information about our data practices, see our [Privacy Policy](https://go.pipelex.com/privacy-policy).

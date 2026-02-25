@@ -4,7 +4,7 @@ This example shows how to extract a table from an image and convert it into a st
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/extract_table.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/extract_table.py)
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_table/extract_table.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_table/extract_table.py)
 
 ## The Pipeline Explained
 
@@ -55,11 +55,11 @@ class HtmlTable(StructuredContent):
         return self
 ```
 
-## The Pipeline Definition: `table.plx`
+## The Pipeline Definition: `table.mthds`
 
 The pipeline uses a two-step "extract and review" pattern. The first pipe does the initial extraction, and the second pipe reviews the generated HTML against the original image to correct any errors. This is a powerful pattern for increasing the reliability of LLM outputs.
 
-```plx
+```toml
 [pipe.extract_html_table_and_review]
 type = "PipeSequence"
 description = "Get an HTML table and review it"
@@ -87,4 +87,4 @@ Rewrite the entire html table with your potential corrections.
 Make sure you do not forget any text.
 """
 ```
-This self-correction pattern is a key technique for building robust and reliable AI workflows with Pipelex. 
+This self-correction pattern is a key technique for building robust and reliable AI methods with Pipelex. 

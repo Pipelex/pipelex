@@ -7,16 +7,16 @@ When running Pipelex pipelines, you need to provide input data that matches what
 The Pipelex CLI can generate a template JSON file with all the required inputs for your pipeline:
 
 ```bash
-pipelex build inputs path/to/my_pipe.plx
+pipelex build inputs path/to/my_pipe.mthds
 ```
 
 This creates a `results/inputs.json` file with the structure needed for your pipeline. You can then fill in the values and use it with:
 
 ```bash
-pipelex run path/to/my_pipe.plx --inputs results/inputs.json
+pipelex run path/to/my_pipe.mthds --inputs results/inputs.json
 ```
 
-See more about the options of the CLI [here](../../../home/9-tools/cli.md).
+See more about the options of the CLI [here](../../9-tools/cli/index.md).
 
 !!! tip "Starting Point for Input Structure"
     Use `pipelex build inputs` to quickly understand what inputs your pipeline expects and generate a template to fill in.
@@ -128,7 +128,7 @@ inputs = {
 **Concept Resolution:**
 
 - The system searches all available domains for a concept matching the class name
-- If multiple concepts with the same name exist in different domains → **Error**: Must specify domain
+- If multiple concepts with the same name exist in different domains → **Error**: Must specify domain code
 - If no concept is found → **Error**
 
 ### 1.4: List of StuffContent Objects
@@ -272,15 +272,15 @@ inputs = {
 }
 ```
 
-**Concept Resolution with Search Domains:**
+**Concept Resolution with Search Domain Codes:**
 
-When you specify a concept name without a domain prefix:
+When you specify a concept name without a domain code prefix:
 
 - ✅ If the concept exists in only one domain → Automatically found
-- ❌ If the concept exists in multiple domains → **Error**: "Multiple concepts found. Please specify domain as 'domain.Concept'"
+- ❌ If the concept exists in multiple domains → **Error**: "Multiple concepts found. Please specify domain code as 'domain_code.Concept'"
 - ❌ If the concept doesn't exist → **Error**: "Concept not found"
 
-**Using Domain Prefix:**
+**Using Domain code prefix:**
 
 ```json
 {
@@ -339,7 +339,7 @@ Provide structured data as a dictionary:
 
 The system will:
 
-1. Find the concept structure (with domain resolution as explained above)
+1. Find the concept structure (with domain code resolution as explained above)
 2. Validate the dictionary against the concept's structure
 3. Create the appropriate content object
 
@@ -431,7 +431,7 @@ When you reference a concept by name (like `"Invoice"` or `"PersonInfo"`), Pipel
 
 ### Explicit Domain Specification
 
-To avoid ambiguity, specify the domain explicitly:
+To avoid ambiguity, specify the domain code explicitly:
 
 ```json
 {
@@ -439,7 +439,7 @@ To avoid ambiguity, specify the domain explicitly:
 }
 ```
 
-**Format:** `"domain_name.ConceptName"`
+**Format:** `"domain_code.ConceptName"`
 
 This tells Pipelex exactly which concept to use, bypassing the search.
 
@@ -466,11 +466,11 @@ inputs = {
 ### Pattern 2: Native Content Types (PDF, Image)
 
 ```python
-from pipelex.core.stuffs.pdf_content import PDFContent
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 
 inputs = {
-    "document": PDFContent(url="invoice.pdf"),
+    "document": DocumentContent(url="invoice.pdf"),
     "photo": ImageContent(url="photo.jpg"),
 }
 ```
@@ -618,7 +618,7 @@ inputs = {
 
 ### Error: "Ambiguous concept"
 
-When a concept name exists in multiple domains, specify the domain:
+When a concept name exists in multiple domains, specify the domain code:
 
 ```python
 # ❌ Ambiguous if "Invoice" exists in multiple domains
@@ -629,7 +629,7 @@ inputs = {
     }
 }
 
-# ✅ Specify the domain
+# ✅ Specify the domain code
 inputs = {
     "invoice": {
         "concept": "accounting.Invoice",

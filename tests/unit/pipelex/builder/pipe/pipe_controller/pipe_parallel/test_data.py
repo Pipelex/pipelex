@@ -14,7 +14,7 @@ class PipeParallelTestCases:
             description="Run pipes in parallel",
             inputs={"data": "Data"},
             output="Results",
-            parallels=[
+            branches=[
                 SubPipeSpec(pipe_code="analyze_data", result="analysis"),
                 SubPipeSpec(pipe_code="transform_data", result="transformed"),
                 SubPipeSpec(pipe_code="validate_data", result="validation"),
@@ -25,7 +25,7 @@ class PipeParallelTestCases:
             description="Run pipes in parallel",
             inputs={"data": "Data"},
             output="Results",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="analyze_data", result="analysis"),
                 SubPipeBlueprint(pipe="transform_data", result="transformed"),
                 SubPipeBlueprint(pipe="validate_data", result="validation"),
@@ -43,7 +43,7 @@ class PipeParallelTestCases:
             description="Parallel with combined output",
             inputs={"input": "Input"},
             output="CombinedResult",
-            parallels=[
+            branches=[
                 SubPipeSpec(pipe_code="pipe1", result="result1"),
                 SubPipeSpec(pipe_code="pipe2", result="result2"),
             ],
@@ -54,7 +54,7 @@ class PipeParallelTestCases:
             description="Parallel with combined output",
             inputs={"input": "Input"},
             output="CombinedResult",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="pipe1", result="result1"),
                 SubPipeBlueprint(pipe="pipe2", result="result2"),
             ],
@@ -71,7 +71,7 @@ class PipeParallelTestCases:
             description="Parallel with combined output",
             inputs={"input": "Input"},
             output="CombinedResult",
-            parallels=[
+            branches=[
                 SubPipeSpec(pipe_code="pipe1", result="result1"),
                 SubPipeSpec(pipe_code="pipe2", result="result2"),
             ],
@@ -82,7 +82,7 @@ class PipeParallelTestCases:
             description="Parallel with combined output",
             inputs={"input": "Input"},
             output="CombinedResult",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="pipe1", result="result1"),
                 SubPipeBlueprint(pipe="pipe2", result="result2"),
             ],

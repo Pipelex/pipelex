@@ -1,0 +1,71 @@
+####################################################################################################
+# Pipelex Model Deck - Custom Configurations for LLMs
+####################################################################################################
+#
+# This file allows you to override or complete the base model decks.
+#
+# ADVANCED USERS ONLY: This file is for users who bring their own API keys and connect directly
+# to AI providers (OpenAI, Anthropic, Google, etc.) without using the Pipelex Gateway.
+#
+# If you're using the standard Pipelex Gateway setup, you don't need to modify this file.
+# The Gateway handles model routing automatically and supports all available models.
+#
+# Waterfalls are useful when using multiple backends directly - they define ordered lists
+# of models that are resolved at configuration time based on which backends are available.
+# This enables defining pipelines that work across different environments with varying
+# backend configurations.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# LLM Deck overrides
+####################################################################################################
+
+[llm.choice_overrides]
+for_text = "disabled"
+for_object = "disabled"
+
+
+####################################################################################################
+# Waterfalls — ordered lists of models resolved at configuration time by backend availability
+#
+# Example (uncomment to use):
+# [llm.waterfalls]
+# premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2", "grok-4"]
+# premium-llm-vision = [
+#     "claude-4.5-opus",
+#     "gemini-3.0-pro",
+#     "gpt-5.2",
+#     "grok-4-fast-reasoning",
+# ]
+# premium-llm-structured = [
+#     "claude-4.5-opus",
+#     "gemini-3.0-pro",
+#     "gpt-5.2",
+#     "grok-4",
+# ]
+# large-context-llm-code = [
+#     "gemini-3.0-pro",
+#     "claude-4.5-opus",
+#     "gpt-5.2",
+#     "grok-4-fast-reasoning",
+# ]
+# large-context-llm-text = ["gemini-2.5-flash", "claude-4.5-sonnet"]
+# small-llm = [
+#     "gemini-2.5-flash-lite",
+#     "gpt-4o-mini",
+#     "claude-3-haiku",
+#     "phi-4",
+#     "grok-3-mini",
+# ]
+# small-llm-structured = [
+#     "gemini-2.5-flash-lite",
+#     "gpt-4o-mini",
+#     "claude-3-haiku",
+# ]
+# small-llm-vision = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
+# small-llm-creative = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
+####################################################################################################

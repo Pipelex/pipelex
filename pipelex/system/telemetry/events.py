@@ -22,6 +22,9 @@ class EventName(StrEnum):
     BUNDLE_DRY_RUN = "bundle_dry_run"
     PIPE_DRY_RUN = "pipe_dry_run"
 
+    # Graph
+    GRAPH_RENDER = "graph_render"
+
 
 class Setting(StrEnum):
     TELEMETRY_MODE = "telemetry_mode"
@@ -43,7 +46,7 @@ class EventProperty(StrEnum):
 
     # Pipeline
     PIPELINE_RUN_ID = "pipeline_run_id"
-    PIPELINE_EXECUTE_OUTCOME = "pipeline_execute_outcome"
+    PIPELINE_OUTCOME = "outcome"
 
     # Pipe
     PIPE_TYPE = "pipe_type"

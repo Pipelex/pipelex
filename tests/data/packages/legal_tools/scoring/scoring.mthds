@@ -1,0 +1,23 @@
+domain    = "pkg_test_scoring"
+main_pipe = "pkg_test_compute_weighted_score"
+
+[concept.PkgTestScoreResult]
+description = "A weighted score result"
+
+[pipe.pkg_test_compute_weighted_score]
+type        = "PipeLLM"
+description = "Compute a weighted score for an item"
+output      = "PkgTestScoreResult"
+prompt      = "Compute a weighted score for: {{ item }}"
+
+[pipe.pkg_test_compute_weighted_score.inputs]
+item = "Text"
+
+[pipe.pkg_test_private_helper]
+type        = "PipeLLM"
+description = "Helper pipe for internal scoring"
+output      = "Text"
+prompt      = "Helper pipe for internal scoring: {{ data }}"
+
+[pipe.pkg_test_private_helper.inputs]
+data = "Text"

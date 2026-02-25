@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from mthds.client.models.pipeline_inputs import StuffContentOrData
 
 from pipelex import log, pretty_print
-from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
@@ -31,7 +31,7 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     # Create the concept
     concept = ConceptFactory.make(
         concept_code="MyConcept",
-        domain="test_domain",
+        domain_code="test_domain",
         description="Test concept for unit tests",
         structure_class_name="MyConcept",
     )
@@ -40,7 +40,7 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
 
     # Create a concept that is not native.Text but initiable by str
     concept_not_native_text = ConceptFactory.make(
-        domain="test_domain",
+        domain_code="test_domain",
         concept_code="MyConceptNotNativeText",
         description="Test concept for unit tests",
         structure_class_name="MyConceptNotNativeText",
@@ -51,7 +51,7 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     # Create AnotherConcept for search domain tests
     concept_another = ConceptFactory.make(
         concept_code="AnotherConcept",
-        domain="test_domain",
+        domain_code="test_domain",
         description="Test concept for search domains",
         structure_class_name="AnotherConcept",
     )
@@ -60,8 +60,8 @@ def setup_test_concept(load_test_library: Callable[[list[Path]], None]):
     yield concept
 
     # Cleanup after test
-    concept_library.remove_concepts_by_concept_strings(
-        concept_strings=["test_domain.MyConcept", "test_domain.MyConceptNotNativeText", "test_domain.AnotherConcept"]
+    concept_library.remove_concepts_by_concept_refs(
+        concept_refs=["test_domain.MyConcept", "test_domain.MyConceptNotNativeText", "test_domain.AnotherConcept"]
     )
 
 
@@ -116,11 +116,11 @@ class TestStuffFactoryImplicitMemory:
 class TestStuffFactoryImplicitMemoryWithSearchDomains:
     """Test StuffFactory with search_domains parameter.
 
-    This tests that search_domains correctly resolves concepts.
+    This tests that search_domain_codes correctly resolves concepts.
     """
 
     @pytest.mark.parametrize(
-        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_domains", "expected_stuff"),
+        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_domain_codes", "expected_stuff"),
         SEARCH_DOMAIN_TEST_CASES,
     )
     def test_search_domain_case(
@@ -130,7 +130,7 @@ class TestStuffFactoryImplicitMemoryWithSearchDomains:
         stuff_content_or_data: StuffContentOrData,
         stuff_name: str | None,
         stuff_code: str,
-        search_domains: list[str],
+        search_domain_codes: list[str],
         expected_stuff: Stuff,
     ):
         log.info(f"Testing search domain case: {test_name}")
@@ -139,7 +139,7 @@ class TestStuffFactoryImplicitMemoryWithSearchDomains:
             name=stuff_name,
             code=stuff_code,
             stuff_content_or_data=stuff_content_or_data,
-            search_domains=search_domains,
+            search_domain_codes=search_domain_codes,
         )
 
         pretty_print(result, title=f"Result for test case: {test_name}")
@@ -155,7 +155,7 @@ class TestStuffFactoryImplicitMemoryErrors:
     """
 
     @pytest.mark.parametrize(
-        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_domains", "expected_exception", "error_match"),
+        ("test_name", "stuff_content_or_data", "stuff_name", "stuff_code", "search_domain_codes", "expected_exception", "error_match"),
         ERROR_TEST_CASES,
     )
     def test_error_case(
@@ -165,7 +165,7 @@ class TestStuffFactoryImplicitMemoryErrors:
         stuff_content_or_data: StuffContentOrData,
         stuff_name: str | None,
         stuff_code: str,
-        search_domains: list[str] | None,
+        search_domain_codes: list[str] | None,
         expected_exception: type[Exception],
         error_match: str,
     ):
@@ -177,5 +177,5 @@ class TestStuffFactoryImplicitMemoryErrors:
                 name=stuff_name,
                 code=stuff_code,
                 stuff_content_or_data=stuff_content_or_data,
-                search_domains=search_domains,
+                search_domain_codes=search_domain_codes,
             )

@@ -8,26 +8,13 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
+from pipelex.builder.talents.llm_talent import LLMTalent
+from pipelex.config import get_config
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.llm.llm_setting import LLMModelChoice
-
-
-class LLMSkill(StrEnum):
-    LLM_TO_RETRIEVE = "llm_to_retrieve"
-
-    LLM_TO_ANSWER_QUESTIONS_CHEAP = "llm_to_answer_questions_cheap"
-    LLM_TO_ANSWER_QUESTIONS = "llm_to_answer_questions"
-
-    LLM_FOR_WRITING_CHEAP = "llm_for_writing_cheap"
-    LLM_FOR_IMG_TO_TEXT_CHEAP = "llm_for_img_to_text_cheap"
-    LLM_FOR_VISUAL_DESIGN = "cheap_llm_for_creativity"
-    LLM_FOR_CREATIVE_WRITING = "llm_for_creative_writing"
-    LLM_TO_CODE = "llm_to_code"
-    LLM_TO_ANALYZE_LARGE_CODEBASE = "llm_to_analyze_large_codebase"
 
 
 class PipeLLMSpec(PipeSpec):
@@ -46,9 +33,13 @@ class PipeLLMSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeLLM"]] = "PipeLLM"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    llm_skill: LLMSkill | str = Field(description="Select the simplest LLM skill corresponding to the task to be performed.")
+    llm_talent: LLMTalent | str = Field(
+        description="Select the simplest LLM talent corresponding to the task to be performed.",
+        examples=list(LLMTalent),
+    )
     system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
     prompt: str | None = Field(
+        default=None,
         description="""A template for the user prompt:
 Use `$` prefix for inline variables (e.g., `$topic`) and `@` prefix to insert content as a block with delimiters
 For example, `@extracted_text` will generate this:
@@ -64,13 +55,18 @@ Or you can mention them by their number in order in the inputs section, starting
 Example: `Only analyze the colors from $image_1 and the shapes from $image_2.
 • If we are generating a structured concept, DO NOT detail the structure in the prompt: we will add the schema later.
 So, don't have to write a bullet-list of all the attributes definitions yourself.
-"""
+""",
     )
 
-    @field_validator("llm_skill", mode="before")
+    @field_validator("llm_talent", mode="before")
     @classmethod
-    def validate_llm(cls, llm_value: str) -> LLMSkill:
-        return LLMSkill(llm_value)
+    def validate_llm_talent(cls, llm_value: str) -> LLMTalent:
+        try:
+            return LLMTalent(llm_value)
+        except ValueError:
+            valid = [talent.value for talent in LLMTalent]
+            msg = f"'{llm_value}' is not a valid LLMTalent. Valid values: {valid}"
+            raise ValueError(msg) from None
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
@@ -83,7 +79,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 
         # Add LLM-specific information
         llm_group.renderables.append(Text())  # Blank line
-        llm_group.renderables.append(Text.from_markup(f"LLM Skill: [bold yellow]{self.llm_skill}[/bold yellow]"))
+        llm_group.renderables.append(Text.from_markup(f"LLM Talent: [bold yellow]{self.llm_talent}[/bold yellow]"))
 
         # Add system prompt if present
         if self.system_prompt:
@@ -115,8 +111,9 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
     def to_blueprint(self) -> PipeLLMBlueprint:
         base_blueprint = super().to_blueprint()
 
-        # create llm choice as a str
-        llm_choice: LLMModelChoice = self.llm_skill
+        # Get llm choice from config-based mapping
+        mappings = get_config().pipelex.builder_config.talent_preset_mappings.llm
+        llm_choice: LLMModelChoice = mappings[self.llm_talent]
 
         return PipeLLMBlueprint(
             description=base_blueprint.description,

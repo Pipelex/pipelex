@@ -1,0 +1,14 @@
+domain      = "scoring"
+description = "Scoring domain for cross-domain dependency targets"
+
+[concept]
+WeightedScore = "A weighted score result"
+
+[pipe]
+[pipe.compute_score]
+type        = "PipeLLM"
+description = "Compute a weighted score"
+inputs      = { data = "Text" }
+output      = "WeightedScore"
+model       = "$quick-reasoning"
+prompt      = "Compute score from @data"

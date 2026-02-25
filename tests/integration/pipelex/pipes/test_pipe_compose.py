@@ -5,7 +5,8 @@ import pytest
 from pipelex import pretty_print
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
@@ -17,6 +18,7 @@ from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlu
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import JINJA2TestCases
 
 
@@ -26,6 +28,7 @@ class TestPipeCompose:
     @pytest.mark.parametrize("template_source", JINJA2TestCases.JINJA2_FOR_ANY)
     async def test_pipe_compose_for_any(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         template_source: str,
         load_empty_library: Callable[[], None],
@@ -49,6 +52,7 @@ class TestPipeCompose:
                 blueprint=pipe_compose_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
         )
         pipe_compose_output = cast("PipeComposeOutput", await get_pipe_router().run(pipe_job=pipe_job))
         rendered_text = pipe_compose_output.main_stuff_as_str
@@ -57,6 +61,7 @@ class TestPipeCompose:
     @pytest.mark.parametrize("template_source", JINJA2TestCases.JINJA2_FOR_STUFF)
     async def test_pipe_compose_for_stuff(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         template_source: str,
         load_empty_library: Callable[[], None],
@@ -88,6 +93,7 @@ class TestPipeCompose:
                 blueprint=pipe_compose_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
             working_memory=working_memory,
         )
         pipe_compose_output = cast("PipeComposeOutput", await get_pipe_router().run(pipe_job=pipe_job))

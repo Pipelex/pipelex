@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import sys
 from typing import cast
 
@@ -36,7 +38,7 @@ class CallerInfoTemplate(StrEnum):
     FUNC_MODULE_LINE = "func_module_line"
 
     @classmethod
-    def for_template_key(cls, key: "CallerInfoTemplate") -> str:
+    def for_template_key(cls, key: CallerInfoTemplate) -> str:
         match key:
             case cls.FILE_LINE:
                 return "{file}:{line}"

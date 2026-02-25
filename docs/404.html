@@ -9,8 +9,8 @@
         const segments = path.split('/').filter(seg => seg);
         const firstSegment = segments[0];
 
-        // Check if it's a version: either "latest" or starts with "0." (e.g., "0.17")
-        const hasVersion = firstSegment === 'latest' || (firstSegment && firstSegment.startsWith('0.'));
+        // Check if it's a version: "latest", "pre-release", or starts with "0." (e.g., "0.17")
+        const hasVersion = firstSegment === 'latest' || firstSegment === 'pre-release' || (firstSegment && firstSegment.startsWith('0.'));
 
         // Check if we're on a version's root 404 page (exactly /{version}/404.html)
         const isVersionRoot404 = segments.length === 2 && segments[1] === '404.html';

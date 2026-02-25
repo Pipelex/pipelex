@@ -1,6 +1,7 @@
 """UI components for routing profile configuration in the init command."""
 
 from rich.console import Console, Group
+from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
@@ -82,7 +83,7 @@ def prompt_primary_backend(console: Console, backend_keys: list[str]) -> str:
             break
 
         except ValueError:
-            console.print(f"[red]Invalid input: '{choice_str}'.[/red] Please enter a number.\n")
+            console.print(f"[red]Invalid input: '{escape(choice_str)}'.[/red] Please enter a number.\n")
 
     return selected_backend
 
@@ -109,8 +110,9 @@ def build_fallback_order_panel(remaining_backends: list[str], backend_options: l
         table.add_row(f"[{idx}]", display_name)
 
     description = Text(
-        "Fallback order determines which backends to try when a model has no exact match or pattern match\n"
-        "and is not available in your default backend.\nCurrent order:",
+        "Fallback order determines which backends to try when a model is not available in your default backend.\n"
+        "Enter indices to reorder (partial list OK - remaining backends keep their order).\n"
+        "Press Enter to keep the current order:",
         style="dim",
     )
 
@@ -137,14 +139,15 @@ def prompt_fallback_order(console: Console, remaining_backends: list[str], backe
 
     console.print()
     console.print("[dim]Enter the order of backends (space or comma separated indices).[/dim]")
-    console.print("[dim]For example: '2 1 3' or '2,1,3' to reorder them.[/dim]")
+    console.print("[dim]You can provide a partial list - remaining backends will keep their current order.[/dim]")
+    console.print("[dim]For example: '2' puts backend 2 first, then the rest in order.[/dim]")
+    console.print("[dim]Press Enter to keep the current order.[/dim]")
     console.print()
 
     fallback_order: list[str] | None = None
     while fallback_order is None:
-        # Show current order as default
-        default_order = " ".join(str(i + 1) for i in range(len(remaining_backends)))
-        choice_str = Prompt.ask("[bold]Enter order[/bold]", default=default_order, console=console)
+        # Show current order as default (empty = keep order)
+        choice_str = Prompt.ask("[bold]Enter order[/bold]", default="", console=console)
         choice_input = choice_str.strip()
 
         # Handle empty input (use default order)
@@ -159,30 +162,29 @@ def prompt_fallback_order(console: Console, remaining_backends: list[str], backe
             # Parse as 1-based indices from user input
             user_indices = [int(part.strip()) for part in parts if part.strip()]
 
-            # Validate: must have exactly the same number of indices
-            if len(user_indices) != len(remaining_backends):
-                console.print(f"[red]Error: You must specify all {len(remaining_backends)} backends.[/red] You provided {len(user_indices)}.\n")
-                continue
-
             # Validate: all indices are in range (1-based)
-            invalid_indices = [i for i in user_indices if i < 1 or i > len(remaining_backends)]
+            invalid_indices = [idx for idx in user_indices if idx < 1 or idx > len(remaining_backends)]
             if invalid_indices:
                 max_idx = len(remaining_backends)
                 console.print(f"[red]Invalid choice(s): {invalid_indices}.[/red] Please enter numbers between 1 and {max_idx}.\n")
                 continue
 
-            # Validate: no duplicates
+            # Validate: no duplicates in user input
             if len(user_indices) != len(set(user_indices)):
-                console.print("[red]Error: Duplicate indices not allowed.[/red] Each backend must appear exactly once.\n")
+                console.print("[red]Error: Duplicate indices not allowed.[/red]\n")
                 continue
 
-            # Convert to 0-based indices and reorder backends
-            zero_based_indices = [i - 1 for i in user_indices]
-            fallback_order = [remaining_backends[i] for i in zero_based_indices]
+            # Convert to 0-based indices
+            zero_based_indices = [idx - 1 for idx in user_indices]
+
+            # Build the fallback order: user-specified first, then remaining in original order
+            specified_backends: list[str] = [remaining_backends[idx] for idx in zero_based_indices]
+            remaining_in_order: list[str] = [backend for backend in remaining_backends if backend not in specified_backends]
+            fallback_order = specified_backends + remaining_in_order
             break
 
         except ValueError:
-            console.print(f"[red]Invalid input: '{choice_str}'.[/red] Please enter numbers separated by commas or spaces.\n")
+            console.print(f"[red]Invalid input: '{escape(choice_str)}'.[/red] Please enter numbers separated by commas or spaces.\n")
 
     # Display the final order
     console.print("\n[green]✓[/green] Fallback order set to:")

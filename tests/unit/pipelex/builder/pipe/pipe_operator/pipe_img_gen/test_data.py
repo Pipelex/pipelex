@@ -1,6 +1,7 @@
 from typing import ClassVar
 
-from pipelex.builder.pipe.pipe_img_gen_spec import ImgGenSkill, PipeImgGenSpec
+from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
+from pipelex.builder.talents.img_gen_talent import ImgGenTalent
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
 
@@ -12,14 +13,15 @@ class PipeImgGenTestCases:
             description="Generate an image",
             inputs={"my_prompt": "Text"},
             output="native.Image",
-            img_gen_skill=ImgGenSkill.GEN_IMAGE_BASIC,
+            img_gen_talent=ImgGenTalent.GEN_IMAGE,
+            prompt="@my_prompt",
         ),
         PipeImgGenBlueprint(
             description="Generate an image",
             inputs={"my_prompt": "Text"},
             output="native.Image",
-            img_gen_prompt_var_name="my_prompt",
-            model=ImgGenSkill.GEN_IMAGE_BASIC,
+            prompt="@my_prompt",
+            model="$gen-image",
             aspect_ratio=None,
             background=None,
             output_format=None,
@@ -35,20 +37,20 @@ class PipeImgGenTestCases:
             description="Generate image with options",
             inputs={"description": "Text"},
             output="Image[3]",
-            img_gen_skill=ImgGenSkill.GEN_IMAGE_FAST,
+            prompt="@description",
+            img_gen_talent=ImgGenTalent.GEN_IMAGE_FAST,
         ),
         PipeImgGenBlueprint(
             description="Generate image with options",
             inputs={"description": "Text"},
             output="Image[3]",
-            img_gen_prompt=None,
-            model=ImgGenSkill.GEN_IMAGE_FAST,
+            prompt="@description",
+            model="$gen-image-fast",
             aspect_ratio=None,
             background=None,
             output_format=None,
             is_raw=None,
             seed=None,
-            img_gen_prompt_var_name="description",
         ),
     )
 

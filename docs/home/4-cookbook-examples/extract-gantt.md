@@ -4,7 +4,7 @@ This example showcases the ability of Pipelex to extract structured information 
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/extract_gantt.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/extract_gantt.py)
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_gantt/extract_gantt.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_gantt/extract_gantt.py)
 
 ## The Pipeline Explained
 
@@ -50,11 +50,11 @@ class GanttChart(StructuredContent):
     milestones: Optional[List[Milestone]]
 ```
 
-## The Pipeline Definition: `gantt.plx`
+## The Pipeline Definition: `gantt.mthds`
 
-The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex workflow from simple, reusable components.
+The `extract_gantt_by_steps` pipeline is a sequence of smaller, focused pipes. This is a great example of building a complex method from simple, reusable components.
 
-```plx
+```toml
 [pipe.extract_gantt_by_steps]
 type = "PipeSequence"
 description = "Extract all details from a gantt chart"
@@ -77,7 +77,7 @@ description = "Extract the precise dates of the task, start_date and end_date"
 inputs = { gantt_chart_image = "GanttChartImage", gantt_timescale = "GanttTimescaleDescription", gantt_task_name = "GanttTaskName" }
 output = "GanttTaskDetails"
 structuring_method = "preliminary_text"
-model = "llm_to_extract_diagram"
+model = "$vision-diagram"
 prompt = """
 I am sharing an image of a Gantt chart: $gantt_chart_image.
 Please analyse the image and for a given task name (and only this task), extract the information of the task, if relevant.
@@ -91,7 +91,7 @@ Here is the name of the task you have to extract the dates for:
 @gantt_task_name
 """
 ```
-This demonstrates the "divide and conquer" approach that Pipelex encourages. By breaking down a complex problem into smaller steps, each step can be handled by a specialized pipe, making the overall workflow more robust and easier to debug. 
+This demonstrates the "divide and conquer" approach that Pipelex encourages. By breaking down a complex problem into smaller steps, each step can be handled by a specialized pipe, making the overall method more robust and easier to debug. 
 
 ## Flowchart
 

@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.types import Self, StrEnum
 
 
@@ -18,12 +19,6 @@ class AspectRatio(StrEnum):
     PORTRAIT_9_21 = "portrait_9_21"
 
 
-class OutputFormat(StrEnum):
-    PNG = "png"
-    JPG = "jpg"
-    WEBP = "webp"
-
-
 class Quality(StrEnum):
     LOW = "low"
     MEDIUM = "medium"
@@ -35,6 +30,14 @@ class Background(StrEnum):
     OPAQUE = "opaque"
     AUTO = "auto"
 
+    @property
+    def is_certainly_transparent(self) -> bool:
+        match self:
+            case Background.TRANSPARENT:
+                return True
+            case Background.OPAQUE | Background.AUTO:
+                return False
+
 
 class ImgGenJobParams(BaseModel):
     aspect_ratio: AspectRatio = Field(strict=False)
@@ -42,10 +45,10 @@ class ImgGenJobParams(BaseModel):
     quality: Quality | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
     guidance_scale: float | None = Field(default=None, gt=0)
-    is_moderated: bool = False
+    is_moderated: bool | None = None
     safety_tolerance: int | None = Field(default=None, ge=1, le=6)
-    is_raw: bool
-    output_format: OutputFormat = Field(strict=False)
+    is_raw: bool | None = None
+    output_format: ImageFormat | None = Field(default=None, strict=False)
     seed: int | None = Field(default=None, ge=0)
 
     @model_validator(mode="after")
@@ -54,12 +57,13 @@ class ImgGenJobParams(BaseModel):
             case Background.OPAQUE | Background.AUTO:
                 pass
             case Background.TRANSPARENT:
-                match self.output_format:
-                    case OutputFormat.PNG:
-                        pass
-                    case OutputFormat.JPG | OutputFormat.WEBP:
-                        msg = "ImgGenJobParams cannot have a non-PNG output format when background is transparent."
-                        raise ValueError(msg)
+                if not self.output_format:
+                    msg = "ImgGenJobParams cannot have a transparent background without setting output_format (to PNG)."
+                    raise ValueError(msg)
+
+                if not self.output_format.is_transparent_compatible:
+                    msg = "ImgGenJobParams transparent background requires a transparency-compatible output format (PNG)."
+                    raise ValueError(msg)
         return self
 
 
@@ -69,10 +73,9 @@ class ImgGenJobParamsDefaults(ConfigModel):
     quality: Quality | None = Field(default=None, strict=False)
     nb_steps: int | None = Field(default=None, gt=0)
     guidance_scale: float = Field(..., gt=0)
-    is_moderated: bool
+    is_moderated: bool | None = None
     safety_tolerance: int = Field(..., ge=1, le=6)
-    is_raw: bool
-    output_format: OutputFormat = Field(strict=False)
+    is_raw: bool | None = None
     seed: int | Literal["auto"]
 
     def make_img_gen_job_params(self) -> ImgGenJobParams:
@@ -81,6 +84,9 @@ class ImgGenJobParamsDefaults(ConfigModel):
             seed = None
         else:
             seed = self.seed
+        output_format: ImageFormat | None = None
+        if self.background.is_certainly_transparent:
+            output_format = ImageFormat.PNG
         return ImgGenJobParams(
             aspect_ratio=self.aspect_ratio,
             background=self.background,
@@ -90,7 +96,7 @@ class ImgGenJobParamsDefaults(ConfigModel):
             is_moderated=self.is_moderated,
             safety_tolerance=self.safety_tolerance,
             is_raw=self.is_raw,
-            output_format=self.output_format,
+            output_format=output_format,
             seed=seed,
         )
 

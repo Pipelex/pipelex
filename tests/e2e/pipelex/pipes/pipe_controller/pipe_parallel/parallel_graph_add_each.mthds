@@ -1,0 +1,59 @@
+domain      = "test_parallel_graph_add_each"
+description = "Test PipeParallel with add_each_output for graph edge verification"
+main_pipe   = "parallel_then_consume"
+
+[concept.ShortSummary]
+description = "A brief one-sentence summary"
+refines     = "Text"
+
+[concept.DetailedSummary]
+description = "A detailed multi-sentence summary"
+refines     = "Text"
+
+[pipe.parallel_then_consume]
+type = "PipeSequence"
+description = "Run parallel summaries then consume one downstream"
+inputs = { input_text = "Text" }
+output = "Text"
+steps = [
+  { pipe = "parallel_summarize", result = "..." },
+  { pipe = "combine_summaries" },
+]
+
+[pipe.parallel_summarize]
+type = "PipeParallel"
+description = "Generate short and detailed summaries in parallel"
+inputs = { input_text = "Text" }
+output = "Text"
+add_each_output = true
+branches = [
+  { pipe = "summarize_short", result = "short_summary" },
+  { pipe = "summarize_detailed", result = "detailed_summary" },
+]
+
+[pipe.summarize_short]
+type        = "PipeLLM"
+description = "Generate a short one-sentence summary"
+inputs      = { input_text = "Text" }
+output      = "ShortSummary"
+model       = "$testing-text"
+prompt      = "Summarize in one sentence: @input_text.text"
+
+[pipe.summarize_detailed]
+type        = "PipeLLM"
+description = "Generate a detailed summary"
+inputs      = { input_text = "Text" }
+output      = "DetailedSummary"
+model       = "$testing-text"
+prompt      = "Write a detailed summary of: @input_text.text"
+
+[pipe.combine_summaries]
+type = "PipeLLM"
+description = "Combine short and detailed summaries into a final result"
+inputs = { short_summary = "ShortSummary", detailed_summary = "DetailedSummary" }
+output = "Text"
+model = "$testing-text"
+prompt = """Combine these two summaries into a final result:
+
+Short: @short_summary.text
+Detailed: @detailed_summary.text"""

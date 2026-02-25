@@ -22,7 +22,7 @@ class PipelexBundleSpec(StructuredContent):
 
     Represents the top-level structure of a Pipelex bundle, which defines a domain
     with its concepts, pipes, and configuration. Bundles are the primary unit of
-    organization for Pipelex workflows, loaded from TOML files.
+    organization for Pipelex methods, loaded from TOML files.
 
     Attributes:
         domain: The domain identifier for this bundle in snake_case format.
@@ -60,13 +60,13 @@ class PipelexBundleSpec(StructuredContent):
 
     @field_validator("domain", mode="before")
     @classmethod
-    def validate_domain_syntax(cls, domain: str) -> str:
+    def validate_domain_syntax(cls, domain_code: str) -> str:
         try:
-            validate_domain_code(code=domain)
+            validate_domain_code(code=domain_code)
         except DomainCodeError as exc:
-            msg = f"Error when trying to validate pipelex bundle spec: domain '{domain}' is not a valid domain code: {exc}"
+            msg = f"Error when trying to validate pipelex bundle spec: domain '{domain_code}' is not a valid domain code: {exc}"
             raise ValueError(msg) from exc
-        return domain
+        return domain_code
 
     @model_validator(mode="after")
     def validate_main_pipe(self) -> "PipelexBundleSpec":
@@ -102,14 +102,18 @@ class PipelexBundleSpec(StructuredContent):
             # Finally, create the ordered dict
             pipe = dict[str, PipeBlueprintUnion](sorted_pipe_items)
 
-        return PipelexBundleBlueprint(
-            domain=self.domain,
-            description=self.description,
-            system_prompt=self.system_prompt,
-            main_pipe=self.main_pipe,
-            pipe=pipe,
-            concept=concept,
-        )
+        try:
+            return PipelexBundleBlueprint(
+                domain=self.domain,
+                description=self.description,
+                system_prompt=self.system_prompt,
+                main_pipe=self.main_pipe,
+                pipe=pipe,
+                concept=concept,
+            )
+        except ValidationError as exc:
+            msg = f"Failed to create pipelex bundle blueprint: {format_pydantic_validation_error(exc)}"
+            raise PipelexBundleSpecBlueprintError(msg) from exc
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

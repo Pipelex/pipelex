@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - pre-release/v*
 
 permissions:
   contents: write
@@ -41,4 +42,12 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Deploy documentation
-        run: make docs-deploy-stable
+        run: |
+          source .venv/bin/activate
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "Deploying stable docs..."
+            make docs-deploy-stable
+          elif [[ "${{ github.ref }}" == refs/heads/pre-release/* ]]; then
+            echo "Deploying pre-release docs..."
+            make docs-deploy-specific-version
+          fi

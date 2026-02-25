@@ -1,0 +1,822 @@
+{
+  "graph_id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3",
+  "created_at": "2026-01-28T01:07:41.638343Z",
+  "pipeline_ref": {
+    "domain": "cv_job_batch",
+    "main_pipe": "batch_analyze_cvs_for_job_offer",
+    "entrypoint": null
+  },
+  "nodes": [
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "kind": "controller",
+      "pipe_code": "batch_analyze_cvs_for_job_offer",
+      "pipe_type": "PipeSequence",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:07:41.644487Z",
+        "ended_at": "2026-01-28T01:08:26.752909Z",
+        "duration": 45.108422
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "job_offer_pdf",
+            "concept": "Document",
+            "content_type": "application/pdf",
+            "preview": null,
+            "size": null,
+            "digest": "ak6kd",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          },
+          {
+            "name": "cvs",
+            "concept": "Document",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "7DeCn",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "match_analyses",
+            "concept": "MatchAnalysis",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "8aUvF",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_1",
+      "kind": "operator",
+      "pipe_code": "extract_one_job_offer",
+      "pipe_type": "PipeExtract",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:07:41.648613Z",
+        "ended_at": "2026-01-28T01:07:49.950573Z",
+        "duration": 8.30196
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "job_offer_pdf",
+            "concept": "Document",
+            "content_type": "application/pdf",
+            "preview": null,
+            "size": null,
+            "digest": "ak6kd",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "job_offer_pages",
+            "concept": "Page",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "Tyt7M",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_2",
+      "kind": "operator",
+      "pipe_code": "analyze_job_requirements",
+      "pipe_type": "PipeLLM",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:07:49.952149Z",
+        "ended_at": "2026-01-28T01:07:56.563304Z",
+        "duration": 6.611155
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "job_offer_pages",
+            "concept": "Page",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "Tyt7M",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "job_requirements",
+            "concept": "JobRequirements",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "EdWGF",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_3",
+      "kind": "controller",
+      "pipe_code": "process_cv_batch",
+      "pipe_type": "PipeBatch",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:07:56.564000Z",
+        "ended_at": "2026-01-28T01:08:26.751266Z",
+        "duration": 30.187266
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "cvs",
+            "concept": "Document",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "7DeCn",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "match_analyses",
+            "concept": "MatchAnalysis",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "8aUvF",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_4",
+      "kind": "controller",
+      "pipe_code": "process_cv",
+      "pipe_type": "PipeSequence",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:07:56.572140Z",
+        "ended_at": "2026-01-28T01:08:26.748422Z",
+        "duration": 30.176282
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "cv_pdf",
+            "concept": "Document",
+            "content_type": "application/pdf",
+            "preview": null,
+            "size": null,
+            "digest": "7DeCn-branch-0",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          },
+          {
+            "name": "job_requirements",
+            "concept": "JobRequirements",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "EdWGF",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "Batch result 1 of match_analyses",
+            "concept": "MatchAnalysis",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "Depdj-branch-0",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_5",
+      "kind": "operator",
+      "pipe_code": "extract_one_cv",
+      "pipe_type": "PipeExtract",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:07:56.576893Z",
+        "ended_at": "2026-01-28T01:08:02.474606Z",
+        "duration": 5.897713
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "cv_pdf",
+            "concept": "Document",
+            "content_type": "application/pdf",
+            "preview": null,
+            "size": null,
+            "digest": "7DeCn-branch-0",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "cv_pages",
+            "concept": "Page",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "JPHx7",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_6",
+      "kind": "controller",
+      "pipe_code": "process_cv",
+      "pipe_type": "PipeSequence",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:07:56.582369Z",
+        "ended_at": "2026-01-28T01:08:15.752457Z",
+        "duration": 19.170088
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "cv_pdf",
+            "concept": "Document",
+            "content_type": "application/pdf",
+            "preview": null,
+            "size": null,
+            "digest": "7DeCn-branch-1",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          },
+          {
+            "name": "job_requirements",
+            "concept": "JobRequirements",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "EdWGF",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "Batch result 2 of match_analyses",
+            "concept": "MatchAnalysis",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "Depdj-branch-1",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_7",
+      "kind": "operator",
+      "pipe_code": "extract_one_cv",
+      "pipe_type": "PipeExtract",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:07:56.587758Z",
+        "ended_at": "2026-01-28T01:08:03.908740Z",
+        "duration": 7.320982
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "cv_pdf",
+            "concept": "Document",
+            "content_type": "application/pdf",
+            "preview": null,
+            "size": null,
+            "digest": "7DeCn-branch-1",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "cv_pages",
+            "concept": "Page",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "WrpJk",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_8",
+      "kind": "operator",
+      "pipe_code": "analyze_one_cv",
+      "pipe_type": "PipeLLM",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:08:02.476853Z",
+        "ended_at": "2026-01-28T01:08:08.771699Z",
+        "duration": 6.294846
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "cv_pages",
+            "concept": "Page",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "JPHx7",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "candidate_profile",
+            "concept": "CandidateProfile",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "XjbcC",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_9",
+      "kind": "operator",
+      "pipe_code": "analyze_one_cv",
+      "pipe_type": "PipeLLM",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:08:03.910600Z",
+        "ended_at": "2026-01-28T01:08:06.965520Z",
+        "duration": 3.05492
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "cv_pages",
+            "concept": "Page",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "WrpJk",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "candidate_profile",
+            "concept": "CandidateProfile",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "Y3w7Y",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_10",
+      "kind": "operator",
+      "pipe_code": "analyze_match",
+      "pipe_type": "PipeLLM",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:08:06.967805Z",
+        "ended_at": "2026-01-28T01:08:15.751660Z",
+        "duration": 8.783855
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "candidate_profile",
+            "concept": "CandidateProfile",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "Y3w7Y",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          },
+          {
+            "name": "job_requirements",
+            "concept": "JobRequirements",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "EdWGF",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "match_analysis",
+            "concept": "MatchAnalysis",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "Depdj-branch-1",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_11",
+      "kind": "operator",
+      "pipe_code": "analyze_match",
+      "pipe_type": "PipeLLM",
+      "status": "succeeded",
+      "timing": {
+        "started_at": "2026-01-28T01:08:08.773765Z",
+        "ended_at": "2026-01-28T01:08:26.747168Z",
+        "duration": 17.973403
+      },
+      "io": {
+        "inputs": [
+          {
+            "name": "candidate_profile",
+            "concept": "CandidateProfile",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "XjbcC",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          },
+          {
+            "name": "job_requirements",
+            "concept": "JobRequirements",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "EdWGF",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ],
+        "outputs": [
+          {
+            "name": "match_analysis",
+            "concept": "MatchAnalysis",
+            "content_type": null,
+            "preview": null,
+            "size": null,
+            "digest": "Depdj-branch-0",
+            "data": null,
+            "data_text": null,
+            "data_html": null,
+            "extra": {}
+          }
+        ]
+      },
+      "error": null,
+      "tags": {},
+      "metrics": {}
+    }
+  ],
+  "edges": [
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_0",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_1",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_1",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_2",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_2",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_3",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_3",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_3",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_4",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_4",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_4",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_5",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_5",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_3",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_6",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_6",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_6",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_7",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_7",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_4",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_8",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_8",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_6",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_9",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_9",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_6",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_10",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_10",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_4",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_11",
+      "kind": "contains",
+      "label": null,
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_11",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_1",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_2",
+      "kind": "data",
+      "label": "job_offer_pages",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_12",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_2",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_4",
+      "kind": "data",
+      "label": "job_requirements",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_13",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_2",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_6",
+      "kind": "data",
+      "label": "job_requirements",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_14",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_5",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_8",
+      "kind": "data",
+      "label": "cv_pages",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_15",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_7",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_9",
+      "kind": "data",
+      "label": "cv_pages",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_16",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_9",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_10",
+      "kind": "data",
+      "label": "candidate_profile",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_17",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_2",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_10",
+      "kind": "data",
+      "label": "job_requirements",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_18",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_8",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_11",
+      "kind": "data",
+      "label": "candidate_profile",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_19",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_2",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_11",
+      "kind": "data",
+      "label": "job_requirements",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_20",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_4",
+      "kind": "batch_item",
+      "label": "[0]",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_21",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_5",
+      "kind": "batch_item",
+      "label": "[0]",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_22",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_6",
+      "kind": "batch_item",
+      "label": "[1]",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_23",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_7",
+      "kind": "batch_item",
+      "label": "[1]",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_24",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_4",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "kind": "batch_aggregate",
+      "label": "[0]",
+      "meta": {}
+    },
+    {
+      "id": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:edge_25",
+      "source": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_6",
+      "target": "d86eef61-e06b-4116-80aa-ad03e0c0cba3:node_0",
+      "kind": "batch_aggregate",
+      "label": "[1]",
+      "meta": {}
+    }
+  ],
+  "meta": {}
+}

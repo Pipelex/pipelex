@@ -1,32 +1,53 @@
-import base64
-import json
-from io import BytesIO
-
-from PIL import Image
+from pydantic import Field, model_validator
+from rich.console import Group
+from rich.markdown import Markdown
+from rich.text import Text
 from typing_extensions import override
-from yattag import Doc
 
-from pipelex.cogt.exceptions import ImageContentError
-from pipelex.cogt.extract.extract_output import ExtractedImage
+from pipelex.cogt.image.image_size import ImageSize
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.base_64_utils import prefixed_base64_str_from_base64_str, save_base_64_str_to_binary_file
-from pipelex.tools.misc.file_utils import ensure_directory_exists, get_incremental_file_path, save_text_to_path
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
-from pipelex.tools.misc.path_utils import InterpretedPathOrUrl, interpret_path_or_url
+from pipelex.tools.jinja2.image_registry import ImageRegistry
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_sync
+from pipelex.tools.misc.http_utils import validate_url_resource_exists
+from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.tools.uri.uri_resolver import describe_uri, extract_filename_from_uri
 from pipelex.types import Self
 
 
 class ImageContent(StuffContent):
-    url: str
-    source_prompt: str | None = None
-    caption: str | None = None
-    base_64: str | None = None
+    url: str = Field(..., description="The image URL: pipelex storage URL, HTTP/HTTPS URL, or base64 data URL")
+
+    public_url: str | None = Field(default=None, description="The public URL of the image")
+    source_prompt: str | None = Field(default=None, description="The source prompt of the image")
+    source_negative_prompt: str | None = Field(default=None, description="The source negative prompt of the image")
+    caption: str | None = Field(default=None, description="The caption of the image")
+    mime_type: str | None = Field(default=None, description="The MIME type of the image")
+    size: ImageSize | None = Field(default=None, description="The size in pixels (width and height) of the image")
+    filename: str | None = Field(default=None, description="The original filename of the image")
+
+    @model_validator(mode="after")
+    def _auto_populate_filename(self) -> Self:
+        """Auto-populate filename from url when it is a local file path."""
+        if self.filename is None:
+            self.filename = extract_filename_from_uri(self.url)
+        return self
+
+    @override
+    def validate_resources(self) -> None:
+        validate_url_resource_exists(self.url)
+
+    @property
+    @override
+    def content_type(self) -> str | None:
+        return self.mime_type
 
     @property
     @override
     def short_desc(self) -> str:
-        url_desc = interpret_path_or_url(path_or_uri=self.url).desc
-        return f"{url_desc} or an image"
+        url_desc = describe_uri(self.url)
+        return f"{url_desc} of an image"
 
     @override
     def rendered_plain(self) -> str:
@@ -34,81 +55,83 @@ class ImageContent(StuffContent):
 
     @override
     def rendered_html(self) -> str:
-        doc = Doc()
-        doc.stag("img", src=self.url, klass="msg-img")
-
-        return doc.getvalue()
+        template_source = '<img src="{{ url|e }}" class="msg-img">'
+        return render_jinja2_sync(
+            template_source=template_source,
+            template_category=TemplateCategory.HTML,
+            templating_context={
+                "url": self.public_url or self.url,
+            },
+        )
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         return f"![{self.url[:100]}]({self.url})"
 
+    def render_with_images(
+        self,
+        registry: ImageRegistry,
+        text_format: TextFormat,  # noqa: ARG002
+    ) -> str:
+        """Register this image and return a token."""
+        image_index = registry.register_image(self)
+        return f"[Image {image_index + 1}]"
+
     @override
-    def rendered_json(self) -> str:
-        return json.dumps({"image_url": self.url, "source_prompt": self.source_prompt})
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        group = Group()
 
-    @classmethod
-    def make_from_extracted_image(cls, extracted_image: ExtractedImage) -> Self:
-        if base_64 := extracted_image.base_64:
-            # Check if it's already a prefixed base64 string
-            if base_64.startswith("data:"):
-                prefixed_base64_str = base_64
-            else:
-                prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
-            return cls(
-                url=prefixed_base64_str,
-                base_64=extracted_image.base_64,
-                caption=extracted_image.caption,
-            )
-        else:
-            msg = f"Base 64 is required for image content: {extracted_image}"
-            raise ImageContentError(msg)
+        # title indicating it's an image:
+        title_text = Text("Image:", style="bold cyan")
+        group.renderables.append(title_text)
 
-    @classmethod
-    def make_from_image(cls, image: Image.Image) -> Self:
-        buffer = BytesIO()
-        image.save(buffer, format="PNG")
-        base_64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-        prefixed_base64_str = prefixed_base64_str_from_base64_str(b64_str=base_64)
-        return cls(
-            url=prefixed_base64_str,
-            base_64=base_64,
-        )
+        # URL with clickable markdown link
+        display_url = f"{self.url[:200]}…" if len(self.url) > 201 else self.url
+        url_markdown = Markdown(f"**URL:** [{display_url}]({self.url})")
+        group.renderables.append(url_markdown)
 
-    def save_to_directory(self, directory: str, base_name: str | None = None, extension: str | None = None):
-        ensure_directory_exists(directory)
-        base_name = base_name or "img"
-        if (base_64 := self.base_64) and not extension:
-            match interpret_path_or_url(path_or_uri=self.url):
-                case InterpretedPathOrUrl.FILE_NAME:
-                    parts = self.url.rsplit(".", 1)
-                    base_name = parts[0]
-                    extension = parts[1]
-                case InterpretedPathOrUrl.FILE_PATH | InterpretedPathOrUrl.FILE_URI | InterpretedPathOrUrl.URL | InterpretedPathOrUrl.BASE_64:
-                    file_type = detect_file_type_from_base64(b64=base_64)
-                    base_name = base_name or "img"
-                    extension = file_type.extension
-            file_path = get_incremental_file_path(
-                base_path=directory,
-                base_name=base_name,
-                extension=extension,
-                avoid_suffix_if_possible=True,
-            )
-            save_base_64_str_to_binary_file(base_64_str=base_64, file_path=file_path)
+        # Display link if present
+        if self.public_url is not None:
+            link_text = Text()
+            link_text.append("Public URL: ", style="bold")
+            link_text.append("Open Image", style=f"cyan link {self.public_url}")
+            group.renderables.append(link_text)
 
-        if caption := self.caption:
-            caption_file_path = get_incremental_file_path(
-                base_path=directory,
-                base_name=f"{base_name}_caption",
-                extension="txt",
-                avoid_suffix_if_possible=True,
-            )
-            save_text_to_path(text=caption, path=caption_file_path)
-        if source_prompt := self.source_prompt:
-            source_prompt_file_path = get_incremental_file_path(
-                base_path=directory,
-                base_name=f"{base_name}_source_prompt",
-                extension="txt",
-                avoid_suffix_if_possible=True,
-            )
-            save_text_to_path(text=source_prompt, path=source_prompt_file_path)
+        # Caption if present
+        if self.caption:
+            caption_text = Text()
+            caption_text.append("Caption: ", style="bold")
+            caption_text.append(self.caption, style="yellow italic")
+            group.renderables.append(caption_text)
+
+        # Size if present
+        if self.size:
+            size_text = Text()
+            size_text.append("Size: ", style="bold")
+            size_text.append(f"{self.size.width}x{self.size.height}", style="dim")
+            group.renderables.append(size_text)
+
+        # MIME type if present
+        if self.mime_type:
+            mime_type_text = Text()
+            mime_type_text.append("MIME Type: ", style="bold")
+            mime_type_text.append(self.mime_type, style="dim")
+            group.renderables.append(mime_type_text)
+
+        # Source prompt if present
+        if self.source_prompt:
+            group.renderables.append(Text())  # Add spacing
+            prompt_text = Text()
+            prompt_text.append("Source Prompt:\n", style="bold")
+            prompt_text.append(self.source_prompt, style="dim italic")
+            group.renderables.append(prompt_text)
+
+        # Source negative prompt if present
+        if self.source_negative_prompt:
+            group.renderables.append(Text())  # Add spacing
+            negative_prompt_text = Text()
+            negative_prompt_text.append("Source Negative Prompt: ", style="bold")
+            negative_prompt_text.append(self.source_negative_prompt, style="dim italic")
+            group.renderables.append(negative_prompt_text)
+
+        return group

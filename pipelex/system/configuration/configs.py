@@ -1,5 +1,3 @@
-from typing import cast
-
 import shortuuid
 from pydantic import Field, field_validator
 
@@ -7,32 +5,19 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.language.plx_config import PlxConfig
-from pipelex.pipeline.track.tracker_config import TrackerConfig
+from pipelex.graph.graph_config import GraphConfig
+from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
-from pipelex.types import StrEnum
+from pipelex.tools.storage.storage_config import StorageConfig
+from pipelex.types import Self, StrEnum
 
 
 class ConfigPaths:
-    DEFAULT_CONFIG_DIR_PATH = "./.pipelex"
-    INFERENCE_DIR_NAME = "inference"
-    INFERENCE_DIR_PATH = f"{DEFAULT_CONFIG_DIR_PATH}/{INFERENCE_DIR_NAME}"
-    BACKENDS_FILE_NAME = "backends.toml"
-    BACKENDS_FILE_PATH = f"{INFERENCE_DIR_PATH}/{BACKENDS_FILE_NAME}"
-    BACKENDS_DIR_NAME = "backends"
-    BACKENDS_DIR_PATH = f"{INFERENCE_DIR_PATH}/{BACKENDS_DIR_NAME}"
-    ROUTING_PROFILES_FILE_NAME = "routing_profiles.toml"
-    ROUTING_PROFILES_FILE_PATH = f"{INFERENCE_DIR_PATH}/{ROUTING_PROFILES_FILE_NAME}"
-    MODEL_DECKS_DIR_NAME = "deck"
-    MODEL_DECKS_DIR_PATH = f"{INFERENCE_DIR_PATH}/{MODEL_DECKS_DIR_NAME}"
-    BASE_DECK_FILE_NAME = "base_deck.toml"
-    BASE_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{BASE_DECK_FILE_NAME}"
-    OVERRIDES_DECK_FILE_NAME = "overrides.toml"
-    OVERRIDES_DECK_FILE_PATH = f"{MODEL_DECKS_DIR_PATH}/{OVERRIDES_DECK_FILE_NAME}"
+    # Dev-only config (not synced with kit)
+    DEV_CONFIG_DIR_PATH = "./.pipelex-dev"
 
 
 class ValidationErrorReaction(StrEnum):
@@ -41,21 +26,14 @@ class ValidationErrorReaction(StrEnum):
     IGNORE = "ignore"
 
 
-class ValidationErrorConfig(ConfigModel):
-    default_reaction: ValidationErrorReaction = Field(strict=False)
-    reactions: dict[PipeValidationErrorType, ValidationErrorReaction]
+class AgentTarget(StrEnum):
+    CURSOR = "cursor"
+    AGENTS = "agents"
+    CLAUDE = "claude"
 
-    @field_validator("reactions", mode="before")
-    @classmethod
-    def validate_reactions(cls, value: dict[str, str]) -> dict[PipeValidationErrorType, ValidationErrorReaction]:
-        return cast(
-            "dict[PipeValidationErrorType, ValidationErrorReaction]",
-            ConfigModel.transform_dict_str_to_enum(
-                input_dict=value,
-                key_enum_cls=PipeValidationErrorType,
-                value_enum_cls=ValidationErrorReaction,
-            ),
-        )
+
+class KitConfig(ConfigModel):
+    preferred_agent_target: AgentTarget = Field(strict=False)
 
 
 class PipeRunConfig(ConfigModel):
@@ -94,7 +72,6 @@ class PromptingConfig(ConfigModel):
 
 
 class FeatureConfig(ConfigModel):
-    is_pipeline_tracking_enabled: bool
     is_reporting_enabled: bool
 
 
@@ -122,30 +99,86 @@ class ScanConfig(ConfigModel):
         return frozenset(value)
 
 
+class TalentPresetMappings(ConfigModel):
+    llm: dict[str, str]
+    img_gen: dict[str, str]
+    extract: dict[str, str]
+
+
 class BuilderConfig(ConfigModel):
     fix_loop_max_attempts: int
     default_output_dir: str
     default_bundle_file_name: str
     default_directory_base_name: str
+    talent_preset_mappings: TalentPresetMappings
+
+
+class PipelineExecutionConfig(ConfigModel):
+    is_normalize_data_urls_to_storage: bool
+    is_mock_inputs: bool
+    is_generate_graph: bool
+    graph_config: GraphConfig
+
+    def with_graph_config_overrides(
+        self,
+        generate_graph: bool | None = None,
+        force_include_full_data: bool | None = None,
+        mock_inputs: bool | None = None,
+    ) -> Self:
+        """Create a copy of this config with optional overrides.
+
+        Args:
+            generate_graph: If not None, overrides is_generate_graph.
+            force_include_full_data: If not None, overrides all graph_config.data_inclusion flags
+                (stuff_json_content, stuff_text_content, stuff_html_content, error_stack_traces).
+            mock_inputs: If not None, overrides is_mock_inputs. When True, generates mock
+                data for missing required inputs (for dry-run validation).
+
+        Returns:
+            A new PipelineExecutionConfig with the specified overrides applied.
+        """
+        updates: dict[str, bool | GraphConfig] = {}
+
+        if generate_graph is not None:
+            updates["is_generate_graph"] = generate_graph
+
+        if mock_inputs is not None:
+            updates["is_mock_inputs"] = mock_inputs
+
+        if force_include_full_data is not None:
+            new_data_inclusion = self.graph_config.data_inclusion.model_copy(
+                update={
+                    "stuff_json_content": force_include_full_data,
+                    "stuff_text_content": force_include_full_data,
+                    "stuff_html_content": force_include_full_data,
+                    "error_stack_traces": force_include_full_data,
+                }
+            )
+            updates["graph_config"] = self.graph_config.model_copy(update={"data_inclusion": new_data_inclusion})
+
+        if updates:
+            return self.model_copy(update=updates)
+        return self
 
 
 class Pipelex(ConfigModel):
+    storage_config: StorageConfig
     feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig
 
-    validation_error_config: ValidationErrorConfig
-    tracker_config: TrackerConfig
     structure_config: StructureConfig
     prompting_config: PromptingConfig
-    plx_config: PlxConfig
+    mthds_config: MthdsConfig
 
     dry_run_config: DryRunConfig
     pipe_run_config: PipeRunConfig
+    pipeline_execution_config: PipelineExecutionConfig
     reporting_config: ReportingConfig
     observer_config: ObserverConfig
     scan_config: ScanConfig
     builder_config: BuilderConfig
+    kit_config: KitConfig
 
 
 class MigrationConfig(ConfigModel):

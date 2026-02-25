@@ -1,8 +1,31 @@
 class URLs:
+    logo_white_on_transparent = "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-wot-1119x352.png"
+    logo_black_on_transparent = "https://d2cinlfp2qnig1.cloudfront.net/logo/Pipelex-logo-bot-1119x352.png"
     homepage = "https://pipelex.com"
+    app = "https://app.pipelex.com/"
     repository = "https://github.com/Pipelex/pipelex"
     documentation = "https://docs.pipelex.com/"
-    changelog = "https://docs.pipelex.com/changelog/"
+    changelog = "https://docs.pipelex.com/latest/changelog/"
     discord = "https://go.pipelex.com/discord"
-    pipe_func_docs = "https://docs.pipelex.com/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc/"
-    backend_provider_docs = "https://docs.pipelex.com/home/5-setup/configure-ai-providers/"
+    privacy_policy = "https://go.pipelex.com/privacy-policy"
+    telemetry_docs = "https://docs.pipelex.com/latest/home/5-setup/telemetry/"
+    gateway_docs = "https://docs.pipelex.com/latest/home/5-setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started"
+    pipe_func_docs = "https://docs.pipelex.com/latest/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc/"
+    backend_provider_docs = "https://docs.pipelex.com/latest/home/5-setup/configure-ai-providers/"
+    native_concepts_docs = "https://docs.pipelex.com/latest/home/6-build-reliable-ai-workflows/concepts/native-concepts/"
+
+    jpg_example_1 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_1.jpg"
+    jpg_example_2 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_2.jpg"
+    jpg_example_3 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_3.jpg"
+
+    pdf_example_1 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/pdf_example_1.pdf"
+    pdf_example_2 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/pdf_example_2.pdf"
+    pdf_example_3 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/pdf_example_3.pdf"
+
+    svg_example = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/svg_example.svg"
+
+    png_example_1 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example_1.png"
+    png_example_2 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example_2.png"
+    png_example_3 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example_3.png"
+
+    txt_example = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/txt_example.txt"

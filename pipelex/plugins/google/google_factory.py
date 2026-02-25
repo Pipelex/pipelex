@@ -1,53 +1,46 @@
 import asyncio
+import base64
 
 from google import genai
 from google.genai import types as genai_types
 
-from pipelex.cogt.exceptions import CogtError
-from pipelex.cogt.image.prompt_image import (
-    PromptImage,
-    PromptImageBase64,
-    PromptImagePath,
-    PromptImageUrl,
-)
-from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+from pipelex.cogt.document.prompt_document import PromptDocument
+from pipelex.cogt.document.prompt_document_utils import prepare_prompt_document_as_base64
+from pipelex.cogt.exceptions import LLMCompletionError
+from pipelex.cogt.image.prompt_image import PromptImage
+from pipelex.cogt.image.prompt_image_utils import prepare_prompt_image_as_base64
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.tools.misc.base_64_utils import load_binary_async
-
-
-class GoogleFactoryError(CogtError):
-    pass
 
 
 class GoogleFactory:
-    @staticmethod
-    def make_google_client(backend: InferenceBackend) -> genai.Client:
+    @classmethod
+    def make_google_client(cls, backend: InferenceBackend) -> genai.Client:
         """Create a Google Gemini API client."""
         return genai.Client(api_key=backend.api_key)
 
     @classmethod
     async def prepare_image_part(cls, prompt_image: PromptImage) -> genai_types.Part:
-        """Convert a PromptImage to Google genai Part format."""
-        image_bytes: bytes
-        mime_type: str
+        """Convert a PromptImage to Google genai Part format.
 
-        if isinstance(prompt_image, PromptImageBase64):
-            image_bytes = prompt_image.get_decoded_bytes()
-            mime_type = prompt_image.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        if isinstance(prompt_image, PromptImagePath):
-            image_bytes = await load_binary_async(prompt_image.file_path)
-            mime_type = prompt_image.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        if isinstance(prompt_image, PromptImageUrl):
-            prompt_image_binary = await PromptImageFactory.make_promptimagebinary_from_url_async(prompt_image)
-            image_bytes = prompt_image_binary.binary
-            mime_type = prompt_image_binary.get_mime_type()
-            return genai_types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
-        msg = f"Unsupported PromptImage type: '{type(prompt_image).__name__}'"
-        raise GoogleFactoryError(msg)
+        Uses the unified prepare_prompt_image_as_base64() which supports all URI types
+        including pipelex-storage://.
+        """
+        prepared = await prepare_prompt_image_as_base64(prompt_image)
+        image_bytes = base64.b64decode(prepared.base64_data)
+        return genai_types.Part.from_bytes(data=image_bytes, mime_type=prepared.mime_type)
+
+    @classmethod
+    async def prepare_document_part(cls, prompt_document: PromptDocument) -> genai_types.Part:
+        """Convert a PromptDocument to Google genai Part format.
+
+        Uses the unified prepare_prompt_document_as_base64() which supports all URI types
+        including pipelex-storage://.
+        """
+        prepared = await prepare_prompt_document_as_base64(prompt_document)
+        document_bytes = base64.b64decode(prepared.base64_data)
+        return genai_types.Part.from_bytes(data=document_bytes, mime_type=prepared.mime_type)
 
     @classmethod
     async def prepare_user_contents(cls, llm_prompt: LLMPrompt) -> genai_types.ContentListUnion:
@@ -66,7 +59,50 @@ class GoogleFactory:
             image_parts = await asyncio.gather(*image_tasks)
             parts.extend(image_parts)
 
+        # Add document parts if present
+        if llm_prompt.user_documents:
+            # Prepare all documents in parallel
+            document_tasks = [cls.prepare_document_part(document) for document in llm_prompt.user_documents]
+            document_parts = await asyncio.gather(*document_tasks)
+            parts.extend(document_parts)
+
         return genai_types.Content(parts=parts, role="user")
+
+    @classmethod
+    def extract_text_from_response(cls, response: genai_types.GenerateContentResponse, model_desc: str) -> str:
+        """Extract text from a Google Gemini response, skipping thinking parts.
+
+        Args:
+            response: The Google Gemini API response.
+            model_desc: Model description for error messages.
+
+        Returns:
+            The concatenated text content from non-thinking parts.
+
+        """
+        if not response.candidates:
+            msg = f"No candidates returned from model: {model_desc}"
+            raise LLMCompletionError(msg)
+
+        candidate = response.candidates[0]
+        if not candidate.content or not candidate.content.parts:
+            msg = f"No content parts in response from model: {model_desc}"
+            raise LLMCompletionError(msg)
+
+        text_parts: list[str] = []
+        for part in candidate.content.parts:
+            if part.thought:
+                continue
+            if part.text:
+                stripped = part.text.strip()
+                if stripped:
+                    text_parts.append(stripped)
+
+        if not text_parts:
+            msg = f"No text content in response from model: {model_desc}"
+            raise LLMCompletionError(msg)
+
+        return "\n\n".join(text_parts)
 
     @classmethod
     def extract_token_usage(cls, usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None) -> NbTokensByCategoryDict:
@@ -87,5 +123,9 @@ class GoogleFactory:
         # Add cached tokens if available
         if usage_metadata.cached_content_token_count:
             nb_tokens_by_category[TokenCategory.INPUT_CACHED] = usage_metadata.cached_content_token_count
+
+        # Add thinking/reasoning tokens if available
+        if usage_metadata.thoughts_token_count:
+            nb_tokens_by_category[TokenCategory.OUTPUT_REASONING] = usage_metadata.thoughts_token_count
 
         return nb_tokens_by_category

@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.exceptions import LLMPromptParameterError
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.system.runtime import ProblemReaction, runtime_manager
@@ -12,6 +13,7 @@ class LLMPrompt(BaseModel):
     system_text: str | None = None
     user_text: str | None = None
     user_images: list[PromptImage] = []
+    user_documents: list[PromptDocument] = []
 
     def validate_before_execution(self):
         reaction = runtime_manager.problem_reactions.job
@@ -39,9 +41,7 @@ class LLMPrompt(BaseModel):
 
     @override
     def __str__(self) -> str:
-        # return json_str(self, title="llm_prompt", is_spaced=True)
         return self.desc()
-        # return "test"
 
     @override
     def __repr__(self) -> str:
@@ -81,5 +81,12 @@ class LLMPrompt(BaseModel):
             description += f"""
 user_images:
 {user_images_desc}
+"""
+        if self.user_documents:
+            user_documents_desc: str = "\n".join([f"  {document}" for document in self.user_documents])
+
+            description += f"""
+user_documents:
+{user_documents_desc}
 """
         return description

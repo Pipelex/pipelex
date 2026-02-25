@@ -1,0 +1,23 @@
+domain    = "pkg_test_legal.contracts"
+main_pipe = "pkg_test_extract_clause"
+
+[concept.PkgTestContractClause]
+description = "A clause extracted from a contract"
+
+[pipe.pkg_test_extract_clause]
+type        = "PipeLLM"
+description = "Extract the main clause from a contract"
+output      = "PkgTestContractClause"
+prompt      = "Extract the main clause from the following contract text: {{ text }}"
+
+[pipe.pkg_test_extract_clause.inputs]
+text = "Text"
+
+[pipe.pkg_test_analyze_contract]
+type        = "PipeLLM"
+description = "Full contract analysis"
+output      = "PkgTestContractClause"
+prompt      = "Analyze the following contract: {{ text }}"
+
+[pipe.pkg_test_analyze_contract.inputs]
+text = "Text"

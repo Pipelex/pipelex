@@ -8,30 +8,34 @@ CODEX_CLOUD_ENV_VAR_KEY = "CODEX_CLOUD"
 
 
 class IntegrationMode(StrEnum):
+    CI = "ci"
     CLI = "cli"
-    FASTAPI = "fastapi"
     DOCKER = "docker"
+    FASTAPI = "fastapi"
     MCP = "mcp"
     N8N = "n8n"
-    PYTHON = "python"
     PYTEST = "pytest"
+    PYTHON = "python"
 
-    def allows_telemetry(self) -> bool:
+    @property
+    def requires_terms_acceptance(self) -> bool:
         match self:
+            case IntegrationMode.CI:
+                return False
             case IntegrationMode.CLI:
                 return True
-            case IntegrationMode.FASTAPI:
-                return True
             case IntegrationMode.DOCKER:
+                return True
+            case IntegrationMode.FASTAPI:
                 return True
             case IntegrationMode.MCP:
                 return True
             case IntegrationMode.N8N:
                 return True
-            case IntegrationMode.PYTHON:
-                return False
             case IntegrationMode.PYTEST:
-                return False
+                return True
+            case IntegrationMode.PYTHON:
+                return True
 
 
 class RunMode(StrEnum):
@@ -137,6 +141,10 @@ class RuntimeManager(BaseModel):
                 return True
             case RunMode.CODEX_CLOUD_TEST:
                 return True
+
+    @property
+    def is_in_codex_cloud(self) -> bool:
+        return self.run_mode in {RunMode.CODEX_CLOUD, RunMode.CODEX_CLOUD_TEST}
 
 
 runtime_manager = RuntimeManager()

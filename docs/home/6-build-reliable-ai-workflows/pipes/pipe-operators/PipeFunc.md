@@ -81,13 +81,13 @@ async def concatenate_texts(working_memory: WorkingMemory) -> TextContent:
     pass
 ```
 
-Then use `function_name = "custom_concat"` in your `.plx` file.
+Then use `function_name = "custom_concat"` in your `.mthds` file.
 
 ## Configuration
 
-Once the function is registered, you can use it in your `.plx` file.
+Once the function is registered, you can use it in your `.mthds` file.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter       | Type   | Description                                                                 | Required |
 | --------------- | ------ | --------------------------------------------------------------------------- | -------- |
@@ -98,9 +98,9 @@ Once the function is registered, you can use it in your `.plx` file.
 
 ### Example
 
-This PLX snippet shows how to use the `concatenate_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
+This MTHDS snippet shows how to use the `concatenate_texts` function defined above. It assumes two previous pipes have produced outputs named `text_a` and `text_b`.
 
-```plx
+```toml
 [pipe.combine_them]
 type = "PipeFunc"
 description = "Combine two text inputs using a custom Python function"

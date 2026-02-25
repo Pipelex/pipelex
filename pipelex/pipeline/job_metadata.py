@@ -1,8 +1,10 @@
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, Field
 
-from pipelex.pipeline.pipeline_models import SpecialPipelineId
+from pipelex.graph.graph_context import GraphContext
+from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.types import StrEnum
 
 
@@ -20,14 +22,36 @@ class UnitJobId(StrEnum):
     IMG_GEN_TEXT_TO_IMAGE = "img_gen_text_to_image"
     EXTRACT_PAGES = "extract_pages"
 
+    @property
+    def model_kind(self) -> str:
+        match self:
+            case UnitJobId.LLM_GEN_TEXT:
+                return "LLM"
+            case UnitJobId.LLM_GEN_OBJECT:
+                return "LLM"
+            case UnitJobId.IMG_GEN_TEXT_TO_IMAGE:
+                return "ImgGen"
+            case UnitJobId.EXTRACT_PAGES:
+                return "Extract"
+
 
 class JobMetadata(BaseModel):
-    job_name: str | None = None
-    pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
-    pipe_job_ids: list[str] | None = None
+    user_id: str
+    pipeline_run_id: str
+    pipe_code: str | None = None
+
+    # Business ID for the current pipe execution (16-char hex string).
+    # Always set during pipe runs for tracking purposes.
+    pipe_run_id: str | None = None
+
+    # OTel context with precomputed trace/span IDs. None when telemetry is disabled.
+    otel_context: OtelContext | None = None
+
+    # GraphSpec tracing context. None when graph tracing is disabled.
+    graph_context: GraphContext | None = None
 
     content_generation_job_id: str | None = None
-    unit_job_id: str | None = None
+    unit_job_id: UnitJobId | None = None
     job_category: JobCategory | None = None
 
     started_at: datetime | None = Field(default_factory=datetime.now)
@@ -39,22 +63,29 @@ class JobMetadata(BaseModel):
             return (self.completed_at - self.started_at).total_seconds()
         return None
 
-    def update(self, updated_metadata: "JobMetadata"):
-        if updated_metadata.job_category:
-            self.job_category = updated_metadata.job_category
-        if updated_metadata.pipe_job_ids:
-            self.pipe_job_ids = self.pipe_job_ids or []
-            self.pipe_job_ids.extend(updated_metadata.pipe_job_ids)
-        if updated_metadata.content_generation_job_id:
-            self.content_generation_job_id = updated_metadata.content_generation_job_id
-        if updated_metadata.unit_job_id:
-            self.unit_job_id = updated_metadata.unit_job_id
-        if updated_metadata.started_at:
-            self.started_at = updated_metadata.started_at
-        if updated_metadata.completed_at:
-            self.completed_at = updated_metadata.completed_at
+    def copy_with_update(
+        self,
+        otel_context: OtelContext | None,
+        graph_context: GraphContext | None = None,
+        **updates: Any,
+    ) -> "JobMetadata":
+        """Create a copy of this metadata with updates applied.
 
-    def copy_with_update(self, updated_metadata: "JobMetadata") -> "JobMetadata":
-        new_metadata = self.model_copy()
-        new_metadata.update(updated_metadata=updated_metadata)
-        return new_metadata
+        Args:
+            otel_context: OTel context to set on the copy. Always set explicitly
+                because it's computed fresh per pipe run and should replace the parent's context
+                (even when None, e.g. in dry mode or when tracing is disabled).
+            graph_context: GraphSpec tracing context to set on the copy. If None,
+                inherits from the current context (unlike otel_context).
+            **updates: Fields to update on the copy.
+        """
+        # graph_context defaults to current value if not provided (inheritance)
+        effective_graph_context = graph_context if graph_context is not None else self.graph_context
+        return self.model_copy(
+            deep=True,
+            update={
+                "otel_context": otel_context,
+                "graph_context": effective_graph_context,
+                **updates,
+            },
+        )

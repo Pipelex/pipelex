@@ -3,7 +3,7 @@ from abc import abstractmethod
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
@@ -29,6 +29,11 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     def desc(self) -> str:
         return f"ImgGen-Worker:{self.inference_model.tag}"
 
+    @property
+    def is_img2img_supported(self) -> bool:
+        """Check if this worker supports image-to-image generation (input images)."""
+        return self.inference_model.is_img2img_supported
+
     def _check_can_perform_job(self, img_gen_job: ImgGenJob):
         # This can be overridden by subclasses for specific checks
         pass
@@ -36,7 +41,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     async def gen_image(
         self,
         img_gen_job: ImgGenJob,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageRawDetails:
         log.dev(f"✨ {self.desc} ✨")
 
         # Verify that the job is valid
@@ -65,14 +70,14 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
     async def _gen_image(
         self,
         img_gen_job: ImgGenJob,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageRawDetails:
         pass
 
     async def gen_image_list(
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> list[GeneratedImage]:
+    ) -> list[GeneratedImageRawDetails]:
         log.dev(f"✨ {self.desc} ✨")
 
         # Verify that the job is valid
@@ -102,5 +107,5 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         self,
         img_gen_job: ImgGenJob,
         nb_images: int,
-    ) -> list[GeneratedImage]:
+    ) -> list[GeneratedImageRawDetails]:
         pass

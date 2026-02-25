@@ -53,7 +53,7 @@ class PipeSorterTestCases:
             description="D depends on B and C",
             inputs={},
             output="Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="pipe_b", result="result_b"),
                 SubPipeBlueprint(pipe="pipe_c", result="result_c"),
             ],
@@ -176,21 +176,25 @@ class PipeSorterTestCases:
             description="Analyzes the input photo to understand visual elements, composition, mood, etc.",
             inputs={"input_photo": "Image"},
             output="ImageAnalysis",
+            prompt="Analyze this image: @input_photo",
         ),
         "define_opposite_concept": PipeLLMBlueprint(
             description="Determines what constitutes the opposite for the analyzed image",
             inputs={"image_analysis": "ImageAnalysis"},
             output="OppositeDefinition",
+            prompt="Define opposite for: @image_analysis",
         ),
         "generate_image_prompt": PipeLLMBlueprint(
             description="Crafts a detailed image generation prompt from the opposite definition",
             inputs={"opposite_definition": "OppositeDefinition"},
             output="ImagePrompt",
+            prompt="Generate prompt from: @opposite_definition",
         ),
         "generate_opposite_image": PipeImgGenBlueprint(
             description="Generates the opposite image using AI",
             inputs={"generation_prompt": "ImagePrompt"},
             output="Image",
+            prompt="@generation_prompt",
         ),
         "photo_opposite_pipeline": PipeSequenceBlueprint(
             description="Main pipeline that generates the opposite of an input photo",
@@ -253,31 +257,37 @@ class PipeSorterTestCases:
             description="Prepare the data",
             inputs={"input": "Text"},
             output="Text",
+            prompt="Prepare: @input",
         ),
         "validate_data": PipeLLMBlueprint(
             description="Validate the prepared data",
             inputs={"prepared_data": "Text"},
             output="Text",
+            prompt="Validate: @prepared_data",
         ),
         "process_small": PipeLLMBlueprint(
             description="Process small items",
             inputs={"item": "Text"},
             output="Text",
+            prompt="Process small: @item",
         ),
         "process_large": PipeLLMBlueprint(
             description="Process large items",
             inputs={"item": "Text"},
             output="Text",
+            prompt="Process large: @item",
         ),
         "process_default": PipeLLMBlueprint(
             description="Default processing",
             inputs={"item": "Text"},
             output="Text",
+            prompt="Process default: @item",
         ),
         "final_process": PipeLLMBlueprint(
             description="Final processing step",
             inputs={"processed": "Text"},
             output="Text",
+            prompt="Final process: @processed",
         ),
     }
     # Expected order: main_pipeline first, then following step order

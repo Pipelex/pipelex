@@ -3,16 +3,27 @@
 import os
 from typing import Any
 
+from rich.markup import escape
+
+from pipelex import log
+from pipelex.cli.commands.init.ide_extension import suggest_extension_install_if_needed
 from pipelex.cli.commands.init.ui.backends_ui import (
     build_backend_selection_panel,
     display_selected_backends,
     get_backend_options_from_toml,
     get_currently_enabled_backends,
-    prompt_backend_indices,
+    prompt_backend_select,
 )
+from pipelex.cli.commands.init.ui.gateway_ui import (
+    display_gateway_accepted_message,
+    display_gateway_declined_message,
+    prompt_gateway_acceptance,
+)
+from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.hub import get_console
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_with_tomlkit, save_toml_to_path
 
@@ -62,6 +73,22 @@ def get_selected_backend_keys(backends_toml_path: str) -> list[str]:
     return selected_backends
 
 
+def disable_gateway_backend(backends_toml_path: str) -> None:
+    """Disable the pipelex_gateway backend in backends.toml.
+
+    Args:
+        backends_toml_path: Path to the backends.toml file.
+    """
+    if not path_exists(backends_toml_path):
+        return
+
+    toml_doc = load_toml_with_tomlkit(backends_toml_path)
+
+    if PipelexBackend.GATEWAY in toml_doc:
+        toml_doc[PipelexBackend.GATEWAY]["enabled"] = False  # type: ignore[index]
+        save_toml_to_path(toml_doc, backends_toml_path)
+
+
 def customize_backends_config(is_first_time_setup: bool = False) -> None:
     """Interactively customize which inference backends are enabled in backends.toml.
 
@@ -85,7 +112,7 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
         currently_enabled = get_currently_enabled_backends(backends_toml_path, backend_options)
 
         # If this is first-time setup, ignore what's in the template (all enabled)
-        # and use only pipelex_inference as the default
+        # and use only pipelex_gateway as the default
         if is_first_time_setup or (currently_enabled and len(currently_enabled) == len(backend_options)):
             currently_enabled = []
 
@@ -95,7 +122,32 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
 
         # UI: Display panel and get user selection
         console.print(build_backend_selection_panel(backend_options, currently_enabled, is_first_time_setup))
-        selected_indices = prompt_backend_indices(console, backend_options, currently_enabled, is_first_time_setup)
+        selected_indices, selected_backends = prompt_backend_select(
+            console=console,
+            backend_options=backend_options,
+            currently_enabled=currently_enabled,
+            is_first_time_setup=is_first_time_setup,
+        )
+
+        # Suggest IDE extension install after backend selection, before gateway terms
+        try:
+            suggest_extension_install_if_needed(console)
+        except Exception as exc:
+            log.debug(f"IDE extension suggestion failed: {exc}")
+
+        # Check if pipelex_gateway is selected and handle terms acceptance
+        if PipelexBackend.GATEWAY in selected_backends:
+            gateway_accepted = prompt_gateway_acceptance(console)
+
+            if gateway_accepted:
+                display_gateway_accepted_message(console)
+                update_service_terms_acceptance(accepted=True)
+            else:
+                display_gateway_declined_message(console)
+                update_service_terms_acceptance(accepted=False)
+
+                # Remove pipelex_gateway from selected indices
+                selected_indices = [idx for idx in selected_indices if backend_options[idx][0] != PipelexBackend.GATEWAY]
 
         # Business logic: Update TOML
         update_backends_in_toml(toml_doc, selected_indices, backend_options)
@@ -105,5 +157,5 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
         display_selected_backends(console, selected_indices, backend_options)
 
     except Exception as exc:
-        console.print(f"[yellow]⚠ Warning: Failed to customize backends: {exc}[/yellow]")
+        console.print(f"[yellow]⚠ Warning: Failed to customize backends: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/backends.toml later[/dim]")

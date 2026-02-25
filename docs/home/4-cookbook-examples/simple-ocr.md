@@ -2,11 +2,11 @@
 
 This example demonstrates a basic OCR (Optical Character Recognition) pipeline. It takes a PDF file as input, extracts the text from each page, and saves the content.
 
-This is a fundamental building block for many document processing workflows.
+This is a fundamental building block for many document processing methods.
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/_quick_start/simple_ocr.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/_quick_start/simple_ocr.py)
+[**➡️ View on GitHub: examples/a_quick_start/simple_ocr.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/a_quick_start/simple_ocr.py)
 
 ## The Pipeline Explained
 
@@ -17,7 +17,7 @@ async def simple_ocr(pdf_url: str) -> ListContent[PageContent]:
     pipe_output = await execute_pipeline(
         pipe_code="extract_page_contents_from_pdf",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
     page_content_list: ListContent[PageContent] = pipe_output.main_stuff_as_list(item_type=PageContent)

@@ -216,4 +216,4 @@ def setup_pipelex():
     return pipelex_instance
 ```
 
-The observer system provides powerful insights into your pipeline execution patterns and is essential for monitoring, debugging, and optimizing your Pipelex workflows.
+The observer system provides powerful insights into your pipeline execution patterns and is essential for monitoring, debugging, and optimizing your Pipelex methods.

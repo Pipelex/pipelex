@@ -41,7 +41,7 @@ class PipelineManager(PipelineManagerAbstract, RootModel[PipelineManagerRoot]):
         return pipeline
 
     @override
-    def add_new_pipeline(self) -> Pipeline:
+    def add_new_pipeline(self, pipe_code: str | None) -> Pipeline:
         pipeline = PipelineFactory.make_pipeline()
         self._set_pipeline(pipeline_run_id=pipeline.pipeline_run_id, pipeline=pipeline)
         return pipeline

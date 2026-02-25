@@ -8,7 +8,7 @@ from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 
 VariableMultiplicity = bool | int
 
-MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?$"
 
 
 class VariableMultiplicityResolution(BaseModel):
@@ -50,15 +50,12 @@ def make_variable_multiplicity(nb_items: int | None, multiple_items: bool | None
     return variable_multiplicity
 
 
-class MultiplicityParseResult:
-    """Result of parsing a concept string with multiplicity notation."""
-
-    def __init__(self, concept: str, multiplicity: int | bool | None):
-        self.concept: str = concept
-        self.multiplicity: int | bool | None = multiplicity
+class MultiplicityParseResult(BaseModel):
+    concept_ref_or_code: str
+    multiplicity: int | bool | None
 
 
-def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResult:
+def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityParseResult:
     """Parse a concept specification string to extract concept and multiplicity.
 
     Supported formats:
@@ -70,29 +67,30 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
     - "domain.ConceptName[5]" -> (domain.ConceptName, 5)
 
     Args:
-        concept_spec: Concept specification string with optional multiplicity brackets
+        concept_ref_or_code: Concept specification string with optional multiplicity brackets
 
     Returns:
         MultiplicityParseResult with concept (without brackets) and multiplicity value
 
     Raises:
-        ValueError: If the concept specification has invalid syntax
+        PipeVariableMultiplicityError: If the concept specification has invalid syntax
+            or if multiplicity is zero or negative (a pipe must produce at least one output)
     """
     # Use strict pattern to validate identifier syntax
-    # Concept must start with letter/underscore, optional domain prefix, optional brackets
-    pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
-    match = re.match(pattern, concept_spec)
+    # Concept must start with letter/underscore, with zero or more dotted domain segments, optional brackets
+    pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?$"
+    match = re.match(pattern, concept_ref_or_code)
 
     if not match:
         msg = (
-            f"Invalid concept specification syntax: '{concept_spec}'. "
+            f"Invalid concept specification syntax: '{concept_ref_or_code}'. "
             f"Expected format: 'ConceptName', 'ConceptName[]', 'ConceptName[N]', "
             f"'domain.ConceptName', 'domain.ConceptName[]', or 'domain.ConceptName[N]' "
             f"where concept and domain names must start with a letter or underscore."
         )
         raise PipeVariableMultiplicityError(msg)
 
-    concept = match.group(1)
+    extracted_concept = match.group(1)
     bracket_content = match.group(2)
 
     multiplicity: int | bool | None
@@ -105,8 +103,68 @@ def parse_concept_with_multiplicity(concept_spec: str) -> MultiplicityParseResul
     else:
         # Number in brackets [N] - fixed count
         multiplicity = int(bracket_content)
+        if multiplicity <= 0:
+            msg = f"Invalid multiplicity value in '{concept_ref_or_code}': multiplicity must be at least 1. A pipe must produce at least one output."
+            raise PipeVariableMultiplicityError(msg)
 
-    return MultiplicityParseResult(concept=concept, multiplicity=multiplicity)
+    return MultiplicityParseResult(concept_ref_or_code=extracted_concept, multiplicity=multiplicity)
+
+
+def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None, target_multiplicity: VariableMultiplicity | None) -> bool:
+    """Check if a source multiplicity is compatible with a target multiplicity.
+
+    This is used to validate that a pipe's output multiplicity can fulfill a required output multiplicity.
+    For example, when validating a PipeSequence, the last step's output multiplicity (source) must be
+    compatible with the sequence's declared output multiplicity (target).
+
+    Compatibility rules:
+    - If target is None (single item), source must also be None
+    - If target is True (variable list), source can be True OR any positive integer
+      (a fixed count is compatible with a variable-length expectation)
+    - If target is an integer N (fixed count), source must be exactly N
+
+    Args:
+        source_multiplicity: The actual multiplicity provided (e.g., from a sub-pipe's output)
+        target_multiplicity: The required/expected multiplicity (e.g., declared on a sequence)
+
+    Returns:
+        True if source_multiplicity can fulfill target_multiplicity, False otherwise
+
+    Examples:
+        >>> is_multiplicity_compatible(None, None)
+        True
+        >>> is_multiplicity_compatible(True, True)
+        True
+        >>> is_multiplicity_compatible(3, True)  # Fixed count fulfills variable expectation
+        True
+        >>> is_multiplicity_compatible(True, 3)  # Variable cannot fulfill fixed expectation
+        False
+        >>> is_multiplicity_compatible(3, 3)
+        True
+        >>> is_multiplicity_compatible(3, 5)  # Different fixed counts are incompatible
+        False
+        >>> is_multiplicity_compatible(None, True)  # Single cannot fulfill list expectation
+        False
+    """
+    # Case 1: Target expects single item (None)
+    if target_multiplicity is None:
+        return source_multiplicity is None
+
+    # Case 2: Target expects variable-length list (True)
+    if target_multiplicity is True:
+        # Accept True (variable) or any integer (fixed count)
+        # Both represent "multiple items", just with different specificity
+        # Note: We must explicitly check for bool first because bool is a subclass of int in Python
+        # isinstance(False, int) returns True, which would incorrectly match False as a valid multiplicity
+        return source_multiplicity is True or (isinstance(source_multiplicity, int) and not isinstance(source_multiplicity, bool))
+
+    # Case 3: Target expects fixed count (integer)
+    # Source must match exactly, but must not be a boolean
+    # Note: We must explicitly check for bool first because bool is a subclass of int in Python
+    # True == 1 evaluates to True, which would incorrectly match True (variable list) as compatible with 1 (fixed count)
+    if isinstance(source_multiplicity, bool):
+        return False
+    return source_multiplicity == target_multiplicity
 
 
 def format_concept_with_multiplicity(concept_code_or_string: str, multiplicity: VariableMultiplicity | None) -> str:

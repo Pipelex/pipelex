@@ -1,5 +1,7 @@
+from typing import Literal
+
 import pytest
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
@@ -96,3 +98,34 @@ class TestFormatPydanticValidationError:
         formatted = format_pydantic_validation_error(exc.value)
         assert "Model type errors:" in formatted
         assert "expected InnerModel, got str" in formatted
+
+    def test_literal_error_single_field(self) -> None:
+        """Test formatting with a literal validation error on a single field."""
+
+        class WithChoices(BaseModel):
+            tone: Literal["Casual", "Professional", "Academic"] = Field(..., description="Tone")
+
+        with pytest.raises(ValidationError) as exc:
+            WithChoices.model_validate({"tone": "tone_Literal"})
+
+        formatted = format_pydantic_validation_error(exc.value)
+        assert "Invalid choice errors:" in formatted
+        assert "'tone'" in formatted
+        assert "tone_Literal" in formatted
+
+    def test_literal_error_multiple_fields(self) -> None:
+        """Test formatting with literal validation errors on multiple fields."""
+
+        class WithMultipleChoices(BaseModel):
+            tone: Literal["Casual", "Professional"] = Field(..., description="Tone")
+            length: Literal["Short", "Medium", "Long"] = Field(..., description="Length")
+
+        with pytest.raises(ValidationError) as exc:
+            WithMultipleChoices.model_validate({"tone": "bad_tone", "length": "bad_length"})
+
+        formatted = format_pydantic_validation_error(exc.value)
+        assert "Invalid choice errors:" in formatted
+        assert "'tone'" in formatted
+        assert "bad_tone" in formatted
+        assert "'length'" in formatted
+        assert "bad_length" in formatted

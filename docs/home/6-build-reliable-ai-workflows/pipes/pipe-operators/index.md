@@ -2,7 +2,7 @@
 
 Pipe operators are the fundamental building blocks in Pipelex, representing a single, focused task. They are the "verbs" of your pipeline that perform the actual work.
 
-Each operator specializes in a specific kind of action, from interacting with Large Language Models to executing custom Python code. You combine these operators using [Pipe Controllers](../pipe-controllers/index.md) to create complex workflows.
+Each operator specializes in a specific kind of action, from interacting with Large Language Models to executing custom Python code. You combine these operators using [Pipe Controllers](../pipe-controllers/index.md) to create complex methods.
 
 ## Core Operators
 

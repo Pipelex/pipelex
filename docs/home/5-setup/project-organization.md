@@ -2,20 +2,21 @@
 
 ## Overview
 
-Pipelex automatically discovers `.plx` pipeline files anywhere in your project (excluding `.venv`, `.git`, `node_modules`, etc.).
+Pipelex automatically discovers `.mthds` pipeline files anywhere in your project (excluding `.venv`, `.git`, `node_modules`, etc.).
 
 ## Recommended: Keep pipelines with related code
 
 ```bash
 your_project/
-├── my_project/             # Your Python package
+├── METHODS.toml                   # Package manifest (optional)
+├── my_project/                    # Your Python package
 │   ├── finance/
 │   │   ├── services.py
-│   │   ├── invoices.plx           # Pipeline with finance code
+│   │   ├── invoices.mthds           # Pipeline with finance code
 │   │   └── invoices_struct.py     # Structure classes
 │   └── legal/
 │       ├── services.py
-│       ├── contracts.plx          # Pipeline with legal code
+│       ├── contracts.mthds          # Pipeline with legal code
 │       └── contracts_struct.py
 ├── .pipelex/                      # Config at repo root
 │   └── pipelex.toml
@@ -23,19 +24,21 @@ your_project/
 └── requirements.txt
 ```
 
+- **Package manifest**: `METHODS.toml` at your project root declares package identity and pipe visibility. See [Packages](../6-build-reliable-ai-workflows/packages.md) for details.
+
 ## Alternative: Centralize pipelines
 
 ```bash
 your_project/
 ├── pipelines/
-│   ├── invoices.plx
-│   ├── contracts.plx
+│   ├── invoices.mthds
+│   ├── contracts.mthds
 │   └── structures.py
 └── .pipelex/
     └── pipelex.toml
 ```
 
-Learn more in our [Project Structure documentation](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md).
+Learn more in our [Project Structure documentation](../../home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md).
 
 ---
 
@@ -51,7 +54,7 @@ Learn more in our [Project Structure documentation](../../home/6-build-reliable-
 Now that you understand project organization:
 
 1. **Start building**: [Get Started](../../home/2-get-started/pipe-builder.md)
-2. **Learn the concepts**: [Writing Workflows Tutorial](../../home/2-get-started/pipe-builder.md)
-3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook)
-4. **Deep dive**: [Build Reliable AI Workflows](../../home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md)
+2. **Learn the concepts**: [Writing Methods Tutorial](../../home/2-get-started/pipe-builder.md)
+3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/main)
+4. **Deep dive**: [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md)
 

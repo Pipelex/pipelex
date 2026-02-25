@@ -1,0 +1,306 @@
+################################################################################
+# Test Profiles Configuration
+################################################################################
+#
+# This file defines test profiles for controlling which models are included
+# in parametrized tests. Select a profile using TEST_PROFILE when running make.
+#
+# Usage:
+#   make regenerate-test-models                    # Use dev profile (default)
+#   make regenerate-test-models TEST_PROFILE=full  # Use full profile
+#   make regenerate-test-models TEST_PROFILE=ci    # Use CI profile
+#
+# Or use the CLI directly:
+#   pipelex-dev preprocess-test-models --generate-fixtures --profile <name>
+#
+# Model List Syntax:
+#   - "model-name"      : Specific model (direct reference)
+#   - "@collection_name": All models from named collection (static)
+#   - "backend:*"       : All models available from that backend (dynamic)
+#   - "gpt-*", "claude-*": Glob pattern matching model names (dynamic)
+#   - "*"               : All available models (same as include_all=true)
+#   - "!pattern"        : Exclude models matching pattern (negation)
+#
+################################################################################
+
+################################################################################
+# Model Collections - Available models organized by manufacturer
+# Reference these in profiles using @collection_name syntax
+################################################################################
+
+[collections.backends]
+# --- All Available Backends ---
+all = [
+  "pipelex_gateway",
+  "anthropic",
+  "azure_openai",
+  "bedrock",
+  "blackboxai",
+  "fal",
+  "google",
+  "groq",
+  "huggingface",
+  "mistral",
+  "ollama",
+  "openai",
+  "portkey",
+  "scaleway",
+  "vertexai",
+  "xai",
+  "internal",
+]
+
+[collections.llm]
+# --- Amazon Models (Nova) ---
+amazon = ["bedrock-nova-pro", "nova-lite-v1", "nova-micro-v1"]
+
+# --- Anthropic Models (Claude) ---
+anthropic = [
+  "claude-3-haiku",
+  "claude-3.7-sonnet",
+  "claude-4-opus",
+  "claude-4-sonnet",
+  "claude-4.1-opus",
+  "claude-4.5-haiku",
+  "claude-4.5-sonnet",
+  "claude-4.5-opus",
+  "claude-4.6-opus",
+]
+
+# --- DeepSeek Models ---
+deepseek = [
+  "deepseek-chat",
+  "deepseek-r1",
+  "deepseek-v3.1",
+  "deepseek-r1-distill-llama-70b",
+  "deepseek-v3.2",
+  "deepseek-v3.2-speciale",
+]
+
+# --- Google Models (Gemini) ---
+google = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.5-pro",
+  "gemini-3.0-pro",
+  "gemini-3.0-flash-preview",
+]
+
+# --- Groq Models ---
+groq = ["groq/compound", "groq/compound-mini"]
+
+# --- Meta Models (Llama) ---
+meta = [
+  "bedrock-meta-llama-3-3-70b-instruct",
+  "llama-3.1-8b-instant",
+  "llama-3.1-8b-instruct",
+  "llama-3.2-11b-vision-instruct",
+  "llama-3.3-70b-instruct",
+  "llama-3.3-70b-instruct-free",
+  "meta-llama/llama-4-maverick-17b-128e-instruct",
+  "meta-llama/llama-4-scout-17b-16e-instruct",
+  "meta-llama/llama-guard-4-12b",
+]
+
+# --- Microsoft Models ---
+microsoft = ["phi-4", "phi-4-multimodal"]
+
+# --- Mistral Models ---
+mistralai = [
+  "bedrock-mistral-large",
+  "ministral-3b",
+  "ministral-8b",
+  "mistral-7b-2312",
+  "mistral-8x7b-2312",
+  "mistral-codestral-2405",
+  "pixtral-12b",
+  "pixtral-large",
+  "mistral-small-2506",
+  "mistral-small-3.2",
+  "mistral-small",
+  "mistral-medium-2508",
+  "mistral-medium-3.1",
+  "mistral-medium",
+  "mistral-large-2512",
+  "mistral-large-3",
+  "mistral-large",
+  "magistral-small-2509",
+  "magistral-small",
+  "magistral-medium-2509",
+  "magistral-medium",
+]
+
+# --- Moonshot AI Models ---
+moonshotai = ["kimi-k2-instruct-0905", "kimi-k2-thinking"]
+
+# --- OpenAI Models ---
+openai = [
+  "gpt-4o-mini",
+  "gpt-4o",
+  "gpt-4.1-nano",
+  "gpt-4.1-mini",
+  "gpt-4.1",
+  "o1-mini",
+  "o1",
+  "o3-mini",
+  "o3",
+  "o4-mini",
+  "gpt-5-nano",
+  "gpt-5-mini",
+  "gpt-5-chat",
+  "gpt-5",
+  "gpt-5-codex",
+  "gpt-5.1-codex",
+  "gpt-5.1-codex-max",
+  "gpt-5.1-chat",
+  "gpt-5.1",
+  "gpt-5.2",
+  "gpt-5.2-chat",
+  "gpt-5.2-codex",
+]
+
+# --- OpenAI OSS Models ---
+openai_oss = ["gpt-oss-20b", "gpt-oss-120b", "gpt-oss-safeguard-20b"]
+
+# --- Qwen Models ---
+qwen = [
+  "qwen-2.5-72b-instruct",
+  "qwen3-32b",
+  "qwen2.5-vl-72b-instruct",
+  "qwen3-vl-235b-a22b",
+  "qwen3-235b-a22b-instruct-2507",
+  "qwen3-coder-30b-a3b-instruct",
+]
+
+# --- XAI Models (Grok) ---
+xai = [
+  "grok-3",
+  "grok-3-mini",
+  "grok-3-fast",
+  "grok-3-mini-fast",
+  "grok-4",
+  "grok-4-fast-reasoning",
+  "grok-4-fast-non-reasoning",
+]
+
+[collections.img_gen]
+# --- Stable Diffusion Models ---
+stable_diffusion = ["fast-lightning-sdxl"]
+
+# --- FAL Models ---
+fal = [
+  "flux-pro",
+  "flux-pro/v1.1",
+  "flux-pro/v1.1-ultra",
+  "flux-2",
+  "flux-2-pro",
+]
+
+# --- OpenAI Models ---
+openai = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"]
+
+# --- Google Models ---
+google = ["nano-banana", "nano-banana-pro"]
+
+# --- Qwen Models ---
+qwen = ["qwen-image"]
+
+[collections.extract]
+# --- PDF Extraction Models ---
+from_pdf = [
+  "pypdfium2-extract-pdf",
+  "docling-extract-text",
+  "mistral-ocr",
+  "mistral-ocr-2503",
+  "mistral-ocr-2505",
+  "mistral-ocr-2512",
+  "mistral-document-ai-2505",
+  "azure-document-intelligence",
+]
+
+# --- Image Extraction Models ---
+from_image = [
+  "docling-extract-text",
+  "mistral-ocr",
+  "mistral-ocr-2503",
+  "mistral-ocr-2505",
+  "mistral-ocr-2512",
+  "deepseek-ocr",
+  "azure-document-intelligence",
+]
+
+################################################################################
+# Profiles
+################################################################################
+
+################################################################################
+# CI Profile - Minimal set for CI (no actual inference)
+################################################################################
+[profiles.ci]
+description = "Minimal set for CI - no actual inference"
+backends = ["azure_openai"]
+llm_models = ["gpt-4o-mini"]
+img_gen_models = []
+extract_models = []
+
+################################################################################
+# Dev Profile
+################################################################################
+[profiles.dev]
+description = "Quick dev testing with fast and cheap models from key providers"
+backends = ["pipelex_gateway", "internal"]
+llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
+img_gen_models = ["gpt-image-1-mini"]
+extract_models = ["@from_pdf"]
+
+################################################################################
+# Coverage Profile
+################################################################################
+[profiles.coverage]
+description = "One model per backend for coverage"
+backends = ["anthropic", "openai", "google", "mistral", "internal"]
+llm_models = [
+  "claude-4.5-haiku",
+  "gpt-4o-mini",
+  "gemini-2.5-flash-lite",
+  "mistral-large",
+]
+img_gen_models = ["gpt-image-1", "nano-banana"]
+extract_models = ["pypdfium2-extract-pdf"]
+
+################################################################################
+# Claude Latest Profile
+################################################################################
+[profiles.claude_latest]
+description = "All Claude 4.5 models"
+backends = ["anthropic", "pipelex_gateway"]
+llm_models = ["claude-4.5-*"]
+img_gen_models = []
+extract_models = []
+
+################################################################################
+# GPT No Codex Profile
+################################################################################
+[profiles.gpt_no_codex]
+description = "All GPT models except codex variants"
+backends = ["openai", "pipelex_gateway"]
+llm_models = ["gpt-*", "!*-codex", "!*-codex-*"]
+img_gen_models = ["gpt-image-*"]
+extract_models = []
+
+################################################################################
+# All Backends Profile - Test across all backends with select models
+################################################################################
+[profiles.all_backends]
+description = "Test select models across all backends"
+backends = ["@all"]
+llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
+img_gen_models = ["gpt-image-1-mini"]
+extract_models = ["@from_pdf"]
+
+################################################################################
+# Full Profile - All available models (use with caution)
+################################################################################
+[profiles.full]
+description = "All available models"
+include_all = true

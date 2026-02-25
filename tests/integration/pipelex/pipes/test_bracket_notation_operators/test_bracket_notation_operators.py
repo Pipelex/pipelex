@@ -49,7 +49,7 @@ class TestBracketNotationInOperators:
             blueprint=blueprint,
         )
 
-        assert pipe.output.code == "Text"
+        assert pipe.output.concept.code == "Text"
         assert pipe.output_multiplicity is True
 
     def test_pipe_llm_with_bracket_output_fixed_count(self, load_empty_library: Callable[[], None]):
@@ -68,7 +68,7 @@ class TestBracketNotationInOperators:
             blueprint=blueprint,
         )
 
-        assert pipe.output.code == "Text"
+        assert pipe.output.concept.code == "Text"
         assert pipe.output_multiplicity == 5
 
     def test_pipe_llm_with_bracket_inputs(self, load_empty_library: Callable[[], None]):
@@ -99,6 +99,7 @@ class TestBracketNotationInOperators:
             description="Generate 3 images",
             inputs={"prompt": NativeConceptCode.TEXT},
             output=f"{NativeConceptCode.IMAGE}[3]",
+            prompt="@prompt",
         )
 
         pipe = PipeFactory[PipeImgGen].make_from_blueprint(
@@ -107,7 +108,7 @@ class TestBracketNotationInOperators:
             blueprint=blueprint,
         )
 
-        assert pipe.output.code == "Image"
+        assert pipe.output.concept.code == "Image"
         assert pipe.output_multiplicity == 3
 
     def test_pipe_func_with_bracket_input_and_output(self, load_test_library: Callable[[list[Path]], None]):
@@ -127,7 +128,7 @@ class TestBracketNotationInOperators:
         )
 
         assert pipe.inputs.root["two_texts"].multiplicity == 2
-        assert pipe.output.code == "Text"
+        assert pipe.output.concept.code == "Text"
 
     def test_pipe_compose_with_bracket_notation(self, load_empty_library: Callable[[], None]):
         load_empty_library()
@@ -146,14 +147,14 @@ class TestBracketNotationInOperators:
         )
 
         assert pipe.inputs.root["items"].multiplicity is True
-        assert pipe.output.code == "Text"
+        assert pipe.output.concept.code == "Text"
 
     def test_pipe_extract_with_bracket_output(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test PipeExtract factory with bracket notation in output."""
         blueprint = PipeExtractBlueprint(
             description="Extract pages",
-            inputs={"document": NativeConceptCode.PDF},
+            inputs={"document": NativeConceptCode.DOCUMENT},
             output=f"{NativeConceptCode.PAGE}[]",  # Extract returns list of pages
         )
 
@@ -163,4 +164,4 @@ class TestBracketNotationInOperators:
             blueprint=blueprint,
         )
 
-        assert pipe.output.code == "Page"
+        assert pipe.output.concept.code == "Page"

@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Callable, cast
+from typing import Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -23,15 +22,17 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeParallelSimple:
-    async def test_parallel_text_analysis(self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_parallel_text_analysis(
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeParallel running three text analysis pipes in parallel."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
-        # Create PipeParallel instance - pipes are loaded from PLX files
+        # Create PipeParallel instance - pipes are loaded from MTHDS files
         pipe_parallel_blueprint = PipeParallelBlueprint(
             description="Parallel text analysis pipeline",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
                 SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
@@ -56,7 +57,7 @@ class TestPipeParallelSimple:
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_text_stuff)
 
         # Verify the PipeParallel instance was created correctly
-        assert pipe_parallel.domain == "test_integration"
+        assert pipe_parallel.domain_code == "test_integration"
         assert pipe_parallel.code == "parallel_text_analyzer"
         assert len(pipe_parallel.parallel_sub_pipes) == 3
         assert pipe_parallel.add_each_output is True
@@ -78,7 +79,7 @@ class TestPipeParallelSimple:
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=job_metadata,
             working_memory=working_memory,
             output_name="parallel_results",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -104,9 +105,9 @@ class TestPipeParallelSimple:
         assert sentiment_result is not None
         assert isinstance(sentiment_result.content, TextContent)
         # Should return one of: positive, negative, neutral
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert sentiment_result.content.text.lower() in {"positive", "negative", "neutral"}
-        assert f"{sentiment_result.concept.domain}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        assert f"{sentiment_result.concept.domain_code}.{sentiment_result.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
 
         # Verify word count result
         word_count_result = final_working_memory.get_stuff("word_count_result")
@@ -114,10 +115,10 @@ class TestPipeParallelSimple:
         assert isinstance(word_count_result.content, TextContent)
         # Should be a number (as text)
         word_count_text = word_count_result.content.text.strip()
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert word_count_text.isdigit() or word_count_text in {"12", "thirteen", "twelve"}  # Allow for some variation
         assert word_count_result.concept.code == "Text"
-        assert word_count_result.concept.domain == "native"
+        assert word_count_result.concept.domain_code == "native"
 
         # Verify keywords extraction result
         keywords_result = final_working_memory.get_stuff("keywords_result")
@@ -125,10 +126,10 @@ class TestPipeParallelSimple:
         assert isinstance(keywords_result.content, TextContent)
         # Should contain comma-separated keywords
         keywords_text = keywords_result.content.text.strip()
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert "," in keywords_text or len(keywords_text.split()) >= 2  # Should have multiple keywords
         assert keywords_result.concept.code == "Text"
-        assert keywords_result.concept.domain == "native"
+        assert keywords_result.concept.domain_code == "native"
 
         # Verify that all results are different (pipes ran independently)
         assert sentiment_result.content.text != word_count_result.content.text
@@ -141,7 +142,7 @@ class TestPipeParallelSimple:
         assert final_result.content.text == "The weather is beautiful today. I love sunny days and outdoor activities."
 
     async def test_parallel_short_text_analysis(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
     ):
         """Test PipeParallel with shorter text to verify consistent behavior."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_parallel")])
@@ -150,7 +151,7 @@ class TestPipeParallelSimple:
             description="Parallel text analysis pipeline for short text",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
             output=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="analyze_sentiment", result="sentiment_result"),
                 SubPipeBlueprint(pipe="count_words", result="word_count_result"),
                 SubPipeBlueprint(pipe="extract_keywords", result="keywords_result"),
@@ -175,7 +176,7 @@ class TestPipeParallelSimple:
 
         # Actually run the PipeParallel pipe
         pipe_output = await pipe_parallel.run_pipe(
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=job_metadata,
             working_memory=working_memory,
             output_name="parallel_results",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -211,9 +212,9 @@ class TestPipeParallelSimple:
 
         # For "Hello world" - word count should be around 2
         word_count_text = word_count_result.content.text.strip()
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert word_count_text in {"2", "two"} or word_count_text.isdigit()
 
         # Sentiment should be one of the valid values
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert sentiment_result.content.text.lower() in {"positive", "negative", "neutral"}

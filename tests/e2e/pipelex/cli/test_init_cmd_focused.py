@@ -3,14 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
-
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestFocusedInitialization:
@@ -22,13 +24,13 @@ class TestFocusedInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("1")  # Backend selection
-        env.add_prompt_input("1")  # Telemetry
+        env.add_confirm_input(True)  # Accept gateway terms of service
+        env.add_prompt_input("1")  # Backend selection (pipelex_gateway)
 
         env.setup_mocks()
 
         # Execute with CONFIG focus
-        init_cmd(focus=InitFocus.CONFIG, reset=False)
+        init_cmd(focus=InitFocus.CONFIG)
 
         # Verify config files exist
         env.verify_file_exists("pipelex.toml")
@@ -53,7 +55,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with INFERENCE focus
-        init_cmd(focus=InitFocus.INFERENCE, reset=False)
+        init_cmd(focus=InitFocus.INFERENCE)
 
         # Verify backends are enabled
         env.verify_backends_enabled(["openai", "anthropic"])
@@ -70,10 +72,10 @@ class TestFocusedInitialization:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Set pipelex_inference as initially enabled
+        # Set pipelex_gateway as initially enabled
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
-        toml_doc["pipelex_inference"]["enabled"] = True  # type: ignore[index]
+        toml_doc[PipelexBackend.GATEWAY]["enabled"] = True  # type: ignore[index]
         save_toml_to_path(toml_doc, str(backends_path))
 
         # Get index for mistral
@@ -88,7 +90,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with INFERENCE focus
-        init_cmd(focus=InitFocus.INFERENCE, reset=False)
+        init_cmd(focus=InitFocus.INFERENCE)
 
         # Verify backend was changed
         env.verify_backends_enabled(["mistral"])
@@ -123,7 +125,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with ROUTING focus
-        init_cmd(focus=InitFocus.ROUTING, reset=False)
+        init_cmd(focus=InitFocus.ROUTING)
 
         # Verify routing was configured
         env.verify_routing("custom_routing", expected_default="anthropic")
@@ -151,66 +153,64 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with ROUTING focus
-        init_cmd(focus=InitFocus.ROUTING, reset=False)
+        init_cmd(focus=InitFocus.ROUTING)
 
         # Verify routing is set to all_openai
         env.verify_routing("all_openai")
 
     def test_telemetry_only_initialization(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case 5.1: Initialize telemetry only."""
+        """Test Case 5.1: Initialize telemetry only - just copies template."""
         # Setup environment with existing config but no telemetry
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=False)
 
-        # User inputs
+        # Only need to confirm initialization
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("2")  # Telemetry: ANONYMOUS
 
         env.setup_mocks()
 
         # Execute with TELEMETRY focus
-        init_cmd(focus=InitFocus.TELEMETRY, reset=False)
+        init_cmd(focus=InitFocus.TELEMETRY)
 
-        # Verify telemetry was created
-        env.verify_telemetry("anonymous")
+        # Verify telemetry was created with default mode (off)
+        env.verify_telemetry("off")
 
     def test_reconfigure_telemetry(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case 5.2: Telemetry already configured - reconfigure."""
+        """Test Case 5.2: Telemetry already configured - reset replaces with template."""
         # Setup environment with existing telemetry
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Set initial telemetry to OFF
+        # Set initial telemetry to IDENTIFIED
         telemetry_path = env.pipelex_dir / "telemetry.toml"
         toml_doc = load_toml_with_tomlkit(str(telemetry_path))
-        toml_doc["telemetry_mode"] = "off"
+        toml_doc["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
         save_toml_to_path(toml_doc, str(telemetry_path))
 
-        # User inputs
+        # User inputs - confirm reconfigure
         env.add_confirm_input(True)  # Confirm reconfigure
-        env.add_prompt_input("3")  # Change to IDENTIFIED
 
         env.setup_mocks()
 
-        # Execute with TELEMETRY focus
-        init_cmd(focus=InitFocus.TELEMETRY, reset=False)
+        # Execute with TELEMETRY focus (will prompt to reconfigure since file exists)
+        init_cmd(focus=InitFocus.TELEMETRY)
 
-        # Verify telemetry was changed
-        env.verify_telemetry("identified")
+        # After reconfigure, telemetry should be reset to default (off)
+        env.verify_telemetry("off")
 
-    def test_reset_routing_with_pipelex_inference(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case: Reset routing when only pipelex_inference is enabled (bug fix test)."""
-        # Setup environment with existing config and pipelex_inference enabled
+    def test_reset_routing_with_pipelex_gateway(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test Case: Reset routing when only pipelex_gateway is enabled (bug fix test)."""
+        # Setup environment with existing config and pipelex_gateway enabled
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Enable only pipelex_inference (disable everything else)
+        # Enable only pipelex_gateway (disable everything else)
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
         for backend_key in toml_doc:
             if backend_key == "internal":
                 continue
-            toml_doc[backend_key]["enabled"] = backend_key == "pipelex_inference"  # type: ignore[index]
+            toml_doc[backend_key]["enabled"] = backend_key == PipelexBackend.GATEWAY  # type: ignore[index]
         save_toml_to_path(toml_doc, str(backends_path))
 
         # Modify routing to have wrong config (simulating the bug scenario)
@@ -225,10 +225,10 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute with ROUTING focus and reset flag
-        init_cmd(focus=InitFocus.ROUTING, reset=True)
+        init_cmd(focus=InitFocus.ROUTING)
 
-        # Verify routing was reset to pipelex_first (correct for pipelex_inference)
-        env.verify_routing("pipelex_first")
+        # Verify routing was reset to all_pipelex_gateway (correct for pipelex_gateway)
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
 
     def test_everything_already_configured(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 7.1: Everything configured - decline reconfigure."""
@@ -242,7 +242,7 @@ class TestFocusedInitialization:
         env.setup_mocks()
 
         # Execute - should complete immediately since everything is configured
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Should complete without errors (no changes made)
         # Verify files still exist

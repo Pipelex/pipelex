@@ -6,7 +6,7 @@ import contextlib
 import io
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from pydantic import BaseModel, ValidationError
 from rich.panel import Panel
@@ -19,6 +19,7 @@ from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.config_files import init_config
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.exceptions import InferenceBackendLibraryError
+from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
@@ -28,13 +29,21 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_optional_env
+from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, RemoteConfigValidationError
+from pipelex.system.pipelex_service.pipelex_service_config import (
+    is_pipelex_gateway_enabled,
+    load_pipelex_service_config_if_exists,
+)
+from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, TelemetryConfig
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
-from pipelex.tools.misc.toml_utils import load_toml_from_path
+from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
-from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
+
+if TYPE_CHECKING:
+    from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 
 
 class BackendFileReport(BaseModel):
@@ -89,19 +98,21 @@ def check_telemetry_config() -> tuple[bool, str]:
     # Use hard-coded path to avoid needing Pipelex initialization
     telemetry_config_path = f".pipelex/{TELEMETRY_CONFIG_FILE_NAME}"
 
-    if not path_exists(telemetry_config_path):
-        return False, "Telemetry configuration file not found"
-
     try:
         toml_doc = load_toml_from_path(telemetry_config_path)
+    except FileNotFoundError:
+        return False, "Telemetry configuration file not found"
+    except TomlError as exc:
+        return False, f"TOML syntax error: {exc}"
+
+    try:
         telemetry_config = TelemetryConfig.model_validate(toml_doc)
-        return True, f"Telemetry configured (mode: {telemetry_config.telemetry_mode})"
-    except ValidationError as validation_error:
-        validation_error_msg = format_pydantic_validation_error(validation_error)
-        msg = f"Invalid telemetry configuration: {validation_error_msg}"
-        return False, msg
-    except Exception as exc:
-        return False, f"Error loading telemetry config: {exc}"
+        return True, f"Telemetry configured (mode: {telemetry_config.custom_posthog.mode})"
+    except ValidationError:
+        # Check if this looks like the old config format (has telemetry_mode at root level)
+        if "custom_posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
+            return False, "Config format has changed - run 'pipelex init telemetry' to update"
+        return False, "Invalid configuration - run 'pipelex init telemetry --reset' to fix"
 
 
 def check_backend_credentials() -> tuple[bool, dict[str, BackendCredentialsReport], str]:
@@ -415,16 +426,21 @@ def display_health_report(
         console.print()
 
         # Show details for each backend
+        bad_backend_credential_reports: dict[str, BackendCredentialsReport] = {}
         for backend_name, backend_credential_report in backend_credential_reports.items():
             if backend_credential_report.all_credentials_valid:
                 console.print(f"  [dim]{backend_name}[/dim]")
                 console.print("    [green]✓[/green] All credentials set")
             else:
+                bad_backend_credential_reports[backend_name] = backend_credential_report
                 console.print(f"  [bold]{backend_name}[/bold]")
                 if backend_credential_report.missing_vars:
                     console.print(f"    [red]✗[/red] Missing: {', '.join(backend_credential_report.missing_vars)}")
                 if backend_credential_report.placeholder_vars:
                     console.print(f"    [yellow]⚠[/yellow] Placeholders: {', '.join(backend_credential_report.placeholder_vars)}")
+
+        error_msg = BackendCredentialsErrorMsgFactory.make_comprehensive_error_msg(backend_credential_reports=bad_backend_credential_reports)
+        console.print(error_msg)
     console.print()
 
     # Models section
@@ -457,8 +473,12 @@ def display_health_report(
     if not all_healthy:
         # Check what can be auto-fixed
         can_auto_fix_config = not config_healthy and config_missing_count > 0
-        can_auto_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
-        has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
+        can_auto_fix_telemetry = not telemetry_healthy and (
+            "not found" in telemetry_message.lower()
+            or "format has changed" in telemetry_message.lower()
+            or "invalid configuration" in telemetry_message.lower()
+        )
+        has_telemetry_validation_error = not telemetry_healthy and not can_auto_fix_telemetry
 
         # Check for backend file issues
         has_backend_file_issues = False
@@ -483,7 +503,7 @@ def display_health_report(
         )
 
         if has_recommendations:
-            console.print("[bold]Recommended Actions[/bold]")
+            console.print("[bold]Possible Solutions[/bold]")
 
             if can_auto_fix_config:
                 console.print("  • Run [cyan]pipelex init config[/cyan] to install missing configuration files")
@@ -491,7 +511,7 @@ def display_health_report(
             if can_auto_fix_telemetry:
                 console.print("  • Run [cyan]pipelex init telemetry[/cyan] to configure telemetry preferences")
 
-            if has_telemetry_validation_error:
+            if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
                 console.print("  • Fix validation errors in [cyan].pipelex/telemetry.toml[/cyan]")
                 console.print("    or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate")
 
@@ -579,10 +599,24 @@ def check_models() -> tuple[bool, str, dict[str, BackendFileReport]]:
 
     log.configure(log_config=get_config().pipelex.log_config)
 
+    # Fetch gateway model specs if Gateway is enabled
+    gateway_model_specs: BackendModelSpecs | None = None
+    if is_pipelex_gateway_enabled():
+        pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+        if pipelex_service_config is None:
+            return False, "Pipelex Gateway is enabled but service configuration is missing", backend_file_reports
+        if not pipelex_service_config.agreement.terms_accepted:
+            return False, "Pipelex Gateway is enabled but terms have not been accepted", backend_file_reports
+        try:
+            remote_config = RemoteConfigFetcher.fetch_remote_config()
+            gateway_model_specs = remote_config.backend_model_specs
+        except (RemoteConfigFetchError, RemoteConfigValidationError) as exc:
+            return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
+
     models_manager = ModelManager()
     secrets_provider = EnvSecretsProvider()
     try:
-        models_manager.setup(secrets_provider=secrets_provider)
+        models_manager.setup(secrets_provider=secrets_provider, gateway_model_specs=gateway_model_specs)
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
         # Backend library error - try to identify which backend
@@ -663,7 +697,12 @@ def do_doctor_cmd(
 
     # Determine what can be auto-fixed
     can_fix_config = not config_healthy and config_missing_count > 0
-    can_fix_telemetry = not telemetry_healthy and "not found" in telemetry_message.lower()
+    # Telemetry can be fixed if not found, format changed, OR invalid configuration
+    can_fix_telemetry = not telemetry_healthy and (
+        "not found" in telemetry_message.lower()
+        or "format has changed" in telemetry_message.lower()
+        or "invalid configuration" in telemetry_message.lower()
+    )
 
     # Check for backend file issues that can be auto-fixed
     can_fix_backends = False
@@ -675,9 +714,10 @@ def do_doctor_cmd(
 
     has_auto_fixable_issues = can_fix_config or can_fix_telemetry or can_fix_backends
 
-    # Determine what requires manual fixes
+    # Determine what requires manual fixes (excludes auto-fixable issues)
     has_config_validation_error = not config_healthy and config_missing_count == 0
-    has_telemetry_validation_error = not telemetry_healthy and "not found" not in telemetry_message.lower()
+    # Telemetry validation error only if it's not auto-fixable (not "not found" and not "format has changed")
+    has_telemetry_validation_error = not telemetry_healthy and not can_fix_telemetry
     has_backend_credential_issues = not backends_healthy and backend_credential_reports
 
     # If --fix flag is provided, offer to fix auto-fixable issues
@@ -691,18 +731,26 @@ def do_doctor_cmd(
             if Confirm.ask(f"[bold]Install {config_missing_count} missing configuration file(s)?[/bold]", default=True):
                 try:
                     console.print()
-                    init_cmd(focus=InitFocus.CONFIG, reset=False, skip_confirmation=True)
+                    init_cmd(focus=InitFocus.CONFIG, skip_confirmation=True)
                     console.print("[green]✓[/green] Configuration files installed")
                 except Exception as exc:
                     console.print(f"[red]Failed to install configuration files: {exc!s}[/red]")
                 console.print()
 
-        # Fix missing telemetry config
+        # Fix missing or outdated telemetry config
         if can_fix_telemetry:
-            if Confirm.ask("[bold]Configure telemetry preferences?[/bold]", default=True):
+            is_format_change = "format has changed" in telemetry_message.lower()
+            is_invalid_config = "invalid configuration" in telemetry_message.lower()
+            if is_format_change:
+                prompt_msg = "[bold]Reset telemetry configuration using the new format?[/bold]"
+            elif is_invalid_config:
+                prompt_msg = "[bold]Reset telemetry configuration to fix validation errors?[/bold]"
+            else:
+                prompt_msg = "[bold]Configure telemetry preferences?[/bold]"
+            if Confirm.ask(prompt_msg, default=True):
                 try:
                     console.print()
-                    init_cmd(focus=InitFocus.TELEMETRY, reset=False, skip_confirmation=True)
+                    init_cmd(focus=InitFocus.TELEMETRY, skip_confirmation=True)
                     console.print("[green]✓[/green] Telemetry configured")
                 except Exception as exc:
                     console.print(f"[red]Failed to configure telemetry: {exc!s}[/red]")
@@ -748,8 +796,8 @@ def do_doctor_cmd(
             console.print("or run [cyan]pipelex init config --reset[/cyan] to regenerate from template.")
             console.print()
 
-        # Telemetry validation errors
-        if has_telemetry_validation_error:
+        # Telemetry validation errors (skip if message already contains the fix command)
+        if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
             console.print("[bold]Telemetry validation error:[/bold]")
             console.print(f"  {telemetry_message}")
             console.print()

@@ -1,5 +1,5 @@
-from pipelex.system.environment import is_env_var_set
-from pipelex.system.runtime import RunMode, runtime_manager
+from pipelex.system.environment import is_env_var_set, is_env_var_truthy
+from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 
 
 def test_testing():
@@ -9,6 +9,8 @@ def test_testing():
         case RunMode.UNIT_TEST:
             assert not is_env_var_set(key="GITHUB_ACTIONS")
             assert not is_env_var_set(key="CI")
+        case RunMode.CODEX_CLOUD_TEST:
+            assert is_env_var_truthy(key=CODEX_CLOUD_ENV_VAR_KEY)
         case _:
             msg = f"Invalid run mode: {runtime_manager.run_mode}"
             raise RuntimeError(msg)

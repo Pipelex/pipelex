@@ -1,29 +1,19 @@
 [meta]
-version = "1.0.0"
+version = "2.0.0"
 description = "Pipelex kit configuration for agent rules"
 
 [agent_rules]
 demote = 1
-default_set = "pipelex_language"
+default_set = "all"
 
 [agent_rules.sets]
-coding_standards = [
-    "commands.md",
-    "python_standards.md",
-    "pytest_standards.md",
-    "docs.md",
-    "tdd.md",
-]
-pipelex_language = ["write_pipelex.md", "run_pipelex.md", "llms.md"]
 all = [
-    "commands.md",
-    "python_standards.md",
-    "write_pipelex.md",
-    "run_pipelex.md",
-    "docs.md",
-    "llms.md",
-    "pytest_standards.md",
-    "tdd.md",
+  "commands.md",
+  "python_standards.md",
+  "pipelex_standards.md",
+  "pytest_standards.md",
+  "docs.md",
+  "tdd.md",
 ]
 
 [agent_rules.cursor.front_matter]
@@ -32,6 +22,10 @@ alwaysApply = false
 [agent_rules.cursor.files.python_standards.front_matter]
 description = "Python coding standards and best practices"
 globs = ["**/*.py"]
+
+[agent_rules.cursor.files.pipelex_standards.front_matter]
+description = "Standards related to developing the Pipelex codebase"
+alwaysApply = true
 
 [agent_rules.cursor.files.pytest_standards.front_matter]
 description = "Guidelines for writing unit tests"
@@ -49,53 +43,18 @@ alwaysApply = true
 description = "Guidelines for writing test-driven development code"
 globs = []
 
-[agent_rules.cursor.files.write_pipelex.front_matter]
-description = "Guidelines for writing Pipelex pipelines"
-globs = ["**/*.plx", "**/pipelines/**/*.py"]
-
-[agent_rules.cursor.files.run_pipelex.front_matter]
-description = "Guidelines for running Pipelex pipelines"
-globs = ["examples/**/*.py"]
-
-[agent_rules.cursor.files.llms.front_matter]
-description = "LLM configuration and usage guidelines"
-globs = ["*.plx", "*.toml"]
-
 [agent_rules.targets.agents]
 path = "AGENTS.md"
-marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
-marker_end = "<!-- END_PIPELEX_RULES -->"
-heading_1 = "# Pipelex Coding Rules"
 
 [agent_rules.targets.agents.sets]
-coding_standards = [
-    "codex_commands.md",
-    "python_standards.md",
-    "pytest_standards.md",
-    "docs.md",
-    "tdd.md",
+all = [
+  "codex_commands.md",
+  "python_standards.md",
+  "pipelex_standards.md",
+  "pytest_standards.md",
+  "docs.md",
+  "tdd.md",
 ]
 
 [agent_rules.targets.claude]
 path = "CLAUDE.md"
-marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
-marker_end = "<!-- END_PIPELEX_RULES -->"
-heading_1 = "# Pipelex Coding Rules"
-
-[agent_rules.targets.github_copilot]
-path = ".github/copilot-instructions.md"
-marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
-marker_end = "<!-- END_PIPELEX_RULES -->"
-heading_1 = "# Pipelex Coding Rules"
-
-[agent_rules.targets.windsurf]
-path = ".windsurfrules.md"
-marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
-marker_end = "<!-- END_PIPELEX_RULES -->"
-heading_1 = "# Pipelex Coding Rules"
-
-[agent_rules.targets.blackbox]
-path = ".blackboxrules"
-marker_begin = "<!-- BEGIN_PIPELEX_RULES -->"
-marker_end = "<!-- END_PIPELEX_RULES -->"
-heading_1 = "# Pipelex Coding Rules"

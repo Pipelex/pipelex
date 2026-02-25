@@ -15,25 +15,25 @@ from pipelex.core.stuffs.text_content import TextContent
 class TestCases:
     # Test cases for TextContent with string content
     TEXT_STRING_BLUEPRINT: ClassVar[dict[str, Any]] = {
-        "concept_string": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+        "concept_ref": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         "content": "The Dawn of Ultra-Rapid Transit: NextGen High-Speed Trains Redefine Travel",
     }
 
     # Test cases for TextContent with dict content
     TEXT_DICT_BLUEPRINT: ClassVar[dict[str, Any]] = {
-        "concept_string": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+        "concept_ref": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         "content": {"text": "Sample text content"},
     }
 
     # Test cases for native concept without prefix (should work)
     TEXT_NO_PREFIX_BLUEPRINT: ClassVar[dict[str, Any]] = {
-        "concept_string": f"{NativeConceptCode.TEXT}",
+        "concept_ref": f"{NativeConceptCode.TEXT}",
         "content": {"text": "Text content without native prefix"},
     }
 
     # Test cases for registered class (using actual registered class)
     REGISTERED_CLASS_BLUEPRINT: ClassVar[dict[str, Any]] = {
-        "concept_string": "test.MockRegisteredContent",
+        "concept_ref": "test.MockRegisteredContent",
         "content": {"title": "Test Question", "description": "What are aerodynamic features?"},
     }
 

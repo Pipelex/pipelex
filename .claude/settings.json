@@ -1,0 +1,45 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pipelex-agent:*)",
+      "Bash(.venv/bin/pipelex-agent:*)",
+      "Bash(.venv/bin/pytest:*)",
+      "Bash(pytest:*)",
+      "Bash(make fix-unused-imports)",
+      "Bash(make fui)",
+      "Bash(make agent-check)",
+      "Bash(make format)",
+      "Bash(make lint)",
+      "Bash(make pyright)",
+      "Bash(make mypy)",
+      "Bash(make c)",
+      "Bash(make cc)",
+      "Bash(make check-unused-imports)",
+      "Bash(make cleanderived)",
+      "Bash(make agent-test)",
+      "Bash(make test-with-prints TEST=:*)",
+      "Bash(make tp TEST=:*)",
+      "Bash(make tb)",
+      "Bash(make install)",
+      "Bash(make lock)",
+      "Bash(make li)",
+      "Bash(make validate)",
+      "Bash(make v)",
+      "Bash(make build)",
+      "Bash(make ukc)",
+      "Bash(make docs-check)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"
+          }
+        ]
+      }
+    ]
+  }
+}

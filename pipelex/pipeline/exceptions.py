@@ -1,4 +1,4 @@
-from pipelex.base_exceptions import PipelexError
+from pipelex.base_exceptions import PipelexError, PipelexUnexpectedError
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 
 
@@ -27,3 +27,7 @@ class PipeStackOverflowError(PipelexError):
         self.limit = limit
         self.pipe_stack = pipe_stack
         super().__init__(message)
+
+
+class JobMetadataError(PipelexUnexpectedError):
+    pass

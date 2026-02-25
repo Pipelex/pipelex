@@ -4,7 +4,7 @@ This example demonstrates a pipeline designed to extract structured data from a 
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/extract_proof_of_purchase.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/extract_proof_of_purchase.py)
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py)
 
 ## The Pipeline Explained
 
@@ -15,7 +15,7 @@ async def extract_proof_of_purchase(pdf_url: str) -> ProofOfPurchase:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor_proof_of_purchase",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
     working_memory = pipe_output.working_memory
@@ -47,17 +47,17 @@ class ProofOfPurchase(StructuredContent):
 ```
 This demonstrates how you can create nested data structures to accurately model your data.
 
-## The Pipeline Definition: `extract_proof_of_purchase.plx`
+## The Pipeline Definition: `extract_proof_of_purchase.mthds`
 
 The pipeline uses a powerful `PipeLLM` to extract the structured data from the document. The prompt is carefully engineered to guide the LLM.
 
-```plx
+```toml
 [pipe.write_markdown_from_page_content_proof_of_purchase]
 type = "PipeLLM"
 description = "Write markdown from page content"
 inputs = { "page_content.page_view" = "Image", page_content = "Page" }
 output = "ProofOfPurchase"
-model = "llm_for_img_to_text"
+model = "$vision"
 structuring_method = "preliminary_text"
 system_prompt = """You are a multimodal LLM, expert at converting images into perfect markdown."""
 prompt = """

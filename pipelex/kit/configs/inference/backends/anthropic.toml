@@ -25,6 +25,7 @@ model_type = "llm"
 sdk = "anthropic"
 prompting_target = "anthropic"
 structure_method = "instructor/anthropic_tools"
+thinking_mode = "manual"
 
 ################################################################################
 # LANGUAGE MODELS
@@ -38,20 +39,13 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 0.25, output = 1.25 }
-
-[claude-3-opus]
-model_id = "claude-3-opus-20240229"
-max_tokens = 4096
-inputs = ["text", "images"]
-outputs = ["text", "structured"]
-max_prompt_images = 100
-costs = { input = 15.0, output = 75.0 }
+thinking_mode = "none"
 
 # --- Claude 3.7 Series --------------------------------------------------------
 ["claude-3.7-sonnet"]
 model_id = "claude-3-7-sonnet-20250219"
 max_tokens = 8192
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -60,7 +54,7 @@ costs = { input = 3.0, output = 15.0 }
 [claude-4-sonnet]
 model_id = "claude-sonnet-4-20250514"
 max_tokens = 64000
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -68,7 +62,7 @@ costs = { input = 3.0, output = 15.0 }
 [claude-4-opus]
 model_id = "claude-opus-4-20250514"
 max_tokens = 32000
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -77,7 +71,7 @@ costs = { input = 3.0, output = 15.0 }
 ["claude-4.1-opus"]
 model_id = "claude-opus-4-1-20250805"
 max_tokens = 32000
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -86,7 +80,7 @@ costs = { input = 3.0, output = 15.0 }
 ["claude-4.5-sonnet"]
 model_id = "claude-sonnet-4-5-20250929"
 max_tokens = 64000
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 3.0, output = 15.0 }
@@ -94,15 +88,24 @@ costs = { input = 3.0, output = 15.0 }
 ["claude-4.5-haiku"]
 model_id = "claude-haiku-4-5-20251001"
 max_tokens = 64000
-inputs = ["text", "images"]
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 1.0, output = 5.0 }
 
 ["claude-4.5-opus"]
 model_id = "claude-opus-4-5-20251101"
-max_tokens = 32000
-inputs = ["text", "images"]
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 max_prompt_images = 100
 costs = { input = 5.0, output = 25.0 }
+
+["claude-4.6-opus"]
+model_id = "claude-opus-4-6"
+max_tokens = 64000
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+max_prompt_images = 100
+costs = { input = 5.0, output = 25.0 }
+thinking_mode = "adaptive"

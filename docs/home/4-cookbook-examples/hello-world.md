@@ -8,7 +8,7 @@ It's the perfect starting point to verify your installation and get a first tast
 
 You can find the complete code for this example in the Pipelex Cookbook repository.
 
-[**➡️ View on GitHub: quick_start/hello_world.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/quick_start/hello_world.py)
+[**➡️ View on GitHub: examples/a_quick_start/hello_world.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/a_quick_start/hello_world.py)
 
 ## The Pipeline Explained
 
@@ -19,7 +19,7 @@ import asyncio
 
 from pipelex import pretty_print
 from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 
 
 async def hello_world():
@@ -27,9 +27,11 @@ async def hello_world():
     This function demonstrates the use of a super simple Pipelex pipeline to generate text.
     """
     # Run the pipe
-    pipe_output = await execute_pipeline(
+    runner = PipelexRunner()
+    response = await runner.execute_pipeline(
         pipe_code="hello_world",
     )
+    pipe_output = response.pipe_output
 
     # Print the output
     pretty_print(pipe_output, title="Your first Pipelex output")
@@ -43,11 +45,11 @@ asyncio.run(hello_world())
 
 This example shows the minimal setup needed to run a Pipelex pipeline: initialize Pipelex, execute a pipeline by its code name, and pretty-print the results.
 
-## The Pipeline Definition: `hello_world.plx`
+## The Pipeline Definition: `hello_world.mthds`
 
 The pipeline definition is extremely simple - it's a single LLM call that generates a haiku:
 
-```plx
+```toml
 domain = "quick_start"
 description = "Discovering Pipelex"
 
@@ -66,6 +68,7 @@ Write a haiku about Hello World.
 
 1.  Clone the cookbook repository:
     ```bash
+    # PRERELEASE_LINK
     git clone https://github.com/Pipelex/pipelex-cookbook.git
     cd pipelex-cookbook
     ```
@@ -76,7 +79,8 @@ Write a haiku about Hello World.
 3.  Set up your environment variables by copying `.env.example` to `.env` and adding your API keys.
 4.  Run the example:
     ```bash
-    python quick_start/hello_world.py
+    # PRERELEASE_LINK
+    python examples/a_quick_start/hello_world.py
     ```
 
 Expected output: A haiku about "Hello World" displayed with pretty formatting.

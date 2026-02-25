@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from pydantic import Field, RootModel
 from typing_extensions import override
 
@@ -5,13 +7,16 @@ from pipelex import log
 from pipelex.cogt.exceptions import ReportingManagerError
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
-from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokensUsage
+from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 LLMUsageRegistryRoot = list[LLMTokensUsage]
 
@@ -61,15 +66,11 @@ class ReportingManager(ReportingProtocol):
             log.warning("LLM job has no llm_tokens_usage")
             return
 
-        llm_token_cost_report: LLMTokenCostReport | None = None
-
-        if self._reporting_config.is_log_costs_to_console:
-            llm_token_cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
-
         pipeline_run_id = llm_job.job_metadata.pipeline_run_id
         self._get_registry(pipeline_run_id).add_tokens_usage(llm_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
+            llm_token_cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
             log.verbose(llm_token_cost_report, title="Token Cost report")
 
     ############################################################
@@ -95,7 +96,7 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def generate_report(self, pipeline_run_id: str | None = None):
-        cost_report_file_path: str | None = None
+        cost_report_file_path: Path | None = None
         if self._reporting_config.is_generate_cost_report_file_enabled:
             ensure_path(self._reporting_config.cost_report_dir_path)
             cost_report_file_path = get_incremental_file_path(

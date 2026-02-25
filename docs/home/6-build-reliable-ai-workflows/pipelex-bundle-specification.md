@@ -1,10 +1,10 @@
 # Pipelex Bundle Specification
 
-A **Pipelex bundle** is the fundamental unit of organization in Pipelex. It's a single `.plx` file that defines a cohesive set of concepts and pipes for a specific domain of work.
+A **Pipelex bundle** is the fundamental unit of organization in Pipelex. It's a single `.mthds` file that defines a cohesive set of concepts and pipes for a specific domain of work.
 
 ## What is a Pipelex Bundle?
 
-A Pipelex bundle (`.plx` file) brings together:
+A Pipelex bundle (`.mthds` file) brings together:
 
 - **Domain declaration** - The semantic namespace for all concepts and pipes in this bundle
 - **Concepts** - The knowledge structures that flow through your pipes (optional)
@@ -12,17 +12,17 @@ A Pipelex bundle (`.plx` file) brings together:
 
 Think of a bundle as a self-contained module that solves a specific problem domain. For example, you might have:
 
-- `invoice_processing.plx` - Bundle for invoice extraction and validation
-- `marketing.plx` - Bundle for generating marketing content
-- `document_analysis.plx` - Bundle for analyzing documents
+- `invoice_processing.mthds` - Bundle for invoice extraction and validation
+- `marketing.mthds` - Bundle for generating marketing content
+- `document_analysis.mthds` - Bundle for analyzing documents
 
 ## Bundle Structure
 
 Every Pipelex bundle follows this structure:
 
-```plx
+```toml
 # 1. Domain Declaration (MANDATORY)
-domain = "domain_name"
+domain = "domain_code"
 description = "Description of what this domain handles"
 
 # 2. Optional: Main Pipe Declaration
@@ -47,10 +47,10 @@ type = "PipeLLM"
 
 Every bundle **must** declare a domain. Only the `domain` field is mandatory; all other fields are optional:
 
-```plx
+```toml
 domain = "invoice_processing"
 description = "Tools for extracting and validating invoice data"
-source = "path/to/invoice_processing.plx"
+source = "path/to/invoice_processing.mthds"
 system_prompt = "You are an expert in financial document processing."
 main_pipe = "extract_and_validate_invoice"
 ```
@@ -75,7 +75,7 @@ Learn more about domains in [Understanding Domains](./domain.md).
 
 When you define a `system_prompt` at the bundle level, it automatically applies to every `PipeLLM` operator in the bundle. This is useful for setting domain-specific context:
 
-```plx
+```toml
 domain = "medical_records"
 system_prompt = "You are a medical records specialist with expertise in HIPAA compliance and clinical documentation."
 
@@ -93,7 +93,7 @@ Individual pipes can override the bundle's system prompt by defining their own `
 
 You can specify a default pipe to execute when no specific pipe is requested:
 
-```plx
+```toml
 domain = "invoice_processing"
 main_pipe = "extract_and_validate_invoice"
 ```
@@ -110,7 +110,7 @@ See more about executing pipes in [Executing Pipelines](./pipes/executing-pipeli
 
 Concepts define the knowledge structures in your domain. While optional, most bundles define at least a few concepts (See more about concepts in [Define Your Concepts](./concepts/define_your_concepts.md)):
 
-```plx
+```toml
 [concept]
 Invoice = "A commercial document issued by a seller to a buyer"
 Vendor = "A company or individual that provides goods or services"
@@ -119,13 +119,13 @@ LineItem = "An individual item or service listed in an invoice"
 
 **Concept Naming:**
 
-Within a bundle, you reference concepts by their simple name (`Invoice`). However, their **full identifier** includes the domain:
+Within a bundle, you reference concepts by their simple name (`Invoice`). However, their **full identifier** includes the domain code:
 
 ```
-domain_name.ConceptName
+domain_code.ConceptName
 ```
 
-For example, if your domain is `invoice_processing`, the concept `Invoice` has the full identifier:
+For example, if your domain_code is `invoice_processing`, the concept `Invoice` has the full identifier:
 
 ```
 invoice_processing.Invoice
@@ -137,7 +137,7 @@ This full identifier is how other bundles reference your concepts.
 
 Pipes are the processing units that transform data. Like concepts, they're optional:
 
-```plx
+```toml
 [pipe.extract_invoice]
 type = "PipeExtract"
 description = "Extract text and images from an invoice PDF"
@@ -146,15 +146,15 @@ output = "Page"
 ```
 See more about designing pipes in [Designing Pipelines](./pipes/index.md).
 
-## Referencing Concepts: When to Use Domain Prefixes
+## Referencing Concepts: When to Use Domain code prefixes
 
-Understanding when to use domain prefixes is crucial for writing clean, maintainable bundles.
+Understanding when to use domain code prefixes is crucial for writing clean, maintainable bundles.
 
 ### Same-Bundle References (No Prefix Needed)
 
-When a pipe in a bundle references a concept **defined in the same bundle**, you don't need the domain prefix:
+When a pipe in a bundle references a concept **defined in the same bundle**, you don't need the domain code prefix:
 
-```plx
+```toml
 domain = "invoice_processing"
 
 [concept]
@@ -173,9 +173,9 @@ This is the most common case and keeps your code clean.
 
 ### Cross-Bundle References (Prefix Required)
 
-When a pipe references a concept **from another bundle/domain**, you must use the full domain prefix:
+When a pipe references a concept **from another bundle/domain**, you must use the full domain code prefix:
 
-```plx
+```toml
 domain = "accounting"
 
 [concept]
@@ -183,7 +183,7 @@ Payment = "A financial transaction recording money transfer"
 ReconciliationReport = "Report of payment reconciliation"
 ```
 
-```plx
+```toml
 [pipe.reconcile_payment]
 type = "PipeLLM"
 description = "Reconcile a payment with an invoice"
@@ -207,7 +207,7 @@ When you execute pipelines, multiple bundles are loaded together into a **Librar
 
 A pipe in one bundle can call a pipe from another bundle using the full pipe identifier:
 
-```plx
+```toml
 domain = "accounts_payable"
 
 [pipe.process_vendor_invoice]
@@ -242,5 +242,5 @@ prompt = "..."
 - [Understanding Domains](./domain.md) - Deep dive into domain organization
 - [Designing Pipelines](./pipes/index.md) - Learn how to design and compose pipes
 - [Define Your Concepts](./concepts/define_your_concepts.md) - Complete guide to concept definitions
-- [Kick off a Pipelex Workflow Project](./kick-off-a-pipelex-workflow-project.md) - Start a new project
+- [Kick off a Pipelex Method Project](./kick-off-a-methods-project.md) - Start a new project
 

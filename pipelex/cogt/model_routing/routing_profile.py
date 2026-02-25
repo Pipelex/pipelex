@@ -3,6 +3,16 @@ from pydantic import Field
 from pipelex.cogt.model_routing.routing_models import BackendMatchForModel, BackendMatchingMethod
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.string_utils import matches_wildcard_pattern
+from pipelex.types import StrEnum
+
+
+class PipelexRoutingProfile(StrEnum):
+    """Special Pipelex routing profiles."""
+
+    ALL_PIPELEX_GATEWAY = "all_pipelex_gateway"
+    ALL_PIPELEX_INFERENCE = "all_pipelex_inference"  # Legacy, deprecated
+    PIPELEX_GATEWAY_FIRST = "pipelex_gateway_first"  # Legacy, deprecated - use ALL_PIPELEX_GATEWAY
+    PIPELEX_FIRST = "pipelex_first"  # Legacy, deprecated - use ALL_PIPELEX_GATEWAY
 
 
 class RoutingProfile(ConfigModel):

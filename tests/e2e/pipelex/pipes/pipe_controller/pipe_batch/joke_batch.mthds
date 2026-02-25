@@ -1,0 +1,49 @@
+domain      = "joke_generation"
+description = "Generating one-liner jokes from topics"
+main_pipe   = "generate_jokes_from_topics"
+
+[concept.Topic]
+description = "A subject or theme that can be used as the basis for a joke."
+refines     = "Text"
+
+[concept.Joke]
+description = "A humorous one-liner intended to make people laugh."
+refines     = "Text"
+
+[pipe.generate_jokes_from_topics]
+type = "PipeSequence"
+description = "Main orchestrator pipe that generates 3 joke topics and creates a one-liner joke for each topic"
+output = "Joke[]"
+steps = [
+  { pipe = "generate_topics", result = "topics" },
+  { pipe = "batch_generate_jokes", result = "jokes" },
+]
+
+[pipe.generate_topics]
+type = "PipeLLM"
+description = "Generate 3 distinct topics suitable for one-liner jokes"
+output = "Topic[3]"
+model = "$testing-text"
+system_prompt = """
+You are a creative comedy writer. Your task is to generate structured topic outputs that can serve as inspiration for one-liner jokes.
+"""
+prompt = """
+Generate 3 distinct and varied topics that would be suitable for crafting clever one-liner jokes. Choose topics that offer good comedic potential.
+"""
+
+[pipe.batch_generate_jokes]
+type             = "PipeBatch"
+description      = "Generate a one-liner joke for each topic by iterating over the topics list"
+inputs           = { topics = "Topic[]" }
+output           = "Joke[]"
+branch_pipe_code = "generate_joke"
+input_list_name  = "topics"
+input_item_name  = "topic"
+
+[pipe.generate_joke]
+type        = "PipeLLM"
+description = "Write a clever one-liner joke based on the given topic"
+inputs      = { topic = "Topic" }
+output      = "Joke"
+model       = "$testing-text"
+prompt      = "Write a clever one-liner joke about $topic. Be concise and witty."

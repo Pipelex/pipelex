@@ -145,3 +145,293 @@ Optional notes:
         pretty_print(result, title="result")
         pretty_print(expected, title="expected")
         assert result == expected
+
+    # =========================================================================
+    # Real-world template tests
+    # =========================================================================
+
+    def test_gantt_chart_analysis_template(self):
+        """Test real-world Gantt chart analysis template."""
+        template = """I am sharing an image of a Gantt chart: $gantt_chart_image.
+Please analyse the image and for a given task name (and only this task), extract the information of the task, if relevant.
+
+Be careful, the time unit is this:
+@gantt_timescale
+
+If the task is a milestone, then only output the start_date.
+
+Here is the name of the task you have to extract the dates for:
+@gantt_task_name"""
+
+        result = preprocess_template(template)
+        expected = """I am sharing an image of a Gantt chart: {{ gantt_chart_image|format() }}.
+Please analyse the image and for a given task name (and only this task), extract the information of the task, if relevant.
+
+Be careful, the time unit is this:
+{{ gantt_timescale|tag("gantt_timescale") }}
+
+If the task is a milestone, then only output the start_date.
+
+Here is the name of the task you have to extract the dates for:
+{{ gantt_task_name|tag("gantt_task_name") }}"""
+
+        assert result == expected
+
+    def test_invoice_extraction_template(self):
+        """Test real-world invoice extraction template."""
+        template = """Extract employee information from this invoice text: @invoice_text.
+
+The company name is: $company_name
+
+Please extract the following fields:
+- Employee name
+- Employee ID
+- Department
+
+@?additional_instructions"""
+
+        result = preprocess_template(template)
+        expected = """Extract employee information from this invoice text: {{ invoice_text|tag("invoice_text") }}.
+
+The company name is: {{ company_name|format() }}
+
+Please extract the following fields:
+- Employee name
+- Employee ID
+- Department
+
+{% if additional_instructions %}{{ additional_instructions|tag("additional_instructions") }}{% endif %}"""
+
+        assert result == expected
+
+    # =========================================================================
+    # Edge cases with punctuation and special characters
+    # =========================================================================
+
+    def test_variable_followed_by_comma(self):
+        """Test variable followed by comma."""
+        template = "Values: @first, @second, and @third"
+        result = preprocess_template(template)
+        expected = 'Values: {{ first|tag("first") }}, {{ second|tag("second") }}, and {{ third|tag("third") }}'
+        assert result == expected
+
+    def test_variable_followed_by_colon(self):
+        """Test variable followed by colon."""
+        template = "@label: the value is @value"
+        result = preprocess_template(template)
+        expected = '{{ label|tag("label") }}: the value is {{ value|tag("value") }}'
+        assert result == expected
+
+    def test_variable_followed_by_semicolon(self):
+        """Test variable followed by semicolon."""
+        template = "First: @first; Second: @second"
+        result = preprocess_template(template)
+        expected = 'First: {{ first|tag("first") }}; Second: {{ second|tag("second") }}'
+        assert result == expected
+
+    def test_variable_in_parentheses(self):
+        """Test variable inside parentheses."""
+        template = "The value (@value) is important"
+        result = preprocess_template(template)
+        expected = 'The value ({{ value|tag("value") }}) is important'
+        assert result == expected
+
+    def test_variable_in_brackets(self):
+        """Test variable inside square brackets."""
+        template = "Array element [$index] = @element"
+        result = preprocess_template(template)
+        expected = 'Array element [{{ index|format() }}] = {{ element|tag("element") }}'
+        assert result == expected
+
+    def test_variable_followed_by_question_mark(self):
+        """Test variable followed by question mark (but not @? pattern)."""
+        template = "Is @value correct?"
+        result = preprocess_template(template)
+        expected = 'Is {{ value|tag("value") }} correct?'
+        assert result == expected
+
+    def test_variable_followed_by_exclamation(self):
+        """Test variable followed by exclamation mark."""
+        template = "Hello @name!"
+        result = preprocess_template(template)
+        expected = 'Hello {{ name|tag("name") }}!'
+        assert result == expected
+
+    # =========================================================================
+    # Variables at different positions
+    # =========================================================================
+
+    def test_variable_at_start_of_line(self):
+        """Test variable at the start of a line."""
+        template = "@start_var is at the beginning"
+        result = preprocess_template(template)
+        expected = '{{ start_var|tag("start_var") }} is at the beginning'
+        assert result == expected
+
+    def test_variable_at_end_of_line(self):
+        """Test variable at the end of a line (no trailing punctuation)."""
+        template = "The value is @end_var"
+        result = preprocess_template(template)
+        expected = 'The value is {{ end_var|tag("end_var") }}'
+        assert result == expected
+
+    def test_variable_alone_on_line(self):
+        """Test variable alone on its own line."""
+        template = """Line before
+@alone_var
+Line after"""
+        result = preprocess_template(template)
+        expected = """Line before
+{{ alone_var|tag("alone_var") }}
+Line after"""
+        assert result == expected
+
+    def test_back_to_back_at_variables(self):
+        """Test multiple @ variables back to back with space."""
+        template = "@first @second @third"
+        result = preprocess_template(template)
+        expected = '{{ first|tag("first") }} {{ second|tag("second") }} {{ third|tag("third") }}'
+        assert result == expected
+
+    def test_back_to_back_dollar_variables(self):
+        """Test multiple $ variables back to back with space."""
+        template = "$first $second $third"
+        result = preprocess_template(template)
+        expected = "{{ first|format() }} {{ second|format() }} {{ third|format() }}"
+        assert result == expected
+
+    # =========================================================================
+    # Complex nested variable names
+    # =========================================================================
+
+    def test_deeply_nested_at_variable(self):
+        """Test deeply nested @ variable with multiple dots."""
+        template = "@user.profile.settings.preferences.theme"
+        result = preprocess_template(template)
+        expected = '{{ user.profile.settings.preferences.theme|tag("user.profile.settings.preferences.theme") }}'
+        assert result == expected
+
+    def test_deeply_nested_dollar_variable(self):
+        """Test deeply nested $ variable with multiple dots."""
+        template = "$config.database.connection.pool.size"
+        result = preprocess_template(template)
+        expected = "{{ config.database.connection.pool.size|format() }}"
+        assert result == expected
+
+    def test_deeply_nested_optional_variable(self):
+        """Test deeply nested @? optional variable."""
+        template = "@?system.logs.archive.entries"
+        result = preprocess_template(template)
+        expected = '{% if system.logs.archive.entries %}{{ system.logs.archive.entries|tag("system.logs.archive.entries") }}{% endif %}'
+        assert result == expected
+
+    # =========================================================================
+    # Variable names with underscores
+    # =========================================================================
+
+    def test_variable_with_leading_underscore(self):
+        """Test variable name starting with underscore."""
+        template = "@_private_var and $_another_private"
+        result = preprocess_template(template)
+        expected = '{{ _private_var|tag("_private_var") }} and {{ _another_private|format() }}'
+        assert result == expected
+
+    def test_variable_with_multiple_underscores(self):
+        """Test variable name with multiple consecutive underscores."""
+        template = "@snake__case__var"
+        result = preprocess_template(template)
+        expected = '{{ snake__case__var|tag("snake__case__var") }}'
+        assert result == expected
+
+    def test_variable_ending_with_underscore(self):
+        """Test variable name ending with underscore."""
+        template = "@trailing_"
+        result = preprocess_template(template)
+        expected = '{{ trailing_|tag("trailing_") }}'
+        assert result == expected
+
+    # =========================================================================
+    # Mixed scenarios
+    # =========================================================================
+
+    def test_all_pattern_types_in_one_line(self):
+        """Test all three pattern types in a single line."""
+        template = "$dollar_var @at_var @?optional_var"
+        result = preprocess_template(template)
+        expected = '{{ dollar_var|format() }} {{ at_var|tag("at_var") }} {% if optional_var %}{{ optional_var|tag("optional_var") }}{% endif %}'
+        assert result == expected
+
+    def test_nested_with_trailing_dot_in_complex_sentence(self):
+        """Test nested variable with trailing dot in complex context."""
+        template = "The user's preference is @user.settings.theme. Please apply it."
+        result = preprocess_template(template)
+        expected = 'The user\'s preference is {{ user.settings.theme|tag("user.settings.theme") }}. Please apply it.'
+        assert result == expected
+
+    def test_variable_adjacent_to_newline(self):
+        """Test variable immediately before newline."""
+        template = "First: @first\nSecond: @second"
+        result = preprocess_template(template)
+        expected = 'First: {{ first|tag("first") }}\nSecond: {{ second|tag("second") }}'
+        assert result == expected
+
+    def test_empty_template(self):
+        """Test empty template string."""
+        template = ""
+        result = preprocess_template(template)
+        assert result == ""
+
+    def test_whitespace_only_template(self):
+        """Test template with only whitespace."""
+        template = "   \n\t\n   "
+        result = preprocess_template(template)
+        assert result == template
+
+    def test_template_with_existing_jinja2_syntax(self):
+        """Test that existing Jinja2 syntax is preserved."""
+        template = "Hello {{ existing_var }}, your topic is $topic"
+        result = preprocess_template(template)
+        expected = "Hello {{ existing_var }}, your topic is {{ topic|format() }}"
+        assert result == expected
+
+    def test_multiple_optional_variables_in_sequence(self):
+        """Test multiple optional variables in sequence."""
+        template = "@?first @?second @?third"
+        result = preprocess_template(template)
+        expected = (
+            '{% if first %}{{ first|tag("first") }}{% endif %} '
+            '{% if second %}{{ second|tag("second") }}{% endif %} '
+            '{% if third %}{{ third|tag("third") }}{% endif %}'
+        )
+        assert result == expected
+
+    # =========================================================================
+    # Edge cases with @ symbol in non-variable contexts
+    # =========================================================================
+
+    def test_email_address_partially_processed(self):
+        """Test that email-like patterns are partially processed (after @).
+
+        The regex pattern [a-zA-Z0-9_.] matches 'example.com' as a single variable
+        name since dots are allowed in variable names.
+        """
+        # Note: user@domain.ext will match 'domain.ext' as variable after @
+        template = "Contact: someone@example.com"
+        result = preprocess_template(template)
+        # After @ we have example.com which matches entirely as variable name
+        expected = 'Contact: someone{{ example.com|tag("example.com") }}'
+        assert result == expected
+
+    def test_at_sign_alone(self):
+        """Test @ sign alone (not followed by valid variable name char)."""
+        template = "Price @ store: $price"
+        result = preprocess_template(template)
+        expected = "Price @ store: {{ price|format() }}"
+        assert result == expected
+
+    def test_dollar_sign_alone(self):
+        """Test $ sign alone (not followed by valid variable name char)."""
+        template = "Cost is $ for @item"
+        result = preprocess_template(template)
+        expected = 'Cost is $ for {{ item|tag("item") }}'
+        assert result == expected

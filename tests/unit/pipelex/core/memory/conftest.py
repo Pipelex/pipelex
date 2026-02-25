@@ -9,14 +9,16 @@ from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from tests.cases.documents import DocumentTestCases
+from tests.cases.images import ImageTestCases
 
 
 # Test data constants
@@ -34,14 +36,10 @@ class TestWorkingMemoryData:
     flights obsolete while dramatically reducing carbon emissions.
     """
 
-    # Sample PDF and image URLs
-    SAMPLE_PDF_URL = "assets/extract_dpe/dpe_single_page.pdf"
-    SAMPLE_IMAGE_URL = "assets/gantt_charts/sample_gantt.png"
-
     # Test cases for different content types
     SINGLE_TEXT_CASE = "single_text"
     SINGLE_IMAGE_CASE = "single_image"
-    SINGLE_PDF_CASE = "single_pdf"
+    SINGLE_DOCUMENT_CASE = "single_document"
     MULTIPLE_STUFF_CASE = "multiple_stuff"
     WITH_ALIASES_CASE = "with_aliases"
     COMPLEX_LIST_CASE = "complex_list"
@@ -52,7 +50,7 @@ class TestWorkingMemoryData:
     TEST_CASES: ClassVar[list[tuple[str, str]]] = [
         ("Single text content", SINGLE_TEXT_CASE),
         ("Single image content", SINGLE_IMAGE_CASE),
-        ("Single PDF content", SINGLE_PDF_CASE),
+        ("Single document content", SINGLE_DOCUMENT_CASE),
         ("Multiple stuff items", MULTIPLE_STUFF_CASE),
         ("WorkingMemory with aliases", WITH_ALIASES_CASE),
         ("Complex list content", COMPLEX_LIST_CASE),
@@ -84,19 +82,19 @@ def single_image_memory() -> WorkingMemory:
         stuff=StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
             name="sample_image",
-            content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
+            content=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
         ),
     )
 
 
 @pytest.fixture
-def single_pdf_memory() -> WorkingMemory:
-    """Create WorkingMemory with single PDF content."""
+def single_document_memory() -> WorkingMemory:
+    """Create WorkingMemory with single document content."""
     return WorkingMemoryFactory.make_from_single_stuff(
         stuff=StuffFactory.make_stuff(
-            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PDF),
-            name="pdf_document",
-            content=PDFContent(url=TestWorkingMemoryData.SAMPLE_PDF_URL),
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
+            name="document_file",
+            content=DocumentContent(url=DocumentTestCases.PDF_FILE_URL_1),
         ),
     )
 
@@ -119,7 +117,7 @@ def multiple_stuff_memory() -> WorkingMemory:
     image_stuff = StuffFactory.make_stuff(
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
         name="diagram",
-        content=ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
+        content=ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
     )
 
     return WorkingMemoryFactory.make_from_multiple_stuffs(stuff_list=[text_stuff, document_stuff, image_stuff], main_name="document")
@@ -153,13 +151,15 @@ def complex_list_memory() -> WorkingMemory:
     complex_content: ListContent[TextContent | ImageContent | NumberContent] = ListContent(
         items=[
             TextContent(text="The quick brown fox jumps over the lazy dog"),
-            ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL),
+            ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1),
             NumberContent(number=42.5),
         ],
     )
 
     complex_stuff = StuffFactory.make_stuff(
-        concept=ConceptFactory.make(concept_code="List", domain=SpecialDomain.NATIVE, description="Lorem Ipsum", structure_class_name="ListContent"),
+        concept=ConceptFactory.make(
+            concept_code="List", domain_code=SpecialDomain.NATIVE, description="Lorem Ipsum", structure_class_name="ListContent"
+        ),
         name="mixed_list",
         content=complex_content,
     )
@@ -172,7 +172,7 @@ def text_and_images_memory() -> WorkingMemory:
     """Create WorkingMemory with text and images content."""
     text_and_images_content = TextAndImagesContent(
         text=TextContent(text="Project overview with diagrams"),
-        images=[ImageContent(url=TestWorkingMemoryData.SAMPLE_IMAGE_URL), ImageContent(url="assets/diagrams/architecture.png")],
+        images=[ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_1), ImageContent(url=ImageTestCases.IMAGE_FILE_PATH_PNG_2)],
     )
 
     stuff = StuffFactory.make_stuff(
@@ -193,7 +193,9 @@ def html_content_memory() -> WorkingMemory:
     )
 
     stuff = StuffFactory.make_stuff(
-        concept=ConceptFactory.make(concept_code="Html", domain=SpecialDomain.NATIVE, description="Lorem Ipsum", structure_class_name="HtmlContent"),
+        concept=ConceptFactory.make(
+            concept_code="Html", domain_code=SpecialDomain.NATIVE, description="Lorem Ipsum", structure_class_name="HtmlContent"
+        ),
         name="test_report",
         content=html_content,
     )

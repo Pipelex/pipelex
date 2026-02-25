@@ -15,6 +15,8 @@ class LLMJob(InferenceJobAbstract):
     job_config: LLMJobConfig
     job_report: LLMJobReport = LLMJobReport()
 
+    applied_job_params: LLMJobParams | None = None
+
     @property
     def params_desc(self) -> str:
         return f"temp={self.job_params.temperature}, max_tokens={self.job_params.max_tokens}"

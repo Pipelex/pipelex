@@ -4,7 +4,7 @@ This example demonstrates a powerful and generic pipeline for extracting content
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/extract_generic.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/extract_generic.py)
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_generic/extract_generic.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_generic/extract_generic.py)
 
 ## The Pipeline Explained
 
@@ -15,7 +15,7 @@ async def extract_generic(pdf_url: str) -> TextAndImagesContent:
     pipe_output = await execute_pipeline(
         pipe_code="power_extractor",
         inputs={
-            "document": PDFContent(url=pdf_url),
+            "document": DocumentContent(url=pdf_url),
         },
     )
     working_memory = pipe_output.working_memory
@@ -23,7 +23,7 @@ async def extract_generic(pdf_url: str) -> TextAndImagesContent:
     return markdown_and_images
 ```
 
-The `merge_markdown_and_images` function is a great example of how you can add your own Python code to a Pipelex workflow to perform custom processing.
+The `merge_markdown_and_images` function is a great example of how you can add your own Python code to a Pipelex method to perform custom processing.
 
 ```python
 def merge_markdown_and_images(working_memory: WorkingMemory) -> TextAndImagesContent:

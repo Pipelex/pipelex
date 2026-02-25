@@ -6,17 +6,17 @@ from typing_extensions import override
 from pipelex.cogt.llm.llm_setting import LLMSettingChoices
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import make_variable_multiplicity, parse_concept_with_multiplicity
-from pipelex.hub import get_native_concept, get_optional_domain, get_required_concept
+from pipelex.hub import get_optional_domain
 from pipelex.pipe_operators.llm.exceptions import PipeLLMFactoryError
 from pipelex.pipe_operators.llm.llm_prompt_blueprint import LLMPromptBlueprint
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
+from pipelex.pipe_operators.llm.template_document_analyzer import TemplateDocumentAnalyzer
+from pipelex.pipe_operators.llm.template_image_analyzer import TemplateImageAnalyzer
 from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
 
 
@@ -29,13 +29,13 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         pipe_type: str,
         pipe_code: str,
         domain_code: str,
-        description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        description: str,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeLLMBlueprint,
     ) -> PipeLLM:
         system_prompt = blueprint.system_prompt
-        if not system_prompt and (domain_obj := get_optional_domain(domain=domain_code)):
+        if not system_prompt and (domain_obj := get_optional_domain(domain_code=domain_code)):
             system_prompt = domain_obj.system_prompt
 
         system_prompt_jinja2_blueprint: TemplateBlueprint | None = None
@@ -66,36 +66,61 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
                 )
                 raise PipeLLMFactoryError(error_msg) from exc
 
-        user_images: list[str] = []
-        if blueprint.inputs:
-            for stuff_name, requirement_str in blueprint.inputs.items():
-                # Parse to strip multiplicity brackets
-                input_parse_result = parse_concept_with_multiplicity(requirement_str)
-
-                domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                    domain=domain_code,
-                    concept_string_or_code=input_parse_result.concept,
+        # Analyze template for image references
+        user_image_references = None
+        if blueprint.prompt and blueprint.inputs:
+            user_image_references = (
+                TemplateImageAnalyzer.analyze_template_for_images(
+                    template_source=blueprint.prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
                 )
-                concept = get_required_concept(
-                    concept_string=ConceptFactory.make_concept_string_with_domain(
-                        domain=domain_and_code.domain,
-                        concept_code=domain_and_code.concept_code,
-                    ),
-                )
+                or None
+            )
 
-                if Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptCode.IMAGE), strict=True):
-                    user_images.append(stuff_name)
-                elif Concept.are_concept_compatible(concept_1=concept, concept_2=get_native_concept(NativeConceptCode.IMAGE), strict=False):
-                    # Get image field paths relative to the concept
-                    image_field_paths = concept.search_for_nested_image_fields_in_structure_class()
-                    # Prefix each path with the stuff_name to make them absolute
-                    for field_path in image_field_paths:
-                        user_images.append(f"{stuff_name}.{field_path}")
+        # Analyze template for document references
+        user_document_references = None
+        if blueprint.prompt and blueprint.inputs:
+            user_document_references = (
+                TemplateDocumentAnalyzer.analyze_template_for_documents(
+                    template_source=blueprint.prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                )
+                or None
+            )
+
+        # Analyze system prompt for image references
+        system_image_references = None
+        if blueprint.system_prompt and blueprint.inputs:
+            system_image_references = (
+                TemplateImageAnalyzer.analyze_template_for_images(
+                    template_source=blueprint.system_prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                )
+                or None
+            )
+
+        # Analyze system prompt for document references
+        system_document_references = None
+        if blueprint.system_prompt and blueprint.inputs:
+            system_document_references = (
+                TemplateDocumentAnalyzer.analyze_template_for_documents(
+                    template_source=blueprint.system_prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                )
+                or None
+            )
 
         llm_prompt_spec = LLMPromptBlueprint(
             system_prompt_blueprint=system_prompt_jinja2_blueprint,
             prompt_blueprint=user_text_jinja2_blueprint,
-            user_images=user_images or None,
+            user_image_references=user_image_references,
+            user_document_references=user_document_references,
+            system_image_references=system_image_references,
+            system_document_references=system_document_references,
         )
 
         llm_choices = LLMSettingChoices(
@@ -113,7 +138,7 @@ class PipeLLMFactory(PipeFactoryProtocol[PipeLLMBlueprint, PipeLLM]):
         )
 
         return PipeLLM(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             inputs=inputs,

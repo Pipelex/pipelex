@@ -91,7 +91,8 @@ def verify_telemetry_config(telemetry_config_path: str, expected_mode: str) -> N
         expected_mode: Expected telemetry mode ("off", "anonymous", or "identified").
     """
     toml_doc = load_toml_with_tomlkit(telemetry_config_path)
-    assert toml_doc["telemetry_mode"] == expected_mode, f"Expected telemetry_mode '{expected_mode}', got '{toml_doc['telemetry_mode']}'"
+    actual_mode = toml_doc["custom_posthog"]["mode"]  # type: ignore[index]
+    assert actual_mode == expected_mode, f"Expected posthog.mode '{expected_mode}', got '{actual_mode}'"
 
 
 class MockedInitEnvironment:
@@ -180,6 +181,13 @@ class MockedInitEnvironment:
         """Mock config_manager to use tmp_path."""
         self.mock_config_manager = self.mocker.MagicMock()
         self.mock_config_manager.pipelex_config_dir = str(self.pipelex_dir)
+        self.mock_config_manager.global_config_dir = str(self.pipelex_dir)
+        self.mock_config_manager.project_config_dir = str(self.pipelex_dir)
+        self.mock_config_manager.project_root = str(self.tmp_path)
+        self.mock_config_manager.backends_file_path = str(self.inference_dir / "backends.toml")
+        self.mock_config_manager.backends_dir_path = str(self.inference_dir / "backends")
+        self.mock_config_manager.routing_profiles_file_path = str(self.inference_dir / "routing_profiles.toml")
+        self.mock_config_manager.model_decks_dir_path = str(self.inference_dir / "deck")
 
         # Patch all locations where config_manager is used
         self.mocker.patch("pipelex.cli.commands.init.command.config_manager", self.mock_config_manager)
@@ -198,10 +206,8 @@ class MockedInitEnvironment:
         self.mocker.patch("pipelex.cli.commands.init.routing.get_console", return_value=self.mock_console)
 
         # Patch UI modules that still instantiate Console directly
-        self.mocker.patch("pipelex.cli.commands.init.telemetry.Console")
         self.mocker.patch("pipelex.cli.commands.init.ui.backends_ui.Console")
         self.mocker.patch("pipelex.cli.commands.init.ui.routing_ui.Console")
-        self.mocker.patch("pipelex.cli.commands.init.ui.telemetry_ui.Console")
 
     def add_prompt_input(self, value: str) -> None:
         """Add a prompt input to the sequence.

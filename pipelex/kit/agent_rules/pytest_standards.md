@@ -2,7 +2,8 @@
 
 ## Unit test generalities
 
-NEVER USE unittest.mock. YOU MUST USE pytest-mock instead.
+NEVER USE unittest.mock. Instead YOU MUST USE pytest-mock: `from pytest_mock import MockerFixture`.
+NEVER EVER put more than one TestClass into a test module.
 
 ### Test file structure
 
@@ -10,20 +11,23 @@ NEVER USE unittest.mock. YOU MUST USE pytest-mock instead.
 - Place test files in the appropriate test category directory:
     - `tests/unit/` - for unit tests that test individual functions/classes in isolation
     - `tests/integration/` - for integration tests that test component interactions
-    - `tests/e2e/` - for end-to-end tests that test complete workflows
-    - `tests/test_pipelines/` - for test pipeline definitions (PLX files and their structuring python files)
+    - `tests/e2e/` - for end-to-end tests that test complete methods
+- Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
-- Always put test inside Test classes: 1 TestClass per module.
+- Always put tests inside Test classes: 1 TestClass per module.
+- NEVER EVER put more than one TestClass into a test module.
+- Put fixtures into conftest.py files for easy sharing.
 
 ### Markers
 
 Apply the appropriate markers:
+- "gha_disabled: will not be able to run properly on GitHub Actions"
 - "llm: uses an LLM to generate text or objects"
 - "img_gen: uses an image generation AI"
 - "extract: uses text/image extraction from documents"
 - "inference: uses either an LLM or an image generation AI"
-- "gha_disabled: will not be able to run properly on GitHub Actions"
+- never add "@pytest.mark.dry_runnable" if you haven't set the "inference" marker
 
 Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
 
@@ -58,7 +62,6 @@ class TestFooBar:
 
 - Never more than 1 class per test module.
 - When testing one method, if possible, limit the number of test functions, but with different test cases in parameters
-- Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
 
 ### Test Data Organization
 
@@ -74,5 +77,5 @@ class TestFooBar:
 - Verify working memory state
 - Check output structure and content
 - Use meaningful test case names
-- Include docstrings explaining test purpose but not on top of the file and not on top of the class.
+- Include concise docstrings explaining test purpose but not on top of the file and not on top of the class.
 - Log outputs for debugging

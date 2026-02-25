@@ -43,6 +43,7 @@ class ClassRegistryUtils:
         base_class: type[Any] | None = None,
         is_recursive: bool = True,
         is_include_imported: bool = False,
+        force_exclude_dirs: list[str] | None = None,
     ) -> None:
         """Registers all classes in Python files within folders that are subclasses of base_class.
         If base_class is None, registers all classes.
@@ -52,13 +53,14 @@ class ClassRegistryUtils:
             base_class: Optional base class to filter registerable classes
             is_recursive: Whether to search recursively in subdirectories
             is_include_imported: Whether to include classes imported from other modules
+            force_exclude_dirs: List of absolute directory paths to exclude from scanning
 
         """
         python_files = find_files_in_dir(
             dir_path=folder_path,
             pattern="*.py",
             is_recursive=is_recursive,
-            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
+            excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs) + (force_exclude_dirs or []),
         )
 
         for python_file in python_files:

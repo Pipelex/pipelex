@@ -1,11 +1,21 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.placeholder import value_is_placeholder
 
+# Load global credentials first (~/.pipelex/.env)
+_global_env_path = Path.home() / ".pipelex" / ".env"
+if _global_env_path.is_file():
+    load_dotenv(dotenv_path=str(_global_env_path), override=True)
+
+# Load project-level .env second (overrides global)
 load_dotenv(dotenv_path=".env", override=True)
+
+# Environment variable for specifying library directories (PATH-style, colon-separated on Unix, semicolon on Windows)
+PIPELEXPATH_ENV_KEY = "PIPELEXPATH"
 
 
 class EnvVarNotFoundError(ToolError):
@@ -48,3 +58,17 @@ def is_env_var_truthy(key: str) -> bool:
     """Return True if the env var is set and not a falsy sentinel ("false" or "0")."""
     value = get_optional_env(key)
     return (value is not None) and (value.lower() not in {"false", "0"})
+
+
+def get_pipelexpath_dirs() -> list[Path] | None:
+    """Get library directories from PIPELEXPATH environment variable.
+
+    PIPELEXPATH uses PATH-style syntax: colon-separated on Unix, semicolon-separated on Windows.
+
+    Returns:
+        List of Path objects for each directory in PIPELEXPATH, or None if not set.
+    """
+    pipelexpath = get_optional_env(PIPELEXPATH_ENV_KEY)
+    if pipelexpath is None:
+        return None
+    return [Path(path_str) for path_str in pipelexpath.split(os.pathsep) if path_str]

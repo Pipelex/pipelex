@@ -4,7 +4,7 @@ import pytest
 
 from pipelex import pretty_print
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from tests.e2e.pipelex.pipes.pipe_controller.pipe_sequence.test_tweet import OptimizedTweet
 
 SAMPLE_DRAFT_TWEET = """
@@ -94,8 +94,11 @@ class TestPipeSequenceWithInputMemory:
     async def test_optimize_tweet_sequence_with_input_memory(self, pipe_run_mode: PipeRunMode):
         """Test the optimize_tweet_sequence pipeline using inputs parameter."""
         # Execute the pipeline using inputs
-        pipe_output = await execute_pipeline(
+        runner = PipelexRunner(
             library_dirs=["tests/e2e/pipelex/pipes/pipe_controller/pipe_sequence/"],
+            pipe_run_mode=pipe_run_mode,
+        )
+        response = await runner.execute_pipeline(
             pipe_code="optimize_tweet_sequence",
             inputs={
                 "draft_tweet": {
@@ -107,8 +110,8 @@ class TestPipeSequenceWithInputMemory:
                     "content": SAMPLE_WRITING_STYLE,
                 },
             },
-            pipe_run_mode=pipe_run_mode,
         )
+        pipe_output = response.pipe_output
         pretty_print(pipe_output, title="Pipe output for optimize_tweet_sequence")
 
         # Get the optimized tweet
@@ -121,8 +124,5 @@ class TestPipeSequenceWithInputMemory:
         assert optimized_tweet
         assert isinstance(optimized_tweet, OptimizedTweet)
         assert len(optimized_tweet.lead_tweet.strip()) > 0
-        match pipe_run_mode:
-            case PipeRunMode.DRY:
-                pass
-            case PipeRunMode.LIVE:
-                assert "Maria Rodriguez" in optimized_tweet.lead_tweet
+        if pipe_run_mode.is_live:
+            assert "Maria Rodriguez" in optimized_tweet.lead_tweet
