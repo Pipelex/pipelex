@@ -254,7 +254,7 @@ def execute_run(
 
     Shared between the ``method`` and ``pipe`` subcommands.
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, library_dirs=library_dir)
 
     try:
         with get_telemetry_manager().telemetry_context():

@@ -20,7 +20,15 @@ from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
 from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.hub import get_class_registry, get_func_registry, get_required_pipe, get_telemetry_manager
+from pipelex.hub import (
+    get_class_registry,
+    get_func_registry,
+    get_library_manager,
+    get_required_pipe,
+    get_telemetry_manager,
+    resolve_library_dirs,
+    set_current_library,
+)
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
@@ -46,6 +54,14 @@ async def _prepare_runner_core(
     library_dirs: list[Path] | None = None,
 ) -> None:
     """Core logic for generating a Python runner file."""
+    # Set up library so pipes can be found
+    lib_manager = get_library_manager()
+    lib_id, _ = lib_manager.open_library()
+    set_current_library(library_id=lib_id)
+    effective_dirs, _ = resolve_library_dirs([str(lib_dir) for lib_dir in library_dirs] if library_dirs else None)
+    if effective_dirs:
+        lib_manager.load_libraries(library_id=lib_id, library_dirs=effective_dirs)
+
     all_blueprints: list[PipelexBundleBlueprint] = []
 
     if bundle_path:

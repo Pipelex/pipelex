@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Annotated
 
 import typer
@@ -52,9 +53,9 @@ def run_method_cmd(
         ),
     ] = None,
     output_dir: Annotated[
-        str,
+        str | None,
         typer.Option("--output-dir", "-o", help="Base directory for all outputs (working memory, main_stuff, graphs)"),
-    ] = "results",
+    ] = None,
     dry_run: Annotated[
         bool,
         typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
@@ -95,6 +96,18 @@ def run_method_cmd(
         pipe_override=pipe,
     )
 
+    method_dir = Path(method_library_dirs[0])
+
+    # Default output_dir to a results/ folder inside the method's directory
+    effective_output_dir = output_dir or str(method_dir / "results")
+
+    # Resolve --inputs relative to the method's directory
+    effective_inputs: str | None = inputs
+    if inputs and not inputs.startswith("{"):
+        inputs_path = Path(inputs)
+        if not inputs_path.is_absolute():
+            effective_inputs = str(method_dir / inputs_path)
+
     # Merge method library dirs with user-supplied -L dirs
     if library_dir:
         effective_library_dir = [*method_library_dirs, *library_dir]
@@ -104,14 +117,14 @@ def run_method_cmd(
     execute_run(
         pipe_code=pipe_code,
         bundle_path=None,
-        inputs=inputs,
+        inputs=effective_inputs,
         save_working_memory=save_working_memory,
         working_memory_path=working_memory_path,
         save_main_stuff=save_main_stuff,
         no_pretty_print=no_pretty_print,
         graph=graph,
         graph_full_data=graph_full_data,
-        output_dir=output_dir,
+        output_dir=effective_output_dir,
         dry_run=dry_run,
         mock_inputs=mock_inputs,
         library_dir=effective_library_dir,

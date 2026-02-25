@@ -59,16 +59,19 @@ def discover_installed_methods(
         A list of discovered installed methods
     """
     methods: list[InstalledMethod] = []
+    seen_dirs: set[Path] = set()
     dirs_to_scan: list[Path] = []
 
     if include_project:
         project_dir = PROJECT_METHODS_DIR.resolve()
         if project_dir.is_dir():
             dirs_to_scan.append(project_dir)
+            seen_dirs.add(project_dir)
 
     if include_global:
-        if GLOBAL_METHODS_DIR.is_dir():
-            dirs_to_scan.append(GLOBAL_METHODS_DIR)
+        global_dir = GLOBAL_METHODS_DIR.resolve()
+        if global_dir.is_dir() and global_dir not in seen_dirs:
+            dirs_to_scan.append(global_dir)
 
     for methods_dir in dirs_to_scan:
         for subdir in sorted(methods_dir.iterdir()):

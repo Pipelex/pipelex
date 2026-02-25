@@ -5,6 +5,7 @@ from typing import Annotated
 
 import typer
 
+from pipelex.builder.conventions import DEFAULT_INPUTS_FILE_NAME
 from pipelex.cli.commands.build.inputs._inputs_core import execute_generate_inputs
 from pipelex.cli.method_resolver import resolve_method_target
 
@@ -47,7 +48,11 @@ def build_inputs_method_cmd(
     if library_dir:
         effective_library_dir.extend(library_dir)
 
-    output_path_path = Path(output_path) if output_path else None
+    # Default output to a results/ folder inside the method's directory
+    if output_path:
+        output_path_path = Path(output_path)
+    else:
+        output_path_path = Path(method_library_dirs[0]) / "results" / DEFAULT_INPUTS_FILE_NAME
 
     execute_generate_inputs(
         pipe_code=pipe_code,

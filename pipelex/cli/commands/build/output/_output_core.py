@@ -16,7 +16,7 @@ from pipelex.core.concepts.concept_representation_generator import ConceptRepres
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import PipeInputError
 from pipelex.core.pipes.output.output_renderer import render_output
-from pipelex.hub import get_required_pipe, get_telemetry_manager
+from pipelex.hub import get_library_manager, get_required_pipe, get_telemetry_manager, resolve_library_dirs, set_current_library
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import PACKAGE_VERSION
 from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
@@ -36,8 +36,17 @@ async def _generate_output_core(
     bundle_path: Path | None = None,
     output_path: Path | None = None,
     output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.JSON,
+    library_dir: list[str] | None = None,
 ) -> None:
     """Core logic for generating output representation for a pipe."""
+    # Set up library so pipes can be found
+    library_manager = get_library_manager()
+    library_id, _ = library_manager.open_library()
+    set_current_library(library_id=library_id)
+    effective_dirs, _ = resolve_library_dirs(library_dir)
+    if effective_dirs:
+        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
+
     if bundle_path:
         try:
             validate_bundle_result = await validate_bundle(mthds_file_path=bundle_path)
@@ -130,7 +139,11 @@ def execute_generate_output(
             tag(name=EventProperty.PIPELEX_VERSION, value=PACKAGE_VERSION)
             tag(name=EventProperty.CLI_COMMAND, value=telemetry_command_label)
 
-            asyncio.run(_generate_output_core(pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path, output_format=output_format))
+            asyncio.run(
+                _generate_output_core(
+                    pipe_code=pipe_code, bundle_path=bundle_path, output_path=output_path, output_format=output_format, library_dir=library_dir
+                )
+            )
 
     except PipeOperatorModelChoiceError as exc:
         handle_model_choice_error(exc, context=ErrorContext.BUILD)

@@ -72,7 +72,18 @@ def build_output_method_cmd(
     if library_dir:
         effective_library_dir.extend(library_dir)
 
-    output_path_path = Path(output_path) if output_path else None
+    # Default output to a results/ folder inside the method's directory
+    if output_path:
+        output_path_path: Path | None = Path(output_path)
+    else:
+        results_dir = Path(method_library_dirs[0]) / "results"
+        match concept_format:
+            case ConceptRepresentationFormat.JSON:
+                output_path_path = results_dir / "output.json"
+            case ConceptRepresentationFormat.PYTHON:
+                output_path_path = results_dir / "output.py"
+            case ConceptRepresentationFormat.SCHEMA:
+                output_path_path = results_dir / "output_schema.json"
 
     execute_generate_output(
         pipe_code=pipe_code,
