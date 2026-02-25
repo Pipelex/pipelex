@@ -36,7 +36,7 @@ def validate_method_cmd(
         pipelex validate method my-method
         pipelex validate method my-method --pipe custom_pipe
     """
-    pipe_code, method_library_dirs = resolve_method_target(
+    pipe_code, method_library_dirs, _ = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
     )

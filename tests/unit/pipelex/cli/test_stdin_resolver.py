@@ -4,15 +4,12 @@ from __future__ import annotations
 
 import io
 import json
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 import typer
 
 from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs, resolve_stdin_inputs
-
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
 
 
 class TestStdinResolver:

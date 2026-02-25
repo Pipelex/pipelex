@@ -6,7 +6,6 @@ from typing import Annotated
 import typer
 
 from pipelex.cli.commands.build.runner._runner_core import execute_prepare_runner
-from pipelex.cli.installed_methods import find_method_by_name
 from pipelex.cli.method_resolver import resolve_method_target
 
 
@@ -38,13 +37,10 @@ def build_runner_method_cmd(
         pipelex build runner method my-method --pipe custom_pipe
         pipelex build runner method my-method --output runner.py
     """
-    pipe_code, method_library_dirs = resolve_method_target(
+    pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
     )
-
-    # For runner generation, we need a bundle path. Use the first .mthds file from the method.
-    method = find_method_by_name(name)
     if not method.mthds_files:
         typer.secho(
             f"Method '{name}' has no .mthds bundle files.",

@@ -47,8 +47,7 @@ def discover_installed_methods(
     """Scan ~/.mthds/methods/ and ./.mthds/methods/ for installed methods.
 
     For each subdirectory with a METHODS.toml:
-    - Parse the manifest and get ``name`` from it
-    - The directory name must match manifest.name
+    - Parse the manifest and get ``name`` from it (falls back to directory name)
     - Collect all .mthds files recursively
 
     Args:

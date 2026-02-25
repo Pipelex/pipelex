@@ -12,7 +12,7 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -44,7 +44,7 @@ async def inputs_core(
             main_pipe_code = bundle_blueprint.main_pipe
             if not main_pipe_code:
                 msg = f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code with --pipe."
-                raise ValidateBundleError(message=msg)
+                raise ValueError(msg)
             pipe_code = main_pipe_code
     else:
         # No bundle - initialize the library manually
@@ -57,7 +57,7 @@ async def inputs_core(
 
     if not pipe_code:
         msg = "No pipe code specified"
-        raise ValidateBundleError(message=msg)
+        raise ValueError(msg)
 
     the_pipe = get_required_pipe(pipe_code=pipe_code)
     inputs_json_str = render_inputs(the_pipe, indent=2)

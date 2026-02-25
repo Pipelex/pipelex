@@ -11,7 +11,6 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import inputs_core
-from pipelex.cli.installed_methods import find_method_by_name
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
@@ -43,12 +42,10 @@ def inputs_method_cmd(
         pipelex-agent inputs method my-method
         pipelex-agent inputs method my-method --pipe custom_pipe
     """
-    pipe_code, method_library_dirs = resolve_method_target(
+    pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
     )
-
-    method = find_method_by_name(name)
     bundle_path: Path | None = None
     if method.mthds_files:
         bundle_path = method.mthds_files[0]

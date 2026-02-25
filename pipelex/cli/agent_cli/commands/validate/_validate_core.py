@@ -10,7 +10,7 @@ from pipelex.hub import (
     resolve_library_dirs,
     set_current_library,
 )
-from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
+from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipe, dry_run_pipes
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
@@ -43,9 +43,13 @@ async def validate_all_core(
     for the_pipe in pipes:
         the_pipe.validate_with_libraries()
 
-    await dry_run_pipes(pipes=pipes, raise_on_failure=True)
+    dry_run_results = await dry_run_pipes(pipes=pipes, raise_on_failure=True)
 
-    validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in pipes]
+    validated_pipes: list[dict[str, str]] = []
+    for the_pipe in pipes:
+        dry_run_output = dry_run_results.get(the_pipe.code)
+        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
+        validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
 
     return {
         "success": True,
