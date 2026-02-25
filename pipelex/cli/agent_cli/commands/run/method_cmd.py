@@ -14,7 +14,6 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_ag
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
-from pipelex.cli.installed_methods import find_method_by_name
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
@@ -69,13 +68,10 @@ def run_method_cmd(
     if mock_inputs and not dry_run:
         agent_error("--mock-inputs requires --dry-run", "ArgumentError")
 
-    pipe_code, method_library_dirs = resolve_method_target(
+    pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
     )
-
-    # Find the first .mthds bundle in the method directory
-    method = find_method_by_name(name)
     bundle_path: str | None = None
     mthds_content: str | None = None
 

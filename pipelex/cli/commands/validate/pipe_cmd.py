@@ -63,12 +63,13 @@ def validate_pipe_cmd(
                 err=True,
             )
             raise typer.Exit(1)
+        library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
         try:
             make_pipelex_for_cli(
                 context=ErrorContext.VALIDATION,
-                library_dirs=[Path(lib_dir) for lib_dir in library_dir] if library_dir else None,
+                library_dirs=library_dirs_paths,
             )
-            do_validate_all_libraries_and_dry_run(library_dirs=[Path(lib_dir) for lib_dir in library_dir] if library_dir else None)
+            do_validate_all_libraries_and_dry_run(library_dirs=library_dirs_paths)
         finally:
             Pipelex.teardown_if_needed()
         return

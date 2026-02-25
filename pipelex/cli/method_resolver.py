@@ -55,19 +55,19 @@ def _find_method_by_exported_pipe(pipe_code: str) -> InstalledMethod:
 def resolve_method_target(
     method_name: str,
     pipe_override: str | None = None,
-) -> tuple[str, list[str]]:
-    """Resolve a method name to (pipe_code, library_dirs).
+) -> tuple[str, list[str], InstalledMethod]:
+    """Resolve a method name to (pipe_code, library_dirs, method).
 
     Finds the installed method by name, determines the pipe to run
     (using pipe_override or main_pipe), and returns the library directories
-    needed to load the method's bundles.
+    needed to load the method's bundles along with the method itself.
 
     Args:
         method_name: The installed method name to resolve.
         pipe_override: Optional pipe code override (takes precedence over main_pipe).
 
     Returns:
-        A tuple of (pipe_code, library_dirs) for execution.
+        A tuple of (pipe_code, library_dirs, installed_method) for execution.
 
     Raises:
         typer.Exit: On resolution errors with user-friendly messages.
@@ -106,7 +106,7 @@ def resolve_method_target(
     # The method directory is a library directory
     library_dirs = [str(method.path)]
 
-    return pipe_code, library_dirs
+    return pipe_code, library_dirs, method
 
 
 def resolve_pipe_from_exports(

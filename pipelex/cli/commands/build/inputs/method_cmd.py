@@ -39,7 +39,7 @@ def build_inputs_method_cmd(
         pipelex build inputs method my-method --pipe custom_pipe
         pipelex build inputs method my-method --output custom_inputs.json
     """
-    pipe_code, method_library_dirs = resolve_method_target(
+    pipe_code, method_library_dirs, _ = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
     )

@@ -92,7 +92,11 @@ async def _execute_run(
     pipeline_inputs = None
     if inputs:
         if inputs.startswith("{"):
-            pipeline_inputs = json.loads(inputs)
+            try:
+                pipeline_inputs = json.loads(inputs)
+            except json.JSONDecodeError as json_decode_exc:
+                typer.secho(f"Failed to parse inline JSON inputs: {json_decode_exc}", fg=typer.colors.RED, err=True)
+                raise typer.Exit(1) from json_decode_exc
         else:
             try:
                 pipeline_inputs = load_json_dict_from_path(inputs)

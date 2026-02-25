@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from mthds.runners.types import RunnerType
+
 from pipelex.config import get_config
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -73,6 +75,7 @@ async def run_pipeline_core(
         "success": True,
         "pipe_code": pipe_code,
         "dry_run": dry_run,
+        "runner": RunnerType.PIPELEX,
         "main_stuff": main_stuff_json,
         "working_memory": pipe_output.working_memory.smart_dump(),
     }

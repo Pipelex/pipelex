@@ -91,7 +91,7 @@ def run_method_cmd(
         raise typer.Exit(1)
 
     # Resolve method name to pipe_code and library dirs
-    pipe_code, method_library_dirs = resolve_method_target(
+    pipe_code, method_library_dirs, _ = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
     )

@@ -14,7 +14,6 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
     validate_bundle_core,
     validate_pipe_in_bundle_core,
 )
-from pipelex.cli.installed_methods import find_method_by_name
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
@@ -46,12 +45,10 @@ def validate_method_cmd(
         pipelex-agent validate method my-method
         pipelex-agent validate method my-method --pipe custom_pipe
     """
-    pipe_code, method_library_dirs = resolve_method_target(
+    pipe_code, method_library_dirs, method = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
     )
-
-    method = find_method_by_name(name)
     if not method.mthds_files:
         agent_error(f"Method '{name}' has no .mthds bundle files.", "MethodError")
         return
@@ -63,7 +60,7 @@ def validate_method_cmd(
     if library_dir:
         library_dirs_paths.extend(Path(lib_dir) for lib_dir in library_dir)
 
-    make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
+    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, log_level=ctx.obj["log_level"])
 
     try:
         if pipe:

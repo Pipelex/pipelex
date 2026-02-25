@@ -63,7 +63,7 @@ def build_output_method_cmd(
         )
         raise typer.Exit(1)
 
-    pipe_code, method_library_dirs = resolve_method_target(
+    pipe_code, method_library_dirs, _ = resolve_method_target(
         method_name=name,
         pipe_override=pipe,
     )

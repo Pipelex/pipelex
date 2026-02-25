@@ -6,6 +6,7 @@ from typing import Any
 
 from mthds.client.pipeline import MAIN_STUFF_NAME
 from mthds.runners.api_runner import ApiRunner
+from mthds.runners.types import RunnerType
 
 
 async def run_pipeline_core_api(
@@ -49,7 +50,7 @@ async def run_pipeline_core_api(
         "success": True,
         "pipe_code": pipe_code,
         "dry_run": False,
-        "runner": "api",
+        "runner": RunnerType.API,
         "pipeline_run_id": response.pipeline_run_id,
         "pipeline_state": response.pipeline_state,
         "main_stuff": main_stuff_json,
