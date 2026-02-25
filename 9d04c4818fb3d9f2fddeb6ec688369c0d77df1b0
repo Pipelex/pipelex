@@ -1,0 +1,25 @@
+pipelex/cli/agent_cli/commands/run/stdin_resolver.py
+  93c16eabce2d3d67 141-143
+tests/unit/pipelex/cli/test_stdin_resolver.py
+  93c16eabce2d3d67 324-335
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.5",
+  "base_commit_sha": "9d04c4818fb3d9f2fddeb6ec688369c0d77df1b0",
+  "prompts": {
+    "93c16eabce2d3d67": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9a19f00a-82f1-4032-b437-89f2f4c9ee00",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 15,
+      "total_deletions": 1,
+      "accepted_lines": 15,
+      "overriden_lines": 0
+    }
+  }
+}
