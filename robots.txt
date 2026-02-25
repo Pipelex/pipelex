@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /latest/
+Disallow: /
+Sitemap: https://docs.pipelex.com/latest/sitemap.xml
