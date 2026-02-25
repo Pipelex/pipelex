@@ -223,7 +223,6 @@ def generate_reference_markdown(model_specs: BackendModelSpecs) -> str:
 
     sections = [
         "# Pipelex Gateway — Available Models",
-        "<!-- PRERELEASE_LINK -->",
         "This file lists the LLMs, document extraction models, and image generation models currently available through Pipelex Gateway.",
         f"For configuration details, see the [documentation]({URLs.gateway_docs}).",
         "",

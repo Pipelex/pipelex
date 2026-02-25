@@ -4,8 +4,7 @@ This example demonstrates a pipeline designed to extract structured data from a 
 
 ## Get the code
 
-<!-- PRERELEASE_LINK -->
-[**➡️ View on GitHub: examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py)
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py)
 
 ## The Pipeline Explained
 

@@ -4,8 +4,7 @@ This example showcases the ability of Pipelex to extract structured information 
 
 ## Get the code
 
-<!-- PRERELEASE_LINK -->
-[**➡️ View on GitHub: examples/b_basics/document_extract/extract_gantt/extract_gantt.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_gantt/extract_gantt.py)
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_gantt/extract_gantt.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_gantt/extract_gantt.py)
 
 ## The Pipeline Explained
 

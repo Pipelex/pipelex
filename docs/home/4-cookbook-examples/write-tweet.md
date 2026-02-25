@@ -4,8 +4,7 @@ This example demonstrates how to create a pipeline that takes a draft of a tweet
 
 ## Get the code
 
-<!-- PRERELEASE_LINK -->
-[**➡️ View on GitHub: examples/wip/write_tweet/write_tweet.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/wip/write_tweet/write_tweet.py)
+[**➡️ View on GitHub: examples/wip/write_tweet/write_tweet.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/wip/write_tweet/write_tweet.py)
 
 ## The Pipeline Explained
 

@@ -174,8 +174,7 @@ Now that you have your backend configured:
 
 1. **Organize your project**: [Project Organization](./project-organization.md)
 2. **Learn the concepts**: [Writing Methods Tutorial](../../home/2-get-started/pipe-builder.md)
-<!-- PRERELEASE_LINK -->
-3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/feature/Chicago)
+3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/main)
 4. **Deep dive**: [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md)
 
 !!! tip "Advanced Configuration"
