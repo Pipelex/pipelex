@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+### Breaking Changes
+
+- **CLI restructure: `method` / `pipe` subcommands** — `pipelex run`, `pipelex validate`, and all `pipelex build` subcommands (`runner`, `inputs`, `output`) now require an explicit `method` or `pipe` keyword. For example: `pipelex run method my-method` or `pipelex run pipe scoring.compute`. The old `pipelex run <target>` form is no longer supported. The agent CLI (`pipelex-agent`) follows the same structure.
+
+### Added
+
+- **Method resolution (`cli/method_resolver.py`)** — resolves installed method names to pipe codes and library directories. Integrates with `mthds` discovery module to find methods in `~/.mthds/methods/` and `./.mthds/methods/`.
+- **`run method` command** — run an installed method by name, optionally overriding the pipe with `--pipe`.
+- **`validate method` command** — validate all bundles in an installed method.
+- **`build runner/inputs/output method` commands** — generate build artifacts for installed methods.
+
 ## [v0.18.0b4] - 2026-02-23
 
 ### Added
