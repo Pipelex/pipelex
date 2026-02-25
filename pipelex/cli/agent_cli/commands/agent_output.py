@@ -40,6 +40,9 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "RemoteConfigValidationError": (
         "This is a server-side issue; report it on Discord/GitHub. Disable pipelex_gateway in backends.toml as a workaround"
     ),
+    # API runner errors
+    "ClientAuthenticationError": "Run 'pipelex-agent doctor' to check credentials, or set the PIPELEX_API_KEY environment variable",
+    "PipelineRequestError": "Check that pipe_code or mthds_content is provided",
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
     # Builder/assembler errors
@@ -72,11 +75,13 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "ValidationError": "input",
     "ValueError": "input",
     "BundleError": "input",
+    "PipelineRequestError": "input",
     "GraphSpecParseError": "input",
     "ConceptLoadError": "input",
     "PipeLoadError": "input",
     "UnknownCommandError": "input",
     # config = environment/config changes needed
+    "ClientAuthenticationError": "config",
     "PipeOperatorModelChoiceError": "config",
     "PipeOperatorModelAvailabilityError": "config",
     "ModelDeckPresetValidatonError": "config",

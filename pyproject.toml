@@ -55,7 +55,7 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-mthds = { path = "../../mthds-ai/clis/mthds-python", editable = true }
+mthds = { path = "../mthds-python", editable = true }
 
 [project.urls]
 Homepage = "https://pipelex.com"

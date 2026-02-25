@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import typer
+from mthds.runners.types import RunnerType
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
+from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
 from pipelex.cli.installed_methods import find_method_by_name
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
@@ -108,56 +110,88 @@ def run_method_cmd(
             except JsonTypeError as exc:
                 agent_error(f"Input file must be a valid JSON dictionary: {inputs}", "JsonTypeError", cause=exc)
 
-    make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
+    runner_type: RunnerType = ctx.obj["runner"]
 
-    try:
-        result = asyncio.run(
-            run_pipeline_core(
-                pipe_code=pipe_code,
-                mthds_content=mthds_content,
-                bundle_uri=bundle_path,
-                inputs=pipeline_inputs,
-                dry_run=dry_run,
-                mock_inputs=mock_inputs,
-                library_dirs=all_library_dirs,
-                graph=graph,
-            )
-        )
-        agent_success(result)
+    match runner_type:
+        case RunnerType.API:
+            # Validate unsupported flags for API runner
+            if dry_run:
+                agent_error("--dry-run is not supported with --runner api", "ArgumentError")
+            if mock_inputs:
+                agent_error("--mock-inputs is not supported with --runner api", "ArgumentError")
 
-    except PipelineExecutionError as exc:
-        extra_fields: dict[str, Any] = {
-            "pipe_code": exc.pipe_code,
-            "pipe_stack": exc.pipe_stack,
-        }
-        if exc.__cause__:
-            extra_fields["cause_type"] = type(exc.__cause__).__name__
-            extra_fields["cause_message"] = str(exc.__cause__)
-        agent_error(exc.message, "PipelineExecutionError", cause=exc, **extra_fields)
+            from mthds.client.exceptions import ClientAuthenticationError, PipelineRequestError  # noqa: PLC0415
 
-    except PipeOperatorModelChoiceError as exc:
-        agent_error(
-            exc.message,
-            "PipeOperatorModelChoiceError",
-            cause=exc,
-            pipe_code=exc.pipe_code,
-            model_type=str(exc.model_type),
-            model_choice=str(exc.model_choice),
-        )
+            try:
+                result = asyncio.run(
+                    run_pipeline_core_api(
+                        pipe_code=pipe_code,
+                        mthds_content=mthds_content,
+                        inputs=pipeline_inputs,
+                    )
+                )
+                agent_success(result)
 
-    except PipeOperatorModelAvailabilityError as exc:
-        availability_extra: dict[str, Any] = {
-            "pipe_code": exc.pipe_code,
-            "model_handle": exc.model_handle,
-        }
-        if exc.fallback_list:
-            availability_extra["fallback_list"] = exc.fallback_list
-        if exc.pipe_stack:
-            availability_extra["pipe_stack"] = exc.pipe_stack
-        agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+            except ClientAuthenticationError as exc:
+                agent_error(str(exc), "ClientAuthenticationError", cause=exc)
 
-    except Exception as exc:
-        agent_error(str(exc), type(exc).__name__, cause=exc)
+            except PipelineRequestError as exc:
+                agent_error(str(exc), "PipelineRequestError", cause=exc)
 
-    finally:
-        Pipelex.teardown_if_needed()
+            except Exception as exc:
+                agent_error(str(exc), type(exc).__name__, cause=exc)
+
+        case RunnerType.PIPELEX:
+            make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
+
+            try:
+                result = asyncio.run(
+                    run_pipeline_core(
+                        pipe_code=pipe_code,
+                        mthds_content=mthds_content,
+                        bundle_uri=bundle_path,
+                        inputs=pipeline_inputs,
+                        dry_run=dry_run,
+                        mock_inputs=mock_inputs,
+                        library_dirs=all_library_dirs,
+                        graph=graph,
+                    )
+                )
+                agent_success(result)
+
+            except PipelineExecutionError as exc:
+                extra_fields: dict[str, Any] = {
+                    "pipe_code": exc.pipe_code,
+                    "pipe_stack": exc.pipe_stack,
+                }
+                if exc.__cause__:
+                    extra_fields["cause_type"] = type(exc.__cause__).__name__
+                    extra_fields["cause_message"] = str(exc.__cause__)
+                agent_error(exc.message, "PipelineExecutionError", cause=exc, **extra_fields)
+
+            except PipeOperatorModelChoiceError as exc:
+                agent_error(
+                    exc.message,
+                    "PipeOperatorModelChoiceError",
+                    cause=exc,
+                    pipe_code=exc.pipe_code,
+                    model_type=str(exc.model_type),
+                    model_choice=str(exc.model_choice),
+                )
+
+            except PipeOperatorModelAvailabilityError as exc:
+                availability_extra: dict[str, Any] = {
+                    "pipe_code": exc.pipe_code,
+                    "model_handle": exc.model_handle,
+                }
+                if exc.fallback_list:
+                    availability_extra["fallback_list"] = exc.fallback_list
+                if exc.pipe_stack:
+                    availability_extra["pipe_stack"] = exc.pipe_stack
+                agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+
+            except Exception as exc:
+                agent_error(str(exc), type(exc).__name__, cause=exc)
+
+            finally:
+                Pipelex.teardown_if_needed()

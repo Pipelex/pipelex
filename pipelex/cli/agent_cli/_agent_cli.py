@@ -4,6 +4,7 @@ from typing import Annotated
 
 import typer
 from click import Command, Context
+from mthds.runners.types import RunnerType
 from typer.core import TyperGroup
 from typing_extensions import override
 
@@ -92,6 +93,10 @@ def app_callback(
         str,
         typer.Option("--log-level", help="Log verbosity level (debug, verbose, info, warning, error, critical)."),
     ] = "warning",
+    runner: Annotated[
+        str,
+        typer.Option("--runner", help="Runner to use: 'pipelex' (local) or 'api' (remote MTHDS API)."),
+    ] = "pipelex",
 ) -> None:
     """Agent CLI callback - no logo, minimal output."""
     from pipelex.cli.agent_cli.commands.agent_output import agent_error  # noqa: PLC0415
@@ -104,6 +109,15 @@ def app_callback(
         valid_values = ", ".join(level.value.lower() for level in LogLevel)
         agent_error(
             f"Invalid log level '{log_level}'. Valid values: {valid_values}",
+            "ArgumentError",
+        )
+
+    try:
+        ctx.obj["runner"] = RunnerType(runner)
+    except ValueError:
+        valid_values = ", ".join(runner_type.value for runner_type in RunnerType)
+        agent_error(
+            f"Invalid runner '{runner}'. Valid values: {valid_values}",
             "ArgumentError",
         )
 

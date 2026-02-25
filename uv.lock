@@ -2395,7 +2395,7 @@ wheels = [
 [[package]]
 name = "mthds"
 version = "0.0.5"
-source = { editable = "../../mthds-ai/clis/mthds-python" }
+source = { editable = "../mthds-python" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
     { name = "httpx" },
@@ -3447,7 +3447,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.14" },
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", editable = "../../mthds-ai/clis/mthds-python" },
+    { name = "mthds", editable = "../mthds-python" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=1.108.1" },
