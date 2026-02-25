@@ -846,7 +846,7 @@ docs-deploy-stable: env
 	$(VENV_MIKE) set-default --push latest
 	$(MAKE) docs-deploy-root
 
-docs-deploy-specific-version: env
+docs-deploy-specific-version-pre-release: env
 	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
 	$(MAKE) docs-deploy-root

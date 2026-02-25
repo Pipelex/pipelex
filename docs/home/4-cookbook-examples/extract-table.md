@@ -4,8 +4,7 @@ This example shows how to extract a table from an image and convert it into a st
 
 ## Get the code
 
-<!-- PRERELEASE_LINK -->
-[**➡️ View on GitHub: examples/b_basics/document_extract/extract_table/extract_table.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_table/extract_table.py)
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_table/extract_table.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_table/extract_table.py)
 
 ## The Pipeline Explained
 

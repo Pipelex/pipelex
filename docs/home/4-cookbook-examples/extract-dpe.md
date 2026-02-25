@@ -4,8 +4,7 @@ This example demonstrates how to extract information from a French "Diagnostic d
 
 ## Get the code
 
-<!-- PRERELEASE_LINK -->
-[**➡️ View on GitHub: examples/b_basics/document_extract/extract_dpe/extract_dpe.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/b_basics/document_extract/extract_dpe/extract_dpe.py)
+[**➡️ View on GitHub: examples/b_basics/document_extract/extract_dpe/extract_dpe.py**](https://github.com/Pipelex/pipelex-cookbook/blob/examples/b_basics/document_extract/extract_dpe/extract_dpe.py)
 
 ## The Pipeline Explained
 

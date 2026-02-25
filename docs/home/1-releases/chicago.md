@@ -41,7 +41,7 @@ A fully managed infrastructure providing unified access to AI models through a s
 [Join the waitlist](https://go.pipelex.com/waitlist) to get early access to the Gateway.
 
 !!! info "Full Model Catalog"
-    Browse all supported models in our [Gateway Models documentation](https://docs.pipelex.com/pre-release/home/5-setup/gateway-models/).
+    Browse all supported models in our [Gateway Models documentation](https://docs.pipelex.com/home/5-setup/gateway-models/).
 
 ---
 
@@ -115,4 +115,4 @@ Then run `pipelex init` to configure your environment and obtain your Gateway AP
 *Ready to build AI methods that just work?*
 
 [Join the Waitlist](https://go.pipelex.com/waitlist){ .md-button .md-button--primary }
-[Documentation](https://docs.pipelex.com/pre-release){ .md-button }
+[Documentation](https://docs.pipelex.com){ .md-button }

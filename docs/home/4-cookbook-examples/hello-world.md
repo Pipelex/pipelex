@@ -8,8 +8,7 @@ It's the perfect starting point to verify your installation and get a first tast
 
 You can find the complete code for this example in the Pipelex Cookbook repository.
 
-<!-- PRERELEASE_LINK -->
-[**➡️ View on GitHub: examples/a_quick_start/hello_world.py**](https://github.com/Pipelex/pipelex-cookbook/blob/feature/Chicago/examples/a_quick_start/hello_world.py)
+[**➡️ View on GitHub: examples/a_quick_start/hello_world.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/a_quick_start/hello_world.py)
 
 ## The Pipeline Explained
 
@@ -70,7 +69,7 @@ Write a haiku about Hello World.
 1.  Clone the cookbook repository:
     ```bash
     # PRERELEASE_LINK
-    git clone -b feature/Chicago https://github.com/Pipelex/pipelex-cookbook.git
+    git clone https://github.com/Pipelex/pipelex-cookbook.git
     cd pipelex-cookbook
     ```
 2.  Install dependencies:
