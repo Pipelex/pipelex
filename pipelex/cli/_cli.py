@@ -11,9 +11,9 @@ from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cli.commands.run_cmd import run_cmd
+from pipelex.cli.commands.run.app import run_app
 from pipelex.cli.commands.show_cmd import show_app
-from pipelex.cli.commands.validate_cmd import validate_cmd
+from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
@@ -166,10 +166,12 @@ def doctor_command(
 app.add_typer(
     build_app, name="build", help="Generate AI methods from natural language requirements: pipelines in .mthds format and python code to run them"
 )
-app.command(name="validate", help="Validate pipes: static validation for syntax and dependencies, dry-run execution for logic and consistency")(
-    validate_cmd
+app.add_typer(
+    validate_app,
+    name="validate",
+    help="Validate a method or pipe: static validation for syntax and dependencies, dry-run execution for logic and consistency",
 )
-app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.mthds)")(run_cmd)
+app.add_typer(run_app, name="run", help="Run a method or pipe, optionally providing a specific bundle file (.mthds)")
 app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
 app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)

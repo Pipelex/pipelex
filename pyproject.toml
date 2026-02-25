@@ -28,7 +28,7 @@ dependencies = [
   "json2html>=1.3.0",
   "kajson==0.3.1",
   "markdown>=3.6",
-  "mthds>=0.0.3",
+  "mthds>=0.0.5",
   "networkx>=3.4.2",
   "openai>=1.108.1",
   "opentelemetry-api",
@@ -53,6 +53,9 @@ dependencies = [
   "typer>=0.16.0",
   "typing-extensions>=4.13.2",
 ]
+
+[tool.uv.sources]
+mthds = { path = "../../mthds-ai/clis/mthds-python", editable = true }
 
 [project.urls]
 Homepage = "https://pipelex.com"

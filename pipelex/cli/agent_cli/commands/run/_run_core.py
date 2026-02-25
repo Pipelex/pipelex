@@ -1,0 +1,133 @@
+"""Core logic for running a pipeline in the agent CLI."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+from pipelex.config import get_config
+from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+from pipelex.pipeline.runner import PipelexRunner
+from pipelex.tools.misc.json_utils import clean_json_dumps
+
+
+async def run_pipeline_core(
+    pipe_code: str,
+    mthds_content: str | None = None,
+    bundle_uri: str | None = None,
+    inputs: dict[str, Any] | None = None,
+    dry_run: bool = False,
+    mock_inputs: bool = False,
+    library_dirs: list[str] | None = None,
+    graph: bool = False,
+) -> dict[str, Any]:
+    """Core logic for running a pipeline and returning JSON-serializable output.
+
+    Args:
+        pipe_code: The pipe code to run.
+        mthds_content: MTHDS content string (optional).
+        bundle_uri: Bundle file path (optional).
+        inputs: Input dictionary for the pipeline.
+        dry_run: Whether to run in dry mode (no actual inference calls).
+        mock_inputs: Whether to generate mock data for missing inputs.
+        library_dirs: List of library directories to search for pipe definitions.
+        graph: Whether to generate execution graph visualizations.
+
+    Returns:
+        Dictionary with execution results suitable for JSON serialization.
+
+    Raises:
+        PipelineExecutionError: If the pipeline execution fails.
+    """
+    pipe_run_mode = PipeRunMode.DRY if dry_run else None
+
+    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        generate_graph=graph,
+        mock_inputs=mock_inputs or None,
+    )
+
+    runner = PipelexRunner(
+        bundle_uri=bundle_uri,
+        pipe_run_mode=pipe_run_mode,
+        execution_config=execution_config,
+        library_dirs=library_dirs,
+    )
+    response = await runner.execute_pipeline(
+        pipe_code=pipe_code,
+        mthds_content=mthds_content,
+        inputs=inputs,
+    )
+    pipe_output = response.pipe_output
+
+    main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+    main_stuff_json: dict[str, Any] = {}
+    if main_stuff:
+        main_stuff_json = {
+            "json": await main_stuff.content.rendered_json_async(),
+            "markdown": await main_stuff.content.rendered_markdown_async(),
+            "html": await main_stuff.content.rendered_html_async(),
+        }
+
+    result: dict[str, Any] = {
+        "success": True,
+        "pipe_code": pipe_code,
+        "dry_run": dry_run,
+        "main_stuff": main_stuff_json,
+        "working_memory": pipe_output.working_memory.smart_dump(),
+    }
+
+    # Determine output directory: next to the bundle, or pipelex-wip/ fallback
+    output_dir: Path
+    if bundle_uri:
+        output_dir = Path(bundle_uri).parent
+    else:
+        output_dir = Path("pipelex-wip")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Generate and save graph visualizations if requested
+    if graph and pipe_output.graph_spec:
+        graph_config = execution_config.graph_config
+        # Enable ReactFlow HTML output and data inclusion for the render
+        render_graph_config = graph_config.model_copy(
+            update={
+                "data_inclusion": graph_config.data_inclusion.model_copy(
+                    update={
+                        "stuff_json_content": True,
+                        "stuff_text_content": True,
+                        "stuff_html_content": True,
+                    }
+                ),
+                "graphs_inclusion": graph_config.graphs_inclusion.model_copy(
+                    update={
+                        "graphspec_json": False,
+                        "mermaidflow_html": False,
+                        "reactflow_html": True,
+                    }
+                ),
+            }
+        )
+
+        graph_outputs = await generate_graph_outputs(
+            graph_spec=pipe_output.graph_spec,
+            graph_config=render_graph_config,
+            pipe_code=pipe_code,
+        )
+
+        saved_files = save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
+
+        # Rename reactflow.html to mode-aware filename
+        graph_filename = "dry_run.html" if dry_run else "live_run.html"
+        reactflow_path = saved_files.get("reactflow_html")
+        if reactflow_path:
+            final_path = reactflow_path.parent / graph_filename
+            reactflow_path.rename(final_path)
+            result["graph_files"] = {"graph_html": str(final_path)}
+
+    # Save output JSON after all result fields are populated
+    output_filename = "dry_run.json" if dry_run else "live_run.json"
+    output_path = output_dir / output_filename
+    output_path.write_text(clean_json_dumps(result, indent=2), encoding="utf-8")
+    result["output_file"] = str(output_path)
+
+    return result

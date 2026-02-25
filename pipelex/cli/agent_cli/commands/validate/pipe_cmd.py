@@ -1,4 +1,4 @@
-"""Agent CLI validate command - simplified pipeline validation with JSON output."""
+"""Agent CLI validate pipe command - validate pipes/bundles with JSON output."""
 
 import asyncio
 from pathlib import Path
@@ -8,162 +8,25 @@ import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
+from pipelex.cli.agent_cli.commands.validate._validate_core import (
+    validate_all_core,
+    validate_bundle_core,
+    validate_pipe_core,
+    validate_pipe_in_bundle_core,
+)
 from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.helpers import is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle
-from pipelex.hub import (
-    get_library_manager,
-    get_required_pipe,
-    resolve_library_dirs,
-    set_current_library,
-)
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
-from pipelex.pipe_run.dry_run import dry_run_pipe, dry_run_pipes
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.pipeline.validate_bundle import ValidateBundleError, validate_bundle
+from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 
 
-async def _validate_all_core(
-    library_dirs: list[Path] | None = None,
-) -> dict[str, Any]:
-    """Validate all pipes in all libraries.
-
-    Args:
-        library_dirs: List of library directories to search for pipe definitions.
-
-    Returns:
-        Dictionary with validation results suitable for JSON serialization.
-
-    Raises:
-        ValidateBundleError: If validation fails.
-    """
-    library_manager = get_library_manager()
-    library_id, library = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    effective_dirs, _ = resolve_library_dirs(library_dirs)
-
-    if effective_dirs:
-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
-
-    pipes = library.pipe_library.get_pipes()
-    for the_pipe in pipes:
-        the_pipe.validate_with_libraries()
-
-    await dry_run_pipes(pipes=pipes, raise_on_failure=True)
-
-    validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in pipes]
-
-    return {
-        "success": True,
-        "validated_pipes": validated_pipes,
-        "total_pipes": len(pipes),
-    }
-
-
-async def _validate_bundle_core(
-    bundle_path: Path,
-    library_dirs: list[Path] | None = None,
-) -> dict[str, Any]:
-    """Validate a bundle file.
-
-    Args:
-        bundle_path: Path to the bundle file.
-        library_dirs: List of library directories to search for pipe definitions.
-
-    Returns:
-        Dictionary with validation results suitable for JSON serialization.
-
-    Raises:
-        ValidateBundleError: If validation fails.
-    """
-    result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
-
-    validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in result.pipes]
-
-    return {
-        "success": True,
-        "bundle_path": str(bundle_path),
-        "validated_pipes": validated_pipes,
-        "total_pipes": len(result.pipes),
-    }
-
-
-async def _validate_pipe_core(
-    pipe_code: str,
-    library_dirs: list[Path] | None = None,
-) -> dict[str, Any]:
-    """Validate a single pipe.
-
-    Args:
-        pipe_code: The pipe code to validate.
-        library_dirs: List of library directories to search for pipe definitions.
-
-    Returns:
-        Dictionary with validation results suitable for JSON serialization.
-
-    Raises:
-        ValidateBundleError: If validation fails.
-    """
-    library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    effective_dirs, _ = resolve_library_dirs(library_dirs)
-
-    if effective_dirs:
-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
-
-    the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
-
-    return {
-        "success": True,
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
-        "total_pipes": 1,
-    }
-
-
-async def _validate_pipe_in_bundle_core(
-    bundle_path: Path,
-    pipe_code: str,
-    library_dirs: list[Path] | None = None,
-) -> dict[str, Any]:
-    """Validate a single pipe within a bundle.
-
-    This first validates the bundle to load its pipes into the library,
-    then validates only the specified pipe.
-
-    Args:
-        bundle_path: Path to the bundle file.
-        pipe_code: The pipe code to validate within the bundle.
-        library_dirs: List of library directories to search for pipe definitions.
-
-    Returns:
-        Dictionary with validation results suitable for JSON serialization.
-
-    Raises:
-        ValidateBundleError: If validation fails.
-    """
-    # Validate the bundle to load all its pipes into the library
-    # This ensures all dependencies are available
-    await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
-
-    # Now get the specific pipe and dry-run only that one
-    the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
-
-    return {
-        "success": True,
-        "bundle_path": str(bundle_path),
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
-        "total_pipes": 1,
-    }
-
-
-def validate_cmd(
+def validate_pipe_cmd(
     ctx: typer.Context,
     target: Annotated[
         str | None,
@@ -203,12 +66,10 @@ def validate_cmd(
     Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
 
     Examples:
-        pipelex-agent validate my_pipe
-        pipelex-agent validate my_bundle.mthds
-        pipelex-agent validate my_bundle.mthds --graph
-        pipelex-agent validate my_bundle.mthds --graph --format both
-        pipelex-agent validate my_bundle.mthds --graph --direction left_to_right
-        pipelex-agent validate --all -L ./my_pipes
+        pipelex-agent validate pipe my_pipe
+        pipelex-agent validate pipe my_bundle.mthds
+        pipelex-agent validate pipe my_bundle.mthds --graph
+        pipelex-agent validate pipe --all -L ./my_pipes
     """
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
     # Handle --all flag
@@ -221,7 +82,7 @@ def validate_cmd(
         make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"])
 
         try:
-            result = asyncio.run(_validate_all_core(library_dirs=library_dirs))
+            result = asyncio.run(validate_all_core(library_dirs=library_dirs))
             agent_success(result)
 
         except ValidateBundleError as exc:
@@ -298,13 +159,13 @@ def validate_cmd(
     try:
         if bundle_path and pipe_code:
             # Validate a specific pipe within a bundle
-            result = asyncio.run(_validate_pipe_in_bundle_core(bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs))
+            result = asyncio.run(validate_pipe_in_bundle_core(bundle_path=bundle_path, pipe_code=pipe_code, library_dirs=library_dirs))
         elif bundle_path:
             # Validate the entire bundle
-            result = asyncio.run(_validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs))
+            result = asyncio.run(validate_bundle_core(bundle_path=bundle_path, library_dirs=library_dirs))
         else:
             # Validate a standalone pipe
-            result = asyncio.run(_validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))  # type: ignore[arg-type]
+            result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))  # type: ignore[arg-type]
 
         # Generate graph if requested and validation succeeded with a bundle
         if graph and bundle_path:
