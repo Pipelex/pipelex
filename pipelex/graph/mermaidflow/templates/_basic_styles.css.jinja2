@@ -1,0 +1,54 @@
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: var(--bg-color, #f5f5f5);
+    transition: background-color 0.3s;
+}
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+h1 {
+    color: var(--text-color, #333);
+    margin: 0;
+    transition: color 0.3s;
+}
+.theme-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.theme-selector label {
+    font-size: 14px;
+    color: var(--label-color, #666);
+    transition: color 0.3s;
+}
+.theme-selector select {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #ccc);
+    background: var(--select-bg, white);
+    color: var(--text-color, #333);
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+.theme-selector select:hover {
+    border-color: var(--border-hover, #999);
+}
+.mermaid-container {
+    background-color: var(--container-bg, white);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s;
+}
+.mermaid {
+    display: flex;
+    justify-content: center;
+}
+
+

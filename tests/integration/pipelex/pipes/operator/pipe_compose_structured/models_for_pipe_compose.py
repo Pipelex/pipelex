@@ -2,6 +2,7 @@
 
 from pydantic import Field
 
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
@@ -9,7 +10,6 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 
@@ -252,7 +252,7 @@ class LocationHolder(StructuredContent):
 
 
 # ============================================================================
-# Models for StuffContent subclass testing (ImageContent, PDFContent, etc.)
+# Models for StuffContent subclass testing (ImageContent, DocumentContent, etc.)
 # ============================================================================
 
 
@@ -265,11 +265,11 @@ class ImageGallery(StructuredContent):
 
 
 class DocumentArchive(StructuredContent):
-    """Archive with PDFContent fields."""
+    """Archive with DocumentContent fields."""
 
     archive_name: str = Field(description="Name of the archive")
-    main_document: PDFContent = Field(description="Main PDF document")
-    supplementary_doc: PDFContent | None = Field(default=None, description="Optional supplementary document")
+    main_document: DocumentContent = Field(description="Main document")
+    supplementary_doc: DocumentContent | None = Field(default=None, description="Optional supplementary document")
 
 
 class Metrics(StructuredContent):
@@ -313,7 +313,7 @@ class MixedMediaReport(StructuredContent):
 
     report_title: str = Field(description="Report title")
     cover_image: ImageContent = Field(description="Cover image")
-    document: PDFContent = Field(description="Associated PDF document")
+    document: DocumentContent = Field(description="Associated document")
     view_count: NumberContent = Field(description="View count metric")
 
 
@@ -325,7 +325,7 @@ class ImageListGallery(StructuredContent):
 
 
 class DocumentBundle(StructuredContent):
-    """Bundle with a list of PDFContent."""
+    """Bundle with a list of DocumentContent."""
 
     bundle_name: str = Field(description="Bundle name")
-    documents: list[PDFContent] = Field(description="List of PDF documents")
+    documents: list[DocumentContent] = Field(description="List of documents")

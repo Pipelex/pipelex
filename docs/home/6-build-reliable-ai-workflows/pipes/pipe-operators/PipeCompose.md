@@ -1,29 +1,139 @@
 # PipeCompose
 
-The `PipeCompose` operator is a powerful utility for rendering [Jinja2 templates](https://jinja.palletsprojects.com/). It allows you to dynamically generate text by combining data from your pipeline's working memory with a template. This is ideal for creating formatted reports, HTML content, or constructing complex, multi-part prompts for LLMs.
+The `PipeCompose` operator composes data from your pipeline's working memory into new outputs. It supports two modes:
 
-## How it works
+1. **Template mode**: Render Jinja2 templates to produce `Text` or `Html` output
+2. **Construct mode**: Build structured objects by mapping fields from inputs
 
-`PipeCompose` takes all the data currently in the `WorkingMemory` and uses it as the context for rendering a Jinja2 template. The resulting text is then saved back to the working memory as a new `Text` output.
+## Template Mode
 
-The template itself can be provided in one of two ways:
-1.  **By Name**: Referring to a template file that has been loaded into Pipelex's template provider. This is the most common and maintainable method.
-2.  **Inline**: Providing the template as a multi-line string directly in the `.plx` file.
+Template mode uses [Jinja2 templates](https://jinja.palletsprojects.com/) to dynamically generate text by combining data from working memory. This is ideal for creating formatted reports, HTML content, or constructing complex, multi-part prompts for LLMs.
 
-### Templating Context
+### How Template Mode Works
+
+`PipeCompose` takes all the data currently in the `WorkingMemory` and uses it as the context for rendering a Jinja2 template. The resulting text is then saved back to the working memory as a new `Text` or `Html` output.
+
+The template can be provided as:
+
+- **Inline string**: A template string directly in the pipe definition
+- **Template section**: A `[pipe.name.template]` section with additional configuration
+
+### Template Context
 
 The Jinja2 template has access to all the "stuffs" currently in the working memory. You can access them by the names they were given in previous pipeline steps. For example, if a previous step produced an output named `user_profile`, you can access its attributes in the template like `{{ user_profile.name }}` or `{{ user_profile.email }}`.
 
-## Configuration
+### Template Mode Configuration
 
-`PipeCompose` is configured in your pipeline's `.plx` file.
+| Parameter       | Type            | Description                                                                 | Required |
+| --------------- | --------------- | --------------------------------------------------------------------------- | -------- |
+| `type`          | string          | The type of the pipe: `PipeCompose`                                         | Yes      |
+| `description`   | string          | A description of the operation                                              | Yes      |
+| `inputs`        | table           | Input variables needed for the template                                     | Yes      |
+| `output`        | string          | The concept for the output (typically `Text` or `Html`)                     | No       |
+| `template`      | string          | An inline Jinja2 template string                                            | Yes*     |
 
-### PLX Parameters
+*Either `template` (inline) or a `[pipe.name.template]` section must be provided.
 
-| Parameter       | Type            | Description                                                                                               | Required                    |
-| --------------- | --------------- | --------------------------------------------------------------------------------------------------------- | --------------------------- |
-| `type`          | string          | The type of the pipe: `PipeCompose`                                                                       | Yes                         |
-| `description`   | string          | A description of the Jinja2 operation.                                                                   | Yes                         |
-| `output`        | string          | The concept for the output. Defaults to `native.Text`.                                                    | No                          |
-| `template`        | string          | An inline Jinja2 template string.                                                                         | Yes       |
-| `extra_context` | table (dict)    | A table of key-value pairs to add to the rendering context, making them available as variables in the template. | No                          |
+### Template Mode Examples
+
+**Simple inline template:**
+
+```toml
+[pipe.compose_greeting]
+type = "PipeCompose"
+description = "Compose a greeting message"
+inputs = { user = "User" }
+output = "Text"
+template = "Hello $user.name, welcome to our platform!"
+```
+
+**HTML template with section:**
+
+```toml
+[pipe.format_html_report]
+type = "PipeCompose"
+description = "Format data as HTML"
+inputs = { summary = "Text", items = "Item[]" }
+output = "Html"
+
+[pipe.format_html_report.template]
+category = "html"
+template = """
+<h1>Report</h1>
+<p>{{ summary }}</p>
+<ul>
+{% for item in items %}
+  <li>{{ item.name }}: {{ item.value }}</li>
+{% endfor %}
+</ul>
+"""
+```
+
+## Construct Mode
+
+Construct mode builds structured objects by mapping fields from inputs. Use this when you need to assemble a complex output concept from multiple inputs without using an LLM.
+
+### How Construct Mode Works
+
+Instead of rendering a template, construct mode creates a structured object by specifying how each field should be populated. Fields can be:
+
+- **Referenced from inputs**: Copy a value from working memory
+- **Templated**: Generate a string using template interpolation
+- **Fixed**: Use a static value
+
+### Construct Mode Configuration
+
+| Parameter     | Type   | Description                                               | Required |
+| ------------- | ------ | --------------------------------------------------------- | -------- |
+| `type`        | string | The type of the pipe: `PipeCompose`                       | Yes      |
+| `description` | string | A description of the operation                            | Yes      |
+| `inputs`      | table  | Input variables needed for the construct                  | Yes      |
+| `output`      | string | The structured concept to output                          | Yes      |
+| `construct`   | section| Field mappings (see below)                                | Yes*     |
+
+*Either `template` or `construct` must be provided, but not both.
+
+### Construct Field Methods
+
+Each field in the `[pipe.name.construct]` section can use one of these methods:
+
+| Method | Syntax | Description |
+|--------|--------|-------------|
+| Reference | `{ from = "input.field" }` | Copy value from input variable or nested field |
+| Template | `{ template = "text with $var" }` | Generate string using template interpolation |
+| Fixed | `"value"` or `123` or `true` | Use a static value directly |
+
+### Construct Mode Example
+
+```toml
+[pipe.assemble_invoice]
+type = "PipeCompose"
+description = "Assemble invoice from order and customer data"
+inputs = { order = "Order", customer = "Customer" }
+output = "Invoice"
+
+[pipe.assemble_invoice.construct]
+invoice_number = { template = "INV-$order.id" }
+customer_name = { from = "customer.name" }
+customer_email = { from = "customer.email" }
+line_items = { from = "order.items" }
+total = { from = "order.total" }
+status = "pending"
+version = 1
+```
+
+In this example:
+
+- `invoice_number` is generated from a template using the order ID
+- `customer_name`, `customer_email`, `line_items`, and `total` are copied from inputs
+- `status` and `version` are fixed values
+
+## Choosing Between Modes
+
+| Use Case | Mode |
+|----------|------|
+| Generate text reports, emails, prompts | Template |
+| Create HTML content | Template |
+| Assemble structured data from multiple sources | Construct |
+| Combine fields from different inputs into one object | Construct |
+| Need to map/rename fields | Construct |

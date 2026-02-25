@@ -12,6 +12,7 @@ from pipelex.tools.uri.resolved_uri import (
     UriKind,
 )
 from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.urls import URLs
 
 
 class TestResolveUriHttpUrls:
@@ -19,7 +20,7 @@ class TestResolveUriHttpUrls:
 
     def test_resolve_https_url(self) -> None:
         """Test that HTTPS URLs are resolved_uri to ResolvedHttpUrl."""
-        uri = "https://example.com/image.png"
+        uri = URLs.png_example_1
 
         resolved_uri = resolve_uri(uri)
 
@@ -30,7 +31,7 @@ class TestResolveUriHttpUrls:
 
     def test_resolve_http_url(self) -> None:
         """Test that HTTP URLs are resolved_uri to ResolvedHttpUrl."""
-        uri = "http://example.com/path/to/file.txt"
+        uri = URLs.txt_example
 
         resolved_uri = resolve_uri(uri)
 

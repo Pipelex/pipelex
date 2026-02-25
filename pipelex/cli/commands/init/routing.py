@@ -3,6 +3,7 @@
 import os
 from typing import Any, cast
 
+from rich.markup import escape
 from rich.prompt import Confirm
 from tomlkit import table
 
@@ -90,21 +91,21 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
         backend_options = get_backend_options_from_toml(template_backends_path, backends_toml_path)
 
-        # Case 1: pipelex_gateway is enabled - use pipelex_gateway_first
+        # Case 1: pipelex_gateway is enabled - use all_pipelex_gateway
         if PipelexBackend.GATEWAY in selected_backend_keys:
             profiles: dict[str, dict[str, Any]] = toml_doc.get("profiles") or {}  # type: ignore[assignment]
 
-            # Migrate legacy pipelex_first profile to pipelex_gateway_first
+            # Migrate legacy pipelex_first profile to all_pipelex_gateway
             if PipelexRoutingProfile.PIPELEX_FIRST in profiles:
                 legacy_profile = cast("dict[str, Any]", profiles[PipelexRoutingProfile.PIPELEX_FIRST])
                 _migrate_profile_to_official_backend(legacy_profile)
-                # Rename the profile from pipelex_first to pipelex_gateway_first
-                profiles[PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST] = legacy_profile
+                # Rename the profile from pipelex_first to all_pipelex_gateway
+                profiles[PipelexRoutingProfile.ALL_PIPELEX_GATEWAY] = legacy_profile
                 del profiles[PipelexRoutingProfile.PIPELEX_FIRST]
 
-            toml_doc["active"] = PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST
+            toml_doc["active"] = PipelexRoutingProfile.ALL_PIPELEX_GATEWAY
             save_toml_to_path(toml_doc, routing_profiles_toml_path)
-            display_routing_profile_result(console, PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST, created=False)
+            display_routing_profile_result(console, PipelexRoutingProfile.ALL_PIPELEX_GATEWAY, created=False)
             return
 
         # Case 2: Only one backend selected - use all_{backend_key} profile
@@ -202,5 +203,5 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         console.print("[dim]You can further customize which models get used on which backend by editing the routes section.[/dim]")
 
     except Exception as exc:
-        console.print(f"[yellow]⚠ Warning: Failed to customize routing profile: {exc}[/yellow]")
+        console.print(f"[yellow]⚠ Warning: Failed to customize routing profile: {escape(str(exc))}[/yellow]")
         console.print("[dim]You can manually edit .pipelex/inference/routing_profiles.toml later[/dim]")

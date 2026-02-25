@@ -1,6 +1,6 @@
 """Unit tests for ConstructBlueprint - the container for field blueprints.
 
-ConstructBlueprint is parsed from the `[pipe.name.construct]` section in PLX files.
+ConstructBlueprint is parsed from the `[pipe.name.construct]` section in MTHDS files.
 """
 
 from typing import Any, ClassVar
@@ -197,6 +197,30 @@ class TestConstructBlueprintFieldAccess:
         assert "total" in field_names
         assert "billing_address" in field_names
         assert len(field_names) == 3
+
+
+class TestConstructBlueprintRequiredVariables:
+    """Tests for get_required_variables method edge cases."""
+
+    def test_get_required_variables_filters_internal_variables(self):
+        """Internal variables (_, preliminary_text, place_holder) should be filtered out."""
+        raw = {
+            "output": {"template": "{{ _internal }} {{ preliminary_text }} {{ place_holder }} {{ user_data }}"},
+        }
+        blueprint = ConstructBlueprint.make_from_raw(raw)
+        required_vars = blueprint.get_required_variables()
+
+        assert "user_data" in required_vars
+        assert "_internal" not in required_vars
+        assert "preliminary_text" not in required_vars
+        assert "place_holder" not in required_vars
+
+    def test_get_required_variables_fixed_only_returns_empty(self):
+        """Construct with only fixed values requires no variables."""
+        raw = {"title": "Fixed Title", "count": 42}
+        blueprint = ConstructBlueprint.make_from_raw(raw)
+
+        assert blueprint.get_required_variables() == set()
 
 
 class TestConstructBlueprintValidation:

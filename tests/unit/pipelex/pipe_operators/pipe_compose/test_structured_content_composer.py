@@ -7,7 +7,7 @@ according to their composition methods, and produces a StructuredContent instanc
 from typing import Any, Callable, ClassVar, get_origin
 
 import pytest
-from pydantic import Field, ValidationError
+from pydantic import Field
 
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.exceptions import WorkingMemoryStuffNotFoundError
@@ -18,6 +18,7 @@ from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
+from pipelex.pipe_operators.compose.exceptions import StructuredContentComposerValidationError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
@@ -339,6 +340,40 @@ class TestStructuredContentComposerErrors:
         with pytest.raises(WorkingMemoryStuffNotFoundError):
             await composer.compose()
 
+    async def test_invalid_dotted_path_raises_value_error(self, load_empty_library: Callable[[], None]):
+        """Test that an invalid dotted path raises StructuredContentComposerValueError.
+
+        This ensures that typos in dotted paths (e.g., deal.nonexistent_field) are
+        surfaced as errors and not silently swallowed during validation.
+        """
+        load_empty_library()
+        deal = Deal(customer_name="Acme Corp", amount=50000.0)
+        working_memory = WorkingMemoryFactory.make_from_single_stuff(
+            stuff=StuffFactory.make_stuff(
+                concept=get_native_concept(NativeConceptCode.TEXT),
+                content=deal,
+                name="deal",
+            ),
+        )
+
+        blueprint = ConstructBlueprint.make_from_raw(
+            {
+                "report_title": {"from": "deal.customer_name"},
+                "customer_name": {"from": "deal.custmer_name"},  # Typo: missing 'o' in customer
+                "deal_value": {"from": "deal.amount"},
+                "summary_text": "Test summary",
+            }
+        )
+
+        composer = StructuredContentComposer(
+            construct_blueprint=blueprint,
+            working_memory=working_memory,
+            output_class=SalesSummary,
+        )
+
+        with pytest.raises(StructuredContentComposerValueError, match="custmer_name"):
+            await composer.compose()
+
     async def test_type_mismatch_raises_error(self, load_empty_library: Callable[[], None]):
         """Test that type mismatch between blueprint and class raises error."""
         load_empty_library()
@@ -358,7 +393,7 @@ class TestStructuredContentComposerErrors:
             output_class=SimpleReport,
         )
 
-        with pytest.raises(ValidationError):
+        with pytest.raises(StructuredContentComposerValidationError):
             await composer.compose()
 
 

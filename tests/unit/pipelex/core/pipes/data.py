@@ -30,7 +30,7 @@ SINGLE_ITEM_NO_BRACKETS_TEST_CASES: list[tuple[str, str, str, int | bool | None]
     # Native domain tests with full concept strings
     ("native", "native.Text", "native.Text", None),
     ("native", "native.Image", "native.Image", None),
-    ("native", "native.PDF", "native.PDF", None),
+    ("native", "native.Document", "native.Document", None),
 ]
 
 # Format: (domain, requirement_str, expected_concept_ref)
@@ -45,7 +45,7 @@ FIXED_COUNT_TEST_CASES: list[tuple[str, str, str, int]] = [
     # Native domain tests
     ("native", "native.Text[5]", "native.Text", 5),
     ("native", "native.Image[3]", "native.Image", 3),
-    ("native", "native.PDF[10]", "native.PDF", 10),
+    ("native", "native.Document[10]", "native.Document", 10),
 ]
 
 # Format: (domain, requirement_str, concept_codes_from_same_domain, expected_concept_ref, expected_multiplicity, description)
@@ -53,7 +53,7 @@ CONCEPT_CODE_RESOLUTION_TEST_CASES: list[tuple[str, str, str, int | bool | None,
     # Native concepts resolved from concept code only (no multiplicity)
     ("native", "Text", "native.Text", None, "Native Text without brackets"),
     ("native", "Image[3]", "native.Image", 3, "Native Image with fixed count"),
-    ("native", "PDF[]", "native.PDF", True, "Native PDF with empty brackets"),
+    ("native", "Document[]", "native.Document", True, "Native Document with empty brackets"),
     # Native concepts with concept_codes_from_same_domain (native always takes precedence)
     ("native", "Text[5]", "native.Text", 5, "Native Text with concept codes list"),
     # Native concepts take precedence even when used with custom domain parameter
@@ -67,7 +67,7 @@ EXPLICIT_DOMAIN_IN_STRING_TEST_CASES: list[tuple[str, str, str, int | bool | Non
     # Explicitly specifying native domain in string
     ("my_domain", "native.Text", "native.Text", None),
     ("accounting", "native.Image[3]", "native.Image", 3),
-    ("test_domain", "native.PDF[]", "native.PDF", True),
+    ("test_domain", "native.Document[]", "native.Document", True),
 ]
 
 # Format: (domain, requirement_str, expected_concept_ref, expected_multiplicity)
@@ -85,7 +85,7 @@ DIFFERENT_CONCEPT_CODES_TEST_CASES: list[tuple[str, str, str]] = [
     # Native concepts
     ("native", "native.Text", "native.Text"),
     ("native", "native.Image", "native.Image"),
-    ("native", "native.PDF", "native.PDF"),
+    ("native", "native.Document", "native.Document"),
     ("native", "native.Number", "native.Number"),
     ("native", "native.Page", "native.Page"),
 ]

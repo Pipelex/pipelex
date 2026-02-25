@@ -87,8 +87,12 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
     ) -> GeneratedImageRawDetails:
         """Generate a single image using Google Gemini Image API."""
         prompt_text = img_gen_job.img_gen_prompt.positive_text
-        aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_string(img_gen_job.job_params.aspect_ratio)
-        width, height = GoogleImgGenFactory.image_size_for_aspect_ratio(img_gen_job.job_params.aspect_ratio)
+        aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_literal(img_gen_job.job_params.aspect_ratio)
+        width, height = GoogleImgGenFactory.dimensions_for_aspect_ratio_and_size(
+            model=self.inference_model.name,
+            aspect_ratio=img_gen_job.job_params.aspect_ratio,
+            size="1K",
+        )
 
         # Build image config for aspect ratio
         image_config = genai_types.ImageConfig(
@@ -99,6 +103,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         generation_config = genai_types.GenerateContentConfig(
             response_modalities=["Image"],
             image_config=image_config,
+            # seed=img_gen_job.job_params.seed,
         )
 
         # Generate content using async client

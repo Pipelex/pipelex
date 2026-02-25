@@ -9,7 +9,7 @@ from pipelex.tools.storage.exceptions import (
     StorageFileNotFoundError,
     StorageS3Error,
 )
-from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 
 
 class S3StorageProvider(StorageProviderAbstract):
@@ -86,14 +86,14 @@ class S3StorageProvider(StorageProviderAbstract):
         }
 
     @override
-    async def _load(self, key: str) -> bytes:
-        """Load bytes from an S3 object.
+    async def _load_with_metadata(self, key: str) -> StoredData:
+        """Load bytes from an S3 object with MIME type metadata.
 
         Args:
             key: Storage key (without scheme prefix).
 
         Returns:
-            The object contents as bytes.
+            StoredData containing object contents and ContentType.
 
         Raises:
             StorageFileNotFoundError: If the object does not exist.
@@ -113,7 +113,9 @@ class S3StorageProvider(StorageProviderAbstract):
                 response = await client.get_object(Bucket=self._bucket_name, Key=key)
                 async with response["Body"] as stream:
                     data: bytes = await stream.read()
-                return data
+                # Extract ContentType from S3 response
+                content_type: str | None = response.get("ContentType")
+                return StoredData(data=data, mime_type=content_type)
             except client.exceptions.NoSuchKey as exc:
                 msg = f"Object not found in S3: '{key}'"
                 raise StorageFileNotFoundError(msg) from exc
@@ -185,7 +187,7 @@ class S3StorageProvider(StorageProviderAbstract):
         return f"https://{self._bucket_name}.s3.{self._region}.amazonaws.com/{key}"
 
     @override
-    async def display_link(self, uri: str) -> str | None:
+    async def public_url(self, uri: str) -> str | None:
         """Return a URL for this storage URI.
 
         Args:

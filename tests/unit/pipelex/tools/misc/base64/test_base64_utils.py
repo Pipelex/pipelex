@@ -11,6 +11,7 @@ from pipelex.tools.misc.base64_utils import (
     strip_base64_str_if_needed,
 )
 from pipelex.tools.misc.filetype_utils import FileType
+from pipelex.urls import URLs
 from tests.cases import FileHelperTestCases, ImageTestCases
 
 
@@ -106,8 +107,8 @@ class TestBase64Utils:
     @pytest.mark.parametrize(
         "url",
         [
-            "https://example.com/image.png",
-            "http://example.com/file.jpg",
+            URLs.png_example_1,
+            URLs.jpg_example_1,
             "/path/to/file.png",
             "relative/path.jpg",
             "data:text/plain,Hello",  # No ;base64,
@@ -187,7 +188,7 @@ class TestBase64Utils:
 
     def test_returns_none_for_non_data_url(self) -> None:
         """Test that non-data URLs return None."""
-        url = "https://example.com/image.png"
+        url = URLs.png_example_1
 
         result = extract_base64_str_from_base64_url_if_possible(url)
 

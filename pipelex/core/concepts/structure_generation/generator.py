@@ -1,21 +1,49 @@
 import ast
 from datetime import datetime
 from enum import Enum
-from typing import Any, Literal, Optional
+from typing import Any, List, Literal, Optional
 
+from kajson.kajson_manager import KajsonManager
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
+from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
+from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+
+
+class ConceptClassInfo:
+    """Information about a concept's structure class for import generation."""
+
+    def __init__(self, class_name: str, module_path: str | None = None):
+        """Initialize ConceptClassInfo.
+
+        Args:
+            class_name: The name of the structure class (e.g., "Skill")
+            module_path: Optional module path where the class is defined (e.g., "myapp.structures.skill").
+                         If None, a forward reference (string) will be used.
+        """
+        self.class_name = class_name
+        self.module_path = module_path
 
 
 class StructureGenerator:
     """Generate Pydantic BaseModel classes from concept structure blueprints."""
 
     # TODO: use StrEnum instead of Enum
-    def __init__(self):
+    def __init__(
+        self,
+        concept_ref_to_class_info: dict[str, ConceptClassInfo] | None = None,
+    ):
+        """Initialize the StructureGenerator.
+
+        Args:
+            concept_ref_to_class_info: Optional mapping from concept refs to ConceptClassInfo.
+                When module_path is provided, proper import statements will be generated.
+                When module_path is None, forward references (strings) will be used.
+        """
         self.imports = {
             "from typing import Optional, List, Dict, Any, Literal",
             "from enum import Enum",
@@ -23,12 +51,16 @@ class StructureGenerator:
             "from pydantic import Field",
         }
         self.enum_definitions: dict[str, dict[str, Any]] = {}  # Store enum definitions
+        self.concept_ref_to_class_info = concept_ref_to_class_info or {}
+        # Track concept classes that need to be mocked during validation (for file generation)
+        self._concept_classes_to_mock: set[str] = set()
 
     def generate_from_structure_blueprint(
         self,
         class_name: str,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
+        description: str = "",
     ) -> tuple[str, type]:
         """Generate Python module content from structure blueprint.
 
@@ -36,6 +68,7 @@ class StructureGenerator:
             class_name: Name of the class to generate
             structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
             base_class_name: Optional base class name to inherit from (defaults to StructuredContent)
+            description: Description for the class docstring (uses class_name if empty)
 
         Returns:
             Generated Python module content, the generated class
@@ -45,7 +78,7 @@ class StructureGenerator:
 
         """
         # Generate the class
-        class_code = self._generate_class_source_code_from_blueprint(class_name, structure_blueprint, base_class_name)
+        class_code = self._generate_class_source_code_from_blueprint(class_name, structure_blueprint, base_class_name, description)
 
         # Generate the complete module with a header comment
         imports_section = "\n".join(sorted(self.imports))
@@ -56,7 +89,7 @@ class StructureGenerator:
             "\n"
             "If you want to customize this structure:\n"
             "  1. Copy this file to your own module\n"
-            "  2. Remove the 'structure' or 'refines' declaration from the concept in the PLX file\n"
+            "  2. Remove the 'structure' or 'refines' declaration from the concept in the MTHDS file\n"
             "     and declare it in inline mode (see https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/define_your_concepts/#basic-concept-definition)\n"
             "  3. Make sure your custom class is importable and registered\n"
             "\n"
@@ -156,6 +189,7 @@ class StructureGenerator:
         class_name: str,
         structure_blueprint: dict[str, ConceptStructureBlueprint],
         base_class_name: str | None = None,
+        description: str = "",
     ) -> str:
         """Generate a class definition from ConceptStructureBlueprint.
 
@@ -163,6 +197,7 @@ class StructureGenerator:
             class_name: Name of the class
             structure_blueprint: Dictionary mapping field names to their ConceptStructureBlueprint definitions
             base_class_name: Optional base class name to inherit from (defaults to StructuredContent)
+            description: Description for the class docstring (uses class_name if empty)
 
         Returns:
             Generated class code with markers for regeneration
@@ -178,9 +213,16 @@ class StructureGenerator:
                 msg = f"Native structure class '{base_class}' not found"
                 raise ConceptStructureGeneratorError(msg)
             self.imports.add(f"from {cls.__module__} import {cls.__name__}")
+        elif base_class != "StructuredContent":
+            # Check if we have module info for this custom base class in concept_ref_to_class_info
+            for class_info in self.concept_ref_to_class_info.values():
+                if class_info.class_name == base_class and class_info.module_path:
+                    self.imports.add(f"from {class_info.module_path} import {class_info.class_name}")
+                    break
 
-        # Generate class header with docstring
-        class_header = f'class {class_name}({base_class}):\n    """Generated {class_name} class"""\n'
+        # Generate class header with docstring (use class name if no description provided)
+        docstring = description or f"Generated {class_name} class"
+        class_header = f'class {class_name}({base_class}):\n    """{docstring}"""\n'
 
         # Generate fields
         field_definitions: list[str] = []
@@ -262,18 +304,37 @@ class StructureGenerator:
             case ConceptStructureBlueprintFieldType.DATE:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
+            case ConceptStructureBlueprintFieldType.CONCEPT:
+                return self._resolve_concept_ref_to_type(field_blueprint.concept_ref)
             case ConceptStructureBlueprintFieldType.LIST:
                 item_type = field_blueprint.item_type or "Any"
+                # Handle list of concepts
+                if item_type == "concept" and field_blueprint.item_concept_ref:
+                    resolved_type = self._resolve_concept_ref_to_type(field_blueprint.item_concept_ref)
+                    return f"List[{resolved_type}]"
                 # Recursively handle item types if they're FieldType enums
                 try:
                     item_type_enum = ConceptStructureBlueprintFieldType(item_type)
-                    if item_type_enum == ConceptStructureBlueprintFieldType.DICT:
-                        item_blueprint = ConceptStructureBlueprint(description="lorem ipsum", type=item_type_enum, key_type="str", value_type="Any")
-                        item_type = self._get_python_type_from_blueprint(item_blueprint)
-                    else:
-                        # Create a temporary blueprint for the item type
-                        item_blueprint = ConceptStructureBlueprint(description="lorem ipsum", type=item_type_enum)
-                        item_type = self._get_python_type_from_blueprint(item_blueprint)
+                    match item_type_enum:
+                        case ConceptStructureBlueprintFieldType.DICT:
+                            item_blueprint = ConceptStructureBlueprint(
+                                description="lorem ipsum", type=item_type_enum, key_type="str", value_type="Any"
+                            )
+                            item_type = self._get_python_type_from_blueprint(item_blueprint)
+                        case ConceptStructureBlueprintFieldType.CONCEPT:
+                            # This case is handled above with item_concept_ref
+                            pass
+                        case (
+                            ConceptStructureBlueprintFieldType.TEXT
+                            | ConceptStructureBlueprintFieldType.NUMBER
+                            | ConceptStructureBlueprintFieldType.INTEGER
+                            | ConceptStructureBlueprintFieldType.BOOLEAN
+                            | ConceptStructureBlueprintFieldType.DATE
+                            | ConceptStructureBlueprintFieldType.LIST
+                        ):
+                            # Create a temporary blueprint for the item type
+                            item_blueprint = ConceptStructureBlueprint(description="lorem ipsum", type=item_type_enum)
+                            item_type = self._get_python_type_from_blueprint(item_blueprint)
                 except ValueError:
                     # Keep as string if not a known FieldType
                     pass
@@ -288,6 +349,51 @@ class StructureGenerator:
                 except ValueError:
                     pass
                 return f"Dict[{key_type}, {value_type}]"
+
+    def _resolve_concept_ref_to_type(self, concept_ref: str | None) -> str:
+        """Resolve a concept reference to a Python type annotation.
+
+        Args:
+            concept_ref: The concept reference (e.g., "myapp.Customer" or "native.Html")
+
+        Returns:
+            The Python type annotation (structure class name).
+            - For native concepts: generates import and returns class name (e.g., HtmlContent)
+            - If module_path is available in concept_ref_to_class_info: generates an import,
+              tracks for mocking, returns class name directly (for file generation)
+            - Otherwise: returns a forward reference string (for runtime - resolved via model_rebuild)
+        """
+        if not concept_ref:
+            return "Any"
+
+        # Handle native concepts (e.g., "native.Html" -> HtmlContent)
+        if NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
+            # Extract the concept code (e.g., "Html" from "native.Html")
+            concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
+            try:
+                native_code = NativeConceptCode(concept_code)
+                structure_class = native_code.structure_class
+                if structure_class:
+                    self.imports.add(f"from {structure_class.__module__} import {structure_class.__name__}")
+                    return structure_class.__name__
+            except ValueError:
+                pass
+
+        # Check concept_ref_to_class_info for the concept reference
+        if concept_ref in self.concept_ref_to_class_info:
+            class_info = self.concept_ref_to_class_info[concept_ref]
+            if class_info.module_path:
+                # File generation: generate import and mock during validation
+                self.imports.add(f"from {class_info.module_path} import {class_info.class_name}")
+                self._concept_classes_to_mock.add(class_info.class_name)
+                return class_info.class_name
+            # No module path: use forward reference (resolved via model_rebuild at runtime)
+            return f'"{class_info.class_name}"'
+
+        # Default: extract concept code and use as forward reference
+        # e.g., "myapp.Customer" -> '"Customer"'
+        concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
+        return f'"{concept_code}"'
 
     def _generate_field(self, field_name: str, field_def: dict[str, Any] | str) -> str:
         """Generate a single field definition.
@@ -364,6 +470,11 @@ class StructureGenerator:
             field_type = field_type_enum
 
         # Use match/case for type handling
+        # Note: field_type is already a ConceptStructureBlueprintFieldType at this point
+        # (converted from string above if needed)
+        if not isinstance(field_type, ConceptStructureBlueprintFieldType):
+            return str(field_type)
+
         match field_type:
             case ConceptStructureBlueprintFieldType.TEXT:
                 return "str"
@@ -376,8 +487,18 @@ class StructureGenerator:
             case ConceptStructureBlueprintFieldType.DATE:
                 self.imports.add("from datetime import datetime")
                 return "datetime"
+            case ConceptStructureBlueprintFieldType.CONCEPT:
+                # Handle concept type - resolve using concept_ref from field_def
+                concept_ref = field_def.get("concept_ref")
+                return self._resolve_concept_ref_to_type(concept_ref)
             case ConceptStructureBlueprintFieldType.LIST:
                 item_type = field_def.get("item_type", "Any")
+                # Handle list of concepts
+                if item_type == "concept":
+                    item_concept_ref = field_def.get("item_concept_ref")
+                    if item_concept_ref:
+                        resolved_type = self._resolve_concept_ref_to_type(item_concept_ref)
+                        return f"List[{resolved_type}]"
                 # Check if item_type is an enum reference
                 if isinstance(item_type, str) and item_type in self.enum_definitions:
                     return f"List[{item_type}]"
@@ -407,9 +528,9 @@ class StructureGenerator:
                     except ValueError:
                         pass
                 return f"Dict[{key_type}, {value_type}]"
-            case _:
-                # Unknown FieldType, assume it's a custom type
-                return str(field_type)
+
+        # Fallback for unknown types
+        return str(field_type)
 
     def _validate_execution(
         self,
@@ -418,11 +539,6 @@ class StructureGenerator:
         base_class_name: str | None = None,
     ) -> type:
         """Validate that the code executes and creates the expected class."""
-        # Import necessary modules for the execution context
-        from typing import Any  # noqa: PLC0415
-
-        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
-
         # exec_globals with basic types but let native class imports execute naturally
         # This ensures we use the same class objects for inheritance checks
         exec_globals: dict[str, Any] = {
@@ -431,12 +547,36 @@ class StructureGenerator:
             "datetime": datetime,
             "Enum": Enum,
             "Optional": Optional,
-            "List": list,
+            "List": List,  # noqa: UP006
             "Dict": dict,
             "Any": Any,
             "Literal": Literal,
             "Field": Field,
         }
+
+        # Add all native content classes to exec_globals so they're available during validation
+        # This is needed because exec() with separate globals/locals puts imports in locals,
+        # but class annotations look in globals
+        for native_code in NativeConceptCode:
+            structure_class = native_code.structure_class
+            if structure_class:
+                exec_globals[structure_class.__name__] = structure_class
+
+        validation_code = python_code
+
+        # For file generation: create mock classes for concept references that would fail import
+        # These classes don't exist yet or their modules aren't in the path
+        for mock_class_name in self._concept_classes_to_mock:
+            # Create a mock class that inherits from StructuredContent
+            mock_class = type(mock_class_name, (StructuredContent,), {})
+            exec_globals[mock_class_name] = mock_class
+            # Remove the import line for this class from the validation code
+            # (the actual generated code will still have it)
+            lines = validation_code.split("\n")
+            filtered_lines = [
+                line for line in lines if not (line.strip().startswith("from ") and f"import {mock_class_name}" in line and "pipelex" not in line)
+            ]
+            validation_code = "\n".join(filtered_lines)
 
         # If a custom base class is specified that's not a native class, get it from the registry
         if base_class_name:
@@ -449,7 +589,7 @@ class StructureGenerator:
                 exec_globals[base_class_name] = custom_base_class  # type: ignore[assignment]
 
         exec_locals: dict[str, Any] = {}
-        exec(python_code, exec_globals, exec_locals)
+        exec(validation_code, exec_globals, exec_locals)
 
         # Verify the expected class was created
         if expected_class_name not in exec_locals:

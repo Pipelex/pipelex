@@ -307,7 +307,7 @@ class TestDictUtils:
         assert context["foo"]["bar"] == "new_value"
 
     def test_substitute_nested_in_context_conflict(self) -> None:
-        """Test error when trying to nest under a non-dict-like value."""
+        """Test error when trying to nest under an immutable value (string has __getitem__ but no __setitem__)."""
         context: dict[str, Any] = {"foo": "string_value"}
         extra_params = {"foo.bar": "new_value"}
 
@@ -316,7 +316,7 @@ class TestDictUtils:
 
         assert "foo.bar" in exc_info.value.message
         assert "foo" in exc_info.value.message
-        assert "dict-like" in exc_info.value.message
+        assert "immutable" in exc_info.value.message
 
     def test_substitute_nested_in_context_none_extra_params(self) -> None:
         """Test function works when extra_params is None."""

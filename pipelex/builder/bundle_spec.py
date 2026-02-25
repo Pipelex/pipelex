@@ -22,7 +22,7 @@ class PipelexBundleSpec(StructuredContent):
 
     Represents the top-level structure of a Pipelex bundle, which defines a domain
     with its concepts, pipes, and configuration. Bundles are the primary unit of
-    organization for Pipelex workflows, loaded from TOML files.
+    organization for Pipelex methods, loaded from TOML files.
 
     Attributes:
         domain: The domain identifier for this bundle in snake_case format.
@@ -102,14 +102,18 @@ class PipelexBundleSpec(StructuredContent):
             # Finally, create the ordered dict
             pipe = dict[str, PipeBlueprintUnion](sorted_pipe_items)
 
-        return PipelexBundleBlueprint(
-            domain=self.domain,
-            description=self.description,
-            system_prompt=self.system_prompt,
-            main_pipe=self.main_pipe,
-            pipe=pipe,
-            concept=concept,
-        )
+        try:
+            return PipelexBundleBlueprint(
+                domain=self.domain,
+                description=self.description,
+                system_prompt=self.system_prompt,
+                main_pipe=self.main_pipe,
+                pipe=pipe,
+                concept=concept,
+            )
+        except ValidationError as exc:
+            msg = f"Failed to create pipelex bundle blueprint: {format_pydantic_validation_error(exc)}"
+            raise PipelexBundleSpecBlueprintError(msg) from exc
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

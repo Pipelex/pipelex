@@ -51,14 +51,14 @@ class TestInMemoryStorageProvider:
 
         assert "should not include scheme prefix" in str(exc_info.value).lower()
 
-    async def test_display_link_returns_memory_reference(self) -> None:
-        """Test that display_link() returns a human-readable memory reference."""
+    async def test_public_url_returns_memory_reference(self) -> None:
+        """Test that public_url() returns a human-readable memory reference."""
         provider = InMemoryStorageProvider()
         test_data = b"display test"
         key = "display/test.bin"
 
         returned_uri = await provider.store(data=test_data, key=key)
-        display = await provider.display_link(uri=returned_uri)
+        display = await provider.public_url(uri=returned_uri)
 
         # Display should indicate it's in-memory storage
         assert display is None

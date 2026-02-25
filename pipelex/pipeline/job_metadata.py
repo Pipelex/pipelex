@@ -3,6 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from pipelex.graph.graph_context import GraphContext
 from pipelex.system.telemetry.otel_context import OtelContext
 from pipelex.types import StrEnum
 
@@ -46,6 +47,9 @@ class JobMetadata(BaseModel):
     # OTel context with precomputed trace/span IDs. None when telemetry is disabled.
     otel_context: OtelContext | None = None
 
+    # GraphSpec tracing context. None when graph tracing is disabled.
+    graph_context: GraphContext | None = None
+
     content_generation_job_id: str | None = None
     unit_job_id: UnitJobId | None = None
     job_category: JobCategory | None = None
@@ -62,6 +66,7 @@ class JobMetadata(BaseModel):
     def copy_with_update(
         self,
         otel_context: OtelContext | None,
+        graph_context: GraphContext | None = None,
         **updates: Any,
     ) -> "JobMetadata":
         """Create a copy of this metadata with updates applied.
@@ -70,6 +75,17 @@ class JobMetadata(BaseModel):
             otel_context: OTel context to set on the copy. Always set explicitly
                 because it's computed fresh per pipe run and should replace the parent's context
                 (even when None, e.g. in dry mode or when tracing is disabled).
+            graph_context: GraphSpec tracing context to set on the copy. If None,
+                inherits from the current context (unlike otel_context).
             **updates: Fields to update on the copy.
         """
-        return self.model_copy(deep=True, update={"otel_context": otel_context, **updates})
+        # graph_context defaults to current value if not provided (inheritance)
+        effective_graph_context = graph_context if graph_context is not None else self.graph_context
+        return self.model_copy(
+            deep=True,
+            update={
+                "otel_context": otel_context,
+                "graph_context": effective_graph_context,
+                **updates,
+            },
+        )

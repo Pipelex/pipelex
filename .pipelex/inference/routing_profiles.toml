@@ -8,50 +8,21 @@
 # Support: https://go.pipelex.com/discord
 # =========================================================================================
 
-# Which profile to use (change this to switch routing)
-# TODO: TBD
-active = "pipelex_gateway_first" # Change to "pipelex_gateway_first" after enabling gateway
+# Note: The internal backend (software-only models) is always available regardless of
+# which routing profile you select. See the documentation for details.
 
-# We recommend using the "pipelex_gateway_first" profile to get a head start with all models.
+# Which profile to use (change this to switch routing)
+active = "all_pipelex_gateway"
+
+# We recommend using the "all_pipelex_gateway" profile to get a head start with all models.
 # To use the Pipelex Gateway backend:
-# 1. Join our Discord community to get your free API key (no credit card required):
-#    Visit https://go.pipelex.com/discord and request your key in the appropriate channel
-# 2. Set the environment variable (or add it to your .env file):
-#    - Linux/macOS: export PIPELEX_GATEWAY_API_KEY="your-api-key"
-#    - Windows CMD: set PIPELEX_GATEWAY_API_KEY=your-api-key
-#    - Windows PowerShell: $env:PIPELEX_GATEWAY_API_KEY="your-api-key"
-# 3. The .pipelex/inference/backends.toml is already configured with api_key = "${PIPELEX_GATEWAY_API_KEY}"
-#    which will get the key from the environment variable.
+# 1. Get your API key at https://app.pipelex.com (free credits included)
+# 2. Add it to your .env file: PIPELEX_GATEWAY_API_KEY=your-key-here
+# 3. Run `pipelex init` and accept the Gateway terms of service
 
 # =========================================================================================
 # Routing Profiles
 # =========================================================================================
-
-[profiles.pipelex_gateway_first]
-description = "Use Pipelex Gateway backend for all its supported models"
-default = "pipelex_gateway"
-fallback_order = [
-    "pipelex_gateway",
-    "azure_openai",
-    "bedrock",
-    "google",
-    "blackboxai",
-    "mistral",
-    "fal",
-]
-
-[profiles.pipelex_gateway_first.routes]
-# Pattern matching: "model-pattern" = "backend-name"
-
-[profiles.pipelex_gateway_first.optional_routes] # Each optional route is considered only if its backend is available
-"gpt-*" = "pipelex_gateway"
-"gpt-image-1" = "openai"
-"claude-*" = "pipelex_gateway"
-"grok-*" = "pipelex_gateway"
-"gemini-*" = "pipelex_gateway"
-"*-sdxl" = "fal"
-"flux-*" = "fal"
-"mistral-ocr" = "mistral"
 
 [profiles.all_pipelex_gateway]
 description = "Use Pipelex Gateway for all its supported models"
@@ -101,6 +72,10 @@ default = "ollama"
 description = "Use OpenAI backend for all its supported models"
 default = "openai"
 
+[profiles.all_openrouter]
+description = "Use OpenRouter backend for all its supported models"
+default = "openrouter"
+
 [profiles.all_portkey]
 description = "Use Portkey backend for all its supported models"
 default = "portkey"
@@ -108,6 +83,10 @@ default = "portkey"
 [profiles.all_scaleway]
 description = "Use Scaleway backend for all its supported models"
 default = "scaleway"
+
+[profiles.all_vertexai]
+description = "Use Vertex AI backend for all its supported models"
+default = "vertexai"
 
 [profiles.all_xai]
 description = "Use xAI backend for all its supported models"

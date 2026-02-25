@@ -113,15 +113,15 @@ class TestStorageProviders:
 
         assert loaded_data == updated_data
 
-    async def test_display_link_returns_value_or_none(self, storage_provider: StorageProviderAbstract) -> None:
-        """Test that display_link returns either a valid link or None."""
+    async def test_public_url_returns_value_or_none(self, storage_provider: StorageProviderAbstract) -> None:
+        """Test that public_url returns either a valid link or None."""
         test_data = b"display link test"
         key = "display/test.bin"
 
         returned_uri = await storage_provider.store(data=test_data, key=key)
-        display = await storage_provider.display_link(uri=returned_uri)
+        display = await storage_provider.public_url(uri=returned_uri)
 
-        # display_link can return None (in-memory) or a string (local file://)
+        # public_url can return None (in-memory) or a string (local file://)
         if display is not None:
             assert isinstance(display, str)
             assert len(display) > 0

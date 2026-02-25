@@ -12,7 +12,7 @@ from pipelex.types import Self
 class PipeParallelBlueprint(PipeBlueprint):
     type: Literal["PipeParallel"] = "PipeParallel"
     pipe_category: Literal["PipeController"] = "PipeController"
-    parallels: list[SubPipeBlueprint]
+    branches: list[SubPipeBlueprint]
     add_each_output: bool = False
     combined_output: str | None = None
 
@@ -20,7 +20,7 @@ class PipeParallelBlueprint(PipeBlueprint):
     @override
     def pipe_dependencies(self) -> set[str]:
         """Return the set of pipe codes from the parallel branches."""
-        return {parallel.pipe for parallel in self.parallels}
+        return {branch.pipe for branch in self.branches}
 
     @field_validator("combined_output", mode="before")
     @classmethod

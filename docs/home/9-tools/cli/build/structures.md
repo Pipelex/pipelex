@@ -10,7 +10,7 @@ pipelex build structures <TARGET> [OPTIONS]
 
 **Arguments:**
 
-- `TARGET` - Either a library directory containing `.plx` files, or a specific `.plx` file
+- `TARGET` - Either a library directory containing `.mthds` files, or a specific `.mthds` file
 
 **Options:**
 
@@ -27,7 +27,7 @@ pipelex build structures ./my_pipelines/
 **Generate structures from a specific bundle file:**
 
 ```bash
-pipelex build structures ./my_pipeline/bundle.plx
+pipelex build structures ./my_pipeline/bundle.mthds
 ```
 
 **Generate structures to a specific output directory:**
@@ -55,7 +55,7 @@ Now you have your structures as Python code:
 
 ## Example Output
 
-For a concept defined in a `.plx` file like:
+For a concept defined in a `.mthds` file like:
 
 ```toml
 [concept.CandidateProfile]
@@ -87,5 +87,7 @@ class CandidateProfile(StructuredContent):
 
 - [Build Pipe](pipe.md) - Generate pipelines from natural language
 - [Build Runner](runner.md) - Generate Python runner scripts
+- [Build Inputs](inputs.md) - Generate example input JSON for a pipe
+- [Build Output](output.md) - Generate example output JSON for a pipe
 - [Concepts](../../../6-build-reliable-ai-workflows/concepts/define_your_concepts.md) - Understanding concept definitions
 

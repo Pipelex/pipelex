@@ -2,7 +2,7 @@ from pipelex.tools.misc.hash_utils import hash_sha256
 
 
 class PipelexDetails:
-    REMOTE_CONFIG_URL = "https://pipelex-config.s3.eu-west-3.amazonaws.com/pipelex_remote_config_02.json"
+    REMOTE_CONFIG_URL = "https://pipelex-config.s3.eu-west-3.amazonaws.com/pipelex_remote_config_04.json"
     PIPELEX_GATEWAY_API_KEY_VAR = "PIPELEX_GATEWAY_API_KEY"
 
     @classmethod
@@ -15,4 +15,4 @@ class PipelexDetails:
         Returns:
             First 16 characters of SHA256 hex digest.
         """
-        return hash_sha256(string=gateway_api_key, length=16)
+        return hash_sha256(data=gateway_api_key, length=16)

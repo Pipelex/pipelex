@@ -2,8 +2,9 @@ from pydantic import RootModel
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_bytes
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError
-from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 
 InMemoryStorageRoot = dict[str, bytes]
 
@@ -14,14 +15,14 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
     root: InMemoryStorageRoot = {}
 
     @override
-    async def _load(self, key: str) -> bytes:
-        """Load bytes from memory.
+    async def _load_with_metadata(self, key: str) -> StoredData:
+        """Load bytes from memory with MIME type metadata.
 
         Args:
             key: Storage key (without scheme prefix).
 
         Returns:
-            The stored bytes.
+            StoredData containing bytes and detected MIME type.
 
         Raises:
             StorageFileNotFoundError: If no data exists for the key.
@@ -30,8 +31,18 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
             msg = f"File not found: '{key}'"
             raise StorageFileNotFoundError(msg)
 
-        log.dev(f"Loaded data from key: '{key}'")
-        return self.root[key]
+        data = self.root[key]
+
+        # Detect MIME type from bytes
+        mime_type: str | None = None
+        try:
+            file_type = detect_file_type_from_bytes(data)
+            mime_type = file_type.mime
+        except FileTypeError:
+            pass  # MIME type detection failed, return None
+
+        log.dev(f"Loaded data with metadata from key: '{key}', mime_type={mime_type}")
+        return StoredData(data=data, mime_type=mime_type)
 
     @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
@@ -45,8 +56,8 @@ class InMemoryStorageProvider(RootModel[InMemoryStorageRoot], StorageProviderAbs
         self.root[key] = data
 
     @override
-    async def display_link(self, uri: str) -> str | None:
-        """In-memory storage cannot generate a display link.
+    async def public_url(self, uri: str) -> str | None:
+        """In-memory storage cannot generate a public URL.
 
         Args:
             uri: Full URI including pipelex-storage:// scheme.

@@ -154,7 +154,7 @@ class TestBracketNotationInOperators:
         """Test PipeExtract factory with bracket notation in output."""
         blueprint = PipeExtractBlueprint(
             description="Extract pages",
-            inputs={"document": NativeConceptCode.PDF},
+            inputs={"document": NativeConceptCode.DOCUMENT},
             output=f"{NativeConceptCode.PAGE}[]",  # Extract returns list of pages
         )
 

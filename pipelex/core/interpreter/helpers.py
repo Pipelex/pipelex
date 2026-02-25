@@ -1,4 +1,20 @@
+from pathlib import Path
+
 from pipelex.types import StrEnum
+
+MTHDS_EXTENSION = ".mthds"
+
+
+def is_pipelex_file(file_path: Path) -> bool:
+    """Check if a file is a Pipelex MTHDS file based on its extension.
+
+    Args:
+        file_path: Path to the file to check
+
+    Returns:
+        True if the file has .mthds extension, False otherwise
+    """
+    return file_path.suffix == MTHDS_EXTENSION
 
 
 class ValidationErrorScope(StrEnum):

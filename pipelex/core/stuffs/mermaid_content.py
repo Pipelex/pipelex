@@ -17,10 +17,6 @@ class MermaidContent(StuffContent):
         return f"some mermaid code ({len(self.mermaid_code)} chars)"
 
     @override
-    def __str__(self) -> str:
-        return self.mermaid_code
-
-    @override
     def rendered_plain(self) -> str:
         return self.mermaid_code
 
@@ -30,7 +26,7 @@ class MermaidContent(StuffContent):
         return render_jinja2_sync(
             template_source=template_source,
             template_category=TemplateCategory.HTML,
-            temlating_context={
+            templating_context={
                 "mermaid_code": self.mermaid_code,
             },
         )

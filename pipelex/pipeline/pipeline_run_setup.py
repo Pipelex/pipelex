@@ -1,10 +1,13 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pipelex.client.protocol import PipelineInputs
-from pipelex.config import get_config
+from mthds.client.models.pipeline_inputs import PipelineInputs
+
+from pipelex import log
+from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
     get_otel_tracer,
@@ -12,8 +15,11 @@ from pipelex.hub import (
     get_report_delegate,
     get_required_pipe,
     get_telemetry_manager,
+    resolve_library_dirs,
     set_current_library,
+    teardown_current_library,
 )
+from pipelex.pipe_run.dry_run import convert_to_working_memory_format
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -25,7 +31,7 @@ from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.exceptions import PipeExecutionError
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
-from pipelex.pipeline.validate_bundle import validate_bundle
+from pipelex.system.configuration.configs import PipelineExecutionConfig
 from pipelex.system.environment import get_optional_env
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.system.telemetry.otel_constants import OTelConstants
@@ -34,13 +40,16 @@ from pipelex.system.telemetry.otel_factory import OtelFactory
 if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
+    from pipelex.graph.graph_context import GraphContext
 
 
 async def pipeline_run_setup(
+    execution_config: PipelineExecutionConfig,
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
-    plx_content: str | None = None,
+    mthds_content: str | None = None,
+    bundle_uri: str | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
     output_multiplicity: VariableMultiplicity | None = None,
@@ -57,24 +66,32 @@ async def pipeline_run_setup(
 
     Parameters
     ----------
+    execution_config:
+        Pipeline execution configuration including graph tracing settings.
+        Must be provided by the caller (typically resolved at the entry point).
     library_id:
         Unique identifier for the library instance. If not provided, defaults to the
         auto-generated ``pipeline_run_id``. Use a custom ID when you need to manage
         multiple library instances or maintain library state across executions.
     library_dirs:
-        List of directory paths to load pipe definitions from. If not provided, loads
-        from the current working directory (the directory from which the Python script
-        is executed). Ignored when ``plx_content`` is provided.
+        List of directory paths to load pipe definitions from. Combined with directories
+        from the ``PIPELEXPATH`` environment variable (PIPELEXPATH directories are searched
+        first). When provided alongside ``mthds_content``, definitions from both sources
+        are loaded into the library.
     pipe_code:
-        Code identifying the pipe to execute. Required when ``plx_content`` is not
-        provided. When both ``plx_content`` and ``pipe_code`` are provided, the
-        specified pipe from the PLX content will be executed (overriding any
+        Code identifying the pipe to execute. Required when ``mthds_content`` is not
+        provided. When both ``mthds_content`` and ``pipe_code`` are provided, the
+        specified pipe from the MTHDS content will be executed (overriding any
         ``main_pipe`` defined in the content).
-    plx_content:
-        Complete PLX file content as a string. When provided, only this content is
-        loaded into the library, creating an isolated execution environment. The pipe
-        to execute is determined by ``pipe_code`` (if provided) or the ``main_pipe``
-        property in the PLX content.
+    mthds_content:
+        Complete MTHDS file content as a string. The pipe to execute is determined by
+        ``pipe_code`` (if provided) or the ``main_pipe`` property in the MTHDS content.
+        Can be combined with ``library_dirs`` to load additional definitions.
+    bundle_uri:
+        URI identifying the bundle. Used to detect if the bundle was already loaded
+        from library directories (e.g., via PIPELEXPATH) to avoid duplicate domain
+        registration. If provided and the resolved absolute path is already in the
+        loaded MTHDS paths, the ``mthds_content`` loading will be skipped.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -102,8 +119,8 @@ async def pipeline_run_setup(
 
     """
     user_id = user_id or OTelConstants.DEFAULT_USER_ID
-    if not plx_content and not pipe_code:
-        msg = "Either pipe_code or plx_content must be provided to the pipeline API."
+    if not mthds_content and not pipe_code:
+        msg = "Either pipe_code or mthds_content must be provided to the pipeline API."
         raise ValueError(msg)
 
     pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code)
@@ -119,29 +136,54 @@ async def pipeline_run_setup(
     pipe: PipeAbstract | None = None
     blueprint: PipelexBundleBlueprint | None = None
 
-    if plx_content:
-        validate_bundle_result = await validate_bundle(plx_content=plx_content)
-        library_manager.load_from_blueprints(library_id=library_id, blueprints=validate_bundle_result.blueprints)
-        # For now, we only support one blueprint when given a plx_content. So blueprints is of length 1.
-        blueprint = validate_bundle_result.blueprints[0]
+    effective_dirs, source_label = resolve_library_dirs(library_dirs)
+
+    if effective_dirs:
+        log.verbose(f"Loading libraries from {len(effective_dirs)} directory(ies) ({source_label}):")
+        for index_dir, dir_path in enumerate(effective_dirs):
+            log.verbose(f"  [{index_dir + 1}] {dir_path}")
+        library_manager.load_libraries(
+            library_id=library_id,
+            library_dirs=effective_dirs,
+        )
+    else:
+        log.verbose(f"No library directories to load ({source_label})")
+
+    # Then handle MTHDS content or pipe_code
+    if mthds_content:
+        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+        blueprints_to_load = [blueprint]
+
+        # Check if this bundle was already loaded from library directories
+        bundle_already_loaded = False
+        if bundle_uri:
+            try:
+                resolved_bundle_uri = Path(bundle_uri).resolve()
+            except (OSError, RuntimeError):
+                # Use str(Path(...)) to normalize the path (e.g., "./file.mthds" -> "file.mthds")
+                # to match the normalization done in library_manager._load_mthds_files_into_library
+                resolved_bundle_uri = Path(bundle_uri)
+            current_library = library_manager.get_library(library_id=library_id)
+            bundle_already_loaded = resolved_bundle_uri in current_library.loaded_mthds_paths
+            if bundle_already_loaded:
+                log.verbose(f"Bundle '{bundle_uri}' already loaded from library directories, skipping duplicate load")
+
+        if not bundle_already_loaded:
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
+
+        # For now, we only support one blueprint when given MTHDS content. So blueprints is of length 1.
+        # blueprint is already set from make_pipelex_bundle_blueprint above
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
         elif blueprint.main_pipe:
             pipe = get_required_pipe(pipe_code=blueprint.main_pipe)
         else:
-            msg = "No pipe code or main pipe in the PLX content provided to the pipeline API."
+            msg = "No pipe code or main pipe in the MTHDS content provided to the pipeline API."
             raise PipeExecutionError(message=msg)
     elif pipe_code:
-        if library_dirs:
-            library_manager.load_libraries(
-                library_id=library_id,
-                library_dirs=[Path(library_dir) for library_dir in library_dirs],
-            )
-        else:
-            library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
-        msg = "Either provide pipe_code or plx_content to the pipeline API. 'pipe_code' must be provided when 'plx_content' is None"
+        msg = "Either provide pipe_code or mthds_content to the pipeline API. 'pipe_code' must be provided when 'mthds_content' is None"
         raise PipeExecutionError(message=msg)
 
     pipe_code = pipe.code
@@ -150,69 +192,113 @@ async def pipeline_run_setup(
     if pipe.domain_code not in search_domain_codes:
         search_domain_codes.insert(0, pipe.domain_code)
 
-    working_memory: WorkingMemory | None = None
-
-    if inputs:
-        if isinstance(inputs, WorkingMemory):
-            working_memory = inputs
-        else:
-            working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
-                pipeline_inputs=inputs,
-                search_domain_codes=search_domain_codes,
-            )
-
-    # Normalize data URLs to pipelex-storage:// URIs if configured
-    if working_memory and get_config().pipelex.pipeline_execution_config.is_normalize_data_urls_to_storage:
-        working_memory = await normalize_data_urls_to_storage(working_memory)
-
-    if pipe_run_mode is None:
-        if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
-            pipe_run_mode = PipeRunMode(run_mode_from_env)
-        else:
-            pipe_run_mode = PipeRunMode.LIVE
-
-    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
-
-    # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
-    # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
-    otel_context: OtelContext | None = None
-    if pipe_run_mode.is_live and get_otel_tracer() is not None:
-        trace_id = OtelFactory.make_trace_id(pipeline_run_id=pipeline_run_id)
-        trace_name, trace_name_redacted = OtelFactory.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
-        otel_context = OtelContext(
-            trace_id=trace_id,
-            trace_name=trace_name,
-            trace_name_redacted=trace_name_redacted,
-            span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+    # Initialize graph tracing if requested (after pipe is loaded so we have domain info)
+    graph_context: GraphContext | None = None
+    if execution_config.is_generate_graph:
+        graph_tracer_manager = GraphTracerManager.get_or_create_instance()
+        graph_context = graph_tracer_manager.open_tracer(
+            graph_id=pipeline_run_id,
+            data_inclusion=execution_config.graph_config.data_inclusion,
+            pipeline_ref_domain=pipe.domain_code,
+            pipeline_ref_main_pipe=pipe_code,
         )
-        # Emit trace start event immediately to establish trace name in PostHog
-        # This must happen before any pipe spans are created/exported
-        get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
 
-    job_metadata = JobMetadata(
-        user_id=user_id,
-        pipeline_run_id=pipeline.pipeline_run_id,
-        otel_context=otel_context,
-    )
+    try:
+        working_memory: WorkingMemory | None = None
 
-    pipe_run_params = PipeRunParamsFactory.make_run_params(
-        output_multiplicity=output_multiplicity,
-        dynamic_output_concept_code=dynamic_output_concept_code,
-        pipe_run_mode=pipe_run_mode,
-    )
+        # First, process user-provided inputs
+        if inputs:
+            if isinstance(inputs, WorkingMemory):
+                working_memory = inputs
+            else:
+                working_memory = WorkingMemoryFactory.make_from_pipeline_inputs(
+                    pipeline_inputs=inputs,
+                    search_domain_codes=search_domain_codes,
+                )
 
-    pipe_job = PipeJobFactory.make_pipe_job(
-        pipe=pipe,
-        pipe_run_params=pipe_run_params,
-        job_metadata=job_metadata,
-        working_memory=working_memory,
-        output_name=output_name,
-    )
+        # If mock inputs is enabled, generate mock data for missing required inputs
+        if execution_config.is_mock_inputs:
+            needed_inputs_spec = pipe.needed_inputs()
+            needed_inputs_for_factory = convert_to_working_memory_format(needed_inputs_spec)
 
-    properties = {
-        EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
-        EventProperty.PIPE_TYPE: pipe.pipe_type,
-    }
-    get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
+            # Filter out inputs that were already provided by the user
+            if working_memory:
+                provided_names = set(working_memory.root.keys())
+                missing_inputs = [spec for spec in needed_inputs_for_factory if spec.variable_name not in provided_names]
+            else:
+                missing_inputs = needed_inputs_for_factory
+                working_memory = WorkingMemoryFactory.make_empty()
 
-    return pipe_job, pipeline_run_id, library_id
+            # Generate mock data only for missing inputs
+            if missing_inputs:
+                mock_memory = WorkingMemoryFactory.make_mock_inputs(needed_inputs=missing_inputs)
+                for name, stuff in mock_memory.root.items():
+                    working_memory.add_new_stuff(name=name, stuff=stuff)
+
+        # Normalize data URLs to pipelex-storage:// URIs if configured
+        if working_memory and execution_config.is_normalize_data_urls_to_storage and not execution_config.is_mock_inputs:
+            working_memory = await normalize_data_urls_to_storage(working_memory)
+
+        # TODO: rethink this, it's not forcing
+        if pipe_run_mode is None:
+            if run_mode_from_env := get_optional_env(key=FORCE_DRY_RUN_MODE_ENV_KEY):
+                pipe_run_mode = PipeRunMode(run_mode_from_env)
+            else:
+                pipe_run_mode = PipeRunMode.LIVE
+
+        get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
+
+        # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
+        # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
+        otel_context: OtelContext | None = None
+        if pipe_run_mode.is_live and get_otel_tracer() is not None:
+            trace_id = OtelFactory.make_trace_id(pipeline_run_id=pipeline_run_id)
+            trace_name, trace_name_redacted = OtelFactory.make_trace_names(pipeline_run_id=pipeline_run_id, pipe_code=pipe_code)
+            otel_context = OtelContext(
+                trace_id=trace_id,
+                trace_name=trace_name,
+                trace_name_redacted=trace_name_redacted,
+                span_id=OTelConstants.OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID,
+            )
+            # Emit trace start event immediately to establish trace name in PostHog
+            # This must happen before any pipe spans are created/exported
+            get_telemetry_manager().handle_trace_start(trace_name=trace_name, trace_name_redacted=trace_name_redacted, trace_id=trace_id)
+
+        job_metadata = JobMetadata(
+            user_id=user_id,
+            pipeline_run_id=pipeline.pipeline_run_id,
+            otel_context=otel_context,
+            graph_context=graph_context,
+        )
+
+        pipe_run_params = PipeRunParamsFactory.make_run_params(
+            output_multiplicity=output_multiplicity,
+            dynamic_output_concept_code=dynamic_output_concept_code,
+            pipe_run_mode=pipe_run_mode,
+        )
+
+        pipe_job = PipeJobFactory.make_pipe_job(
+            pipe=pipe,
+            pipe_run_params=pipe_run_params,
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            output_name=output_name,
+        )
+
+        properties = {
+            EventProperty.PIPELINE_RUN_ID: job_metadata.pipeline_run_id,
+            EventProperty.PIPE_TYPE: pipe.pipe_type,
+        }
+        get_telemetry_manager().track_event(event_name=EventName.PIPELINE_EXECUTE, properties=properties)
+
+        return pipe_job, pipeline_run_id, library_id
+    except Exception:
+        # Cleanup graph tracer if it was opened
+        if graph_context is not None:
+            tracer_manager = GraphTracerManager.get_instance()
+            if tracer_manager is not None:
+                tracer_manager.close_tracer(pipeline_run_id)
+        # Cleanup library
+        library_manager.teardown(library_id=library_id)
+        teardown_current_library()
+        raise

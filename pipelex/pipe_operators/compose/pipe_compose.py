@@ -5,6 +5,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
+from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
@@ -14,15 +15,15 @@ from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErr
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_class_registry, get_concept_library, get_content_generator, get_native_concept
 from pipelex.pipe_operators.compose.construct_blueprint import ConstructBlueprint
+from pipelex.pipe_operators.compose.exceptions import PipeComposeError, StructuredContentComposerValueError
 from pipelex.pipe_operators.compose.structured_content_composer import StructuredContentComposer
 from pipelex.pipe_operators.pipe_operator import PipeOperator
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
@@ -110,16 +111,23 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.is_construct_mode:
             return
 
-        # In template mode, output must be Text-compatible
-        if not get_concept_library().is_compatible(
+        # In template mode, output must be Text-compatible or Html-compatible
+        concept_library = get_concept_library()
+        is_text_compatible = concept_library.is_compatible(
             tested_concept=self.output.concept,
             wanted_concept=get_native_concept(native_concept=NativeConceptCode.TEXT),
             strict=True,
-        ):
+        )
+        is_html_compatible = concept_library.is_compatible(
+            tested_concept=self.output.concept,
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.HTML),
+            strict=True,
+        )
+        if not (is_text_compatible or is_html_compatible):
             msg = (
-                f"The output of a PipeCompose in template mode must be strictly compatible with the Text concept. "
+                f"The output of a PipeCompose in template mode must be strictly compatible with the Text or Html concept. "
                 f"In the pipe '{self.code}' the output is '{self.output.concept.concept_ref}'. "
-                "Make sure this concept refines the native Text concept, or use construct mode for StructuredContent."
+                "Make sure this concept refines the native Text or Html concept, or use construct mode for StructuredContent."
             )
             raise PipeValidationError(
                 message=msg,
@@ -127,7 +135,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 domain_code=self.domain_code,
                 pipe_code=self.code,
                 provided_concept_code=self.output.concept.concept_ref,
-                required_concept_codes=[NativeConceptCode.TEXT.concept_ref],
+                required_concept_codes=[NativeConceptCode.TEXT.concept_ref, NativeConceptCode.HTML.concept_ref],
             )
 
     @override
@@ -166,7 +174,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         output_name: str | None,
         content_generator: ContentGeneratorProtocol,
     ) -> PipeComposeOutput:
-        """Run PipeCompose in template mode (produces Text output)."""
+        """Run PipeCompose in template mode (produces Text or Html output)."""
         if self.template is None:
             msg = "Template is required for template mode"
             raise ValueError(msg)
@@ -186,12 +194,17 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
         assert isinstance(jinja2_text, str)
 
-        # Get the structure class from the registry (might be a subclass of TextContent)
+        # Get the structure class from the registry (might be a subclass of TextContent or HtmlContent)
         structure_class = get_class_registry().get_required_subclass(
             name=self.output.concept.structure_class_name,
             base_class=StuffContent,
         )
-        the_content = structure_class(text=jinja2_text)
+
+        # Construct content based on the structure class type
+        if issubclass(structure_class, HtmlContent):
+            the_content = structure_class(inner_html=jinja2_text, css_class="")
+        else:
+            the_content = structure_class(text=jinja2_text)
 
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
 
@@ -233,8 +246,13 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             runtime_params=pipe_run_params.params if pipe_run_params else None,
             extra_context=self.extra_context,
             content_generator=content_generator,
+            pipe_run_params=pipe_run_params,
         )
-        the_content = await composer.compose()
+        try:
+            the_content = await composer.compose()
+        except PipeComposeError as exc:
+            msg = f"In pipe '{self.code}' (output: {self.output.concept.code}): {exc.message}"
+            raise PipeComposeError(msg) from exc
         log.verbose(f"Composed structured content: {the_content}")
 
         output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
@@ -265,12 +283,58 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             log.verbose(f"PipeCompose: using regular operator pipe for jinja2 rendering (dry run not applied to jinja2): {self.code}")
             content_generator_used = get_content_generator()
 
-        return await self._live_run_operator_pipe(
-            job_metadata=job_metadata,
+        if self.is_construct_mode:
+            try:
+                return await self._live_run_operator_pipe(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=pipe_run_params,
+                    output_name=output_name,
+                    content_generator=content_generator_used,
+                )
+            except PipeComposeError as exc:
+                # Construct mode can fail with mock data (e.g., description-only concepts
+                # produce empty classes without the fields that dotted paths reference).
+                # Only fall back for value errors from the composer (e.g., unresolvable dotted paths),
+                # not for type incompatibility or validation errors which are legitimate failures.
+                if not isinstance(exc.__cause__, StructuredContentComposerValueError):
+                    raise
+                # Only swallow the error when running with mock inputs (e.g., graph generation).
+                # With real inputs (e.g., pipelex validate), unresolvable paths are real bugs.
+                if not get_config().pipelex.pipeline_execution_config.is_mock_inputs:
+                    raise
+                return self._make_mock_construct_output(
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    output_name=output_name,
+                )
+        else:
+            return await self._live_run_operator_pipe(
+                job_metadata=job_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+                output_name=output_name,
+                content_generator=content_generator_used,
+            )
+
+    def _make_mock_construct_output(
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        output_name: str | None,
+    ) -> PipeComposeOutput:
+        """Create a mock output for construct mode when composition fails during dry run."""
+        output_class = get_class_registry().get_required_subclass(
+            name=self.output.concept.structure_class_name,
+            base_class=StuffContent,
+        )
+        factory = DryRunFactory.make_dry_run_factory(output_class)
+        the_content = factory.build()
+        output_stuff = StuffFactory.make_stuff(concept=self.output.concept, content=the_content, name=output_name)
+        working_memory.set_new_main_stuff(stuff=output_stuff, name=output_name)
+        return PipeComposeOutput(
             working_memory=working_memory,
-            pipe_run_params=pipe_run_params or PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
-            output_name=output_name,
-            content_generator=content_generator_used,
+            pipeline_run_id=job_metadata.pipeline_run_id,
         )
 
     @override

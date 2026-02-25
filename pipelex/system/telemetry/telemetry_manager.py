@@ -15,6 +15,7 @@ from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
+from pipelex.system.telemetry.exception_capture import DualClientExceptionCapture
 from pipelex.system.telemetry.otel_constants import OTelConstants, PostHogAttr, PostHogEvent
 from pipelex.system.telemetry.otel_factory import OtelFactory
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, TelemetryRedactionConfig
@@ -45,6 +46,7 @@ class TelemetryManager(TelemetryManagerAbstract):
         self.telemetry_config = telemetry_config
         self._pipelex_telemetry_enabled = pipelex_telemetry_enabled
         self._pipelex_distinct_id: str | None = None
+        self._exception_capture: DualClientExceptionCapture | None = None
 
         # Create custom PostHog client only if user's telemetry is enabled
         self.custom_posthog_client: Posthog | None = None
@@ -117,6 +119,15 @@ class TelemetryManager(TelemetryManagerAbstract):
         posthog.privacy_mode = True
         posthog.default_client = self.custom_posthog_client or self.pipelex_posthog_client
 
+        # Set up dual-client exception autocapture if any client is enabled
+        if self.custom_posthog_client or self.pipelex_posthog_client:
+            self._exception_capture = DualClientExceptionCapture(
+                custom_posthog_client=self.custom_posthog_client,
+                custom_distinct_id=self.telemetry_config.custom_posthog.user_id,
+                pipelex_posthog_client=self.pipelex_posthog_client,
+                pipelex_distinct_id=self._pipelex_distinct_id,
+            )
+
     def _handle_transmission_error(self, error: Exception | None, _items: list[dict[str, Any]]) -> None:
         """Handle errors that occur during custom telemetry transmission.
 
@@ -181,7 +192,14 @@ class TelemetryManager(TelemetryManagerAbstract):
 
     @override
     def teardown(self):
-        # First, shutdown the TracerProvider to flush all pending spans
+        # First, restore original exception hooks to avoid capturing exceptions during shutdown
+        if self._exception_capture:
+            try:
+                self._exception_capture.close()
+            except Exception as exc:
+                log.debug(f"Error closing exception capture: {exc}")
+
+        # Then, shutdown the TracerProvider to flush all pending spans
         # This MUST happen before PostHog shutdown, otherwise spans won't be exported
         if self._tracer_provider:
             try:
@@ -277,7 +295,7 @@ class TelemetryManager(TelemetryManagerAbstract):
     def is_custom_portkey_logging_enabled(self, is_debug_configured: bool) -> bool:
         is_debug: bool = is_debug_configured
         if not is_debug and self.telemetry_config.custom_portkey.force_debug_enabled:
-            log.info("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
+            log.verbose("Force-enabling Portkey logging (debug mode) because custom_portkey.force_debug_enabled is set in telemetry configuration")
             is_debug = True
         if is_debug and is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY):
             log.warning(
@@ -304,7 +322,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             and self.telemetry_config.pipelex_gateway.portkey
             and self.telemetry_config.pipelex_gateway.portkey.force_debug_enabled
         ):
-            log.dev(
+            log.verbose(
                 "Force-enabling Portkey logging (debug mode) because pipelex_gateway.portkey.force_debug_enabled is set in telemetry configuration"
             )
             is_debug = True
@@ -324,7 +342,7 @@ class TelemetryManager(TelemetryManagerAbstract):
             and self.telemetry_config.pipelex_gateway.portkey.force_tracing_enabled
             and not is_env_var_truthy(OTelConstants.DO_NOT_TRACK_ENV_VAR_KEY)
         ):
-            log.dev(
+            log.verbose(
                 "Force-enabling Pipelex Gateway Portkey tracing "
                 "because pipelex_gateway.portkey.force_tracing_enabled is set in telemetry configuration"
             )

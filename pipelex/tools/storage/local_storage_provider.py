@@ -3,8 +3,9 @@ from pathlib import Path
 import aiofiles
 from typing_extensions import override
 
+from pipelex.tools.misc.filetype_utils import FileTypeError, detect_file_type_from_path
 from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidUriError
-from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 
 
 class LocalStorageProvider(StorageProviderAbstract):
@@ -51,14 +52,14 @@ class LocalStorageProvider(StorageProviderAbstract):
         return resolved_path
 
     @override
-    async def _load(self, key: str) -> bytes:
-        """Load bytes from a file.
+    async def _load_with_metadata(self, key: str) -> StoredData:
+        """Load bytes from a file with MIME type metadata.
 
         Args:
             key: Storage key (relative path, without scheme prefix).
 
         Returns:
-            The file contents as bytes.
+            StoredData containing file contents and detected MIME type.
 
         Raises:
             StorageFileNotFoundError: If the file does not exist.
@@ -71,7 +72,17 @@ class LocalStorageProvider(StorageProviderAbstract):
             raise StorageFileNotFoundError(msg)
 
         async with aiofiles.open(file_path, "rb") as file_handle:  # pyright: ignore[reportUnknownMemberType]
-            return await file_handle.read()
+            data = await file_handle.read()
+
+        # Detect MIME type from file path
+        mime_type: str | None = None
+        try:
+            file_type = detect_file_type_from_path(file_path)
+            mime_type = file_type.mime
+        except FileTypeError:
+            pass  # MIME type detection failed, return None
+
+        return StoredData(data=data, mime_type=mime_type)
 
     @override
     async def _store(self, data: bytes, *, key: str, content_type: str | None) -> None:
@@ -94,7 +105,7 @@ class LocalStorageProvider(StorageProviderAbstract):
             await file_handle.write(data)
 
     @override
-    async def display_link(self, uri: str) -> str:
+    async def public_url(self, uri: str) -> str:
         """Return a file:// URI for this storage URI.
 
         Args:

@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from pipelex.cogt.img_gen.img_gen_model_rules import ImgGenArgTopic, ImgGenModelRules
 from pipelex.cogt.llm.structured_output import StructureMethod
+from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
@@ -25,6 +26,7 @@ class InferenceModelSpecBlueprint(ConfigModel):
     outputs: list[str] = Field(default_factory=list)
     costs: CostsByCategoryDict | None = Field(default=None, strict=False)
     structure_method: StructureMethod | None = Field(default=None, strict=False)
+    thinking_mode: ThinkingMode = Field(default=ThinkingMode.NONE, strict=False)
     max_tokens: int | None = None
     max_prompt_images: int | None = None
     prompting_target: PromptingTarget | None = Field(default=None, strict=False)
@@ -45,6 +47,10 @@ class InferenceModelSpecBlueprint(ConfigModel):
     @field_validator("costs", mode="before")
     @staticmethod
     def validate_costs(value: dict[str, float]) -> CostsByCategoryDict:
+        negative_costs = {key: val for key, val in value.items() if val < 0}
+        if negative_costs:
+            msg = f"Cost values must not be negative, got: {negative_costs}"
+            raise ValueError(msg)
         return ConfigModel.transform_dict_of_floats_str_to_enum(
             input_dict=value,
             key_enum_cls=CostCategory,
@@ -95,6 +101,7 @@ class InferenceModelSpecFactory(BaseModel):
             outputs=blueprint.outputs,
             costs=blueprint.costs or {},
             structure_method=blueprint.structure_method,
+            thinking_mode=blueprint.thinking_mode,
             max_tokens=blueprint.max_tokens,
             max_prompt_images=blueprint.max_prompt_images,
             prompting_target=blueprint.prompting_target,

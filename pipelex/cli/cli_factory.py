@@ -1,5 +1,7 @@
 """Factory functions for CLI commands."""
 
+from pathlib import Path
+
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_gateway_api_key_missing_error,
@@ -23,7 +25,7 @@ from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.exceptions import TelemetryConfigValidationError
 
 
-def make_pipelex_for_cli(context: ErrorContext) -> Pipelex:
+def make_pipelex_for_cli(context: ErrorContext, library_dirs: list[str] | list[Path] | None = None) -> Pipelex:
     """Initialize Pipelex for CLI commands with proper error handling.
 
     This is a DRY wrapper around Pipelex.make() that catches common errors
@@ -31,6 +33,7 @@ def make_pipelex_for_cli(context: ErrorContext) -> Pipelex:
 
     Args:
         context: The CLI context for error messages.
+        library_dirs: The library directories to use for the Pipelex instance.
 
     Returns:
         Initialized Pipelex instance.
@@ -39,7 +42,7 @@ def make_pipelex_for_cli(context: ErrorContext) -> Pipelex:
         typer.Exit: If initialization fails with a handled error.
     """
     try:
-        return Pipelex.make(integration_mode=IntegrationMode.CLI)
+        return Pipelex.make(integration_mode=IntegrationMode.CLI, library_dirs=library_dirs)
     except TelemetryConfigValidationError as exc:
         handle_telemetry_config_validation_error(exc)
     except GatewayTermsNotAcceptedError as exc:

@@ -8,7 +8,7 @@ from pipelex.core.pipes.exceptions import PipeVariableMultiplicityError
 
 VariableMultiplicity = bool | int
 
-MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
+MUTLIPLICITY_PATTERN = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?$"
 
 
 class VariableMultiplicityResolution(BaseModel):
@@ -50,15 +50,12 @@ def make_variable_multiplicity(nb_items: int | None, multiple_items: bool | None
     return variable_multiplicity
 
 
-class MultiplicityParseResult:
-    """Result of parsing a concept string with multiplicity notation."""
-
-    def __init__(self, concept: str, multiplicity: int | bool | None):
-        self.concept: str = concept
-        self.multiplicity: int | bool | None = multiplicity
+class MultiplicityParseResult(BaseModel):
+    concept_ref_or_code: str
+    multiplicity: int | bool | None
 
 
-def parse_concept_with_multiplicity(concept_ref: str) -> MultiplicityParseResult:
+def parse_concept_with_multiplicity(concept_ref_or_code: str) -> MultiplicityParseResult:
     """Parse a concept specification string to extract concept and multiplicity.
 
     Supported formats:
@@ -70,7 +67,7 @@ def parse_concept_with_multiplicity(concept_ref: str) -> MultiplicityParseResult
     - "domain.ConceptName[5]" -> (domain.ConceptName, 5)
 
     Args:
-        concept_ref: Concept specification string with optional multiplicity brackets
+        concept_ref_or_code: Concept specification string with optional multiplicity brackets
 
     Returns:
         MultiplicityParseResult with concept (without brackets) and multiplicity value
@@ -80,20 +77,20 @@ def parse_concept_with_multiplicity(concept_ref: str) -> MultiplicityParseResult
             or if multiplicity is zero or negative (a pipe must produce at least one output)
     """
     # Use strict pattern to validate identifier syntax
-    # Concept must start with letter/underscore, optional domain prefix, optional brackets
-    pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)(?:\[(\d*)\])?$"
-    match = re.match(pattern, concept_ref)
+    # Concept must start with letter/underscore, with zero or more dotted domain segments, optional brackets
+    pattern = r"^([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)(?:\[(\d*)\])?$"
+    match = re.match(pattern, concept_ref_or_code)
 
     if not match:
         msg = (
-            f"Invalid concept specification syntax: '{concept_ref}'. "
+            f"Invalid concept specification syntax: '{concept_ref_or_code}'. "
             f"Expected format: 'ConceptName', 'ConceptName[]', 'ConceptName[N]', "
             f"'domain.ConceptName', 'domain.ConceptName[]', or 'domain.ConceptName[N]' "
             f"where concept and domain names must start with a letter or underscore."
         )
         raise PipeVariableMultiplicityError(msg)
 
-    concept = match.group(1)
+    extracted_concept = match.group(1)
     bracket_content = match.group(2)
 
     multiplicity: int | bool | None
@@ -107,10 +104,10 @@ def parse_concept_with_multiplicity(concept_ref: str) -> MultiplicityParseResult
         # Number in brackets [N] - fixed count
         multiplicity = int(bracket_content)
         if multiplicity <= 0:
-            msg = f"Invalid multiplicity value in '{concept_ref}': multiplicity must be at least 1. A pipe must produce at least one output."
+            msg = f"Invalid multiplicity value in '{concept_ref_or_code}': multiplicity must be at least 1. A pipe must produce at least one output."
             raise PipeVariableMultiplicityError(msg)
 
-    return MultiplicityParseResult(concept=concept, multiplicity=multiplicity)
+    return MultiplicityParseResult(concept_ref_or_code=extracted_concept, multiplicity=multiplicity)
 
 
 def is_multiplicity_compatible(source_multiplicity: VariableMultiplicity | None, target_multiplicity: VariableMultiplicity | None) -> bool:

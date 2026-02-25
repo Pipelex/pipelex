@@ -79,12 +79,17 @@ class PipeLLMBlueprint(PipeBlueprint):
 
         if missing_inputs:
             missing_vars_str = ", ".join(sorted(missing_inputs))
-            msg = f"Missing input variable(s): {missing_vars_str}. These variables are used in the prompt/system_prompt but not declared in inputs."
+            msg = (
+                f"Missing input variable(s): {missing_vars_str}. These variables are used in the prompt or system_prompt but not declared in inputs."
+            )
             raise ValueError(msg)
 
         if unused_inputs:
             unused_vars_str = ", ".join(sorted(unused_inputs))
-            msg = f"Unused input variable(s): {unused_vars_str}. These variables are declared in inputs but not referenced in prompt/system_prompt."
+            msg = (
+                f"Unused input variable(s): '{unused_vars_str}'. "
+                "These variables are declared in inputs but not referenced in the prompt or system_prompt."
+            )
             raise ValueError(msg)
 
     @override

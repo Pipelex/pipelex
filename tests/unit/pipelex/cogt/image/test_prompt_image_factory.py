@@ -5,6 +5,7 @@ from pipelex.cogt.image.prompt_image import PromptImageBase64, PromptImageUri
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.tools.misc.base64_utils import make_base64_url_from_path
 from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
+from pipelex.urls import URLs
 from tests.cases.images import ImageTestCases
 
 
@@ -48,8 +49,8 @@ class TestPromptImageFactoryDataUrl:
     @pytest.mark.parametrize(
         ("_topic", "uri"),
         [
-            ("http_url", "https://example.com/image.png"),
-            ("https_url", "https://secure.example.com/photo.jpg"),
+            ("http_url", URLs.png_example_1),
+            ("https_url", URLs.jpg_example_1),
             ("local_absolute_path", "/path/to/image.png"),
             ("local_relative_path", "images/photo.jpg"),
             ("storage_uri", "pipelex-storage://images/test.png"),

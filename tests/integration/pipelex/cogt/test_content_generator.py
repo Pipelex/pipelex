@@ -12,7 +12,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.cases import ImageTestCases, PDFTestCases
+from tests.cases import DocumentTestCases, ImageTestCases
 from tests.integration.pipelex.cogt.test_data import Employee
 
 USER_TEXT_FOR_BASE = """
@@ -57,7 +57,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_llm_text_only(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
-        llm_setting_main = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_text")
+        llm_setting_main = get_model_deck().get_llm_setting(llm_choice="$testing-text")
 
         text: str = await content_generator.make_llm_text(
             job_metadata=job_metadata,
@@ -71,7 +71,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_direct(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
-        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
+        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_direct: Employee = await content_generator.make_object_direct(
             job_metadata=job_metadata,
@@ -86,7 +86,7 @@ class TestContentGenerator:
     @pytest.mark.llm
     @pytest.mark.inference
     async def test_make_object_list_direct(self, job_metadata: JobMetadata, content_generator: ContentGeneratorProtocol):
-        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="llm_for_testing_gen_object")
+        llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_list_direct: list[Employee] = await content_generator.make_object_list_direct(
             job_metadata=job_metadata,
@@ -157,7 +157,7 @@ class TestContentGenerator:
         page_contents = await content_generator.make_extract_pages(
             job_metadata=job_metadata,
             extract_handle=extract_handle_from_pdf,
-            extract_input=ExtractInput(pdf_uri=PDFTestCases.PDF_FILE_PATH_1),
+            extract_input=ExtractInput(document_uri=DocumentTestCases.PDF_FILE_PATH_1),
             extract_job_params=extract_job_params,
             extract_job_config=ExtractJobConfig(),
         )

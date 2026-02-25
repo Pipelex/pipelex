@@ -1,20 +1,22 @@
 from typing import ClassVar
 
 from markupsafe import escape
+from mthds.client.models.pipeline_inputs import StuffContentOrData
 from pydantic import Field
 
-from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import DictStuff, Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.urls import URLs
 
 
 class MySubClass(StructuredContent):
@@ -691,14 +693,14 @@ class RenderedHtmlTestData:
     HTML_CSS_CLASS = 'report-content x" onclick="alert(1)'
     HTML_EXPECTED = f'<div class="{escape(HTML_CSS_CLASS)!s}">{HTML_INNER_HTML}</div>'
 
-    IMAGE_URL = 'https://example.com/image.png?x=1&y="2"'
+    IMAGE_URL = URLs.png_example_1
     IMAGE_EXPECTED = f'<img src="{escape(IMAGE_URL)!s}" class="msg-img">'
 
     MERMAID_CODE = 'graph TD; A-- "<b>&</b>" -->B'
     MERMAID_EXPECTED = f'<div class="mermaid">{escape(MERMAID_CODE)!s}</div>'
 
-    PDF_URL = "https://example.com/doc.pdf?x=1&y=2"
-    PDF_EXPECTED = f'<a href="{escape(PDF_URL)!s}" class="msg-pdf">{escape(PDF_URL)!s}</a>'
+    DOCUMENT_URL = URLs.pdf_example_1
+    DOCUMENT_EXPECTED = f'<a href="{escape(DOCUMENT_URL)!s}" class="msg-document">{escape(DOCUMENT_URL)!s}</a>'
 
     RENDERED_HTML_TEST_CASES: ClassVar[list[tuple[StuffContent, str]]] = [
         (
@@ -715,12 +717,118 @@ class RenderedHtmlTestData:
         (
             MermaidContent(
                 mermaid_code=MERMAID_CODE,
-                mermaid_url="https://example.com/diagram.svg",
+                mermaid_url=URLs.svg_example,
             ),
             MERMAID_EXPECTED,
         ),
         (
-            PDFContent(url=PDF_URL),
-            PDF_EXPECTED,
+            DocumentContent(url=DOCUMENT_URL),
+            DOCUMENT_EXPECTED,
         ),
     ]
+
+
+class StuffViewerTestData:
+    """Test data for render_stuff_viewer tests."""
+
+    # Tab label test cases: (content_type, expected_label)
+    TAB_LABEL_CASES: ClassVar[list[tuple[str | None, str]]] = [
+        (None, "HTML"),
+        ("", "HTML"),
+        ("text/plain", "HTML"),
+        ("text/html", "HTML"),
+        ("application/json", "HTML"),
+        ("application/pdf", "PDF"),
+        ("image/png", "Image"),
+        ("image/jpeg", "Image"),
+        ("image/gif", "Image"),
+        ("image/webp", "Image"),
+        ("image/svg+xml", "Image"),
+    ]
+
+    # Content instances for testing
+    TEXT_CONTENT: ClassVar[TextContent] = TextContent(text="Hello, World!")
+    HTML_CONTENT: ClassVar[HtmlContent] = HtmlContent(
+        inner_html="<p>Test paragraph</p>",
+        css_class="test-class",
+    )
+    IMAGE_CONTENT: ClassVar[ImageContent] = ImageContent(url=URLs.png_example_1, mime_type="image/png")
+    PDF_CONTENT: ClassVar[DocumentContent] = DocumentContent(url=URLs.pdf_example_1)
+    MERMAID_CONTENT: ClassVar[MermaidContent] = MermaidContent(
+        mermaid_code="graph TD; A-->B",
+        mermaid_url="https://mermaid.live/view#abc",
+    )
+
+    # Content with special characters for escaping tests
+    SPECIAL_CHARS_CONTENT: ClassVar[TextContent] = TextContent(text='Text with "quotes", <tags>, and &entities')
+
+    # Stuff objects for testing (created as functions to avoid import-time issues)
+    @staticmethod
+    def make_text_stuff() -> Stuff:
+        """Create a Stuff with TextContent."""
+        return Stuff(
+            stuff_code="txt01",
+            stuff_name="test_text",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+            content=StuffViewerTestData.TEXT_CONTENT,
+        )
+
+    @staticmethod
+    def make_html_stuff() -> Stuff:
+        """Create a Stuff with HtmlContent."""
+        return Stuff(
+            stuff_code="htm01",
+            stuff_name="test_html",
+            concept=ConceptFactory.make(
+                concept_code="Html",
+                domain_code=SpecialDomain.NATIVE,
+                description="HTML content",
+                structure_class_name="HtmlContent",
+            ),
+            content=StuffViewerTestData.HTML_CONTENT,
+        )
+
+    @staticmethod
+    def make_image_stuff() -> Stuff:
+        """Create a Stuff with ImageContent."""
+        return Stuff(
+            stuff_code="img01",
+            stuff_name="test_image",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
+            content=StuffViewerTestData.IMAGE_CONTENT,
+        )
+
+    @staticmethod
+    def make_pdf_stuff() -> Stuff:
+        """Create a Stuff with DocumentContent."""
+        return Stuff(
+            stuff_code="pdf01",
+            stuff_name="test_pdf",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
+            content=StuffViewerTestData.PDF_CONTENT,
+        )
+
+    @staticmethod
+    def make_mermaid_stuff() -> Stuff:
+        """Create a Stuff with MermaidContent."""
+        return Stuff(
+            stuff_code="mmd01",
+            stuff_name="test_mermaid",
+            concept=ConceptFactory.make(
+                concept_code="Mermaid",
+                domain_code=SpecialDomain.NATIVE,
+                description="Mermaid diagram content",
+                structure_class_name="MermaidContent",
+            ),
+            content=StuffViewerTestData.MERMAID_CONTENT,
+        )
+
+    @staticmethod
+    def make_special_chars_stuff() -> Stuff:
+        """Create a Stuff with special characters for escaping tests."""
+        return Stuff(
+            stuff_code="spc01",
+            stuff_name="test_special",
+            concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.TEXT),
+            content=StuffViewerTestData.SPECIAL_CHARS_CONTENT,
+        )

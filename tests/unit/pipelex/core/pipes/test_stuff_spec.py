@@ -44,7 +44,7 @@ class TestStuffSpecToBundleRepresentation:
             # Various native concepts without multiplicity
             (NativeConceptCode.TEXT, None, "native.Text"),
             (NativeConceptCode.IMAGE, None, "native.Image"),
-            (NativeConceptCode.PDF, None, "native.PDF"),
+            (NativeConceptCode.DOCUMENT, None, "native.Document"),
             (NativeConceptCode.NUMBER, None, "native.Number"),
             # Various native concepts with variable-length list
             (NativeConceptCode.TEXT, True, "native.Text[]"),

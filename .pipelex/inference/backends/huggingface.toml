@@ -23,6 +23,7 @@
 [defaults]
 model_type = "img_gen"
 sdk = "huggingface_img_gen"
+thinking_mode = "none"
 
 ################################################################################
 # IMAGE GENERATION MODELS

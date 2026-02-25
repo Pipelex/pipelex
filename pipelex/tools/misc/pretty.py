@@ -63,10 +63,37 @@ class PrettyRenderable(ABC):
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         pass
 
+    def rendered_pretty_text(self, title: str | None = None, width: int = PRETTY_WIDTH_FOR_EXPORT) -> str:
+        """Render as plain ASCII text string.
+
+        Args:
+            title: Optional title for the rendering
+            width: Console width for text wrapping
+
+        Returns:
+            Plain text string representation
+        """
+        pretty = self.rendered_pretty(title=title, depth=0)
+        return PrettyPrinter.pretty_text(pretty, width=width)
+
+    def rendered_pretty_html(self, title: str | None = None, width: int | None = None) -> str:
+        """Render as HTML string.
+
+        Args:
+            title: Optional title for the rendering
+            width: Optional console width for layout
+
+        Returns:
+            HTML string representation
+        """
+        pretty = self.rendered_pretty(title=title, depth=0)
+        return PrettyPrinter.pretty_html(pretty, width=width or PRETTY_WIDTH_FOR_EXPORT)
+
 
 class PrettyPrintMode(StrEnum):
     RICH = "rich"
     POOR = "poor"
+    SILENT = "silent"
 
 
 def pretty_print(
@@ -160,6 +187,8 @@ class PrettyPrinter:
                 )
             case PrettyPrintMode.POOR:
                 cls.pretty_print_without_rich(content=content, title=title, subtitle=subtitle, inner_title=inner_title, console_width=console_width)
+            case PrettyPrintMode.SILENT:
+                return
 
     @classmethod
     def pretty_print_using_rich(
@@ -241,6 +270,26 @@ class PrettyPrinter:
             highlight=True,
             width=width,
         )
+
+    @classmethod
+    def pretty_text(
+        cls,
+        pretty: PrettyPrintable,
+        width: int = PRETTY_WIDTH_FOR_EXPORT,
+    ) -> str:
+        """Export a PrettyPrintable as plain ASCII text without styling.
+
+        Args:
+            pretty: The Rich renderable to convert
+            width: Console width for text wrapping
+
+        Returns:
+            Plain text string representation
+        """
+        buf = StringIO()
+        console = Console(record=True, file=buf, width=width, force_terminal=False)
+        console.print(pretty)
+        return console.export_text()
 
     @classmethod
     def pretty_html(

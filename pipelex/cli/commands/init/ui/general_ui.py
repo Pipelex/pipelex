@@ -3,7 +3,14 @@
 from rich.panel import Panel
 
 
-def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_routing: bool, needs_telemetry: bool, reset: bool) -> Panel:
+def build_initialization_panel(
+    needs_config: bool,
+    needs_inference: bool,
+    needs_routing: bool,
+    needs_telemetry: bool,
+    reset: bool,
+    check_credentials: bool = False,
+) -> Panel:
     """Build the initialization confirmation panel.
 
     Args:
@@ -12,6 +19,7 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
         needs_routing: Whether routing setup is needed.
         needs_telemetry: Whether telemetry setup is needed.
         reset: Whether this is a reset operation.
+        check_credentials: Whether credential prompting will happen.
 
     Returns:
         A Panel containing the initialization confirmation message.
@@ -23,6 +31,9 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] configuration files in [cyan].pipelex/[/cyan]")
         if needs_inference:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] inference backends")
+            message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
+        if check_credentials:
+            message_parts.append("• Prompt for missing API keys (saved to [cyan]~/.pipelex/.env[/cyan])")
         if needs_routing:
             message_parts.append("• [yellow]Reset and reconfigure[/yellow] routing profile")
         if needs_telemetry:
@@ -32,6 +43,9 @@ def build_initialization_panel(needs_config: bool, needs_inference: bool, needs_
             message_parts.append("• Create required configuration files in [cyan].pipelex/[/cyan]")
         if needs_inference:
             message_parts.append("• Ask you to choose your inference backends")
+            message_parts.append("• Suggest IDE extension for [cyan].mthds[/cyan] syntax highlighting")
+        if check_credentials:
+            message_parts.append("• Prompt for missing API keys (saved to [cyan]~/.pipelex/.env[/cyan])")
         if needs_routing:
             message_parts.append("• Ask you to configure your routing profile")
         if needs_telemetry:

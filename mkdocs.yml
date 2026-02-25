@@ -1,6 +1,6 @@
 site_name: Pipelex Documentation
 site_url: https://docs.pipelex.com/
-site_description: "Official documentation for Pipelex, a framework and language for building deterministic, repeatable AI workflows and knowledge pipelines."
+site_description: "Official documentation for Pipelex, an open-source library/CLI for building and running deterministic, repeatable AI methods."
 docs_dir: docs
 repo_url: "https://github.com/Pipelex/pipelex"
 repo_name: "Pipelex on GitHub"
@@ -91,9 +91,11 @@ extra_css:
 nav:
   - Home:
     - What is Pipelex?: index.md
+    - Releases:
+      - v0.18.0 "Chicago": home/1-releases/chicago.md
     - Get Started:
       - The Pipe Builder: home/2-get-started/pipe-builder.md
-      - Write Workflows Manually: home/2-get-started/write-workflows-manually.md
+      - Write Methods Manually: home/2-get-started/write-methods-manually.md
     - Understand Pipelex:
       - The Know-How Graph: home/3-understand-pipelex/viewpoint.md
       - The Pipelex Paradigm: home/3-understand-pipelex/pipelex-paradigm/index.md
@@ -111,7 +113,6 @@ nav:
         - Table Extraction from Image: home/4-cookbook-examples/extract-table.md
         - DPE Extraction: home/4-cookbook-examples/extract-dpe.md
       - Text Generation:
-        - Screenplay Generator (wip): home/4-cookbook-examples/write-screenplay.md
         - Tweet Optimizer (wip): home/4-cookbook-examples/write-tweet.md
     - Setup (first run):
       - Overview: home/5-setup/index.md
@@ -119,8 +120,8 @@ nav:
       - Gateway Available Models: home/5-setup/gateway-models.md
       - Project Organization: home/5-setup/project-organization.md
       - Telemetry: home/5-setup/telemetry.md
-    - Build Reliable AI Workflows:
-      - Kick off a Pipeline Project: home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project.md
+    - Build Reliable AI Methods:
+      - Kick off a Method Project: home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md
       - Pipe Builder: home/6-build-reliable-ai-workflows/pipe-builder.md
       - Pipelex Bundle Specification: home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md
       - Domain: home/6-build-reliable-ai-workflows/domain.md
@@ -130,9 +131,10 @@ nav:
         - Python classes: home/6-build-reliable-ai-workflows/concepts/python-classes.md
         - Native Concepts: home/6-build-reliable-ai-workflows/concepts/native-concepts.md
         - Refining Concepts: home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
-      - Design and Run Pipelines:
+      - Design and Run Methods:
         - Overview: home/6-build-reliable-ai-workflows/pipes/index.md
         - Libraries: home/6-build-reliable-ai-workflows/libraries.md
+        - Packages: home/6-build-reliable-ai-workflows/packages.md
         - Executing Pipelines: home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md
         - Providing Inputs to Pipelines: home/6-build-reliable-ai-workflows/pipes/provide-inputs.md
         - Working Memory: home/6-build-reliable-ai-workflows/pipes/working-memory.md
@@ -151,14 +153,13 @@ nav:
           - PipeParallel: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeParallel.md
           - PipeBatch: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeBatch.md
           - PipeCondition: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeCondition.md
-      - Optimize Cost & Quality: home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-workflows.md
+      - Optimize Cost & Quality: home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-methods.md
       - LLM Structured Generation: home/6-build-reliable-ai-workflows/llm-structured-generation-config.md
       - LLM Prompting Style: home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
     - Configuration (TOML reference):
       - Overview: home/7-configuration/index.md
       - Pipeline Validation Configuration:
         - Dry Run: home/7-configuration/config-pipeline-validation/dry-run-config.md
-        - Static Validation: home/7-configuration/config-pipeline-validation/static-validation-config.md
       - Practical Configuration:
         - Logging: home/7-configuration/config-practical/logging-config.md
         - Pipe Run: home/7-configuration/config-practical/pipe-run-config.md
@@ -179,13 +180,16 @@ nav:
         - Validate: home/9-tools/cli/validate.md
         - Run: home/9-tools/cli/run.md
         - Show: home/9-tools/cli/show.md
-        - Kit: home/9-tools/cli/kit.md
+        - Pkg: home/9-tools/cli/pkg.md
         - Build:
           - Overview: home/9-tools/cli/build/index.md
           - Pipe: home/9-tools/cli/build/pipe.md
           - Runner: home/9-tools/cli/build/runner.md
           - Structures: home/9-tools/cli/build/structures.md
+          - Inputs: home/9-tools/cli/build/inputs.md
+          - Output: home/9-tools/cli/build/output.md
       - Pipe Builder: home/9-tools/pipe-builder.md
+      - plxt (Formatter & Linter): home/9-tools/plxt.md
       - Logging: home/9-tools/logging.md
     - Advanced Customizations:
       - Overview: home/10-advanced-customizations/index.md
@@ -197,6 +201,16 @@ nav:
       - Content Generator: home/10-advanced-customizations/content-generator-injection.md
       - Plugin Injection: home/10-advanced-customizations/plugin-injection.md
       - Pipe Router: home/10-advanced-customizations/pipe-router-injection.md
+  - Under the Hood:
+    - Overview: under-the-hood/index.md
+    - Architecture Overview: under-the-hood/architecture-overview.md
+    - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
+    - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
+    - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
+    - Reasoning Controls: under-the-hood/reasoning-controls.md
+    - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
+    - Test Profile Configuration: under-the-hood/test-profile-configuration.md
+    - Init CLI Flows: under-the-hood/init-cli-flows.md
   - API: https://pipelex.github.io/pipelex-api/
   - MCP: https://pipelex.github.io/pipelex-mcp/
   - n8n: https://pipelex.github.io/n8n-nodes-pipelex/

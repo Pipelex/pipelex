@@ -1,10 +1,10 @@
 from typing import Any
 
-from polyfactory.factories.pydantic_factory import ModelFactory
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
+from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput, Page
@@ -25,6 +25,7 @@ from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.urls import URLs
 
 
 class ContentGeneratorDry(ContentGeneratorProtocol):
@@ -41,8 +42,8 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         raw_details: GeneratedImageRawDetails,
     ) -> ImageContent:
         return ImageContent(
-            url=raw_details.actual_url or "https://example.com/image.jpg",
-            display_link=raw_details.actual_url or "https://example.com/image.jpg",
+            url=raw_details.actual_url or URLs.jpg_example_1,
+            public_url=raw_details.actual_url or URLs.jpg_example_1,
             mime_type=raw_details.mime_type or "image/jpeg",
             size=raw_details.size,
         )
@@ -69,17 +70,11 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         llm_setting_for_object: LLMSetting,
         llm_prompt_for_object: LLMPrompt,
     ) -> BaseModelTypeVar:
-        class ObjectFactory(ModelFactory[object_class]):  # type: ignore[valid-type]
-            __model__ = object_class
-            __check_model__ = True
-            __use_examples__ = True
-            __allow_none_optionals__ = False  # Ensure Optional fields always get values
-
-        # `factory_use_contruct=True` prevents from running the model_validator/field_validator.
-        # It is that way because the dry run was failing a lot of pipes that had validation test on the
-        # field values. For example, if a string requires to be a snake_case, the ObjectFactory would
-        # generate something like `DOIJZjoDoIJDZOjDZJo` which is... not a snake_case.
-        return ObjectFactory.build(factory_use_construct=True)
+        object_factory = DryRunFactory.make_dry_run_factory(object_class)
+        # We run validators to ensure mock data is valid. Fields with format constraints
+        # (snake_case, PascalCase, etc.) should have `examples` defined in their Field()
+        # so polyfactory uses those instead of random strings.
+        return object_factory.build()
 
     @override
     @update_job_metadata
@@ -115,15 +110,20 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         func_name = "make_object_list_direct"
         log.verbose(f"🤡 DRY RUN: {self.__class__.__name__}.{func_name}")
         nb_list_items = nb_items or get_config().pipelex.dry_run_config.nb_list_items
-        return [
-            await self.make_object_direct(
+        items: list[BaseModelTypeVar] = []
+        for idx in range(nb_list_items):
+            item = await self.make_object_direct(
                 job_metadata=job_metadata,
                 object_class=object_class,
                 llm_setting_for_object=llm_setting_for_object_list,
                 llm_prompt_for_object=llm_prompt_for_object_list,
             )
-            for _ in range(nb_list_items)
-        ]
+            # Set first item's pipe_code to "mock_main" to coordinate with BundleHeaderSpec.main_pipe
+            # which uses examples=["mock_main"] for dry run validation
+            if idx == 0 and hasattr(item, "pipe_code"):
+                item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+            items.append(item)
+        return items
 
     @override
     @update_job_metadata
@@ -265,15 +265,15 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
     ) -> list[ImageContent]:
-        if not extract_input.pdf_uri:
-            msg = "PDF URI is required to render page views"
+        if not extract_input.document_uri:
+            msg = "Document URI is required to render page views"
             raise ValueError(msg)
         nb_pages = get_config().pipelex.dry_run_config.nb_extract_pages
         page_view_images_resolved: list[ImageContent] = []
-        for page_index in range(1, nb_pages + 1):
+        for _ in range(1, nb_pages + 1):
             page_view_image = self._make_generated_image_fake(
                 raw_details=GeneratedImageRawDetails(
-                    actual_url=f"https://example.com/page_{page_index}.png",
+                    actual_url=URLs.jpg_example_1,
                     size=ImageSize(width=1024, height=1024),
                     mime_type="image/jpeg",
                 ),
@@ -315,7 +315,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
 
         if extract_job_params and extract_job_params.should_include_page_views:
             page_view_contents: list[ImageContent] = []
-            if extract_input.pdf_uri:
+            if extract_input.document_uri:
                 page_view_contents = await self.make_render_page_views(
                     extract_input=extract_input,
                     extract_handle=extract_handle,

@@ -1,61 +1,56 @@
 """Extract/OCR related test fixtures."""
 
+from pathlib import Path
+
 import pytest
 
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.hub import get_model_deck
-from tests.integration.pipelex.fixtures.routing_fixtures import ALL_BACKENDS, check_backend_supports_model
+from pipelex.system.configuration.configs import ConfigPaths
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 
 def is_extract_handle_supported(extract_handle: str) -> bool:
     """Check if an extract handle is available in the current model deck."""
     model_deck = get_model_deck()
-    return model_deck.is_handle_defined(extract_handle)
-
-
-def is_extract_handle_supported_by_enabled_backends(extract_handle: str) -> bool:
-    """Check if an extract handle is supported by at least one enabled backend."""
-    return any(check_backend_supports_model(backend, extract_handle) for backend in ALL_BACKENDS)
+    return model_deck.is_handle_defined(extract_handle, model_type=ModelType.TEXT_EXTRACTOR)
 
 
 # ================================================================================================
-# Extract Handles by Backend
-# Comment out handles you don't want to test
+# Extract model collections are now defined in .pipelex-dev/test_profiles.toml
+# See [collections.extract] section for from_pdf and from_image lists
 # ================================================================================================
 
-EXTRACT_HANDLE_FROM_PDF = [
-    "pypdfium2-extract-pdf",
-    "docling-extract-text",
-    "mistral-ocr",
-    "mistral-ocr-2503",
-    "mistral-ocr-2505",
-    "mistral-ocr-2512",
-    "mistral-document-ai-2505",
-    "azure-document-intelligence",
-]
 
-EXTRACT_HANDLE_FROM_IMAGE = [
-    "docling-extract-text",
-    "mistral-ocr",
-    "mistral-ocr-2503",
-    "mistral-ocr-2505",
-    "mistral-ocr-2512",
-]
+def _load_extract_collection(collection_name: str) -> list[str]:
+    """Load an extract collection from test_profiles.toml.
 
-ALL_EXTRACT_HANDLES: list[str] = list(set(EXTRACT_HANDLE_FROM_PDF + EXTRACT_HANDLE_FROM_IMAGE))
+    Args:
+        collection_name: Name of the collection (e.g., "from_pdf", "from_image").
+
+    Returns:
+        List of model handles in the collection.
+    """
+    test_profiles_path = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_profiles.toml"
+    if not test_profiles_path.exists():
+        return []
+
+    try:
+        profiles_config = load_toml_from_path(str(test_profiles_path))
+        collections = profiles_config.get("collections", {})
+        extract_collections = collections.get("extract", {})
+        model_list = extract_collections.get(collection_name, [])
+        if isinstance(model_list, list):
+            return [str(mdl) for mdl in model_list]  # pyright: ignore[reportUnknownVariableType,reportUnknownArgumentType]
+        return []
+    except Exception:
+        return []
 
 
-@pytest.fixture(
-    params=ALL_EXTRACT_HANDLES,
-)
-def extract_handle(request: pytest.FixtureRequest) -> str:
-    assert isinstance(request.param, str)
-    extract_handle_param = request.param
-    if not is_extract_handle_supported(extract_handle_param):
-        pytest.skip(f"Extract handle '{extract_handle_param}' not available in model deck")
-    if not is_extract_handle_supported_by_enabled_backends(extract_handle_param):
-        pytest.skip(f"Extract handle '{extract_handle_param}' not supported by any enabled backend")
-    return extract_handle_param
+# Load collections at module level for pytest parametrization
+EXTRACT_HANDLE_FROM_PDF = _load_extract_collection("from_pdf")
+EXTRACT_HANDLE_FROM_IMAGE = _load_extract_collection("from_image")
 
 
 @pytest.fixture(
@@ -66,8 +61,6 @@ def extract_handle_from_pdf(request: pytest.FixtureRequest) -> str:
     extract_handle_param = request.param
     if not is_extract_handle_supported(extract_handle_param):
         pytest.skip(f"Extract handle '{extract_handle_param}' not available in model deck")
-    if not is_extract_handle_supported_by_enabled_backends(extract_handle_param):
-        pytest.skip(f"Extract handle '{extract_handle_param}' not supported by any enabled backend")
     return extract_handle_param
 
 
@@ -79,15 +72,13 @@ def extract_handle_from_image(request: pytest.FixtureRequest) -> str:
     extract_handle_param = request.param
     if not is_extract_handle_supported(extract_handle_param):
         pytest.skip(f"Extract handle '{extract_handle_param}' not available in model deck")
-    if not is_extract_handle_supported_by_enabled_backends(extract_handle_param):
-        pytest.skip(f"Extract handle '{extract_handle_param}' not supported by any enabled backend")
     return extract_handle_param
 
 
 @pytest.fixture(
     params=[
-        "extract_ocr_from_document",
-        "extract_basic_from_pdf",
+        "@default-extract-document",
+        "@default-text-from-pdf",
     ],
 )
 def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
@@ -97,7 +88,7 @@ def extract_choice_for_pdf(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
-        "extract_ocr_from_document",
+        "@default-extract-document",
     ],
 )
 def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
@@ -107,28 +98,36 @@ def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
 
 @pytest.fixture(
     params=[
+        # max_nb_images=None: Extract all images (unlimited)
         ExtractJobParams(
-            should_include_images=True,
+            max_nb_images=None,
             should_caption_images=False,
             should_include_page_views=False,
             page_views_dpi=72,
-            max_nb_images=None,
             image_min_size=None,
         ),
+        # max_nb_images=10: Limit to 10 images
         ExtractJobParams(
-            should_include_images=True,
+            max_nb_images=10,
             should_caption_images=True,
             should_include_page_views=False,
             page_views_dpi=72,
-            max_nb_images=10,
             image_min_size=100,
         ),
+        # max_nb_images=0: No images but page_views True
         ExtractJobParams(
-            should_include_images=False,
+            max_nb_images=0,
             should_caption_images=False,
             should_include_page_views=True,
             page_views_dpi=150,
-            max_nb_images=None,
+            image_min_size=None,
+        ),
+        # max_nb_images=0: No images and no page_views
+        ExtractJobParams(
+            max_nb_images=0,
+            should_caption_images=False,
+            should_include_page_views=False,
+            page_views_dpi=None,
             image_min_size=None,
         ),
     ],

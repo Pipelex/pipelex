@@ -1,8 +1,9 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.pipe_run.pipe_run_params import PipeRunParamKey
 from pipelex.types import Self, StrEnum
 
@@ -41,19 +42,44 @@ class ConceptStructureBlueprintFieldType(StrEnum):
     BOOLEAN = "boolean"
     NUMBER = "number"
     DATE = "date"
+    CONCEPT = "concept"
 
 
 class ConceptStructureBlueprint(BaseModel):
     description: str
     type: ConceptStructureBlueprintFieldType | None = None
-    item_type: str | None = None
+    # type=dict
     key_type: str | None = None
     value_type: str | None = None
+    # type=list
+    item_type: str | None = None
+    # type=concept
+    concept_ref: str | None = None
+    item_concept_ref: str | None = None
+
     choices: list[str] | None = Field(default=None)
-    required: bool | None = Field(default=True)
     default_value: Any | None = None
+    required: bool = Field(default=False)
 
     # TODO: date translator for default_value
+
+    @field_validator("concept_ref", mode="before")
+    @classmethod
+    def validate_concept_ref(cls, concept_ref: str | None) -> str | None:
+        if concept_ref is not None:
+            if not is_concept_ref_or_code_valid(concept_ref_or_code=concept_ref):
+                msg = f"Concept ref '{concept_ref}' must be a valid concept ref (domain.ConceptCode) or simply a concept code (PascalCase)"
+                raise ValueError(msg)
+        return concept_ref
+
+    @field_validator("item_concept_ref", mode="before")
+    @classmethod
+    def validate_item_concept_ref(cls, item_concept_ref: str | None) -> str | None:
+        if item_concept_ref is not None:
+            if not is_concept_ref_or_code_valid(concept_ref_or_code=item_concept_ref):
+                msg = f"Item concept ref '{item_concept_ref}' must be a valid concept ref (domain.ConceptCode) or simply a concept code (PascalCase)"
+                raise ValueError(msg)
+        return item_concept_ref
 
     @model_validator(mode="after")
     def validate_structure_blueprint(self) -> Self:
@@ -64,13 +90,49 @@ class ConceptStructureBlueprint(BaseModel):
             raise ValueError(msg)
 
         # If type is "dict", key_type and value_type must not be empty
-        if self.type == ConceptStructureBlueprintFieldType.DICT:
-            if not self.key_type:
-                msg = f"When type is '{ConceptStructureBlueprintFieldType.DICT}', key_type must not be empty. Actual key_type: {self.key_type}"
-                raise ValueError(msg)
-            if not self.value_type:
-                msg = f"When type is '{ConceptStructureBlueprintFieldType.DICT}', value_type must not be empty. Actual value_type: {self.value_type}"
-                raise ValueError(msg)
+        match self.type:
+            case ConceptStructureBlueprintFieldType.DICT:
+                if not self.key_type:
+                    msg = f"When type is 'dict', key_type must not be empty. Actual key_type: {self.key_type}"
+                    raise ValueError(msg)
+                if not self.value_type:
+                    msg = f"When type is 'dict', value_type must not be empty. Actual value_type: {self.value_type}"
+                    raise ValueError(msg)
+
+            case ConceptStructureBlueprintFieldType.CONCEPT:
+                # Validate concept type requires concept_ref
+                if not self.concept_ref:
+                    msg = "When type is 'concept', concept_ref must be set."
+                    raise ValueError(msg)
+                # Concept fields cannot have default values
+                if self.default_value is not None:
+                    msg = "default_value cannot be set for concept type (complex objects cannot have defaults)."
+                    raise ValueError(msg)
+
+            case ConceptStructureBlueprintFieldType.LIST:
+                # Validate list of concepts requires item_concept_ref
+                if self.item_type == "concept" and not self.item_concept_ref:
+                    msg = "When item_type is 'concept', item_concept_ref must be set."
+                    raise ValueError(msg)
+                # item_concept_ref can only be set when item_type is 'concept'
+                if self.item_concept_ref and self.item_type != "concept":
+                    msg = f"item_concept_ref can only be set when item_type is 'concept'. Actual item_type: {self.item_type}"
+                    raise ValueError(msg)
+
+            case (
+                ConceptStructureBlueprintFieldType.TEXT
+                | ConceptStructureBlueprintFieldType.INTEGER
+                | ConceptStructureBlueprintFieldType.BOOLEAN
+                | ConceptStructureBlueprintFieldType.NUMBER
+                | ConceptStructureBlueprintFieldType.DATE
+                | None
+            ):
+                pass
+
+        # Validate concept_ref can only be set when type is 'concept'
+        if self.concept_ref and self.type != ConceptStructureBlueprintFieldType.CONCEPT:
+            msg = f"'concept_ref' can only be set when type is 'concept'. Actual type: {self.type}"
+            raise ValueError(msg)
 
         # Check when default_value is not None, type is not None (except for choice fields)
         if self.default_value is not None and self.type is None and not self.choices:
@@ -118,6 +180,10 @@ class ConceptStructureBlueprint(BaseModel):
             case ConceptStructureBlueprintFieldType.DATE:
                 if not isinstance(self.default_value, datetime):
                     self._raise_type_mismatch_error("date", type(self.default_value).__name__)
+            case ConceptStructureBlueprintFieldType.CONCEPT:
+                # CONCEPT type cannot have default values, this is already validated in validate_structure_blueprint
+                # This case is here for exhaustiveness
+                pass
 
     def _raise_type_mismatch_error(self, expected_type_name: str, actual_type_name: str) -> None:
         msg = f"default_value type mismatch: expected {expected_type_name} for type '{self.type}', but got {actual_type_name}"

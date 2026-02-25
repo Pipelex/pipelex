@@ -1,0 +1,27 @@
+domain      = "pipe_llm_text_simple_e2e"
+description = "Test PipeLLM with simple text-only input and output"
+
+[pipe.write_haiku_e2e_using_setting]
+type = "PipeLLM"
+description = "Write a haiku about the given topic"
+inputs = { topic = "Text" }
+output = "Text"
+model = { model = "gpt-4o-mini", temperature = 0.9, max_tokens = "auto" }
+prompt = """
+Write a haiku (three lines: 5 syllables, 7 syllables, 5 syllables) about the following topic.
+Output ONLY the three lines of the haiku, nothing else.
+$topic
+"""
+
+
+[pipe.write_haiku_e2e_using_preset]
+type = "PipeLLM"
+description = "Write a haiku about the given topic"
+inputs = { topic = "Text" }
+output = "Text"
+model = "$testing-text"
+prompt = """
+Write a haiku (three lines: 5 syllables, 7 syllables, 5 syllables) about the following topic.
+Output ONLY the three lines of the haiku, nothing else.
+$topic
+"""

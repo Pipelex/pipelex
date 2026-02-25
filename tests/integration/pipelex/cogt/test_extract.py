@@ -7,26 +7,26 @@ from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
 from pipelex.hub import get_extract_worker
 from pipelex.pipeline.job_metadata import JobMetadata
-from tests.cases import ImageTestCases, PDFTestCases
+from tests.cases import DocumentTestCases, ImageTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 @pytest.mark.extract
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 @pytest.mark.filterwarnings("ignore:Accessing the 'model_fields' attribute on the instance is deprecated:DeprecationWarning")
 class TestExtract:
-    @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
+    @pytest.mark.parametrize("file_path", DocumentTestCases.DOCUMENT_FILE_PATHS)
     async def test_extract_pdf_path(
         self,
         generated_content_factory: GeneratedContentFactory,
         job_metadata: JobMetadata,
-        extract_handle_from_pdf: str,
+        extract_combo: ModelCombo,
         extract_job_params: ExtractJobParams,
         file_path: str,
     ):
-        pretty_print(extract_job_params, title="Extract Job Params")
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_pdf)
+        pretty_print(extract_job_params, title=f"Extract Job Params for {file_path}")
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -34,7 +34,7 @@ class TestExtract:
             msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
         extract_job = ExtractJobFactory.make_extract_job(
-            extract_input=ExtractInput(pdf_uri=file_path),
+            extract_input=ExtractInput(document_uri=file_path),
             extract_job_params=extract_job_params,
             job_metadata=job_metadata,
         )
@@ -49,15 +49,15 @@ class TestExtract:
         for page_index, page_content in enumerate(page_contents):
             pretty_print(page_content, title=f"Page {page_index}")
 
-    @pytest.mark.parametrize("url", PDFTestCases.DOCUMENT_URLS)
+    @pytest.mark.parametrize("url", DocumentTestCases.DOCUMENT_URLS)
     async def test_extract_pdf_url(
         self,
         job_metadata: JobMetadata,
-        extract_handle_from_pdf: str,
+        extract_combo: ModelCombo,
         extract_job_params: ExtractJobParams,
         url: str,
     ):
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_pdf)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -65,7 +65,7 @@ class TestExtract:
             msg = f"Image captioning is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
         extract_job = ExtractJobFactory.make_extract_job(
-            extract_input=ExtractInput(pdf_uri=url),
+            extract_input=ExtractInput(document_uri=url),
             extract_job_params=extract_job_params,
             job_metadata=job_metadata,
         )
@@ -78,11 +78,11 @@ class TestExtract:
     async def test_extract_image_path(
         self,
         job_metadata: JobMetadata,
-        extract_handle_from_image: str,
+        extract_combo: ModelCombo,
         extract_job_params: ExtractJobParams,
         file_path: str,
     ):
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_image_supported:
             msg = f"Image extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -102,11 +102,11 @@ class TestExtract:
     async def test_extract_image_url(
         self,
         job_metadata: JobMetadata,
-        extract_handle_from_image: str,
+        extract_combo: ModelCombo,
         extract_job_params: ExtractJobParams,
         url: str,
     ):
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_image_supported:
             msg = f"Image extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
@@ -122,27 +122,26 @@ class TestExtract:
         pretty_print(extract_output, title="Extract Output")
         assert extract_output.pages
 
-    @pytest.mark.parametrize("file_path", PDFTestCases.DOCUMENT_FILE_PATHS)
+    @pytest.mark.parametrize("file_path", DocumentTestCases.DOCUMENT_FILE_PATHS)
     async def test_extract_image_save(
         self,
         job_metadata: JobMetadata,
-        extract_handle_from_image: str,
+        extract_combo: ModelCombo,
         file_path: str,
     ):
-        extract_worker = get_extract_worker(extract_handle=extract_handle_from_image)
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
         if not extract_worker.is_pdf_supported:
             msg = f"PDF extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
         specific_extract_job_params = ExtractJobParams(
-            should_include_images=True,
+            max_nb_images=None,
             should_caption_images=False,
             should_include_page_views=False,
             page_views_dpi=72,
-            max_nb_images=None,
             image_min_size=None,
         )
         extract_job = ExtractJobFactory.make_extract_job(
-            extract_input=ExtractInput(pdf_uri=file_path),
+            extract_input=ExtractInput(document_uri=file_path),
             extract_job_params=specific_extract_job_params,
             job_metadata=job_metadata,
         )

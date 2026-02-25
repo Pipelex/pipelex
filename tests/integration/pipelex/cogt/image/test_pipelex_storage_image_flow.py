@@ -14,13 +14,13 @@ import pytest
 import pytest_asyncio
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.image.prepared_image import PreparedImageBase64
 from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images, prepare_prompt_image
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.tools.misc.file_utils import load_binary
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+from pipelex.tools.uri.prepared_file import PreparedFileBase64
 from pipelex.tools.uri.resolved_uri import ResolvedPipelexStorage
 from pipelex.tools.uri.uri_resolver import resolve_uri
 
@@ -65,7 +65,7 @@ class TestPipelexStorageImageFlow:
         # Step 1: Create ImageContent as would be returned by GeneratedContentFactory
         image_content = ImageContent(
             url=storage_uri,
-            display_link=None,
+            public_url=None,
             mime_type="image/png",
         )
 
@@ -80,7 +80,7 @@ class TestPipelexStorageImageFlow:
         )
 
         # Verify result
-        assert isinstance(prepared, PreparedImageBase64)
+        assert isinstance(prepared, PreparedFileBase64)
         assert prepared.file_type.mime == "image/png"
         # Verify base64 data is valid (can be decoded)
         decoded = base64.b64decode(prepared.base64_data)
@@ -112,7 +112,7 @@ class TestPipelexStorageImageFlow:
         # Verify all images were prepared
         assert len(prepared_images) == 2
         for prepared in prepared_images:
-            assert isinstance(prepared, PreparedImageBase64)
+            assert isinstance(prepared, PreparedFileBase64)
             assert prepared.file_type.mime == "image/png"
 
     async def test_storage_uri_resolves_correctly(

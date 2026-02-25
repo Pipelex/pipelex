@@ -6,14 +6,15 @@ from click import Command, Context
 from typer.core import TyperGroup
 from typing_extensions import override
 
-from pipelex.cli.commands.build import build_app
+from pipelex.cli.commands.build.app import build_app
 from pipelex.cli.commands.doctor_cmd import doctor_cmd
+from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
-from pipelex.cli.commands.kit_cmd import kit_app
-from pipelex.cli.commands.run_cmd import run_cmd
+from pipelex.cli.commands.run.app import run_app
 from pipelex.cli.commands.show_cmd import show_app
-from pipelex.cli.commands.validate_cmd import validate_cmd
+from pipelex.cli.commands.validate.app import validate_app
+from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.readiness import check_readiness
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
@@ -25,7 +26,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["init", "doctor", "kit", "build", "validate", "run", "show"]
+        return ["init", "doctor", "build", "validate", "run", "graph", "show", "which"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -67,8 +68,28 @@ app = typer.Typer(
 )
 
 
+def version_callback(value: bool) -> None:
+    """Print version and exit when --version is passed."""
+    if value:
+        package_version = get_package_version()
+        typer.echo(f"pipelex {package_version}")
+        raise typer.Exit
+
+
 @app.callback(invoke_without_command=True)
-def app_callback(ctx: typer.Context) -> None:
+def app_callback(
+    ctx: typer.Context,
+    version: Annotated[  # noqa: ARG001
+        bool,
+        typer.Option(
+            "--version",
+            "-V",
+            help="Show version and exit.",
+            callback=version_callback,
+            is_eager=True,
+        ),
+    ] = False,
+) -> None:
     console = get_console()
     package_version = get_package_version()
 
@@ -101,16 +122,37 @@ def app_callback(ctx: typer.Context) -> None:
     check_readiness()
 
 
-@app.command(name="init", help="Initialize Pipelex configuration in a `.pipelex` directory")
+@app.command(name="init", help="Initialize Pipelex configuration, backends, credentials, routing, and telemetry")
 def init_command(
-    focus: Annotated[InitFocus, typer.Argument(help="What to initialize: 'config', 'telemetry', or 'all'")] = InitFocus.ALL,
+    focus: Annotated[
+        InitFocus,
+        typer.Argument(
+            help="What to initialize: 'all' (default), 'config', 'credentials', 'inference', 'routing', 'telemetry', or 'agreement'",
+        ),
+    ] = InitFocus.ALL,
+    local: Annotated[
+        bool, typer.Option("--local", "-l", help="Create project-level .pipelex/ at the detected project root instead of global ~/.pipelex/")
+    ] = False,
 ) -> None:
-    """Initialize Pipelex configuration and telemetry.
+    """Initialize Pipelex configuration in ~/.pipelex (global) or project .pipelex (--local).
 
-    Note: Config updates are not yet supported. This command always performs a full
-    reset of the configuration.
+    Focus options:
+
+      all          Full setup: config files, backends, credentials, routing, telemetry (default)
+
+      config       Reset configuration files and prompt for missing API keys
+
+      credentials  Prompt for missing API keys only (reads enabled backends, saves to ~/.pipelex/.env)
+
+      inference    Reset inference backends selection and prompt for missing API keys
+
+      routing      Reset routing profile
+
+      telemetry    Reset telemetry preferences
+
+      agreement    Review/accept Pipelex Gateway terms of service
     """
-    init_cmd(focus=focus)
+    init_cmd(focus=focus, local=local)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and suggest fixes")
@@ -121,12 +163,15 @@ def doctor_command(
     doctor_cmd(fix=fix)
 
 
-app.add_typer(kit_app, name="kit", help="Manage kit assets: agent rules, migration rules")
 app.add_typer(
-    build_app, name="build", help="Generate AI workflows from natural language requirements: pipelines in .plx format and python code to run them"
+    build_app, name="build", help="Generate AI methods from natural language requirements: pipelines in .mthds format and python code to run them"
 )
-app.command(name="validate", help="Validate pipes: static validation for syntax and dependencies, dry-run execution for logic and consistency")(
-    validate_cmd
+app.add_typer(
+    validate_app,
+    name="validate",
+    help="Validate a method or pipe: static validation for syntax and dependencies, dry-run execution for logic and consistency",
 )
-app.command(name="run", help="Run a pipe, optionally providing a specific bundle file (.plx)")(run_cmd)
+app.add_typer(run_app, name="run", help="Run a method or pipe, optionally providing a specific bundle file (.mthds)")
+app.add_typer(graph_app, name="graph", help="Generate and render execution graphs")
 app.add_typer(show_app, name="show", help="Show configuration, pipes, and list AI models")
+app.command(name="which", help="Locate where a pipe is defined, similar to 'which' for executables")(which_cmd)

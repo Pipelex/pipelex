@@ -12,15 +12,18 @@ from pipelex.core.domains.domain import SpecialDomain
 
 
 class TestCases:
-    # Test cases for make_refines method - only native concepts can be refined
-    MAKE_REFINES_TEST_CASES: ClassVar[list[tuple[str, ConceptBlueprint, str]]] = [
+    # Test cases for make_refines method
+    # Format: (test_name, domain_code, blueprint, expected_result)
+    MAKE_REFINES_TEST_CASES: ClassVar[list[tuple[str, str, ConceptBlueprint, str]]] = [
         (
             "native_concept_ref",
+            "test_domain",
             ConceptBlueprint(description="A concept that refines a native text concept", refines=NativeConceptCode.TEXT),
             f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         ),
         (
             "fully_qualified_native_string",
+            "test_domain",
             ConceptBlueprint(
                 description="A concept that refines a fully qualified native concept",
                 refines=f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
@@ -28,9 +31,22 @@ class TestCases:
             f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
         ),
         (
-            "without_domain",
-            ConceptBlueprint(description="A concept that refines a concept without domain", refines=NativeConceptCode.TEXT),
+            "native_without_domain",
+            "test_domain",
+            ConceptBlueprint(description="A concept that refines a native concept without domain", refines=NativeConceptCode.TEXT),
             f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}",
+        ),
+        (
+            "local_concept_without_domain",
+            "my_domain",
+            ConceptBlueprint(description="A concept that refines a local concept", refines="LocalConcept"),
+            "my_domain.LocalConcept",
+        ),
+        (
+            "external_concept_with_domain",
+            "my_domain",
+            ConceptBlueprint(description="A concept that refines an external concept", refines="other_domain.ExternalConcept"),
+            "other_domain.ExternalConcept",
         ),
     ]
 
@@ -44,8 +60,8 @@ class TestCases:
         ("my_domain", "Text", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Text")),
         # Test case 4: Native concept code (Image)
         ("my_domain", "Image", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Image")),
-        # Test case 5: Native concept code (PDF)
-        ("my_domain", "PDF", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="PDF")),
+        # Test case 5: Native concept code (Document)
+        ("my_domain", "Document", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Document")),
         # Test case 6: Native concept code with same domain codes provided (native takes precedence)
         ("my_domain", "Text", DomainAndConceptCode(domain_code=SpecialDomain.NATIVE, concept_code="Text")),
         # Test case 7: Concept code from same domain

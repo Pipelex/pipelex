@@ -30,6 +30,13 @@ async def make_base64_url_from_http_url(url: str) -> str:
     return make_base64_url(base64_data=base64_data, file_type=file_type)
 
 
+def make_base64_url_from_bytes(raw_bytes: bytes) -> str:
+    """Create a data: URL from raw bytes, detecting file type automatically."""
+    base64_data = base64.b64encode(raw_bytes).decode("ascii")
+    file_type = detect_file_type_from_bytes(raw_bytes=raw_bytes)
+    return make_base64_url(base64_data=base64_data, file_type=file_type)
+
+
 def make_base64_url(
     base64_data: str,
     file_type: FileType,

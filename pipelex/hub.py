@@ -1,5 +1,7 @@
 import sys
+from collections.abc import Sequence
 from contextvars import ContextVar
+from pathlib import Path
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
@@ -34,6 +36,8 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
+from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
+from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
@@ -55,7 +59,7 @@ class PipelexHub:
         self._class_registry: ClassRegistryAbstract | None = None
         self._storage_provider: StorageProviderAbstract | None = None
         self._telemetry_manager: TelemetryManagerAbstract | None = None
-
+        self._func_registry: FuncRegistry | None = None
         # cogt
         self._models_manager: ModelManagerAbstract | None = None
         self._plugin_manager: PluginManager | None = None
@@ -65,6 +69,7 @@ class PipelexHub:
 
         # pipelex
         self._library_manager: LibraryManagerAbstract | None = None
+        self._default_library_dirs: list[Path] | None = None
         self._domain_library: DomainLibraryAbstract | None = None
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
@@ -307,11 +312,26 @@ class PipelexHub:
     def set_library_manager(self, library_manager: LibraryManagerAbstract):
         self._library_manager = library_manager
 
+    def set_default_library_dirs(self, library_dirs: list[Path] | None) -> None:
+        self._default_library_dirs = library_dirs
+
+    def get_default_library_dirs(self) -> list[Path] | None:
+        return self._default_library_dirs
+
     def get_library(self) -> Library:
         if self._library_manager is not None:
             return self._library_manager.get_current_library()
         msg = "Library is not initialized"
         raise RuntimeError(msg)
+
+    def get_func_registry(self) -> FuncRegistry:
+        if self._func_registry is None:
+            msg = "FuncRegistry is not initialized"
+            raise RuntimeError(msg)
+        return self._func_registry
+
+    def set_func_registry(self, func_registry: FuncRegistry):
+        self._func_registry = func_registry
 
 
 # Shorthand functions for accessing the singleton
@@ -344,6 +364,10 @@ def get_storage_provider() -> StorageProviderAbstract:
 
 def get_class_registry() -> ClassRegistryAbstract:
     return get_pipelex_hub().get_required_class_registry()
+
+
+def get_func_registry() -> FuncRegistry:
+    return get_pipelex_hub().get_func_registry()
 
 
 def get_telemetry_manager() -> TelemetryManagerAbstract:
@@ -426,9 +450,46 @@ def get_current_library() -> str:
     return library_id
 
 
+def get_default_library_dirs() -> list[Path] | None:
+    return get_pipelex_hub().get_default_library_dirs()
+
+
 def teardown_current_library() -> None:
     """Teardown the library_id for the current async context."""
     _library_id.set(None)
+
+
+def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tuple[list[Path], str]:
+    """Resolve library directories following the standard 3-tier priority.
+
+    Resolution priority:
+    1. Per-call library_dirs (explicit override)
+    2. Instance-level defaults from Pipelex.make()
+    3. PIPELEXPATH environment variable (fallback)
+
+    Note: An empty list [] is a valid explicit value that disables library loading.
+
+    Args:
+        library_dirs: Optional per-call override. If provided (even if empty),
+            takes precedence over instance defaults and PIPELEXPATH.
+
+    Returns:
+        A tuple of (effective_dirs, source_label) where:
+        - effective_dirs: The resolved list of Path objects
+        - source_label: A string describing the source for logging (e.g., "per-call")
+    """
+    if library_dirs is not None:
+        return [Path(lib_dir) for lib_dir in library_dirs], "per-call"
+
+    hub_defaults = get_pipelex_hub().get_default_library_dirs()
+    if hub_defaults is not None:
+        return hub_defaults, "instance default"
+
+    pipelexpath_dirs = get_pipelexpath_dirs()
+    if pipelexpath_dirs is not None:
+        return pipelexpath_dirs, PIPELEXPATH_ENV_KEY
+
+    return [], "none configured"
 
 
 def get_required_domain(domain_code: str) -> Domain:
@@ -453,6 +514,18 @@ def get_required_pipe(pipe_code: str) -> PipeAbstract:
 
 def get_optional_pipe(pipe_code: str) -> PipeAbstract | None:
     return get_pipelex_hub().get_required_pipe_library().get_optional_pipe(pipe_code=pipe_code)
+
+
+def get_pipe_source(pipe_code: str) -> Path | None:
+    """Get the source file path for a pipe.
+
+    Args:
+        pipe_code: The pipe code to look up.
+
+    Returns:
+        Path to the .mthds file the pipe was loaded from, or None if unknown.
+    """
+    return get_pipelex_hub().get_library_manager().get_pipe_source(pipe_code=pipe_code)
 
 
 def get_concept_library() -> ConceptLibraryAbstract:

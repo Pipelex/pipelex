@@ -108,7 +108,7 @@ def make_otel_gen_ai_output_type(output_type: str) -> otel_gen_ai_attributes.Gen
 
 
 class PipelexSpanAttr(StrEnum):
-    """Pipelex-specific span attribute keys for workflow tracing."""
+    """Pipelex-specific span attribute keys for method tracing."""
 
     TRACE_NAME = "pipelex.trace.name"
     TRACE_NAME_REDACTED = "pipelex.trace.name.redacted"

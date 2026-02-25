@@ -4,6 +4,7 @@ from collections.abc import Callable
 from typing import Any, TypeVar, cast, get_type_hints
 
 from pydantic import Field, PrivateAttr, RootModel
+from typing_extensions import override
 
 from pipelex.system.exceptions import ToolError
 from pipelex.urls import URLs
@@ -59,9 +60,34 @@ def pipe_func(name: str | None = None) -> Callable[[T], T]:
     return decorator
 
 
+class IneligibleFunctionInfo:
+    """Information about a function that has @pipe_func decorator but failed eligibility checks."""
+
+    def __init__(self, func_name: str, reason: str, source_file: str | None = None):
+        self.func_name = func_name
+        self.reason = reason
+        self.source_file = source_file
+
+    @override
+    def __str__(self) -> str:
+        if self.source_file:
+            return f"Function '{self.func_name}' in '{self.source_file}': {self.reason}"
+        return f"Function '{self.func_name}': {self.reason}"
+
+
+# Type for tracking ineligible decorated functions
+IneligibleFuncsDict = dict[str, IneligibleFunctionInfo]
+
+
+def _make_ineligible_funcs_dict() -> IneligibleFuncsDict:
+    """Factory function for creating an empty ineligible functions dict with proper typing."""
+    return {}
+
+
 class FuncRegistry(RootModel[FuncRegistryDict]):
     root: FuncRegistryDict = Field(default_factory=dict)
     _logger: logging.Logger = PrivateAttr(logging.getLogger(FUNC_REGISTRY_LOGGER_CHANNEL_NAME))
+    _ineligible_decorated_funcs: IneligibleFuncsDict = PrivateAttr(default_factory=_make_ineligible_funcs_dict)
 
     def log(self, message: str) -> None:
         self._logger.debug(message)
@@ -72,6 +98,7 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def teardown(self) -> None:
         """Resets the registry to an empty state."""
         self.root.clear()
+        self._ineligible_decorated_funcs.clear()
 
     def register_function(
         self,
@@ -122,12 +149,21 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
     def get_required_function(self, name: str) -> Callable[..., Any]:
         """Retrieves a function from the registry by its name. Raises an error if not found."""
         if name not in self.root:
-            msg = (
-                f"Function '{name}' not found in registry. "
-                f"Since v0.12.0, custom functions require the @pipe_func() decorator for auto-discovery. "
-                f"Add @pipe_func() above your function definition. "
-                f"See: {URLs.pipe_func_docs}"
-            )
+            # Check if this function was found but is ineligible
+            ineligible_info = self._ineligible_decorated_funcs.get(name)
+            if ineligible_info:
+                msg = (
+                    f"Function '{name}' has @pipe_func() decorator but is not eligible for registration: "
+                    f"{ineligible_info.reason}. "
+                    f"See: {URLs.pipe_func_docs}"
+                )
+            else:
+                msg = (
+                    f"Function '{name}' not found in registry. "
+                    f"Since v0.12.0, custom functions require the @pipe_func() decorator for auto-discovery. "
+                    f"Add @pipe_func() above your function definition. "
+                    f"See: {URLs.pipe_func_docs}"
+                )
             raise FuncRegistryError(msg)
         return self.root[name]
 
@@ -236,6 +272,111 @@ class FuncRegistry(RootModel[FuncRegistryDict]):
             pass
 
         return False
+
+    def check_function_eligibility(self, func: Any) -> str | None:
+        """Check if a function is eligible for PipeFunc registration and return error message if not.
+
+        This method provides detailed error messages explaining why a function is not eligible,
+        which is useful for debugging when a @pipe_func decorated function is not being registered.
+
+        Args:
+            func: The function to check
+
+        Returns:
+            None if the function is eligible, or an error message string explaining why not
+        """
+        if not callable(func):
+            return "not callable"
+
+        the_function = cast("Callable[..., Any]", func)
+
+        # Import here to avoid circular imports
+        from pipelex.core.memory.working_memory import WorkingMemory  # noqa: PLC0415
+        from pipelex.core.stuffs.stuff_content import StuffContent  # noqa: PLC0415
+
+        # Get function signature
+        try:
+            sig = inspect.signature(the_function)
+        except (ValueError, TypeError) as exc:
+            return f"could not inspect signature: {exc}"
+
+        params = list(sig.parameters.values())
+
+        # Check parameter count
+        if len(params) == 0:
+            return "must have exactly one parameter named 'working_memory', but has no parameters"
+        if len(params) > 1:
+            return f"must have exactly one parameter named 'working_memory', but has {len(params)} parameters"
+
+        # Check parameter name
+        param = params[0]
+        if param.name != "working_memory":
+            return f"parameter must be named 'working_memory', but is named '{param.name}'"
+
+        # Get type hints
+        try:
+            type_hints = get_type_hints(the_function)
+        except Exception as exc:
+            return f"could not get type hints: {exc}"
+
+        # Check parameter type annotation
+        if "working_memory" not in type_hints:
+            return "parameter 'working_memory' must have type annotation 'WorkingMemory'"
+
+        param_type = type_hints["working_memory"]
+        if param_type != WorkingMemory:
+            return f"parameter 'working_memory' must have type 'WorkingMemory', but has type '{param_type}'"
+
+        # Check return type annotation
+        if "return" not in type_hints:
+            return "must have a return type annotation that is a subclass of StuffContent"
+
+        return_type = type_hints["return"]
+
+        # Check if return type is a subclass of StuffContent
+        try:
+            if inspect.isclass(return_type) and issubclass(return_type, StuffContent):
+                return None  # Eligible
+            # Handle generic types like ListContent[SomeType]
+            if hasattr(return_type, "__origin__"):
+                origin = return_type.__origin__
+                if inspect.isclass(origin) and issubclass(origin, StuffContent):
+                    return None  # Eligible
+        except TypeError:
+            pass
+
+        return f"return type must be a subclass of StuffContent, but is '{return_type}'"
+
+    def register_ineligible_function(
+        self,
+        func: Callable[..., Any],
+        reason: str,
+        source_file: str | None = None,
+    ) -> None:
+        """Register a function that has @pipe_func decorator but failed eligibility checks.
+
+        This allows us to provide better error messages when the function is later looked up.
+
+        Args:
+            func: The function that failed eligibility
+            reason: The reason the function is not eligible
+            source_file: Optional source file path where the function was found
+        """
+        func_name = getattr(func, "_pipe_func_name", None) or func.__name__
+        info = IneligibleFunctionInfo(func_name=func_name, reason=reason, source_file=source_file)
+        self._ineligible_decorated_funcs[func_name] = info
+        self.log(f"Registered ineligible @pipe_func function: {info}")
+
+    def get_ineligible_function_info(self, name: str) -> IneligibleFunctionInfo | None:
+        """Get information about an ineligible @pipe_func decorated function.
+
+        Args:
+            name: The function name to look up
+
+        Returns:
+            IneligibleFunctionInfo if the function was found but ineligible, None otherwise
+        """
+        return self._ineligible_decorated_funcs.get(name)
 
 
 func_registry = FuncRegistry()

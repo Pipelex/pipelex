@@ -4,7 +4,10 @@ import pytest
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
-from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.jinja2.jinja2_required_variables import (
+    detect_jinja2_required_variables,
+    detect_jinja2_variable_references,
+)
 
 
 class TestData:
@@ -178,19 +181,19 @@ Best regards,
         ),
     ]
 
-    PLX_STYLE_TEMPLATES: ClassVar[list[tuple[str, str, set[str]]]] = [
+    MTHDS_STYLE_TEMPLATES: ClassVar[list[tuple[str, str, set[str]]]] = [
         (
-            "plx_at_variable_preprocessed",
+            "mthds_at_variable_preprocessed",
             '{{ page.page_view|tag("page.page_view") }}',
             {"page.page_view"},
         ),
         (
-            "plx_dollar_variable_preprocessed",
+            "mthds_dollar_variable_preprocessed",
             "{{ page.text_and_images.text.text|format() }}",
             {"page.text_and_images.text.text"},
         ),
         (
-            "plx_mixed_preprocessed",
+            "mthds_mixed_preprocessed",
             '{{ page.page_view|tag("page.page_view") }}\n{{ page.text_and_images.text.text|format() }}',
             {"page.page_view", "page.text_and_images.text.text"},
         ),
@@ -340,15 +343,15 @@ class TestDetectJinja2Variables:
 
     @pytest.mark.parametrize(
         ("topic", "template_source", "expected_paths"),
-        TestData.PLX_STYLE_TEMPLATES,
+        TestData.MTHDS_STYLE_TEMPLATES,
     )
-    def test_plx_style_templates(
+    def test_mthds_style_templates(
         self,
         topic: str,
         template_source: str,
         expected_paths: set[str],
     ):
-        """Test detection in PLX-style preprocessed templates with tag/format filters."""
+        """Test detection in MTHDS-style preprocessed templates with tag/format filters."""
         result = detect_jinja2_required_variables(
             template_category=TemplateCategory.LLM_PROMPT,
             template_source=template_source,
@@ -540,3 +543,147 @@ class TestDetectJinja2Variables:
             template_source=template_source,
         )
         assert result == {"user.profile.name", "config.value"}
+
+
+class TestDetectJinja2VariableReferences:
+    """Tests for detect_jinja2_variable_references function that tracks filters."""
+
+    def test_simple_variable_no_filters(self) -> None:
+        """Test simple variable without filters."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{{ name }}",
+        )
+
+        assert len(result) == 1
+        assert result[0].path == "name"
+        assert result[0].filters == []
+
+    def test_variable_with_single_filter(self) -> None:
+        """Test variable with a single filter applied."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source='{{ name|tag("name") }}',
+        )
+
+        assert len(result) == 1
+        assert result[0].path == "name"
+        assert "tag" in result[0].filters
+
+    def test_variable_with_chained_filters(self) -> None:
+        """Test variable with multiple chained filters."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{{ value|lower|upper|trim }}",
+        )
+
+        assert len(result) == 1
+        assert result[0].path == "value"
+        # All filters should be captured
+        assert "lower" in result[0].filters
+        assert "upper" in result[0].filters
+        assert "trim" in result[0].filters
+
+    def test_with_images_filter_detected(self) -> None:
+        """Test that the with_images filter is detected."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{{ page | with_images }}",
+        )
+
+        assert len(result) == 1
+        assert result[0].path == "page"
+        assert "with_images" in result[0].filters
+
+    def test_multiple_variables_different_filters(self) -> None:
+        """Test multiple variables with different filters."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source='{{ name|tag("x") }} and {{ page | with_images }} and {{ plain }}',
+        )
+
+        assert len(result) == 3
+        paths = {ref.path: ref.filters for ref in result}
+        assert "tag" in paths["name"]
+        assert "with_images" in paths["page"]
+        assert paths["plain"] == []
+
+    def test_nested_variable_with_filter(self) -> None:
+        """Test nested dotted variable with filter."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{{ document.pages | with_images }}",
+        )
+
+        assert len(result) == 1
+        assert result[0].path == "document.pages"
+        assert "with_images" in result[0].filters
+
+    def test_filter_arguments_not_in_filter_name(self) -> None:
+        """Test that filter arguments don't affect the filter name."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source='{{ text|truncate(50)|default("N/A") }}',
+        )
+
+        assert len(result) == 1
+        assert result[0].path == "text"
+        assert "truncate" in result[0].filters
+        assert "default" in result[0].filters
+        # Arguments shouldn't be in filter names
+        assert "50" not in result[0].filters
+        assert "N/A" not in result[0].filters
+
+    def test_same_variable_multiple_times_combines_filters(self) -> None:
+        """Test that same variable referenced multiple times combines filters."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{{ name }} and {{ name|upper }}",
+        )
+
+        # Should have one entry for 'name' with the 'upper' filter
+        assert len(result) == 1
+        assert result[0].path == "name"
+        assert "upper" in result[0].filters
+
+    def test_format_filter_detected(self) -> None:
+        """Test that format filter (common in MTHDS templates) is detected."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{{ content|format() }}",
+        )
+
+        assert len(result) == 1
+        assert result[0].path == "content"
+        assert "format" in result[0].filters
+
+    def test_deeply_nested_path_with_filter(self) -> None:
+        """Test deeply nested path with filter."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{{ document.section.pages.items | with_images }}",
+        )
+
+        assert len(result) == 1
+        assert result[0].path == "document.section.pages.items"
+        assert "with_images" in result[0].filters
+
+    def test_for_loop_variable_not_included(self) -> None:
+        """Test that for loop variables are not included as external references."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="{% for item in items %}{{ item|upper }}{% endfor %}",
+        )
+
+        # Only 'items' should be returned, not 'item' (loop variable)
+        assert len(result) == 1
+        assert result[0].path == "items"
+
+    def test_empty_template_returns_empty_list(self) -> None:
+        """Test empty template returns empty list."""
+        result = detect_jinja2_variable_references(
+            template_category=TemplateCategory.LLM_PROMPT,
+            template_source="No variables here",
+        )
+
+        assert result == []

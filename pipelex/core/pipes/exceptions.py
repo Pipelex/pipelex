@@ -5,6 +5,7 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.types import StrEnum
 
 
@@ -80,8 +81,11 @@ class PipeOperatorModelChoiceError(PipelexError):
 
         # Extract the choice identifier from the model_choice union type
         if isinstance(self.model_choice, str):
-            # It's a preset/alias string
+            # It's a raw string (shouldn't happen but handle it)
             msg += f" • choice='{self.model_choice}'"
+        elif isinstance(self.model_choice, ModelReference):
+            # It's a ModelReference with kind and name
+            msg += f" • choice='{self.model_choice.raw}' ({self.model_choice.kind})"
         else:
             # It's a Setting object with a model field and optional desc()
             msg += f" • choice={self.model_choice.desc()}"
@@ -112,6 +116,8 @@ class PipeValidationErrorType(StrEnum):
     # Errors that are raised but NOT auto-fixed (will fail validation)
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE = "img_gen_input_not_text_compatible"
+    INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
+    BATCH_ITEM_NAME_COLLISION = "batch_item_name_collision"
 
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"

@@ -41,7 +41,7 @@ class TestPipeSequenceSimple:
         concept_library.add_concepts([concept_1])
         concept_2 = get_native_concept(native_concept=NativeConceptCode.TEXT)
 
-        # Create PipeSequence instance - pipes are loaded from PLX files
+        # Create PipeSequence instance - pipes are loaded from MTHDS files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Simple sequence for text processing",
             inputs={"input_text": concept_1.concept_ref},
@@ -108,7 +108,7 @@ class TestPipeSequenceSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" -> "HELLO WORLD" -> "PROCESSED: HELLO WORLD"
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result.content.text in {"PROCESSED: HELLO WORLD", "PROCESSED: hello world"}
 
         # Verify working memory contains all intermediate results
@@ -124,14 +124,14 @@ class TestPipeSequenceSimple:
         capitalized_result = final_working_memory.get_stuff("capitalized_text")
         assert capitalized_result is not None
         assert isinstance(capitalized_result.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert capitalized_result.content.text == "HELLO WORLD"
 
         # Final result should be there (stored as final_text, which is the last SubPipe's output_name)
         final_result_in_memory = final_working_memory.get_stuff("final_text")
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result_in_memory.content.text == "PROCESSED: HELLO WORLD"
 
         # Verify working memory structure

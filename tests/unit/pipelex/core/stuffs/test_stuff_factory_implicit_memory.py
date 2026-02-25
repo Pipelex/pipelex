@@ -3,9 +3,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 import pytest
+from mthds.client.models.pipeline_inputs import StuffContentOrData
 
 from pipelex import log, pretty_print
-from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff

@@ -8,9 +8,9 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_pipe_router
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
@@ -55,7 +55,7 @@ class TestPipeExtract:
             description="OCR test for image processing",
             inputs={"page_scan": NativeConceptCode.IMAGE},
             output="Page[]",
-            page_images=True,
+            max_page_images=None,
             page_image_captions=False,
             page_views=True,
             page_views_dpi=72,
@@ -103,10 +103,10 @@ class TestPipeExtract:
         input_name = "arbitrary_name"
         blueprint = PipeExtractBlueprint(
             description="OCR test for PDF processing",
-            inputs={input_name: NativeConceptCode.PDF},
+            inputs={input_name: NativeConceptCode.DOCUMENT},
             output="Page[]",
             model=extract_choice_for_pdf,
-            page_images=True,
+            max_page_images=None,
             page_image_captions=page_image_captions,
             page_views=True,
             page_views_dpi=72,
@@ -123,9 +123,9 @@ class TestPipeExtract:
             working_memory=WorkingMemoryFactory.make_from_single_stuff(
                 stuff=StuffFactory.make_stuff(
                     concept=ConceptFactory.make_native_concept(
-                        native_concept_code=NativeConceptCode.PDF,
+                        native_concept_code=NativeConceptCode.DOCUMENT,
                     ),
-                    content=PDFContent(url=pdf_url),
+                    content=DocumentContent(url=pdf_url),
                     name=input_name,
                 ),
             ),

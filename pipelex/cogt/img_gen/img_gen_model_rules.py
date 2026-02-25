@@ -22,6 +22,7 @@ class ImgGenArgTopic(StrEnum):
     depending on the model backend being used.
     """
 
+    MODEL_NAME = "model_name"
     PROMPT = "prompt"
     NUM_IMAGES = "num_images"
     ASPECT_RATIO = "aspect_ratio"
@@ -30,6 +31,7 @@ class ImgGenArgTopic(StrEnum):
     BACKGROUND = "background"
     OUTPUT_FORMAT = "output_format"
     SPECIFIC = "specific"
+    INPUT_IMAGES = "input_images"
 
 
 class NumImagesTaxonomy(StrEnum):
@@ -135,6 +137,29 @@ class OutputFormatTaxonomy(StrEnum):
     FLUX_1 = "flux_1"
     FLUX_2 = "flux_2"
     GPT = "gpt"
+
+
+class ModelNameTaxonomy(StrEnum):
+    """Taxonomy for how model name/id is passed to the API.
+
+    - STANDARD: passes model as {"model": model_id}
+    """
+
+    STANDARD = "standard"
+
+
+class InputImagesTaxonomy(StrEnum):
+    """Taxonomy for mapping input images to API format for image-to-image generation.
+
+    Different providers accept input images in different formats:
+    - GPT_IMAGE: OpenAI gpt-image-1/1.5 format with `image` array of base64 data URLs
+    - BFL_FLUX_2: BFL Flux 2 Pro format with `input_image`, `input_image_2`, etc.
+    - NONE: Model does not support image inputs
+    """
+
+    GPT_IMAGE = "gpt_image"
+    BFL_FLUX_2 = "bfl_flux_2"
+    NONE = "none"
 
 
 ImgGenModelRules = dict[ImgGenArgTopic, str]

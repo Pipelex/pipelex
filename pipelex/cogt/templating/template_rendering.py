@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 from pipelex.cogt.templating.template_category import TemplateCategory
@@ -11,12 +12,14 @@ async def render_template(
     category: TemplateCategory,
     context: dict[str, Any],
     templating_style: TemplatingStyle | None = None,
+    finalize: Callable[[Any], Any] | None = None,
 ) -> str:
     template_source = preprocess_template(template)
 
     return await render_jinja2_async(
         template_source=template_source,
         template_category=category,
-        temlating_context=context,
+        templating_context=context,
         templating_style=templating_style,
+        finalize=finalize,
     )

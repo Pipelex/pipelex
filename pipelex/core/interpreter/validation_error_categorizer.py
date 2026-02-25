@@ -7,16 +7,8 @@ from pipelex import log
 from pipelex.core.bundles.exceptions import (
     PipelexBundleBlueprintValidationErrorData,
 )
-from pipelex.core.interpreter.helpers import get_error_scope
+from pipelex.core.interpreter.helpers import ValidationErrorScope, get_error_scope
 from pipelex.core.pipes.exceptions import PipeValidationErrorType
-from pipelex.types import StrEnum
-
-
-class ErrorCatKey(StrEnum):
-    LOC = "loc"
-    MSG = "msg"
-    TYPE = "type"
-
 
 PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD = "domain"
 PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD = "source"
@@ -78,6 +70,102 @@ def _categorize_input_validation_error(
     return None
 
 
+def _categorize_syntax_validation_error(
+    message: str,
+    domain: str | None,
+    source: str | None,
+) -> PipelexBundleBlueprintValidationErrorData | None:
+    """Categorize syntax validation errors (invalid pipe code, invalid main_pipe).
+
+    Args:
+        message: The error message from the validation
+        domain: Domain code
+        source: Source file path
+
+    Returns:
+        Categorized error data, or None if not a syntax validation error
+    """
+    message_lower = message.lower()
+
+    # Detect invalid main_pipe syntax
+    if "invalid main pipe syntax" in message_lower:
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+            domain_code=domain,
+            source=source,
+            message=message,
+        )
+
+    # Detect invalid pipe code syntax
+    if "is not a valid pipe code" in message_lower:
+        return PipelexBundleBlueprintValidationErrorData(
+            error_type=PipeValidationErrorType.INVALID_PIPE_CODE_SYNTAX,
+            domain_code=domain,
+            source=source,
+            message=message,
+        )
+
+    return None
+
+
+def _is_pydantic_internal_loc_element(element: str) -> bool:
+    """Check if a loc element is a pydantic internal type discriminator rather than a user-facing field name.
+
+    Pydantic loc tuples contain both field names (e.g. "structure", "cv_summary") and
+    internal type discriminators (e.g. "ConceptBlueprint", "dict[str,union[str,function-after]]",
+    "function-after", "str"). We filter out the internal ones to build cleaner error paths.
+    """
+    # Elements containing brackets or hyphens are pydantic type names (e.g. "dict[str,...]", "function-after")
+    if "[" in element or "-" in element:
+        return True
+    # Builtin type names and pydantic model class names used as union discriminators
+    return element in {"str", "int", "float", "bool", "list", "dict", "set", "tuple", "none", "ConceptBlueprint"}
+
+
+def _categorize_concept_validation_error(
+    loc: tuple[int | str, ...],
+    message: str,
+    domain: str | None,
+    source: str | None,
+) -> PipelexBundleBlueprintValidationErrorData | None:
+    """Categorize concept validation errors (e.g., missing concept_ref in structure fields).
+
+    Args:
+        loc: Location tuple from pydantic validation error
+        message: The error message from the validation
+        domain: Domain code
+        source: Source file path
+
+    Returns:
+        Categorized error data with concept_code and enriched message, or None for
+        noise errors (e.g. pydantic union branch failures like "Input should be a valid string")
+    """
+    # Skip pydantic union branch failure noise: when validating a union type like
+    # `ConceptBlueprint | str`, pydantic tries each branch and reports failures for both.
+    # The "Input should be a valid string" errors from the `str` branch are not actionable.
+    if message == "Input should be a valid string":
+        return None
+
+    concept_code: str | None = None
+    if len(loc) >= 2:
+        concept_code = str(loc[1])
+
+    # Build a clean location path filtering out pydantic internal type discriminators
+    # e.g. "concept.InterviewPreparationPackage.structure.cv_summary" instead of
+    # "concept.InterviewPreparationPackage.ConceptBlueprint.structure.dict[str,union[str,function-after]].cv_summary.function-after"
+    clean_parts = [str(part) for part in loc if not _is_pydantic_internal_loc_element(str(part))]
+    location_path = ".".join(clean_parts)
+
+    enriched_message = f"Concept validation error at '{location_path}': {message}"
+
+    return PipelexBundleBlueprintValidationErrorData(
+        domain_code=domain,
+        source=source,
+        concept_code=concept_code,
+        message=enriched_message,
+    )
+
+
 def categorize_blueprint_validation_error(
     blueprint_dict: dict[str, Any],
     error: ErrorDetails,
@@ -94,13 +182,29 @@ def categorize_blueprint_validation_error(
     domain = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_DOMAIN_FIELD)) if blueprint_dict else None
     source = cast("str | None", blueprint_dict.get(PIPELEX_BUNDLE_BLUEPRINT_SOURCE_FIELD)) if blueprint_dict else None
 
-    loc = error.get(ErrorCatKey.LOC.value, ())
-    message = error.get(ErrorCatKey.MSG.value, "Unknown validation error")
+    loc = error["loc"]
+    message = error["msg"]
 
     # Extract pipe code from location if available (e.g., ('pipes', 'extract_details_of_task', ...))
     pipe_code: str | None = None
     if len(loc) >= 2 and loc[0] == "pipes":
         pipe_code = str(loc[1])
+
+    error_scope = get_error_scope(loc)
+
+    # Categorize based on error scope
+    match error_scope:
+        case ValidationErrorScope.CONCEPT:
+            # Concept validation errors (e.g., missing concept_ref in structure fields)
+            # Returns None for noise errors like union branch failures, which we silently skip
+            return _categorize_concept_validation_error(
+                loc=loc,
+                message=message,
+                domain=domain,
+                source=source,
+            )
+        case ValidationErrorScope.PIPE | ValidationErrorScope.DOMAIN | ValidationErrorScope.MAIN_PIPE | ValidationErrorScope.BUNDLE:
+            pass
 
     # Try to categorize input validation errors (missing/unused inputs)
     input_error = _categorize_input_validation_error(
@@ -112,8 +216,16 @@ def categorize_blueprint_validation_error(
     if input_error:
         return input_error
 
+    # Try to categorize syntax validation errors (invalid pipe code, main_pipe)
+    syntax_error = _categorize_syntax_validation_error(
+        message=message,
+        domain=domain,
+        source=source,
+    )
+    if syntax_error:
+        return syntax_error
+
     # If we couldn't categorize the error, log a warning
-    error_scope = get_error_scope(loc)
     log.warning(f"Pipelex bundle blueprint validation error that is not categorized: {error_scope} - {source} - {domain}")
 
     return None

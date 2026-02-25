@@ -10,7 +10,8 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
-from pipelex.hub import get_concept_library, get_required_pipe
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
@@ -54,7 +55,11 @@ class PipeSequence(PipeController):
         The output of the pipe sequence should match the output of the last step,
         both in terms of concept compatibility and multiplicity.
         """
-        last_step_pipe = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code)
+        last_step_pipe_code = self.sequential_sub_pipes[-1].pipe_code
+        # Skip output validation if the last step is an unresolved cross-package ref
+        if QualifiedRef.has_cross_package_prefix(last_step_pipe_code) and get_optional_pipe(pipe_code=last_step_pipe_code) is None:
+            return
+        last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
 
         # Check concept compatibility
         if not get_concept_library().is_compatible(tested_concept=last_step_pipe.output.concept, wanted_concept=self.output.concept):
@@ -113,7 +118,13 @@ class PipeSequence(PipeController):
         generated_outputs: set[str] = set()
 
         for sequential_sub_pipe in self.sequential_sub_pipes:
-            sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
+            # Skip cross-package pipe refs that aren't loaded yet (dependency not resolved)
+            if QualifiedRef.has_cross_package_prefix(sequential_sub_pipe.pipe_code):
+                sub_pipe = get_optional_pipe(pipe_code=sequential_sub_pipe.pipe_code)
+                if sub_pipe is None:
+                    continue
+            else:
+                sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
             # Use the centralized recursion detection
             sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes_with_current)
 
@@ -131,7 +142,7 @@ class PipeSequence(PipeController):
                     except InputStuffSpecNotFoundError as exc:
                         msg = (
                             f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
-                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
+                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs.format_for_display()}"
                         )
                         raise PipeSequenceValueError(msg) from exc
                     needed_inputs.add_stuff_spec(

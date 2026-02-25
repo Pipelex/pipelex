@@ -1,0 +1,74 @@
+/* ============================================================
+   Shared Content Area Styling
+   Uses CSS variables with fallbacks for both implementations
+   ============================================================ */
+
+.stuff-content-html {
+    font-family: var(--font-sans, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+    background: var(--color-bg, #1e1e1e);
+    color: var(--color-text-muted, #d4d4d4);
+    padding: 12px;
+    border-radius: var(--radius-md, 4px);
+}
+
+.stuff-content-html table {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.stuff-content-html th,
+.stuff-content-html td {
+    border: 1px solid var(--color-border, #444);
+    padding: 8px 12px;
+    text-align: left;
+}
+
+.stuff-content-html th {
+    background: var(--color-surface-hover, #252a30);
+    color: var(--color-text, #e0e0e0);
+    font-weight: 600;
+}
+
+.stuff-content-html tr:hover {
+    background: var(--color-surface-hover, #2a2530);
+}
+
+.stuff-content-pdf {
+    min-height: 400px;
+}
+
+.stuff-content-pdf iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    min-height: 500px;
+}
+
+.stuff-content-image {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 300px;
+}
+
+.stuff-content-image img {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+}
+
+.stuff-content-text {
+    font-family: var(--font-mono, 'Monaco', 'Menlo', 'Ubuntu Mono', monospace);
+    font-size: 13px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}
+
+.stuff-content-text.nowrap {
+    white-space: pre;
+    word-wrap: normal;
+    line-height: 1;
+    overflow-x: auto;
+    padding-right: 20px;
+}

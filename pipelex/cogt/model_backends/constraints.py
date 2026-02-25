@@ -7,5 +7,4 @@ class ListedConstraint(StrEnum):
 
 
 class ValuedConstraint(StrEnum):
-    MAX_OUTPUT_TOKENS_LIMIT = "max_output_tokens_limit"
     FIXED_TEMPERATURE = "fixed_temperature"

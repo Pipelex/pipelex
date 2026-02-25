@@ -1,3 +1,5 @@
+from typing import TYPE_CHECKING
+
 from pydantic import Field, RootModel
 from typing_extensions import override
 
@@ -12,6 +14,9 @@ from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 LLMUsageRegistryRoot = list[LLMTokensUsage]
 
@@ -91,7 +96,7 @@ class ReportingManager(ReportingProtocol):
 
     @override
     def generate_report(self, pipeline_run_id: str | None = None):
-        cost_report_file_path: str | None = None
+        cost_report_file_path: Path | None = None
         if self._reporting_config.is_generate_cost_report_file_enabled:
             ensure_path(self._reporting_config.cost_report_dir_path)
             cost_report_file_path = get_incremental_file_path(

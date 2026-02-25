@@ -234,6 +234,36 @@ def mock_fetch_remote_content_disabled(mocker: MockerFixture) -> None:
 
 
 @pytest.fixture
+def mock_upload_local_content_enabled(mocker: MockerFixture) -> None:
+    """Mock the config to enable uploading local content.
+
+    When `is_upload_local_content_enabled` is True, local file paths are read,
+    uploaded to storage, and replaced with pipelex-storage:// URIs.
+    """
+    original_config = get_config()
+    mocker.patch.object(
+        original_config.pipelex.storage_config,
+        "is_upload_local_content_enabled",
+        True,
+    )
+
+
+@pytest.fixture
+def mock_upload_local_content_disabled(mocker: MockerFixture) -> None:
+    """Mock the config to disable uploading local content.
+
+    When `is_upload_local_content_enabled` is False, local file paths are passed
+    through without being uploaded to storage.
+    """
+    original_config = get_config()
+    mocker.patch.object(
+        original_config.pipelex.storage_config,
+        "is_upload_local_content_enabled",
+        False,
+    )
+
+
+@pytest.fixture
 def storage_provider_patched(
     storage_provider: StorageProviderAbstract,
     mocker: MockerFixture,

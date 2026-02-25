@@ -7,9 +7,11 @@ from typing_extensions import override
 
 from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.filetype_utils import (
+    UNKNOWN_FILE_TYPE,
     FileType,
     detect_file_type_from_base64,
     detect_file_type_from_bytes,
+    mime_type_to_extension,
 )
 from pipelex.tools.misc.http_utils import URL_MAX_LENGTH
 from pipelex.tools.uri.resolved_uri import ResolvedUri
@@ -24,7 +26,13 @@ class PromptImageDetail(StrEnum):
 
     @property
     def as_openai_detail(self) -> Literal["high", "low", "auto"]:
-        return self.value
+        match self:
+            case PromptImageDetail.HIGH:
+                return "high"
+            case PromptImageDetail.LOW:
+                return "low"
+            case PromptImageDetail.AUTO:
+                return "auto"
 
 
 class PromptImageUri(BaseModel):
@@ -32,6 +40,7 @@ class PromptImageUri(BaseModel):
 
     kind: Literal["uri"] = "uri"
     uri: str
+    mime_type: str | None = None
 
     @field_validator("uri", mode="before")
     @classmethod
@@ -58,6 +67,16 @@ class PromptImageUri(BaseModel):
     def short_description(self) -> str:
         """Return a short description of the image."""
         return f"{self.resolved.kind.desc}: {self.uri[:100]}"
+
+    def get_image_type(self) -> str:
+        """Get the image type (extension) from stored mime_type.
+
+        Returns:
+            File extension (e.g., "png", "jpeg") or UNKNOWN_FILE_TYPE if mime_type is not set.
+        """
+        if self.mime_type:
+            return mime_type_to_extension(self.mime_type)
+        return UNKNOWN_FILE_TYPE
 
 
 class PromptImageBase64(BaseModel):

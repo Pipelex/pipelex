@@ -53,14 +53,14 @@ class TestLocalStorageProvider:
 
         assert "should not include scheme prefix" in str(exc_info.value).lower()
 
-    async def test_display_link_returns_file_uri(self, tmp_path: Path) -> None:
-        """Test that display_link() returns a file:// URI for clickable terminal links."""
+    async def test_public_url_returns_file_uri(self, tmp_path: Path) -> None:
+        """Test that public_url() returns a file:// URI for clickable terminal links."""
         provider = LocalStorageProvider(root_path=tmp_path)
         test_data = b"display test"
         key = "subdir/display_test.bin"
 
         returned_uri = await provider.store(data=test_data, key=key)
-        display = await provider.display_link(uri=returned_uri)
+        display = await provider.public_url(uri=returned_uri)
 
         expected_uri = (tmp_path / key).as_uri()
         assert display == expected_uri

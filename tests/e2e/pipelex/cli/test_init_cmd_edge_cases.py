@@ -3,9 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
-
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.model_backends.backend import PipelexBackend
@@ -14,10 +11,13 @@ from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
 
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
+
 
 class TestEdgeCases:
-    def test_pipelex_gateway_sets_pipelex_gateway_first(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case 9.1: pipelex_gateway always sets pipelex_gateway_first."""
+    def test_pipelex_gateway_sets_all_pipelex_gateway(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test Case 9.1: pipelex_gateway always sets all_pipelex_gateway."""
         # Setup environment
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_empty_dir()
@@ -37,8 +37,8 @@ class TestEdgeCases:
         # Execute
         init_cmd(focus=InitFocus.ALL)
 
-        # Verify pipelex_gateway_first is set automatically
-        env.verify_routing(PipelexRoutingProfile.PIPELEX_GATEWAY_FIRST)
+        # Verify all_pipelex_gateway is set automatically
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
 
     def test_single_non_pipelex_backend(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 9.2: Single non-pipelex backend."""

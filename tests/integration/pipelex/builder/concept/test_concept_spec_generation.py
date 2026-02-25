@@ -8,6 +8,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_llm_worker
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.builder.concept.integration_test_data import ConceptSpecGenerationTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 @pytest.mark.llm
@@ -25,14 +26,14 @@ class TestConceptSpecGeneration:
         self,
         job_metadata: JobMetadata,
         llm_job_params: LLMJobParams,
-        llm_handle: str,
+        llm_combo: ModelCombo,
         topic: str,
         user_prompt: str,
     ):
-        log.info(f"Testing {topic} with llm_handle '{llm_handle}'")
+        log.info(f"Testing {topic} with llm_handle '{llm_combo.handle}'")
 
         # Get the LLM worker
-        llm_worker = get_llm_worker(llm_handle=llm_handle)
+        llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
 
         # Skip if object generation is not supported
         if not llm_worker.is_gen_object_supported:
@@ -57,7 +58,7 @@ class TestConceptSpecGeneration:
         generated_concept_spec = await llm_worker.gen_object(llm_job=llm_job, schema=ConceptSpec)
 
         # Display the result
-        pretty_print(generated_concept_spec, title=f"Generated ConceptSpec for '{topic}' using {llm_handle}")
+        pretty_print(generated_concept_spec, title=f"Generated ConceptSpec for '{topic}' using {llm_combo.handle}")
 
         # Basic validation: if we got here without exceptions, the ConceptSpec was created successfully
         # The Pydantic validation and field validators have already run

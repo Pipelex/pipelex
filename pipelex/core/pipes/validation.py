@@ -121,3 +121,7 @@ def validate_input_name(input_name: str) -> None:
             "where each part must also be in snake_case."
         )
         raise ValueError(msg)
+
+
+def is_pipe_code_valid(pipe_code: str) -> bool:
+    return is_snake_case(pipe_code)

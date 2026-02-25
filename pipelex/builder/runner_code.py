@@ -20,6 +20,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 
 @dataclass
@@ -33,7 +34,8 @@ class CustomClassInfo:
     @property
     def module_name(self) -> str:
         """Get the module name (filename without .py) for this class."""
-        return f"{self.domain_code}_{self.concept_code}"
+        concept_snake_case = pascal_case_to_snake_case(self.concept_code)
+        return f"{self.domain_code}__{concept_snake_case}"
 
     @property
     def import_statement(self) -> str:
@@ -151,32 +153,40 @@ def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict
     return native_classes, custom_classes
 
 
-def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) -> str:
+def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, library_dir: str | None = None) -> str:
     """Generate the complete Python runner code for a pipe.
 
     This generates a runnable Python script with:
     - Import statements for all required structure classes
     - An async function to run the pipeline with proper return type
     - Example input values based on the pipe's input concepts
-    - Output handling with main_stuff_as
+    - Output handling with main_stuff_as (or main_stuff for Anything)
 
     Args:
         pipe: The pipe to generate runner code for
         output_multiplicity: Whether the output is a list (e.g., Text[])
+        library_dir: Directory containing the MTHDS bundles to load
     """
     # Get output information
     structure_class_name = pipe.output.concept.structure_class_name
     is_native = NativeConceptCode.is_native_structure_class(structure_class_name)
     custom_info = None if is_native else _collect_concept_info(pipe.output.concept)
 
+    # Check if output is the special "Anything" concept (no specific content type)
+    is_anything_output = pipe.output.concept.code == NativeConceptCode.ANYTHING
+
     # Collect all imports needed for inputs
     native_classes, custom_classes = _collect_imports_for_inputs(pipe.inputs)
 
-    # Add output class to appropriate set
-    if is_native:
-        native_classes.add(structure_class_name)
-    elif custom_info:
-        custom_classes[structure_class_name] = custom_info
+    # Track if we need to import Any from typing (for Anything output)
+    needs_any_import = is_anything_output
+
+    # Add output class to appropriate set (unless it's Anything)
+    if not is_anything_output:
+        if is_native:
+            native_classes.add(structure_class_name)
+        elif custom_info:
+            custom_classes[structure_class_name] = custom_info
 
     # Build import section
     import_lines: list[str] = []
@@ -195,6 +205,11 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
         )
 
     import_lines.extend(["import asyncio", ""])
+
+    # Add typing import if needed (for Anything output)
+    if needs_any_import:
+        import_lines.append("from typing import Any")
+        import_lines.append("")
 
     # Add native content class imports
     native_imports: list[str] = []
@@ -215,7 +230,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
         [
             "",
             "from pipelex.pipelex import Pipelex",
-            "from pipelex.pipeline.execute import execute_pipeline",
+            "from pipelex.pipeline.runner import PipelexRunner",
         ]
     )
 
@@ -224,7 +239,7 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
         input_entries: list[str] = []
         for var_name, input_req in pipe.inputs.root.items():
             is_multiple = _is_multiple(input_req.multiplicity)
-            result, _ = input_req.concept.generate_input_representation(
+            result, _ = input_req.concept.render_concept_representation(
                 output_format=ConceptRepresentationFormat.PYTHON,
                 is_multiple=is_multiple,
             )
@@ -234,8 +249,12 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
     else:
         input_memory_block = "            # No inputs required"
 
-    # Determine return type annotation
-    if output_multiplicity:
+    # Determine return type annotation and result call
+    # Special case: Anything output uses Any type and main_stuff (no content type casting)
+    if is_anything_output:
+        return_type = "Any"
+        result_call = "pipe_output.main_stuff"
+    elif output_multiplicity:
         return_type = f"list[{structure_class_name}]"
         result_call = f"pipe_output.main_stuff_as_items(item_type={structure_class_name})"
     else:
@@ -247,7 +266,8 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
         "",
         "",
         f"async def run_{pipe.code}() -> {return_type}:",
-        "    pipe_output = await execute_pipeline(",
+        "    runner = PipelexRunner()",
+        "    response = await runner.execute_pipeline(",
         f'        pipe_code="{pipe.code}",',
     ]
 
@@ -263,12 +283,23 @@ def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False) 
     function_lines.extend(
         [
             "    )",
+            "    pipe_output = response.pipe_output",
             f"    return {result_call}",
             "",
             "",
             'if __name__ == "__main__":',
             "    # Initialize Pipelex",
-            "    with Pipelex.make():",
+        ]
+    )
+
+    # Add Pipelex.make() with library_dirs if provided
+    if library_dir:
+        function_lines.append(f'    with Pipelex.make(library_dirs=["{library_dir}"]):')
+    else:
+        function_lines.append("    with Pipelex.make():")
+
+    function_lines.extend(
+        [
             "        # Run the pipeline",
             f"        result = asyncio.run(run_{pipe.code}())",
             "",

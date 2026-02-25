@@ -23,7 +23,7 @@ class TestPipeParallelValidation:
         concept_blueprint = ConceptBlueprint(description="A test document")
         concept_1 = ConceptFactory.make_from_blueprint(
             domain_code=domain_code,
-            concept_code="Document",
+            concept_code="TestDocument",
             blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(
@@ -71,7 +71,7 @@ class TestPipeParallelValidation:
                 "context": concept_2.code,
             },
             output=ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_3.code),
-            parallels=[SubPipeBlueprint(pipe=real_pipe.code, result="analysis_result")],
+            branches=[SubPipeBlueprint(pipe=real_pipe.code, result="analysis_result")],
             add_each_output=True,
             combined_output=None,
         )
@@ -104,7 +104,7 @@ class TestPipeParallelValidation:
         concept_blueprint = ConceptBlueprint(description="Lorem Ipsum")
         concept_1 = ConceptFactory.make_from_blueprint(
             domain_code=domain_code,
-            concept_code="Document",
+            concept_code="TestDocument",
             blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(
@@ -123,7 +123,7 @@ class TestPipeParallelValidation:
             description="Basic parallel pipe for testing",
             inputs={"input_var": concept_1.concept_ref},
             output=ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_3.code),
-            parallels=[SubPipeBlueprint(pipe="test_pipe_1", result="result_1")],
+            branches=[SubPipeBlueprint(pipe="test_pipe_1", result="result_1")],
             add_each_output=True,
             combined_output=None,
         )
@@ -155,7 +155,7 @@ class TestPipeParallelValidation:
         concept_blueprint = ConceptBlueprint(description="A test document")
         concept_1 = ConceptFactory.make_from_blueprint(
             domain_code=domain_code,
-            concept_code="Document",
+            concept_code="TestDocument",
             blueprint_or_string_description=concept_blueprint,
         )
         concept_2 = ConceptFactory.make_from_blueprint(
@@ -178,7 +178,7 @@ class TestPipeParallelValidation:
                 "context": concept_2.concept_ref,
             },
             output=ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_3.code),
-            parallels=[],  # No sub-pipes to avoid dependency issues
+            branches=[],  # No sub-pipes to avoid dependency issues
             add_each_output=True,
             combined_output=None,
         )

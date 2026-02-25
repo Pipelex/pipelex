@@ -23,7 +23,6 @@ class TestKitIndexLoader:
     def test_index_sets_contain_expected_files(self):
         """Test that agent_rules sets reference expected markdown files."""
         idx = load_index()
-        assert "pipelex_language" in idx.agent_rules.sets
         assert "all" in idx.agent_rules.sets
         assert len(idx.agent_rules.sets["all"]) > 0
 

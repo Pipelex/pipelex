@@ -1,0 +1,14 @@
+domain    = "pkg_test_analytics_dep"
+main_pipe = "pkg_test_compute_analytics"
+
+[concept.PkgTestWeightedScore]
+description = "A weighted score from the analytics library (same code as scoring_dep)"
+
+[pipe.pkg_test_compute_analytics]
+type        = "PipeLLM"
+description = "Compute analytics"
+output      = "PkgTestWeightedScore"
+prompt      = "Compute analytics for: {{ data }}"
+
+[pipe.pkg_test_compute_analytics.inputs]
+data = "Text"

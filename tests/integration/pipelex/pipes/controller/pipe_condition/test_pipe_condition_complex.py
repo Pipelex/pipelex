@@ -79,7 +79,7 @@ class TestPipeConditionComplex:
 
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert "URGENT_TECHNICAL_PROCESSED" in final_result.content.text
 
     async def test_business_finance_routing(
@@ -125,7 +125,7 @@ class TestPipeConditionComplex:
         pretty_print(pipe_output, title="Business Finance Processing")
 
         assert pipe_output is not None
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             final_result = pipe_output.main_stuff
             assert isinstance(final_result.content, TextContent)
             assert "FINANCE_BUSINESS_PROCESSED" in final_result.content.text
@@ -173,7 +173,7 @@ class TestPipeConditionComplex:
         pretty_print(pipe_output, title="Legal Complex Processing")
 
         assert pipe_output is not None
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             final_result = pipe_output.main_stuff
             assert isinstance(final_result.content, TextContent)
             assert "COMPLEX_LEGAL_PROCESSED" in final_result.content.text
@@ -229,13 +229,15 @@ class TestPipeConditionComplex:
         pretty_print(pipe_output, title="Technical Expert High Complexity Processing")
 
         assert pipe_output is not None
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             final_result = pipe_output.main_stuff
             assert isinstance(final_result.content, TextContent)
             assert "EXPERT_TECHNICAL_PROCESSED" in final_result.content.text
 
     # DRY RUN TESTS
-    async def test_complex_pipeline_dry_run_success(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
+    async def test_complex_pipeline_dry_run_success(
+        self, pipe_run_mode: PipeRunMode, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test complex pipeline dry run with valid inputs - should succeed."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="business", priority="urgent", language="english", complexity="low")
@@ -267,7 +269,7 @@ class TestPipeConditionComplex:
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="complex_document_processor"),
-                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
             ),
@@ -278,7 +280,9 @@ class TestPipeConditionComplex:
         assert pipe_output is not None
         assert pipe_output.working_memory is not None
 
-    async def test_complex_pipeline_dry_run_missing_inputs(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
+    async def test_complex_pipeline_dry_run_missing_inputs(
+        self, pipe_run_mode: PipeRunMode, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test complex pipeline dry run with missing inputs - should fail with PipeRouterError."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         doc_request = DocumentRequest(document_type="technical", priority="urgent", language="english", complexity="high")
@@ -300,7 +304,7 @@ class TestPipeConditionComplex:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="complex_document_processor"),
-                    pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                    pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                     working_memory=working_memory,
                     job_metadata=job_metadata,
                 ),
@@ -390,5 +394,5 @@ class TestPipeConditionComplex:
 
         assert pipe_output is not None
         assert pipe_output.main_stuff is not None
-        if pipe_run_mode == PipeRunMode.LIVE:
+        if pipe_run_mode.is_live:
             assert expected_output_contains in pipe_output.main_stuff_as_str

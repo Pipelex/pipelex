@@ -9,12 +9,12 @@ from google.genai import types as genai_types
 from mistralai.models import ImageURLChunk
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.image.prepared_image import PreparedImageBase64
 from pipelex.cogt.image.prompt_image import PromptImageUri
 from pipelex.cogt.image.prompt_image_utils import prepare_prompt_image_as_base64
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+from pipelex.tools.uri.prepared_file import PreparedFileBase64
 
 # Minimal PNG image (1x1 transparent pixel)
 MINIMAL_PNG_BYTES = bytes(
@@ -181,5 +181,5 @@ class TestPromptImageUtilsPipelexStorageSupport:
 
         result = await prepare_prompt_image_as_base64(prompt_image_with_storage_uri)
 
-        assert isinstance(result, PreparedImageBase64)
+        assert isinstance(result, PreparedFileBase64)
         assert result.file_type.mime == "image/png"

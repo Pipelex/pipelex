@@ -1,4 +1,4 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
@@ -8,8 +8,13 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
+
+if TYPE_CHECKING:
+    from pipelex.pipe_operators.shared.image_reference import ImageReference
 
 
 class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
@@ -44,6 +49,48 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             if blueprint.negative_prompt
             else None
         )
+
+        # Analyze both prompts for image references
+        # Images may be referenced in positive prompt, negative prompt, or both
+        image_references: list[ImageReference] | None = None
+        if blueprint.inputs:
+            all_image_refs: list[ImageReference] = []
+            seen_paths: set[str] = set()
+
+            # Analyze positive prompt
+            if blueprint.prompt:
+                prompt_refs = TemplateImageAnalyzer.analyze_template_for_images(
+                    template_source=blueprint.prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                    template_category=TemplateCategory.IMG_GEN_PROMPT,
+                )
+                for ref in prompt_refs:
+                    if ref.variable_path not in seen_paths:
+                        all_image_refs.append(ref)
+                        seen_paths.add(ref.variable_path)
+
+            # Analyze negative prompt
+            if blueprint.negative_prompt:
+                negative_refs = TemplateImageAnalyzer.analyze_template_for_images(
+                    template_source=blueprint.negative_prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                    template_category=TemplateCategory.IMG_GEN_PROMPT,
+                )
+                for ref in negative_refs:
+                    if ref.variable_path not in seen_paths:
+                        all_image_refs.append(ref)
+                        seen_paths.add(ref.variable_path)
+
+            image_references = all_image_refs or None
+
+        img_gen_prompt_blueprint = ImgGenPromptBlueprint(
+            prompt_blueprint=prompt_blueprint,
+            negative_prompt_blueprint=negative_prompt_blueprint,
+            image_references=image_references,
+        )
+
         return PipeImgGen(
             domain_code=domain_code,
             code=pipe_code,
@@ -51,8 +98,7 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
             inputs=inputs,
             output=output,
             output_multiplicity=final_multiplicity,
-            prompt_blueprint=prompt_blueprint,
-            negative_prompt_blueprint=negative_prompt_blueprint,
+            img_gen_prompt_blueprint=img_gen_prompt_blueprint,
             img_gen_choice=blueprint.model,
             aspect_ratio=blueprint.aspect_ratio,
             is_raw=blueprint.is_raw,

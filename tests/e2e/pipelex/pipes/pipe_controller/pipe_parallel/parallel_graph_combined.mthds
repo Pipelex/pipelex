@@ -1,0 +1,60 @@
+domain      = "test_parallel_graph_combined"
+description = "Test PipeParallel with combined_output wrapped in PipeSequence with follow-up consumer"
+main_pipe   = "pgc_analysis_then_summarize"
+
+[concept.PgcToneResult]
+description = "Result of tone analysis"
+refines     = "Text"
+
+[concept.PgcLengthResult]
+description = "Result of length analysis"
+refines     = "Text"
+
+[concept.PgcCombinedResult]
+description = "Combined results from parallel analysis"
+
+[pipe.pgc_analysis_then_summarize]
+type = "PipeSequence"
+description = "Run parallel analysis then summarize the combined result"
+inputs = { input_text = "Text" }
+output = "Text"
+steps = [
+  { pipe = "pgc_parallel_analysis", result = "pgc_combined_result" },
+  { pipe = "pgc_summarize_combined" },
+]
+
+[pipe.pgc_parallel_analysis]
+type = "PipeParallel"
+description = "Analyze tone and length in parallel with combined output"
+inputs = { input_text = "Text" }
+output = "PgcCombinedResult"
+add_each_output = true
+combined_output = "PgcCombinedResult"
+branches = [
+  { pipe = "pgc_analyze_tone", result = "tone_result" },
+  { pipe = "pgc_analyze_length", result = "length_result" },
+]
+
+[pipe.pgc_analyze_tone]
+type        = "PipeLLM"
+description = "Analyze the tone of the text"
+inputs      = { input_text = "Text" }
+output      = "PgcToneResult"
+model       = "$testing-text"
+prompt      = "Describe the tone of: @input_text.text"
+
+[pipe.pgc_analyze_length]
+type        = "PipeLLM"
+description = "Analyze the length of the text"
+inputs      = { input_text = "Text" }
+output      = "PgcLengthResult"
+model       = "$testing-text"
+prompt      = "Describe the length characteristics of: @input_text.text"
+
+[pipe.pgc_summarize_combined]
+type        = "PipeLLM"
+description = "Summarize the combined parallel analysis result"
+inputs      = { pgc_combined_result = "PgcCombinedResult" }
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Summarize the following analysis: @pgc_combined_result"

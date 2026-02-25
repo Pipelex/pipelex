@@ -50,7 +50,7 @@ class TestPipeBatchSimple:
 
         pipe_batch_blueprint = PipeBatchBlueprint(
             description="Simple batch processing test",
-            branch_pipe_code="uppercase_transformer",  # This exists in the PLX file
+            branch_pipe_code="uppercase_transformer",  # This exists in the MTHDS file
             inputs={
                 "text_list": concept_1.concept_ref,
             },
@@ -128,7 +128,7 @@ class TestPipeBatchSimple:
         expected_results = ["UPPER: HELLO", "UPPER: WORLD", "UPPER: TEST"]
         for i, item in enumerate(output_list.items):
             assert isinstance(item, TextContent)
-            if pipe_run_mode != PipeRunMode.DRY:
+            if pipe_run_mode.is_live:
                 assert item.text == expected_results[i], f"Item {i}: expected '{expected_results[i]}', got '{item.text}'"
 
         # Verify working memory contains all the expected elements
@@ -152,7 +152,7 @@ class TestPipeBatchSimple:
         assert isinstance(batch_result.content, ListContent)
         result_list = batch_result.as_list_of_fixed_content_type(item_type=TextContent)
         assert len(result_list.items) == 3
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert result_list.items[0].text == "UPPER: HELLO"
             assert result_list.items[1].text == "UPPER: WORLD"
             assert result_list.items[2].text == "UPPER: TEST"

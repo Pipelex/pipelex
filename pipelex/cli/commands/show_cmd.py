@@ -24,11 +24,11 @@ from pipelex.hub import (
     get_required_pipe,
     get_secrets_provider,
     get_telemetry_manager,
+    resolve_library_dirs,
     set_current_library,
 )
 from pipelex.pipelex import Pipelex
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.configuration.configs import ConfigPaths
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
 from pipelex.tools.misc.package_utils import get_package_version
@@ -37,7 +37,6 @@ if TYPE_CHECKING:
     from pipelex.cogt.models.model_manager import ModelManager
 
 COMMAND = "show"
-SUB_COMMAND_PIPES = "pipes"
 SUB_COMMAND_PIPE = "pipe"
 SUB_COMMAND_MODELS = "models"
 SUB_COMMAND_BACKENDS = "backends"
@@ -77,8 +76,8 @@ def do_show_backends(show_all: bool = False) -> None:
             backend_library = InferenceBackendLibrary()
             backend_library.load(
                 secrets_provider=secrets_provider,
-                backends_library_path=ConfigPaths.BACKENDS_FILE_PATH,
-                backends_dir_path=ConfigPaths.BACKENDS_DIR_PATH,
+                backends_library_path=config_manager.backends_file_path,
+                backends_dir_path=config_manager.backends_dir_path,
                 include_disabled=True,
             )
         else:
@@ -186,55 +185,71 @@ def show_config_cmd() -> None:
     do_show_config()
 
 
-@show_app.command("pipes", help="List all available pipes in the current project")
-def list_pipes_cmd() -> None:
-    """List all pipes that have been loaded into the pipe library.
-
-    This includes pipes from your project's .plx files and any
-    pipes from imported packages.
-    """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPES)
-
-    try:
-        library_manager = get_library_manager()
-        library_id, _ = library_manager.open_library()
-        set_current_library(library_id=library_id)
-        library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
-
-        with get_telemetry_manager().telemetry_context():
-            tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
-            tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
-            tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPES}")
-
-            do_list_pipes()
-    finally:
-        Pipelex.teardown_if_needed()
-
-
-@show_app.command("pipe", help="Display the detailed definition of a specific pipe")
+@show_app.command("pipe", help="Display a specific pipe or list all pipes with --all")
 def show_pipe_cmd(
-    pipe_code: Annotated[str, typer.Argument(help="Pipeline code to show definition for (e.g., 'my_domain.my_pipe')")],
+    pipe_code: Annotated[
+        str | None,
+        typer.Argument(help="Pipe code to show (e.g., 'my_domain.my_pipe')"),
+    ] = None,
+    show_all: Annotated[
+        bool,
+        typer.Option("--all", "-a", help="List all available pipes"),
+    ] = False,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--library-dir",
+            "-L",
+            help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times.",
+        ),
+    ] = None,
 ) -> None:
-    """Show the complete definition of a pipe including its inputs, outputs,
-    prompt, and all configuration settings.
+    """Show the complete definition of a pipe, or list all pipes with --all.
 
-    Example:
-        pipelex show pipe hello_world
+    Examples:
+        pipelex show pipe my_pipe
+        pipelex show pipe my_pipe -L ./my_library
+        pipelex show pipe --all
+        pipelex show pipe --all -L ./my_library
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
+    if show_all and pipe_code:
+        typer.secho(
+            "Failed: --all cannot be used with a pipe code",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    if not show_all and not pipe_code:
+        typer.secho(
+            "Failed: please provide a pipe code or use --all to list all pipes",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE, library_dirs=library_dirs)
 
     try:
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
         set_current_library(library_id=library_id)
-        library_manager.load_libraries(library_id=library_id, library_dirs=[Path.cwd()])
+        effective_dirs, _ = resolve_library_dirs(library_dirs)
+
+        if effective_dirs:
+            library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
         with get_telemetry_manager().telemetry_context():
             tag(name=EventProperty.INTEGRATION, value=IntegrationMode.CLI)
             tag(name=EventProperty.PIPELEX_VERSION, value=get_package_version())
             tag(name=EventProperty.CLI_COMMAND, value=f"{COMMAND} {SUB_COMMAND_PIPE}")
 
-            do_show_pipe(pipe_code=pipe_code)
+            if show_all:
+                do_list_pipes()
+            else:
+                assert pipe_code is not None
+                do_show_pipe(pipe_code=pipe_code)
     finally:
         Pipelex.teardown_if_needed()
 

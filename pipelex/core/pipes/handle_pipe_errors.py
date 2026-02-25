@@ -4,7 +4,6 @@ from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.interpreter.validation_error_categorizer import ErrorCatKey
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError, PipeValidationErrorType
 from pipelex.types import StrEnum
 
@@ -29,7 +28,7 @@ def _extract_wrapped_pipe_validation_error(error: ErrorDetails) -> PipeValidatio
         The original PipeValidationError if found, None otherwise
     """
     # Check if the error type indicates a value_error (which wraps exceptions from validators)
-    error_type = error.get(ErrorCatKey.TYPE.value, "")
+    error_type = error["type"]
     if error_type != "value_error":
         return None
 
@@ -68,7 +67,7 @@ def categorize_pipe_validation_error(
     if errors:
         # Check first error's field name to determine model type
         first_error = errors[0]
-        loc = first_error.get(ErrorCatKey.LOC.value, ())
+        loc = first_error["loc"]
         # TODO: Refactor how to determine model scope (use error codes)
         if loc:
             field_name = str(loc[0])
@@ -97,8 +96,8 @@ def categorize_pipe_validation_error(
                 pipe_code=None,  # We don't have the code at this point
             )
         else:
-            loc = error.get(ErrorCatKey.LOC.value, ())
-            message = error.get(ErrorCatKey.MSG.value, "Unknown validation error")
+            loc = error["loc"]
+            message = error["msg"]
             field_path_str = " → ".join(str(item) for item in loc)
             unknown_field_name = str(loc[0]) if len(loc) >= 1 else None
 
@@ -133,9 +132,9 @@ def _handle_pipe_errors(
         PipesAndConceptValidationErrorData with all context populated
     """
     # Extract data from error
-    loc = error.get(ErrorCatKey.LOC.value, ())
-    message = error.get(ErrorCatKey.MSG.value, "Unknown validation error")
-    pydantic_type = error.get(ErrorCatKey.TYPE.value, "")
+    loc = error["loc"]
+    message = error["msg"]
+    pydantic_type = error["type"]
     field_path = " → ".join(str(item) for item in loc)
 
     # Extract field_name from loc[0] (direct field on Pipe model)
@@ -189,7 +188,7 @@ def categorize_pipe_validation_with_libraries_error(
     return PipesAndConceptValidationErrorData(
         error_type=error_type,
         domain_code=pipe_error.domain_code,
-        source=pipe_error.file_path or None,
+        source=pipe_error.file_path,
         pipe_code=pipe_error.pipe_code,
         concept_code=None,  # This is a pipe error, not a concept error
         field_name=None,  # Field name is not provided in PipeValidationError

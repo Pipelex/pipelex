@@ -7,6 +7,7 @@ from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.tools.misc.pretty import pretty_print
+from pipelex.urls import URLs
 
 
 def remove_ansi_escape_codes(text: str) -> str:
@@ -42,7 +43,7 @@ class TestPageContentRendering:
                 text=TextContent(text="Page text"),
                 images=None,
             ),
-            page_view=ImageContent(url="https://example.com/page_screenshot.png"),
+            page_view=ImageContent(url=URLs.png_example_1),
         )
         pretty_print(page.rendered_pretty())
 
@@ -51,4 +52,4 @@ class TestPageContentRendering:
 
         assert "Page text" in output
         assert "Page View" in output
-        assert "page_screenshot.png" in output
+        assert "png_example_1.png" in output

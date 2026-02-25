@@ -1,0 +1,26 @@
+domain    = "pkg_test_consumer_analysis"
+main_pipe = "pkg_test_analyze_item"
+
+[concept.PkgTestAnalysisResult]
+description = "Analysis result combining scoring"
+
+[pipe.pkg_test_analyze_item]
+type = "PipeSequence"
+description = "Analyze an item using scoring dependency"
+output = "PkgTestAnalysisResult"
+steps = [
+  { pipe = "scoring_dep->pkg_test_scoring_dep.pkg_test_compute_score" },
+  { pipe = "pkg_test_summarize" },
+]
+
+[pipe.pkg_test_analyze_item.inputs]
+item = "Text"
+
+[pipe.pkg_test_summarize]
+type        = "PipeLLM"
+description = "Summarize the analysis"
+output      = "PkgTestAnalysisResult"
+prompt      = "Summarize the analysis for: {{ item }}"
+
+[pipe.pkg_test_summarize.inputs]
+item = "Text"

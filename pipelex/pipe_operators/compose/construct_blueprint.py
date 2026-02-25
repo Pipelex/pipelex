@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, SerializationInfo, SerializerFunctionWrapHandler, field_validator, model_serializer, model_validator
 
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
@@ -34,7 +34,7 @@ class ConstructFieldBlueprint(BaseModel):
     """Blueprint for composing a single field in a StructuredContent.
 
     Defines how a field value is composed using one of 4 methods:
-    1. Fixed value: literal string, number, bool
+    1. Fixed value: literal string, number, bool, or list
     2. Variable reference (from): path to variable in working memory
     3. Template: Jinja2 template string (with $ preprocessing)
     4. Nested construct: recursive ConstructBlueprint
@@ -45,6 +45,8 @@ class ConstructFieldBlueprint(BaseModel):
         from_path: Variable path in working memory (for FROM_VAR method)
         template: Jinja2 template string (for TEMPLATE method)
         nested: Nested ConstructBlueprint (for NESTED method)
+        list_to_dict_keyed_by: Optional modifier for FROM_VAR method that converts
+            a ListContent/list to dict keyed by the specified attribute name
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -54,6 +56,7 @@ class ConstructFieldBlueprint(BaseModel):
     from_path: str | None = None
     template: str | None = None
     nested: ConstructBlueprint | None = None
+    list_to_dict_keyed_by: str | None = None
 
     @model_validator(mode="after")
     def validate_method_data_consistency(self) -> Self:
@@ -77,13 +80,37 @@ class ConstructFieldBlueprint(BaseModel):
                     raise ValueError(msg)
         return self
 
+    def to_mthds_dict(self) -> Any:
+        """Convert to MTHDS-format dict for serialization.
+
+        Returns the format expected in MTHDS files:
+        - FIXED: Just the value itself
+        - FROM_VAR: { from: "path" } with optional list_to_dict_keyed_by
+        - TEMPLATE: { template: "..." }
+        - NESTED: The nested construct's MTHDS dict
+        """
+        match self.method:
+            case ConstructFieldMethod.FIXED:
+                return self.fixed_value
+            case ConstructFieldMethod.FROM_VAR:
+                result: dict[str, Any] = {"from": self.from_path}
+                if self.list_to_dict_keyed_by:
+                    result["list_to_dict_keyed_by"] = self.list_to_dict_keyed_by
+                return result
+            case ConstructFieldMethod.TEMPLATE:
+                return {"template": self.template}
+            case ConstructFieldMethod.NESTED:
+                if self.nested:
+                    return self.nested.to_mthds_dict()
+                return {}
+
     @classmethod
     def make_from_raw(cls, raw: Any) -> ConstructFieldBlueprint:
         """Create a ConstructFieldBlueprint from raw TOML input.
 
         Args:
             raw: The raw value from TOML parsing. Can be:
-                - str/int/float/bool: Fixed value
+                - str/int/float/bool/list: Fixed value
                 - dict with 'from' key: Variable reference
                 - dict with 'template' key: Template
                 - dict with other keys: Nested construct
@@ -103,6 +130,11 @@ class ConstructFieldBlueprint(BaseModel):
                 method=ConstructFieldMethod.FIXED,
                 fixed_value=raw,
             )
+        elif isinstance(raw, list):
+            return cls(
+                method=ConstructFieldMethod.FIXED,
+                fixed_value=cast("list[Any]", raw),
+            )
         elif isinstance(raw, dict):
             raw_dict = cast("dict[str, Any]", raw)
             if len(raw_dict) == 0:
@@ -118,17 +150,24 @@ class ConstructFieldBlueprint(BaseModel):
                 raise ConstructFieldBlueprintValueError(msg)
 
             if has_from:
-                # Variable reference
-                if len(raw_dict) != 1:
-                    msg = "'from' field should only have the 'from' key"
+                # Variable reference, possibly with list_to_dict_keyed_by modifier
+                allowed_keys = {"from", "list_to_dict_keyed_by"}
+                if not set(raw_dict.keys()).issubset(allowed_keys):
+                    extra_keys = set(raw_dict.keys()) - allowed_keys
+                    msg = f"'from' field has unexpected keys: {extra_keys}"
                     raise ConstructFieldBlueprintValueError(msg)
                 from_value = raw_dict["from"]
                 if not isinstance(from_value, str):
                     msg = "'from' value must be a string path"
                     raise ConstructFieldBlueprintTypeError(msg)
+                list_to_dict_keyed_by = raw_dict.get("list_to_dict_keyed_by")
+                if list_to_dict_keyed_by is not None and not isinstance(list_to_dict_keyed_by, str):
+                    msg = "'list_to_dict_keyed_by' value must be a string attribute name"
+                    raise ConstructFieldBlueprintTypeError(msg)
                 return cls(
                     method=ConstructFieldMethod.FROM_VAR,
                     from_path=from_value,
+                    list_to_dict_keyed_by=list_to_dict_keyed_by,
                 )
             elif has_template:
                 # Template
@@ -158,7 +197,7 @@ class ConstructFieldBlueprint(BaseModel):
 class ConstructBlueprint(BaseModel):
     """Blueprint for composing a StructuredContent from working memory.
 
-    Parsed from `[pipe.name.construct]` section in PLX files.
+    Parsed from `[pipe.name.construct]` section in MTHDS files.
 
     Attributes:
         fields: Dictionary mapping field names to their composition blueprints
@@ -230,6 +269,26 @@ class ConstructBlueprint(BaseModel):
                     pass
 
         return required
+
+    def to_mthds_dict(self) -> dict[str, Any]:
+        """Convert to MTHDS-format dict (fields at root, no wrapper).
+
+        Returns the format expected in MTHDS files where field names are at
+        the root level, not wrapped in a 'fields' key.
+        """
+        return {field_name: field_bp.to_mthds_dict() for field_name, field_bp in self.fields.items()}
+
+    @model_serializer(mode="wrap")
+    def serialize_with_context(self, handler: SerializerFunctionWrapHandler, info: SerializationInfo) -> dict[str, Any]:
+        """Serialize with format-aware context.
+
+        When context contains {"format": "mthds"}, outputs MTHDS-format dict.
+        Otherwise, uses default Pydantic serialization.
+        """
+        if info.context and info.context.get("format") == "mthds":
+            return self.to_mthds_dict()
+        result = handler(self)
+        return dict(result)  # Ensure dict return type
 
     @classmethod
     def make_from_raw(cls, raw: dict[str, Any]) -> ConstructBlueprint:

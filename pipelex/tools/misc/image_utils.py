@@ -55,6 +55,15 @@ class ImageFormat(StrEnum):
                 return "image/webp"
 
     @classmethod
+    def from_mime_type(cls, mime_type: str) -> "ImageFormat":
+        for fmt in cls:
+            if fmt.as_mime_type == mime_type:
+                return fmt
+        cls.raise_if_unsupported_mime_type(mime_type)
+        msg = f"Unsupported MIME type: {mime_type}"
+        raise ValueError(msg)
+
+    @classmethod
     def get_supported_mime_types(cls) -> frozenset[str]:
         """Return the set of supported image MIME types."""
         return frozenset(fmt.as_mime_type for fmt in cls)

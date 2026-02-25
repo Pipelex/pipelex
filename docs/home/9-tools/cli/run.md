@@ -8,11 +8,11 @@ Execute a pipeline with optional inputs and outputs.
 pipelex run [TARGET] [OPTIONS]
 ```
 
-Executes a pipeline, either from a standalone bundle (.plx) file or from your project's pipe library.
+Executes a pipeline, either from a standalone bundle (.mthds) file or from your project's pipe library.
 
 **Arguments:**
 
-- `TARGET` - Either a pipe code or a bundle file path, auto-detected according to presence of the .plx file extension
+- `TARGET` - Either a pipe code or a bundle file path, auto-detected according to presence of the .mthds file extension
 
 **Options:**
 
@@ -22,6 +22,7 @@ Executes a pipeline, either from a standalone bundle (.plx) file or from your pr
 - `--output`, `-o` - Path to save output JSON (defaults to `results/run_{pipe_code}.json`)
 - `--no-output` - Skip saving output to file
 - `--no-pretty-print` - Skip pretty printing the main output
+- `--library-dir`, `-L` - Directory to search for pipe definitions (.mthds files). Can be specified multiple times.
 
 **Examples:**
 
@@ -33,16 +34,19 @@ pipelex run hello_world
 pipelex run write_weekly_report --inputs weekly_report_data.json
 
 # Run a bundle file (uses its main_pipe)
-pipelex run my_bundle.plx
+pipelex run my_bundle.mthds
 
 # Run a specific pipe from a bundle
-pipelex run my_bundle.plx --pipe extract_invoice
+pipelex run my_bundle.mthds --pipe extract_invoice
 
 # Run with explicit options
 pipelex run --pipe hello_world --output my_output.json
 
 # Run without saving or pretty printing
 pipelex run my_pipe --no-output --no-pretty-print
+
+# Run with custom library directories
+pipelex run my_pipe -L ./pipelines -L ./shared_pipes
 ```
 
 ## Input JSON Format

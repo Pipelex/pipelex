@@ -23,10 +23,10 @@ class PipeComposeBlueprint(PipeBlueprint):
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
 
     # Either template or construct must be provided, but not both
-    # Note: The field is named 'construct_spec' internally to avoid conflict with Pydantic's
-    # BaseModel.construct() method. In PLX/TOML files, use 'construct' (via validation_alias).
+    # Note: The field is named 'construct_blueprint' internally to avoid conflict with Pydantic's
+    # BaseModel.construct() method. In MTHDS/TOML files, use 'construct' (via aliases).
     template: str | TemplateBlueprint | None = None
-    construct_blueprint: ConstructBlueprint | None = Field(default=None, validation_alias="construct")
+    construct_blueprint: ConstructBlueprint | None = Field(default=None, validation_alias="construct", serialization_alias="construct")
 
     @model_validator(mode="before")
     @classmethod
@@ -136,7 +136,7 @@ class PipeComposeBlueprint(PipeBlueprint):
 
     @override
     def validate_output(self):
-        parsed_output = parse_concept_with_multiplicity(concept_ref=self.output)
+        parsed_output = parse_concept_with_multiplicity(concept_ref_or_code=self.output)
         if parsed_output.multiplicity:
             msg = (
                 "PipeCompose does not support multiple output generation. The output of PipeCompose must be a single stuff, "

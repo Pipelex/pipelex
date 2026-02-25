@@ -22,10 +22,10 @@ jobs:
           fi
 
   # ───────────────────────────────────────────────────────────────
-  # 2) Only work-branches → release/vX.Y.Z
+  # 2) Only work-branches → release/vX.Y.Z, pre-release/vX.Y.Z..., or dev
   # ───────────────────────────────────────────────────────────────
   gate-release:
-    if: startsWith(github.event.pull_request.base.ref, 'release/v') || github.event.pull_request.base.ref == 'dev'
+    if: startsWith(github.event.pull_request.base.ref, 'release/v') || startsWith(github.event.pull_request.base.ref, 'pre-release/v') || github.event.pull_request.base.ref == 'dev'
     runs-on: ubuntu-latest
     steps:
       - name: Verify source branch uses allowed prefix

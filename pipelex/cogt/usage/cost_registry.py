@@ -1,4 +1,5 @@
 import csv
+from pathlib import Path
 from typing import Any
 
 from pydantic import Field, RootModel
@@ -34,7 +35,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
         pipeline_run_id: str,
         llm_tokens_usages: list[LLMTokensUsage],
         unit_scale: float,
-        cost_report_file_path: str | None = None,
+        cost_report_file_path: Path | None = None,
     ):
         if not llm_tokens_usages:
             if pipeline_run_id != "untitled":
@@ -162,7 +163,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             cls.save_to_csv(records, cost_report_file_path)
 
     @staticmethod
-    def save_to_csv(records: list[dict[str, Any]], file_path: str) -> None:
+    def save_to_csv(records: list[dict[str, Any]], file_path: Path) -> None:
         """Save records to CSV file."""
         if not records:
             return

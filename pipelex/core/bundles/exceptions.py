@@ -23,5 +23,6 @@ class PipelexBundleBlueprintValidationErrorData(BaseModel):
     domain_code: str | None = None
     source: str | None = None
     pipe_code: str | None = None
+    concept_code: str | None = None
     message: str
     variable_names: list[str] | None = None

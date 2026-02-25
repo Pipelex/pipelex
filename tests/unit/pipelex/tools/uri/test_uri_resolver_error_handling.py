@@ -88,12 +88,17 @@ class TestUriResolverErrorHandling:
         with pytest.raises(httpx.ConnectError):
             await make_base64_url_from_any_uri("https://nonexistent-domain-12345.com/image.png")
 
-    async def test_pipelex_storage_raises_value_error_with_descriptive_message(self) -> None:
-        """Test that pipelex-storage:// URIs raise ValueError with helpful message."""
+    async def test_pipelex_storage_propagates_storage_errors(self, mocker: MockerFixture) -> None:
+        """Test that storage errors are propagated when loading pipelex-storage:// URIs."""
+        from pipelex.tools.storage.exceptions import StorageFileNotFoundError  # noqa: PLC0415
+
+        mock_storage = mocker.AsyncMock()
+        mock_storage.load = mocker.AsyncMock(side_effect=StorageFileNotFoundError("Key not found"))
+
         storage_uri = f"{PIPELEX_STORAGE_SCHEME}bucket/path/file.png"
 
-        with pytest.raises(ValueError, match="Unsupported URI type"):
-            await make_base64_url_from_any_uri(storage_uri)
+        with pytest.raises(StorageFileNotFoundError):
+            await make_base64_url_from_any_uri(storage_uri, storage_provider=mock_storage)
 
     async def test_local_file_not_found_raises_file_not_found_error(self) -> None:
         """Test that non-existent local files raise FileNotFoundError."""

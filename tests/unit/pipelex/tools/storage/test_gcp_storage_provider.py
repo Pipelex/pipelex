@@ -178,32 +178,32 @@ class TestGcpStorageProvider:
 
         assert "should not include scheme prefix" in str(exc_info.value).lower()
 
-    async def test_display_link_returns_public_url_when_signed_urls_disabled(
+    async def test_public_url_returns_public_url_when_signed_urls_disabled(
         self,
         gcp_provider_no_signed_urls: GcpStorageProvider,
         gcp_bucket_name: str,
     ) -> None:
-        """Test that display_link() returns a public URL when signed URLs are disabled."""
+        """Test that public_url() returns a public URL when signed URLs are disabled."""
         key = "display/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
 
-        display = await gcp_provider_no_signed_urls.display_link(uri=uri)
+        display = await gcp_provider_no_signed_urls.public_url(uri=uri)
 
         expected_url = f"https://storage.googleapis.com/{gcp_bucket_name}/{key}"
         assert display == expected_url
 
-    async def test_display_link_returns_signed_url_when_signed_urls_enabled(
+    async def test_public_url_returns_signed_url_when_signed_urls_enabled(
         self,
         gcp_provider_with_signed_urls: GcpStorageProvider,
         mock_gcp_storage: dict[str, Any],
     ) -> None:
-        """Test that display_link() returns a signed URL when signed URLs are enabled."""
+        """Test that public_url() returns a signed URL when signed URLs are enabled."""
         key = "presigned/test.bin"
         uri = f"{PIPELEX_STORAGE_SCHEME}{key}"
         expected_signed_url = "https://storage.googleapis.com/signed-url?signature=xyz"
         mock_gcp_storage["blob"].generate_signed_url.return_value = expected_signed_url
 
-        display = await gcp_provider_with_signed_urls.display_link(uri=uri)
+        display = await gcp_provider_with_signed_urls.public_url(uri=uri)
 
         assert display == expected_signed_url
         mock_gcp_storage["blob"].generate_signed_url.assert_called_once_with(

@@ -1,6 +1,8 @@
 import asyncio
-from typing import Literal, cast, get_type_hints
+import inspect
+from typing import Literal, cast, get_args, get_origin, get_type_hints
 
+from kajson.kajson_manager import KajsonManager
 from pydantic import field_validator
 from typing_extensions import override
 
@@ -42,7 +44,12 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     def validate_function_name(cls, function_name: str) -> str:
         function = func_registry.get_function(function_name)
         if not function:
-            msg = f"Function '{function_name}' not found in registry"
+            # Check if this function was found but is ineligible (e.g., missing return type)
+            ineligible_info = func_registry.get_ineligible_function_info(function_name)
+            if ineligible_info:
+                msg = f"Function '{function_name}' has @pipe_func() decorator but is not eligible for registration: {ineligible_info.reason}"
+            else:
+                msg = f"Function '{function_name}' not found in registry"
             raise ValueError(msg)
 
         return_type = get_type_hints(function).get("return")
@@ -70,7 +77,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
     @override
     def validate_output_with_library(self):
         function = func_registry.get_required_function(self.function_name)
-        return_type = get_type_hints(function).get("return")
+        return_type: type[StuffContent] | None = get_type_hints(function).get("return")
         if return_type is None:
             msg = (
                 f"PipeFunc '{self.code}' failed to validate output with library: The return type of the function is None. "
@@ -93,6 +100,76 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             )
             raise TypeError(msg)
 
+        # Validate that the function's return type matches the concept's structure class
+        concept_structure_class = KajsonManager.get_class_registry().get_class(name=self.output.concept.structure_class_name)
+        if concept_structure_class is None:
+            msg = (
+                f"PipeFunc '{self.code}' failed to validate output with library: "
+                f"Concept structure class '{self.output.concept.structure_class_name}' not found in registry."
+            )
+            raise TypeError(msg)
+
+        # When multiplicity is set (e.g., output = "Expense[]"), the return type should be ListContent[T]
+        # where T matches the concept's structure class
+        if self.output.multiplicity:
+            # We already validated that return_type is a subclass of ListContent above.
+            # Now check that the generic parameter matches the concept's structure class.
+            type_args: tuple[type, ...] | None = None
+
+            # Try standard typing module first
+            origin = get_origin(return_type)
+            if origin is not None:
+                type_args = get_args(return_type)
+            else:
+                # For Pydantic generics (e.g., ListContent[MyItem]), use Pydantic's metadata
+                return_type_for_metadata = cast("type", return_type)
+                pydantic_metadata: dict[str, tuple[type, ...]] | None = getattr(return_type_for_metadata, "__pydantic_generic_metadata__", None)
+                if pydantic_metadata is not None:
+                    type_args = pydantic_metadata.get("args")
+
+            if type_args:
+                item_type = type_args[0]
+                # Check if item type matches the concept's structure class:
+                # 1. Same class object
+                # 2. Subclass relationship
+                # 3. Same class name (for cases where the class is defined in different modules but represents the same concept)
+                is_same_class = item_type == concept_structure_class
+                is_subclass = not is_same_class and issubclass(item_type, concept_structure_class)
+                is_same_name = item_type.__name__ == self.output.concept.structure_class_name
+
+                # Debug logging
+                log.verbose(
+                    f"PipeFunc '{self.code}' ListContent validation: "
+                    f"item_type={item_type.__module__}.{item_type.__name__}, "
+                    f"concept_structure_class={concept_structure_class.__module__}.{concept_structure_class.__name__}, "
+                    f"is_same_class={is_same_class}, is_subclass={is_subclass}, is_same_name={is_same_name}"
+                )
+
+                if not (is_same_class or is_subclass or is_same_name):
+                    msg = (
+                        f"PipeFunc '{self.code}' output concept expects structure class '{self.output.concept.structure_class_name}' "
+                        f"(from {concept_structure_class.__module__}.{concept_structure_class.__name__}), "
+                        f"but the function '{self.function_name}' return type is 'ListContent[{item_type.__name__}]' "
+                        f"(from {item_type.__module__}.{item_type.__name__}). "
+                        f"The item type of your ListContent should be '{self.output.concept.structure_class_name}' or a subclass of it."
+                    )
+                    raise TypeError(msg)
+            # If no type_args found, return_type is raw ListContent without generic parameter - we already validated it's a ListContent subclass
+        else:
+            # No multiplicity - return type must match the concept's structure class
+            # Same checks as above: same class, subclass, or same name
+            is_same_class = return_type == concept_structure_class
+            is_subclass = not is_same_class and issubclass(return_type, concept_structure_class)
+            is_same_name = return_type.__name__ == self.output.concept.structure_class_name
+
+            if not (is_same_class or is_subclass or is_same_name):
+                msg = (
+                    f"PipeFunc '{self.code}' output concept expects structure class '{self.output.concept.structure_class_name}', "
+                    f"but the function '{self.function_name}' return type is '{return_type.__name__}'. "
+                    f"The return type of your function should be '{self.output.concept.structure_class_name}' or a subclass of it."
+                )
+                raise TypeError(msg)
+
     @override
     async def _live_run_operator_pipe(
         self,
@@ -104,10 +181,30 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         log.verbose(f"Running PipeFunc with function '{self.function_name}'")
         function = func_registry.get_required_function(self.function_name)
 
-        if asyncio.iscoroutinefunction(function):  # pyright: ignore[reportDeprecated]
-            func_output_object = await function(working_memory=working_memory)
-        else:
-            func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
+        try:
+            if inspect.iscoroutinefunction(function):
+                func_output_object = await function(working_memory=working_memory)
+            else:
+                func_output_object = await asyncio.to_thread(function, working_memory=working_memory)
+        except Exception as exc:
+            # Build informative error message with actual input values from working memory
+            inputs_lines: list[str] = []
+            for input_name in self.inputs.root:
+                try:
+                    stuff = working_memory.get_stuff(name=input_name)
+                    inputs_lines.append(f"    {input_name} = {stuff.content!r}")
+                except Exception:
+                    inputs_lines.append(f"    {input_name} = <not found in working memory>")
+
+            inputs_desc = "\n".join(inputs_lines) if inputs_lines else "    none"
+            output_desc = self.output.to_bundle_representation()
+            msg = (
+                f"PipeFunc '{self.code}' failed during execution.\n"
+                f"  Expected output: {output_desc}\n"
+                f"  Inputs:\n{inputs_desc}\n\n"
+                f"  Error: {type(exc).__name__}: {exc}"
+            )
+            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
         the_content: StuffContent
         if isinstance(func_output_object, StuffContent):
@@ -146,6 +243,10 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
         output_name: str | None = None,
     ) -> PipeFuncOutput:
         function = func_registry.get_required_function(self.function_name)
+        log.info(
+            f"🚨 For your information, the dry run of PipeFunc '{self.code}' is not actually running the python function \
+            but only validating the inputs and return type."
+        )
         return_type = get_type_hints(function).get("return")
         if return_type is None:
             msg = f"Dry run of {self.type} '{self.code}' failed: The return type of the function is None. It should be a subclass of StuffContent."
@@ -163,7 +264,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             structure_class=return_type,
             multiplicity=False,
         )
-        mock_content = WorkingMemoryFactory.create_mock_content(stuff_spec)
+        mock_content = WorkingMemoryFactory.make_mock_content(stuff_spec)
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,

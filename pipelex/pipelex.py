@@ -1,4 +1,5 @@
 import types
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from kajson.class_registry import ClassRegistry
@@ -9,6 +10,7 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.base_exceptions import PipelexConfigError, PipelexSetupError
 from pipelex.cogt.content_generation.content_generator import ContentGenerator
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
 from pipelex.cogt.content_generation.content_generator_protocol import (
     ContentGeneratorProtocol,
 )
@@ -30,22 +32,26 @@ from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
 from pipelex.core.registry_models import CoreRegistryModels
+from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import report_validation_error
+from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
+from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
-from pipelex.observer.local_observer import LocalObserver
 from pipelex.observer.multi_observer import MultiObserver
-from pipelex.observer.observer_protocol import ObserverProtocol
+from pipelex.observer.observer_protocol import ObserverNoOp, ObserverProtocol
 from pipelex.pipe_run.pipe_router import PipeRouter
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.pipeline.pipeline_manager import PipelineManager
+from pipelex.pipeline.pipeline_manager_abstract import PipelineManagerAbstract
 from pipelex.plugins.plugin_manager import PluginManager
 from pipelex.reporting.reporting_manager import ReportingManager
 from pipelex.reporting.reporting_protocol import ReportingNoOp, ReportingProtocol
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.system.configuration.configs import ConfigPaths, PipelexConfig
+from pipelex.system.configuration.configs import PipelexConfig
+from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
 )
@@ -54,7 +60,7 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
     load_pipelex_service_config_if_exists,
 )
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
-from pipelex.system.registries.func_registry import func_registry
+from pipelex.system.registries.func_registry import FuncRegistry, func_registry
 from pipelex.system.registries.singleton import MetaSingleton
 from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.observer_telemetry import ObserverTelemetry
@@ -66,6 +72,8 @@ from pipelex.system.telemetry.telemetry_manager_abstract import (
     TelemetryManagerAbstract,
 )
 from pipelex.test_extras.registry_test_models import TestRegistryModels
+from pipelex.tools.jinja2.jinja2_template_loader import TemplateLoader
+from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.tools.misc.package_utils import get_package_info
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
@@ -88,7 +96,7 @@ class Pipelex(metaclass=MetaSingleton):
         config_cls: type[ConfigRoot] | None = None,
     ) -> None:
         self.is_pipelex_service_enabled = False  # Will be set during setup
-        self.config_dir_path = config_dir_path or ConfigPaths.DEFAULT_CONFIG_DIR_PATH
+        self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
         self.pipelex_hub = PipelexHub()
         set_pipelex_hub(self.pipelex_hub)
 
@@ -107,7 +115,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         # tools
         self.class_registry: ClassRegistryAbstract | None = None
-
+        self.func_registry: FuncRegistry | None = None
         # cogt
         self.plugin_manager = PluginManager()
         self.pipelex_hub.set_plugin_manager(self.plugin_manager)
@@ -148,19 +156,21 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def setup(
         self,
         integration_mode: IntegrationMode,
+        disable_inference: bool = False,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
         models_manager: ModelManagerAbstract | None = None,
         inference_manager: InferenceManager | None = None,
         content_generator: ContentGeneratorProtocol | None = None,
-        pipeline_manager: PipelineManager | None = None,
+        pipeline_manager: PipelineManagerAbstract | None = None,
         pipe_router: PipeRouterProtocol | None = None,
         reporting_delegate: ReportingProtocol | None = None,
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         library_manager: LibraryManagerAbstract | None = None,
+        library_dirs: list[str] | list[Path] | None = None,
         **kwargs: Any,
     ):
         if kwargs:
@@ -179,22 +189,30 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         remote_config: RemoteConfig | None = None
         gateway_model_specs: BackendModelSpecs | None = None
         if is_pipelex_service_enabled:
-            # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
-            if integration_mode.requires_terms_acceptance:
-                # Check if terms are accepted
-                pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
-                if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
-                    raise GatewayTermsNotAcceptedError
-            # Fetch remote configuration
-            remote_config = RemoteConfigFetcher.fetch_remote_config()
-            log.verbose("Successfully fetched Pipelex Gateway remote configuration")
-            gateway_model_specs = remote_config.backend_model_specs
+            if disable_inference:
+                # Use dummy config when inference is disabled (for testing without network access)
+                remote_config = RemoteConfigFetcher.make_dummy_remote_config()
+                gateway_model_specs = remote_config.backend_model_specs
+                log.verbose("Using dummy remote config (inference disabled)")
+            else:
+                # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
+                if integration_mode.requires_terms_acceptance:
+                    # Check if terms are accepted
+                    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+                    if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
+                        raise GatewayTermsNotAcceptedError
+                # Fetch remote configuration
+                remote_config = RemoteConfigFetcher.fetch_remote_config()
+                log.verbose("Successfully fetched Pipelex Gateway remote configuration")
+                gateway_model_specs = remote_config.backend_model_specs
 
+        # Disable Pipelex telemetry when inference is disabled (no remote config available)
+        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and not disable_inference
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
             remote_config=remote_config,
-            is_pipelex_telemetry_enabled=is_pipelex_service_enabled,
+            is_pipelex_telemetry_enabled=is_pipelex_telemetry_enabled,
             telemetry_config=telemetry_config,
             injected_telemetry_manager=telemetry_manager,
         )
@@ -206,11 +224,35 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.class_registry = class_registry or ClassRegistry()
         self.pipelex_hub.set_class_registry(self.class_registry)
         self.kajson_manager = KajsonManager(class_registry=self.class_registry)
+
+        self.func_registry = func_registry or FuncRegistry()
+        self.pipelex_hub.set_func_registry(func_registry=self.func_registry)
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         if storage_provider is None:
             storage_config = get_config().pipelex.storage_config
             storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
+
+        # Register stuff templates first (used by mermaid, reactflow, and stuff_viewer)
+        stuff_name, stuff_package, stuff_templates = STUFF_TEMPLATE_SET
+        TemplateLoader.register_set(
+            name=stuff_name,
+            package=stuff_package,
+            templates=stuff_templates,
+        )
+        reactflow_name, reactflow_package, reactflow_templates = REACTFLOW_TEMPLATE_SET
+        TemplateLoader.register_set(
+            name=reactflow_name,
+            package=reactflow_package,
+            templates=reactflow_templates,
+        )
+        mermaid_name, mermaid_package, mermaid_templates = MERMAID_TEMPLATE_SET
+        TemplateLoader.register_set(
+            name=mermaid_name,
+            package=mermaid_package,
+            templates=mermaid_templates,
+        )
+        TemplateLoader.load_all()
 
         self.library_manager = library_manager or LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
@@ -259,8 +301,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(error_msg) from credentials_exc
 
         if content_generator is None:
-            generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
-            content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
+            if disable_inference:
+                content_generator = ContentGeneratorDry()
+            else:
+                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
+                content_generator = ContentGenerator(generated_content_factory=generated_content_factory)
         self.pipelex_hub.set_content_generator(content_generator)
 
         self.inference_manager = inference_manager or InferenceManager()
@@ -278,6 +323,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.library_manager = library_manager or LibraryManager()
         self.pipelex_hub.set_library_manager(library_manager=self.library_manager)
 
+        # Resolve library_dirs: explicit value replaces PIPELEXPATH, otherwise use env var as fallback
+        # When library_dirs is explicitly provided (even if empty), it overrides the env var
+        if library_dirs is not None:
+            resolved_library_dirs = [Path(dir_path) for dir_path in library_dirs]
+            self.pipelex_hub.set_default_library_dirs(resolved_library_dirs)
+        else:
+            pipelexpath_dirs = get_pipelexpath_dirs()
+            if pipelexpath_dirs is not None:
+                self.pipelex_hub.set_default_library_dirs(pipelexpath_dirs)
+
         self.pipeline_manager = pipeline_manager or PipelineManager()
         self.pipelex_hub.set_pipeline_manager(pipeline_manager=self.pipeline_manager)
         self.pipeline_manager.setup()
@@ -290,9 +345,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # --- Observers -------------------------------------------------------------------------
 
         if not observers:
-            local_observer = LocalObserver()
+            no_op_observer = ObserverNoOp()
             observer_telemetry = ObserverTelemetry(telemetry_manager=self.telemetry_manager)
-            observers = {"local": local_observer, "telemetry": observer_telemetry}
+            observers = {"noop": no_op_observer, "telemetry": observer_telemetry}
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
 
@@ -319,6 +374,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if self.class_registry:
             self.class_registry.teardown()
         func_registry.teardown()
+        TemplateLoader.reset()
+        TemplateRegistry.clear()
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} teardown done (except config & logs)")
         self.pipelex_hub.reset_config()
@@ -336,6 +393,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def make(
         cls,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
+        disable_inference: bool = False,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -348,6 +406,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_config: TelemetryConfig | None = None,
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
+        library_dirs: list[str] | list[Path] | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create and initialize a Pipelex singleton instance.
@@ -358,6 +417,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
+            disable_inference: When True, disables all inference functionality by using a mock
+                content generator. This skips gateway terms acceptance check and auto-skips
+                inference tests. Useful for CI/testing scenarios where inference is not needed.
             class_registry: Custom class registry for dynamic loading
             secrets_provider: Custom secrets/credentials provider
             storage_provider: Custom storage backend
@@ -370,6 +432,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             telemetry_config: Custom telemetry configuration
             telemetry_manager: Custom telemetry manager
             observers: Custom observers for pipeline events
+            library_dirs: Default library directories for pipeline execution. If provided, these
+                directories will be used instead of the PIPELEXPATH environment variable.
+                Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
             **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
 
         Returns:
@@ -387,6 +452,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         try:
             pipelex_instance.setup(
                 integration_mode=integration_mode,
+                disable_inference=disable_inference,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
                 storage_provider=storage_provider,
@@ -399,6 +465,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 telemetry_config=telemetry_config,
                 telemetry_manager=telemetry_manager,
                 observers=observers,
+                library_dirs=library_dirs,
                 **kwargs,
             )
             pipelex_instance.models_manager.validate_model_deck()

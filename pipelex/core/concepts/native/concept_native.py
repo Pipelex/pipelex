@@ -1,12 +1,14 @@
 from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
 from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.dynamic_content import DynamicContent
+from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
@@ -16,7 +18,8 @@ class NativeConceptCode(StrEnum):
     DYNAMIC = "Dynamic"
     TEXT = "Text"
     IMAGE = "Image"
-    PDF = "PDF"
+    DOCUMENT = "Document"
+    HTML = "Html"
     TEXT_AND_IMAGES = "TextAndImages"
     NUMBER = "Number"
     IMG_GEN_PROMPT = "ImgGenPrompt"
@@ -50,8 +53,10 @@ class NativeConceptCode(StrEnum):
                 return TextContent
             case NativeConceptCode.IMAGE:
                 return ImageContent
-            case NativeConceptCode.PDF:
-                return PDFContent
+            case NativeConceptCode.DOCUMENT:
+                return DocumentContent
+            case NativeConceptCode.HTML:
+                return HtmlContent
             case NativeConceptCode.TEXT_AND_IMAGES:
                 return TextAndImagesContent
             case NativeConceptCode.NUMBER:
@@ -107,7 +112,8 @@ class NativeConceptCode(StrEnum):
             case (
                 NativeConceptCode.DYNAMIC
                 | NativeConceptCode.IMAGE
-                | NativeConceptCode.PDF
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.IMG_GEN_PROMPT
@@ -128,7 +134,8 @@ class NativeConceptCode(StrEnum):
             case (
                 NativeConceptCode.TEXT
                 | NativeConceptCode.IMAGE
-                | NativeConceptCode.PDF
+                | NativeConceptCode.DOCUMENT
+                | NativeConceptCode.HTML
                 | NativeConceptCode.TEXT_AND_IMAGES
                 | NativeConceptCode.NUMBER
                 | NativeConceptCode.IMG_GEN_PROMPT
@@ -154,8 +161,9 @@ class NativeConceptCode(StrEnum):
             return False
 
         if "." in concept_ref_or_code:
-            domain_code, concept_code = concept_ref_or_code.split(".", 1)
-            return SpecialDomain.is_native(domain_code=domain_code) and concept_code in cls.values_list()
+            ref = QualifiedRef.parse(concept_ref_or_code)
+            assert ref.domain_path is not None
+            return SpecialDomain.is_native(domain_code=ref.domain_path) and ref.local_code in cls.values_list()
         return concept_ref_or_code in cls.values_list()
 
     @classmethod
@@ -173,8 +181,9 @@ class NativeConceptCode(StrEnum):
         """
         if "." not in concept_ref:
             return False
-        domain_code, concept_code = concept_ref.split(".", 1)
-        return SpecialDomain.is_native(domain_code=domain_code) and concept_code in cls.values_list()
+        ref = QualifiedRef.parse(concept_ref)
+        assert ref.domain_path is not None
+        return SpecialDomain.is_native(domain_code=ref.domain_path) and ref.local_code in cls.values_list()
 
     @classmethod
     def validate_native_concept_ref_or_code(cls, concept_ref_or_code: str) -> None:

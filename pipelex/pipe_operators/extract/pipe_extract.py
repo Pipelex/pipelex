@@ -18,6 +18,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import (
+    get_concept_library,
     get_content_generator,
     get_model_deck,
     get_native_concept,
@@ -38,12 +39,12 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     type: Literal["PipeExtract"] = "PipeExtract"
     extract_choice: ExtractModelChoice | None
     should_caption_images: bool
-    should_include_images: bool
+    max_page_images: int | None
     should_include_page_views: bool
-    page_views_dpi: int
+    page_views_dpi: int | None
 
     image_stuff_name: str | None = None
-    pdf_stuff_name: str | None = None
+    document_stuff_name: str | None = None
 
     @override
     def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
@@ -55,8 +56,8 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
     @model_validator(mode="after")
     def validate_fields(self) -> Self:
-        if self.image_stuff_name is None and self.pdf_stuff_name is None:
-            msg = "For PipeExtract you must provide either a pdf or an image or a concept that refines one of them"
+        if self.image_stuff_name is None and self.document_stuff_name is None:
+            msg = "For PipeExtract you must provide either a document or an image or a concept that refines one of them"
             raise ValueError(msg)
         return self
 
@@ -71,7 +72,30 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
 
     @override
     def validate_inputs_with_library(self):
-        pass
+        the_single_input = self.inputs.get_single_stuff_spec()
+        image_concept = get_native_concept(native_concept=NativeConceptCode.IMAGE)
+        document_concept = get_native_concept(native_concept=NativeConceptCode.DOCUMENT)
+        concept_library = get_concept_library()
+        if concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=image_concept, strict=True):
+            # it's an image, we can't accept documnt-related fields
+            if self.should_caption_images:
+                msg = "PipeExtract with image input cannot have should_caption_images set to True"
+                raise ValueError(msg)
+            if self.should_include_page_views:
+                msg = "PipeExtract with image input cannot have should_include_page_views set to True"
+                raise ValueError(msg)
+            if self.page_views_dpi is not None:
+                msg = "PipeExtract with image input cannot have page_views_dpi set"
+                raise ValueError(msg)
+            if self.max_page_images is not None:
+                msg = "PipeExtract with image input cannot have max_page_images set"
+                raise ValueError(msg)
+        elif not concept_library.is_compatible(tested_concept=the_single_input.concept, wanted_concept=document_concept, strict=True):
+            msg = (
+                "The input to PipeExtract must be an image or a document (or a concept that refines one of them), "
+                f"but is {the_single_input.concept.concept_ref}"
+            )
+            raise TypeError(msg)
 
     @override
     def validate_output_static(self):
@@ -106,24 +130,26 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
         if self.image_stuff_name:
             image_stuff = working_memory.get_stuff_as_image(name=self.image_stuff_name)
             image_uri = image_stuff.url
-        elif self.pdf_stuff_name:
-            pdf_stuff = working_memory.get_stuff_as_pdf(name=self.pdf_stuff_name)
-            pdf_uri = pdf_stuff.url
+        elif self.document_stuff_name:
+            document_stuff = working_memory.get_stuff_as_document(name=self.document_stuff_name)
+            pdf_uri = document_stuff.url
 
         extract_choice: ExtractModelChoice = self.extract_choice or get_model_deck().extract_choice_default
         extract_setting: ExtractSetting = get_model_deck().get_extract_setting(extract_choice=extract_choice)
 
+        # MTHDS-level max_page_images takes precedence if set, otherwise use ExtractSetting
+        max_nb_images = self.max_page_images if self.max_page_images is not None else extract_setting.max_nb_images
+
         extract_job_params = ExtractJobParams(
-            should_include_images=self.should_include_images,
             should_caption_images=self.should_caption_images,
             should_include_page_views=self.should_include_page_views,
             page_views_dpi=self.page_views_dpi,
-            max_nb_images=extract_setting.max_nb_images,
+            max_nb_images=max_nb_images,
             image_min_size=extract_setting.image_min_size,
         )
         extract_input = ExtractInput(
             image_uri=image_uri,
-            pdf_uri=pdf_uri,
+            document_uri=pdf_uri,
         )
         page_contents = await content_generator.make_extract_pages(
             extract_input=extract_input,

@@ -1,4 +1,3 @@
-from pipelex.client.exceptions import ClientAuthenticationError
 from pipelex.core.concepts.exceptions import (
     ConceptCodeError,
     ConceptError,
@@ -58,8 +57,6 @@ from pipelex.system.exceptions import (
 )
 
 __all__ = [
-    # from pipelex.client.exceptions
-    "ClientAuthenticationError",
     # from pipelex.core.domains.exceptions
     "DomainCodeError",
     # from pipelex.core.concepts.exceptions

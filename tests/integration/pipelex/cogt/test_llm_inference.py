@@ -9,17 +9,17 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_inference_manager
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import ImageDescription, LLMTestConstants, LLMVisionTestCases, Person
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 class TestLLMInference:
     @pytest.mark.parametrize("user_text", [LLMTestConstants.USER_TEXT_SUPER_SHORT])
-    async def test_simple_gen_text_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, user_text: str):
-        log.info(f"test_simple_gen_text_from_text: Testing llm_handle '{llm_handle}'")
-        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
+    async def test_simple_gen_text_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo, user_text: str):
+        log.info(f"test_simple_gen_text_from_text: Testing llm_handle '{llm_combo.handle}'")
+        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_combo.handle)
         log.info(f"Using llm_worker: {llm_worker.desc}")
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
@@ -34,9 +34,9 @@ class TestLLMInference:
         pretty_print(generated_text)
         # get_report_delegate().generate_report()
 
-    async def test_simple_gen_object_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str):
-        log.info(f"test_simple_gen_object_from_text: Testing llm_handle '{llm_handle}'")
-        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
+    async def test_simple_gen_object_from_text(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo):
+        log.info(f"test_simple_gen_object_from_text: Testing llm_handle '{llm_combo.handle}'")
+        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_combo.handle)
         if not llm_worker.is_gen_object_supported:
             msg = f"Object generation is not supported for this LLM worker: '{llm_worker.desc}'"
             log.info(msg)
@@ -55,10 +55,10 @@ class TestLLMInference:
         # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
-    async def test_gen_text_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
-        log.info(f"test_gen_text_from_image: Testing llm_handle '{llm_handle}'")
+    async def test_gen_text_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo, image_path: str):
+        log.info(f"test_gen_text_from_image: Testing llm_handle '{llm_combo.handle}'")
         prompt_image = PromptImageUri(uri=image_path)
-        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
+        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_combo.handle)
         if not llm_worker.is_vision_supported:
             msg = f"Vision is not supported for this LLM worker: '{llm_worker.desc}'"
             log.info(msg)
@@ -77,14 +77,14 @@ class TestLLMInference:
             assert generated_text
             pretty_print(generated_text, title=f"Vision of {image_path}")
         except PromptImageFormatError as exc:
-            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
+            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_combo.handle} because {exc}")
         # get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("image_path", [LLMVisionTestCases.PATH_IMG_PNG_1])
-    async def test_gen_object_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, image_path: str):
-        log.info(f"test_gen_object_from_image: Testing llm_handle '{llm_handle}'")
+    async def test_gen_object_from_image(self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo, image_path: str):
+        log.info(f"test_gen_object_from_image: Testing llm_handle '{llm_combo.handle}'")
         prompt_image = PromptImageUri(uri=image_path)
-        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_handle)
+        llm_worker = get_inference_manager().get_llm_worker(llm_handle=llm_combo.handle)
 
         if not llm_worker.is_vision_supported:
             msg = f"Vision is not supported for this LLM worker: '{llm_worker.desc}'"
@@ -112,5 +112,5 @@ class TestLLMInference:
             assert generated_object.time_period
             pretty_print(generated_object, title=f"Image Description of {image_path}")
         except PromptImageFormatError as exc:
-            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_handle} because {exc}")
+            pytest.skip(f"Prompt Image format not supported for this LLM: {llm_combo.handle} because {exc}")
         # get_report_delegate().generate_report()

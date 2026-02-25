@@ -1,6 +1,6 @@
 # Refining Concepts
 
-Concept refinement allows you to create more specific versions of existing concepts while inheriting their structure. This provides semantic clarity and type safety for domain-specific workflows.
+Concept refinement allows you to create more specific versions of existing concepts while inheriting their structure. This provides semantic clarity and type safety for domain-specific methods.
 
 ## What is Concept Refinement?
 
@@ -9,7 +9,7 @@ Refinement is the process of creating a specialized concept from a more general 
 - **Inherits the structure** of the base concept
 - **Adds semantic specificity** to clarify its purpose
 
-Think of it as creating a subtype: an `Invoice` is a specific kind of `PDF`, and a `Photo` is a specific kind of `Image`.
+Think of it as creating a subtype: an `Invoice` is a specific kind of `Document`, and a `Photo` is a specific kind of `Image`.
 
 ## Why Refine Concepts?
 
@@ -17,7 +17,7 @@ Think of it as creating a subtype: an `Invoice` is a specific kind of `PDF`, and
 
 Refined concepts make your pipeline's intent explicit:
 
-```plx
+```toml
 # ❌ Less clear
 [pipe.process_invoice]
 inputs = { invoice = "PDF" }
@@ -29,7 +29,7 @@ inputs = { invoice = "Invoice" }
 
 ### 2. Self-Documenting Code
 
-```plx
+```toml
 [pipe.extract_contract_terms]
 type = "PipeLLM"
 description = "Extract key terms from a contract"
@@ -37,20 +37,20 @@ inputs = { contract = "Contract" }  # Clear what type of document is expected
 output = "ContractTerms"
 ```
 
-### 3. Domain-Specific Workflows
+### 3. Domain-Specific Methods
 
 Build pipelines tailored to specific use cases:
 
-```plx
+```toml
 domain = "finance"
 
 [concept.Invoice]
 description = "A commercial invoice"
-refines = "PDF"
+refines = "Document"
 
 [concept.Receipt]
 description = "Proof of payment"
-refines = "PDF"
+refines = "Document"
 
 [pipe.process_invoice]
 type = "PipeLLM"
@@ -69,7 +69,7 @@ output = "ReceiptData"
 
 Using specific concept names helps catch errors early:
 
-```plx
+```toml
 [pipe.analyze_invoice]
 inputs = { invoice = "Invoice" }  # Only accepts Invoice
 output = "Analysis"
@@ -77,57 +77,62 @@ output = "Analysis"
 
 ## Current Limitations
 
-!!! warning "You can only refine native concepts (For Now)"
-    Currently, you can **only refine [native concepts](native-concepts.md)**. Refining custom concepts will be supported in a future release
-
 !!! warning "No structure on refined concepts (For Now)"
     When you refine a concept, you **cannot** add an inline structure or specify a `structure_class_name`. This limitation will be lifted in future releases.
     
     **Not allowed:**
-    ```plx
-    [concept.Invoice]
-    description = "A commercial invoice"
-    refines = "PDF"
-    structure_class_name = "InvoiceModel"  # ❌ Not allowed
-    
-    [concept.Invoice.structure]  # ❌ Not allowed
-    invoice_number = "Invoice ID"
-    ```
-    
-    **Allowed:**
-    ```plx
-    [concept.Invoice]
-    description = "A commercial invoice"
-    refines = "PDF"  # ✅ Inherits PDFContent structure
-    ```
+```toml
+[concept.Invoice]
+description = "A commercial invoice"
+refines = "Document"
+structure_class_name = "InvoiceModel"  # ❌ Not allowed
+
+[concept.Invoice.structure]  # ❌ Not allowed
+invoice_number = "Invoice ID"
+```
+
+**Allowed:**
+```toml
+[concept.Invoice]
+description = "A commercial invoice"
+refines = "Document"  # ✅ Inherits DocumentContent structure
+```
 
 ## Basic Refinement Syntax
 
 Define a refined concept using the `refines` field:
 
-```plx
+```toml
 [concept.ConceptName]
 description = "Description of the refined concept"
-refines = "NativeConceptName"
+refines = "BaseConceptName"
 ```
 
-### Refining PDF
+For concepts in a different domain, use the fully qualified reference:
 
-```plx
+```toml
+[concept.SpecializedConcept]
+description = "A more specialized version of an existing concept"
+refines = "otherdomain.BaseConceptName"
+```
+
+### Refining Document
+
+```toml
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
-refines = "PDF"
+refines = "Document"
 
 [concept.Contract]
 description = "A legally binding agreement between parties"
-refines = "PDF"
+refines = "Document"
 ```
 
-Both concepts inherit the `PDFContent` structure (with a `url` field) but represent semantically distinct document types.
+Both concepts inherit the `DocumentContent` structure (with a `url` field) but represent semantically distinct document types.
 
 ### Refining Image
 
-```plx
+```toml
 [concept.ProductPhoto]
 description = "A photograph of a product for marketing purposes"
 refines = "Image"
@@ -141,7 +146,7 @@ Each inherits `ImageContent` structure (url, caption, base_64, etc.) with specif
 
 ### Refining Text
 
-```plx
+```toml
 [concept.Article]
 description = "A written composition on a specific topic"
 refines = "Text"
@@ -151,6 +156,120 @@ description = "A condensed version of a longer text"
 refines = "Text"
 ```
 
+### Building Concept Hierarchies
+
+You can build hierarchies by refining concepts that have their own structures. The refined concept inherits the structure from the base concept:
+
+```toml
+domain = "crm"
+
+# Base concept with structure
+[concept.Customer]
+description = "A customer in our system"
+
+[concept.Customer.structure]
+name = { type = "text", required = true, description = "Customer name" }
+email = { type = "text", required = true, description = "Customer email" }
+
+# Refined concept - inherits Customer's structure
+[concept.VIPCustomer]
+description = "A VIP customer with special privileges"
+refines = "Customer"
+
+# Another refined concept from the same base
+[concept.InactiveCustomer]
+description = "A customer who has not been active recently"
+refines = "Customer"
+```
+
+Both `VIPCustomer` and `InactiveCustomer` will have access to the `name` and `email` fields defined in `Customer`. When you create content for these concepts, it will be compatible with the base `Customer` structure.
+
+## Cross-Package Refinement
+
+You can refine concepts that live in a different package. This lets you specialize a shared concept from a dependency without modifying the dependency itself.
+
+### Syntax
+
+Use the `->` cross-package reference operator in the `refines` field:
+
+```toml
+[concept.RefinedConcept]
+description = "A more specialized version of a cross-package concept"
+refines = "alias->domain.BaseConceptCode"
+```
+
+| Part | Description |
+|------|-------------|
+| `alias` | The dependency alias declared in your `METHODS.toml` `[dependencies]` section |
+| `->` | Cross-package reference operator |
+| `domain` | The dot-separated domain path inside the dependency package |
+| `BaseConceptCode` | The `PascalCase` concept code to refine |
+
+### Full Example
+
+Suppose you depend on a scoring library that defines a `WeightedScore` concept:
+
+**Dependency package** (`scoring-lib`):
+
+```toml title="METHODS.toml"
+[package]
+address = "github.com/acme/scoring-lib"
+version = "2.0.0"
+description = "Scoring utilities."
+
+[exports.scoring]
+pipes = ["compute_weighted_score"]
+```
+
+```toml title="scoring.mthds"
+domain = "scoring"
+
+[concept.WeightedScore]
+description = "A weighted score result"
+
+[pipe.compute_weighted_score]
+type = "PipeLLM"
+description = "Compute a weighted score"
+output = "WeightedScore"
+prompt = "Compute a weighted score for: {{ item }}"
+```
+
+**Your consumer package**:
+
+```toml title="METHODS.toml"
+[package]
+address = "github.com/acme/analysis-app"
+version = "1.0.0"
+description = "Analysis application."
+
+[dependencies]
+scoring_lib = { address = "github.com/acme/scoring-lib", version = "^2.0.0" }
+
+[exports.analysis]
+pipes = ["compute_detailed_score"]
+```
+
+```toml title="analysis.mthds"
+domain = "analysis"
+
+[concept.DetailedScore]
+description = "An extended score with additional detail"
+refines = "scoring_lib->scoring.WeightedScore"
+
+[pipe.compute_detailed_score]
+type = "PipeLLM"
+description = "Compute a detailed score"
+output = "DetailedScore"
+prompt = "Compute a detailed score for: {{ item }}"
+```
+
+`DetailedScore` inherits the structure of `WeightedScore` from the `scoring_lib` dependency's `scoring` domain.
+
+!!! important
+    The base concept must be accessible from the dependency. The dependency must export the pipes in the domain that contains the concept, or the concept's domain must be reachable via an exported pipe's bundle.
+
+For more on how dependencies and cross-package references work, see [Packages](../packages.md#cross-package-references).
+
 ## Type Compatibility
 
 Understanding how refined concepts interact with pipe inputs is crucial.
@@ -158,28 +277,28 @@ Understanding how refined concepts interact with pipe inputs is crucial.
 ### How Refinement Affects Type Checking
 
 !!! important "Key Rule"
-    A pipe that accepts a **native concept** will **NOT** accept concepts that refine it.
-    
-    ```plx
-    [pipe.extract_text]
-    inputs = { document = "PDF" }  # Only accepts PDF, not Invoice or Contract
-    ```
-    
-    If you want a pipe to accept both a native concept and its refinements, you must explicitly define the pipe to accept the refined concepts or use a more general approach.
+    A pipe that accepts a **base concept** will **NOT** accept concepts that refine it.
+
+```toml
+[pipe.extract_text]
+inputs = { document = "Document" }  # Only accepts Document, not Invoice or Contract
+```
+
+    If you want a pipe to accept both a base concept and its refinements, you must explicitly define the pipe to accept the refined concepts or use a more general approach.
 
 ### Practical Example
 
-```plx
+```toml
 [concept.Invoice]
-refines = "PDF"
+refines = "Document"
 
 [concept.Contract]
-refines = "PDF"
+refines = "Document"
 
-# This pipe only accepts generic PDFs
-[pipe.extract_from_pdf]
+# This pipe only accepts generic documents
+[pipe.extract_from_document]
 type = "PipeExtract"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Page"
 
 # This pipe only accepts Invoices
@@ -197,7 +316,7 @@ output = "ContractData"
 
 In this setup:
 
-- `extract_from_pdf` expects exactly `PDF` (not `Invoice` or `Contract`)
+- `extract_from_document` expects exactly `Document` (not `Invoice` or `Contract`)
 - `process_invoice` expects exactly `Invoice`
 - `process_contract` expects exactly `Contract`
 
@@ -205,67 +324,71 @@ In this setup:
 
 ### 1. Choose Meaningful Names
 
-```plx
+```toml
 # ❌ Avoid generic or vague names
 [concept.Document1]
-refines = "PDF"
+refines = "Document"
 
 # ✅ Use specific, descriptive names
 [concept.Invoice]
-refines = "PDF"
+refines = "Document"
 ```
 
 ### 2. Write Clear Descriptions
 
-```plx
+```toml
 # ❌ Too vague
 [concept.Invoice]
 description = "A document"
-refines = "PDF"
+refines = "Document"
 
 # ✅ Clear and specific
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer, detailing products or services provided and payment terms"
-refines = "PDF"
+refines = "Document"
 ```
 
 ### 3. Don't Over-Refine
 
-```plx
+```toml
 # ❌ Too specific, creates unnecessary complexity
 [concept.SmallInvoice]
 description = "An invoice under $100"
-refines = "PDF"
+refines = "Document"
 
 [concept.LargeInvoice]
 description = "An invoice over $1000"
-refines = "PDF"
+refines = "Document"
 
 # ✅ Keep it general, handle specifics in processing logic
 [concept.Invoice]
 description = "A commercial invoice"
-refines = "PDF"
+refines = "Document"
 ```
 
 ## When to Refine vs. When to Create New Concepts
 
 ### Refine When:
 
-- ✅ Your concept is semantically a specific type of a native concept
-- ✅ The native structure is sufficient for your needs
+- ✅ Your concept is semantically a specific type of an existing concept
+- ✅ The base concept's structure is sufficient for your needs
 - ✅ You want to inherit existing validation and behavior
-- ✅ You're building domain-specific workflows with clear document/content types
+- ✅ You're building domain-specific methods with clear document/content types
+- ✅ You need to create specialized versions of an existing concept
 
-**Example:**
-```plx
-[concept.Invoice]  # Clearly a type of PDF
-refines = "PDF"
+**Examples:**
+```toml
+[concept.Invoice]  # Clearly a type of Document
+refines = "Document"
+
+[concept.VIPCustomer]  # A specialized type of Customer
+refines = "Customer"
 ```
 
 ### Create New Concept When:
 
 - ✅ Your concept needs custom structure with multiple fields
-- ✅ Your concept doesn't naturally fit any native concept
+- ✅ Your concept doesn't naturally fit any existing concept
 - ✅ You need complex validation or computed properties
 
 
@@ -275,4 +398,5 @@ refines = "PDF"
 - [Native Concepts](native-concepts.md) - Complete guide to native concepts
 - [Inline Structures](inline-structures.md) - Add structure to concepts
 - [Python StructuredContent Classes](python-classes.md) - Advanced customization
+- [Packages](../packages.md) - Package system, dependencies, and cross-package references
 

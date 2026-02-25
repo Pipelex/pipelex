@@ -6,7 +6,6 @@ from typing import cast
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.cogt.image.prepared_image import PreparedImageBase64
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prepare_prompt_image
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -18,6 +17,8 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.pipeline.input_normalizer import normalize_data_urls_to_storage
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+from pipelex.tools.uri.prepared_file import PreparedFileBase64
+from pipelex.urls import URLs
 from tests.cases import ImageTestCases
 
 
@@ -57,7 +58,7 @@ class TestDataUrlImageFlow:
         )
 
         # Verify result
-        assert isinstance(prepared, PreparedImageBase64), f"Expected PreparedImageBase64 for {_topic}"
+        assert isinstance(prepared, PreparedFileBase64), f"Expected PreparedFileBase64 for {_topic}"
         # Verify base64 data can be decoded (valid format)
         decoded_bytes = base64.b64decode(prepared.base64_data)
         assert len(decoded_bytes) > 0
@@ -134,7 +135,7 @@ class TestDataUrlImageFlow:
         )
 
         # Verify the round-trip preserves the data
-        assert isinstance(prepared, PreparedImageBase64)
+        assert isinstance(prepared, PreparedFileBase64)
         # Extract original base64 for comparison
         original_base64 = data_url.split(",", 1)[1]
         assert prepared.base64_data == original_base64
@@ -183,7 +184,7 @@ class TestDataUrlImageFlow:
         mocker.patch("pipelex.pipeline.input_normalizer.get_storage_provider", return_value=provider)
 
         # Create ImageContent with HTTP URL
-        http_url = "https://example.com/image.png"
+        http_url = URLs.png_example_1
         image_content = ImageContent(url=http_url)
         stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),

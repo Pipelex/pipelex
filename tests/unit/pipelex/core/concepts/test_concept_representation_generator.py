@@ -2,6 +2,7 @@
 
 from pydantic import Field
 
+from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_representation_generator import (
     ConceptRepresentationFormat,
     ConceptRepresentationGenerator,
@@ -95,11 +96,12 @@ class TestConceptRepresentationFormat:
         """Test that the enum has the expected values."""
         assert ConceptRepresentationFormat.JSON.value == "json"
         assert ConceptRepresentationFormat.PYTHON.value == "python"
+        assert ConceptRepresentationFormat.SCHEMA.value == "schema"
 
     def test_enum_iteration(self) -> None:
         """Test that we can iterate over enum values."""
         values = list(ConceptRepresentationFormat)
-        assert len(values) == 2
+        assert len(values) == 3
 
 
 # =============================================================================
@@ -133,6 +135,20 @@ class TestGenerateFieldValueBasicTypes:
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_field_value(bool, "active")
         assert result is False
+
+    def test_int_or_float_union_field(self) -> None:
+        """Int | float union field generates a numeric value (1), not a string placeholder."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_field_value(int | float, "number")
+        assert isinstance(result, (int, float)), f"Expected int or float, got {type(result)}: {result}"
+        assert result == 1
+
+    def test_float_or_int_union_field(self) -> None:
+        """Float | int union field generates a numeric value (1), not a string placeholder."""
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_field_value(float | int, "amount")
+        assert isinstance(result, (int, float)), f"Expected int or float, got {type(result)}: {result}"
+        assert result == 1
 
 
 # =============================================================================
@@ -409,8 +425,9 @@ class TestIncludeOptionalParameter:
         """With include_optional=False, optional fields are excluded (JSON)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
-        expected = {"url": "url_value"}
-        assert result == expected
+        assert isinstance(result, dict)
+        assert "url" in result
+        assert result["url"].startswith("https://mock-")
         # Verify optional fields are NOT present
         assert "source_prompt" not in result
         assert "caption" not in result
@@ -420,8 +437,9 @@ class TestIncludeOptionalParameter:
         """With include_optional=False, optional fields are excluded (Python)."""
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
         result = generator.generate_class_representation(ContentWithRequiredAndOptional, include_optional=False)
-        expected = 'ContentWithRequiredAndOptional(url="url_value")'
-        assert result == expected
+        assert isinstance(result, str)
+        assert result.startswith('ContentWithRequiredAndOptional(url="https://mock-')
+        assert result.endswith('")')
 
     def test_includes_optional_fields_by_default(self) -> None:
         """By default, optional fields ARE included (backward compatibility)."""
@@ -453,9 +471,144 @@ class TestIncludeOptionalParameter:
 
         generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
         result = generator.generate_class_representation(ImageContent, include_optional=False)
-        expected = {"url": "url_value"}
-        assert result == expected
+        assert isinstance(result, dict)
+        assert "url" in result
+        assert result["url"].startswith("https://mock-")
         # Verify optional fields are NOT present
         assert "source_prompt" not in result
         assert "caption" not in result
         assert "base_64" not in result
+
+
+# =============================================================================
+# Tests for SCHEMA format with is_multiple parameter
+# =============================================================================
+
+
+class TestSchemaRepresentationWithMultiple:
+    """Test schema representation with is_multiple parameter."""
+
+    def test_schema_single_item(self) -> None:
+        """Schema for single item returns the JSON schema directly."""
+        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+
+        # Register the test class
+        KajsonManager.get_class_registry().register_class(SimpleContent)
+
+        # Create a concept with the registered class
+        concept = Concept(
+            code="SimpleContent",
+            domain_code="test",
+            description="Test concept",
+            structure_class_name="SimpleContent",
+        )
+
+        result, imports = concept.render_concept_representation(
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            is_multiple=False,
+        )
+
+        assert result["concept"] == "test.SimpleContent"
+        assert result["content"]["type"] == "object"
+        assert "properties" in result["content"]
+        assert "name" in result["content"]["properties"]
+        assert "count" in result["content"]["properties"]
+        assert imports == set()
+
+    def test_schema_multiple_items_wraps_in_array(self) -> None:
+        """Schema for multiple items wraps the schema in an array type."""
+        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+
+        # Register the test class
+        KajsonManager.get_class_registry().register_class(SimpleContent)
+
+        # Create a concept with the registered class
+        concept = Concept(
+            code="SimpleContent",
+            domain_code="test",
+            description="Test concept",
+            structure_class_name="SimpleContent",
+        )
+
+        result, imports = concept.render_concept_representation(
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            is_multiple=True,
+        )
+
+        assert result["concept"] == "test.SimpleContent"
+        # The content should be wrapped in an array schema
+        assert result["content"]["type"] == "array"
+        assert "items" in result["content"]
+        # The items should be the original schema
+        assert result["content"]["items"]["type"] == "object"
+        assert "properties" in result["content"]["items"]
+        assert "name" in result["content"]["items"]["properties"]
+        assert "count" in result["content"]["items"]["properties"]
+        assert imports == set()
+
+    def test_schema_nested_content_multiple(self) -> None:
+        """Schema for nested content with multiple items wraps correctly."""
+        from kajson.kajson_manager import KajsonManager  # noqa: PLC0415
+
+        # Register the test classes
+        KajsonManager.get_class_registry().register_class(NestedChild)
+        KajsonManager.get_class_registry().register_class(ContentWithNestedClass)
+
+        # Create a concept with the registered class
+        concept = Concept(
+            code="ContentWithNestedClass",
+            domain_code="test",
+            description="Test concept with nested class",
+            structure_class_name="ContentWithNestedClass",
+        )
+
+        result, _ = concept.render_concept_representation(
+            output_format=ConceptRepresentationFormat.SCHEMA,
+            is_multiple=True,
+        )
+
+        assert result["concept"] == "test.ContentWithNestedClass"
+        # The content should be wrapped in an array schema
+        assert result["content"]["type"] == "array"
+        assert "items" in result["content"]
+        # The items should contain the nested structure
+        items_schema = result["content"]["items"]
+        assert items_schema["type"] == "object"
+        assert "properties" in items_schema
+
+
+# =============================================================================
+# Tests for NumberContent (native Number concept)
+# =============================================================================
+
+
+class TestNumberContentRepresentation:
+    """Test that NumberContent generates proper numeric values, not string placeholders.
+
+    NumberContent has a field 'number: int | float' which is a union type.
+    The generator should produce a numeric value (1), not 'number_int | float'.
+    """
+
+    def test_number_content_json_representation(self) -> None:
+        """NumberContent generates proper numeric value in JSON format."""
+        from pipelex.core.stuffs.number_content import NumberContent  # noqa: PLC0415
+
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.JSON)
+        result = generator.generate_class_representation(NumberContent)
+
+        assert isinstance(result, dict)
+        assert "number" in result
+        assert isinstance(result["number"], (int, float)), f"Expected numeric value, got {type(result['number'])}: {result['number']}"
+        assert result["number"] == 1
+
+    def test_number_content_python_representation(self) -> None:
+        """NumberContent generates proper numeric value in Python format."""
+        from pipelex.core.stuffs.number_content import NumberContent  # noqa: PLC0415
+
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
+        result = generator.generate_class_representation(NumberContent)
+
+        # Should be "NumberContent(number=1)" not "NumberContent(number=\"number_int | float\")"
+        assert isinstance(result, str)
+        assert "number=1" in result, f"Expected 'number=1' in result, got: {result}"
+        assert "number_int" not in result, f"Should not contain string placeholder: {result}"

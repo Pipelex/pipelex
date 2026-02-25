@@ -8,6 +8,7 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeCategory, PipeType
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, parse_concept_with_multiplicity
@@ -30,19 +31,23 @@ class PipeSpec(StructuredContent):
         - [N]: exactly N items (e.g., "Image[3]" for 3 images)
 
     Examples:
-        inputs = {"document": "PDF", "queries": "Text[]"}  # single PDF, multiple texts
+        inputs = {"document": "Document", "queries": "Text[]"}  # single document, multiple texts
         output = "Article[]"  # produces a list of articles
         output = "Image[5]"  # produces exactly 5 images
     """
 
-    pipe_code: str = Field(description="Unique pipe identifier. Must be snake_case.")
+    pipe_code: str = Field(description="Unique pipe identifier. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
     type: Any = Field(
         description=(
             f"Pipe type. Validated at runtime, must be one of: {PipeType}. Examples: PipeLLM, PipeImgGen, PipeExtract, PipeSequence, PipeParallel."
-        )
+        ),
+        # Do NOT set examples here - subclasses have Literal types with defaults
+        # Setting examples would cause mocking issues where the base class type doesn't match subclass fields
     )
+    # TODO: Change examples to list(PipeCategory) for randomness in mocks
     pipe_category: Any = Field(
-        description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'.")
+        description=(f"Pipe category. Validated at runtime, must be one of: {PipeCategory}. Either 'PipeController' or 'PipeOperator'."),
+        examples=["PipeOperator"],
     )
     description: str = Field(description="Natural language description of the pipe's purpose and functionality.")
     inputs: dict[str, str] = Field(
@@ -51,14 +56,16 @@ class PipeSpec(StructuredContent):
             "Keys: input names in snake_case. "
             "Values: ConceptCodes in PascalCase with optional brackets. "
             "Examples: 'Text' (single), 'Text[]' (variable list), 'Image[2]' (exactly 2 images), 'domain.Concept[]' (domain-qualified list)."
-        )
+        ),
+        json_schema_extra={"mock_format": MockFormat.DICT_SNAKE_KEY_PASCAL_VALUE},
     )
     output: str = Field(
         description=(
             "Output concept code in PascalCase with optional multiplicity brackets. "
             "Examples: 'Text' (single text), 'Article[]' (list of articles), 'Image[3]' (exactly 3 images). "
             "IMPORTANT: Always use PascalCase for the concept name."
-        )
+        ),
+        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
     )
 
     @field_validator("pipe_code", mode="before")
@@ -79,7 +86,7 @@ class PipeSpec(StructuredContent):
     def validate_output(cls, output: str) -> str:
         # Extract concept without multiplicity for validation
         parse_result = parse_concept_with_multiplicity(output)
-        validate_concept_ref_or_code(concept_ref_or_code=parse_result.concept)
+        validate_concept_ref_or_code(concept_ref_or_code=parse_result.concept_ref_or_code)
         return output  # Return original with brackets intact
 
     @field_validator("inputs", mode="after")
@@ -111,7 +118,17 @@ class PipeSpec(StructuredContent):
 
     @classmethod
     def validate_pipe_code_syntax(cls, pipe_code: str) -> str:
-        # First, normalize Unicode to ASCII to prevent homograph attacks
+        # Strip namespace prefix if present (e.g., "domain.my_pipe" → "my_pipe").
+        # The builder LLM sometimes generates dotted pipe codes; the namespace
+        # comes from the bundle's domain field, not from the pipe code itself.
+        # This must happen BEFORE ASCII normalization, because normalize_to_ascii()
+        # strips dots (keeping only alphanumeric + underscore).
+        if "." in pipe_code:
+            bare_pipe_code = pipe_code.rsplit(".", maxsplit=1)[1]
+            log.warning(f"Pipe code '{pipe_code}' contains a namespace prefix, stripped to '{bare_pipe_code}'")
+            pipe_code = bare_pipe_code
+
+        # Normalize Unicode to ASCII to prevent homograph attacks
         normalized_pipe_code = normalize_to_ascii(pipe_code)
 
         if normalized_pipe_code != pipe_code:

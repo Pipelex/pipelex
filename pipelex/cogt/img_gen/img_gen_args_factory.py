@@ -11,6 +11,8 @@ from typing import Any
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.image.prompt_image import PromptImage
+from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, Quality
 from pipelex.cogt.img_gen.img_gen_model_rules import (
@@ -19,6 +21,8 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
     ImgGenArgTopic,
     ImgGenModelRules,
     InferenceTaxonomy,
+    InputImagesTaxonomy,
+    ModelNameTaxonomy,
     NumImagesTaxonomy,
     OutputFormatTaxonomy,
     PromptTaxonomy,
@@ -28,6 +32,7 @@ from pipelex.cogt.img_gen.img_gen_model_rules import (
 from pipelex.config import get_config
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
 
 
 class ImgGenArgsFactory:
@@ -38,11 +43,12 @@ class ImgGenArgsFactory:
     """
 
     @classmethod
-    def make_args_for_model(
+    async def make_args_for_model(
         cls,
         model_rules: ImgGenModelRules,
         img_gen_job: ImgGenJob,
         nb_images: int,
+        model_id: str,
     ) -> dict[str, Any]:
         """Build provider-specific API arguments from model rules and job parameters.
 
@@ -53,6 +59,7 @@ class ImgGenArgsFactory:
             model_rules: Mapping of argument topics to their taxonomy values for the target model
             img_gen_job: The image generation job containing prompt and parameters
             nb_images: Number of images to generate
+            model_id: The model identifier to pass to the provider API
 
         Returns:
             Dictionary of API arguments ready to be passed to the provider's API
@@ -132,6 +139,30 @@ class ImgGenArgsFactory:
                             specific_taxonomy=specific_taxonomy,
                         )
                     )
+                case ImgGenArgTopic.MODEL_NAME:
+                    model_name_taxonomy = ModelNameTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_model_name(
+                            model_name_taxonomy=model_name_taxonomy,
+                            model_id=model_id,
+                        )
+                    )
+                case ImgGenArgTopic.INPUT_IMAGES:
+                    input_images_taxonomy = InputImagesTaxonomy(taxonomy_value)
+                    input_images_args = await cls.make_args_from_input_images(
+                        input_images_taxonomy=input_images_taxonomy,
+                        input_images=img_gen_job.img_gen_prompt.input_images,
+                    )
+                    args_dict.update(input_images_args)
+
+        # Validate that input_images were processed if provided
+        if img_gen_job.img_gen_prompt.input_images:
+            if ImgGenArgTopic.INPUT_IMAGES not in model_rules:
+                msg = (
+                    "Input images were provided but the model does not have 'input_images' rules configured. "
+                    "This model may not support image-to-image generation, or the configuration is incomplete."
+                )
+                raise ImgGenParameterError(msg)
 
         return args_dict
 
@@ -154,6 +185,11 @@ class ImgGenArgsFactory:
         """Map prompt parameters to provider-specific format."""
         match prompt_taxonomy:
             case PromptTaxonomy.POSITIVE_ONLY:
+                if negative_text:
+                    log.warning(
+                        f"A negative prompt was provided but the model's prompt taxonomy is '{PromptTaxonomy.POSITIVE_ONLY}', "
+                        "which does not support negative prompts. The negative prompt will be silently ignored."
+                    )
                 return {"prompt": positive_text}
             case PromptTaxonomy.WITH_NEGATIVE:
                 args_dict: dict[str, Any] = {"prompt": positive_text}
@@ -167,6 +203,17 @@ class ImgGenArgsFactory:
         match specific_taxonomy:
             case SpecificTaxonomy.FAL:
                 return {"sync_mode": False}
+
+    @classmethod
+    def make_args_from_model_name(
+        cls,
+        model_name_taxonomy: ModelNameTaxonomy,
+        model_id: str,
+    ) -> dict[str, Any]:
+        """Map model identifier to provider-specific parameter."""
+        match model_name_taxonomy:
+            case ModelNameTaxonomy.STANDARD:
+                return {"model": model_id}
 
     @classmethod
     def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background) -> dict[str, Any]:
@@ -203,7 +250,7 @@ class ImgGenArgsFactory:
                     case AspectRatio.PORTRAIT_9_21:
                         value = "portrait_21_9"
                     case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
-                        msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1 image generation model"
+                        msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux image generation model"
                         raise ImgGenParameterError(msg)
             case AspectRatioTaxonomy.FLUX_11_ULTRA:
                 key = "aspect_ratio"
@@ -376,3 +423,61 @@ class ImgGenArgsFactory:
                 key = "output_format"
                 value = output_format.value
         return {key: value}
+
+    @classmethod
+    async def make_args_from_input_images(
+        cls,
+        input_images_taxonomy: InputImagesTaxonomy,
+        input_images: list[PromptImage] | None,
+    ) -> dict[str, Any]:
+        """Map input images to provider-specific API parameters for image-to-image generation.
+
+        Args:
+            input_images_taxonomy: The taxonomy specifying how to format images for the target API
+            input_images: List of input images to include in the request
+
+        Returns:
+            Dictionary of API arguments for the input images
+        """
+        if not input_images:
+            return {}
+
+        if input_images_taxonomy == InputImagesTaxonomy.NONE:
+            msg = "Model does not support image inputs, but input images were provided"
+            raise ImgGenParameterError(msg)
+
+        match input_images_taxonomy:
+            case InputImagesTaxonomy.GPT_IMAGE:
+                # OpenAI /images/edits format: "image" accepts array of base64 data URLs
+                # Max 16 images, each < 50MB, png/webp/jpg
+                # Format: data:image/png;base64,{base64_data}
+                prepped_images = await prep_prompt_images(prompt_images=input_images, is_http_url_enabled=False)
+                image_data_urls: list[str] = []
+                for prepped in prepped_images:
+                    if isinstance(prepped, PreparedFileBase64):
+                        image_data_urls.append(prepped.as_data_url())
+                    elif isinstance(prepped, PreparedFileHttpUrl):
+                        # GPT Image API requires base64 data URLs, not HTTP URLs
+                        msg = "GPT Image API requires base64 data URLs, but got HTTP URL"
+                        raise ImgGenParameterError(msg)
+                    else:
+                        msg = f"Unexpected PreparedFile type for GPT Image API: {type(prepped).__name__}"
+                        raise ImgGenParameterError(msg)
+                return {"image": image_data_urls}
+
+            case InputImagesTaxonomy.BFL_FLUX_2:
+                # BFL Flux 2 Pro format: input_image (1st), input_image_2 through input_image_8
+                # Max 8 images total, accepts URLs or base64 data URLs
+                prepped_images = await prep_prompt_images(prompt_images=input_images, is_http_url_enabled=True)
+                args: dict[str, Any] = {}
+                for idx, prepped in enumerate(prepped_images[:8]):
+                    # 0->input_image, 1->input_image_2, 2->input_image_3, etc.
+                    key = "input_image" if idx == 0 else f"input_image_{idx + 1}"
+                    if isinstance(prepped, PreparedFileBase64):
+                        args[key] = prepped.as_data_url()
+                    elif isinstance(prepped, PreparedFileHttpUrl):
+                        args[key] = prepped.url
+                    else:
+                        msg = f"Unexpected PreparedFile type for Flux 2 API: {type(prepped).__name__}"
+                        raise ImgGenParameterError(msg)
+                return args

@@ -1,8 +1,8 @@
-"""Normalize pipeline inputs by converting data URLs to pipelex-storage:// URIs.
+"""Normalize pipeline inputs by converting data URLs and local file paths to pipelex-storage:// URIs.
 
 This module provides functions to scan WorkingMemory and convert any ImageContent
-with data URLs (data:...;base64,...) to pipelex-storage:// URIs for more efficient
-pipeline processing.
+or DocumentContent with data URLs (data:...;base64,...) or local file paths to
+pipelex-storage:// URIs for more efficient pipeline processing.
 """
 
 import base64
@@ -10,34 +10,41 @@ from typing import Any, cast
 
 import shortuuid
 
+from pipelex.base_exceptions import PipelexError
+from pipelex.config import get_config
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.hub import get_storage_provider
+from pipelex.tools.misc.file_utils import load_binary_async
 from pipelex.tools.misc.filetype_utils import detect_file_type_from_bytes
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
-from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl
+from pipelex.tools.uri.resolved_uri import ResolvedBase64DataUrl, ResolvedLocalPath
 from pipelex.tools.uri.uri_resolver import resolve_uri
+
+# Type alias for content types that can have their URLs normalized
+NormalizableContent = ImageContent | DocumentContent
 
 
 async def normalize_data_urls_to_storage(working_memory: WorkingMemory) -> WorkingMemory:
-    """Convert all data URLs in ImageContent to pipelex-storage:// URIs.
+    """Convert all data URLs in ImageContent and DocumentContent to pipelex-storage:// URIs.
 
-    Scans all stuffs in working memory and for any ImageContent with a data:...;base64,...
-    URL, stores the data and replaces the URL with a pipelex-storage:// URI.
+    Scans all stuffs in working memory and for any ImageContent or DocumentContent with
+    a data:...;base64,... URL, stores the data and replaces the URL with a pipelex-storage:// URI.
 
     This handles:
 
-    - Direct ImageContent
-    - ListContent containing ImageContent items
-    - StructuredContent with nested ImageContent fields (recursive)
+    - Direct ImageContent and DocumentContent
+    - ListContent containing ImageContent or DocumentContent items
+    - StructuredContent with nested ImageContent or DocumentContent fields (recursive)
 
     Args:
         working_memory: The working memory to normalize.
 
     Returns:
-        The same WorkingMemory instance with normalized ImageContent URLs.
+        The same WorkingMemory instance with normalized URLs.
     """
     storage = get_storage_provider()
 
@@ -54,18 +61,18 @@ async def _normalize_value(
     value: Any,
     storage: StorageProviderAbstract,
 ) -> tuple[Any, bool]:
-    """Recursively normalize a value, converting data URLs in ImageContent to storage URIs.
+    """Recursively normalize a value, converting data URLs in ImageContent/DocumentContent to storage URIs.
 
     Args:
-        value: The value to normalize (can be ImageContent, StructuredContent, list, or any other type).
+        value: The value to normalize (can be ImageContent, DocumentContent, StructuredContent, list, or any other type).
         storage: The storage provider to use.
 
     Returns:
         A tuple of (normalized_value, has_changed).
     """
-    # Handle ImageContent directly
-    if isinstance(value, ImageContent):
-        normalized = await _normalize_image_content(image_content=value, storage=storage)
+    # Handle ImageContent and DocumentContent
+    if isinstance(value, (ImageContent, DocumentContent)):
+        normalized = await _normalize_url_content(content=value, storage=storage)
         return normalized, normalized is not value
 
     # Handle StructuredContent (recursively process all fields)
@@ -76,7 +83,7 @@ async def _normalize_value(
     if isinstance(value, ListContent):
         return await _normalize_list_content(list_content=value, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
 
-    # Handle plain lists (might contain ImageContent or StructuredContent)
+    # Handle plain lists (might contain ImageContent, DocumentContent, or StructuredContent)
     if isinstance(value, list):
         return await _normalize_list(items=value, storage=storage)  # pyright: ignore[reportUnknownArgumentType]
 
@@ -140,6 +147,8 @@ async def _normalize_list_content(
     first_item = normalized_items[0]
     if isinstance(first_item, ImageContent):
         return ListContent[ImageContent](items=cast("list[ImageContent]", normalized_items)), True
+    if isinstance(first_item, DocumentContent):
+        return ListContent[DocumentContent](items=cast("list[DocumentContent]", normalized_items)), True
 
     # For other types (e.g., StructuredContent subclasses), use generic ListContent
     return ListContent(items=normalized_items), True
@@ -170,38 +179,61 @@ async def _normalize_list(
     return normalized_items, has_changes
 
 
-async def _normalize_image_content(
-    image_content: ImageContent,
+async def _normalize_url_content(
+    content: NormalizableContent,
     storage: StorageProviderAbstract,
-) -> ImageContent:
-    """Normalize a single ImageContent, converting data URLs to storage URIs.
+) -> NormalizableContent:
+    """Normalize ImageContent or DocumentContent by converting data URLs to storage URIs.
 
     Args:
-        image_content: The image content to normalize.
+        content: The image or document content to normalize.
         storage: The storage provider to use.
 
     Returns:
-        The original ImageContent if no normalization needed, or a new ImageContent
+        The original content if no normalization needed, or a new instance
         with the normalized URL.
     """
-    resolved_uri = resolve_uri(image_content.url)
+    resolved_uri = resolve_uri(content.url)
 
-    if not isinstance(resolved_uri, ResolvedBase64DataUrl):
-        # Not a data URL, we can keep the original ImageContent without any changes
-        return image_content
+    if isinstance(resolved_uri, ResolvedBase64DataUrl):
+        # Decode base64 data and store
+        raw_bytes = base64.b64decode(resolved_uri.base64_data)
+        file_type = detect_file_type_from_bytes(raw_bytes)
+        mime_type = resolved_uri.mime_type or content.mime_type
+        key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
+        storage_uri = await storage.store(data=raw_bytes, key=key, content_type=mime_type)
+        public_url = await storage.public_url(uri=storage_uri)
 
-    # Decode base64 data and store
-    raw_bytes = base64.b64decode(resolved_uri.base64_data)
-    file_type = detect_file_type_from_bytes(raw_bytes)
-    key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
-    storage_uri = await storage.store(data=raw_bytes, key=key)
+        # Use model_copy to preserve all type-specific fields
+        return content.model_copy(
+            update={
+                "url": storage_uri,
+                "public_url": public_url,
+                "mime_type": mime_type,
+            }
+        )
+    elif isinstance(resolved_uri, ResolvedLocalPath):
+        if not get_config().pipelex.storage_config.is_upload_local_content_enabled:
+            return content
 
-    return ImageContent(
-        url=storage_uri,
-        display_link=image_content.display_link,
-        mime_type=resolved_uri.mime_type or image_content.mime_type,
-        source_prompt=image_content.source_prompt,
-        source_negative_prompt=image_content.source_negative_prompt,
-        caption=image_content.caption,
-        size=image_content.size,
-    )
+        # Read local file, detect type, upload to storage
+        try:
+            raw_bytes = await load_binary_async(resolved_uri.path)
+        except FileNotFoundError as exc:
+            msg = f"Input file not found: '{resolved_uri.path}'"
+            raise PipelexError(msg) from exc
+        file_type = detect_file_type_from_bytes(raw_bytes)
+        key = f"normalized/{shortuuid.uuid()}.{file_type.extension}"
+        storage_uri = await storage.store(data=raw_bytes, key=key, content_type=file_type.mime)
+        public_url = await storage.public_url(uri=storage_uri)
+
+        return content.model_copy(
+            update={
+                "url": storage_uri,
+                "public_url": public_url,
+                "mime_type": file_type.mime,
+            }
+        )
+    else:
+        # Other URI types (HTTP URLs, pipelex-storage://) are kept unchanged
+        return content

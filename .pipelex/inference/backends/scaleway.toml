@@ -25,6 +25,7 @@
 model_type = "llm"
 sdk = "openai"
 structure_method = "instructor/json"
+thinking_mode = "none"
 
 # --- DeepSeek Models ----------------------------------------------------------
 [deepseek-r1-distill-llama-70b]

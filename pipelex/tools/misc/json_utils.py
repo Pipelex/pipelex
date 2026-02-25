@@ -1,5 +1,9 @@
+import datetime
 import json
 from collections.abc import Mapping
+from decimal import Decimal
+from enum import Enum
+from pathlib import Path
 from typing import Any, Union, cast
 
 from kajson import kajson
@@ -18,6 +22,71 @@ class ArgumentTypeError(ToolError):
 
 class JsonTypeError(ToolError):
     pass
+
+
+CLEAN_JSON_FIELDS_TO_SKIP = ("__class__", "__module__")
+
+
+def clean_json_content(content: Any) -> Any:
+    """Recursively clean content for standard JSON serialization.
+
+    Removes kajson metadata fields (``__class__``, ``__module__``) and converts
+    non-JSON-native types to their JSON-safe equivalents:
+
+    - ``datetime.datetime`` / ``datetime.date`` / ``datetime.time`` -> ISO-format string
+    - ``Enum`` -> its ``.value``
+    - ``Decimal`` -> ``float``
+    - ``Path`` -> ``str``
+
+    Args:
+        content: The data structure to clean (dict, list, or scalar value).
+
+    Returns:
+        A cleaned copy of *content* that ``json.dumps`` can serialize directly.
+    """
+    if isinstance(content, dict):
+        cleaned: dict[str, Any] = {}
+        content_dict = cast("dict[str, Any]", content)
+        for key in content_dict:
+            if key in CLEAN_JSON_FIELDS_TO_SKIP:
+                continue
+            cleaned[key] = clean_json_content(content_dict[key])
+        return cleaned
+    elif isinstance(content, list):
+        content_list = cast("list[Any]", content)
+        return [clean_json_content(item) for item in content_list]
+    elif isinstance(content, (datetime.datetime, datetime.date, datetime.time)):
+        return content.isoformat()
+    elif isinstance(content, Enum):
+        return content.value
+    elif isinstance(content, Decimal):
+        return float(content)
+    elif isinstance(content, Path):
+        return str(content)
+    else:
+        return content
+
+
+# TODO: make this more powerful using kajson
+def clean_json_dumps(data: Any, indent: int | None = None) -> str:
+    """Serialize data to a JSON string, producing clean output without metadata.
+
+    Unlike kajson.dumps (which adds ``__class__``/``__module__`` metadata for
+    round-tripping), this function produces standard JSON suitable for external
+    consumers such as the agent CLI.
+
+    The data is first recursively cleaned via :func:`clean_json_content`
+    (datetime -> ISO string, Enum -> value, Decimal -> float, Path -> str,
+    kajson metadata removed) and then serialized with ``json.dumps``.
+
+    Args:
+        data: The data to serialize (dict, list, or any JSON-compatible structure).
+        indent: Number of spaces for indentation. Defaults to None (compact).
+
+    Returns:
+        A JSON string.
+    """
+    return json.dumps(clean_json_content(data), indent=indent)
 
 
 def json_str(some_object: Any, title: str | None = None, is_spaced: bool = False) -> str:
@@ -61,6 +130,7 @@ def save_as_json_to_path(
     path: str,
     indent: int | None = 4,
     is_warning_enabled: bool = True,
+    create_directory: bool = False,
 ):
     """Saves a Python object as a JSON file at the specified path.
 
@@ -72,13 +142,14 @@ def save_as_json_to_path(
         path (str): The file path where the JSON file will be saved.
         indent (int | None, optional): Number of spaces for JSON formatting indentation. Defaults to 4.
         is_warning_enabled (bool, optional): Whether to show warnings during JSON purification. Defaults to True.
+        create_directory (bool, optional): Whether to create the directory if it doesn't exist. Defaults to False.
 
     Returns:
         None
 
     """
     _, json_string = purify_json(object_to_save, indent=indent, is_warning_enabled=is_warning_enabled)
-    save_text_to_path(json_string, path)
+    save_text_to_path(json_string, path, create_directory=create_directory)
 
 
 def load_json_from_path(path: str) -> JsonContent:
@@ -103,7 +174,7 @@ def load_json_from_path(path: str) -> JsonContent:
         return json_content
 
 
-def load_json_dict_from_path(path: str) -> dict[Any, Any]:
+def load_json_dict_from_path(path: str) -> dict[str, Any]:
     """Loads a JSON file and ensures it contains a dictionary.
 
     This function reads a JSON file and verifies that its content is a dictionary.
@@ -113,7 +184,7 @@ def load_json_dict_from_path(path: str) -> dict[Any, Any]:
         path (str): The file path to the JSON file to be loaded.
 
     Returns:
-        Dict[Any, Any]: The parsed JSON content as a Python dictionary.
+        Dict[str, Any]: The parsed JSON content as a Python dictionary.
 
     Raises:
         JsonTypeError: If the JSON content is not a dictionary.

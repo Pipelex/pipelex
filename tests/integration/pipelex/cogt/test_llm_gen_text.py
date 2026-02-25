@@ -13,6 +13,7 @@ from pipelex.cogt.model_backends.constraints import ListedConstraint, ValuedCons
 from pipelex.hub import get_llm_worker, get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.cogt.test_data import LLMTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 def get_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMetadata) -> tuple[LLMWorkerAbstract, LLMJob]:
@@ -37,14 +38,13 @@ def get_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMeta
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
-@pytest.mark.usefixtures("routing_profile_override")
 class TestLLMGenText:
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_using_handle(
-        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_handle: str, topic: str, prompt_text: str
+        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo, topic: str, prompt_text: str
     ):
-        pretty_print(prompt_text, title=f"Generating text about '{topic}' using '{llm_handle}'")
-        llm_worker = get_llm_worker(llm_handle=llm_handle)
+        pretty_print(prompt_text, title=f"Generating text about '{topic}' using '{llm_combo.handle}'")
+        llm_worker = get_llm_worker(llm_handle=llm_combo.handle)
         llm_job = LLMJobFactory.make_llm_job(
             llm_prompt=LLMPrompt(
                 user_text=prompt_text,

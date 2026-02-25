@@ -1,6 +1,10 @@
 import asyncio
+import base64
+import tempfile
+from pathlib import Path
 from typing import Any
 
+import aiofiles
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import SdkTypeError
@@ -8,17 +12,12 @@ from pipelex.cogt.extract.extract_input import ExtractInputError
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
+from pipelex.cogt.file.file_preparation_utils import prepare_file_from_uri
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.docling.docling_factory import DoclingFactory
 from pipelex.plugins.docling.docling_sdk import DoclingSdk
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.uri.resolved_uri import (
-    ResolvedBase64DataUrl,
-    ResolvedHttpUrl,
-    ResolvedLocalPath,
-    ResolvedPipelexStorage,
-)
-from pipelex.tools.uri.uri_resolver import resolve_uri
+from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 
 class DoclingExtractWorker(ExtractWorkerAbstract):
@@ -49,7 +48,7 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
         source_uri: str
         if image_uri := extract_job.extract_input.image_uri:
             source_uri = image_uri
-        elif pdf_uri := extract_job.extract_input.pdf_uri:
+        elif pdf_uri := extract_job.extract_input.document_uri:
             source_uri = pdf_uri
         else:
             msg = "Neither image URI nor PDF URI provided in ExtractJob"
@@ -58,18 +57,38 @@ class DoclingExtractWorker(ExtractWorkerAbstract):
         return await self._extract_from_source(source_uri=source_uri)
 
     async def _extract_from_source(self, source_uri: str) -> ExtractOutput:
-        """Extract text from a source URI (file path, file:// URI, or http(s) URL)."""
-        resolved_uri = resolve_uri(source_uri)
-        resolved_source: str
-        match resolved_uri:
-            case ResolvedHttpUrl():
-                resolved_source = resolved_uri.url
-            case ResolvedLocalPath():
-                resolved_source = resolved_uri.path
-            case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for Docling extraction: {resolved_uri.kind}"
-                raise ExtractInputError(msg)
+        """Extract text from any supported URI type (file path, http(s) URL, pipelex-storage://, or base64 data URL)."""
+        prepared = await prepare_file_from_uri(
+            uri=source_uri,
+            keep_http_url=True,
+            keep_local_path=True,
+        )
 
-        # Run synchronous Docling conversion in a thread pool to avoid blocking
-        conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, resolved_source)
-        return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)
+        docling_source: str
+        temp_path: Path | None = None
+
+        match prepared:
+            case PreparedFileHttpUrl():
+                docling_source = prepared.url
+            case PreparedFileLocalPath():
+                docling_source = prepared.path
+            case PreparedFileBase64():
+                # Docling needs a file path, so write base64 data to temp file
+                suffix = f".{prepared.file_type.extension}" if prepared.file_type.extension else ".pdf"
+                with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp_file:
+                    temp_path = Path(temp_file.name)
+                try:
+                    async with aiofiles.open(temp_path, "wb") as file:
+                        await file.write(base64.b64decode(prepared.base64_data))
+                    docling_source = str(temp_path)
+                except BaseException:
+                    temp_path.unlink(missing_ok=True)
+                    raise
+
+        try:
+            # Run synchronous Docling conversion in a thread pool to avoid blocking
+            conversion_result = await asyncio.to_thread(self.docling_sdk.document_converter.convert, docling_source)
+            return DoclingFactory.make_extract_output_from_docling_document(doc=conversion_result.document)
+        finally:
+            if temp_path:
+                temp_path.unlink(missing_ok=True)

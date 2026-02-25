@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import random
 from typing import TYPE_CHECKING, Any
 
 from portkey_ai import (
@@ -10,11 +11,14 @@ from portkey_ai.api_resources import exceptions as portkey_exc
 
 from pipelex import log
 from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
+from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.hub import get_telemetry_manager
 from pipelex.plugins.gateway.gateway_exceptions import GatewayCredentialsError
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_schemas import GatewayExtractRequestParams
+from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.plugins.portkey.portkey_constants import PortkeyHeaderKey
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.urls import URLs
@@ -72,16 +76,29 @@ class GatewayFactory:
             extra_headers[PortkeyHeaderKey.PROVIDER] = inference_model.backend_name
 
         if isinstance(inference_job, ExtractJob):
-            should_include_images = inference_job.job_params.should_include_images
+            # Derive boolean from max_nb_images: None/positive = True, 0 = False
+            max_nb_images = inference_job.job_params.max_nb_images
+            should_include_images = max_nb_images is None or max_nb_images > 0
             extract_protocol = GatewayExtractProtocol.make_from_model_handle(model_handle=inference_model.name)
             match extract_protocol:
                 case GatewayExtractProtocol.MISTRAL_DOC_AI:
                     extra_body["include_image_base64"] = should_include_images
                 case GatewayExtractProtocol.AZURE_DOC_INTEL:
                     request_params = GatewayExtractRequestParams(should_include_images=should_include_images)
-                    messages: list[dict[str, str]] = [{"role": "user", "content": request_params.model_dump_json()}]
-                    extra_body["messages"] = messages
-
+                    messages_azure: list[dict[str, str]] = [{"role": "user", "content": request_params.model_dump_json()}]
+                    extra_body["messages"] = messages_azure
+                case GatewayExtractProtocol.DEEPSEEK_OCR:
+                    messages_deepseek: list[dict[str, str]] = [{"role": "user", "content": "Convert the document to markdown."}]
+                    extra_body["messages"] = messages_deepseek
+        elif isinstance(inference_job, LLMJob) and inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
+            # Mistral models really want non-null seed
+            extra_body["seed"] = random.randint(0, 1000000)
+        elif isinstance(inference_job, ImgGenJob) and inference_model.model_id.startswith("gemini"):
+            aspect_ratio_str = GoogleImgGenFactory.aspect_ratio_literal(inference_job.job_params.aspect_ratio)
+            extra_body["image_config"] = {
+                "aspect_ratio": aspect_ratio_str,
+                # "image_size": "2K",
+            }
         # OTel-correlated Portkey tracing (only when enabled and OTel context available)
         if get_telemetry_manager().is_pipelex_gateway_portkey_tracing_enabled() and (otel_context := inference_job.job_metadata.otel_context):
             # Use OTel trace_id and span_id for correlation

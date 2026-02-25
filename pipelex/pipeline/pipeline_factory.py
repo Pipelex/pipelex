@@ -8,7 +8,7 @@ class PipelineFactory:
     @classmethod
     def make_pipeline(cls) -> Pipeline:
         pipeline_run_id = cls.make_pipeline_run_id()
-        log.dev(f"Making new pipeline with run id: {pipeline_run_id}")
+        log.verbose(f"Making new pipeline with run id: {pipeline_run_id}")
         return Pipeline(
             pipeline_run_id=pipeline_run_id,
         )

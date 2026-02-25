@@ -1,5 +1,6 @@
 import pytest
 from kajson.kajson_manager import KajsonManager
+from pydantic import ValidationError
 
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.core.concepts.concept import Concept
@@ -19,12 +20,13 @@ class NestedImageInfo(StructuredContent):
     """A nested structure that contains image-like data (same structure as ImageContent)."""
 
     url: str
-    display_link: str | None = None
+    public_url: str | None = None
     source_prompt: str | None = None
     source_negative_prompt: str | None = None
     caption: str | None = None
     mime_type: str | None = None
     size: ImageSize | None = None
+    filename: str | None = None
 
 
 class DocumentWithNestedImage(StructuredContent):
@@ -40,7 +42,9 @@ class TestConcept:
     def test_get_validated_native_concept_ref(self):
         assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.TEXT) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
         assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.IMAGE) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}"
-        assert NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.PDF) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}"
+        assert (
+            NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.DOCUMENT) == f"{SpecialDomain.NATIVE}.{NativeConceptCode.DOCUMENT}"
+        )
         assert (
             NativeConceptCode.get_validated_native_concept_ref(NativeConceptCode.TEXT_AND_IMAGES)
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}"
@@ -59,8 +63,8 @@ class TestConcept:
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.IMAGE}"
         )
         assert (
-            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}")
-            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.PDF}"
+            NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.DOCUMENT}")
+            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.DOCUMENT}"
         )
         assert (
             NativeConceptCode.get_validated_native_concept_ref(f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT_AND_IMAGES}")
@@ -75,7 +79,7 @@ class TestConcept:
         with pytest.raises(NativeConceptDefinitionError):
             NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.IMAGE}")
         with pytest.raises(NativeConceptDefinitionError):
-            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.PDF}")
+            NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.DOCUMENT}")
         with pytest.raises(NativeConceptDefinitionError):
             NativeConceptCode.get_validated_native_concept_ref(f"not_native.{NativeConceptCode.TEXT_AND_IMAGES}")
         with pytest.raises(NativeConceptDefinitionError):
@@ -131,7 +135,7 @@ class TestConcept:
         assert (
             Concept.is_native_concept(
                 ConceptFactory.make_from_blueprint(
-                    concept_code=NativeConceptCode.PDF,
+                    concept_code=NativeConceptCode.DOCUMENT,
                     domain_code=valid_domain,
                     blueprint_or_string_description=ConceptBlueprint(description=valid_definition),
                 ),
@@ -202,12 +206,9 @@ class TestConcept:
         with pytest.raises(ConceptStringError):
             validate_concept_ref(f"snake_case_domaiN.{valid_concept_code}")
 
-        # Multiple dots
-        with pytest.raises(ConceptStringError):
-            validate_concept_ref(f"domain.sub.{valid_concept_code}")
-
-        with pytest.raises(ConceptStringError):
-            validate_concept_ref(f"a.b.c.{valid_concept_code}")
+        # Hierarchical domains (multiple dots) - now valid
+        validate_concept_ref(f"domain.sub.{valid_concept_code}")
+        validate_concept_ref(f"a.b.c.{valid_concept_code}")
 
         # Invalid domain (not snake_case)
         with pytest.raises(ConceptStringError):
@@ -234,6 +235,41 @@ class TestConcept:
 
         with pytest.raises(ConceptStringError):
             validate_concept_ref(f"{valid_domain}.text-name")
+
+    @pytest.mark.parametrize(
+        "domain_code",
+        [
+            "scoring_lib->scoring",
+            "my_lib->legal.contracts",
+        ],
+    )
+    def test_concept_with_cross_package_domain_code(self, domain_code: str):
+        """Concept construction with a cross-package domain code should pass validation."""
+        concept = Concept(
+            code="WeightedScore",
+            domain_code=domain_code,
+            description="Test concept",
+            structure_class_name="TextContent",
+        )
+        assert concept.domain_code == domain_code
+
+    @pytest.mark.parametrize(
+        "domain_code",
+        [
+            "lib->",
+            "lib->Legal",
+            "lib->.scoring",
+        ],
+    )
+    def test_concept_with_invalid_cross_package_domain_code(self, domain_code: str):
+        """Concept construction with an invalid cross-package domain code should raise."""
+        with pytest.raises(ValidationError):
+            Concept(
+                code="WeightedScore",
+                domain_code=domain_code,
+                description="Test concept",
+                structure_class_name="TextContent",
+            )
 
     def test_are_concept_compatible(self):
         concept1 = ConceptFactory.make_from_blueprint(
@@ -317,6 +353,7 @@ class TestConcept:
                     "text": ConceptStructureBlueprint(
                         type=ConceptStructureBlueprintFieldType.TEXT,
                         description="The text content",
+                        required=True,
                     ),
                 },
             ),

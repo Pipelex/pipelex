@@ -1,6 +1,7 @@
 """UI components for routing profile configuration in the init command."""
 
 from rich.console import Console, Group
+from rich.markup import escape
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.table import Table
@@ -82,7 +83,7 @@ def prompt_primary_backend(console: Console, backend_keys: list[str]) -> str:
             break
 
         except ValueError:
-            console.print(f"[red]Invalid input: '{choice_str}'.[/red] Please enter a number.\n")
+            console.print(f"[red]Invalid input: '{escape(choice_str)}'.[/red] Please enter a number.\n")
 
     return selected_backend
 
@@ -183,7 +184,7 @@ def prompt_fallback_order(console: Console, remaining_backends: list[str], backe
             break
 
         except ValueError:
-            console.print(f"[red]Invalid input: '{choice_str}'.[/red] Please enter numbers separated by commas or spaces.\n")
+            console.print(f"[red]Invalid input: '{escape(choice_str)}'.[/red] Please enter numbers separated by commas or spaces.\n")
 
     # Display the final order
     console.print("\n[green]✓[/green] Fallback order set to:")

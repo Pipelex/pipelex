@@ -1,20 +1,21 @@
 import hashlib
 
 
-def hash_sha256(string: str, length: int | None = None) -> str:
-    """Hash the string using truncated SHA256.
+def hash_sha256(data: str | bytes, length: int | None = None) -> str:
+    """Hash the data using truncated SHA256.
 
     Uses the first `length` characters of SHA256 hex digest, which provides
     collision resistance for practical purposes while being compact.
 
     Args:
-        string: The string to hash.
+        data: The string or bytes to hash.
         length: The length of the hash to return.
 
     Returns:
         First `length` characters of SHA256 hex digest if length is provided, otherwise the full hash.
     """
-    the_hash = hashlib.sha256(string.encode("utf-8")).hexdigest()
+    data_bytes = data.encode("utf-8") if isinstance(data, str) else data
+    the_hash = hashlib.sha256(data_bytes).hexdigest()
     if length is not None:
         return the_hash[:length]
     return the_hash

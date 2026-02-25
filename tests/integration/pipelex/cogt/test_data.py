@@ -8,6 +8,7 @@ from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.types import StrEnum
 from tests.cases import ImageTestCases
+from tests.cases.documents import DocumentTestCases
 from tests.integration.pipelex.test_data import PipeTestCases
 
 
@@ -92,6 +93,28 @@ class LLMVisionTestCases:
     # Data URLs for vision tests (topic, data_url)
     IMAGE_DATA_URLS: ClassVar[list[tuple[str, str]]] = [
         ("Pipelex Logo Tiny", ImageTestCases.LOGO_TINY_PNG_DATA_URL),
+    ]
+
+
+class LLMDocumentTestCases:
+    """Test cases for LLM document understanding."""
+
+    DOCUMENT_USER_TEXT = "Summarize this document in 2-3 concise sentences."
+    DOCUMENT_USER_TEXT_DETAILED = "What are the key points in this document? List them as bullet points."
+
+    # PDF document paths - universally supported across providers
+    PDF_DOCUMENT_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, document_path
+        ("Job Offer PDF", DocumentTestCases.PDF_FILE_PATH_2),
+    ]
+
+    # DOCX document paths - limited support (Anthropic supports, Google doesn't)
+    DOCX_DOCUMENT_PATHS: ClassVar[list[tuple[str, str]]] = [  # topic, document_path
+        ("CV DOCX", DocumentTestCases.DOCX_FILE_PATH_1),
+    ]
+
+    # Document URLs - using remote URLs from DocumentTestCases
+    DOCUMENT_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, document_url
+        ("Job Offer URL", DocumentTestCases.PDF_FILE_URL_1),
     ]
 
 
@@ -208,4 +231,31 @@ class SerDeTestLLMCases:
     ]
     PYDANTIC_EXAMPLES_DICT: ClassVar[list[dict[str, Any]]] = [
         DICT_1,
+    ]
+
+
+class LLMReasoningTestCases:
+    """Test cases for LLM reasoning/thinking integration tests."""
+
+    PROMPTS: ClassVar[list[tuple[str, str]]] = [  # topic, prompt_text
+        ("Comparison", "Which is larger: 0.9 or 0.11?"),
+        ("Letter counting", "How many Rs are in the word 'Strawberry'?"),
+        ("Multiplication", "What is 317 * 723?"),
+        # ("Huge multiplication", "What is 9738317 * 723837893?"),
+        # (
+        #     "Tricky growth",
+        #     """
+        #     When my son was 7 he was 3ft tall. When he was 8 he was 4ft tall. When he was 9 he was 5ft tall.
+        #     How tall do you think he was when he was 12? and at 15?
+        #     Conclude with your opinion as a one-sentence answer.
+        # """,
+        # ),
+        # (
+        #     "Tricky river crossing",
+        #     """
+        #     A man, a cabbage, and a goat are trying to cross a river.
+        #     They have a boat that can only carry three things at once. How do they do it?
+        #     Conclude with your opinion as a one-sentence answer.
+        # """,
+        # ),
     ]

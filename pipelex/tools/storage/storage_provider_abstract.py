@@ -1,6 +1,16 @@
 from abc import ABC, abstractmethod
+from typing import NamedTuple
+
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError, StorageInvalidKeyError
 
 PIPELEX_STORAGE_SCHEME = "pipelex-storage://"
+
+
+class StoredData(NamedTuple):
+    """Data returned from storage with optional MIME type metadata."""
+
+    data: bytes
+    mime_type: str | None = None
 
 
 class StorageProviderAbstract(ABC):
@@ -10,9 +20,9 @@ class StorageProviderAbstract(ABC):
     the interface for concrete storage providers.
 
     Subclasses must implement:
-        - _load(key): Load data by key (without scheme)
+        - _load_with_metadata(key): Load data with MIME type by key (without scheme)
         - _store(data, key, content_type): Store data and return URI
-        - display_link(uri): Return human-readable link for URI
+        - public_url(uri): Return human-readable link for URI
     """
 
     def _strip_scheme(self, uri: str) -> str:
@@ -27,8 +37,6 @@ class StorageProviderAbstract(ABC):
         Raises:
             StorageFileNotFoundError: If URI doesn't start with the expected scheme.
         """
-        from pipelex.tools.storage.exceptions import StorageFileNotFoundError  # noqa: PLC0415
-
         if not uri.startswith(PIPELEX_STORAGE_SCHEME):
             msg = f"Invalid URI '{uri}': must start with '{PIPELEX_STORAGE_SCHEME}'"
             raise StorageFileNotFoundError(msg)
@@ -46,8 +54,6 @@ class StorageProviderAbstract(ABC):
         Raises:
             StorageInvalidKeyError: If key already contains the scheme prefix.
         """
-        from pipelex.tools.storage.exceptions import StorageInvalidKeyError  # noqa: PLC0415
-
         if key.startswith(PIPELEX_STORAGE_SCHEME):
             msg = f"Key should not include scheme prefix: '{key}'"
             raise StorageInvalidKeyError(msg)
@@ -62,18 +68,30 @@ class StorageProviderAbstract(ABC):
         Returns:
             The stored bytes.
         """
+        stored_data = await self.load_with_metadata(uri)
+        return stored_data.data
+
+    async def load_with_metadata(self, uri: str) -> StoredData:
+        """Load data from storage with MIME type metadata.
+
+        Args:
+            uri: Full URI including PIPELEX_STORAGE_SCHEME prefix.
+
+        Returns:
+            StoredData containing bytes and optional MIME type.
+        """
         key = self._strip_scheme(uri)
-        return await self._load(key)
+        return await self._load_with_metadata(key)
 
     @abstractmethod
-    async def _load(self, key: str) -> bytes:
-        """Load data from storage by key.
+    async def _load_with_metadata(self, key: str) -> StoredData:
+        """Load data from storage by key with MIME type metadata.
 
         Args:
             key: Storage key (without scheme prefix).
 
         Returns:
-            The stored bytes.
+            StoredData containing bytes and optional MIME type.
         """
 
     async def store(self, data: bytes, key: str, content_type: str | None = None) -> str:
@@ -102,7 +120,7 @@ class StorageProviderAbstract(ABC):
         """
 
     @abstractmethod
-    async def display_link(self, uri: str) -> str | None:
+    async def public_url(self, uri: str) -> str | None:
         """Return human-readable link for this URI.
 
         Args:

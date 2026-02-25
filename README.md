@@ -1,9 +1,13 @@
 <div align="center">
   <a href="https://www.pipelex.com/"><img src="https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/logo.png" alt="Pipelex Logo" width="400" style="max-width: 100%; height: auto;"></a>
 
-  <h2 align="center">AI Workflows That Agents Build & Run</h2>
-  <p align="center">Pipelex is developing the open standard for repeatable AI workflows.<br/>
+  <br/>
+  <br/>
+  <br/>
+  <h2 align="center">The Reference Runtime for Executing Methods</h2>
+  <p align="center">Pipelex is the reference Python runtime for executing methods, based on the <a href="https://mthds.ai">MTHDS</a> open standard.<br/>
 Write business logic, not API calls.</p>
+
 
   <div>
     <a href="https://go.pipelex.com/demo"><strong>Demo</strong></a> -
@@ -22,7 +26,7 @@ Write business logic, not API calls.</p>
     <a href="https://go.pipelex.com/discord"><img src="https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white" alt="Discord"></a>
     <a href="https://www.youtube.com/@PipelexAI"><img src="https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white" alt="YouTube"></a>
     <a href="https://pipelex.com"><img src="https://img.shields.io/badge/Homepage-03bb95?logo=google-chrome&logoColor=white&style=flat" alt="Website"></a>
-    <a href="https://github.com/Pipelex/pipelex-cookbook"><img src="https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat" alt="Cookbook"></a>
+    <a href="https://github.com/Pipelex/pipelex-cookbook/tree/main"><img src="https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat" alt="Cookbook"></a>
     <a href="https://docs.pipelex.com/"><img src="https://img.shields.io/badge/Docs-03bb95?logo=read-the-docs&logoColor=white&style=flat" alt="Documentation"></a>
     <a href="https://docs.pipelex.com/changelog/"><img src="https://img.shields.io/badge/Changelog-03bb95?logo=git&logoColor=white&style=flat" alt="Changelog"></a>
     <br/>
@@ -41,27 +45,39 @@ pip install pipelex
 pipelex init
 ```
 
-## 2. Get Your API Key (Free)
+## 2. Configure AI Access
 
-To use AI models, you need an API key:
+To run pipelines with AI models, choose one of these options:
 
-- **Free Pipelex API Key**: Join our [Discord community](https://go.pipelex.com/discord) and request your **free API key** (no credit card required) in the [🔑・free-api-key](https://discord.com/channels/1369447918955921449/1418228010431025233) channel.
-- **Bring your own API keys**: OpenAI, Anthropic, Google, Mistral
-- **Local AI**: Ollama, vLLM, LM Studio, llama.cpp... any endpoint based on the OpenAI API or not, as you can plug-in your own non-standard APIs.
+### Option A: Pipelex Gateway (Recommended)
 
-See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for details.
+Get **free credits** with a single API key for LLMs, document extraction, and image generation across all major providers (OpenAI, Anthropic, Google, Azure, and more). New models added constantly.
 
-## 3. Generate Your First Workflow
+1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
+2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
+3. Run `pipelex init` and accept the Gateway terms of service
 
-Create a complete AI workflow with a single command:
+> **Migrating from pipelex_inference?** The old `pipelex_inference` backend is deprecated. Get your new Gateway key at [app.pipelex.com](https://app.pipelex.com/).
+
+### Option B: Bring Your Own Keys
+
+Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for setup.
+
+### Option C: Local AI
+
+Run models locally with Ollama, vLLM, LM Studio, or llama.cpp - no API keys required. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) for details.
+
+## 3. Generate Your First Method
+
+Create a complete AI method with a single command:
 
 ```bash
-pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview" --output results/cv_match.plx
+pipelex build pipe "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview" --output results/cv_match.mthds
 ```
 
-This command generates a production-ready `.plx` file with domain definitions, concepts, and multiple processing steps that analyzes CV-job fit and prepares interview questions.
+This command generates a production-ready `.mthds` file with domain definitions, concepts, and multiple processing steps that analyzes CV-job fit and prepares interview questions.
 
-**cv_match.plx**
+**cv_match.mthds**
 ```toml
 domain = "cv_match"
 description = "Matching CVs with job offers and generating interview questions"
@@ -84,7 +100,7 @@ refines = "Text"
 [pipe.analyze_cv_job_match_and_generate_questions]
 type = "PipeSequence"
 description = """
-Main pipeline that orchestrates the complete CV-job matching and interview question generation workflow. Takes a candidate's CV and a job offer as PDF documents, extracts their content, performs a comprehensive match analysis identifying strengths, gaps, and areas to probe, and generates exactly 5 targeted interview questions based on the analysis results.
+Main pipeline that orchestrates the complete CV-job matching and interview question generation method. Takes a candidate's CV and a job offer as PDF documents, extracts their content, performs a comprehensive match analysis identifying strengths, gaps, and areas to probe, and generates exactly 5 targeted interview questions based on the analysis results.
 """
 inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
 output = "Question[5]"
@@ -106,7 +122,7 @@ Executes parallel extraction of text content from both the CV PDF and job offer 
 """
 inputs = { cv_pdf = "PDF", job_offer_pdf = "PDF" }
 output = "Dynamic"
-parallels = [
+branches = [
     { pipe = "extract_cv_text", result = "cv_pages" },
     { pipe = "extract_job_offer_text", result = "job_offer_pages" },
 ]
@@ -119,7 +135,7 @@ Extracts text content from the candidate's CV PDF document using OCR technology,
 """
 inputs = { cv_pdf = "PDF" }
 output = "Page[]"
-model = "extract_basic_from_pdf"
+model = "@default-text-from-pdf"
 
 [pipe.extract_job_offer_text]
 type = "PipeExtract"
@@ -128,7 +144,7 @@ Extracts text content from the job offer PDF document using OCR technology, conv
 """
 inputs = { job_offer_pdf = "PDF" }
 output = "Page[]"
-model = "extract_basic_from_pdf"
+model = "@default-text-from-pdf"
 
 [pipe.analyze_match]
 type = "PipeLLM"
@@ -137,7 +153,7 @@ Performs comprehensive analysis comparing the candidate's CV against the job off
 """
 inputs = { cv_pages = "Page[]", job_offer_pages = "Page[]" }
 output = "MatchAnalysis"
-model = "llm_to_answer_questions"
+model = "$writing-factual"
 system_prompt = """
 You are an expert HR analyst and recruiter specializing in candidate-job fit assessment. Your task is to generate a structured MatchAnalysis comparing a candidate's CV against job requirements.
 """
@@ -160,7 +176,7 @@ Generates exactly 5 targeted, relevant interview questions based on the match an
 """
 inputs = { match_analysis = "MatchAnalysis" }
 output = "Question[5]"
-model = "llm_for_writing_cheap"
+model = "$testing-structured"
 system_prompt = """
 You are an expert HR interviewer and talent assessment specialist. Your task is to generate structured interview questions based on candidate-position match analysis.
 """
@@ -230,7 +246,7 @@ flowchart TD
 
 ```bash
 # Run with input file
-pipelex run results/cv_match.plx --inputs inputs.json
+pipelex run results/cv_match.mthds --inputs inputs.json
 ```
 
 Create an `inputs.json` file with your PDF URLs:
@@ -257,35 +273,24 @@ Create an `inputs.json` file with your PDF URLs:
 ```python
 import asyncio
 import json
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.pipelex import Pipelex
 
 async def run_pipeline():
     with open("inputs.json", encoding="utf-8") as f:
         inputs = json.load(f)
 
-    pipe_output = await execute_pipeline(
+    runner = PipelexRunner()
+    response = await runner.execute_pipeline(
         pipe_code="cv_match",
         inputs=inputs
     )
+    pipe_output = response.pipe_output
     print(pipe_output.main_stuff_as_str)
 
 Pipelex.make()
 asyncio.run(run_pipeline())
 ```
-
-## 5. Iterate with AI Assistance
-
-Install AI assistant rules to easily modify your pipelines:
-
-```bash
-pipelex kit rules
-```
-
-This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, and Blackbox AI. Now you can refine pipelines with natural language:
-
-- "Include confidence scores between 0 and 100 in the match analysis"
-- "Write a recap email at the end"
 
 <div>
   <h2 align="center">🚀 See Pipelex in Action</h2>
@@ -293,13 +298,13 @@ This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, 
   <table align="center">
     <tr>
       <td align="center" width="50%">
-        <h3>From Whiteboard to AI Workflow in less than 5 minutes with no hands (2025-07)</h3>
+        <h3>From Whiteboard to AI Method in less than 5 minutes with no hands (2025-07)</h3>
         <a href="https://go.pipelex.com/demo">
           <img src="https://go.pipelex.com/demo-thumbnail" alt="Pipelex Demo" width="100%" style="max-width: 500px; height: auto;">
         </a>
       </td>
       <td align="center" width="50%">
-        <h3>The AI workflow that writes an AI workflow in 64 seconds (2025-09)</h3>
+        <h3>The AI method that writes an AI method in 64 seconds (2025-09)</h3>
         <a href="https://go.pipelex.com/Demo-Live">
           <img src="https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_play_video_demo_live.jpg" alt="Pipelex Live Demo" width="100%" style="max-width: 500px; height: auto;">
         </a>
@@ -311,26 +316,31 @@ This installs rules for Cursor, Claude, OpenAI Codex, GitHub Copilot, Windsurf, 
 
 ## 💡 What is Pipelex?
 
-Pipelex is an open-source language that enables you to build and run **repeatable AI workflows**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+Pipelex is the reference Python runtime for executing **repeatable AI methods**, based on the [MTHDS](https://mthds.ai) open standard. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
 
-Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.plx` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
+Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The mthds language (`.mthds` files) is simple and human-readable, even for non-technical users. Each step can be structured and validated, giving you the reliability of software with the intelligence of AI.
 
 ## 📖 Next Steps
 
 **Learn More:**
-- [Design and Run Pipelines](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/pipes/) - Complete guide with examples
-- [Kick off a Pipeline Project](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/kick-off-a-pipelex-workflow-project/) - Deep dive into Pipelex
+- [Design and Run Methods](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/pipes/) - Complete guide with examples
+- [Kick off a Method Project](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/kick-off-a-methods-project/) - Deep dive into Pipelex
 - [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/) - Set up AI providers and models
 
 ## 🔧 IDE Extension
 
-We **highly** recommend installing our extension for `.plx` files into your IDE. You can find it in the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex). It's coming soon to VS Code marketplace too. If you're using Cursor, Windsurf or another VS Code fork, you can search for it directly in your extensions tab.
+We **highly** recommend installing our extension for `.mthds` syntax highlighting in your IDE:
+
+- **VS Code**: Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pipelex.pipelex)
+- **Cursor, Windsurf, and other VS Code forks**: Install from the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex), or search for "Pipelex" directly in your extensions tab
+
+Running `pipelex init` will also offer to install the extension automatically if it detects your IDE.
 
 ## 📚 Examples & Cookbook
 
 Explore real-world examples in our **Cookbook** repository:
 
-[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/)
+[![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/main)
 
 Clone it, fork it, and experiment with production-ready pipelines for various use cases.
 
@@ -353,13 +363,12 @@ pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal]"
 
 ## Privacy & Telemetry
 
-Pipelex collects optional, anonymous usage data to help improve the product. On first run, you'll be prompted to choose your telemetry preference:
+Pipelex supports two independent telemetry streams:
 
-- **Off**: No telemetry data collected
-- **Anonymous**: Anonymous usage data only (command usage, performance metrics, feature usage)
-- **Identified**: Usage data with user identification (helps us provide better support)
+- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#gateway-telemetry-pipelex-controlled)
+- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#custom-telemetry-user-controlled)
 
-Your prompts, LLM responses, file paths, and URLs are automatically redacted and never transmitted. You can change your preference at any time or disable telemetry completely by setting the `DO_NOT_TRACK` environment variable.
+**We only collect technical data** (model names, token counts, latency, error rates) - never your prompts, completions, or business data. Set `DO_NOT_TRACK=1` to disable all telemetry (note: Gateway requires telemetry to function).
 
 For more details, see the [Telemetry Documentation](https://docs.pipelex.com/home/5-setup/telemetry/) or read our [Privacy Policy](https://go.pipelex.com/privacy-policy).
 

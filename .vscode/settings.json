@@ -13,7 +13,7 @@
         "**/__pycache__": true,
         ".mypy_cache": true,
         ".pytest_cache": true,
-        ".ruff_cache": true,
+        ".ruff_cache": true
     },
     "python.testing.pytestArgs": [
         "tests"
@@ -22,6 +22,18 @@
     "python.testing.pytestEnabled": true,
     "djlint.showInstallError": false,
     "files.associations": {
-        "*.plx": "plx"
+        "*.plx": "mthds"
+    },
+    "editor.formatOnSave": true,
+    "[html]": {
+        "editor.formatOnSave": false
+    },
+    "[toml]": {
+        "editor.defaultFormatter": "Pipelex.pipelex",
+        "editor.formatOnSave": true
+    },
+    "[mthds]": {
+        "editor.defaultFormatter": "Pipelex.pipelex",
+        "editor.formatOnSave": true
     }
 }

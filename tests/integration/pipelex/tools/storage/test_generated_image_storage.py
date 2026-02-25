@@ -14,11 +14,11 @@ from pytest_mock import MockerFixture
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
-from pipelex.cogt.image.prepared_image import PreparedImageBase64
 from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
 from pipelex.cogt.image.prompt_image_utils import prepare_prompt_image
 from pipelex.tools.misc.file_utils import load_binary
 from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME, StorageProviderAbstract
+from pipelex.tools.uri.prepared_file import PreparedFileBase64
 from tests.cases import ImageTestCases
 
 
@@ -73,7 +73,7 @@ class TestGeneratedImageStorage:
             is_http_url_enabled=False,
         )
 
-        assert isinstance(prepared, PreparedImageBase64)
+        assert isinstance(prepared, PreparedFileBase64)
         # Verify the data matches the original
         decoded = base64.b64decode(prepared.base64_data)
         assert decoded == image_bytes
@@ -116,7 +116,7 @@ class TestGeneratedImageStorage:
             is_http_url_enabled=False,
         )
 
-        assert isinstance(prepared, PreparedImageBase64)
+        assert isinstance(prepared, PreparedFileBase64)
         assert prepared.base64_data == ImageTestCases.MINIMAL_PNG_BASE64
 
     async def test_generated_image_uri_format_applied(

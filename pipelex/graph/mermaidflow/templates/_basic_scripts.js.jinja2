@@ -1,0 +1,141 @@
+// Parse mermaid code from embedded JSON (safe from XSS)
+const mermaidCodeElement = document.getElementById('mermaid-code-data');
+const mermaidCode = JSON.parse(mermaidCodeElement.textContent);
+let currentTheme = {{ theme | tojson }};
+
+// Theme-specific color palettes for custom node styling
+const themePalettes = {
+    default: {
+        page: { bg: '#f8fafc', text: '#1e293b', label: '#64748b', border: '#cbd5e1',
+                borderHover: '#94a3b8', selectBg: 'white', containerBg: 'white' },
+        failed: { fill: '#fee2e2', stroke: '#dc2626' },
+        controller: { fill: '#dbeafe', stroke: '#2563eb' },
+        pipe: { fill: '#dbeafe', stroke: '#2563eb' },
+        stuff: { fill: '#fef3c7', stroke: '#d97706' },
+        subgraph: ['#eff6ff', '#ecfdf5', '#fefce8', '#fdf4ff', '#f0fdfa']
+    },
+    dark: {
+        page: { bg: '#1a1a2e', text: '#e0f7fa', label: '#80deea', border: '#2d4a5a',
+                borderHover: '#00bcd4', selectBg: '#2d4a5a', containerBg: '#16213e' },
+        failed: { fill: '#3a1a1a', stroke: '#ff5252' },
+        controller: { fill: '#1a3a4a', stroke: '#00e5ff' },
+        pipe: { fill: '#1a3a4a', stroke: '#00e5ff' },
+        stuff: { fill: '#2a1a3a', stroke: '#ff4081' },
+        subgraph: ['#1e3a4a', '#1a3a3a', '#2a3a4a', '#1a2a4a', '#2a4a4a']
+    },
+    forest: {
+        page: { bg: '#f0fdf4', text: '#14532d', label: '#166534', border: '#86efac',
+                borderHover: '#4ade80', selectBg: 'white', containerBg: '#fafffe' },
+        failed: { fill: '#fecaca', stroke: '#b91c1c' },
+        controller: { fill: '#dcfce7', stroke: '#16a34a' },
+        pipe: { fill: '#dcfce7', stroke: '#16a34a' },
+        stuff: { fill: '#fef9c3', stroke: '#ca8a04' },
+        subgraph: ['#d1fae5', '#bbf7d0', '#d9f99d', '#fef08a', '#a7f3d0']
+    },
+    neutral: {
+        page: { bg: '#fafafa', text: '#171717', label: '#525252', border: '#d4d4d4',
+                borderHover: '#a3a3a3', selectBg: 'white', containerBg: 'white' },
+        failed: { fill: '#fecaca', stroke: '#991b1b' },
+        controller: { fill: '#e5e5e5', stroke: '#525252' },
+        pipe: { fill: '#e5e5e5', stroke: '#525252' },
+        stuff: { fill: '#fef3c7', stroke: '#92400e' },
+        subgraph: ['#f5f5f5', '#e5e5e5', '#fafaf9', '#f5f5f4', '#fafafa']
+    },
+    base: {
+        page: { bg: '#fff', text: '#18181b', label: '#52525b', border: '#e4e4e7',
+                borderHover: '#a1a1aa', selectBg: 'white', containerBg: '#fafafa' },
+        failed: { fill: '#ffe4e6', stroke: '#e11d48' },
+        controller: { fill: '#e0f2fe', stroke: '#0284c7' },
+        pipe: { fill: '#e0f2fe', stroke: '#0284c7' },
+        stuff: { fill: '#ffedd5', stroke: '#ea580c' },
+        subgraph: ['#f0f9ff', '#f0fdf4', '#fffbeb', '#fdf4ff', '#ecfeff']
+    }
+};
+
+function applyPageTheme(theme) {
+    const palette = themePalettes[theme]?.page || themePalettes.default.page;
+    document.documentElement.style.setProperty('--bg-color', palette.bg);
+    document.documentElement.style.setProperty('--text-color', palette.text);
+    document.documentElement.style.setProperty('--label-color', palette.label);
+    document.documentElement.style.setProperty('--border-color', palette.border);
+    document.documentElement.style.setProperty('--border-hover', palette.borderHover);
+    document.documentElement.style.setProperty('--select-bg', palette.selectBg);
+    document.documentElement.style.setProperty('--container-bg', palette.containerBg);
+}
+
+function applyThemeColors(code, theme) {
+    const palette = themePalettes[theme] || themePalettes.default;
+    let result = code;
+
+    // Replace classDef colors
+    result = result.replace(
+        /classDef\s+failed\s+fill:[^,]+,stroke:[^\s\n]+/g,
+        `classDef failed fill:${palette.failed.fill},stroke:${palette.failed.stroke}`
+    );
+    result = result.replace(
+        /classDef\s+controller\s+fill:[^,]+,stroke:[^\s\n]+/g,
+        `classDef controller fill:${palette.controller.fill},stroke:${palette.controller.stroke}`
+    );
+    result = result.replace(
+        /classDef\s+pipe\s+fill:[^,]+,stroke:[^\s\n]+/g,
+        `classDef pipe fill:${palette.pipe.fill},stroke:${palette.pipe.stroke}`
+    );
+    result = result.replace(
+        /classDef\s+pipe_failed\s+fill:[^,]+,stroke:[^\s\n]+/g,
+        `classDef pipe_failed fill:${palette.failed.fill},stroke:${palette.failed.stroke}`
+    );
+    result = result.replace(
+        /classDef\s+stuff\s+fill:[^,]+,stroke:[^,]+/g,
+        `classDef stuff fill:${palette.stuff.fill},stroke:${palette.stuff.stroke}`
+    );
+
+    // Replace subgraph fill colors (style sg_xxx fill:#xxx)
+    const subgraphColors = palette.subgraph;
+    let colorIndex = 0;
+    result = result.replace(
+        /style\s+(sg_[^\s]+)\s+fill:#[a-fA-F0-9]+/g,
+        (match, subgraphId) => {
+            const color = subgraphColors[colorIndex % subgraphColors.length];
+            colorIndex++;
+            return `style ${subgraphId} fill:${color}`;
+        }
+    );
+
+    return result;
+}
+
+function initMermaid(theme) {
+    mermaid.initialize({
+        startOnLoad: false,
+        theme: theme,
+        flowchart: {
+            useMaxWidth: true,
+            htmlLabels: true,
+            curve: 'basis'
+        }
+    });
+}
+
+async function renderDiagram(theme) {
+    const container = document.getElementById('mermaid-diagram');
+    const themedCode = applyThemeColors(mermaidCode, theme);
+    container.innerHTML = themedCode;
+    container.removeAttribute('data-processed');
+    applyPageTheme(theme);
+    initMermaid(theme);
+    await mermaid.run({ nodes: [container] });
+}
+
+// Set initial theme in dropdown
+document.getElementById('theme-select').value = currentTheme;
+
+// Handle theme change
+document.getElementById('theme-select').addEventListener('change', async (e) => {
+    currentTheme = e.target.value;
+    await renderDiagram(currentTheme);
+});
+
+// Initial render on page load
+renderDiagram(currentTheme);
+
+

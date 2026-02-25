@@ -2,7 +2,6 @@ from typing import Any
 
 from typing_extensions import override
 
-from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
@@ -29,7 +28,7 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
     ) -> PipeExtract:
         concept_library = get_concept_library()
         image_stuff_name = None
-        pdf_stuff_name = None
+        document_stuff_name = None
 
         # Already validated above that we have exactly one input
         input_name = blueprint.input_names[0]
@@ -43,19 +42,17 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             image_stuff_name = input_name
         elif concept_library.is_compatible(
             tested_concept=input_requirement.concept,
-            wanted_concept=get_native_concept(native_concept=NativeConceptCode.PDF),
+            wanted_concept=get_native_concept(native_concept=NativeConceptCode.DOCUMENT),
             strict=True,
         ):
-            pdf_stuff_name = input_name
+            document_stuff_name = input_name
         else:
             msg = (
                 f"The input concept {input_requirement.concept.concept_ref} is not compatible "
                 f"with the required concept {get_native_concept(native_concept=NativeConceptCode.IMAGE).concept_ref} or "
-                f"{get_native_concept(native_concept=NativeConceptCode.PDF).concept_ref}"
+                f"{get_native_concept(native_concept=NativeConceptCode.DOCUMENT).concept_ref}"
             )
             raise PipeExtractFactoryError(msg)
-
-        page_views_dpi = blueprint.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
 
         return PipeExtract(
             domain_code=domain_code,
@@ -65,9 +62,9 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             inputs=inputs,
             extract_choice=blueprint.model,
             image_stuff_name=image_stuff_name,
-            pdf_stuff_name=pdf_stuff_name,
-            should_include_images=blueprint.page_images or False,
+            document_stuff_name=document_stuff_name,
+            max_page_images=blueprint.max_page_images,
             should_caption_images=blueprint.page_image_captions or False,
             should_include_page_views=blueprint.page_views or False,
-            page_views_dpi=page_views_dpi,
+            page_views_dpi=blueprint.page_views_dpi,
         )

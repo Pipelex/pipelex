@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json as json_module
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from pydantic import BaseModel, ValidationError
@@ -53,6 +54,7 @@ class PydanticValidationErrorAnalysis(BaseModel):
     type_errors: list[str]
     value_errors: list[str]
     enum_errors: list[str]
+    literal_errors: list[str]
     union_tag_errors: list[str]
     model_type_errors: list[str]
 
@@ -77,6 +79,14 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
     enum_errors = [
         f"'{'.'.join(map(str, err['loc']))}': invalid enum value '{err.get('input', 'unknown')}'" for err in exc.errors() if err["type"] == "enum"
     ]
+    literal_errors: list[str] = []
+    for err in exc.errors():
+        if err["type"] == "literal_error":
+            field_path = ".".join(map(str, err["loc"]))
+            actual_input = err.get("input", "unknown")
+            expected = err.get("ctx", {}).get("expected", "unknown")
+            literal_errors.append(f"'{field_path}': got '{actual_input}', expected one of {expected}")
+
     union_tag_errors: list[str] = []
     for err in exc.errors():
         if err["type"] == "union_tag_not_found":
@@ -106,13 +116,15 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
         error_msg += f"\n\nValue errors: {', '.join(value_errors)}"
     if enum_errors:
         error_msg += f"\n\nEnum errors: {', '.join(enum_errors)}"
+    if literal_errors:
+        error_msg += f"\n\nInvalid choice errors: {', '.join(literal_errors)}"
     if union_tag_errors:
         error_msg += f"\n\nUnion discriminator errors: {', '.join(union_tag_errors)}"
     if model_type_errors:
         error_msg += f"\n\nModel type errors: {', '.join(model_type_errors)}"
 
     # If none of the specific error types were found, add the raw error messages
-    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, union_tag_errors, model_type_errors]):
+    if not any([missing_fields, extra_fields, type_errors, value_errors, enum_errors, literal_errors, union_tag_errors, model_type_errors]):
         error_msg += "\n\nOther validation errors:"
         for err in exc.errors():
             error_msg += f"\n{'.'.join(map(str, err['loc']))}: {err['type']}: {err['msg']}"
@@ -124,6 +136,7 @@ def analyze_pydantic_validation_error(exc: ValidationError) -> PydanticValidatio
         type_errors=type_errors,
         value_errors=value_errors,
         enum_errors=enum_errors,
+        literal_errors=literal_errors,
         union_tag_errors=union_tag_errors,
         model_type_errors=model_type_errors,
     )
@@ -140,6 +153,125 @@ def format_pydantic_validation_error(exc: ValidationError) -> str:
 
     """
     return analyze_pydantic_validation_error(exc).error_msg
+
+
+def _serialize_input_value(value: Any) -> Any:
+    """Serialize an input value for JSON output, falling back to repr() for non-serializable objects.
+
+    Args:
+        value: The input value from a pydantic validation error.
+
+    Returns:
+        A JSON-serializable representation of the value.
+
+    """
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (dict, list)):
+        typed_value: dict[str, Any] | list[Any] = cast("dict[str, Any] | list[Any]", value)
+        try:
+            json_module.dumps(typed_value)
+            return typed_value
+        except (TypeError, ValueError):
+            return repr(typed_value)
+    return repr(value)
+
+
+def _serialize_context(ctx: dict[str, Any]) -> dict[str, Any]:
+    """Serialize a pydantic error context dict so every value is JSON-safe.
+
+    Pydantic context dicts can contain non-JSON-serializable objects (type objects,
+    enum instances, etc.). This applies _serialize_input_value() to each value.
+
+    Args:
+        ctx: The context dict from a pydantic validation error.
+
+    Returns:
+        A dict with all values guaranteed to be JSON-serializable.
+
+    """
+    return {key: _serialize_input_value(value) for key, value in ctx.items()}
+
+
+def format_pydantic_validation_error_for_agent(exc: ValidationError) -> tuple[str, dict[str, Any]]:
+    """Format a Pydantic ValidationError into a concise message and structured details dict for agent CLI output.
+
+    Args:
+        exc: The Pydantic ValidationError exception
+
+    Returns:
+        A tuple of (message, details) where message is a concise summary string
+        and details is a structured dict with model name, error count, categories, and per-error info.
+
+    """
+    analysis = analyze_pydantic_validation_error(exc)
+    model_name = exc.title
+    error_count = exc.error_count()
+
+    # Build categories dict with only non-empty lists
+    all_categories: dict[str, list[str]] = {
+        "missing_fields": analysis.missing_fields,
+        "extra_fields": analysis.extra_fields,
+        "type_errors": analysis.type_errors,
+        "value_errors": analysis.value_errors,
+        "enum_errors": analysis.enum_errors,
+        "literal_errors": analysis.literal_errors,
+        "union_tag_errors": analysis.union_tag_errors,
+        "model_type_errors": analysis.model_type_errors,
+    }
+    categories = {key: value for key, value in all_categories.items() if value}
+
+    # Build per-error details list
+    errors: list[dict[str, Any]] = []
+    for err in exc.errors():
+        field_path = ".".join(map(str, err["loc"])) if err["loc"] else ""
+        error_detail: dict[str, Any] = {
+            "field_path": field_path,
+            "error_type": err["type"],
+            "message": err["msg"],
+            "input_value": _serialize_input_value(err.get("input")),
+            "context": _serialize_context(err.get("ctx", {})),
+        }
+        errors.append(error_detail)
+
+    # Build concise summary message
+    category_summaries: list[str] = []
+    if analysis.missing_fields:
+        field_names = ", ".join(f.strip("'") for f in analysis.missing_fields)
+        category_summaries.append(
+            f"missing required fields: '{field_names}'"
+            if len(analysis.missing_fields) == 1
+            else f"missing required fields: {', '.join(analysis.missing_fields)}"
+        )
+    if analysis.extra_fields:
+        category_summaries.append(f"extra forbidden fields: {', '.join(analysis.extra_fields)}")
+    if analysis.type_errors:
+        category_summaries.append(f"type errors: {', '.join(analysis.type_errors)}")
+    if analysis.value_errors:
+        category_summaries.append(f"value errors: {', '.join(analysis.value_errors)}")
+    if analysis.enum_errors:
+        category_summaries.append(f"enum errors: {', '.join(analysis.enum_errors)}")
+    if analysis.literal_errors:
+        category_summaries.append(f"literal errors: {', '.join(analysis.literal_errors)}")
+    if analysis.union_tag_errors:
+        category_summaries.append(f"union tag errors: {', '.join(analysis.union_tag_errors)}")
+    if analysis.model_type_errors:
+        category_summaries.append(f"model type errors: {', '.join(analysis.model_type_errors)}")
+
+    error_word = "error" if error_count == 1 else "errors"
+    if category_summaries:
+        message = f"Validation failed for {model_name}: {error_count} {error_word} ({'; '.join(category_summaries)})"
+    else:
+        message = f"Validation failed for {model_name}: {error_count} {error_word}"
+
+    details: dict[str, Any] = {
+        "model": model_name,
+        "error_count": error_count,
+        "categories": categories,
+        "errors": errors,
+    }
+
+    return message, details
 
 
 def convert_strenum_to_str(

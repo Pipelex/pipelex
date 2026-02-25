@@ -68,9 +68,14 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     │   ├── internal.toml       # Internal/local models (OCR)
     │   └── ...
     └── deck/                   # Model deck configurations
-        ├── base_deck.toml      # Core aliases and presets
-        └── overrides.toml      # Custom overrides
+        ├── 1_llm_deck.toml           # LLM aliases & presets
+        ├── 2_img_gen_deck.toml       # Image generation config
+        ├── 3_extract_deck.toml       # Document extraction config
+        ├── x_custom_llm_deck.toml    # Custom LLM waterfalls/overrides
+        └── x_custom_extract_deck.toml # Custom extract waterfalls
 ```
+
+Deck files are loaded in order by their numeric prefix (`1_`, `2_`, `3_`), with custom/override files (`x_` prefix) loaded last.
 
 ## Pipelex Gateway (Optional & Free)
 
@@ -79,7 +84,7 @@ Pipelex Gateway is a unified inference backend that provides access to all major
 ### Benefits
 
 - **Single API Key**: Access OpenAI, Anthropic, Google, Mistral, FAL, and more with one key
-- **Free to Get Started**: Available free on Discord (no credit card required, limited time offer)
+- **Free to Get Started**: Available free on [app.pipelex.com](https://app.pipelex.com/) (no credit card required, limited time offer)
 - **Simplified Configuration**: No need to manage multiple provider credentials
 - **Automatic Routing**: All AI models (LLMs, OCR, image generation) are automatically routed to their respective providers
 - **Unified Interface**: Same configuration system for text generation, OCR, and image generation
@@ -139,20 +144,20 @@ Your API key is hashed for security. Gateway telemetry operates independently fr
     
     1. **Get your new Gateway API key**:
         - If you had a `pipelex_inference` key: get your new key at [app.pipelex.com](https://app.pipelex.com/)
-        - New users: join our [Discord](https://go.pipelex.com/discord) and request a free key with credits
+        - New users: join the [waitlist](https://app.pipelex.com/waitlist) and the community on [Discord](https://go.pipelex.com/discord)
     2. Update your `.env`: set `PIPELEX_GATEWAY_API_KEY` with your new key
     3. Run `pipelex init` and accept the Gateway terms
     4. Update any routing profiles that reference `pipelex_inference` to use `pipelex_gateway`
 
 4. **Verify routing configuration:**
-   
-   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `pipelex_gateway_first`:
-   
+
+   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `all_pipelex_gateway`:
+
    ```toml
-   active = "pipelex_gateway_first"
-   
-   [profiles.pipelex_gateway_first]
-   description = "Use Pipelex Gateway backend for all its supported models"
+   active = "all_pipelex_gateway"
+
+   [profiles.all_pipelex_gateway]
+   description = "Use Pipelex Gateway for all its supported models"
    default = "pipelex_gateway"
    ```
 
@@ -160,7 +165,7 @@ Your API key is hashed for security. Gateway telemetry operates independently fr
 
 Once configured, all models are available through the unified backend. Use standard model names in your pipelines:
 
-```plx
+```toml
 [pipe.example]
 type = "PipeLLM"
 model = { model = "claude-4.5-sonnet", temperature = 0.7 }
@@ -322,10 +327,10 @@ PIPELEX_GATEWAY_API_KEY="your-pipelex-key"
 In `.pipelex/inference/routing_profiles.toml`:
 ```toml
 # Which profile to use
-active = "pipelex_gateway_first"
+active = "all_pipelex_gateway"
 
-[profiles.pipelex_gateway_first]
-description = "Use Pipelex Gateway backend for all its supported models"
+[profiles.all_pipelex_gateway]
+description = "Use Pipelex Gateway for all its supported models"
 default = "pipelex_gateway"
 ```
 
@@ -403,69 +408,109 @@ Common scenarios for hybrid routing:
 3. **Gradual Migration**: Start with Pipelex Gateway, gradually move to your own keys as usage grows
 4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Gateway
 
+### Internal Backend (Always Available)
+
+The **internal backend** is a special backend containing software-only models that run locally without requiring AI services. These include models for PDF text extraction, local document parsing, and other processing tasks that don't need external API calls.
+
+Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_pipelex_gateway` or `all_openai`).
+
+This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
+
 ## Model Deck
 
 The Model Deck is the unified configuration hub for all AI model-related settings, including LLMs, OCR models, and image generation models.
 
 ### Aliases
 
-Define user-friendly names that map to model names in `.pipelex/inference/deck/base_deck.toml`:
+Define user-friendly names that map to model names. Aliases are defined in the deck files (e.g., `.pipelex/inference/deck/1_llm_deck.toml`):
 
 ```toml
-[aliases]
-# LLM aliases
-base-claude = "claude-4.5-sonnet"
-base-gpt = "gpt-5"
-base-gemini = "gemini-2.5-flash"
-base-mistral = "mistral-medium"
-smart_llm = [
-    "claude-4.5-sonnet",
-    "claude-4.1-opus",
-    "claude-4.5-sonnet",
-    "gpt-5",
-    "gemini-2.5-pro",
-]
+[llm.aliases]
+# Simple aliases map to a single model
+best-claude = "claude-4.5-opus"
+best-gpt = "gpt-5.2"
+best-gemini = "gemini-3.0-pro"
 
-# Aliases can also define fallback chains
-llm_to_engineer = { model = "smart_llm", temperature = 0.2 }
+# Default aliases (used in presets)
+default-general = "claude-4.5-sonnet"
+default-premium = "claude-4.5-opus"
+default-large-context-text = "gemini-2.5-flash"
+default-small = "gemini-2.5-flash-lite"
+```
+
+When using aliases in `.mthds` files or other configurations, prefix them with `@`:
+
+```toml
+model = "@best-claude"           # References the best-claude alias
+model = "@default-general"       # References the default-general alias
 ```
 
 ### LLM Presets
 
-Presets combine model selection with optimized parameters for specific tasks:
+Presets combine model selection with optimized parameters for specific tasks. Defined in `.pipelex/inference/deck/1_llm_deck.toml`:
 
 ```toml
 [llm.presets]
-# General purpose presets
-cheap_llm_for_text = { model = "cheap_llm_for_text", temperature = 0.5 }
-cheap_llm_for_object = { model = "cheap_llm_for_object", temperature = 0.5 }
+# Writing presets
+writing-factual = { model = "@default-premium", temperature = 0.1 }
+writing-creative = { model = "@default-premium", temperature = 0.9 }
 
-# Task-specific presets
-llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
-llm_to_extract_invoice = { model = "claude-4.5-sonnet", temperature = 0.1 }
-llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
+# Retrieval
+retrieval = { model = "@default-large-context-text", temperature = 0.1 }
 
-### OCR Presets
+# Engineering
+engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
+engineering-code = { model = "@default-premium", temperature = 0.1 }
 
-OCR presets combine OCR model selection with optimized parameters:
+# Vision
+vision = { model = "@default-premium-vision", temperature = 0.5 }
+vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
+vision-diagram = { model = "@default-premium-vision", temperature = 0.3 }
+```
+
+When using presets in `.mthds` files, prefix them with `$`:
+
+```toml
+model = "$engineering-structured"   # Uses preset for structured extraction
+model = "$vision"                   # Uses preset for image-to-text
+model = "$writing-creative"         # Uses preset for creative writing
+```
+
+### Extract Presets
+
+Extract presets combine document extraction model selection with optimized parameters. Defined in `.pipelex/inference/deck/3_extract_deck.toml`:
 
 ```toml
 [extract.presets]
-# General purpose OCR
-extract_ocr_from_document = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-extract_basic_from_pdf = { model = "pypdfium2-extract-pdf", max_nb_images = 100, image_min_size = 50 }
+# Testing preset
+extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50 }
+```
+
+You can also use aliases directly in `.mthds` files for document extraction:
+
+```toml
+model = "@default-extract-document"   # Uses default document extraction alias
+model = "@default-text-from-pdf"      # Uses alias for basic PDF text extraction
 ```
 
 ### Image Generation Presets
 
-Image generation presets combine model selection with generation parameters:
+Image generation presets combine model selection with generation parameters. Defined in `.pipelex/inference/deck/2_img_gen_deck.toml`:
 
 ```toml
 [img_gen.presets]
 # General purpose image generation
-gen_image_basic = { model = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
-gen_image_fast = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
-gen_image_high_quality = { model = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
+gen-image = { model = "@default-general", quality = "medium" }
+gen-image-fast = { model = "@default-small", quality = "low" }
+gen-image-high-quality = { model = "@default-premium", quality = "high" }
+```
+
+When using image generation presets in `.mthds` files, prefix them with `$`:
+
+```toml
+model = "$gen-image"              # Uses default image generation preset
+model = "$gen-image-fast"         # Uses fast image generation preset
+model = "$gen-image-high-quality" # Uses high quality image generation preset
 ```
 
 ### Default Choices
@@ -474,38 +519,50 @@ Set default models for different types of AI operations:
 
 ```toml
 [llm.choice_defaults]
-for_text = "cheap_llm_for_text"
-for_object = "cheap_llm_for_object"
+for_text = "@default-general"
+for_object = "@default-general"
 
 [extract]
-choice_default = "extract_ocr_from_document"
+choice_default = "@default-extract-document"
 
 [img_gen]
-choice_default = "gen_image_basic"
+choice_default = "$gen-image"
 ```
+
+Note the sigil prefixes: `@` for aliases and `$` for presets.
 
 ## Customization
 
 ### Local Overrides
 
-Use `.pipelex/inference/deck/overrides.toml` for project-specific customizations:
+Use custom deck files (prefixed with `x_`) for project-specific customizations:
+
+**For LLMs** (`.pipelex/inference/deck/x_custom_llm_deck.toml`):
 
 ```toml
-# Override specific presets
-[llm.presets]
-llm_to_extract_invoice = { model = "gpt-4o-mini", temperature = 0.2 }
+# Override default choices
+[llm.choice_overrides]
+for_text = "@my-custom-alias"
+for_object = "@my-custom-alias"
 
-[extract.presets]
-my_custom_extract = { ocr_handle = "mistral-ocr", max_nb_images = 5 }
+# Add custom waterfalls - lists of models tried in order
+[llm.waterfalls]
+premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2"]
+small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
+```
 
-[img_gen.presets]
-my_custom_img_gen = { model = "flux-dev", quality = "medium" }
+**For Extract** (`.pipelex/inference/deck/x_custom_extract_deck.toml`):
 
-# Add custom aliases
-[aliases]
-my_custom_llm = "claude-3-sonnet"
-my_custom_extract = "pypdfium2-extract-pdf"
-my_custom_img_gen = "base-img-gen"
+```toml
+[extract.waterfalls]
+document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
+```
+
+When using waterfalls in `.mthds` files, prefix them with `~`:
+
+```toml
+model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.0-pro, then gpt-5.2
+model = "~small-llm"      # Will try gemini-2.5-flash-lite, then gpt-4o-mini, etc.
 ```
 
 ### Adding New Backends
@@ -559,7 +616,8 @@ Common error types:
 
 4. **Presets and Aliases**:
    - Create task-specific presets for consistency across your pipelines
-   - Use meaningful alias names that describe the use case (e.g., `llm_to_extract_invoice`)
+   - Use kebab-case naming (e.g., `engineering-structured`, `vision-diagram`)
+   - Use proper sigil prefixes: `$` for presets, `@` for aliases, `~` for waterfalls
    - Document custom presets and their use cases in your team documentation
 
 5. **Customization**:

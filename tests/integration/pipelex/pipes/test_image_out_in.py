@@ -25,6 +25,6 @@ class TestImageOutIn:
             ),
         )
 
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             description = pipe_output.main_stuff_as_str
             assert description

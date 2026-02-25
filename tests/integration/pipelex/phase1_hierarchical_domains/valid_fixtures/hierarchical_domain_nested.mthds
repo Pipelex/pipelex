@@ -1,0 +1,15 @@
+domain      = "legal.contracts"
+description = "Nested hierarchical domain for legal contracts"
+
+[concept]
+NonCompeteClause = "A non-compete clause in a contract"
+ContractSummary  = "A summary of a contract"
+
+[pipe]
+[pipe.summarize_contract]
+type        = "PipeLLM"
+description = "Summarize a contract"
+inputs      = { clause = "NonCompeteClause" }
+output      = "ContractSummary"
+model       = "$quick-reasoning"
+prompt      = "Summarize @clause"

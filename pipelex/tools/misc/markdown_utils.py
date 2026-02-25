@@ -1,6 +1,5 @@
 from typing import Any, cast
 
-from pipelex.tools.misc.attribute_utils import AttributePolisher
 from pipelex.tools.misc.json_utils import purify_json_dict
 from pipelex.tools.misc.string_utils import snake_to_capitalize_first_letter
 
@@ -51,10 +50,9 @@ def convert_to_markdown(data: Any, level: int = 1, is_pretty: bool = False) -> s
     elif isinstance(data, (str, int, float, bool)):
         # Simple scalar types become paragraphs (strings) or inline text
         # If it's a string with multiple lines, just output them as-is.
-        str_value = str(data)
-        if AttributePolisher.should_truncate(value=str_value):
-            return str(AttributePolisher.get_truncated_value(value=str_value))
-        return str_value
+        # No truncation - markdown output should preserve full content
+        # TODO: Detect if its an image and truncate the base64
+        return str(data)
 
     elif data is None:
         # No value

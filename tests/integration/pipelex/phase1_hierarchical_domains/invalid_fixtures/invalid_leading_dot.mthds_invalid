@@ -1,0 +1,5 @@
+domain = ".legal"
+description = "Invalid domain with leading dot"
+
+[concept]
+TestConcept = "A test concept"

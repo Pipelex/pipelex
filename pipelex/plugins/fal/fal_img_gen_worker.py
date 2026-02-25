@@ -37,10 +37,11 @@ class FalImgGenWorker(ImgGenWorkerAbstract):
         if self.inference_model.rules is None:
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
             raise ImgGenParameterError(msg)
-        args_dict = ImgGenArgsFactory.make_args_for_model(
+        args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
             nb_images=nb_images,
+            model_id=self.inference_model.model_id,
         )
         fal_application = self.inference_model.model_id
         log.verbose(args_dict, title=f"Fal arguments, application={fal_application}")

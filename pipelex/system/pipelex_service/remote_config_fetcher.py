@@ -61,7 +61,7 @@ class RemoteConfigFetcher:
         return _fetch_with_retry(url)
 
     @classmethod
-    def _make_dummy_remote_config(cls) -> RemoteConfig:
+    def make_dummy_remote_config(cls) -> RemoteConfig:
         """Create a default RemoteConfig for testing in offline environments.
 
         Returns:
@@ -91,7 +91,7 @@ class RemoteConfigFetcher:
         # In Codex Cloud, return dummy config to avoid SSL issues with MITM proxy
         if runtime_manager.is_in_codex_cloud:
             print_to_stderr("Skipping remote config fetch in Codex Cloud, using dummy config instead")
-            return cls._make_dummy_remote_config()
+            return cls.make_dummy_remote_config()
 
         url = PipelexDetails.REMOTE_CONFIG_URL
 

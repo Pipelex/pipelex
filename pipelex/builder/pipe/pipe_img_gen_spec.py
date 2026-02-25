@@ -6,18 +6,13 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
+from pipelex.builder.talents.img_gen_talent import ImgGenTalent
+from pipelex.config import get_config
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
     from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
-
-
-class ImgGenSkill(StrEnum):
-    GEN_IMAGE_BASIC = "gen_image_basic"
-    GEN_IMAGE_FAST = "gen_image_fast"
-    GEN_IMAGE_HIGH_QUALITY = "gen_image_high_quality"
 
 
 class PipeImgGenSpec(PipeSpec):
@@ -35,16 +30,23 @@ class PipeImgGenSpec(PipeSpec):
 
     type: Literal["PipeImgGen"] = "PipeImgGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
-    img_gen_skill: ImgGenSkill | str = Field(description="Select the most adequate image generation skill according to the task to be performed.")
+    img_gen_talent: ImgGenTalent | str = Field(
+        description="Select the most adequate image generation talent according to the task to be performed.",
+        examples=list(ImgGenTalent),
+    )
     prompt: str = Field(description="A finalized image generation prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).")
 
-    @field_validator("img_gen_skill", mode="before")
+    @field_validator("img_gen_talent", mode="before")
     @classmethod
-    def validate_img_gen_skill(cls, img_gen_skill_value: str | None) -> ImgGenSkill | None:
-        if img_gen_skill_value is None:
+    def validate_img_gen_talent(cls, img_gen_talent_value: str | None) -> ImgGenTalent | None:
+        if img_gen_talent_value is None:
             return None
-        else:
-            return ImgGenSkill(img_gen_skill_value)
+        try:
+            return ImgGenTalent(img_gen_talent_value)
+        except ValueError:
+            valid = [talent.value for talent in ImgGenTalent]
+            msg = f"'{img_gen_talent_value}' is not a valid ImgGenTalent. Valid values: {valid}"
+            raise ValueError(msg) from None
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
@@ -57,7 +59,7 @@ class PipeImgGenSpec(PipeSpec):
 
         # Add image generation specific information
         img_gen_group.renderables.append(Text())  # Blank line
-        img_gen_group.renderables.append(Text.from_markup(f"Image Generation Skill: [bold yellow]{self.img_gen_skill}[/bold yellow]"))
+        img_gen_group.renderables.append(Text.from_markup(f"Image Generation Talent: [bold yellow]{self.img_gen_talent}[/bold yellow]"))
 
         return img_gen_group
 
@@ -66,7 +68,9 @@ class PipeImgGenSpec(PipeSpec):
         """Convert this PipeImgGenBlueprint to the core PipeImgGenBlueprint."""
         base_blueprint = super().to_blueprint()
 
-        img_gen_choice: ImgGenModelChoice = self.img_gen_skill
+        # Get img_gen choice from config-based mapping
+        mappings = get_config().pipelex.builder_config.talent_preset_mappings.img_gen
+        img_gen_choice: ImgGenModelChoice = mappings[self.img_gen_talent]
 
         return PipeImgGenBlueprint(
             description=base_blueprint.description,

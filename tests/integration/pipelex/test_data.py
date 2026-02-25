@@ -1,17 +1,20 @@
 from typing import ClassVar
 
+from pipelex.builder.bundle_header_spec import BundleHeaderSpec
+from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.exceptions import PipeRouterError
-from tests.cases import ImageTestCases, PDFTestCases
+from tests.cases import DocumentTestCases, ImageTestCases
 
 
 class SomeContentWithImageAttribute(StructuredContent):
@@ -56,10 +59,10 @@ class PipeTestCases:
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
     )
-    SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
+    SIMPLE_STUFF_DOCUMENT = StuffFactory.make_stuff(
         name="document",
-        concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PDF),
-        content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
+        concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
+        content=DocumentContent(url=DocumentTestCases.DOCUMENT_URLS[0]),
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
         name="complex",
@@ -159,7 +162,7 @@ class PipeExtractTestCases:
         ImageTestCases.IMAGE_FILE_PATH_PNG_2,
         ImageTestCases.IMAGE_URL_PNG,
     ]
-    PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = DocumentTestCases.DOCUMENT_FILE_PATHS + DocumentTestCases.DOCUMENT_URLS
 
 
 class ImageGenTestCases:
@@ -413,3 +416,38 @@ Extract information from the following text:
         ("Nested unions complex", NESTED_UNIONS_COMPLEX, "ConceptWithNestedUnions"),
         ("Nested unions mixed", NESTED_UNIONS_MIXED, "ConceptWithNestedUnions"),
     ]
+
+
+class AssemblePipelexBundleSpecTestCases:
+    """Test data for assemble_pipelex_bundle_spec tests."""
+
+    CONCEPT_SPECS: ClassVar[list[ConceptSpec]] = [
+        ConceptSpec(
+            the_concept_code="UserBrief",
+            description="A short, natural-language description of what the user wants.",
+            refines="Text",
+        ),
+        ConceptSpec(
+            the_concept_code="PlanDraft",
+            description="Natural-language pipeline plan text describing sequences, inputs, outputs.",
+            refines="Text",
+        ),
+    ]
+
+    PIPE_SPECS: ClassVar[list[PipeLLMSpec]] = [
+        PipeLLMSpec(
+            pipe_code="generate_plan",
+            description="Generate a plan from a user brief.",
+            inputs={"brief": "UserBrief"},
+            output="PlanDraft",
+            llm_talent="engineer",
+            prompt="Generate a plan for: @brief",
+        ),
+    ]
+
+    BUNDLE_HEADER = BundleHeaderSpec(
+        domain_code="test_domain",
+        description="A test domain for assembly testing.",
+        system_prompt=None,
+        main_pipe="generate_plan",
+    )

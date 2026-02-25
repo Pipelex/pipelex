@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import base64
 import pathlib
 from typing import TYPE_CHECKING, cast
 
@@ -11,6 +12,7 @@ from pypdfium2.raw import FPDF_PAGEOBJ_IMAGE, FPDFBitmap_BGRA
 from pipelex.cogt.extract.bounding_box import BoundingBox
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage
 from pipelex.cogt.image.image_size import ImageSize
+from pipelex.hub import get_storage_provider
 from pipelex.system.exceptions import ToolError
 from pipelex.tools.misc.file_fetch_utils import fetch_file_from_url_httpx
 from pipelex.tools.misc.image_utils import ImageFormat, pil_image_to_bytes
@@ -39,6 +41,33 @@ class PyPdfium2RendererError(ToolError):
 
 
 PdfInput = str | pathlib.Path | bytes
+
+
+async def _resolve_pdf_uri_to_input(pdf_uri: str) -> PdfInput:
+    """Resolve a PDF URI to PdfInput (path or bytes).
+
+    Handles all URI types: HTTP URLs, local paths, pipelex-storage:// URIs,
+    and base64 data URLs.
+
+    Args:
+        pdf_uri: URI string (local path, HTTP URL, pipelex-storage://, or data: URL)
+
+    Returns:
+        PdfInput: path string for local files, bytes for remote/storage/base64
+    """
+    pdf_input: PdfInput
+    resolved_uri = resolve_uri(pdf_uri)
+    match resolved_uri:
+        case ResolvedHttpUrl():
+            pdf_input = await fetch_file_from_url_httpx(url=resolved_uri.url)
+        case ResolvedLocalPath():
+            pdf_input = resolved_uri.path
+        case ResolvedPipelexStorage():
+            storage = get_storage_provider()
+            pdf_input = await storage.load(uri=resolved_uri.storage_uri)
+        case ResolvedBase64DataUrl():
+            pdf_input = base64.b64decode(resolved_uri.base64_data)
+    return pdf_input
 
 
 def _extract_image_from_pdf_object(
@@ -94,7 +123,7 @@ def _extract_image_from_pdf_object(
         return ExtractedImageFromPage(
             size=ImageSize(width=width, height=height),
             actual_bytes=actual_bytes,
-            output_format=ImageFormat.JPEG,
+            image_format=ImageFormat.JPEG,
             bounding_box=bounding_box,
         )
 
@@ -110,7 +139,7 @@ def _extract_image_from_pdf_object(
     return ExtractedImageFromPage(
         size=ImageSize(width=width, height=height),
         actual_bytes=actual_bytes,
-        output_format=effective_format,
+        image_format=effective_format,
         bounding_box=bounding_box,
     )
 
@@ -249,29 +278,12 @@ class PyPdfium2Renderer:
             return await asyncio.to_thread(self._extract_text_from_pdf_pages_sync, pdf_input)
 
     async def render_pdf_pages_from_uri(self, pdf_uri: str, dpi: int) -> list[Image.Image]:
-        resolved_uri = resolve_uri(pdf_uri)
-        match resolved_uri:
-            case ResolvedHttpUrl():
-                pdf_bytes = await fetch_file_from_url_httpx(url=resolved_uri.url)
-                return await self.render_pdf_pages(pdf_input=pdf_bytes, dpi=dpi)
-            case ResolvedLocalPath():
-                return await self.render_pdf_pages(pdf_input=resolved_uri.path, dpi=dpi)
-            case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for PDF rendering: {resolved_uri.kind}"
-                raise PyPdfium2RendererError(msg)
+        pdf_input = await _resolve_pdf_uri_to_input(pdf_uri)
+        return await self.render_pdf_pages(pdf_input=pdf_input, dpi=dpi)
 
     async def extract_text_from_pdf_pages_from_uri(self, pdf_uri: str) -> list[str]:
         """Extract text from all pages of a PDF from URI."""
-        pdf_input: PdfInput
-        resolved_uri = resolve_uri(pdf_uri)
-        match resolved_uri:
-            case ResolvedHttpUrl():
-                pdf_input = await fetch_file_from_url_httpx(url=resolved_uri.url)
-            case ResolvedLocalPath():
-                pdf_input = resolved_uri.path
-            case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for PDF text extraction: {resolved_uri.kind}"
-                raise PyPdfium2RendererError(msg)
+        pdf_input = await _resolve_pdf_uri_to_input(pdf_uri)
         return await self.extract_text_from_pdf_pages(pdf_input=pdf_input)
 
     async def extract_embedded_images_from_page(
@@ -302,7 +314,7 @@ class PyPdfium2Renderer:
                 output_format,
             )
 
-    async def _extract_embedded_images_from_pdf(
+    async def extract_embedded_images_from_pdf(
         self,
         pdf_input: PdfInput,
         max_depth: int = DEFAULT_IMAGE_EXTRACTION_MAX_DEPTH,
@@ -336,7 +348,7 @@ class PyPdfium2Renderer:
         """Extract embedded images from all pages of a PDF from URI.
 
         Args:
-            pdf_uri: PDF URI (file path or URL)
+            pdf_uri: PDF URI (local path or HTTP URL)
             max_depth: Maximum depth to descend into Form XObjects (default 15)
             output_format: Output format for images, or None to preserve original
                 format when possible (JPEG) or default to PNG
@@ -344,17 +356,8 @@ class PyPdfium2Renderer:
         Returns:
             Dictionary mapping page index (1-based) to list of ExtractedImageFromPage
         """
-        pdf_input: PdfInput
-        resolved_uri = resolve_uri(pdf_uri)
-        match resolved_uri:
-            case ResolvedHttpUrl():
-                pdf_input = await fetch_file_from_url_httpx(url=resolved_uri.url)
-            case ResolvedLocalPath():
-                pdf_input = resolved_uri.path
-            case ResolvedPipelexStorage() | ResolvedBase64DataUrl():
-                msg = f"Unsupported URI type for PDF image extraction: {resolved_uri.kind}"
-                raise PyPdfium2RendererError(msg)
-        return await self._extract_embedded_images_from_pdf(
+        pdf_input = await _resolve_pdf_uri_to_input(pdf_uri)
+        return await self.extract_embedded_images_from_pdf(
             pdf_input=pdf_input,
             max_depth=max_depth,
             output_format=output_format,

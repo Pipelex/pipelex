@@ -188,7 +188,7 @@ class TestBackendCustomization:
         assert toml_doc["mistral"]["enabled"] is False  # type: ignore[index]
 
     def test_init_config_copies_files_without_customizing(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that init_config copies files but doesn't customize backends (that's init_cmd's job)."""
+        """Test that init_config copies non-inference files and skips the inference/ directory."""
         # Setup template directories
         kit_configs_dir = tmp_path / "kit" / "configs"
         kit_configs_dir.mkdir(parents=True)
@@ -214,20 +214,12 @@ class TestBackendCustomization:
         # Execute init_config
         result = init_config(reset=False)
 
-        # Verify files were copied
+        # Verify non-inference files were copied
         assert result > 0
         assert (target_dir / "pipelex.toml").exists()
-        assert (target_dir / "inference" / "backends.toml").exists()
 
-        # Verify backend customization was NOT applied (original values preserved)
-        toml_doc = load_toml_with_tomlkit(str(target_dir / "inference" / "backends.toml"))
-
-        # Verify original enabled states from template
-        # pipelex_gateway is enabled by default, pipelex_inference is deprecated (disabled)
-        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is True  # type: ignore[index]
-        assert toml_doc["anthropic"]["enabled"] is True  # type: ignore[index]
-        assert toml_doc["mistral"]["enabled"] is True  # type: ignore[index]
-        assert toml_doc["internal"]["enabled"] is True  # type: ignore[index]
+        # Verify inference/ directory was NOT copied (managed by the inference init step)
+        assert not (target_dir / "inference").exists()
 
     def test_customize_backends_handles_missing_file_gracefully(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test that customize_backends_config handles missing backends.toml gracefully."""

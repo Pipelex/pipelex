@@ -32,6 +32,30 @@ class PipeSequenceTestCases:
         ),
     )
 
+    SEQUENCE_WITH_BATCH_STEP = (
+        "sequence_with_batch_step",
+        PipeSequenceSpec(
+            pipe_code="batch_sequence",
+            description="A sequence with a batch step",
+            inputs={"items": "Text[]"},
+            output="Summary",
+            steps=[
+                SubPipeSpec(pipe_code="process_item", result="processed_items", batch_over="items", batch_as="item"),
+                SubPipeSpec(pipe_code="summarize", result="summary"),
+            ],
+        ),
+        PipeSequenceBlueprint(
+            description="A sequence with a batch step",
+            inputs={"items": "Text[]"},
+            output="Summary",
+            steps=[
+                SubPipeBlueprint(pipe="process_item", result="processed_items", batch_over="items", batch_as="item"),
+                SubPipeBlueprint(pipe="summarize", result="summary"),
+            ],
+        ),
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, PipeSequenceSpec, PipeSequenceBlueprint]]] = [
         SIMPLE_SEQUENCE,
+        SEQUENCE_WITH_BATCH_STEP,
     ]

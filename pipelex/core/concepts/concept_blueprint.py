@@ -3,8 +3,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, field_validator, model_validator
 
 from pipelex.core.concepts.concept_structure_blueprint import RESERVED_FIELD_NAMES, ConceptStructureBlueprint
-from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.concepts.native.exceptions import NativeConceptDefinitionError
+from pipelex.core.concepts.validation import is_concept_ref_or_code_valid
 
 ConceptStructureBlueprintType = str | ConceptStructureBlueprint
 
@@ -22,13 +21,25 @@ class ConceptBlueprint(BaseModel):
     @field_validator("refines", mode="before")
     @classmethod
     def validate_refines(cls, refines: str | None = None) -> str | None:
-        if refines is not None:
-            try:
-                NativeConceptCode.validate_native_concept_ref_or_code(concept_ref_or_code=refines)
-            except NativeConceptDefinitionError as exc:
-                msg = f"Could not validate refine '{refines}': {exc}"
-                raise ValueError(msg) from exc
-        return refines
+        """Validate the refines field.
+
+        Refines can be either:
+        - A native concept ref (e.g., "native.Text", "Text")
+        - A non-native concept ref (e.g., "myapp.BaseEntity") for concept-to-concept inheritance
+
+        Non-native concept refs are allowed since dependencies are loaded in topological order,
+        ensuring the refined concept exists before the refining concept is constructed.
+        """
+        if refines is None:
+            return None
+
+        # Check if it's a valid concept ref or code (domain.ConceptCode or ConceptCode in PascalCase)
+        if is_concept_ref_or_code_valid(concept_ref_or_code=refines):
+            return refines
+
+        # Invalid refines value
+        msg = f"Refines '{refines}' must be a valid concept ref (domain.ConceptCode) or concept code (PascalCase)"
+        raise ValueError(msg)
 
     @field_validator("structure", mode="before")
     @classmethod

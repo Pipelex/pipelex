@@ -25,7 +25,7 @@ class GeneratedContentFactory:
         secondary_id: str,
         data: bytes,
         mime_type: str | None,
-        output_format: ImageFormat | None,
+        image_format: ImageFormat | None,
     ) -> str:
         """Build a storage key using a SHA-256 hash of the data.
 
@@ -34,15 +34,15 @@ class GeneratedContentFactory:
             secondary_id: The secondary ID
             data: The binary data to hash
             mime_type: Optional MIME type to determine file extension
-            output_format: Optional output format to determine file extension
+            image_format: Optional output format to determine file extension
 
         Returns:
             A storage key in the format "{primary_id}/{secondary_id}/{hash}.{extension}"
         """
         hash_digest = hashlib.sha256(data).hexdigest()[:16]
 
-        if output_format:
-            extension = output_format.as_file_extension
+        if image_format:
+            extension = image_format.as_file_extension
         elif mime_type:
             match mime_type:
                 case "image/jpeg":
@@ -67,11 +67,11 @@ class GeneratedContentFactory:
         secondary_id: str,
         raw_details: GeneratedImageRawDetails,
     ) -> ImageContent:
-        output_format: ImageFormat | None = None
+        image_format: ImageFormat | None = None
         base64_extracted_mime_type: str | None = None
         is_remote_url: bool
-        if raw_details.output_format:
-            output_format = ImageFormat(raw_details.output_format)
+        if raw_details.image_format:
+            image_format = ImageFormat(raw_details.image_format)
 
         if raw_details.actual_url:
             url = raw_details.actual_url
@@ -105,7 +105,7 @@ class GeneratedContentFactory:
                     secondary_id=secondary_id,
                     data=actual_bytes,
                     mime_type=raw_details.mime_type or base64_extracted_mime_type,
-                    output_format=output_format,
+                    image_format=image_format,
                 )
                 url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
                 is_remote_url = False
@@ -118,12 +118,12 @@ class GeneratedContentFactory:
             mime_type = raw_details.mime_type
         elif base64_extracted_mime_type:
             mime_type = base64_extracted_mime_type
-        elif output_format:
-            mime_type = output_format.as_mime_type
+        elif image_format:
+            mime_type = image_format.as_mime_type
         else:
             mime_type = "image/jpeg"
 
-        display_link: str | None
+        public_url: str | None
         if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content_enabled:
             actual_bytes = await self._fetch_remote_content(url=url)
             storage_key = self._build_storage_key(
@@ -131,18 +131,18 @@ class GeneratedContentFactory:
                 secondary_id=secondary_id,
                 data=actual_bytes,
                 mime_type=mime_type,
-                output_format=output_format,
+                image_format=image_format,
             )
             url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
-            display_link = await self.storage_provider.display_link(uri=url)
+            public_url = await self.storage_provider.public_url(uri=url)
         elif not is_remote_url:
-            display_link = await self.storage_provider.display_link(uri=url)
+            public_url = await self.storage_provider.public_url(uri=url)
         else:
-            display_link = url
+            public_url = url
 
         return ImageContent(
             url=url,
-            display_link=display_link,
+            public_url=public_url,
             size=raw_details.size,
             mime_type=mime_type,
             caption=raw_details.caption,

@@ -5,7 +5,7 @@ Validate your pipeline definitions and configuration for correctness.
 ## Validate All Pipes
 
 ```bash
-pipelex validate all
+pipelex validate --all
 ```
 
 Performs comprehensive validation:
@@ -16,11 +16,18 @@ Performs comprehensive validation:
 
 This is the recommended validation to run before committing changes or deploying pipelines.
 
+**Options:**
+
+- `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+
 **Examples:**
 
 ```bash
 # Validate everything
-pipelex validate all
+pipelex validate --all
+
+# Validate with custom library directories
+pipelex validate --all -L ./pipelines -L ./shared_pipes
 ```
 
 ## Validate Single Pipe
@@ -39,6 +46,7 @@ Validates and dry-runs a specific pipe from your imported packages, useful for i
 **Options:**
 
 - `--pipe PIPE_CODE` - Explicitly specify the pipe code to validate (alternative to positional argument)
+- `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
 
 **Examples:**
 
@@ -49,34 +57,41 @@ pipelex validate write_weekly_report
 
 # Validate a specific pipe (explicit option)
 pipelex validate --pipe analyze_cv_matching
+
+# Validate with custom library directories
+pipelex validate my_pipe -L ./pipelines
 ```
 
 ## Validate Bundle
 
 ```bash
-pipelex validate BUNDLE_FILE.plx
-pipelex validate --bundle BUNDLE_FILE.plx
+pipelex validate BUNDLE_FILE.mthds
+pipelex validate --bundle BUNDLE_FILE.mthds
 ```
 
-Validates all pipes defined in a bundle file. The command automatically detects `.plx` files as bundles.
+Validates all pipes defined in a bundle file. The command automatically detects `.mthds` files as bundles.
 
 **Arguments:**
 
-- `BUNDLE_FILE.plx` - Path to the bundle file (auto-detected by `.plx` extension)
+- `BUNDLE_FILE.mthds` - Path to the bundle file (auto-detected by `.mthds` extension)
 
 **Options:**
 
-- `--bundle BUNDLE_FILE.plx` - Explicitly specify the bundle file path
+- `--bundle BUNDLE_FILE.mthds` - Explicitly specify the bundle file path
+- `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 
 **Examples:**
 
 ```bash
 # Validate a bundle (auto-detected)
-pipelex validate my_pipeline.plx
-pipelex validate pipelines/invoice_processor.plx
+pipelex validate my_pipeline.mthds
+pipelex validate pipelines/invoice_processor.mthds
 
 # Validate a bundle (explicit option)
-pipelex validate --bundle my_pipeline.plx
+pipelex validate --bundle my_pipeline.mthds
+
+# Validate a bundle with additional library directories
+pipelex validate my_bundle.mthds -L ./shared_pipes
 ```
 
 !!! note
@@ -85,22 +100,22 @@ pipelex validate --bundle my_pipeline.plx
 ## Validate Specific Pipe in Bundle
 
 ```bash
-pipelex validate --bundle BUNDLE_FILE.plx --pipe PIPE_CODE
+pipelex validate --bundle BUNDLE_FILE.mthds --pipe PIPE_CODE
 ```
 
 Validates all pipes in a bundle, while ensuring a specific pipe exists in that bundle. The entire bundle is validated, not just the specified pipe.
 
 **Options:**
 
-- `--bundle BUNDLE_FILE.plx` - Path to the bundle file
+- `--bundle BUNDLE_FILE.mthds` - Path to the bundle file
 - `--pipe PIPE_CODE` - Pipe code that must exist in the bundle
 
 **Examples:**
 
 ```bash
 # Validate bundle and ensure specific pipe exists in it
-pipelex validate --bundle my_pipeline.plx --pipe extract_invoice
-pipelex validate --bundle invoice_processor.plx --pipe validate_amounts
+pipelex validate --bundle my_pipeline.mthds --pipe extract_invoice
+pipelex validate --bundle invoice_processor.mthds --pipe validate_amounts
 ```
 
 !!! important "Bundle Validation Behavior"
@@ -110,7 +125,7 @@ pipelex validate --bundle invoice_processor.plx --pipe validate_amounts
 
 All validation commands check:
 
-- Syntax correctness of `.plx` files
+- Syntax correctness of `.mthds` files
 - Concept and pipe definitions are valid
 - Input/output connections are correct
 - All referenced pipes and concepts exist
@@ -118,6 +133,5 @@ All validation commands check:
 
 ## Related Configuration
 
-- [Static Validation Configuration](../../7-configuration/config-pipeline-validation/static-validation-config.md)
 - [Dry Run Configuration](../../7-configuration/config-pipeline-validation/dry-run-config.md)
 

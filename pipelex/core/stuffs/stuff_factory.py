@@ -1,9 +1,9 @@
 from typing import Any, cast
 
 import shortuuid
+from mthds.client.models.pipeline_inputs import StuffContentOrData
 from pydantic import BaseModel, ValidationError, field_validator
 
-from pipelex.client.protocol import StuffContentOrData
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -110,7 +110,6 @@ class StuffFactory:
         stuff_contents: dict[str, StuffContent],
         name: str | None = None,
     ) -> Stuff:
-        # TODO: Add unit tests for this method
         """Combine a dictionary of stuffs into a single stuff."""
         the_subclass = get_class_registry().get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)
         try:

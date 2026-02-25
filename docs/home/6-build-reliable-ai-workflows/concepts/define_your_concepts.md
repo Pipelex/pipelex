@@ -1,6 +1,6 @@
 # Defining Your Concepts
 
-Concepts are the foundation of reliable AI workflows. They define what flows through your pipes—not just as data types, but as meaningful pieces of knowledge with clear boundaries and validation rules.
+Concepts are the foundation of reliable AI methods. They define what flows through your pipes—not just as data types, but as meaningful pieces of knowledge with clear boundaries and validation rules.
 
 ## Writing Concept Definitions
 
@@ -10,7 +10,7 @@ Every concept starts with a natural language definition. This definition serves 
 
 The simplest way to define a concept is with a descriptive sentence:
 
-```plx
+```toml
 [concept]
 Invoice = "A commercial document issued by a seller to a buyer"
 Employee = "A person employed by an organization"
@@ -21,7 +21,7 @@ ProductReview = "A customer's evaluation of a product or service"
     Concept names **MUST** be in `PascalCase` (also known as UpperCamelCase). Each word starts with a capital letter, with no underscores or hyphens.
     
     **Valid concept names:**
-    ```plx
+    ```toml
     ✅ Invoice
     ✅ ProductReview
     ✅ CustomerFeedback
@@ -29,19 +29,19 @@ ProductReview = "A customer's evaluation of a product or service"
     ```
     
     **Invalid concept names:**
-    ```plx
+    ```toml
     ❌ invoice           # Not PascalCase
     ❌ product_review    # snake_case not allowed
     ❌ Product-Review    # Hyphens not allowed
     ❌ productReview     # camelCase not allowed (must start with capital)
     ```
 
-Those concepts will be Text-based by default. If you want to use sutrctured output, you need to create a Python class for the concept, or declare the structure directly in the concept definition. 
+Those concepts will be Text-based by default. If you want to use structured output, declare the structure directly in the concept definition (recommended) or create a Python class for advanced use cases.
 
 **Key principles for concept definitions:**
 
 1. **Define what it is, not what it's for**
-   ```plx
+   ```toml
    # ❌ Wrong: includes usage context
    TextToSummarize = "Text that needs to be summarized"
    
@@ -50,7 +50,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
    ```
 
 2. **Use singular forms**
-   ```plx
+   ```toml
    # ❌ Wrong: plural form
    Invoices = "Commercial documents from sellers"
    
@@ -59,7 +59,7 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
    ```
 
 3. **Avoid unnecessary adjectives**
-   ```plx
+   ```toml
    # ❌ Wrong: includes subjective qualifier
    LongArticle = "A lengthy written composition"
    
@@ -71,8 +71,8 @@ Those concepts will be Text-based by default. If you want to use sutrctured outp
 
 Group concepts that naturally belong together in the same domain. A domain acts as a namespace for a set of related concepts and pipes, helping you organize and reuse your pipeline components. You can learn more about them in [Understanding Domains](../domain.md).
 
-```plx
-# finance.plx
+```toml
+# finance.mthds
 domain = "finance"
 description = "Financial document processing"
 
@@ -86,24 +86,39 @@ LineItem = "An individual item or service listed in a financial document"
 
 ## Get Started with Inline Structures
 
-To add structure to your concepts, the simplest approach is using **inline structures** directly in your `.plx` files:
+To add structure to your concepts, the **recommended approach** is using **inline structures** directly in your `.mthds` files. Inline structures support all field types including nested concepts:
 
-```plx
+```toml
+[concept.Customer]
+description = "A customer for an invoice"
+
+[concept.Customer.structure]
+name = { type = "text", description = "Customer's full name", required = true }
+email = { type = "text", description = "Customer's email address", required = true }
+
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
 
 [concept.Invoice.structure]
 invoice_number = "The unique invoice identifier"
 issue_date = { type = "date", description = "The date the invoice was issued" }
+customer = { type = "concept", concept_ref = "finance.Customer", description = "The customer" }
 total_amount = { type = "number", description = "The total invoice amount" }
-vendor_name = "The name of the vendor"
 ```
 
-This automatically generates a fully-typed Pydantic model with validation—no Python code needed!
+This automatically generates fully-typed Pydantic models with validation—no Python code needed!
 
-**For complete details on inline structures, field types, and all features, see [Inline Structures](inline-structures.md).**
+**For complete details on inline structures, nested concepts, and all features, see [Inline Structures](inline-structures.md).**
 
-### Alternative: Python Classes
+### Generating Python Classes
+
+If you need type hints and IDE autocomplete, use the `pipelex build structures` command to generate Python classes from your inline definitions:
+
+```bash
+pipelex build structures ./my_pipelines/
+```
+
+### Alternative: Hand-Written Python Classes
 
 For advanced features like custom validation, computed properties, or reusable business logic, you can create explicit Python classes.
 
@@ -113,7 +128,7 @@ For advanced features like custom validation, computed properties, or reusable b
 
 You can create more specific versions of existing concepts through refinement. For example, an `Invoice` is a specific kind of `PDF`:
 
-```plx
+```toml
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
 refines = "PDF"

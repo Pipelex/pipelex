@@ -70,10 +70,11 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
             msg = f"Model '{self.inference_model.name}' does not have rules configured"
             raise ImgGenParameterError(msg)
 
-        args_dict = ImgGenArgsFactory.make_args_for_model(
+        args_dict = await ImgGenArgsFactory.make_args_for_model(
             model_rules=self.inference_model.rules,
             img_gen_job=img_gen_job,
             nb_images=nb_images,
+            model_id=self.inference_model.model_id,
         )
 
         args_dict["prompt"] = img_gen_job.img_gen_prompt.positive_text
@@ -125,7 +126,7 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     GeneratedImageRawDetails(
                         base64_str=base64_str,
                         size=ImageSize(width=width, height=height),
-                        output_format=response_output_format,
+                        image_format=response_output_format,
                     ),
                 )
         else:

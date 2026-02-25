@@ -8,6 +8,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.exceptions import PipeRunError
@@ -124,25 +125,41 @@ class PipeBatch(PipeController):
                 content=item,
                 name=input_item_stuff_name,
             )
+
+            # Register batch item extraction with graph tracer
+            if job_metadata.graph_context is not None:
+                tracer_manager = GraphTracerManager.get_instance()
+                if tracer_manager is not None:
+                    # Pass this PipeBatch's node_id so BATCH_ITEM edges can source from the controller
+                    batch_controller_node_id = job_metadata.graph_context.parent_node_id
+                    tracer_manager.register_batch_item_extraction(
+                        graph_id=job_metadata.graph_context.graph_id,
+                        list_stuff_code=input_stuff.stuff_code,
+                        item_stuff_code=branch_input_item_code,
+                        item_index=branch_index,
+                        batch_controller_node_id=batch_controller_node_id,
+                    )
+
             branch_memory = working_memory.make_deep_copy()
             branch_memory.set_new_main_stuff(stuff=item_input_stuff, name=input_item_stuff_name)
 
             # We create a deep copy of the run params to avoid modifying the original run params,
-            # and we set the final stuff code to use the one provided fro the branch pipe.
-            # Note: the batching will yield a list by aggregating the outputs of each run of the branch pipe,
-            # but each run of the branch pipe will only yield one output, so we set the output multiplicity to False.
+            # and we set the final stuff code to use the one provided for the branch pipe.
+            # Note: we set output_multiplicity to None to allow inner pipes to use their own
+            # multiplicity settings (e.g., a PipeLLM with output="Item[]" should still produce ListContent).
+            # PipeBatch aggregates the final outputs of each branch run into a list.
             branch_pipe_run_params = pipe_run_params.model_copy(
                 deep=True,
                 update={
                     "final_stuff_code": branch_output_item_code,
-                    "output_multiplicity": False,
+                    "output_multiplicity": None,
                 },
             )
             branch_pipe_run_params.run_mode = pipe_run_params.run_mode
             task = sub_pipe.run_pipe(
                 job_metadata=job_metadata,
                 working_memory=branch_memory,
-                output_name=f"Batch result {branch_index + 1} of {output_name}",
+                output_name=output_name,
                 pipe_run_params=branch_pipe_run_params,
             )
             tasks.append(task)
@@ -150,10 +167,12 @@ class PipeBatch(PipeController):
         pipe_outputs = await asyncio.gather(*tasks)
 
         output_items: list[StuffContent] = []
+        branch_output_stuff_codes: list[str] = []
 
         for pipe_output in pipe_outputs:
             branch_output_stuff = pipe_output.main_stuff
             output_items.append(branch_output_stuff.content)
+            branch_output_stuff_codes.append(branch_output_stuff.stuff_code)
 
         list_content: ListContent[StuffContent] = ListContent(items=output_items)
         output_stuff = StuffFactory.make_stuff(
@@ -161,6 +180,23 @@ class PipeBatch(PipeController):
             content=list_content,
             name=output_name,
         )
+
+        # Register batch aggregation with graph tracer
+        if job_metadata.graph_context is not None:
+            tracer_manager = GraphTracerManager.get_instance()
+            if tracer_manager is not None:
+                # Pass the PipeBatch's node_id (from graph_context.parent_node_id) so that
+                # BATCH_AGGREGATE edges correctly target this PipeBatch node, not a parent
+                # controller that may later finish and register as producer of the same output
+                batch_controller_node_id = job_metadata.graph_context.parent_node_id
+                for agg_index, item_stuff_code in enumerate(branch_output_stuff_codes):
+                    tracer_manager.register_batch_aggregation(
+                        graph_id=job_metadata.graph_context.graph_id,
+                        output_list_stuff_code=output_stuff.stuff_code,
+                        item_stuff_code=item_stuff_code,
+                        item_index=agg_index,
+                        batch_controller_node_id=batch_controller_node_id,
+                    )
 
         working_memory.set_new_main_stuff(
             stuff=output_stuff,
@@ -180,12 +216,23 @@ class PipeBatch(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        return await self._live_run_controller_pipe(
+        pipe_output = await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
         )
+        # For dry run coordination: set the first item's pipe_code to "mock_main"
+        # to match the BundleHeaderSpec.main_pipe examples=["mock_main"]
+        main_stuff = pipe_output.main_stuff
+        content = main_stuff.content
+        if isinstance(content, ListContent):
+            list_content = cast("ListContent[StuffContent]", content)
+            if list_content.items:
+                first_item = list_content.items[0]
+                if hasattr(first_item, "pipe_code"):
+                    first_item.pipe_code = "mock_main"  # pyright: ignore[reportAttributeAccessIssue]
+        return pipe_output
 
     @override
     async def _validate_after_run(

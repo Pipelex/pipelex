@@ -23,3 +23,7 @@ class StructuredContentComposerTypeError(PipeComposeError, TypeError):
 
 class StructuredContentComposerValueError(PipeComposeError, ValueError):
     pass
+
+
+class StructuredContentComposerValidationError(PipeComposeError):
+    pass

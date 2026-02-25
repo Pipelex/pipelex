@@ -41,6 +41,7 @@ ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI = [
     "BLACKBOX_API_KEY",
     "GOOGLE_API_KEY",
     "HF_TOKEN",
+    "OPENROUTER_API_KEY",
 ]
 
 
@@ -63,14 +64,25 @@ def pytest_addoption(parser: Parser):
         help="Pipe run mode: 'live' or 'dry'",
         choices=("live", "dry"),
     )
+    parser.addoption(
+        "--disable-inference",
+        action="store_true",
+        default=False,
+        help="Disable inference for this test session. Uses mock content generator, "
+        "skips gateway terms check, and auto-skips tests marked with @pytest.mark.inference.",
+    )
 
 
-def pytest_configure(config: Config) -> None:  # noqa: ARG001
+def pytest_configure(config: Config) -> None:
     """Check prerequisites before test collection starts.
 
     Validates that Pipelex Gateway terms are accepted when gateway is enabled.
     This runs early to provide clear feedback before wasting time on test collection.
     """
+    # Skip check when inference is disabled via CLI option
+    if config.getoption("--disable-inference", default=False):
+        return
+
     # Skip check in CI environments (IntegrationMode.CI doesn't require terms)
     if is_env_var_set(key="GITHUB_ACTIONS") or is_env_var_set(key="CI"):
         return
@@ -112,6 +124,9 @@ def pytest_configure(config: Config) -> None:  # noqa: ARG001
 
 @pytest.fixture
 def pipe_run_mode(request: FixtureRequest) -> PipeRunMode:
+    # Force dry mode when inference is disabled
+    if request.config.getoption("--disable-inference", default=False):
+        return PipeRunMode.DRY
     mode_str = request.config.getoption("--pipe-run-mode")
     return PipeRunMode(mode_str)
 
@@ -172,3 +187,48 @@ def setup_ci_environment():
     # Cleanup placeholder environment variables after tests complete
     if runtime_manager.is_ci_testing:
         _cleanup_placeholder_env_vars(env_var_keys=env_var_keys)
+
+
+def pytest_collection_modifyitems(config: Config, items: list[pytest.Item]) -> None:
+    """Auto-skip non-dry-runnable inference tests when --disable-inference is set.
+
+    This hook runs after test collection and adds skip markers to tests that:
+    - Are marked with @pytest.mark.inference
+    - Are NOT marked with @pytest.mark.dry_runnable
+
+    Tests marked with both inference and dry_runnable can still run because
+    they use the mock ContentGeneratorDry.
+    """
+    if not config.getoption("--disable-inference", default=False):
+        return
+
+    skip_inference = pytest.mark.skip(reason="Inference disabled via --disable-inference (test is not dry_runnable)")
+    for item in items:
+        if "inference" in item.keywords and "dry_runnable" not in item.keywords:
+            item.add_marker(skip_inference)
+
+
+def is_inference_disabled_in_pipelex(request: FixtureRequest) -> bool:
+    """Check if inference is disabled for this test session.
+
+    Use this helper in your conftest.py to pass the disable_inference flag
+    to Pipelex.make():
+
+        from pipelex.test_extras.shared_pytest_plugins import is_inference_disabled
+
+        @pytest.fixture(scope="module", autouse=True)
+        def reset_pipelex_config_fixture(request):
+            pipelex_instance = Pipelex.make(
+                disable_inference=is_inference_disabled(request),
+            )
+
+    Yield:
+            pipelex_instance.teardown()
+
+    Args:
+        request: The pytest FixtureRequest object.
+
+    Returns:
+        True if --disable-inference was passed, False otherwise.
+    """
+    return bool(request.config.getoption("--disable-inference", default=False))

@@ -39,7 +39,7 @@ class TestBracketNotationInControllers:
             description="Process items in parallel",
             inputs={"data": "DataItem[2]"},
             output="ProcessedData",
-            parallels=[],
+            branches=[],
             add_each_output=True,
         )
 

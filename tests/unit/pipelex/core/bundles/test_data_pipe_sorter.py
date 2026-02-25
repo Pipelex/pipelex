@@ -53,7 +53,7 @@ class PipeSorterTestCases:
             description="D depends on B and C",
             inputs={},
             output="Text",
-            parallels=[
+            branches=[
                 SubPipeBlueprint(pipe="pipe_b", result="result_b"),
                 SubPipeBlueprint(pipe="pipe_c", result="result_c"),
             ],

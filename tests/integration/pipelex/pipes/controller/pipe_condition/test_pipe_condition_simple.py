@@ -79,7 +79,7 @@ class TestPipeConditionSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" (11 chars > 5) -> expression="long" -> capitalize_long_text -> "LONG: HELLO WORLD"
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result.content.text == "LONG: HELLO WORLD"
 
         # Verify working memory structure
@@ -96,7 +96,7 @@ class TestPipeConditionSimple:
         final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
         assert (
             f"{final_result_in_memory.concept.domain_code}.{final_result_in_memory.concept.code}"
@@ -108,7 +108,7 @@ class TestPipeConditionSimple:
     ):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
-        # Create PipeCondition instance - pipes are loaded from PLX files
+        # Create PipeCondition instance - pipes are loaded from MTHDS files
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Text length condition for short text testing",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
@@ -155,7 +155,7 @@ class TestPipeConditionSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hi" (2 chars <= 5) -> expression="short" -> add_prefix_short_text -> "SHORT: hi"
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result.content.text == "SHORT: hi"
 
         # Verify working memory structure
@@ -172,14 +172,16 @@ class TestPipeConditionSimple:
         final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result_in_memory.content.text == "SHORT: hi"
         assert (
             f"{final_result_in_memory.concept.domain_code}.{final_result_in_memory.concept.code}"
             == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
         )
 
-    async def test_condition_dry_run_success(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
+    async def test_condition_dry_run_success(
+        self, pipe_run_mode: PipeRunMode, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeCondition dry run with valid inputs using real pipe - should succeed."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create test data using CategoryInput for the real pipe basic_condition_by_category_2
@@ -201,7 +203,7 @@ class TestPipeConditionSimple:
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
-                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
             ),
@@ -226,7 +228,9 @@ class TestPipeConditionSimple:
             assert isinstance(original_input.content, CategoryInput)
             assert original_input.content.category == "small"
 
-    async def test_condition_dry_run_missing_inputs_failure(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
+    async def test_condition_dry_run_missing_inputs_failure(
+        self, pipe_run_mode: PipeRunMode, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeCondition dry run with missing inputs using real pipe - should fail with PipeRouterError."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create empty working memory - missing required input
@@ -237,7 +241,7 @@ class TestPipeConditionSimple:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
-                    pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                    pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                     working_memory=empty_working_memory,
                     job_metadata=job_metadata,
                 ),
@@ -254,7 +258,9 @@ class TestPipeConditionSimple:
         assert cause.missing_inputs is not None
         assert "input_data" in cause.missing_inputs
 
-    async def test_condition_dry_run_medium_category_validation(self, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]):
+    async def test_condition_dry_run_medium_category_validation(
+        self, pipe_run_mode: PipeRunMode, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeCondition dry run with medium category - should validate the 'medium' branch."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create test data using CategoryInput for the medium category
@@ -276,7 +282,7 @@ class TestPipeConditionSimple:
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
-                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
                 job_metadata=job_metadata,
             ),

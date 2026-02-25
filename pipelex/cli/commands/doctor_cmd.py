@@ -22,9 +22,6 @@ from pipelex.cogt.exceptions import InferenceBackendLibraryError
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
 from pipelex.cogt.models.model_manager import ModelManager
-
-if TYPE_CHECKING:
-    from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.config import get_config
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import PipelexHub, get_console, set_pipelex_hub
@@ -44,6 +41,9 @@ from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
+
+if TYPE_CHECKING:
+    from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 
 
 class BackendFileReport(BaseModel):
@@ -111,8 +111,8 @@ def check_telemetry_config() -> tuple[bool, str]:
     except ValidationError:
         # Check if this looks like the old config format (has telemetry_mode at root level)
         if "custom_posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
-            return False, "Config format has changed - run [cyan]pipelex init telemetry[/cyan] to update"
-        return False, "Invalid configuration - run [cyan]pipelex init telemetry --reset[/cyan] to fix"
+            return False, "Config format has changed - run 'pipelex init telemetry' to update"
+        return False, "Invalid configuration - run 'pipelex init telemetry --reset' to fix"
 
 
 def check_backend_credentials() -> tuple[bool, dict[str, BackendCredentialsReport], str]:

@@ -1,5 +1,7 @@
+import traceback
 from abc import ABC, abstractmethod
-from typing import Any, final
+from datetime import datetime, timezone
+from typing import TYPE_CHECKING, Any, final
 
 from opentelemetry import trace
 from opentelemetry.trace import NonRecordingSpan, Span, SpanContext, SpanKind, Status, StatusCode, TraceFlags
@@ -16,6 +18,7 @@ from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.validation import is_variable_satisfied_by_inputs
+from pipelex.graph.graph_tracer_manager import GraphTracerManager, IOSpec, NodeKind
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata, OtelContext
@@ -32,6 +35,9 @@ from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManager
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.tools.misc.string_utils import is_snake_case
 from pipelex.types import Self
+
+if TYPE_CHECKING:
+    from pipelex.graph.graph_context import GraphContext
 
 PipeAbstractType = type["PipeAbstract"]
 
@@ -50,6 +56,10 @@ class PipeAbstract(ABC, BaseModel):
     @property
     def pipe_type(self) -> str:
         return self.__class__.__name__
+
+    @property
+    def is_controller(self) -> bool:
+        return PipeCategory.is_controller_by_str(self.pipe_category)
 
     @property
     def concept_dependencies(self) -> list[Concept]:
@@ -72,6 +82,13 @@ class PipeAbstract(ABC, BaseModel):
     @field_validator("code", mode="before")
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:
+        # Strip namespace prefix if present (e.g., "domain.my_pipe" → "my_pipe").
+        # The builder LLM sometimes generates dotted pipe codes; the namespace
+        # comes from the bundle's domain field, not from the pipe code itself.
+        if "." in code:
+            bare_code = code.rsplit(".", maxsplit=1)[1]
+            log.warning(f"Runtime pipe code '{code}' contains a namespace prefix, stripped to '{bare_code}'")
+            code = bare_code
         if not is_snake_case(code):
             msg = f"Invalid pipe code syntax '{code}'. Must be in snake_case."
             raise ValueError(msg)
@@ -136,7 +153,10 @@ class PipeAbstract(ABC, BaseModel):
         input_names = set(self.inputs.variables)
         for required_variable_path in self.required_variables():
             if not is_variable_satisfied_by_inputs(required_variable_path, input_names):
-                msg = f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+                msg = (
+                    f"Required variable '{required_variable_path}' is not in the inputs of pipe '{self.code}'. "
+                    f"Current inputs: {self.inputs.format_for_display()}"
+                )
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
@@ -153,7 +173,7 @@ class PipeAbstract(ABC, BaseModel):
             var_name = named_stuff_spec.variable_name
 
             if var_name not in self.inputs.variables:
-                msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs}"
+                msg = f"Required variable '{var_name}' is not in the inputs of pipe '{self.code}'. Current inputs: {self.inputs.format_for_display()}"
                 raise PipeValidationError(
                     message=msg,
                     error_type=PipeValidationErrorType.MISSING_INPUT_VARIABLE,
@@ -163,7 +183,7 @@ class PipeAbstract(ABC, BaseModel):
                 )
 
             # TODO: add this to the PipeController validation. (This might need to refactor a little bit how we can override the validation)
-            if PipeCategory.is_controller_by_str(self.pipe_category):
+            if self.is_controller:
                 # Compare the essential parts of StuffSpec (concept code + multiplicity)
                 # Skip validation if the needed stuff_spec is Dynamic or Anything (flexible output types)
                 declared_stuff_spec = self.inputs.root[var_name]
@@ -256,6 +276,24 @@ class PipeAbstract(ABC, BaseModel):
                 missing_inputs=missing_input_names,
             )
 
+        # Validate external resources (URLs, file paths) referenced by input contents.
+        # Skipped in dry-run mode because inputs are mock-generated with fake URLs.
+        if not pipe_run_params.run_mode.is_dry:
+            for named_stuff_spec in self.needed_inputs().named_stuff_specs:
+                variable_name = named_stuff_spec.variable_name
+                stuff = working_memory.get_optional_stuff(variable_name)
+                if stuff is not None:
+                    try:
+                        stuff.content.validate_resources()
+                    except ValueError as exc:
+                        msg = f"Input '{variable_name}' of pipe '{self.code}' references an invalid resource: {exc}"
+                        raise PipeRunInputsError(
+                            message=msg,
+                            run_mode=pipe_run_params.run_mode,
+                            pipe_code=self.code,
+                            variable_name=variable_name,
+                        ) from exc
+
         # Specific pipe validation function
         await self._validate_before_run(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
@@ -323,11 +361,8 @@ class PipeAbstract(ABC, BaseModel):
         if indent_level > 0:
             indent = f"{indent}[yellow]↳[/yellow] "
         pipe_type_label = f"[white]{self.pipe_type}:[/white]"
-        match pipe_run_params.run_mode:
-            case PipeRunMode.LIVE:
-                pass
-            case PipeRunMode.DRY:
-                pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
+        if pipe_run_params.run_mode.is_dry:
+            pipe_type_label = f"[dim]Dry run:[/dim] {pipe_type_label}"
         pipe_code_label = f"[red]{self.code}[/red]"
         concept_code_label = f"[bold green]{self.output.concept.code}[/bold green]"
         arrow = "[yellow]→[/yellow]"
@@ -343,21 +378,109 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
 
-        match pipe_run_params.run_mode:
-            case PipeRunMode.LIVE:
-                pipe_output = await self.live_run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                    output_name=output_name,
+        # Handle graph tracing if enabled
+        graph_node_id: str | None = None
+        child_graph_context: GraphContext | None = None
+        tracer_manager = None
+
+        parent_graph_context = job_metadata.graph_context
+        if parent_graph_context is not None:
+            tracer_manager = GraphTracerManager.get_instance()
+            if tracer_manager is not None:
+                started_at = datetime.now(timezone.utc)
+                node_kind = NodeKind.CONTROLLER if self.is_controller else NodeKind.OPERATOR
+
+                # Capture input specs from working memory for data flow tracking
+                input_specs: list[IOSpec] = []
+                for var_name in self.needed_inputs().required_names:
+                    stuff = working_memory.get_optional_stuff(var_name)
+                    if stuff is not None:
+                        input_spec = IOSpec(
+                            name=var_name,
+                            concept=stuff.concept.code,
+                            content_type=stuff.content.content_type,
+                            digest=stuff.stuff_code,
+                            data=stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
+                            data_text=stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
+                            data_html=stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
+                        )
+                        input_specs.append(input_spec)
+
+                graph_node_id, child_graph_context = tracer_manager.on_pipe_start(
+                    graph_context=parent_graph_context,
+                    pipe_code=self.code,
+                    pipe_type=self.type,
+                    node_kind=node_kind,
+                    started_at=started_at,
+                    input_specs=input_specs or None,
                 )
-            case PipeRunMode.DRY:
-                pipe_output = await self.dry_run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=pipe_run_params,
-                    output_name=output_name,
+                # Update job metadata with child graph context for nested pipes
+                if child_graph_context is not None:
+                    job_metadata = job_metadata.copy_with_update(
+                        otel_context=job_metadata.otel_context,
+                        graph_context=child_graph_context,
+                    )
+        try:
+            await self.validate_before_run(
+                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
+            match pipe_run_params.run_mode:
+                case PipeRunMode.LIVE:
+                    pipe_output = await self.live_run_pipe(
+                        job_metadata=job_metadata,
+                        working_memory=working_memory,
+                        pipe_run_params=pipe_run_params,
+                        output_name=output_name,
+                    )
+                case PipeRunMode.DRY:
+                    pipe_output = await self.dry_run_pipe(
+                        job_metadata=job_metadata,
+                        working_memory=working_memory,
+                        pipe_run_params=pipe_run_params,
+                        output_name=output_name,
+                    )
+            await self.validate_after_run(
+                job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            )
+        except Exception as exc:
+            # Record graph tracing error
+            if tracer_manager is not None and parent_graph_context is not None:
+                error_stack: str | None = None
+                if parent_graph_context.data_inclusion.error_stack_traces:
+                    error_stack = traceback.format_exc()
+                tracer_manager.on_pipe_end_error(
+                    graph_id=parent_graph_context.graph_id,
+                    node_id=graph_node_id,
+                    ended_at=datetime.now(timezone.utc),
+                    error_type=type(exc).__name__,
+                    error_message=str(exc),
+                    error_stack=error_stack,
                 )
+            raise
+
+        # Record graph tracing success
+        if tracer_manager is not None and parent_graph_context is not None:
+            # Capture output spec for data flow tracking
+            # Note: main_stuff may not exist for pipes like PipeParallel with add_each_output=true
+            main_stuff = pipe_output.working_memory.get_optional_main_stuff()
+            output_spec: IOSpec | None = None
+            if main_stuff is not None:
+                output_spec = IOSpec(
+                    name=output_name or main_stuff.stuff_name or "main_stuff",
+                    concept=main_stuff.concept.code,
+                    content_type=main_stuff.content.content_type,
+                    digest=main_stuff.stuff_code,
+                    data=main_stuff.content.smart_dump() if parent_graph_context.data_inclusion.stuff_json_content else None,
+                    data_text=main_stuff.content.rendered_pretty_text() if parent_graph_context.data_inclusion.stuff_text_content else None,
+                    data_html=main_stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
+                )
+
+            tracer_manager.on_pipe_end_success(
+                graph_id=parent_graph_context.graph_id,
+                node_id=graph_node_id,
+                ended_at=datetime.now(timezone.utc),
+                output_spec=output_spec,
+            )
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)
         return pipe_output
@@ -437,16 +560,9 @@ class PipeAbstract(ABC, BaseModel):
     ) -> PipeOutput:
         log.verbose(f"Dry run of {self.type}: '{self.code}'")
         assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
-        await self.validate_before_run(
+        return await self._dry_run_pipe(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
         )
-        pipe_output = await self._dry_run_pipe(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-        )
-        await self.validate_after_run(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
-        )
-        return pipe_output
 
     @abstractmethod
     async def _live_run_pipe(

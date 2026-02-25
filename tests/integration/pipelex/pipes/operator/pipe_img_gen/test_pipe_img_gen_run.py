@@ -13,6 +13,7 @@ from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
 from pipelex.pipeline.job_metadata import JobMetadata
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 from tests.integration.pipelex.test_data import ImageGenTestCases
 
 
@@ -26,7 +27,7 @@ class TestPipeImgGenRun:
         self,
         job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
-        img_gen_handle: str,
+        img_gen_combo: ModelCombo,
         topic: str,  # noqa: ARG002
         prompt: str,
         negative_prompt: str | None,
@@ -35,7 +36,7 @@ class TestPipeImgGenRun:
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
             description="Image generation test",
-            model=img_gen_handle,
+            model=img_gen_combo.handle,
             output=NativeConceptCode.IMAGE,
             prompt=prompt,
             negative_prompt=negative_prompt,
@@ -59,7 +60,7 @@ class TestPipeImgGenRun:
         self,
         job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
-        img_gen_handle: str,
+        img_gen_combo: ModelCombo,
         topic: str,  # noqa: ARG002
         image_desc: str,
         negative_prompt: str | None,
@@ -68,7 +69,7 @@ class TestPipeImgGenRun:
         load_empty_library()
         pipe_img_gen_blueprint = PipeImgGenBlueprint(
             description="Image generation test",
-            model=img_gen_handle,
+            model=img_gen_combo.handle,
             inputs={"image_desc": "Text"},
             output=NativeConceptCode.IMAGE,
             prompt="Sketch black and white funny illustration of: $image_desc",

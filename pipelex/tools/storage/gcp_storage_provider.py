@@ -12,7 +12,7 @@ from pipelex.tools.storage.exceptions import (
     StorageGcpCredentialsError,
     StorageGcpError,
 )
-from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract, StoredData
 
 # GCS signed URL signing process version (v4 is recommended, v2 is deprecated)
 GCS_SIGNED_URL_VERSION = "v4"
@@ -81,14 +81,14 @@ class GcpStorageProvider(StorageProviderAbstract):
             self._bucket = client.bucket(self._bucket_name)  # pyright: ignore[reportUnknownMemberType]
         return self._bucket  # pyright: ignore[reportUnknownVariableType,reportUnknownMemberType]
 
-    def _load_sync(self, key: str) -> bytes:
-        """Synchronous implementation of load for use with to_thread.
+    def _load_with_metadata_sync(self, key: str) -> StoredData:
+        """Synchronous implementation of load with metadata for use with to_thread.
 
         Args:
             key: Storage key (without scheme prefix).
 
         Returns:
-            The object contents as bytes.
+            StoredData containing object contents and content_type.
 
         Raises:
             StorageFileNotFoundError: If the object does not exist.
@@ -104,7 +104,10 @@ class GcpStorageProvider(StorageProviderAbstract):
         try:
             blob = bucket.blob(key)
             data: bytes = blob.download_as_bytes()
-            return data
+            # Reload blob metadata to get content_type
+            blob.reload()
+            content_type: str | None = blob.content_type
+            return StoredData(data=data, mime_type=content_type)
         except NotFound as exc:  # pyright: ignore[reportUnknownVariableType]
             msg = f"Object not found in GCS: '{key}'"
             raise StorageFileNotFoundError(msg) from exc
@@ -113,20 +116,20 @@ class GcpStorageProvider(StorageProviderAbstract):
             raise StorageGcpError(msg) from exc
 
     @override
-    async def _load(self, key: str) -> bytes:
-        """Load bytes from a GCS object.
+    async def _load_with_metadata(self, key: str) -> StoredData:
+        """Load bytes from a GCS object with MIME type metadata.
 
         Args:
             key: Storage key (without scheme prefix).
 
         Returns:
-            The object contents as bytes.
+            StoredData containing object contents and content_type.
 
         Raises:
             StorageFileNotFoundError: If the object does not exist.
             StorageGcpError: If the GCS operation fails.
         """
-        return await asyncio.to_thread(self._load_sync, key)
+        return await asyncio.to_thread(self._load_with_metadata_sync, key)
 
     def _store_sync(self, data: bytes, key: str, content_type: str | None) -> None:
         """Synchronous implementation of store for use with to_thread.
@@ -203,7 +206,7 @@ class GcpStorageProvider(StorageProviderAbstract):
             return self._make_public_url(key)
 
     @override
-    async def display_link(self, uri: str) -> str | None:
+    async def public_url(self, uri: str) -> str | None:
         """Return a URL for this storage URI.
 
         Args:
