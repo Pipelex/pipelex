@@ -1,7 +1,7 @@
 from pathlib import Path
 
 import pytest
-from mthds.packages.exceptions import ManifestError
+from mthds.package.exceptions import ManifestError
 from pytest_mock import MockerFixture
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint

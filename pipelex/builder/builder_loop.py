@@ -2,11 +2,11 @@ import re
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
-from mthds.models.pipeline_inputs import PipelineInputs
-from mthds.packages.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
-from mthds.packages.discovery import MANIFEST_FILENAME
-from mthds.packages.manifest import MthdsPackageManifest
-from mthds.packages.manifest_parser import serialize_manifest_to_toml
+from mthds.client.models.pipeline_inputs import PipelineInputs
+from mthds.package.bundle_scanner import build_domain_exports_from_scan, scan_bundles_for_domain_info
+from mthds.package.discovery import MANIFEST_FILENAME
+from mthds.package.manifest.parser import serialize_manifest_to_toml
+from mthds.package.manifest.schema import MethodsManifest
 
 from pipelex import builder, log
 from pipelex.builder.builder import (
@@ -1141,7 +1141,7 @@ def maybe_generate_manifest_for_output(output_dir: Path) -> Path | None:
     exports = build_domain_exports_from_scan(domain_pipes, domain_main_pipes)
 
     dir_name = output_dir.name.replace("-", "_").replace(" ", "_").lower()
-    manifest = MthdsPackageManifest(
+    manifest = MethodsManifest(
         address=f"example.com/yourorg/{dir_name}",
         version="0.1.0",
         description=f"Package generated from {len(mthds_files)} .mthds file(s)",

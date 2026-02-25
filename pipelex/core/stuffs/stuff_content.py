@@ -1,7 +1,7 @@
 from typing import Any, TypeVar, final
 
 from kajson import kajson
-from mthds.models.stuff import StuffContentAbstract
+from mthds.client.models.stuff import StuffContentAbstract
 from rich.json import JSON
 from typing_extensions import override
 

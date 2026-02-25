@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from mthds.pipeline import MAIN_STUFF_NAME, PipelineExecuteResponse, PipelineStartResponse, PipelineState
+from mthds.client.pipeline import MAIN_STUFF_NAME, PipelineExecuteResponse, PipelineStartResponse, PipelineState
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 

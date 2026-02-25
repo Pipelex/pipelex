@@ -4,9 +4,9 @@ Converts PipelexBundleBlueprint instances to BundleMetadata for use with
 the mthds PackageVisibilityChecker.
 """
 
-from mthds.packages.bundle_metadata import BundleMetadata
-from mthds.packages.manifest import MthdsPackageManifest
-from mthds.packages.visibility import PackageVisibilityChecker, VisibilityError
+from mthds.package.bundle_metadata import BundleMetadata
+from mthds.package.manifest.schema import MethodsManifest
+from mthds.package.visibility import PackageVisibilityChecker, VisibilityError
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 
@@ -33,7 +33,7 @@ def _blueprint_to_metadata(blueprint: PipelexBundleBlueprint) -> BundleMetadata:
 
 
 def make_visibility_checker(
-    manifest: MthdsPackageManifest | None,
+    manifest: MethodsManifest | None,
     blueprints: list[PipelexBundleBlueprint],
 ) -> PackageVisibilityChecker:
     """Create a PackageVisibilityChecker from pipelex blueprints.
@@ -50,7 +50,7 @@ def make_visibility_checker(
 
 
 def check_visibility_for_blueprints(
-    manifest: MthdsPackageManifest | None,
+    manifest: MethodsManifest | None,
     blueprints: list[PipelexBundleBlueprint],
 ) -> list[VisibilityError]:
     """Convenience function: check visibility for pipelex blueprints.

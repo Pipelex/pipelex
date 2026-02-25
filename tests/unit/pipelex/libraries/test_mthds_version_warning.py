@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from mthds.packages.dependency_resolver import ResolvedDependency
-from mthds.packages.manifest import MthdsPackageManifest
+from mthds.package.dependency_resolver import ResolvedDependency
+from mthds.package.manifest.schema import MethodsManifest
 from pytest_mock import MockerFixture
 
 from pipelex.libraries.library_factory import LibraryFactory
@@ -64,7 +64,7 @@ class TestMthdsVersionWarning:
         mthds_file = tmp_path / "dep.mthds"
         mthds_file.write_text('domain = "dep_domain"\n')
 
-        dep_manifest = MthdsPackageManifest(
+        dep_manifest = MethodsManifest(
             address="github.com/org/dep-pkg",
             version="1.0.0",
             description="A dependency",

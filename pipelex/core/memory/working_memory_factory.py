@@ -1,5 +1,5 @@
 import shortuuid
-from mthds.models.pipeline_inputs import PipelineInputs
+from mthds.client.models.pipeline_inputs import PipelineInputs
 from pydantic import BaseModel
 
 from pipelex import log
