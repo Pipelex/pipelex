@@ -389,16 +389,16 @@ wheels = [
 
 [[package]]
 name = "boto3-stubs"
-version = "1.42.56"
+version = "1.42.57"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "botocore-stubs" },
     { name = "types-s3transfer" },
     { name = "typing-extensions", marker = "python_full_version < '3.12'" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/3d/a1/23cdd844dc940ef9c77ee1fc95cbf4c0a3f4ee53ecb3c2bbf7ba9932d2f7/boto3_stubs-1.42.56.tar.gz", hash = "sha256:95e4eab435b1b8e05e0d977c76f706efcded2b9a375cbc45b031c7458d100b25", size = 100972, upload-time = "2026-02-24T21:06:18.112Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/db/47/30033635df9b94d4ebccb27855a79f8b5378146cd0319f09c789e1a9a973/boto3_stubs-1.42.57.tar.gz", hash = "sha256:8be86716820406ce0996f72aa58e34ba1a1ebb43867d8a423c60ac8fe944f303", size = 101008, upload-time = "2026-02-25T21:04:52.389Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/de/e2/a47ab38dbc20bf241af2d9dad7b6c517794df3a54a586abb00678a5eacff/boto3_stubs-1.42.56-py3-none-any.whl", hash = "sha256:824d229b2d87cac1a714472d88c13631df5cb4e1ef3bc3167cac635084ca5b57", size = 69824, upload-time = "2026-02-24T21:06:09.403Z" },
+    { url = "https://files.pythonhosted.org/packages/7f/92/098773ec6c418f47ff3324dcffc03625977969b9801a80f0450c3925377d/boto3_stubs-1.42.57-py3-none-any.whl", hash = "sha256:b8ec44ed973987f3f42f61f2a280adf709ae09fe4d0736bb7428a3b08286c6e3", size = 69825, upload-time = "2026-02-25T21:04:47.709Z" },
 ]
 
 [[package]]
@@ -846,10 +846,10 @@ wheels = [
 
 [[package]]
 name = "cuda-pathfinder"
-version = "1.3.5"
+version = "1.4.0"
 source = { registry = "https://pypi.org/simple" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/ca/b5/e4056e4058fb56519fcddf1face6fe3ff2398953b41615fafe9fb1540bf2/cuda_pathfinder-1.3.5-py3-none-any.whl", hash = "sha256:6c88220f8637cb35d2a75c620d72efebf683b248b923713d8fbe235844c1a4b9", size = 33711, upload-time = "2026-02-23T18:34:27.253Z" },
+    { url = "https://files.pythonhosted.org/packages/ff/60/d8f1dbfb7f06b94c662e98c95189e6f39b817da638bc8fcea0d003f89e5d/cuda_pathfinder-1.4.0-py3-none-any.whl", hash = "sha256:437079ca59e7b61ae439ecc501d69ed87b3accc34d58153ef1e54815e2c2e118", size = 38406, upload-time = "2026-02-25T22:13:00.807Z" },
 ]
 
 [[package]]
@@ -3301,7 +3301,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.18.0b4"
+version = "0.18.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
