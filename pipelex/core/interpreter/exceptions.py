@@ -15,5 +15,5 @@ class PipelexInterpreterError(PipelexError):
         super().__init__(message)
 
 
-class PLXDecodeError(TomlError):
-    """Raised when PLX decoding fails."""
+class MthdsDecodeError(TomlError):
+    """Raised when MTHDS decoding fails."""

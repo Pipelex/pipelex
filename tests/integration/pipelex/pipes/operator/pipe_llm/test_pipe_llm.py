@@ -16,6 +16,7 @@ from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint, Stru
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, PipeTestCases
 
 
@@ -26,6 +27,7 @@ from tests.integration.pipelex.test_data import BasicStructuredDataTestCases, Pi
 class TestPipeLLMBasic:
     async def test_pipe_llm_simple(
         self,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ):
@@ -47,6 +49,7 @@ class TestPipeLLMBasic:
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
         )
         pipe_llm_output = await get_pipe_router().run(
             pipe_job=pipe_job,
@@ -78,6 +81,7 @@ class TestPipeLLMBasic:
     )
     async def test_pipe_llm_structured(
         self,
+        job_metadata: JobMetadata,
         topic: str,
         data: str,
         concept: str,
@@ -89,7 +93,6 @@ class TestPipeLLMBasic:
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/operator/pipe_llm")])
         # TODO: Add assertion on generated objects vs expected results
-        pretty_print(data, title="data")
         working_memory = WorkingMemoryFactory.make_from_single_stuff(
             stuff=StuffFactory.make_stuff(
                 concept=get_native_concept(NativeConceptCode.TEXT),
@@ -109,6 +112,7 @@ class TestPipeLLMBasic:
             structuring_method=structuring_method,
         )
 
+        pretty_print(pipe_llm_blueprint, title="pipe_llm_blueprint")
         pipe_code = f"extract_{topic}_{concept}_{structuring_method}"
         pipe_code = pipe_code.lower().replace(" ", "_")
         pipe = PipeFactory[PipeLLM].make_from_blueprint(
@@ -123,8 +127,12 @@ class TestPipeLLMBasic:
             pipe=pipe,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
         )
+
         pipe_llm_output = await get_pipe_router().run(pipe_job=pipe_job)
+
+        pretty_print(pipe_llm_output, title="pipe_llm_dzqdzqoutput")
 
         # Log test information
         log.verbose(f"Testing {topic} with {structuring_method} method", title="Test Case")
@@ -149,6 +157,7 @@ class TestPipeLLMBasic:
     @pytest.mark.parametrize(("stuff", "attribute_paths"), PipeTestCases.STUFFS_IMAGE_ATTRIBUTES)
     async def test_pipe_llm_attribute_image(
         self,
+        job_metadata: JobMetadata,
         stuff: Stuff,
         attribute_paths: list[str],
         pipe_run_mode: PipeRunMode,
@@ -160,14 +169,15 @@ class TestPipeLLMBasic:
             if not stuff_name:
                 pytest.fail(f"Cannot use nameless stuff in this test: {stuff}")
             working_memory = WorkingMemoryFactory.make_from_single_stuff(stuff=stuff)
+            # Build prompt dynamically to include the input variable reference
+            prompt_with_input = f"Here is the input: ${stuff_name}\n{PipeTestCases.MULTI_IMG_DESC_PROMPT}"
             pipe_llm_blueprint = PipeLLMBlueprint(
                 description="LLM test for image processing with attributes",
-                inputs={stuff_name: stuff.concept.concept_string},
+                inputs={stuff_name: "native.Image"},
                 output=NativeConceptCode.TEXT,
                 system_prompt=PipeTestCases.SYSTEM_PROMPT,
-                prompt=PipeTestCases.MULTI_IMG_DESC_PROMPT,
+                prompt=prompt_with_input,
             )
-
             pipe_job = PipeJobFactory.make_pipe_job(
                 working_memory=working_memory,
                 pipe=PipeFactory[PipeLLM].make_from_blueprint(
@@ -176,6 +186,7 @@ class TestPipeLLMBasic:
                     blueprint=pipe_llm_blueprint,
                 ),
                 pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+                job_metadata=job_metadata,
             )
 
             pipe_llm_output = await get_pipe_router().run(

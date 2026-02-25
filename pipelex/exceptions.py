@@ -1,4 +1,3 @@
-from pipelex.client.exceptions import ClientAuthenticationError
 from pipelex.core.concepts.exceptions import (
     ConceptCodeError,
     ConceptError,
@@ -22,7 +21,7 @@ from pipelex.core.pipes.exceptions import (
     PipeOperatorModelChoiceError,
     PipeValidationError,
 )
-from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
 from pipelex.core.stuffs.exceptions import (
     StuffArtefactError,
     StuffArtefactReservedFieldError,
@@ -46,20 +45,18 @@ from pipelex.pipeline.exceptions import (
     PipelineExecutionError,
     PipeStackOverflowError,
 )
-from pipelex.pipeline.track.exceptions import JobHistoryError
 from pipelex.system.exceptions import (
     ConfigModelError,
     ConfigValidationError,
     CredentialsError,
     FatalError,
+    MissingDependencyError,
     NestedKeyConflictError,
     ToolError,
     TracebackMessageError,
 )
 
 __all__ = [
-    # from pipelex.client.exceptions
-    "ClientAuthenticationError",
     # from pipelex.core.domains.exceptions
     "DomainCodeError",
     # from pipelex.core.concepts.exceptions
@@ -91,7 +88,7 @@ __all__ = [
     "PipeRouterError",
     "PipeRunError",
     # from pipelex.core.pipes.exceptions
-    "PipeInputNotFoundError",
+    "InputStuffSpecNotFoundError",
     "PipeFactoryError",
     "PipeOperatorModelChoiceError",
     # from pipelex.core.stuffs.exceptions
@@ -113,14 +110,13 @@ __all__ = [
     "PipeStackOverflowError",
     "PipelineExecutionError",
     "PipeExecutionError",
-    # from pipelex.pipeline.track.exceptions
-    "JobHistoryError",
     # from pipelex.system.exceptions
     "ToolError",
     "NestedKeyConflictError",
     "CredentialsError",
     "TracebackMessageError",
     "FatalError",
+    "MissingDependencyError",
     "ConfigValidationError",
     "ConfigModelError",
 ]

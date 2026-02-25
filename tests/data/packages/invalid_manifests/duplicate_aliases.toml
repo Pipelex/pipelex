@@ -1,0 +1,7 @@
+[package]
+address = "github.com/org/repo"
+version = "1.0.0"
+description = "Test package with duplicate aliases"
+
+[dependencies]
+my_dep = { address = "github.com/org/dep1", version = "1.0.0" }

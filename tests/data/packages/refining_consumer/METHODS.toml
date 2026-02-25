@@ -1,0 +1,10 @@
+[package]
+address = "github.com/mthds/refining-app"
+version = "1.0.0"
+description = "Consumer with concept that refines a cross-package concept"
+
+[dependencies]
+scoring_dep = { address = "github.com/mthds/scoring-lib", version = "2.0.0", path = "../scoring_dep" }
+
+[exports.pkg_test_refining]
+pipes = ["pkg_test_refine_score"]

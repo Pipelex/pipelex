@@ -5,11 +5,54 @@ from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
 from pipelex.cogt.llm.llm_setting import LLMModelChoice
 from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.models.model_reference import ModelReference
 from pipelex.types import StrEnum
 
 
+class PipeFactoryErrorType(StrEnum):
+    """Types of pipe factory errors.
+
+    These error types are raised during pipe creation from blueprints.
+    Some are auto-fixed in the builder loop (marked below).
+    """
+
+    # Errors that are auto-fixed in builder_loop.py
+    UNKNOWN_CONCEPT = "unknown_concept"  # AUTO-FIXED: concept not declared in domain
+
+    # Generic fallback for unexpected factory errors
+    UNKNOWN_FACTORY_ERROR = "unknown_factory_error"
+
+
 class PipeFactoryError(PipelexError):
-    pass
+    """Raised when a pipe cannot be created from a blueprint.
+
+    This error includes structured data about the failure, particularly useful
+    for missing concept errors that can be auto-fixed by the builder loop.
+
+    Attributes:
+        message: Human-readable error message
+        error_type: The type of factory error
+        pipe_code: The pipe code that failed to be created
+        domain: The domain of the pipe
+        missing_concept_code: The concept code that is missing (for MISSING_OUTPUT_CONCEPT errors)
+        declared_concepts: List of concepts declared in the domain
+    """
+
+    def __init__(
+        self,
+        message: str,
+        error_type: PipeFactoryErrorType = PipeFactoryErrorType.UNKNOWN_FACTORY_ERROR,
+        pipe_code: str | None = None,
+        domain_code: str | None = None,
+        missing_concept_code: str | None = None,
+        declared_concepts: list[str] | None = None,
+    ):
+        self.error_type = error_type
+        self.pipe_code = pipe_code
+        self.domain_code = domain_code
+        self.missing_concept_code = missing_concept_code
+        self.declared_concepts = declared_concepts or []
+        super().__init__(message)
 
 
 class PipeVariableMultiplicityError(ValueError):
@@ -38,8 +81,11 @@ class PipeOperatorModelChoiceError(PipelexError):
 
         # Extract the choice identifier from the model_choice union type
         if isinstance(self.model_choice, str):
-            # It's a preset/alias string
+            # It's a raw string (shouldn't happen but handle it)
             msg += f" • choice='{self.model_choice}'"
+        elif isinstance(self.model_choice, ModelReference):
+            # It's a ModelReference with kind and name
+            msg += f" • choice='{self.model_choice.raw}' ({self.model_choice.kind})"
         else:
             # It's a Setting object with a model field and optional desc()
             msg += f" • choice={self.model_choice.desc()}"
@@ -61,14 +107,17 @@ class PipeValidationErrorType(StrEnum):
     # Errors that are auto-fixed in builder_loop.py
     MISSING_INPUT_VARIABLE = "missing_input_variable"  # AUTO-FIXED
     EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"  # AUTO-FIXED
-    INPUT_REQUIREMENT_MISMATCH = "input_requirement_mismatch"  # AUTO-FIXED
+    INPUT_STUFF_SPEC_MISMATCH = "input_stuff_spec_mismatch"  # AUTO-FIXED
     INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"  # AUTO-FIXED
+    INADEQUATE_OUTPUT_MULTIPLICITY = "inadequate_output_multiplicity"  # AUTO-FIXED
 
     CIRCULAR_DEPENDENCY_ERROR = "circular_dependency_error"
 
     # Errors that are raised but NOT auto-fixed (will fail validation)
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE = "img_gen_input_not_text_compatible"
+    INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"
+    BATCH_ITEM_NAME_COLLISION = "batch_item_name_collision"
 
     # Generic fallback for unexpected validation errors
     UNKNOWN_VALIDATION_ERROR = "unknown_validation_error"
@@ -79,7 +128,7 @@ class PipeValidationError(ValueError):
         self,
         message: str,
         error_type: PipeValidationErrorType | None = None,
-        domain: str | None = None,
+        domain_code: str | None = None,
         pipe_code: str | None = None,
         variable_names: list[str] | None = None,
         required_concept_codes: list[str] | None = None,
@@ -88,7 +137,7 @@ class PipeValidationError(ValueError):
         explanation: str | None = None,
     ):
         self.error_type = error_type
-        self.domain = domain
+        self.domain_code = domain_code
         self.pipe_code = pipe_code
         self.variable_names = variable_names
         self.required_concept_codes = required_concept_codes
@@ -98,7 +147,7 @@ class PipeValidationError(ValueError):
         super().__init__(message)
 
     def desc(self) -> str:
-        msg = f"{self.error_type} • domain='{self.domain}'"
+        msg = f"{self.error_type} • domain_code='{self.domain_code}'"
         if self.pipe_code:
             msg += f" • pipe='{self.pipe_code}'"
         if self.variable_names:

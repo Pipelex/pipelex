@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from rich.console import Group
 from rich.text import Text
 from typing_extensions import override
@@ -8,6 +8,7 @@ from typing_extensions import override
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
+from pipelex.types import Self
 
 
 class PipeBatchSpec(PipeSpec):
@@ -23,6 +24,8 @@ class PipeBatchSpec(PipeSpec):
           And the concept corresponding to that input list must be multiple, using the [] notation,
           i.e. something like "Ideas[]" or "Images[]".
         - input_item_name is typically the singular noun corresponding to the items in the list, like "idea" or "image".
+        - input_item_name must NOT be the same as input_list_name.
+        - input_item_name must NOT match any key in the inputs dict.
 
     """
 
@@ -31,10 +34,41 @@ class PipeBatchSpec(PipeSpec):
     branch_pipe_code: str = Field(
         description="The pipe code to execute for each item in the input list. This pipe is instantiated once per item in parallel."
     )
-    input_list_name: str = Field(description="Name of the list in WorkingMemory to iterate over, if needed.")
-    input_item_name: str = Field(
-        description="Name assigned to individual items within each execution branch. This is how the branch pipe accesses its specific input item.",
+    input_list_name: str = Field(
+        description=(
+            "Name of the list in WorkingMemory to iterate over. "
+            "Typically a plural noun (e.g., 'items', 'reports'). "
+            "Must match one of the keys in the inputs dict."
+        ),
     )
+    input_item_name: str = Field(
+        description=(
+            "Name assigned to individual items within each execution branch. "
+            "Typically the singular form of input_list_name (e.g., 'item', 'report'). "
+            "Must NOT be the same as input_list_name or any key in the inputs dict."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def validate_input_names(self) -> Self:
+        """Validate that input_item_name does not collide with input_list_name or inputs keys."""
+        if self.input_item_name == self.input_list_name:
+            msg = (
+                f"input_item_name '{self.input_item_name}' must not be the same as input_list_name "
+                f"'{self.input_list_name}'. The list name should be plural (e.g., 'reports') and "
+                f"the item name should be the singular form (e.g., 'report')."
+            )
+            raise ValueError(msg)
+        if self.inputs and self.input_item_name in self.inputs:
+            msg = (
+                f"input_item_name '{self.input_item_name}' must not be the same as any key in inputs "
+                f"(found in: {list(self.inputs.keys())}). "
+                f"The input_item_name is injected into the branch pipe for each iteration "
+                f"and must be distinct from the batch pipe's own input names. "
+                f"Use the singular form of the list name (e.g., 'reports' → 'report')."
+            )
+            raise ValueError(msg)
+        return self
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

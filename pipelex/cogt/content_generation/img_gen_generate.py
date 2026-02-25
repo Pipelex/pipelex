@@ -1,11 +1,11 @@
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
 from pipelex.hub import get_img_gen_worker
 
 
-async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImage:
+async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImageRawDetails:
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)
     img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
         img_gen_prompt=img_gen_assignment.img_gen_prompt,
@@ -18,7 +18,7 @@ async def img_gen_single_image(img_gen_assignment: ImgGenAssignment) -> Generate
     return generated_image
 
 
-async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[GeneratedImage]:
+async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[GeneratedImageRawDetails]:
     img_gen_worker = get_img_gen_worker(img_gen_handle=img_gen_assignment.img_gen_handle)
     img_gen_job = ImgGenJobFactory.make_img_gen_job_from_prompt(
         img_gen_prompt=img_gen_assignment.img_gen_prompt,
@@ -34,7 +34,7 @@ async def img_gen_image_list(img_gen_assignment: ImgGenAssignment) -> list[Gener
     return generated_image_list
 
 
-async def img_gen_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImage | list[GeneratedImage]:
+async def img_gen_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImageRawDetails | list[GeneratedImageRawDetails]:
     if img_gen_assignment.nb_images > 1:
         return await img_gen_image_list(img_gen_assignment)
     return await img_gen_single_image(img_gen_assignment)

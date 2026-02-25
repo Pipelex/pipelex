@@ -16,7 +16,7 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 class PipeSequenceSpec(PipeSpec):
     """PipeSequenceSpec orchestrates the execution of multiple pipes in a defined order,
     where each pipe's output can be used as input for subsequent pipes. This enables
-    building complex data processing workflows with step-by-step transformations.
+    building powerful methods with step-by-step transformations.
     """
 
     type: SkipJsonSchema[Literal["PipeSequence"]] = "PipeSequence"

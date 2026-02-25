@@ -21,3 +21,11 @@ class ComplexUser(BaseModel):
     addresses: list[Address]
     preferences: UserPreferences
     metadata: dict[str, str | int | bool] = Field(default_factory=dict)
+
+
+class ImageData(BaseModel):
+    """Model with base64 image data for testing truncation."""
+
+    name: str
+    base_64: str
+    url: str | None = None

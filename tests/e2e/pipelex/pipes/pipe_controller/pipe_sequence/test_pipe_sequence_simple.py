@@ -20,7 +20,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 @pytest.mark.inference
 @pytest.mark.asyncio
 class TestPipeSequenceSimple:
-    async def test_simple_text_sequence(self, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
+    async def test_simple_text_sequence(self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]):
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence/")])
         """Test simple text processing sequence without batching."""
         # Create test input
@@ -28,7 +28,7 @@ class TestPipeSequenceSimple:
             name="raw_text",
             concept=ConceptFactory.make(
                 concept_code="RawText",
-                domain="simple_text_processing",
+                domain_code="simple_text_processing",
                 description="simple_text_processing.RawText",
                 structure_class_name="TextContent",
             ),
@@ -40,7 +40,7 @@ class TestPipeSequenceSimple:
 
         pipe = get_required_pipe(pipe_code="simple_text_sequence")
         pipe_output = await pipe.run_pipe(
-            job_metadata=JobMetadata(job_name="test_simple_text_sequence"),
+            job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -50,4 +50,4 @@ class TestPipeSequenceSimple:
         assert pipe_output.working_memory is not None
         assert pipe_output.main_stuff is not None
         assert pipe_output.main_stuff.concept.code == "SummaryText"
-        assert pipe_output.main_stuff.concept.domain == "simple_text_processing"
+        assert pipe_output.main_stuff.concept.domain_code == "simple_text_processing"

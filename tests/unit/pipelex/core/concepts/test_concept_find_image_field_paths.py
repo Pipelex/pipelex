@@ -60,7 +60,7 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
     # Create and register concepts
     concepts_to_register: list[Concept] = [
         ConceptFactory.make(
-            domain=TestData.DOMAIN,
+            domain_code=TestData.DOMAIN,
             concept_code=code,
             description=description,
             structure_class_name=structure_class_name,
@@ -76,8 +76,8 @@ def register_test_concepts(load_test_library: Callable[[list[Path]], None]):
     yield
 
     # Cleanup: Remove test concepts from library
-    concept_strings = [concept.concept_string for concept in concepts_to_register]
-    concept_library.remove_concepts_by_concept_strings(concept_strings)
+    concept_refs = [concept.concept_ref for concept in concepts_to_register]
+    concept_library.remove_concepts_by_concept_refs(concept_refs)
 
 
 class TestConceptFindImageFieldPaths:

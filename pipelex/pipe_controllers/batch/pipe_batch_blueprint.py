@@ -2,6 +2,7 @@ from typing import Literal
 
 from typing_extensions import override
 
+from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
 
 
@@ -29,9 +30,31 @@ class PipeBatchBlueprint(PipeBlueprint):
         if not self.input_item_name:
             msg = "Empty input item name is not allowed"
             raise ValueError(msg)
+        # Specialization: catch the most common mistake (item name == list name) with a targeted message
+        if self.input_item_name == self.input_list_name:
+            msg = (
+                f"Input item name '{self.input_item_name}' must not be the same as "
+                f"input list name '{self.input_list_name}'. "
+                f"Use a plural for the list and its singular form for the item "
+                f"(e.g., list 'reports' → item 'report')."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION,
+            )
+        # General guard: item name must not collide with any other input key either
+        # (e.g. a batch pipe with inputs {"items": "Item[]", "context": "Text"} must not use "context" as item name)
         if self.input_item_name in self.inputs:
-            msg = f"Input item name '{self.input_item_name}' found in inputs: {self.inputs}"
-            raise ValueError(msg)
+            msg = (
+                f"Input item name '{self.input_item_name}' must not be the same as any key in inputs: "
+                f"{self.inputs}. The input_item_name is injected into the branch pipe for each iteration. "
+                f"Use the singular form of the list name "
+                f"(e.g., list 'reports' → item 'report')."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.BATCH_ITEM_NAME_COLLISION,
+            )
 
     @override
     def validate_output(self):

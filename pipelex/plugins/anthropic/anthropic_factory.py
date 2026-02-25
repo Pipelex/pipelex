@@ -1,35 +1,28 @@
-import asyncio
+import math
 from typing import TYPE_CHECKING
 
 from anthropic import AsyncAnthropic, AsyncAnthropicBedrock
 from anthropic.types import Usage
+from anthropic.types.document_block_param import DocumentBlockParam
+from anthropic.types.image_block_param import ImageBlockParam
 from anthropic.types.message_param import MessageParam
 from openai.types.chat import (
     ChatCompletionMessageParam,
     ChatCompletionSystemMessageParam,
 )
 
+from pipelex.cogt.document.prompt_document_utils import prep_prompt_documents
 from pipelex.cogt.exceptions import CogtError
-from pipelex.cogt.image.prompt_image import (
-    PromptImage,
-    PromptImageBase64,
-    PromptImagePath,
-    PromptImageTypedBase64,
-    PromptImageTypedUrlOrBase64,
-    PromptImageUrl,
-)
-from pipelex.cogt.image.prompt_image_factory import PromptImageFactory
+from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.misc.base_64_utils import load_binary_as_base64_async
-from pipelex.tools.misc.filetype_utils import detect_file_type_from_base64
+from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
-    from anthropic.types.image_block_param import ImageBlockParam
     from anthropic.types.text_block_param import TextBlockParam
 
 
@@ -69,49 +62,88 @@ class AnthropicFactory:
                     aws_region=aws_region,
                 )
 
+    @staticmethod
+    def _make_image_block_param(prepped_image: PreparedFile) -> ImageBlockParam:
+        """Convert a PreparedFile to an Anthropic ImageBlockParam."""
+        image_block_param: ImageBlockParam
+        match prepped_image:
+            case PreparedFileBase64():
+                image_block_param = {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": prepped_image.mime_type,  # type: ignore[typeddict-item]
+                        "data": prepped_image.base64_data,
+                    },  # pyright: ignore[reportAssignmentType]
+                }
+            case PreparedFileHttpUrl():
+                image_block_param = {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": prepped_image.url,
+                    },
+                }
+            case PreparedFileLocalPath():
+                msg = "PreparedFileLocalPath is not supported for images - should be converted to base64"
+                raise TypeError(msg)
+        return image_block_param
+
+    @staticmethod
+    def _make_document_block_param(prepped_document: PreparedFile, title: str | None = None) -> DocumentBlockParam:
+        """Convert a PreparedFile to an Anthropic DocumentBlockParam."""
+        document_block_param: DocumentBlockParam
+        match prepped_document:
+            case PreparedFileBase64():
+                source_dict: dict[str, str] = {
+                    "type": "base64",
+                    "media_type": prepped_document.mime_type,
+                    "data": prepped_document.base64_data,
+                }
+                document_block_param = {
+                    "type": "document",
+                    "source": source_dict,  # type: ignore[typeddict-item]
+                }  # pyright: ignore[reportAssignmentType]
+                if title:
+                    document_block_param["title"] = title
+            case PreparedFileHttpUrl():
+                document_block_param = {
+                    "type": "document",
+                    "source": {
+                        "type": "url",
+                        "url": prepped_document.url,
+                    },
+                }  # pyright: ignore[reportAssignmentType]
+                if title:
+                    document_block_param["title"] = title
+            case PreparedFileLocalPath():
+                msg = "PreparedFileLocalPath is not supported for documents - should be converted to base64"
+                raise TypeError(msg)
+        return document_block_param
+
     @classmethod
     async def make_user_message(
         cls,
         llm_job: LLMJob,
     ) -> MessageParam:
         message: MessageParam
-        content: list[TextBlockParam | ImageBlockParam] = []
+        content: list[TextBlockParam | ImageBlockParam | DocumentBlockParam] = []
+        llm_prompt = llm_job.llm_prompt
 
-        if llm_job.llm_prompt.user_text:
+        if user_text := llm_prompt.user_text:
             text_block_param: TextBlockParam = {
                 "type": "text",
-                "text": llm_job.llm_prompt.user_text,
+                "text": user_text,
             }
             content.append(text_block_param)
-        if llm_job.llm_prompt.user_images:
-            tasks_to_prep_images = [cls._prep_image_for_anthropic(prompt_image) for prompt_image in llm_job.llm_prompt.user_images]
-            prepped_user_images = await asyncio.gather(*tasks_to_prep_images)
-            # images_block_params: List[ImageBlockParam] = []
+        if llm_prompt.user_images:
+            prepped_user_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=False)
             for prepped_image in prepped_user_images:
-                image_block_param: ImageBlockParam
-                if isinstance(prepped_image, PromptImageTypedBase64):
-                    mime = prepped_image.file_type.mime
-                    image_block_param = {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": mime,  # type: ignore[typeddict-item]
-                            "data": prepped_image.base_64.decode("utf-8"),
-                        },  # pyright: ignore[reportAssignmentType]
-                    }
-                elif isinstance(prepped_image, str):  # pyright: ignore[reportUnnecessaryIsInstance]
-                    url = prepped_image
-                    image_block_param = {
-                        "type": "image",
-                        "source": {
-                            "type": "url",
-                            "url": url,
-                        },
-                    }
-                else:
-                    msg = f"Unsupported PromptImageTypedBytesOrUrl type: '{type(prepped_image).__name__}'"
-                    raise AnthropicFactoryError(msg)
-                content.append(image_block_param)
+                content.append(cls._make_image_block_param(prepped_image))
+        if llm_prompt.user_documents:
+            prepped_user_documents = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
+            for prepped_document in prepped_user_documents:
+                content.append(cls._make_document_block_param(prepped_document))
 
         message = {
             "role": "user",
@@ -121,74 +153,34 @@ class AnthropicFactory:
         return message
 
     # This creates a MessageParam disguised as a ChatCompletionMessageParam to please instructor type checking
-    @staticmethod
+    @classmethod
     def openai_typed_user_message(
+        cls,
         user_content_txt: str,
-        prepped_user_images: list[PromptImageTypedUrlOrBase64] | None = None,
+        prepped_user_images: list[PreparedFile] | None = None,
+        prepped_user_documents: list[tuple[PreparedFile, str | None]] | None = None,
     ) -> ChatCompletionMessageParam:
         text_block_param: TextBlockParam = {"type": "text", "text": user_content_txt}
         message: MessageParam
+
+        content: list[TextBlockParam | ImageBlockParam | DocumentBlockParam] = []
+
         if prepped_user_images is not None:
-            images_block_params: list[ImageBlockParam] = []
             for prepped_image in prepped_user_images:
-                image_block_param_in_loop: ImageBlockParam
-                if isinstance(prepped_image, PromptImageTypedBase64):
-                    mime = prepped_image.file_type.mime
-                    image_block_param_in_loop = {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": mime,  # type: ignore[typeddict-item]
-                            "data": prepped_image.base_64.decode("utf-8"),
-                        },  # pyright: ignore[reportAssignmentType]
-                    }
-                elif isinstance(prepped_image, str):  # pyright: ignore[reportUnnecessaryIsInstance]
-                    url = prepped_image
-                    image_block_param_in_loop = {
-                        "type": "image",
-                        "source": {
-                            "type": "url",
-                            "url": url,
-                        },
-                    }
-                else:
-                    msg = f"Unsupported PromptImageTypedBytesOrUrl type: '{type(prepped_image).__name__}'"
-                    raise AnthropicFactoryError(msg)
-                images_block_params.append(image_block_param_in_loop)
+                content.append(cls._make_image_block_param(prepped_image))
 
-            content: list[TextBlockParam | ImageBlockParam] = [*images_block_params, text_block_param]
-            message = {
-                "role": "user",
-                "content": content,
-            }
+        if prepped_user_documents is not None:
+            for prepped_document, title in prepped_user_documents:
+                content.append(cls._make_document_block_param(prepped_document, title=title))
 
-        else:
-            message = {
-                "role": "user",
-                "content": [text_block_param],
-            }
+        content.append(text_block_param)
+
+        message = {
+            "role": "user",
+            "content": content,
+        }
 
         return message  # type: ignore[return-value, valid-type] # pyright: ignore[reportReturnType]
-
-    @classmethod
-    async def _prep_image_for_anthropic(
-        cls,
-        prompt_image: PromptImage,
-    ) -> PromptImageTypedUrlOrBase64:
-        typed_bytes_or_url: PromptImageTypedUrlOrBase64
-        if isinstance(prompt_image, PromptImageBase64):
-            typed_bytes_or_url = prompt_image.make_prompt_image_typed_base64()
-        elif isinstance(prompt_image, PromptImageUrl):
-            image_bytes = await PromptImageFactory.make_promptimagebase64_from_url_async(prompt_image)
-            file_type = detect_file_type_from_base64(image_bytes.base_64)
-            typed_bytes_or_url = PromptImageTypedBase64(base_64=image_bytes.base_64, file_type=file_type)
-        elif isinstance(prompt_image, PromptImagePath):
-            b64 = await load_binary_as_base64_async(prompt_image.file_path)
-            typed_bytes_or_url = PromptImageTypedBase64(base_64=b64, file_type=prompt_image.get_file_type())
-        else:
-            msg = f"Unsupported PromptImage type: '{type(prompt_image).__name__}'"
-            raise AnthropicFactoryError(msg)
-        return typed_bytes_or_url
 
     @classmethod
     async def make_simple_messages(
@@ -198,22 +190,28 @@ class AnthropicFactory:
         """Makes a list of messages with a system message (if provided) and followed by a user message."""
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
-        # System message ####
         if system_content := llm_prompt.system_text:
             messages.append(ChatCompletionSystemMessageParam(role="system", content=system_content))
 
-        prepped_user_images: list[PromptImageTypedUrlOrBase64] | None
+        prepped_user_images: list[PreparedFile] | None
         if llm_prompt.user_images:
-            tasks_to_prep_images = [cls._prep_image_for_anthropic(prompt_image) for prompt_image in llm_prompt.user_images]
-            prepped_user_images = await asyncio.gather(*tasks_to_prep_images)
+            prepped_user_images = await prep_prompt_images(prompt_images=llm_prompt.user_images, is_http_url_enabled=False)
         else:
             prepped_user_images = None
 
+        prepped_user_documents: list[tuple[PreparedFile, str | None]] | None
+        if llm_prompt.user_documents:
+            prepped_docs = await prep_prompt_documents(prompt_documents=llm_prompt.user_documents, is_http_url_enabled=False)
+            prepped_user_documents = [(prepped_doc, None) for prepped_doc in prepped_docs]
+        else:
+            prepped_user_documents = None
+
         # Concatenation ####
         messages.append(
-            AnthropicFactory.openai_typed_user_message(
+            cls.openai_typed_user_message(
                 user_content_txt=llm_prompt.user_text or "",
                 prepped_user_images=prepped_user_images,
+                prepped_user_documents=prepped_user_documents,
             ),
         )
         return messages
@@ -233,3 +231,12 @@ class AnthropicFactory:
             TokenCategory.OUTPUT: nb_output,
         }
         return nb_tokens_by_category
+
+    @staticmethod
+    def calculate_safe_max_tokens_for_timeout(timeout_seconds: int) -> int:
+        """Calculate max_tokens that won't trigger SDK timeout protection.
+
+        Formula: max_tokens = timeout_seconds * 128000 / 3600
+        Based on SDK heuristic: expected_time_seconds = 3600 * max_tokens / 128000
+        """
+        return math.floor(timeout_seconds * 128000 / 3600)

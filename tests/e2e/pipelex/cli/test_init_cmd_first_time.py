@@ -6,14 +6,16 @@ from typing import TYPE_CHECKING
 import pytest
 import typer
 
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
-
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestFirstTimeInitialization:
@@ -23,23 +25,23 @@ class TestFirstTimeInitialization:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_empty_dir()
 
-        # User inputs: confirm, default backend (1), telemetry OFF (1)
-        env.add_confirm_input(True)
-        env.add_prompt_input("1")  # Default: pipelex_inference
-        env.add_prompt_input("1")  # Telemetry: OFF
+        # User inputs: confirm init, default backend (1), accept gateway terms
+        env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service
+        env.add_prompt_input("1")  # Default: pipelex_gateway
 
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify
         env.verify_file_exists("pipelex.toml")
         env.verify_file_exists("inference/backends.toml")
         env.verify_file_exists("inference/routing_profiles.toml")
         env.verify_file_exists("telemetry.toml")
-        env.verify_backends_enabled(["pipelex_inference"])
-        env.verify_routing("pipelex_first")
+        env.verify_backends_enabled([PipelexBackend.GATEWAY])
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
         env.verify_telemetry("off")
 
     def test_init_with_multiple_backends_and_routing(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -58,12 +60,11 @@ class TestFirstTimeInitialization:
         env.add_prompt_input(indices_str)  # Select 3 backends
         env.add_prompt_input("1")  # Primary: first one (anthropic)
         env.add_prompt_input("2,1")  # Custom fallback order (mistral, anthropic)
-        env.add_prompt_input("2")  # Telemetry: ANONYMOUS
 
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends
         env.verify_backends_enabled(["openai", "anthropic", "mistral"])
@@ -71,8 +72,8 @@ class TestFirstTimeInitialization:
         # Verify custom routing
         env.verify_routing("custom_routing", expected_default="anthropic")
 
-        # Verify telemetry
-        env.verify_telemetry("anonymous")
+        # Verify telemetry (default mode from template)
+        env.verify_telemetry("off")
 
     def test_init_with_all_backends(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 1.3: Initialization with all backends."""
@@ -82,13 +83,13 @@ class TestFirstTimeInitialization:
 
         # User inputs
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service (since all includes gateway)
         env.add_prompt_input("all")  # Select all backends
-        env.add_prompt_input("1")  # Telemetry: OFF
 
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify all backends are enabled
         toml_doc = load_toml_with_tomlkit(str(env.inference_dir / "backends.toml"))
@@ -96,8 +97,8 @@ class TestFirstTimeInitialization:
             if backend_key != "internal":
                 assert toml_doc[backend_key]["enabled"] is True  # type: ignore[index]
 
-        # Verify routing (pipelex_first since pipelex_inference is included)
-        env.verify_routing("pipelex_first")
+        # Verify routing (all_pipelex_gateway since pipelex_gateway is included)
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
 
     def test_cancel_at_backend_selection(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 1.4: Cancel at backend selection."""
@@ -113,7 +114,7 @@ class TestFirstTimeInitialization:
 
         # Execute - may raise an exit exception on cancellation
         try:
-            init_cmd(focus=InitFocus.ALL, reset=False)
+            init_cmd(focus=InitFocus.ALL)
         except (typer.Exit, SystemExit):
             # Expected: user quit at backend selection
             pass
@@ -121,9 +122,9 @@ class TestFirstTimeInitialization:
         # Verify config files were created but backends remain in template state
         env.verify_file_exists("inference/backends.toml")
 
-        # Verify pipelex_inference is still enabled (default template state)
+        # Verify pipelex_gateway is still enabled (default template state)
         toml_doc = load_toml_with_tomlkit(str(env.inference_dir / "backends.toml"))
-        assert toml_doc["pipelex_inference"]["enabled"] is True  # type: ignore[index]
+        assert toml_doc[PipelexBackend.GATEWAY]["enabled"] is True  # type: ignore[index]
 
     def test_cancel_at_initialization_confirmation(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test Case 1.5: Cancel at initialization confirmation."""
@@ -138,7 +139,7 @@ class TestFirstTimeInitialization:
 
         # Execute - should raise typer.Exit
         with pytest.raises(typer.Exit):
-            init_cmd(focus=InitFocus.ALL, reset=False)
+            init_cmd(focus=InitFocus.ALL)
 
         # Verify no files were created
         env.verify_file_not_exists("pipelex.toml")

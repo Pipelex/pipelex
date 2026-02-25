@@ -1,9 +1,10 @@
+from typing import Any
+
 from pydantic import ValidationError
 from pydantic_core import ErrorDetails
 
-from pipelex.core.exceptions import PipesAndConceptValidationErrorData
-from pipelex.core.interpreter.validation_error_categorizer import ErrorCatKey
-from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
+from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
+from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError, PipeValidationErrorType
 from pipelex.types import StrEnum
 
 
@@ -14,13 +15,42 @@ class ModelScope(StrEnum):
     CONCEPT = "concept"
 
 
+def _extract_wrapped_pipe_validation_error(error: ErrorDetails) -> PipeValidationError | None:
+    """Extract a wrapped PipeValidationError from a pydantic error if present.
+
+    When a PipeValidationError is raised inside a model validator, pydantic wraps it.
+    This function attempts to extract the original PipeValidationError from the error context.
+
+    Args:
+        error: Pydantic error details that may contain a wrapped PipeValidationError
+
+    Returns:
+        The original PipeValidationError if found, None otherwise
+    """
+    # Check if the error type indicates a value_error (which wraps exceptions from validators)
+    error_type = error["type"]
+    if error_type != "value_error":
+        return None
+
+    # Check if there's a context with the original error
+    ctx: dict[str, Any] | None = error.get("ctx")
+    if ctx:
+        # Pydantic may store the original exception in ctx["error"]
+        original_error = ctx.get("error")
+        if isinstance(original_error, PipeValidationError):
+            return original_error
+
+    return None
+
+
 def categorize_pipe_validation_error(
     validation_error: ValidationError,
 ) -> list[PipesAndConceptValidationErrorData]:
     """Categorize all errors from a ValidationError for Pipe instantiation.
 
     This function determines the model scope (PIPE or CONCEPT) from the ValidationError
-    and processes all errors accordingly.
+    and processes all errors accordingly. It also detects wrapped PipeValidationError
+    exceptions that were raised inside model validators.
 
     Args:
         validation_error: Pydantic ValidationError from Pipe model validation
@@ -37,7 +67,7 @@ def categorize_pipe_validation_error(
     if errors:
         # Check first error's field name to determine model type
         first_error = errors[0]
-        loc = first_error.get(ErrorCatKey.LOC.value, ())
+        loc = first_error["loc"]
         # TODO: Refactor how to determine model scope (use error codes)
         if loc:
             field_name = str(loc[0])
@@ -56,19 +86,23 @@ def categorize_pipe_validation_error(
     # Process all errors
     categorized_errors: list[PipesAndConceptValidationErrorData] = []
     for error in errors:
-        if model_scope == ModelScope.PIPE:
+        # First, check if this is a wrapped PipeValidationError
+        wrapped_pipe_error = _extract_wrapped_pipe_validation_error(error)
+        if wrapped_pipe_error:
+            categorized_error = categorize_pipe_validation_with_libraries_error(pipe_error=wrapped_pipe_error)
+        elif model_scope == ModelScope.PIPE:
             categorized_error = _handle_pipe_errors(
                 error=error,
                 pipe_code=None,  # We don't have the code at this point
             )
         else:
-            loc = error.get(ErrorCatKey.LOC.value, ())
-            message = error.get(ErrorCatKey.MSG.value, "Unknown validation error")
+            loc = error["loc"]
+            message = error["msg"]
             field_path_str = " → ".join(str(item) for item in loc)
             unknown_field_name = str(loc[0]) if len(loc) >= 1 else None
 
             categorized_error = PipesAndConceptValidationErrorData(
-                domain=None,
+                domain_code=None,
                 source=None,
                 pipe_code=None,
                 concept_code=None,  # We don't have the code at this point
@@ -98,9 +132,9 @@ def _handle_pipe_errors(
         PipesAndConceptValidationErrorData with all context populated
     """
     # Extract data from error
-    loc = error.get(ErrorCatKey.LOC.value, ())
-    message = error.get(ErrorCatKey.MSG.value, "Unknown validation error")
-    pydantic_type = error.get(ErrorCatKey.TYPE.value, "")
+    loc = error["loc"]
+    message = error["msg"]
+    pydantic_type = error["type"]
     field_path = " → ".join(str(item) for item in loc)
 
     # Extract field_name from loc[0] (direct field on Pipe model)
@@ -123,7 +157,7 @@ def _handle_pipe_errors(
         error_type = PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
 
     return PipesAndConceptValidationErrorData(
-        domain=None,
+        domain_code=None,
         source=None,
         pipe_code=pipe_code,
         concept_code=None,
@@ -153,12 +187,35 @@ def categorize_pipe_validation_with_libraries_error(
     error_type = pipe_error.error_type or PipeValidationErrorType.UNKNOWN_VALIDATION_ERROR
     return PipesAndConceptValidationErrorData(
         error_type=error_type,
-        domain=pipe_error.domain,
-        source=pipe_error.file_path or None,
+        domain_code=pipe_error.domain_code,
+        source=pipe_error.file_path,
         pipe_code=pipe_error.pipe_code,
         concept_code=None,  # This is a pipe error, not a concept error
         field_name=None,  # Field name is not provided in PipeValidationError
         message=message,
         field_path=pipe_error.file_path or "",
         variable_names=pipe_error.variable_names,
+    )
+
+
+def categorize_pipe_factory_error(
+    factory_error: PipeFactoryError,
+) -> PipeFactoryErrorData:
+    """Categorize a PipeFactoryError and create structured error data.
+
+    This function handles errors from PipeFactory, particularly missing concept errors.
+
+    Args:
+        factory_error: PipeFactoryError with structured error information
+
+    Returns:
+        PipeFactoryErrorData with all relevant fields populated
+    """
+    return PipeFactoryErrorData(
+        error_type=factory_error.error_type,
+        domain_code=factory_error.domain_code,
+        pipe_code=factory_error.pipe_code,
+        missing_concept_code=factory_error.missing_concept_code,
+        declared_concepts=factory_error.declared_concepts,
+        message=factory_error.message,
     )

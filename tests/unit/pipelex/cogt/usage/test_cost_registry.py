@@ -10,16 +10,14 @@ from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.pipeline.pipeline_models import SpecialPipelineId
 
 
 class TestCostRegistry:
     """Test CostRegistry methods without pandas dependency."""
 
-    def test_to_records(self):
+    def test_to_records(self, job_metadata: JobMetadata):
         """Test conversion from CostRegistry to list of flat dictionaries."""
         # Create a simple cost report
-        job_metadata = JobMetadata(pipeline_run_id=SpecialPipelineId.UNTITLED)
         llm_tokens_usage = LLMTokensUsage(
             job_metadata=job_metadata,
             inference_model_name="test-model",
@@ -75,7 +73,7 @@ class TestCostRegistry:
 
         # Save to CSV
         csv_file = tmp_path / "test_report.csv"
-        CostRegistry.save_to_csv(records, str(csv_file))
+        CostRegistry.save_to_csv(records, csv_file)
 
         # Verify file exists
         assert csv_file.exists()
@@ -101,7 +99,7 @@ class TestCostRegistry:
     def test_save_to_csv_empty_records(self, tmp_path: Path):
         """Test that save_to_csv handles empty records gracefully."""
         csv_file = tmp_path / "empty_report.csv"
-        CostRegistry.save_to_csv([], str(csv_file))
+        CostRegistry.save_to_csv([], csv_file)
 
         # File should not be created for empty records
         assert not csv_file.exists()
@@ -137,7 +135,7 @@ class TestCostRegistry:
 
         # Save to CSV - should handle varying fields without errors
         csv_file = tmp_path / "varying_fields_report.csv"
-        CostRegistry.save_to_csv(records, str(csv_file))
+        CostRegistry.save_to_csv(records, csv_file)
 
         # Verify file exists
         assert csv_file.exists()
@@ -174,15 +172,13 @@ class TestCostRegistry:
         assert rows[2]["nb_tokens_output_reasoning"] == "150"
         assert rows[2]["cost_output_reasoning"] == "0.15"
 
-    def test_generate_report_aggregation(self, mocker: MockerFixture, tmp_path: Path):
+    def test_generate_report_aggregation(self, job_metadata: JobMetadata, mocker: MockerFixture, tmp_path: Path):
         """Test groupby logic and cost calculations are correct."""
         # Mock console output to avoid printing during tests
         mock_console = mocker.MagicMock()
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mock_console)
 
         # Create test data with multiple LLM usages
-        job_metadata = JobMetadata(pipeline_run_id="test-pipeline")
-
         llm_tokens_usages = [
             # First usage of model-a: 100 input (20 cached), 50 output
             LLMTokensUsage(
@@ -240,11 +236,11 @@ class TestCostRegistry:
             pipeline_run_id="test-pipeline",
             llm_tokens_usages=llm_tokens_usages,
             unit_scale=1.0,
-            cost_report_file_path=str(csv_file),
+            cost_report_file_path=csv_file,
         )
 
         # Verify console was called to print table
-        mock_console.print.assert_called_once()
+        assert mock_console.print.call_count == 2
 
         # Read the CSV and verify aggregation
         with open(csv_file, encoding="utf-8") as file:
@@ -303,13 +299,12 @@ class TestCostRegistry:
         )
         mock_log_verbose.assert_called_once()
 
-    def test_generate_report_with_file_output(self, tmp_path: Path, mocker: MockerFixture):
+    def test_generate_report_with_file_output(self, job_metadata: JobMetadata, tmp_path: Path, mocker: MockerFixture):
         """Test that CSV file is created when file path is provided."""
         # Mock console output
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mocker.MagicMock())
 
         # Create test data
-        job_metadata = JobMetadata(pipeline_run_id="test-pipeline")
         llm_tokens_usage = LLMTokensUsage(
             job_metadata=job_metadata,
             inference_model_name="test-model",
@@ -332,7 +327,7 @@ class TestCostRegistry:
             pipeline_run_id="test-pipeline",
             llm_tokens_usages=[llm_tokens_usage],
             unit_scale=1.0,
-            cost_report_file_path=str(csv_file),
+            cost_report_file_path=csv_file,
         )
 
         # Verify CSV file was created
@@ -366,7 +361,7 @@ class TestCostRegistry:
             (0.01, 8.0),  # Scale by 0.01: 0.08 / 0.01
         ],
     )
-    def test_generate_report_unit_scaling(self, unit_scale: float, expected_scaled_cost: float, mocker: MockerFixture):
+    def test_generate_report_unit_scaling(self, job_metadata: JobMetadata, unit_scale: float, expected_scaled_cost: float, mocker: MockerFixture):
         """Test that unit scaling is applied correctly to cost display."""
         # Mock console to avoid output during tests
         mocker.patch("pipelex.cogt.usage.cost_registry.get_console", return_value=mocker.MagicMock())
@@ -374,7 +369,6 @@ class TestCostRegistry:
         mock_table = mock_table_class.return_value
 
         # Create test data
-        job_metadata = JobMetadata(pipeline_run_id="test-pipeline")
         llm_tokens_usage = LLMTokensUsage(
             job_metadata=job_metadata,
             inference_model_name="test-model",

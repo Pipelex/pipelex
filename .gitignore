@@ -7,7 +7,6 @@ __pycache__/
 
 # Distribution / packaging
 dist/
-build/
 *.egg-info/
 
 # mkdocs
@@ -43,8 +42,13 @@ Thumbs.db
 reports/
 results/
 
-# personnal pipelex config file that overrides the default one
+# personnal pipelex config files that overrides the default one
 pipelex_super.toml
+pipelex_override.toml
+telemetry_override.toml
+
+# local pipelex service configuration
+.pipelex/pipelex_service.toml
 
 # temporary files
 temp/
@@ -53,3 +57,17 @@ gcp_credentials.json
 
 /pipelex.toml
 settings.local.json
+structures/
+.pipelex/storage
+
+# Generated test fixtures (regenerate with `make regenerate-test-models`)
+tests/integration/pipelex/fixtures/_generated_model_sets.py
+
+.pipelex-dev/model_availability.json
+
+# Local test profile overrides (not tracked - for personal customization)
+.pipelex-dev/test_profiles_override.toml
+pipelex-wip
+
+# Derived artifacts (auto-generated, not tracked)
+derived/

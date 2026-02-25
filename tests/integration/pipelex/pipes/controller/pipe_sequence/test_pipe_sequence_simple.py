@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Callable, cast
+from typing import Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -28,25 +27,25 @@ class TestPipeSequenceSimple:
     """Simple integration test for PipeSequence controller."""
 
     async def test_simple_sequence_processing(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
     ):
         """Test PipeSequence with a simple 2-step text transformation scenario."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_sequence")])
-        domain = "test_integration"
+        domain_code = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Lorem Ipsum"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_library = get_concept_library()
         concept_library.add_concepts([concept_1])
         concept_2 = get_native_concept(native_concept=NativeConceptCode.TEXT)
 
-        # Create PipeSequence instance - pipes are loaded from PLX files
+        # Create PipeSequence instance - pipes are loaded from MTHDS files
         pipe_sequence_blueprint = PipeSequenceBlueprint(
             description="Simple sequence for text processing",
-            inputs={"input_text": concept_1.concept_string},
-            output=concept_2.concept_string,
+            inputs={"input_text": concept_1.concept_ref},
+            output=concept_2.concept_ref,
             steps=[
                 SubPipeBlueprint(pipe="capitalize_text", result="capitalized_text"),
                 SubPipeBlueprint(pipe="add_prefix", result="final_text"),
@@ -54,7 +53,7 @@ class TestPipeSequenceSimple:
         )
 
         pipe_sequence = PipeFactory[PipeSequence].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="simple_sequence",
             blueprint=pipe_sequence_blueprint,
         )
@@ -70,7 +69,7 @@ class TestPipeSequenceSimple:
 
         # Verify the PipeSequence instance was created correctly
         assert pipe_sequence is not None
-        assert pipe_sequence.domain == "test_integration"
+        assert pipe_sequence.domain_code == "test_integration"
         assert pipe_sequence.code == "simple_sequence"
         assert len(pipe_sequence.sequential_sub_pipes) == 2
         assert pipe_sequence.sequential_sub_pipes[0].pipe_code == "capitalize_text"
@@ -91,7 +90,7 @@ class TestPipeSequenceSimple:
 
         # Actually run the PipeSequence pipe
         pipe_output = await pipe_sequence.run_pipe(
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=job_metadata,
             working_memory=working_memory,
             output_name="sequence_result",
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
@@ -109,7 +108,7 @@ class TestPipeSequenceSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" -> "HELLO WORLD" -> "PROCESSED: HELLO WORLD"
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result.content.text in {"PROCESSED: HELLO WORLD", "PROCESSED: hello world"}
 
         # Verify working memory contains all intermediate results
@@ -125,14 +124,14 @@ class TestPipeSequenceSimple:
         capitalized_result = final_working_memory.get_stuff("capitalized_text")
         assert capitalized_result is not None
         assert isinstance(capitalized_result.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert capitalized_result.content.text == "HELLO WORLD"
 
         # Final result should be there (stored as final_text, which is the last SubPipe's output_name)
         final_result_in_memory = final_working_memory.get_stuff("final_text")
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result_in_memory.content.text == "PROCESSED: HELLO WORLD"
 
         # Verify working memory structure

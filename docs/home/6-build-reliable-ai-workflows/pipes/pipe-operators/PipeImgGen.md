@@ -6,15 +6,37 @@ The `PipeImgGen` operator is used to generate images from a text prompt using a 
 
 `PipeImgGen` takes a text prompt and a set of parameters, then calls an underlying image generation service (like GPT Image or Flux) to create one or more images.
 
-The prompt can be provided in two ways:
-1.  As a static string directly in the pipe's PLX definition using the `img_gen_prompt` parameter.
-2.  As a dynamic input by connecting a concept that is or refines `native.Text`.
-
 The pipe can be configured to generate a single image or a list of images.
 
 ## Configuration
 
-`PipeImgGen` is configured in your pipeline's `.plx` file.
+`PipeImgGen` is configured in your pipeline's `.mthds` file.
+
+### The `prompt` Field is Required
+
+**IMPORTANT:** `PipeImgGen` requires an explicit `prompt` field. When using dynamic inputs, the `prompt` field must reference the input variable using the `$` prefix.
+
+**Wrong - Missing required `prompt` field:**
+
+```toml
+[pipe.render_slide]
+type = "PipeImgGen"
+inputs = { img_prompt = "ImgGenPrompt" }
+output = "Image"
+model = "$gen-image"
+# ERROR: Missing required field 'prompt'
+```
+
+**Correct - `prompt` field references the input:**
+
+```toml
+[pipe.render_slide]
+type = "PipeImgGen"
+inputs = { img_prompt = "ImgGenPrompt" }
+output = "Image"
+prompt = "$img_prompt"
+model = "$gen-image"
+```
 
 ### Image Generation Models and Backend System
 
@@ -28,58 +50,83 @@ PipeImgGen uses the unified inference backend system to manage image generation 
 Common image generation model handles:
 
 - `base-img-gen`: Base image generation model (alias for flux-pro/v1.1)
-- `best-img-gen`: Best quality image generation model (alias for flux-pro/v1.1-ultra)  
+- `best-img-gen`: Best quality image generation model (alias for flux-pro/v1.1-ultra)
 - `fast-img-gen`: Fast image generation model (alias for fast-lightning-sdxl)
 
 Image generation presets are defined in your model deck configuration and can include parameters like `quality`, `guidance_scale`, and `safety_tolerance`.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter               | Type            | Description                                                                                                                   | Required |
 | ----------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                  | string          | The type of the pipe: `PipeImgGen`                                                                          | Yes      |
 | `description`           | string          | A description of the image generation operation.                                                                           | Yes      |
-| `inputs`                | dictionary      | The input concept(s) for the image generation operation, as a dictionary mapping input names to concept codes.                                                     | Yes       |
+| `inputs`                | dictionary      | The input concept(s) for the image generation operation, as a dictionary mapping input names to concept codes. Required when the prompt references variables. | No       |
 | `output`                | string          | The output concept produced by the image generation operation. Use bracket notation for multiple images: `"Image[3]"` generates exactly 3 images.                                                | Yes      |
-| `img_gen_prompt`        | string          | A static text prompt for image generation. Use this *or* `input`.                                                             | No       |
 | `model`           | string          | The choice of image generation model name, setting, or preset to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
+| `prompt`                | string          | The image generation prompt. Can be a static string or reference input variables using `$` prefix (e.g., `"$description"` or `"A sketch of: $subject"`). | Yes      |
 | `aspect_ratio`          | string          | The desired aspect ratio of the image (e.g., `"16:9"`, `"1:1"`).                                                              | No       |
 | `seed`                  | integer or "auto" | A seed for the random number generator to ensure reproducibility. `"auto"` uses a random seed.                                | No       |
-
 
 ### Example: Generating a single image from a static prompt
 
 This pipe generates one image of a futuristic car without requiring any input.
 
-```plx
+```toml
 [pipe.generate_car_image]
 type = "PipeImgGen"
 description = "Generate a futuristic car image"
 output = "Image"
-img_gen_prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
-model = "gen_image_basic"
+prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
+model = "$gen-image"
 aspect_ratio = "16:9"
 quality = "hd"
 ```
 
-### Example: Generating multiple images from a dynamic prompt
+### Example: Generating an image from a dynamic prompt
+
+This pipe takes a text prompt as input and generates an image.
+
+```toml
+[pipe.generate_from_description]
+type = "PipeImgGen"
+description = "Generate an image from a description"
+inputs = { description = "ImgGenPrompt" }
+output = "Image"
+prompt = "$description"
+model = "$gen-image"
+```
+
+### Example: Dynamic prompt with prefix text
+
+You can combine static text with dynamic variables in the prompt:
+
+```toml
+[pipe.generate_sketch]
+type = "PipeImgGen"
+description = "Generate a black and white sketch from a description"
+inputs = { subject = "ImgGenPrompt" }
+output = "Image"
+prompt = "Create a black and white pencil sketch of: $subject"
+model = "$gen-image"
+```
+
+### Example: Generating multiple images
 
 This pipe takes a text prompt as input and generates three variations of the image using bracket notation.
 
-```plx
-[concept]
-ImagePrompt = "A text prompt for generating an image"
-
+```toml
 [pipe.generate_logo_variations]
 type = "PipeImgGen"
 description = "Generate three logo variations from a prompt"
-inputs = { prompt = "ImgGenPrompt" }
+inputs = { img_prompt = "ImgGenPrompt" }
 output = "Image[3]"
-model = "gen_image_basic"
+prompt = "$img_prompt"
+model = "$gen-image"
 aspect_ratio = "1:1"
 ```
 
 The output of the PipeImgGen has to be a concept compatible with the native `Image` concept. A concept is compatible with the `Image` concept if it refines the `Image` concept.
 
-To use this pipe, you would first load a text prompt (e.g., "A minimalist logo for a coffee shop, featuring a stylized mountain and a coffee bean") into the "prompt" stuff (`ImgGenPrompt` concept). After running, the output will be a list containing three generated `ImageContent` objects.
+To use this pipe, you would first load a text prompt (e.g., "A minimalist logo for a coffee shop, featuring a stylized mountain and a coffee bean") into the input stuff (`ImgGenPrompt` concept). After running, the output will be a list containing three generated `ImageContent` objects.
 

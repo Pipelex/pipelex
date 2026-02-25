@@ -1,6 +1,6 @@
 # Understanding Multiplicity
 
-Multiplicity in Pipelex defines how many items a particular stuff can comprise in a particular context. This applies to any of the pipe input variables and also to the output of the pipe. This idea is fundamental to building flexible AI workflows that can handle both single items and collections.
+Multiplicity in Pipelex defines how many items a particular stuff can comprise in a particular context. This applies to any of the pipe input variables and also to the output of the pipe. This idea is fundamental to building flexible AI methods that can handle both single items and collections.
 
 This guide explains the philosophy behind multiplicity in Pipelex and how to use it effectively in your pipelines.
 
@@ -12,7 +12,7 @@ In Pipelex, concepts are always defined in the singular form. You define a `Keyw
 
 A concept represents a semantic entity—a meaningful piece of knowledge with clear boundaries. When you define a concept, you're describing what something *is*, not how many of them you might have:
 
-```plx
+```toml
 [concept]
 Keyword = "A significant word or term extracted from text"
 ProductIdea = "A concept for a new product or service"
@@ -23,7 +23,7 @@ Each of these definitions describes a single, coherent entity. The essence of wh
 
 ### Lists Are Circumstantial, Not Essential
 
-The number of items you're working with is a circumstantial detail of your workflow, not part of the concept's identity:
+The number of items you're working with is a circumstantial detail of your method, not part of the concept's identity:
 
 - A pipe that extracts keywords from text might find 3 keywords or 30—but each is still a `Keyword`
 - A pipe that generates product ideas might produce 5 ideas or 10—but each remains a `ProductIdea`
@@ -41,7 +41,7 @@ Output multiplicity controls how many items a pipe produces. You can specify thi
 
 When no brackets are used in the output, the pipe produces a single item:
 
-```plx
+```toml
 [concept]
 Summary = "A concise overview of content"
 
@@ -63,7 +63,7 @@ This is the default behavior and represents the most common case.
 
 Use empty brackets in the output to let the LLM decide how many items to generate:
 
-```plx
+```toml
 [concept]
 LineItem = "A single line item from an invoice"
 
@@ -100,7 +100,7 @@ The pipe will extract however many line items appear in the invoice. A simple in
 
 Use a number in brackets to generate an exact number of items:
 
-```plx
+```toml
 [concept]
 Headline = "A catchy title for content"
 
@@ -136,7 +136,7 @@ Input multiplicity specifies whether a pipe expects a single item or multiple it
 
 Input multiplicity is specified using bracket notation in the `inputs` dictionary:
 
-```plx
+```toml
 # Standard syntax (single item, the default)
 inputs = { document = "Text" }
 
@@ -153,7 +153,7 @@ inputs = { comparison_items = "Text[2]" }
 
 When you use the standard syntax, the pipe expects exactly one item. This is the default behavior:
 
-```plx
+```toml
 [concept]
 Report = "A detailed analytical document"
 
@@ -176,7 +176,7 @@ Analyze this report in detail:
 
 Use empty brackets `[]` to specify that the pipe expects a list with an indeterminate number of items:
 
-```plx
+```toml
 [concept]
 Document = "A written or printed record"
 Summary = "A concise overview of multiple documents"
@@ -207,7 +207,7 @@ Create a single unified summary that captures the key points across all document
 
 Use a number in brackets `[N]` to specify that the pipe expects exactly that many items:
 
-```plx
+```toml
 [concept]
 Image = "A visual image file"
 Comparison = "A detailed comparison analysis"
@@ -232,7 +232,7 @@ Describe their similarities, differences, and relative strengths.
 
 Process an unknown number of invoices, extracting structured data from each:
 
-```plx
+```toml
 [concept]
 InvoiceImage = "An image of an invoice document"
 InvoiceData = "Structured invoice information"
@@ -262,7 +262,7 @@ steps = [
 
 Create exactly 3 subject line variations for A/B testing:
 
-```plx
+```toml
 [concept]
 EmailContent = "The body text of an email"
 SubjectLine = "An email subject line"
@@ -286,7 +286,7 @@ Each should use a different persuasion technique.
 
 Compare exactly two products side by side:
 
-```plx
+```toml
 [concept]
 ProductDescription = "A description of a product's features"
 Comparison = "A comparative analysis of products"
@@ -309,7 +309,7 @@ Provide a balanced comparison of features, benefits, and potential drawbacks.
 
 Extract all company names mentioned in a document:
 
-```plx
+```toml
 [concept]
 Article = "A news or information article"
 CompanyName = "The name of a company or organization"
@@ -355,7 +355,7 @@ Use variable input multiplicity when:
 
 - The pipe should handle batches of unknown size
 - You're aggregating or summarizing multiple items
-- The workflow involves collecting items before processing
+- The method involves collecting items before processing
 - You want maximum flexibility in how the pipe is called
 
 ### When to Use Fixed Input (Brackets with Number `[N]`)
@@ -372,13 +372,15 @@ Use fixed input multiplicity when:
 When a pipe produces multiple outputs, Pipelex automatically wraps them in a `ListContent` container. This container maintains the type information:
 
 ```python
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.pipeline.runner import PipelexRunner
 
 # Execute a pipe with multiple outputs
-pipe_output = await execute_pipeline(
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     pipe_code="extract_line_items",
     inputs={"invoice_text": "Your invoice text here..."}
 )
+pipe_output = response.pipe_output
 
 # Get the list of line items
 line_items_list = pipe_output.main_stuff_as_items(item_type=LineItem)
@@ -392,9 +394,11 @@ line_items_container = pipe_output.main_stuff_as_list(item_type=LineItem)
 Similarly, when providing multiple inputs, you can use lists:
 
 ```python
+from pipelex.pipeline.runner import PipelexRunner
 from pipelex.core.stuffs.text_content import TextContent
 
-pipe_output = await execute_pipeline(
+runner = PipelexRunner()
+response = await runner.execute_pipeline(
     pipe_code="summarize_all_documents",
     inputs={
         "documents": [
@@ -404,6 +408,7 @@ pipe_output = await execute_pipeline(
         ]
     }
 )
+pipe_output = response.pipe_output
 ```
 
 ## Summary

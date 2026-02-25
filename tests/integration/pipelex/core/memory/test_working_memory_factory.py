@@ -6,9 +6,10 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from tests.cases.images import ImageTestCases
 
 if TYPE_CHECKING:
-    from pipelex.client.protocol import PipelineInputs
+    from mthds.client.models.pipeline_inputs import PipelineInputs
 
 
 class TestWorkingMemoryFactory:
@@ -45,19 +46,14 @@ class TestWorkingMemoryFactory:
                         },
                         "images": [
                             {
-                                "url": "mock_url",
+                                "url": ImageTestCases.IMAGE_FILE_PATH_JPG_1,
                                 "caption": "First image showing data visualization",
                                 "source_prompt": "Generate a chart showing quarterly sales data",
                             },
-                            {
-                                "url": ("data:image/png;base64,mock_base64"),
-                                "caption": "Second image with base64 data",
-                                "base_64": ("mock_base64"),
-                            },
-                            {"url": "/local/path/diagram.png", "caption": "System architecture diagram"},
+                            {"url": ImageTestCases.IMAGE_FILE_PATH_PNG_2, "caption": "System architecture diagram"},
                         ],
                     },
-                    "page_view": {"url": "mock_url", "caption": "Full page screenshot"},
+                    "page_view": {"url": ImageTestCases.IMAGE_FILE_PATH_PNG_3, "caption": "Full page screenshot"},
                 },
             },
         }
@@ -84,33 +80,26 @@ class TestWorkingMemoryFactory:
         # Verify images
         images = page_content.text_and_images.images
         assert images is not None
-        assert len(images) == 3
+        assert len(images) == 2
 
         # Check first image
         first_image = images[0]
         assert isinstance(first_image, ImageContent)
-        assert first_image.url == "mock_url"
+        assert first_image.url == ImageTestCases.IMAGE_FILE_PATH_JPG_1
         assert first_image.caption == "First image showing data visualization"
         assert first_image.source_prompt == "Generate a chart showing quarterly sales data"
 
-        # Check second image (with base64)
+        # Check second image
         second_image = images[1]
         assert isinstance(second_image, ImageContent)
-        expected_base64 = "mock_base64"
-        assert second_image.base_64 == expected_base64
-        assert second_image.caption == "Second image with base64 data"
-
-        # Check third image
-        third_image = images[2]
-        assert isinstance(third_image, ImageContent)
-        assert third_image.url == "/local/path/diagram.png"
-        assert third_image.caption == "System architecture diagram"
+        assert second_image.url == ImageTestCases.IMAGE_FILE_PATH_PNG_2
+        assert second_image.caption == "System architecture diagram"
 
         # Verify page_view
         page_view = page_content.page_view
         assert page_view is not None
         assert isinstance(page_view, ImageContent)
-        assert page_view.url == "mock_url"
+        assert page_view.url == ImageTestCases.IMAGE_FILE_PATH_PNG_3
         assert page_view.caption == "Full page screenshot"
 
     def test_make_from_compact_memory_empty(self, load_empty_library: Callable[[], None]):

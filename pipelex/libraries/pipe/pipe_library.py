@@ -7,6 +7,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.types import Self
@@ -38,9 +39,10 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
     def add_new_pipe(self, pipe: PipeAbstract):
         if pipe.code in self.root:
             msg = (
-                f"Pipe '{pipe.code}' already exists in the library. You might be running the same pipe twice in the same pipeline."
-                "We do not yet handle this case, so please avoid running the same pipe twice in the same pipeline"
-                "Or consider adding for good in the library and call it by its code."
+                f"Pipe '{pipe.code}' already exists in the library. "
+                "It is likely declared in two different bundle files loaded into the same library. "
+                "Check your library configuration: PIPELEXPATH environment variable, "
+                "library_dirs passed to Pipelex.make(), or the --library-dir / -L CLI option."
             )
             raise PipeLibraryError(msg)
         self.root[pipe.code] = pipe
@@ -52,13 +54,51 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
-        return self.root.get(pipe_code)
+        # Direct lookup first (bare code or exact match)
+        pipe = self.root.get(pipe_code)
+        if pipe is not None:
+            return pipe
+        # Cross-package: "alias->domain.pipe_code" -> lookup "alias->pipe_code"
+        if QualifiedRef.has_cross_package_prefix(pipe_code):
+            alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
+            try:
+                ref = QualifiedRef.parse(remainder)
+            except QualifiedRefError:
+                return None
+            pipe = self.root.get(f"{alias}->{ref.local_code}")
+            if pipe is not None and ref.is_qualified and pipe.domain_code != ref.domain_path:
+                return None
+            return pipe
+        # If it's a domain-qualified ref (e.g. "scoring.compute_score"), try the local code
+        if "." in pipe_code:
+            try:
+                ref = QualifiedRef.parse(pipe_code)
+            except QualifiedRefError:
+                return None
+            pipe = self.root.get(ref.local_code)
+            if pipe is not None and ref.is_qualified and pipe.domain_code != ref.domain_path:
+                return None
+            return pipe
+        return None
+
+    def add_dependency_pipe(self, alias: str, pipe: PipeAbstract) -> None:
+        """Add a pipe from a dependency package with an aliased key.
+
+        Args:
+            alias: The dependency alias
+            pipe: The pipe to add
+        """
+        key = f"{alias}->{pipe.code}"
+        if key in self.root:
+            msg = f"Dependency pipe '{key}' already exists in the library"
+            raise PipeLibraryError(msg)
+        self.root[key] = pipe
 
     @override
     def get_required_pipe(self, pipe_code: str) -> PipeAbstract:
         the_pipe = self.get_optional_pipe(pipe_code=pipe_code)
         if not the_pipe:
-            msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in plx file in an imported package."
+            msg = f"Pipe '{pipe_code}' not found. Check for typos and make sure it is declared in MTHDS file in an imported package."
             raise PipeNotFoundError(msg)
         return the_pipe
 
@@ -93,15 +133,15 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         pipes = self.get_pipes()
 
         # Sort pipes by domain and code
-        ordered_items = sorted(pipes, key=lambda pipe: (pipe.domain or "", pipe.code or ""))
+        ordered_items = sorted(pipes, key=lambda pipe: (pipe.domain_code or "", pipe.code or ""))
 
         # Create dictionary for return value
         pipes_dict: dict[str, dict[str, dict[str, str]]] = {}
 
         # Group by domain and create separate tables
-        for domain, domain_pipes in groupby(ordered_items, key=lambda pipe: pipe.domain):
+        for domain_code, domain_pipes in groupby(ordered_items, key=lambda pipe: pipe.domain_code):
             table = Table(
-                title=f"[bold magenta]domain = {domain}[/]",
+                title=f"[bold magenta]domain = {domain_code}[/]",
                 show_header=True,
                 show_lines=True,
                 header_style="bold cyan",
@@ -110,29 +150,31 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             )
 
             table.add_column("Code", style="green")
+            table.add_column("Type", style="cyan")
             table.add_column("Definition", style="white")
             table.add_column("Input", style="yellow")
             table.add_column("Output", style="yellow")
 
-            pipes_dict[domain] = {}
+            pipes_dict[domain_code] = {}
 
             for pipe in domain_pipes:
                 inputs = pipe.inputs
-                formatted_inputs = [f"{name}: {_format_concept_code(requirement.concept.code, domain)}" for name, requirement in inputs.items]
+                formatted_inputs = [f"{name}: {_format_concept_code(stuff_spec.concept.code, domain_code)}" for name, stuff_spec in inputs.items]
                 formatted_inputs_str = ", ".join(formatted_inputs)
-                output_code = _format_concept_code(pipe.output.code, domain)
+                output_code = _format_concept_code(pipe.output.concept.code, domain_code)
 
                 table.add_row(
                     pipe.code,
+                    pipe.type,
                     pipe.description or "",
                     formatted_inputs_str,
                     output_code,
                 )
 
-                pipes_dict[domain][pipe.code] = {
+                pipes_dict[domain_code][pipe.code] = {
                     "description": pipe.description or "",
                     "inputs": formatted_inputs_str,
-                    "output": pipe.output.code,
+                    "output": pipe.output.concept.code,
                 }
 
             pretty_print(table)

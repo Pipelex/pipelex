@@ -1,0 +1,11 @@
+domain = "my_domain"
+description = "Invalid: same-domain pipe ref to non-existent pipe"
+
+[pipe]
+[pipe.my_sequence]
+type = "PipeSequence"
+description = "Sequence with invalid same-domain ref"
+output = "Text"
+steps = [
+    { pipe = "my_domain.nonexistent_pipe", result = "something" },
+]

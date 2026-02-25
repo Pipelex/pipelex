@@ -26,8 +26,8 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
         return cls(root={})
 
     @override
-    def get_domain(self, domain: str) -> Domain | None:
-        return self.root.get(domain)
+    def get_domain(self, domain_code: str) -> Domain | None:
+        return self.root.get(domain_code)
 
     def add_domain(self, domain: Domain):
         domain_code = domain.code
@@ -47,10 +47,10 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
         del self.root[domain_code]
 
     @override
-    def get_required_domain(self, domain: str) -> Domain:
+    def get_required_domain(self, domain_code: str) -> Domain:
         """Get a domain by code from this library, raising an error if not found."""
-        the_domain = self.get_domain(domain=domain)
+        the_domain = self.get_domain(domain_code=domain_code)
         if not the_domain:
-            msg = f"Domain '{domain}' not found. Check for typos and make sure it is declared in a pipeline library."
+            msg = f"Domain '{domain_code}' not found. Check for typos and make sure it is declared in a pipeline library."
             raise DomainLibraryError(msg)
         return the_domain

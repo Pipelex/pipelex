@@ -31,7 +31,7 @@ apply_to_jinja2_rendering = true
 text_gen_truncate_length = 100
 nb_list_items = 3
 nb_extract_pages = 2
-image_urls = ["https://example.com/image1.jpg", "https://example.com/image2.jpg"]
+image_urls = ["https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/ai_lympics.jpg", "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/animal_lympics.jpg"]
 allowed_to_fail_pipes = ["optional_pipe", "experimental_pipe"]
 ```
 

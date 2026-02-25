@@ -5,7 +5,7 @@ from typing import Any, final
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from pipelex.core.concepts.exceptions import ConceptStringError
-from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.core.pipes.validation import validate_input_name
 from pipelex.core.pipes.variable_multiplicity import MUTLIPLICITY_PATTERN, PipeVariableMultiplicityError, parse_concept_with_multiplicity
 from pipelex.types import Self, StrEnum
@@ -82,7 +82,7 @@ class PipeBlueprint(ABC, BaseModel):
     source: str | None = None
     pipe_category: Any = Field(exclude=True)  # Technical field for Union discrimination, not user-facing
     type: Any  # TODO: Find a better way to handle this.
-    description: str | None = None
+    description: str
     inputs: dict[str, str] | None = None
     output: str
 
@@ -181,11 +181,11 @@ class PipeBlueprint(ABC, BaseModel):
                     raise ValueError(msg)
 
                 # Extract the concept part (without multiplicity) and validate it
-                concept_string_or_code = match.group(1)
+                concept_ref_or_code = match.group(1)
                 try:
-                    validate_concept_string_or_code(concept_string_or_code=concept_string_or_code)
+                    validate_concept_ref_or_code(concept_ref_or_code=concept_ref_or_code)
                 except ConceptStringError as exc:
-                    msg = f"Invalid concept string or code '{concept_string_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
+                    msg = f"Invalid concept string or code '{concept_ref_or_code}' when trying to validate the input of a pipe blueprint: {exc}"
                     raise ValueError(msg) from exc
 
         self.validate_inputs()
@@ -199,9 +199,9 @@ class PipeBlueprint(ABC, BaseModel):
             msg = f"Invalid concept specification syntax: '{self.output}'. {exc}"
             raise ValueError(msg) from exc
         try:
-            validate_concept_string_or_code(concept_string_or_code=output_parse_result.concept)
+            validate_concept_ref_or_code(concept_ref_or_code=output_parse_result.concept_ref_or_code)
         except ConceptStringError as exc:
-            msg = f"Invalid concept string '{output_parse_result.concept}' when trying to validate the output of a pipe blueprint: {exc}"
+            msg = f"Invalid concept string '{output_parse_result.concept_ref_or_code}' when trying to validate the output of a pipe blueprint: {exc}"
             raise ValueError(msg) from exc
 
         self.validate_output()

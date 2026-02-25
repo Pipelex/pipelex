@@ -1,3 +1,6 @@
+SHELL := /bin/bash
+.SHELLFLAGS := -o pipefail -c
+
 ifeq ($(wildcard .env),.env)
 include .env
 export
@@ -6,7 +9,8 @@ VIRTUAL_ENV := $(CURDIR)/.venv
 PROJECT_NAME := $(shell grep '^name = ' pyproject.toml | sed -E 's/name = "(.*)"/\1/')
 
 # The "?" is used to make the variable optional, so that it can be overridden by the user.
-PYTHON_VERSION ?= 3.11
+PYTHON_VERSION ?= 3.13
+LINT_PYTHON_VERSION ?=
 # Note: VENV_* variables include quotes to handle paths with spaces (e.g., "My Projects/pipelex")
 VENV_PYTHON := "$(VIRTUAL_ENV)/bin/python"
 VENV_PYTEST := "$(VIRTUAL_ENV)/bin/pytest"
@@ -17,7 +21,9 @@ VENV_PIPELEX := "$(VIRTUAL_ENV)/bin/pipelex"
 VENV_MKDOCS := "$(VIRTUAL_ENV)/bin/mkdocs"
 VENV_MIKE := "$(VIRTUAL_ENV)/bin/mike"
 VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
+VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
+SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -50,18 +56,36 @@ make update                   - Upgrade dependencies via uv
 make validate                 - Run the setup sequence to validate the config and libraries
 make build                    - Build the wheels
 
-make format                   - format with ruff format
-make lint                     - lint with ruff check
+make format                   - format with ruff and plxt
+make lint                     - lint with ruff and plxt
+make ruff-format              - format with ruff format
+make ruff-lint                - lint with ruff check
 make pyright                  - Check types with pyright
 make mypy                     - Check types with mypy
+make plxt-format              - Format MTHDS/TOML/PLX files with plxt
+make plxt-lint                - Lint MTHDS/TOML/PLX files with plxt
 
 make rules                    - Install agent rules for contributing to Pipelex
 make up-kit-configs           - Update kit configs from .pipelex/
 make ukc                      - Shorthand -> up-kit-configs
 make check-config-sync        - Verify .pipelex and pipelex/kit/configs are in sync
-make check-rules              - Verify installed agent rules match kit templates
 make ccs                      - Shorthand -> check-config-sync
+make check-rules              - Verify installed agent rules match kit templates
+make check-urls               - Check all URLs in pipelex/urls.py for broken links (quiet)
+make cu                       - Check URLs with verbose output (shows details)
+make generate-mthds-schema    - Generate JSON Schema for .mthds files
+make gms                      - Shorthand -> generate-mthds-schema
+make check-mthds-schema       - Check MTHDS JSON Schema is up-to-date
+make cms                      - Shorthand -> check-mthds-schema
+make update-gateway-models    - Update gateway models reference
+make ugm                      - Shorthand -> update-gateway-models
+make check-gateway-models     - Check gateway models reference is up-to-date
+make cgm                      - Shorthand -> check-gateway-models
+make regenerate-test-models   - Regenerate test model fixtures from backend configs
+make rtm                      - Shorthand -> regenerate-test-models
+make insert-skeleton          - Insert skeleton from $(SKELETON_DIR)
 
+make up                       - Shorthand -> generate-mthds-schema update-gateway-models up-kit-configs rules
 make cleanenv                 - Remove virtual env and lock files
 make cleanderived             - Remove extraneous compiled files, caches, logs, etc.
 make cleanall                 - Remove all -> cleanenv + cleanderived
@@ -70,12 +94,15 @@ make merge-check-ruff-lint    - Run ruff merge check without updating files
 make merge-check-ruff-format  - Run ruff merge check without updating files
 make merge-check-mypy         - Run mypy merge check without updating files
 make merge-check-pyright	  - Run pyright merge check without updating files
+make merge-check-plxt-format  - Run plxt format check without modifying files
+make merge-check-plxt-lint    - Run plxt lint check
 
 make v                        - Shorthand -> validate
 make codex-tests              - Run tests for Codex (exit on first failure) (no inference, no codex_disabled)
 make gha-tests		          - Run tests for github actions (exit on first failure) (no inference, no gha_disabled)
 make test                     - Run unit tests (no inference)
 make test-xdist               - Run unit tests with xdist (no inference)
+make agent-test               - Run unit tests, silent on success, output on failure (for AI agents)
 make t                        - Shorthand -> test-xdist
 make test-quiet               - Run unit tests without prints (no inference)
 make tq                       - Shorthand -> test-quiet
@@ -103,8 +130,13 @@ make docs-serve-versioned     - Serve versioned docs locally with mike
 make docs-list                - List deployed documentation versions
 make docs-deploy VERSION=x.y.z - Deploy docs as version x.y.z (local, no push)
 make docs-deploy-stable       - Deploy stable docs with 'latest' alias (CI only)
-make docs-deploy-beta         - Manually deploy pre-release docs with '-beta' suffix
-make docs-deploy-404          - Deploy 404.html for versionless URL redirects
+make docs-deploy-specific-version         - Deploy docs for the current version with 'pre-release' alias (CI only)
+make docs-deploy-root          - Deploy root assets (404.html, robots.txt, index.html) to gh-pages
+make docs-delete VERSION=x.y.z - Delete a deployed documentation version
+
+make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
+make stop-graph-server        - Stop the graph viewer HTTP server
+make view-graph               - Start server and open ReactFlow graph in browser
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -114,23 +146,36 @@ make li                       - Shorthand -> lock install
 make test-count               - Count the number of tests
 make check-test-badge         - Check if the test count matches the badge value
 
+make test-durations           - Show slowest tests with xdist (TOP=30, MIN=0.5)
+make td                       - Shorthand -> test-durations
+make test-durations-serial    - Show slowest tests without xdist (TOP=30, MIN=0.5)
+make tds                      - Shorthand -> test-durations-serial
+make test-time                - Timed test run with xdist (wall clock)
+make tt                       - Shorthand -> test-time
+make test-time-serial         - Timed test run without xdist (wall clock)
+make tts                      - Shorthand -> test-time-serial
+
 endef
 export HELP
 
 .PHONY: \
-	all help env lock install update build \
-	format lint pyright mypy pylint \
-    rules up-kit-configs ukc check-config-sync check-rules ccs \
+	all help env env-verbose check-uv check-uv-verbose lock install update build \
+	format lint ruff-format ruff-lint pyright mypy pylint plxt plxt-format plxt-lint \
+    rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
 	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
-	validate v check c cc \
-	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright \
-	li check-unused-imports fix-unused-imports check-uv check-TODOs \
-	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-beta \
+	validate v check c cc agent-check agent-test \
+	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
+	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
+	li check-unused-imports fix-unused-imports check-TODOs check-uv \
+	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
+	generate-mthds-schema gms check-mthds-schema cms \
+	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
-	docs-deploy-404
+	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
+	docs-deploy-root
 
 all help:
 	@echo "$$HELP"
@@ -140,7 +185,18 @@ all help:
 ### SETUP
 ##########################################################################################
 
+# Quiet check-uv: only shows output if uv is missing (needs install)
 check-uv:
+	@command -v uv >/dev/null 2>&1 || { \
+		echo ""; \
+		echo "=== [$(PROJECT_NAME)] ===== (check-uv) ====== Ensuring uv ≥ $(UV_MIN_VERSION) =========="; \
+		echo "uv not found – installing latest …"; \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	}
+	@uv self update >/dev/null 2>&1 || true
+
+# Verbose check-uv: always shows output (for setup commands)
+check-uv-verbose:
 	$(call PRINT_TITLE,"Ensuring uv ≥ $(UV_MIN_VERSION)")
 	@command -v uv >/dev/null 2>&1 || { \
 		echo "uv not found – installing latest …"; \
@@ -148,8 +204,18 @@ check-uv:
 	}
 	@uv self update >/dev/null 2>&1 || true
 
-
+# Quiet env: only shows output if venv needs to be created
 env: check-uv
+	@if [ ! -d "$(VIRTUAL_ENV)" ]; then \
+		echo ""; \
+		echo "=== [$(PROJECT_NAME)] ===== (env) ====== Creating virtual environment ================="; \
+		echo "Creating Python virtual env in \`${VIRTUAL_ENV}\`"; \
+		uv venv "$(VIRTUAL_ENV)" --python $(PYTHON_VERSION); \
+		echo "Using Python: $$($(VENV_PYTHON) --version) from $$(readlink $(VENV_PYTHON) 2>/dev/null || echo $(VENV_PYTHON))"; \
+	fi
+
+# Verbose env: always shows output (for setup commands like install, lock, update)
+env-verbose: check-uv-verbose
 	$(call PRINT_TITLE,"Creating virtual environment")
 	@if [ ! -d "$(VIRTUAL_ENV)" ]; then \
 		echo "Creating Python virtual env in \`${VIRTUAL_ENV}\`"; \
@@ -159,16 +225,23 @@ env: check-uv
 	fi
 	@echo "Using Python: $$($(VENV_PYTHON) --version) from $$(readlink $(VENV_PYTHON) 2>/dev/null || echo $(VENV_PYTHON))"
 
-install: env
+install: env-verbose
 	$(call PRINT_TITLE,"Installing dependencies")
 	@. "$(VIRTUAL_ENV)/bin/activate" && \
 	uv sync --all-extras && \
 	echo "Installed Pipelex dependencies in ${VIRTUAL_ENV} with all extras.";
+	@$(MAKE) --silent regenerate-test-models-quiet
 
 lock: env
 	$(call PRINT_TITLE,"Resolving dependencies without update")
 	@uv lock && \
 	echo uv lock without update;
+
+plxt: env ## Rebuild and reinstall plxt CLI from local vscode-pipelex source
+	$(call PRINT_TITLE,"Reinstalling plxt from source")
+	@. "$(VIRTUAL_ENV)/bin/activate" && \
+	uv sync --all-extras --reinstall-package pipelex-tools && \
+	echo "Reinstalled plxt in ${VIRTUAL_ENV}";
 
 update: env
 	$(call PRINT_TITLE,"Updating all dependencies")
@@ -178,7 +251,7 @@ update: env
 
 validate: env
 	$(call PRINT_TITLE,"Running setup sequence")
-	$(VENV_PIPELEX) validate all
+	$(VENV_PIPELEX) validate --all
 
 build: env
 	$(call PRINT_TITLE,"Building the wheels")
@@ -186,15 +259,32 @@ build: env
 
 rules: env
 	$(call PRINT_TITLE,"Installing agent rules for contributing to Pipelex")
-	$(VENV_PIPELEX) kit rules --set coding_standards
+	$(VENV_PIPELEX_DEV) kit rules --set all
 
 check-rules: env
 	$(call PRINT_TITLE,"Checking installed agent rules against templates")
 	$(VENV_PIPELEX_DEV) check-rules --quiet
 
+check-urls: env
+	$(call PRINT_TITLE,"Checking URLs in pipelex/urls.py for broken links")
+	$(VENV_PIPELEX_DEV) check-urls --quiet
+
+cu: env
+	$(call PRINT_TITLE,"Checking URLs in pipelex/urls.py for broken links with detailed output")
+	$(VENV_PIPELEX_DEV) check-urls
+
 up-kit-configs:
 	$(call PRINT_TITLE,"Updating kit configs from .pipelex/")
-	@rsync -av --delete .pipelex/ pipelex/kit/configs/
+	@rsync -av --delete \
+		--exclude='.DS_Store' \
+		--exclude='pipelex_service.toml' \
+		--exclude='pipelex_override.toml' \
+		--exclude='telemetry_override.toml' \
+		--exclude='storage' \
+		--exclude='x_custom_llm_deck.toml' \
+		--exclude='x_custom_extract_deck.toml' \
+		--exclude='mthds_schema.json' \
+		.pipelex/ pipelex/kit/configs/
 
 ukc: up-kit-configs
 	@echo "> done: ukc = up-kit-configs"
@@ -206,9 +296,77 @@ check-config-sync: env
 ccs: check-config-sync
 	@echo "> done: ccs = check-config-sync"
 
-##############################################################################################
-############################      Cleaning                        ############################
-##############################################################################################
+generate-mthds-schema: env
+	$(call PRINT_TITLE,"Generating MTHDS JSON Schema")
+	$(VENV_PIPELEX_DEV) generate-mthds-schema
+
+gms: generate-mthds-schema
+	@echo "> done: gms = generate-mthds-schema"
+
+check-mthds-schema: env
+	$(call PRINT_TITLE,"Checking MTHDS JSON Schema is up-to-date")
+	$(VENV_PIPELEX_DEV) check-mthds-schema --quiet
+
+cms: check-mthds-schema
+	@echo "> done: cms = check-mthds-schema"
+
+update-gateway-models: env
+	$(call PRINT_TITLE,"Updating gateway models reference")
+	$(VENV_PIPELEX_DEV) update-gateway-models
+
+ugm: update-gateway-models
+	@echo "> done: ugm = update-gateway-models"
+
+check-gateway-models: env
+	$(call PRINT_TITLE,"Checking gateway models reference is up-to-date")
+	$(VENV_PIPELEX_DEV) check-gateway-models --quiet
+
+cgm: check-gateway-models
+	@echo "> done: cgm = check-gateway-models"
+
+sync-main-config: env
+	$(call PRINT_TITLE,"Syncing main config to kit and project configs")
+	$(VENV_PIPELEX_DEV) sync-main-config --quiet
+
+smc: sync-main-config
+	@echo "> done: smc = sync-main-config"
+
+smc-dry: env
+	$(call PRINT_TITLE,Previewing main config sync - dry run)
+	$(VENV_PIPELEX_DEV) sync-main-config --dry-run
+
+# Support PROF as shorthand for TEST_PROFILE
+ifdef PROF
+TEST_PROFILE := $(PROF)
+endif
+TEST_PROFILE ?= dev
+
+regenerate-test-models: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures")
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
+
+rtm: regenerate-test-models
+	@echo "> done: rtm = regenerate-test-models"
+
+regenerate-test-models-quiet: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures")
+	@$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE) > /dev/null 2>&1
+
+rtm-full: env
+	$(call PRINT_TITLE,"Regenerating test model fixtures with full profile")
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile full
+
+insert-skeleton:
+	@if [ ! -d $(SKELETON_DIR) ]; then \
+			echo "Error: Skeleton directory $(SKELETON_DIR) not found"; \
+			exit 1; \
+	fi
+	@cp -rn $(SKELETON_DIR). .
+	@echo "Skeleton files inserted from $(SKELETON_DIR)"
+
+##########################################################################################
+### CLEANING
+##########################################################################################
 
 cleanderived:
 	$(call PRINT_TITLE,"Erasing derived files and directories")
@@ -222,12 +380,15 @@ cleanderived:
 	find . -type d -wholename '**/.pytest_cache' -exec rm -rf {} + && \
 	find . -type d -wholename './logs/*.log' -exec rm -rf {} + && \
 	find . -type d -wholename './.reports/*' -exec rm -rf {} + && \
+	rm -f tests/integration/pipelex/fixtures/_generated_model_sets.py && \
+	rm -f .pipelex-dev/model_availability.json && \
+	rm -rf derived/ && \
 	echo "Cleaned up derived files and directories";
 
 cleanenv:
 	$(call PRINT_TITLE,"Erasing virtual environment")
 	find . -name 'uv.lock' -delete && \
-	find . -type d -wholename './.venv' -exec rm -rf {} + && \
+	rm -rf "$(VIRTUAL_ENV)" && \
 	echo "Cleaned up virtual env and dependency lock files";
 
 cleanconfig:
@@ -244,21 +405,29 @@ cleanall: cleanderived cleanenv cleanconfig
 
 codex-tests: env
 	$(call PRINT_TITLE,"Unit testing for Codex")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for Codex (excluding inference and codex_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst -m "(dry_runnable or not inference) and not (pipelex_api or codex_disabled)" || [ $$? = 5 ]
 
 gha-tests: env
 	$(call PRINT_TITLE,"Unit testing for github actions")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
 	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
+	@echo "• Regenerating test model fixtures"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE)
 	@echo "• Running all unit tests"
 	$(VENV_PYTEST) -n auto --exitfirst --quiet
 
 run-manual-trigger-gha-tests: env
 	$(call PRINT_TITLE,"Running GHA tests")
+	@echo "• Regenerating test model fixtures with ci profile"
+	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running GHA unit tests for inference, llm, and not gha_disabled"
 	$(VENV_PYTEST) --exitfirst --quiet -m "not (gha_disabled or pipelex_api) and (inference or llm)" || [ $$? = 5 ]
 
@@ -335,6 +504,10 @@ tb: env
 
 test-inference-with-prints: env
 	$(call PRINT_TITLE,"Unit testing")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -347,6 +520,10 @@ test-inference-with-prints: env
 
 test-inference-fast: env
 	$(call PRINT_TITLE,"Unit testing")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -377,6 +554,10 @@ ti-dry: env
 
 test-llm: env
 	$(call PRINT_TITLE,"Unit testing LLM")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "llm" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -392,6 +573,10 @@ tl: test-llm
 
 test-extract: env
 	$(call PRINT_TITLE,"Unit testing Extract")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "extract" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -407,6 +592,10 @@ te: test-extract
 
 test-img-gen: env
 	$(call PRINT_TITLE,"Unit testing Image Generation")
+	@if [ "$(origin TEST_PROFILE)" = "command line" ] || [ "$(origin PROF)" = "command line" ]; then \
+		echo "• Regenerating test model fixtures with profile: $(TEST_PROFILE)"; \
+		$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile $(TEST_PROFILE); \
+	fi
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --pipe-run-mode live --exitfirst -m "img_gen" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
@@ -434,6 +623,51 @@ test-pipelex-api: env
 
 ta: test-pipelex-api
 	@echo "> done: ta = test-pipelex-api"
+
+agent-test: env
+	@echo "• Running unit tests..."
+	@tmpfile=$$(mktemp); \
+	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=short -q > "$$tmpfile" 2>&1; \
+	exit_code=$$?; \
+	if [ $$exit_code -ne 0 ]; then grep -vE '\[\s*[0-9]+%\]\s*$$' "$$tmpfile"; fi; \
+	rm -f "$$tmpfile"; \
+	if [ $$exit_code -eq 0 ]; then echo "• All tests passed."; fi; \
+	exit $$exit_code
+
+##########################################################################################
+### TEST DIAGNOSTICS
+##########################################################################################
+
+TOP ?= 30
+MIN ?= 0.5
+
+test-durations: env
+	$(call PRINT_TITLE,"Slowest tests - xdist - top=$(TOP) min=$(MIN)s")
+	$(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --durations=$(TOP) --durations-min=$(MIN) --tb=no -q
+
+td: test-durations
+	@echo "> done: td = test-durations"
+
+test-durations-serial: env
+	$(call PRINT_TITLE,"Slowest tests - serial - top=$(TOP) min=$(MIN)s")
+	$(VENV_PYTEST) -p no:xdist -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --durations=$(TOP) --durations-min=$(MIN) --tb=no -q
+
+tds: test-durations-serial
+	@echo "> done: tds = test-durations-serial"
+
+test-time: env
+	$(call PRINT_TITLE,"Timed test run - xdist")
+	@time $(VENV_PYTEST) -n auto -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=no -q --no-header 2>&1 | tail -1
+
+tt: test-time
+	@echo "> done: tt = test-time"
+
+test-time-serial: env
+	$(call PRINT_TITLE,"Timed test run - serial")
+	@time $(VENV_PYTEST) -p no:xdist -m $(USUAL_PYTEST_MARKERS) -o log_level=WARNING --tb=no -q --no-header 2>&1 | tail -1
+
+tts: test-time-serial
+	@echo "> done: tts = test-time-serial"
 
 cov: env
 	$(call PRINT_TITLE,"Unit testing with coverage")
@@ -464,17 +698,31 @@ cov-missing: env
 cm: cov-missing
 	@echo "> done: cm = cov-missing"
 
-############################################################################################
-############################               Linting              ############################
-############################################################################################
+##########################################################################################
+### FORMATTING, LINTING, AND TYPECHECKING
+##########################################################################################
 
-format: env
+ruff-format: env
 	$(call PRINT_TITLE,"Formatting with ruff")
 	$(VENV_RUFF) format . --config pyproject.toml
 
-lint: env
+ruff-lint: env
 	$(call PRINT_TITLE,"Linting with ruff")
 	$(VENV_RUFF) check . --fix --config pyproject.toml
+
+plxt-format: env
+	$(call PRINT_TITLE,"Formatting MTHDS/TOML with plxt")
+	$(VENV_PLXT) fmt
+
+plxt-lint: env
+	$(call PRINT_TITLE,"Linting MTHDS/TOML with plxt")
+	$(VENV_PLXT) lint
+
+format: ruff-format plxt-format
+	@echo "> done: format = ruff-format plxt-format"
+
+lint: ruff-lint plxt-lint
+	@echo "> done: lint = ruff-lint plxt-lint"
 
 pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
@@ -503,15 +751,23 @@ merge-check-ruff-lint: env check-unused-imports
 
 merge-check-pyright: env
 	$(call PRINT_TITLE,"Typechecking with pyright")
-	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON)
+	$(VENV_PYRIGHT) --pythonpath $(VENV_PYTHON) --project pyproject.toml $(if $(LINT_PYTHON_VERSION),--pythonversion $(LINT_PYTHON_VERSION))
 
 merge-check-mypy: env
 	$(call PRINT_TITLE,"Typechecking with mypy")
-	$(VENV_MYPY) --config-file pyproject.toml
+	$(VENV_MYPY) --config-file pyproject.toml $(if $(LINT_PYTHON_VERSION),--python-version $(LINT_PYTHON_VERSION))
 
 merge-check-pylint: env
 	$(call PRINT_TITLE,"Linting with pylint")
 	$(VENV_PYLINT) --rcfile pyproject.toml .
+
+merge-check-plxt-format: env
+	$(call PRINT_TITLE,"Checking MTHDS/TOML formatting with plxt")
+	$(VENV_PLXT) fmt --check
+
+merge-check-plxt-lint: env
+	$(call PRINT_TITLE,"Linting MTHDS/TOML with plxt")
+	$(VENV_PLXT) lint
 
 ##########################################################################################
 ### MISCELLANEOUS
@@ -538,6 +794,31 @@ check-TODOs: env
 
 # Extract version from pyproject.toml for docs deployment
 DOCS_VERSION := $(shell grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
+
+define ROOT_ROBOTS_TXT
+User-agent: *
+Allow: /latest/
+Disallow: /
+Sitemap: https://$(SITE_DOMAIN)/latest/sitemap.xml
+endef
+export ROOT_ROBOTS_TXT
+
+define ROOT_INDEX_HTML
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Redirecting to latest documentation...</title>
+    <meta http-equiv="refresh" content="0;url=/latest/">
+    <link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
+</head>
+<body>
+    <p>Redirecting to <a href="/latest/">latest documentation</a>...</p>
+</body>
+</html>
+endef
+export ROOT_INDEX_HTML
 
 docs: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
@@ -559,25 +840,80 @@ docs-deploy: env
 	$(call PRINT_TITLE,"Deploying documentation version $(if $(VERSION),$(VERSION),$(DOCS_VERSION))")
 	$(VENV_MIKE) deploy $(if $(VERSION),$(VERSION),$(DOCS_VERSION))
 
-docs-deploy-stable: env docs-deploy-404
+docs-deploy-stable: env
 	$(call PRINT_TITLE,"Deploying stable documentation $(DOCS_VERSION) with latest alias")
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) latest
 	$(VENV_MIKE) set-default --push latest
+	$(MAKE) docs-deploy-root
 
-docs-deploy-beta: env docs-deploy-404
-	$(call PRINT_TITLE,"Deploying pre-release documentation $(DOCS_VERSION)-beta")
-	$(VENV_MIKE) deploy --push $(DOCS_VERSION)-beta
+docs-deploy-specific-version-pre-release: env
+	$(call PRINT_TITLE,"Deploying documentation $(DOCS_VERSION) with pre-release alias")
+	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
+	$(MAKE) docs-deploy-root
 
-docs-deploy-404:
-	$(call PRINT_TITLE,"Deploying 404.html to gh-pages root for versionless URL redirects")
-	@TMPDIR=$$(mktemp -d); \
+docs-deploy-root:
+ifeq ($(SITE_DOMAIN),)
+	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
+endif
+	$(call PRINT_TITLE,"Deploying root assets (404.html, robots.txt, index.html) to gh-pages")
+	@git fetch origin gh-pages:gh-pages 2>/dev/null || true; \
+	TMPDIR=$$(mktemp -d); \
 	trap "cd '$(CURDIR)'; git worktree remove '$$TMPDIR' 2>/dev/null || true; rm -rf '$$TMPDIR'" EXIT; \
 	git worktree add "$$TMPDIR" gh-pages && \
 	cp docs/404.html "$$TMPDIR/404.html" && \
+	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
+	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
 	cd "$$TMPDIR" && \
-	git add 404.html && \
-	(git diff --cached --quiet || git commit -m "Update 404.html for versionless URL redirects") && \
+	git add 404.html robots.txt index.html && \
+	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html)") && \
 	git push origin gh-pages
+
+docs-delete: env
+ifndef VERSION
+	$(error VERSION is required. Usage: make docs-delete VERSION=x.y.z)
+endif
+	$(call PRINT_TITLE,"Deleting documentation version $(VERSION)")
+	$(VENV_MIKE) delete --push $(VERSION)
+
+##########################################################################################
+### GRAPH VIEWER
+##########################################################################################
+
+GRAPH_SERVER_PORT ?= 8765
+GRAPH_SERVER_DIR ?= temp/test_outputs
+
+serve-graph:
+	$(call PRINT_TITLE,"Starting HTTP server for ReactFlow graphs on port $(GRAPH_SERVER_PORT)")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@echo "Serving $(GRAPH_SERVER_DIR) at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Press Ctrl+C to stop the server"
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR)
+
+serve-graph-bg:
+	$(call PRINT_TITLE,"Starting HTTP server for ReactFlow graphs on port $(GRAPH_SERVER_PORT) (background)")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR) &
+	@echo "Server running at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Run 'make stop-graph-server' to stop"
+
+stop-graph-server:
+	$(call PRINT_TITLE,"Stopping graph viewer HTTP server")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null && echo "Server stopped" || echo "No server running on port $(GRAPH_SERVER_PORT)"
+
+view-graph:
+	$(call PRINT_TITLE,"Opening ReactFlow graph viewer")
+	@pkill -f "python3 -m http.server $(GRAPH_SERVER_PORT)" 2>/dev/null || true
+	@cd "$(CURDIR)" && python3 -m http.server $(GRAPH_SERVER_PORT) --directory $(GRAPH_SERVER_DIR) &
+	@sleep 1
+	@open "http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Server running at http://localhost:$(GRAPH_SERVER_PORT)"
+	@echo "Run 'make stop-graph-server' to stop"
+
+sg: serve-graph
+	@echo "> done: sg = serve-graph"
+
+vg: view-graph
+	@echo "> done: vg = view-graph"
 
 ##########################################################################################
 ### SHORTHANDS
@@ -586,11 +922,17 @@ docs-deploy-404:
 c: format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived c
-	@echo "> done: cc = cleanderived format lint pyright pylint mypy"
+cc: cleanderived regenerate-test-models-quiet c
+	@echo "> done: cc = cleanderived regenerate-test-models format lint pyright pylint mypy"
 
-check: cc check-unused-imports ccs check-rules pylint
+up: generate-mthds-schema update-gateway-models up-kit-configs rules
+	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
+
+check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema pylint
 	@echo "> done: check"
+
+agent-check: fix-unused-imports format lint pyright mypy
+	@echo "> done: agent-check"
 
 v: validate
 	@echo "> done: v = validate"

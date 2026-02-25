@@ -1,26 +1,12 @@
 from __future__ import annotations
 
 import importlib.util
-from datetime import datetime
-from typing import TYPE_CHECKING, Any
 
-from rich import box
-from rich.table import Table
+from rich.markup import escape
 
-from pipelex.cogt.exceptions import MissingDependencyError
-from pipelex.config import get_config
-from pipelex.hub import get_console
-
-if TYPE_CHECKING:
-    from anthropic.types import ModelInfo
-    from openai.types import Model
-
-    from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cli.exceptions import PipelexCLIError
-from pipelex.hub import get_models_manager
-from pipelex.plugins.openai.openai_llms import openai_list_available_models
-from pipelex.plugins.plugin_sdk_registry import Plugin
-from pipelex.tools.aws.aws_config import AwsCredentialsError
+from pipelex.exceptions import MissingDependencyError
+from pipelex.hub import get_console, get_models_manager
 
 
 class ModelLister:
@@ -66,8 +52,10 @@ class ModelLister:
         for sdk in models_by_sdk:
             try:
                 match sdk:
-                    case "openai" | "azure_openai":
-                        await cls._list_openai_models(
+                    case "openai" | "azure_openai" | "openai_responses" | "azure_openai_responses":
+                        from pipelex.plugins.openai.openai_list import list_openai_models  # noqa: PLC0415
+
+                        await list_openai_models(
                             sdk=sdk,
                             backend_name=backend_name,
                             backend=backend,
@@ -76,7 +64,7 @@ class ModelLister:
                         )
                         any_listed = True
 
-                    case "anthropic" | "bedrock_anthropic":
+                    case "anthropic":
                         if importlib.util.find_spec("anthropic") is None:
                             lib_name = "anthropic"
                             lib_extra_name = "anthropic"
@@ -92,9 +80,10 @@ class ModelLister:
                             )
 
                         from pipelex.plugins.anthropic.anthropic_exceptions import AnthropicSDKUnsupportedError  # noqa: PLC0415
+                        from pipelex.plugins.anthropic.anthropic_list import list_anthropic_models  # noqa: PLC0415
 
                         try:
-                            await cls._list_anthropic_models(
+                            await list_anthropic_models(
                                 sdk=sdk,
                                 backend_name=backend_name,
                                 backend=backend,
@@ -121,9 +110,33 @@ class ModelLister:
                                 msg,
                             )
 
-                        cls._list_mistral_models(
+                        from pipelex.plugins.mistral.mistral_list import list_mistral_models  # noqa: PLC0415
+
+                        list_mistral_models(
                             sdk=sdk,
                             backend_name=backend_name,
+                            flat=flat,
+                            any_listed=any_listed,
+                        )
+                        any_listed = True
+
+                    case "google":
+                        if importlib.util.find_spec("google.genai") is None:
+                            lib_name = "google-genai"
+                            lib_extra_name = "google"
+                            msg = "The google-genai SDK is required to use Google GenAI models."
+                            raise MissingDependencyError(
+                                lib_name,
+                                lib_extra_name,
+                                msg,
+                            )
+
+                        from pipelex.plugins.google.google_list import list_google_models  # noqa: PLC0415
+
+                        await list_google_models(
+                            sdk=sdk,
+                            backend_name=backend_name,
+                            backend=backend,
                             flat=flat,
                             any_listed=any_listed,
                         )
@@ -140,7 +153,9 @@ class ModelLister:
                                 msg,
                             )
 
-                        await cls._list_bedrock_models(
+                        from pipelex.plugins.bedrock.bedrock_list import list_bedrock_models  # noqa: PLC0415
+
+                        list_bedrock_models(
                             sdk=sdk,
                             backend_name=backend_name,
                             backend=backend,
@@ -169,365 +184,6 @@ class ModelLister:
             flat=flat,
         )
 
-    @classmethod
-    async def _list_openai_models(
-        cls,
-        sdk: str,
-        backend_name: str,
-        backend: InferenceBackend,
-        flat: bool,
-        any_listed: bool,
-    ) -> None:
-        """List OpenAI models."""
-        plugin = Plugin(sdk=sdk, backend=backend_name)
-        openai_models = await openai_list_available_models(
-            plugin=plugin,
-            backend=backend,
-        )
-
-        if flat:
-            cls._display_openai_models_flat(
-                models=openai_models,
-                sdk=sdk,
-                backend_name=backend_name,
-                any_listed=any_listed,
-            )
-        else:
-            cls._display_openai_models_table(
-                models=openai_models,
-                sdk=sdk,
-                backend_name=backend_name,
-            )
-
-    @classmethod
-    async def _list_anthropic_models(
-        cls,
-        sdk: str,
-        backend_name: str,
-        backend: InferenceBackend,
-        flat: bool,
-        any_listed: bool,
-    ) -> None:
-        """List Anthropic models."""
-        if importlib.util.find_spec("anthropic") is None:
-            lib_name = "anthropic"
-            lib_extra_name = "anthropic"
-            msg = (
-                "The anthropic SDK is required in order to use Anthropic models via the anthropic client. "
-                "However, you can use Anthropic models through bedrock directly "
-                "by using the 'bedrock-anthropic-claude' llm family. (eg: bedrock-anthropic-claude)"
-            )
-            raise MissingDependencyError(
-                lib_name,
-                lib_extra_name,
-                msg,
-            )
-
-        from anthropic import AuthenticationError  # noqa: PLC0415
-
-        from pipelex.plugins.anthropic.anthropic_llms import anthropic_list_available_models  # noqa: PLC0415
-
-        plugin = Plugin(sdk=sdk, backend=backend_name)
-        try:
-            anthropic_models = await anthropic_list_available_models(
-                plugin=plugin,
-                backend=backend,
-            )
-
-            if flat:
-                cls._display_anthropic_models_flat(
-                    models=anthropic_models,
-                    sdk=sdk,
-                    backend_name=backend_name,
-                    any_listed=any_listed,
-                )
-            else:
-                cls._display_anthropic_models_table(
-                    models=anthropic_models,
-                    sdk=sdk,
-                    backend_name=backend_name,
-                )
-        except AuthenticationError as auth_exc:
-            msg = f"Authentication error for SDK '{sdk}' in backend '{backend_name}': {auth_exc}"
-            raise PipelexCLIError(msg) from auth_exc
-
-    @classmethod
-    def _list_mistral_models(
-        cls,
-        sdk: str,
-        backend_name: str,
-        flat: bool,
-        any_listed: bool,
-    ) -> None:
-        """List Mistral models."""
-        if importlib.util.find_spec("mistralai") is None:
-            lib_name = "mistralai"
-            lib_extra_name = "mistral"
-            msg = (
-                "The mistralai SDK is required in order to use Mistral models through the mistralai client. "
-                "However, you can use Mistral models through bedrock directly "
-                "by using the 'bedrock-mistral' llm family. (eg: bedrock-mistral-large)"
-            )
-            raise MissingDependencyError(
-                lib_name,
-                lib_extra_name,
-                msg,
-            )
-
-        from pipelex.plugins.mistral.mistral_llms import mistral_list_available_models  # noqa: PLC0415
-
-        mistral_models = mistral_list_available_models()
-
-        if flat:
-            cls._display_mistral_models_flat(
-                models=mistral_models,
-                sdk=sdk,
-                backend_name=backend_name,
-                any_listed=any_listed,
-            )
-        else:
-            cls._display_mistral_models_table(
-                models=mistral_models,
-                sdk=sdk,
-                backend_name=backend_name,
-            )
-
-    @classmethod
-    async def _list_bedrock_models(
-        cls,
-        sdk: str,
-        backend_name: str,
-        backend: InferenceBackend,
-        flat: bool,
-        any_listed: bool,
-    ) -> None:
-        """List Bedrock models."""
-        if importlib.util.find_spec("boto3") is None or importlib.util.find_spec("aioboto3") is None:
-            lib_name = "boto3,aioboto3"
-            lib_extra_name = "bedrock"
-            msg = "The boto3 and aioboto3 SDKs are required to use Bedrock models."
-            raise MissingDependencyError(
-                lib_name,
-                lib_extra_name,
-                msg,
-            )
-
-        from pipelex.plugins.bedrock.bedrock_llms import bedrock_list_available_models  # noqa: PLC0415
-
-        plugin = Plugin(sdk=sdk, backend=backend_name)
-
-        try:
-            # Get AWS region for display
-            aws_config = get_config().pipelex.aws_config
-            _, _, aws_region = aws_config.get_aws_access_keys()
-        except AwsCredentialsError as exc:
-            msg = f"Error getting AWS credentials for Bedrock: {exc}"
-            raise PipelexCLIError(msg) from exc
-
-        try:
-            # List available models using the plugin-specific function
-            bedrock_models_list = bedrock_list_available_models(
-                plugin=plugin,
-                backend=backend,
-            )
-
-            if flat:
-                cls._display_bedrock_models_flat(
-                    models=bedrock_models_list,
-                    sdk=sdk,
-                    backend_name=backend_name,
-                    aws_region=aws_region,
-                    any_listed=any_listed,
-                )
-            else:
-                cls._display_bedrock_models_table(
-                    models=bedrock_models_list,
-                    sdk=sdk,
-                    aws_region=aws_region,
-                )
-
-        except Exception as exc:
-            msg = f"Error listing Bedrock models: {exc}"
-            raise PipelexCLIError(msg) from exc
-
-    @staticmethod
-    def _display_openai_models_flat(
-        models: list[Model],
-        sdk: str,
-        backend_name: str,
-        any_listed: bool,
-    ) -> None:
-        """Display OpenAI models in CSV format."""
-        console = get_console()
-        if not any_listed:
-            console.print("model_id,created,owned_by,sdk,backend")
-        for model in models:
-            # Convert Unix timestamp to formatted date
-            if hasattr(model, "created") and model.created:
-                created = datetime.fromtimestamp(model.created).strftime("%Y-%m-%d")  # noqa: DTZ006
-            else:
-                created = "N/A"
-            owned_by = model.owned_by if hasattr(model, "owned_by") else "N/A"
-            console.print(f"{model.id},{created},{owned_by},{sdk},{backend_name}")
-
-    @staticmethod
-    def _display_openai_models_table(
-        models: list[Model],
-        sdk: str,
-        backend_name: str,
-    ) -> None:
-        """Display OpenAI models in table format."""
-        table = Table(
-            title=f"Available Models for Backend '{backend_name}' (SDK: {sdk})",
-            show_header=True,
-            header_style="bold cyan",
-            box=box.SQUARE_DOUBLE_HEAD,
-        )
-        table.add_column("Model ID", style="green")
-        table.add_column("Created", style="yellow")
-        table.add_column("Owned By", style="blue")
-
-        for model in models:
-            # Convert Unix timestamp to formatted date
-            if hasattr(model, "created") and model.created:
-                created = datetime.fromtimestamp(model.created).strftime("%Y-%m-%d")  # noqa: DTZ006
-            else:
-                created = "N/A"
-            owned_by = model.owned_by if hasattr(model, "owned_by") else "N/A"
-            table.add_row(model.id, created, owned_by)
-        console = get_console()
-        console.print("\n")
-        console.print(table)
-        console.print("\n")
-
-    @staticmethod
-    def _display_anthropic_models_flat(
-        models: list[ModelInfo],
-        sdk: str,
-        backend_name: str,
-        any_listed: bool,
-    ) -> None:
-        """Display Anthropic models in CSV format."""
-        console = get_console()
-        if not any_listed:
-            console.print("model_id,display_name,created_at,sdk,backend")
-        for anthropic_model in models:
-            created_date = anthropic_model.created_at.strftime("%Y-%m-%d") if anthropic_model.created_at else "N/A"
-            display_name = anthropic_model.display_name.replace(",", ";") if anthropic_model.display_name else "N/A"
-            console.print(f"{anthropic_model.id},{display_name},{created_date},{sdk},{backend_name}")
-
-    @staticmethod
-    def _display_anthropic_models_table(
-        models: list[ModelInfo],
-        sdk: str,
-        backend_name: str,
-    ) -> None:
-        """Display Anthropic models in table format."""
-        table = Table(
-            title=f"Available Models for Backend '{backend_name}' (SDK: {sdk})",
-            show_header=True,
-            header_style="bold cyan",
-            box=box.SQUARE_DOUBLE_HEAD,
-        )
-        table.add_column("Model ID", style="green")
-        table.add_column("Display Name", style="blue")
-        table.add_column("Created At", style="yellow")
-
-        for anthropic_model in models:
-            created_date = anthropic_model.created_at.strftime("%Y-%m-%d") if anthropic_model.created_at else "N/A"
-            table.add_row(anthropic_model.id, anthropic_model.display_name, created_date)
-
-        console = get_console()
-        console.print("\n")
-        console.print(table)
-        console.print("\n")
-
-    @staticmethod
-    def _display_mistral_models_flat(
-        models: list[Any],
-        sdk: str,
-        backend_name: str,
-        any_listed: bool,
-    ) -> None:
-        """Display Mistral models in CSV format."""
-        console = get_console()
-        if not any_listed:
-            console.print("model_id,max_context_length,sdk,backend")
-        for mistral_model in models:
-            max_ctx = str(mistral_model.max_context_length) if mistral_model.max_context_length else "N/A"
-            console.print(f"{mistral_model.id},{max_ctx},{sdk},{backend_name}")
-
-    @staticmethod
-    def _display_mistral_models_table(
-        models: list[Any],
-        sdk: str,
-        backend_name: str,
-    ) -> None:
-        """Display Mistral models in table format."""
-        table = Table(
-            title=f"Available Models for Backend '{backend_name}' (SDK: {sdk})",
-            show_header=True,
-            header_style="bold cyan",
-            box=box.SQUARE_DOUBLE_HEAD,
-        )
-        table.add_column("Model ID", style="green")
-        table.add_column("Max Context Length", style="yellow")
-
-        for mistral_model in models:
-            max_ctx = str(mistral_model.max_context_length) if mistral_model.max_context_length else "N/A"
-            table.add_row(mistral_model.id, max_ctx)
-
-        console = get_console()
-        console.print("\n")
-        console.print(table)
-        console.print("\n")
-
-    @staticmethod
-    def _display_bedrock_models_flat(
-        models: list[dict[str, Any]],
-        sdk: str,
-        backend_name: str,
-        aws_region: str,
-        any_listed: bool,
-    ) -> None:
-        """Display Bedrock models in CSV format."""
-        console = get_console()
-        if not any_listed:
-            console.print("model_id,provider,model_arn,sdk,backend,region")
-        for bedrock_model in models:  # pyright: ignore[reportUnknownVariableType]
-            model_id = bedrock_model.get("modelId", "N/A")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-            provider = bedrock_model.get("providerName", "N/A")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-            model_arn = bedrock_model.get("modelArn", "N/A")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-            console.print(f"{model_id},{provider},{model_arn},{sdk},{backend_name},{aws_region}")  # pyright: ignore[reportUnknownArgumentType]
-
-    @staticmethod
-    def _display_bedrock_models_table(
-        models: list[dict[str, Any]],
-        sdk: str,
-        aws_region: str,
-    ) -> None:
-        """Display Bedrock models in table format."""
-        table = Table(
-            title=f"Available Bedrock Models in {aws_region} (SDK: {sdk})",
-            show_header=True,
-            header_style="bold cyan",
-            box=box.SQUARE_DOUBLE_HEAD,
-        )
-        table.add_column("Model ID", style="green")
-        table.add_column("Provider", style="blue")
-        table.add_column("Model ARN", style="yellow")
-
-        for bedrock_model in models:  # pyright: ignore[reportUnknownVariableType]
-            model_id = bedrock_model.get("modelId", "N/A")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-            provider = bedrock_model.get("providerName", "N/A")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-            model_arn = bedrock_model.get("modelArn", "N/A")  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
-            table.add_row(model_id, provider, model_arn)  # pyright: ignore[reportUnknownArgumentType]
-
-        console = get_console()
-        console.print("\n")
-        console.print(table)
-        console.print("\n")
-
     @staticmethod
     def _display_unsupported_sdks_message(
         any_listed: bool,
@@ -540,10 +196,12 @@ class ModelLister:
         if not any_listed and unsupported_sdks:
             console = get_console()
             if not flat:
-                console.print(f"\n[yellow]Note: Backend '{backend_name}' has models using SDKs that don't support remote listing:[/yellow]")
+                console.print(
+                    f"\n[yellow]Note: Backend '{escape(backend_name)}' has models using SDKs that we don't support for remote listing:[/yellow]"
+                )
                 for sdk in unsupported_sdks:
                     console.print(f"  • {sdk} ({len(models_by_sdk[sdk])} configured model(s))")
                 console.print("\n[dim]Configured models are still available for use in pipelines.[/dim]\n")
             else:
                 # In flat mode, just print a simple comment
-                console.print(f"# Note: Backend '{backend_name}' has {len(unsupported_sdks)} SDK(s) that don't support remote listing")
+                console.print(f"# Note: Backend '{escape(backend_name)}' has {len(unsupported_sdks)} SDK(s) that we don't support for remote listing")

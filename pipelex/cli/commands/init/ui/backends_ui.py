@@ -150,9 +150,12 @@ def build_backend_selection_panel(
     )
 
 
-def prompt_backend_indices(
-    console: Console, backend_options: list[tuple[str, str]], currently_enabled: list[int] | None = None, is_first_time_setup: bool = False
-) -> list[int]:
+def prompt_backend_select(
+    console: Console,
+    backend_options: list[tuple[str, str]],
+    currently_enabled: list[int] | None = None,
+    is_first_time_setup: bool = False,
+) -> tuple[list[int], set[str]]:
     """Prompt user to select backend indices with validation.
 
     Args:
@@ -162,17 +165,19 @@ def prompt_backend_indices(
         is_first_time_setup: Whether this is the first time backends are being set up.
 
     Returns:
-        List of validated backend indices (0-based) selected by the user.
+        A tuple of (selected_indices, selected_backend_keys) where:
+            - selected_indices: List of validated backend indices (0-based).
+            - selected_backend_keys: Set of backend keys corresponding to selected indices.
 
     Raises:
         typer.Exit: If user chooses to quit.
     """
-    # Determine default based on current selection or fallback to first option (pipelex_inference)
+    # Determine default based on current selection or fallback to first option (pipelex_gateway)
     if currently_enabled and not is_first_time_setup:
         default_indices = sorted(currently_enabled)
         default_str = ",".join(str(i + 1) for i in default_indices)
     else:
-        # For first-time setup or no current selection, default to pipelex_inference (index 0)
+        # For first-time setup or no current selection, default to pipelex_gateway (index 0)
         default_indices = [0]
         default_str = "1"
 
@@ -223,7 +228,10 @@ def prompt_backend_indices(
                 f"Please enter numbers separated by commas or spaces, [cyan]a[/cyan] for all, or [cyan]q[/cyan] to quit.\n"
             )
 
-    return selected_indices
+    # Build set of selected backend keys
+    selected_backend_keys = {backend_options[idx][0] for idx in selected_indices}
+
+    return selected_indices, selected_backend_keys
 
 
 def display_selected_backends(console: Console, selected_indices: list[int], backend_options: list[tuple[str, str]]) -> None:

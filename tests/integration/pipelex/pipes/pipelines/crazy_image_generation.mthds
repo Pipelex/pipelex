@@ -1,0 +1,42 @@
+domain      = "crazy_image_generation"
+description = "Imagining and rendering absurd, funny images with unexpected surreal elements"
+main_pipe   = "generate_crazy_image"
+
+[concept.ImagePrompt]
+description = """
+A detailed textual description of a scene to be used as input for an image generation model, including subjects, setting, style, and visual details.
+"""
+refines = "Text"
+
+[pipe.generate_crazy_image]
+type = "PipeSequence"
+description = """
+Main pipeline that orchestrates the full crazy image generation flow - imagines a wild, absurd scene concept and renders it as an image
+"""
+output = "Image"
+steps = [
+  { pipe = "imagine_scene", result = "image_prompt" },
+  { pipe = "render_image", result = "crazy_image" },
+]
+
+[pipe.imagine_scene]
+type = "PipeLLM"
+description = """
+Generates a creative, absurd, and hilarious image concept combining unexpected elements in surreal ways - think flying spaghetti monsters, penguins in business suits at a disco, or a T-Rex doing yoga on the moon
+"""
+output = "ImagePrompt"
+model = "$img-gen-prompting-cheap"
+system_prompt = """
+You are a wildly creative visual concept artist specializing in absurd, surreal, and hilarious imagery. Your task is to generate a structured image prompt that combines unexpected elements in surprising and funny ways. Think outside the box - the more unexpected the combination, the better!
+"""
+prompt = """
+Generate a creative, absurd, and funny image concept. Combine unexpected elements in a surreal way that would make viewers laugh or do a double-take. Be VERY concise and focus on vivid, specific visual details that work well for image generation.
+"""
+
+[pipe.render_image]
+type        = "PipeImgGen"
+description = "Generates the absurd image based on the creative scene description"
+inputs      = { image_prompt = "ImagePrompt" }
+output      = "Image"
+prompt      = "$image_prompt"
+model       = "@default-small"

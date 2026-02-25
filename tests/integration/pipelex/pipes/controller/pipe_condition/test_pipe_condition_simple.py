@@ -1,8 +1,7 @@
 from pathlib import Path
-from typing import Callable, cast
+from typing import Callable
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_factory import ConceptFactory
@@ -17,6 +16,7 @@ from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
 from pipelex.pipe_controllers.condition.pipe_condition_blueprint import PipeConditionBlueprint
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -29,7 +29,7 @@ from tests.integration.pipelex.pipes.controller.pipe_condition.pipe_condition im
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeConditionSimple:
     async def test_condition_long_text_processing(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
     ):
         """Test PipeCondition with long text that should trigger capitalize_long_text pipe."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
@@ -55,7 +55,7 @@ class TestPipeConditionSimple:
 
         working_memory = WorkingMemoryFactory.make_from_single_stuff(input_text_stuff)
 
-        assert pipe_condition.domain == "test_integration"
+        assert pipe_condition.domain_code == "test_integration"
         assert pipe_condition.code == "text_length_condition"
         assert pipe_condition.outcome_map == {"long": "capitalize_long_text", "short": "add_prefix_short_text"}
 
@@ -65,7 +65,7 @@ class TestPipeConditionSimple:
         assert input_text.content.text == "hello world"
 
         pipe_output = await pipe_condition.run_pipe(
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -79,7 +79,7 @@ class TestPipeConditionSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hello world" (11 chars > 5) -> expression="long" -> capitalize_long_text -> "LONG: HELLO WORLD"
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result.content.text == "LONG: HELLO WORLD"
 
         # Verify working memory structure
@@ -96,16 +96,19 @@ class TestPipeConditionSimple:
         final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result_in_memory.content.text == "LONG: HELLO WORLD"
-        assert f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        assert (
+            f"{final_result_in_memory.concept.domain_code}.{final_result_in_memory.concept.code}"
+            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        )
 
     async def test_condition_short_text_processing(
-        self, request: FixtureRequest, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
+        self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, load_test_library: Callable[[list[Path]], None]
     ):
         """Test PipeCondition with short text that should trigger add_prefix_short_text pipe."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
-        # Create PipeCondition instance - pipes are loaded from PLX files
+        # Create PipeCondition instance - pipes are loaded from MTHDS files
         pipe_condition_blueprint = PipeConditionBlueprint(
             description="Text length condition for short text testing",
             inputs={"input_text": f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"},
@@ -138,7 +141,7 @@ class TestPipeConditionSimple:
 
         # Actually run the PipeCondition pipe
         pipe_output = await pipe_condition.run_pipe(
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
         )
@@ -152,7 +155,7 @@ class TestPipeConditionSimple:
         final_result = pipe_output.main_stuff
         assert isinstance(final_result.content, TextContent)
         # Should be: "hi" (2 chars <= 5) -> expression="short" -> add_prefix_short_text -> "SHORT: hi"
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result.content.text == "SHORT: hi"
 
         # Verify working memory structure
@@ -169,11 +172,16 @@ class TestPipeConditionSimple:
         final_result_in_memory = final_working_memory.get_main_stuff()
         assert final_result_in_memory is not None
         assert isinstance(final_result_in_memory.content, TextContent)
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert final_result_in_memory.content.text == "SHORT: hi"
-        assert f"{final_result_in_memory.concept.domain}.{final_result_in_memory.concept.code}" == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        assert (
+            f"{final_result_in_memory.concept.domain_code}.{final_result_in_memory.concept.code}"
+            == f"{SpecialDomain.NATIVE}.{NativeConceptCode.TEXT}"
+        )
 
-    async def test_condition_dry_run_success(self, request: FixtureRequest, load_test_library: Callable[[list[Path]], None]):
+    async def test_condition_dry_run_success(
+        self, pipe_run_mode: PipeRunMode, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeCondition dry run with valid inputs using real pipe - should succeed."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create test data using CategoryInput for the real pipe basic_condition_by_category_2
@@ -181,7 +189,7 @@ class TestPipeConditionSimple:
         input_data_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="CategoryInput",
-                domain="test_pipe_condition_2",
+                domain_code="test_pipe_condition_2",
                 description="test_pipe_condition_2.CategoryInput",
                 structure_class_name="CategoryInput",
             ),
@@ -195,9 +203,9 @@ class TestPipeConditionSimple:
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
-                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=job_metadata,
             ),
         )
         pretty_print(pipe_output)
@@ -220,31 +228,39 @@ class TestPipeConditionSimple:
             assert isinstance(original_input.content, CategoryInput)
             assert original_input.content.category == "small"
 
-    async def test_condition_dry_run_missing_inputs_failure(self, request: FixtureRequest, load_test_library: Callable[[list[Path]], None]):
+    async def test_condition_dry_run_missing_inputs_failure(
+        self, pipe_run_mode: PipeRunMode, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeCondition dry run with missing inputs using real pipe - should fail with PipeRouterError."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create empty working memory - missing required input
         empty_working_memory = WorkingMemoryFactory.make_empty()
 
         # Run dry run using the real pipe - this should fail with PipeRouterError
-        with pytest.raises(PipeRunInputsError) as exc_info:
+        with pytest.raises(PipeRouterError) as exc_info:
             await get_pipe_router().run(
                 pipe_job=PipeJobFactory.make_pipe_job(
                     pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
-                    pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                    pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                     working_memory=empty_working_memory,
-                    job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                    job_metadata=job_metadata,
                 ),
             )
 
         # Verify the error details
         error = exc_info.value
         assert error.pipe_code == "basic_condition_by_category_2"
-        assert error.missing_inputs is not None
-        assert "input_data" in error.missing_inputs
-        assert "Missing required inputs" in str(error)
+        assert "missing required inputs" in str(error)
 
-    async def test_condition_dry_run_medium_category_validation(self, request: FixtureRequest, load_test_library: Callable[[list[Path]], None]):
+        # Check the underlying cause is PipeRunInputsError with missing_inputs details
+        cause = error.__cause__
+        assert isinstance(cause, PipeRunInputsError)
+        assert cause.missing_inputs is not None
+        assert "input_data" in cause.missing_inputs
+
+    async def test_condition_dry_run_medium_category_validation(
+        self, pipe_run_mode: PipeRunMode, job_metadata: JobMetadata, load_test_library: Callable[[list[Path]], None]
+    ):
         """Test PipeCondition dry run with medium category - should validate the 'medium' branch."""
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_condition")])
         # Create test data using CategoryInput for the medium category
@@ -252,7 +268,7 @@ class TestPipeConditionSimple:
         input_data_stuff = StuffFactory.make_stuff(
             concept=ConceptFactory.make(
                 concept_code="CategoryInput",
-                domain="test_pipe_condition_2",
+                domain_code="test_pipe_condition_2",
                 description="test_pipe_condition_2.CategoryInput",
                 structure_class_name="CategoryInput",
             ),
@@ -266,9 +282,9 @@ class TestPipeConditionSimple:
         pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code="basic_condition_by_category_2"),
-                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=PipeRunMode.DRY),
+                pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
                 working_memory=working_memory,
-                job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+                job_metadata=job_metadata,
             ),
         )
 

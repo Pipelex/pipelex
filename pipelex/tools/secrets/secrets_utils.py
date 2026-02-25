@@ -32,7 +32,11 @@ class VarPrefix(StrEnum):
     SECRET = "secret"
 
 
-def substitute_vars(content: str, secrets_provider: SecretsProviderAbstract) -> str:
+def substitute_vars(
+    content: str,
+    secrets_provider: SecretsProviderAbstract,
+    raise_on_missing_var: bool = True,
+) -> str:
     """Substitute variable placeholders with values from environment variables or secrets.
 
     Supports the following placeholder formats:
@@ -44,44 +48,52 @@ def substitute_vars(content: str, secrets_provider: SecretsProviderAbstract) -> 
     Args:
         content: Text content with variable placeholders
         secrets_provider: The secrets provider to use for secret lookups
+        raise_on_missing_var: If True (default), raise VarNotFoundError when a variable
+            is not found. If False, keep the original placeholder in the output.
 
     Returns:
         Content with variables substituted
 
     Raises:
         VarNotFoundError: If required variable is missing from all specified sources
+            and raise_on_missing_var is True
 
     """
 
     def replace_var(match: re.Match[str]) -> str:
         var_spec = match.group(1)
 
-        # Check if it's a fallback pattern (contains |)
-        if "|" in var_spec:
-            return _handle_fallback_pattern(var_spec, secrets_provider)
+        try:
+            # Check if it's a fallback pattern (contains |)
+            if "|" in var_spec:
+                return _handle_fallback_pattern(var_spec, secrets_provider)
 
-        # Check if it has a prefix (env: or secret:)
-        if ":" in var_spec:
-            prefix_str, var_name = var_spec.split(":", 1)
-            prefix_str = prefix_str.strip()
+            # Check if it has a prefix (env: or secret:)
+            if ":" in var_spec:
+                prefix_str, var_name = var_spec.split(":", 1)
+                prefix_str = prefix_str.strip()
 
-            try:
-                prefix = VarPrefix(prefix_str)
-            except ValueError as exc:
-                msg = f"Unknown variable prefix: '{prefix_str}'"
-                raise UnknownVarPrefixError(
-                    var_name=var_name,
-                    message=msg,
-                ) from exc
+                try:
+                    prefix = VarPrefix(prefix_str)
+                except ValueError as exc:
+                    msg = f"Unknown variable prefix: '{prefix_str}'"
+                    raise UnknownVarPrefixError(
+                        var_name=var_name,
+                        message=msg,
+                    ) from exc
 
-            match prefix:
-                case VarPrefix.ENV:
-                    return _get_env_var(var_name)
-                case VarPrefix.SECRET:
-                    return _get_secret(var_name, secrets_provider)
-        else:
-            # Default behavior: use secrets provider
-            return _get_secret(var_spec, secrets_provider)
+                match prefix:
+                    case VarPrefix.ENV:
+                        return _get_env_var(var_name)
+                    case VarPrefix.SECRET:
+                        return _get_secret(var_name, secrets_provider)
+            else:
+                # Default behavior: use secrets provider
+                return _get_secret(var_spec, secrets_provider)
+        except (VarNotFoundError, VarFallbackPatternError):
+            if raise_on_missing_var:
+                raise
+            return match.group(0)  # Keep original placeholder
 
     # Pattern matches ${VAR_NAME} or ${prefix:VAR_NAME} or ${env:VAR|secret:VAR}
     # Restrict to not match across newlines, quotes, or nested braces

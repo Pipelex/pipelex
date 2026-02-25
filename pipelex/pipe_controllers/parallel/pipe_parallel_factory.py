@@ -2,10 +2,10 @@ from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from pipelex.core.concepts.concept import Concept
 from pipelex.core.concepts.concept_factory import ConceptFactory
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.hub import get_required_concept
 from pipelex.pipe_controllers.parallel.exceptions import PipeParallelFactoryError
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
@@ -25,13 +25,13 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
         pipe_type: str,
         pipe_code: str,
         domain_code: str,
-        description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        description: str,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeParallelBlueprint,
     ) -> PipeParallel:
         parallel_sub_pipes: list[SubPipe] = []
-        for sub_pipe_blueprint in blueprint.parallels:
+        for sub_pipe_blueprint in blueprint.branches:
             if not sub_pipe_blueprint.result:
                 msg = f"Unexpected error in pipe '{pipe_code}': PipeParallel requires a result specified for each parallel sub pipe"
                 raise PipeParallelFactoryError(message=msg)
@@ -48,13 +48,13 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
 
         # Handle combined_output if specified
         if blueprint.combined_output:
-            combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_string_or_code(
-                domain=domain_code,
-                concept_string_or_code=blueprint.combined_output,
+            combined_output_domain_and_code = ConceptFactory.make_domain_and_concept_code_from_concept_ref_or_code(
+                domain_code=domain_code,
+                concept_ref_or_code=blueprint.combined_output,
             )
             combined_output = get_required_concept(
-                concept_string=ConceptFactory.make_concept_string_with_domain(
-                    domain=combined_output_domain_and_code.domain,
+                concept_ref=ConceptFactory.make_concept_ref_with_domain(
+                    domain_code=combined_output_domain_and_code.domain_code,
                     concept_code=combined_output_domain_and_code.concept_code,
                 ),
             )
@@ -62,7 +62,7 @@ class PipeParallelFactory(PipeFactoryProtocol[PipeParallelBlueprint, PipeParalle
             combined_output = None
 
         return PipeParallel(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             inputs=inputs,

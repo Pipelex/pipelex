@@ -1,13 +1,20 @@
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from typing_extensions import override
 
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_factory import PipeFactoryProtocol
+from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.variable_multiplicity import parse_concept_with_multiplicity
+from pipelex.pipe_operators.img_gen.img_gen_prompt_blueprint import ImgGenPromptBlueprint
 from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.pipe_operators.shared.template_image_analyzer import TemplateImageAnalyzer
+
+if TYPE_CHECKING:
+    from pipelex.pipe_operators.shared.image_reference import ImageReference
 
 
 class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
@@ -19,9 +26,9 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         pipe_type: str,
         pipe_code: str,
         domain_code: str,
-        description: str | None,
-        inputs: InputRequirements,
-        output: Concept,
+        description: str,
+        inputs: InputStuffSpecs,
+        output: StuffSpec,
         blueprint: PipeImgGenBlueprint,
     ) -> PipeImgGen:
         # Parse output for multiplicity (may have brackets like "Image[]" or "Image[3]")
@@ -30,25 +37,68 @@ class PipeImgGenFactory(PipeFactoryProtocol[PipeImgGenBlueprint, PipeImgGen]):
         # Convert bracket notation to output_multiplicity (default to 1 if no brackets)
         final_multiplicity = output_parse_result.multiplicity if isinstance(output_parse_result.multiplicity, int) else 1
 
-        img_gen_prompt = blueprint.img_gen_prompt
-        img_gen_prompt_var_name = blueprint.img_gen_prompt_var_name
+        prompt_blueprint = TemplateBlueprint(
+            template=blueprint.prompt,
+            category=TemplateCategory.IMG_GEN_PROMPT,
+        )
+        negative_prompt_blueprint = (
+            TemplateBlueprint(
+                template=blueprint.negative_prompt,
+                category=TemplateCategory.IMG_GEN_PROMPT,
+            )
+            if blueprint.negative_prompt
+            else None
+        )
 
-        # If we have inputs, that means that the prompt is in the inputs.
-        # The blueprint already validated that there is only 1 input.
+        # Analyze both prompts for image references
+        # Images may be referenced in positive prompt, negative prompt, or both
+        image_references: list[ImageReference] | None = None
         if blueprint.inputs:
-            img_gen_prompt_var_name = blueprint.input_names[0]
-        else:
-            img_gen_prompt = blueprint.img_gen_prompt
+            all_image_refs: list[ImageReference] = []
+            seen_paths: set[str] = set()
+
+            # Analyze positive prompt
+            if blueprint.prompt:
+                prompt_refs = TemplateImageAnalyzer.analyze_template_for_images(
+                    template_source=blueprint.prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                    template_category=TemplateCategory.IMG_GEN_PROMPT,
+                )
+                for ref in prompt_refs:
+                    if ref.variable_path not in seen_paths:
+                        all_image_refs.append(ref)
+                        seen_paths.add(ref.variable_path)
+
+            # Analyze negative prompt
+            if blueprint.negative_prompt:
+                negative_refs = TemplateImageAnalyzer.analyze_template_for_images(
+                    template_source=blueprint.negative_prompt,
+                    input_specs=blueprint.inputs,
+                    domain_code=domain_code,
+                    template_category=TemplateCategory.IMG_GEN_PROMPT,
+                )
+                for ref in negative_refs:
+                    if ref.variable_path not in seen_paths:
+                        all_image_refs.append(ref)
+                        seen_paths.add(ref.variable_path)
+
+            image_references = all_image_refs or None
+
+        img_gen_prompt_blueprint = ImgGenPromptBlueprint(
+            prompt_blueprint=prompt_blueprint,
+            negative_prompt_blueprint=negative_prompt_blueprint,
+            image_references=image_references,
+        )
 
         return PipeImgGen(
-            domain=domain_code,
+            domain_code=domain_code,
             code=pipe_code,
             description=description,
             inputs=inputs,
             output=output,
             output_multiplicity=final_multiplicity,
-            img_gen_prompt=img_gen_prompt,
-            img_gen_prompt_var_name=img_gen_prompt_var_name,
+            img_gen_prompt_blueprint=img_gen_prompt_blueprint,
             img_gen_choice=blueprint.model,
             aspect_ratio=blueprint.aspect_ratio,
             is_raw=blueprint.is_raw,

@@ -199,6 +199,26 @@ def snake_to_capitalize_first_letter(snake_str: str) -> str:
     return phrase.capitalize()
 
 
+def snake_to_title_case(snake_str: str) -> str:
+    """Converts a snake_case string to Title Case with spaces.
+
+    This function splits the string at underscores, joins the components with spaces,
+    and capitalizes the first letter of each word.
+
+    Args:
+        snake_str (str): The snake_case string to convert (e.g., "hello_world").
+
+    Returns:
+        str: The Title Case string with spaces (e.g., "Hello World").
+
+    Example:
+        >>> snake_to_title_case("cv_matching_graph")
+        'Cv Matching Graph'
+
+    """
+    return snake_str.replace("_", " ").title()
+
+
 def is_snake_case(word: str) -> bool:
     return re.match(r"^[a-z][a-z0-9_]*$", word) is not None
 
@@ -244,6 +264,32 @@ def normalize_to_ascii(text: str) -> str:
     normalized = unicodedata.normalize("NFKD", text)
     # Keep only ASCII letters, numbers, and underscores
     return "".join(c for c in normalized if ord(c) < 128 and (c.isalnum() or c == "_"))
+
+
+def get_root_from_dotted_path(dotted_path: str) -> str:
+    """Extract the root segment from a dot-separated path.
+
+    This function returns the first segment of a dotted path (everything before
+    the first dot). If there is no dot, returns the entire string unchanged.
+
+    Args:
+        dotted_path: A string that may contain dots as separators (e.g., "object.attribute.sub").
+
+    Returns:
+        The first segment before the first dot, or the whole string if no dot exists.
+
+    Examples:
+        >>> get_root_from_dotted_path("foo.bar.baz")
+        'foo'
+        >>> get_root_from_dotted_path("foo.bar")
+        'foo'
+        >>> get_root_from_dotted_path("foo")
+        'foo'
+        >>> get_root_from_dotted_path("")
+        ''
+
+    """
+    return dotted_path.split(".", 1)[0]
 
 
 def matches_wildcard_pattern(text: str, pattern: str) -> bool:

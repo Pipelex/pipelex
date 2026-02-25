@@ -11,18 +11,13 @@ class ConcretePipeBlueprint(PipeBlueprint):
 class TestPipeBlueprintValidation:
     def test_validate_pipe_type_correct(self):
         for pipe_type_enum in PipeType:
-            pipe_type = pipe_type_enum.value
-            match pipe_type:
-                case "PipeFunc" | "PipeImgGen" | "PipeCompose" | "PipeLLM" | "PipeExtract":
-                    category = "PipeOperator"
-                case "PipeBatch" | "PipeCondition" | "PipeParallel" | "PipeSequence":
-                    category = "PipeController"
             blueprint = ConcretePipeBlueprint(
-                type=pipe_type,
-                pipe_category=category,
+                type=pipe_type_enum,
+                pipe_category=pipe_type_enum.category,
+                description="lorem ipsum",
                 output="Text",
             )
-            assert blueprint.type == pipe_type
+            assert blueprint.type == pipe_type_enum
 
     def test_validate_pipe_type_incorrect(self):
         invalid_types = ["InvalidType", "PipeTest", "RandomPipe", "NotAPipe", ""]
@@ -31,24 +26,25 @@ class TestPipeBlueprintValidation:
                 ConcretePipeBlueprint(
                     type=invalid_type,
                     pipe_category="PipeOperator",
+                    description="lorem ipsum",
                     output="Text",
                 )
             assert "Invalid pipe type" in str(exc_info.value)
 
     def test_validate_pipe_category_correct(self):
         for category_enum in PipeCategory:
-            category = category_enum.value
-            match category:
-                case "PipeOperator":
-                    pipe_type = "PipeLLM"
-                case "PipeController":
-                    pipe_type = "PipeSequence"
+            match category_enum:
+                case PipeCategory.PIPE_OPERATOR:
+                    pipe_type = PipeType.PIPE_LLM
+                case PipeCategory.PIPE_CONTROLLER:
+                    pipe_type = PipeType.PIPE_SEQUENCE
             blueprint = ConcretePipeBlueprint(
                 type=pipe_type,
-                pipe_category=category,
+                pipe_category=category_enum,
+                description="lorem ipsum",
                 output="Text",
             )
-            assert blueprint.pipe_category == category
+            assert blueprint.pipe_category == category_enum
 
     def test_validate_pipe_category_incorrect(self):
         invalid_categories = ["InvalidCategory", "Operator", "Controller", "PipeOp", "RandomCategory", ""]
@@ -57,6 +53,7 @@ class TestPipeBlueprintValidation:
                 ConcretePipeBlueprint(
                     type="PipeLLM",
                     pipe_category=invalid_category,
+                    description="lorem ipsum",
                     output="Text",
                 )
             assert "Invalid pipe category" in str(exc_info.value)
@@ -65,6 +62,7 @@ class TestPipeBlueprintValidation:
         blueprint = ConcretePipeBlueprint(
             type="PipeLLM",
             pipe_category="PipeOperator",
+            description="lorem ipsum",
             inputs={"text": "Text", "prompt": "Text"},
             output="Text",
         )
@@ -73,6 +71,7 @@ class TestPipeBlueprintValidation:
         blueprint = ConcretePipeBlueprint(
             type="PipeLLM",
             pipe_category="PipeOperator",
+            description="lorem ipsum",
             inputs=None,
             output="Text",
         )
@@ -81,6 +80,7 @@ class TestPipeBlueprintValidation:
         blueprint = ConcretePipeBlueprint(
             type="PipeLLM",
             pipe_category="PipeOperator",
+            description="lorem ipsum",
             inputs={"items": "Text[]", "count": "Number[2]"},
             output="Text",
         )
@@ -91,6 +91,7 @@ class TestPipeBlueprintValidation:
             ConcretePipeBlueprint(
                 type="PipeLLM",
                 pipe_category="PipeOperator",
+                description="lorem ipsum",
                 inputs={"text": "InvalidFormat!"},
                 output="Text",
             )
@@ -100,6 +101,7 @@ class TestPipeBlueprintValidation:
             ConcretePipeBlueprint(
                 type="PipeLLM",
                 pipe_category="PipeOperator",
+                description="lorem ipsum",
                 inputs={"text": "invalid_concept"},
                 output="Text",
             )
@@ -109,6 +111,7 @@ class TestPipeBlueprintValidation:
             ConcretePipeBlueprint(
                 type="PipeLLM",
                 pipe_category="PipeOperator",
+                description="lorem ipsum",
                 inputs={"text": "Text"},
                 output="InvalidConcept!",
             )
@@ -119,6 +122,7 @@ class TestPipeBlueprintValidation:
             ConcretePipeBlueprint(
                 type="PipeLLM",
                 pipe_category="PipeOperator",
+                description="lorem ipsum",
                 output="Text",
                 extra_field="should not be allowed",  # type: ignore[call-arg]
             )

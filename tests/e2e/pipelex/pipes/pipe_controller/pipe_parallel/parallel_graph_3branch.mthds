@@ -1,0 +1,82 @@
+domain      = "test_parallel_graph_3branch"
+description = "Test 3-branch PipeParallel with selective downstream consumption"
+main_pipe   = "pg3_sequence"
+
+[concept.Pg3ToneResult]
+description = "Result of tone analysis"
+refines     = "Text"
+
+[concept.Pg3LengthResult]
+description = "Result of length analysis"
+refines     = "Text"
+
+[concept.Pg3StyleResult]
+description = "Result of style analysis"
+refines     = "Text"
+
+[concept.Pg3CombinedResult]
+description = "Combined results from 3-branch parallel analysis"
+
+[pipe.pg3_sequence]
+type = "PipeSequence"
+description = "Run 3-branch parallel analysis then selectively consume 2 of 3 branch outputs"
+inputs = { input_text = "Text" }
+output = "Text"
+steps = [
+  { pipe = "pg3_parallel", result = "full_combo" },
+  { pipe = "pg3_refine_tone", result = "refined_tone" },
+  { pipe = "pg3_refine_length", result = "refined_length" },
+]
+
+[pipe.pg3_parallel]
+type = "PipeParallel"
+description = "Analyze tone, length, and style in parallel with combined output"
+inputs = { input_text = "Text" }
+output = "Pg3CombinedResult"
+add_each_output = true
+combined_output = "Pg3CombinedResult"
+branches = [
+  { pipe = "pg3_analyze_tone", result = "tone_result" },
+  { pipe = "pg3_analyze_length", result = "length_result" },
+  { pipe = "pg3_analyze_style", result = "style_result" },
+]
+
+[pipe.pg3_analyze_tone]
+type        = "PipeLLM"
+description = "Analyze the tone of the text"
+inputs      = { input_text = "Text" }
+output      = "Pg3ToneResult"
+model       = "$testing-text"
+prompt      = "Describe the tone of: @input_text.text"
+
+[pipe.pg3_analyze_length]
+type        = "PipeLLM"
+description = "Analyze the length of the text"
+inputs      = { input_text = "Text" }
+output      = "Pg3LengthResult"
+model       = "$testing-text"
+prompt      = "Describe the length characteristics of: @input_text.text"
+
+[pipe.pg3_analyze_style]
+type        = "PipeLLM"
+description = "Analyze the writing style of the text"
+inputs      = { input_text = "Text" }
+output      = "Pg3StyleResult"
+model       = "$testing-text"
+prompt      = "Describe the writing style of: @input_text.text"
+
+[pipe.pg3_refine_tone]
+type        = "PipeLLM"
+description = "Refine the tone analysis"
+inputs      = { tone_result = "Pg3ToneResult" }
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Refine and elaborate on this tone analysis: @tone_result.text"
+
+[pipe.pg3_refine_length]
+type        = "PipeLLM"
+description = "Refine the length analysis"
+inputs      = { length_result = "Pg3LengthResult" }
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Refine and elaborate on this length analysis: @length_result.text"

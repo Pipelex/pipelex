@@ -35,7 +35,6 @@ is_structure_prompt_enabled = false
 
 # Job configuration
 [cogt.llm_config.llm_job_config]
-is_streaming_enabled = false
 max_retries = 3  # Between 1 and 10
 ```
 
@@ -66,7 +65,7 @@ guidance_scale = 3.5    # Controls adherence to prompt
 is_moderated = true    # Enable content moderation
 safety_tolerance = 5    # Safety level (1-6)
 is_raw = false         # Raw output mode
-output_format = "jpg"  # Options: png, jpg, webp
+output_format = "jpeg"  # Options: png, jpeg, webp
 seed = "auto"          # "auto" or specific integer
 ```
 
@@ -102,7 +101,6 @@ Configuration for Optical Character Recognition:
 
 ```toml
 [cogt.extract_config]
-page_output_text_file_name = "page_text.md"
 default_page_views_dpi = 72
 
 ## Unified Backend Integration
@@ -172,7 +170,6 @@ default_max_images = 100
 is_structure_prompt_enabled = false
 
 [cogt.llm_config.llm_job_config]
-is_streaming_enabled = false
 max_retries = 3
 
 [cogt.img_gen_config.img_gen_job_config]
@@ -187,9 +184,9 @@ guidance_scale = 3.5
 is_moderated = true
 safety_tolerance = 5
 is_raw = false
-output_format = "jpg"
+output_format = "jpeg"
 seed = "auto"
 
 [cogt.extract_config]
-page_output_text_file_name = "page_text.md"
+default_page_views_dpi = 72
 ```

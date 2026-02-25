@@ -8,7 +8,7 @@ When you compose pipes together with [PipeControllers](./pipe-controllers/index.
 
 Consider our marketing pipeline example from the [Designing Pipelines](index.md) guide:
 
-```plx
+```toml
 [pipe.description_to_tagline]
 type = "PipeSequence"
 description = "From product description to tagline"

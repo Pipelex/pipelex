@@ -7,6 +7,7 @@ from rich.table import Table
 from rich.text import Text
 from typing_extensions import override
 
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.pipes.pipe_blueprint import PipeCategory, PipeType
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.tools.misc.pretty import PrettyPrintable
@@ -29,8 +30,9 @@ class PipeSignature(StructuredContent):
         - output = "Image[3]" - exactly 3 images
     """
 
-    code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.")
-    type: PipeType | str = Field(description="Pipe type.")
+    code: str = Field(description="Pipe code identifying the pipe. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
+    # TODO: Change examples to list(PipeType) for randomness in mocks
+    type: PipeType | str = Field(description="Pipe type.", examples=["PipeLLM"])
     pipe_category: SkipJsonSchema[PipeCategory] = Field(description="Pipe category set according to its type.")
     description: str = Field(description="What the pipe does")
     inputs: dict[str, str] = Field(
@@ -40,12 +42,16 @@ class PipeSignature(StructuredContent):
             "Values: ConceptCodes in PascalCase. Don't use multiplicity brackets. "
         )
     )
-    result: str = Field(description="Variable name for the pipe's result in snake_case. This name can be referenced as input in subsequent pipes.")
+    result: str = Field(
+        description="Variable name for the pipe's result in snake_case. This name can be referenced as input in subsequent pipes.",
+        json_schema_extra={"mock_format": MockFormat.SNAKE_CASE},
+    )
     output: str = Field(
         description=(
             "Output concept code in PascalCase with optional multiplicity brackets. "
             "Examples: 'Text' (single text), 'Article[]' (list of articles), 'Image[5]' (exactly 5 images)."
-        )
+        ),
+        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
     )
     pipe_dependencies: list[str] = Field(description="List of pipe codes that this pipe depends on. This is for the PipeControllers")
 

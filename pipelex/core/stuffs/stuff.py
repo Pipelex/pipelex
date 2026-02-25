@@ -1,18 +1,21 @@
-from typing import Any, cast
+# pyright: reportImportCycles=false
+from typing import Any, cast, get_args, get_origin
 
-from pydantic import ConfigDict, ValidationError
+from kajson import kajson
+from mthds.client.models.stuff import DictStuffAbstract, StuffAbstract
+from pydantic import ValidationError
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.core.concepts.concept import Concept
-from pipelex.core.stuffs.exceptions import StuffArtefactReservedFieldError, StuffContentTypeError, StuffContentValidationError
+from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.exceptions import StuffContentTypeError, StuffContentValidationError
 from pipelex.core.stuffs.html_content import HtmlContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.mermaid_content import MermaidContent
 from pipelex.core.stuffs.number_content import NumberContent
-from pipelex.core.stuffs.pdf_content import PDFContent
-from pipelex.core.stuffs.stuff_artefact import BaseStuffArtefactField, StuffArtefact
+from pipelex.core.stuffs.stuff_artefact import StuffArtefact
 from pipelex.core.stuffs.stuff_content import StuffContent, StuffContentType
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -21,34 +24,14 @@ from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 from pipelex.tools.typing.pydantic_utils import CustomBaseModel, format_pydantic_validation_error
 
 
-class Stuff(PrettyRenderable, CustomBaseModel):
-    model_config = ConfigDict(extra="forbid", strict=True)
-
-    stuff_code: str
-    stuff_name: str | None = None
-    concept: Concept
-    content: StuffContent
-
+class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffContent]):
     def make_artefact(self) -> StuffArtefact:
-        artefact_dict: dict[str, Any] = self.content.model_dump(serialize_as_any=True)
+        """Create a Jinja2-compatible artefact from this Stuff.
 
-        def set_artefact_field(key: str, value: str | StuffContent | None):
-            if value is None:
-                return
-            if key in artefact_dict:
-                stuff_name = self.stuff_name or f"unnamed using concept code {self.concept.code}"
-                msg = f"""Cannot create stuff artefact for stuff '{stuff_name}' of concept '{self.concept.code}' because reserved field '{key}'
-in the structured output '{self.content.__class__.__name__}' already exists in the stuff content.
-Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code', 'content'."""
-                raise StuffArtefactReservedFieldError(message=msg)
-            artefact_dict[key] = value
-
-        set_artefact_field(BaseStuffArtefactField.STUFF_NAME, self.stuff_name)
-        set_artefact_field(BaseStuffArtefactField.CONTENT_CLASS, self.content.__class__.__name__)
-        set_artefact_field(BaseStuffArtefactField.CONCEPT_CODE, self.concept.code)
-        set_artefact_field(BaseStuffArtefactField.STUFF_CODE, self.stuff_code)
-        set_artefact_field(BaseStuffArtefactField.CONTENT, self.content)
-        return StuffArtefact(artefact_dict)
+        Returns:
+            StuffArtefact that provides template access to content fields and metadata.
+        """
+        return StuffArtefact(stuff=self)
 
     @classmethod
     def make_stuff_name(cls, concept: Concept) -> str:
@@ -74,9 +57,19 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
 {self.concept.code} — {type(self.content).__name__}:
 {self.content.short_desc}"""
 
+    @property
+    def header(self) -> str:
+        """A descriptive header with stuff_code, stuff_name, and concept."""
+        name_part = f" ({self.stuff_name})" if self.stuff_name else ""
+        return f"Stuff[{self.stuff_code}{name_part}] <{self.concept.code}>"
+
+    @override
+    def __repr__(self) -> str:
+        return f"{self.header}\n{kajson.dumps(self.content.smart_dump(), indent=4)}"
+
     @override
     def __str__(self) -> str:
-        return f"{self.title}\n{self.content.rendered_json()}"
+        return f"{self.title}\n{kajson.dumps(self.content.smart_dump(), indent=4)}"
 
     @property
     def is_list(self) -> bool:
@@ -87,8 +80,8 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         return isinstance(self.content, ImageContent)
 
     @property
-    def is_pdf(self) -> bool:
-        return isinstance(self.content, PDFContent)
+    def is_document(self) -> bool:
+        return isinstance(self.content, DocumentContent)
 
     @property
     def is_text(self) -> bool:
@@ -110,9 +103,12 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
             return content
 
         # If isinstance failed, try model validation approach
+        # This handles cases where the same class is loaded from different import paths
         try:
             # Check if class names match (quick filter before attempting validation)
             if type(content).__name__ == content_type.__name__:
+                # Use model_dump() instead of smart_dump() to ensure we get a dict
+                # smart_dump() may return a string for some content types (e.g., TextContent)
                 content_dict = content.smart_dump()
                 validated_content = content_type.model_validate(content_dict)
                 log.verbose(f"Model validation passed: converted {type(content).__name__} to {content_type.__name__}")
@@ -126,6 +122,33 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
             ) from exc
 
         actual_type = type(content)
+
+        # Check if user is trying to use ListContent[Something] - suggest get_stuff_as_list() instead
+        origin = get_origin(content_type)
+        if origin is None:
+            # For Pydantic generics, check __pydantic_generic_metadata__
+            pydantic_metadata: dict[str, Any] | None = getattr(content_type, "__pydantic_generic_metadata__", None)
+            if pydantic_metadata is not None:
+                origin = pydantic_metadata.get("origin")
+
+        if origin is not None and issubclass(origin, ListContent):
+            # User passed ListContent[Something] - extract the item type and suggest the correct method
+            type_args = get_args(content_type)
+            if not type_args:
+                pydantic_metadata = getattr(content_type, "__pydantic_generic_metadata__", None)
+                if pydantic_metadata is not None:
+                    type_args = pydantic_metadata.get("args", ())
+
+            if type_args:
+                item_type_name = type_args[0].__name__
+                msg = (
+                    f"Cannot use ListContent[{item_type_name}] with get_stuff_as() or content_as(). "
+                    f'Use get_stuff_as_list("<name>", {item_type_name}) instead.'
+                )
+            else:
+                msg = 'Cannot use ListContent[...] with get_stuff_as() or content_as(). Use get_stuff_as_list("<name>", ItemType) instead.'
+            raise StuffContentTypeError(message=msg, expected_type=content_type.__name__, actual_type=actual_type.__name__)
+
         msg = f"Content is of type '{actual_type}', instead of the expected '{content_type}'"
         raise StuffContentTypeError(message=msg, expected_type=content_type.__name__, actual_type=actual_type.__name__)
 
@@ -148,11 +171,12 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         """
         list_content = cast("ListContent[StuffContentType]", self.content_as(content_type=ListContent))
 
-        # Validate all items are of the expected type
+        converted_items: list[StuffContentType] = []
         for item in list_content.items:
-            self.verify_content_type(item, item_type)
+            converted_item = self.verify_content_type(item, item_type)
+            converted_items.append(converted_item)
 
-        return list_content
+        return ListContent[StuffContentType](items=converted_items)
 
     @property
     def as_text(self) -> TextContent:
@@ -170,9 +194,9 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         return self.content_as(content_type=ImageContent)
 
     @property
-    def as_pdf(self) -> PDFContent:
-        """Get content as PDFContent if applicable."""
-        return self.content_as(content_type=PDFContent)
+    def as_document(self) -> DocumentContent:
+        """Get content as DocumentContent if applicable."""
+        return self.content_as(content_type=DocumentContent)
 
     @property
     def as_text_and_image(self) -> TextAndImagesContent:
@@ -217,13 +241,9 @@ Forbidden fields are: 'stuff_name', 'content_class', 'concept_code', 'stuff_code
         self.content.pretty_print_content(title=title)
 
 
-class DictStuff(CustomBaseModel):
+class DictStuff(CustomBaseModel, DictStuffAbstract):
     """Stuff with content as dict[str, Any] instead of StuffContent.
 
     This is used for serialization where the content needs to be a plain dict.
     Has the exact same structure as Stuff but with dict content.
     """
-
-    model_config = ConfigDict(extra="forbid", strict=True)
-    concept: str
-    content: Any

@@ -7,6 +7,8 @@ from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.stuff_artefact import BaseStuffArtefactField, StuffArtefact
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from tests.cases.documents import DocumentTestCases
+from tests.cases.images import ImageTestCases
 from tests.unit.pipelex.core.memory.conftest import TestWorkingMemoryData
 
 
@@ -42,25 +44,25 @@ class TestWorkingMemoryGenerateContext:
         # Verify MAIN_STUFF_NAME points to the same artefact
         assert context[MAIN_STUFF_NAME] is context["sample_text"]
 
-    def test_generate_context_single_pdf(self, single_pdf_memory: WorkingMemory):
-        """Test generate_context with single PDF content."""
-        context = single_pdf_memory.generate_context()
+    def test_generate_context_single_document(self, single_document_memory: WorkingMemory):
+        """Test generate_context with single document content."""
+        context = single_document_memory.generate_context()
 
         assert isinstance(context, dict)
-        assert len(context) == 2  # pdf_document + MAIN_STUFF_NAME alias
-        assert "pdf_document" in context
+        assert len(context) == 2  # document_file + MAIN_STUFF_NAME alias
+        assert "document_file" in context
         assert MAIN_STUFF_NAME in context
 
         # Verify artefact structure
-        artefact = context["pdf_document"]
+        artefact = context["document_file"]
         assert isinstance(artefact, StuffArtefact)
         assert BaseStuffArtefactField.CONTENT in artefact
 
         # Verify actual content value
-        assert artefact[BaseStuffArtefactField.CONTENT].url == TestWorkingMemoryData.SAMPLE_PDF_URL
+        assert artefact[BaseStuffArtefactField.CONTENT].url == DocumentTestCases.PDF_FILE_URL_1
 
         # Verify MAIN_STUFF_NAME points to the same artefact
-        assert context[MAIN_STUFF_NAME] is context["pdf_document"]
+        assert context[MAIN_STUFF_NAME] is context["document_file"]
 
     def test_generate_context_single_image(self, single_image_memory: WorkingMemory):
         """Test generate_context with single image content."""
@@ -78,7 +80,7 @@ class TestWorkingMemoryGenerateContext:
         assert isinstance(artefact[BaseStuffArtefactField.CONTENT], ImageContent)
 
         # Verify actual content value
-        assert artefact[BaseStuffArtefactField.CONTENT].url == TestWorkingMemoryData.SAMPLE_IMAGE_URL
+        assert artefact[BaseStuffArtefactField.CONTENT].url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
 
         # Verify MAIN_STUFF_NAME points to the same artefact
         assert context[MAIN_STUFF_NAME] is context["sample_image"]
@@ -109,7 +111,7 @@ class TestWorkingMemoryGenerateContext:
         assert isinstance(context["document"][BaseStuffArtefactField.CONTENT], TextContent)
         assert context["document"][BaseStuffArtefactField.CONTENT].text == TestWorkingMemoryData.SAMPLE_TEXT
         assert isinstance(context["diagram"][BaseStuffArtefactField.CONTENT], ImageContent)
-        assert context["diagram"][BaseStuffArtefactField.CONTENT].url == TestWorkingMemoryData.SAMPLE_IMAGE_URL
+        assert context["diagram"][BaseStuffArtefactField.CONTENT].url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
 
         # Verify MAIN_STUFF_NAME points to document (main_name="document" in fixture)
         assert context[MAIN_STUFF_NAME] is context["document"]
@@ -159,7 +161,7 @@ class TestWorkingMemoryGenerateContext:
         assert isinstance(list_content.items[0], TextContent)
         assert list_content.items[0].text == "The quick brown fox jumps over the lazy dog"
         assert isinstance(list_content.items[1], ImageContent)
-        assert list_content.items[1].url == TestWorkingMemoryData.SAMPLE_IMAGE_URL
+        assert list_content.items[1].url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
         assert isinstance(list_content.items[2], NumberContent)
         assert list_content.items[2].number == 42.5
 
@@ -184,8 +186,8 @@ class TestWorkingMemoryGenerateContext:
         assert content.text.text == "Project overview with diagrams"
         assert content.images is not None
         assert len(content.images) == 2
-        assert content.images[0].url == TestWorkingMemoryData.SAMPLE_IMAGE_URL
-        assert content.images[1].url == "assets/diagrams/architecture.png"
+        assert content.images[0].url == ImageTestCases.IMAGE_FILE_PATH_PNG_1
+        assert content.images[1].url == ImageTestCases.IMAGE_FILE_PATH_PNG_2
 
     def test_generate_context_html_content(self, html_content_memory: WorkingMemory):
         """Test generate_context with HTML content."""

@@ -1,9 +1,17 @@
 from pipelex.cogt.exceptions import CogtError
 
 
-class MistralModelListingError(CogtError):
+class MistralPluginError(CogtError):
     pass
 
 
-class MistralWorkerConfigurationError(CogtError):
+class MistralModelListingError(MistralPluginError):
+    pass
+
+
+class MistralWorkerConfigurationError(MistralPluginError):
+    pass
+
+
+class MistralExtractResponseError(MistralPluginError):
     pass

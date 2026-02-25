@@ -1,0 +1,7 @@
+domain = "pkg_test_standalone"
+
+[pipe.pkg_test_do_something]
+type        = "PipeLLM"
+description = "Do something useful"
+output      = "Text"
+prompt      = "Do something useful"

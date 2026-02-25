@@ -7,11 +7,14 @@ PIPE_PARALLEL = (
     """domain = "test_pipes"
 description = "Domain with parallel pipe"
 
+[concept]
+ProcessedData = "Processed data concept"
+
 [pipe.parallel_process]
 type = "PipeParallel"
 description = "PipeParallel example in PIPE_PARALLEL_TEST_CASES"
 output = "ProcessedData"
-parallels = [
+branches = [
     { pipe = "process_a", result = "result_a" },
     { pipe = "process_b", result = "result_b" },
 ]
@@ -20,12 +23,13 @@ add_each_output = true
     PipelexBundleBlueprint(
         domain="test_pipes",
         description="Domain with parallel pipe",
+        concept={"ProcessedData": "Processed data concept"},
         pipe={
             "parallel_process": PipeParallelBlueprint(
                 type="PipeParallel",
                 description="PipeParallel example in PIPE_PARALLEL_TEST_CASES",
                 output="ProcessedData",
-                parallels=[
+                branches=[
                     SubPipeBlueprint(pipe="process_a", result="result_a"),
                     SubPipeBlueprint(pipe="process_b", result="result_b"),
                 ],

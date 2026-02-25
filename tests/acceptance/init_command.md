@@ -21,15 +21,15 @@ Before each test scenario, ensure:
 - [ ] Press Enter to confirm initialization
 - [ ] Verify config files are copied successfully
 - [ ] Verify backend selection panel is displayed with numbered options
-- [ ] Select option `1` (pipelex_inference) and press Enter
+- [ ] Select option `1` (pipelex_gateway) and press Enter
 - [ ] Verify confirmation message shows 1 backend configured
-- [ ] Verify routing profile is set to "pipelex_first"
+- [ ] Verify routing profile is set to "all_pipelex_gateway"
 - [ ] Verify telemetry selection panel is displayed
 - [ ] Select option `1` (OFF) and press Enter
 - [ ] Verify telemetry mode is set successfully
 - [ ] Verify `.pipelex/` directory exists with all config files
-- [ ] Verify `.pipelex/inference/backends.toml` has pipelex_inference enabled
-- [ ] Verify `.pipelex/inference/routing_profiles.toml` has active = "pipelex_first"
+- [ ] Verify `.pipelex/inference/backends.toml` has pipelex_gateway enabled
+- [ ] Verify `.pipelex/inference/routing_profiles.toml` has active = "all_pipelex_gateway"
 - [ ] Verify `.pipelex/telemetry.toml` has telemetry_mode = "off"
 
 **Test Case 1.2: Initialization with multiple backends**
@@ -323,11 +323,11 @@ Before each test scenario, ensure:
 
 ### 9. Edge Cases
 
-**Test Case 9.1: pipelex_inference always sets pipelex_first**
+**Test Case 9.1: pipelex_gateway always sets all_pipelex_gateway**
 
 - [ ] Run: `pipelex init`
-- [ ] Select pipelex_inference as one of multiple backends
-- [ ] Verify routing is set to "pipelex_first" automatically
+- [ ] Select pipelex_gateway as one of multiple backends
+- [ ] Verify routing is set to "all_pipelex_gateway" automatically
 - [ ] Verify NO primary/fallback prompts
 
 **Test Case 9.2: Single non-pipelex backend**

@@ -14,3 +14,11 @@ class PipeRunMode(StrEnum):
                 return True
             case PipeRunMode.LIVE:
                 return False
+
+    @property
+    def is_live(self) -> bool:
+        match self:
+            case PipeRunMode.LIVE:
+                return True
+            case PipeRunMode.DRY:
+                return False

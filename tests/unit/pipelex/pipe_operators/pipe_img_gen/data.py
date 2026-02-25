@@ -1,8 +1,8 @@
 from typing import ClassVar
 
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
-from pipelex.core.pipes.exceptions import PipeValidationErrorType
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
+from pipelex.tools.misc.image_utils import ImageFormat
 
 
 class PipeImgGenInputTestCases:
@@ -15,6 +15,7 @@ class PipeImgGenInputTestCases:
             description="VALID_TEXT_INPUT: Test case: valid_text_input",
             inputs={"prompt": "native.Text"},
             output="native.Image",
+            prompt="@prompt",
         ),
     )
 
@@ -24,7 +25,7 @@ class PipeImgGenInputTestCases:
             description="VALID_WITH_INLINE_PROMPT: Test case: valid_with_inline_prompt",
             inputs={},
             output="native.Image",
-            img_gen_prompt="A beautiful sunset over the ocean",
+            prompt="A beautiful sunset over the ocean",
         ),
     )
 
@@ -34,6 +35,7 @@ class PipeImgGenInputTestCases:
             description="VALID_WITH_ASPECT_RATIO: Test case: valid_with_aspect_ratio",
             inputs={"prompt": "native.Text"},
             output="native.Image",
+            prompt="@prompt",
             aspect_ratio=AspectRatio.LANDSCAPE_16_9,
         ),
     )
@@ -44,6 +46,7 @@ class PipeImgGenInputTestCases:
             description="VALID_WITH_NB_OUTPUT: Test case: valid_with_nb_output",
             inputs={"prompt": "native.Text"},
             output="native.Image[3]",
+            prompt="@prompt",
         ),
     )
 
@@ -53,6 +56,7 @@ class PipeImgGenInputTestCases:
             description="VALID_WITH_SEED: Test case: valid_with_seed",
             inputs={"prompt": "native.Text"},
             output="native.Image",
+            prompt="@prompt",
             seed=42,
         ),
     )
@@ -63,6 +67,7 @@ class PipeImgGenInputTestCases:
             description="VALID_WITH_SEED_AUTO: Test case: valid_with_seed_auto",
             inputs={"prompt": "native.Text"},
             output="native.Image",
+            prompt="@prompt",
             seed="auto",
         ),
     )
@@ -73,6 +78,7 @@ class PipeImgGenInputTestCases:
             description="VALID_WITH_BACKGROUND: Test case: valid_with_background",
             inputs={"prompt": "native.Text"},
             output="native.Image",
+            prompt="@prompt",
             background=Background.TRANSPARENT,
         ),
     )
@@ -83,7 +89,8 @@ class PipeImgGenInputTestCases:
             description="VALID_WITH_OUTPUT_FORMAT: Test case: valid_with_output_format",
             inputs={"prompt": "native.Text"},
             output="native.Image",
-            output_format=OutputFormat.PNG,
+            prompt="@prompt",
+            output_format=ImageFormat.PNG,
         ),
     )
 
@@ -93,6 +100,7 @@ class PipeImgGenInputTestCases:
             description="VALID_WITH_IS_RAW: Test case: valid_with_is_raw",
             inputs={"prompt": "native.Text"},
             output="native.Image",
+            prompt="@prompt",
             is_raw=True,
         ),
     )
@@ -107,19 +115,4 @@ class PipeImgGenInputTestCases:
         VALID_WITH_BACKGROUND,
         VALID_WITH_OUTPUT_FORMAT,
         VALID_WITH_IS_RAW,
-    ]
-
-    # Error test cases: (test_id, blueprint, expected_error_type)
-    ERROR_WRONG_INPUT_TYPE: ClassVar[tuple[str, PipeImgGenBlueprint, PipeValidationErrorType]] = (
-        "wrong_input_type",
-        PipeImgGenBlueprint(
-            description="ERROR_WRONG_INPUT_TYPE: Test case: wrong_input_type",
-            inputs={"image": "native.Image"},
-            output="native.Image",
-        ),
-        PipeValidationErrorType.IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE,
-    )
-
-    ERROR_CASES: ClassVar[list[tuple[str, PipeImgGenBlueprint, PipeValidationErrorType]]] = [
-        ERROR_WRONG_INPUT_TYPE,
     ]

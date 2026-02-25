@@ -21,9 +21,11 @@ class TestPipeLLMBlueprintConversion:
         self, test_name: str, pipe_spec: PipeLLMSpec, expected_blueprint: PipeLLMBlueprint, load_empty_library: Callable[[], str]
     ):
         load_empty_library()
-        item_concept = ConceptFactory.make(concept_code="Item", domain="test_domain", description="Item", structure_class_name="Item")
-        data_concept = ConceptFactory.make(concept_code="Data", domain="test_domain", description="Data", structure_class_name="Data")
-        analysis_concept = ConceptFactory.make(concept_code="Analysis", domain="test_domain", description="Analysis", structure_class_name="Analysis")
+        item_concept = ConceptFactory.make(concept_code="Item", domain_code="test_domain", description="Item", structure_class_name="Item")
+        data_concept = ConceptFactory.make(concept_code="Data", domain_code="test_domain", description="Data", structure_class_name="Data")
+        analysis_concept = ConceptFactory.make(
+            concept_code="Analysis", domain_code="test_domain", description="Analysis", structure_class_name="Analysis"
+        )
         concept_library = get_concept_library()
         concept_library.add_new_concept(concept=item_concept)
         concept_library.add_new_concept(concept=data_concept)

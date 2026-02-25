@@ -24,6 +24,7 @@
 model_type = "img_gen"
 sdk = "fal"
 prompting_target = "fal"
+thinking_mode = "none"
 
 ################################################################################
 # IMAGE GENERATION MODELS
@@ -36,17 +37,59 @@ inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.05, output = 0.0 }
 
+[flux-pro.rules]
+prompt = "positive_only"
+num_images = "fal"
+aspect_ratio = "flux"
+inference = "flux"
+safety_checker = "available"
+output_format = "flux_1"
+specific = "fal"
+
 ["flux-pro/v1.1"]
 model_id = "fal-ai/flux-pro/v1.1"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.05, output = 0.0 }
 
+["flux-pro/v1.1".rules]
+prompt = "positive_only"
+num_images = "fal"
+aspect_ratio = "flux"
+inference = "flux"
+safety_checker = "available"
+output_format = "flux_1"
+specific = "fal"
+
 ["flux-pro/v1.1-ultra"]
 model_id = "fal-ai/flux-pro/v1.1-ultra"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.06, output = 0.0 }
+
+["flux-pro/v1.1-ultra".rules]
+prompt = "positive_only"
+num_images = "fal"
+aspect_ratio = "flux_11_ultra"
+inference = "flux_11_ultra"
+safety_checker = "available"
+output_format = "flux_1"
+specific = "fal"
+
+[flux-2]
+model_id = "fal-ai/flux-2"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 0.05, output = 0.0 }
+
+[flux-2.rules]
+prompt = "positive_only"
+num_images = "fal"
+aspect_ratio = "flux"
+inference = "flux"
+safety_checker = "available"
+output_format = "flux_2"
+specific = "fal"
 
 # --- SDXL models --------------------------------------------------------------
 [fast-lightning-sdxl]
@@ -55,3 +98,11 @@ inputs = ["text"]
 outputs = ["image"]
 costs = { input = 0.0003, output = 0.0 }
 
+[fast-lightning-sdxl.rules]
+prompt = "positive_only"
+num_images = "fal"
+aspect_ratio = "flux"
+inference = "sdxl_lightning"
+safety_checker = "unavailable"
+output_format = "sdxl"
+specific = "fal"

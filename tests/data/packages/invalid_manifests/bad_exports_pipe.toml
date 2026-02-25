@@ -1,0 +1,7 @@
+[package]
+address = "github.com/org/repo"
+version = "1.0.0"
+description = "Test package with invalid exports pipe name"
+
+[exports.valid_domain]
+pipes = ["InvalidPipeName"]

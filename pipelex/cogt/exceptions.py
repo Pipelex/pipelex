@@ -1,9 +1,13 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.extract.extract_setting import ExtractModelChoice
-from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
-from pipelex.cogt.llm.llm_setting import LLMModelChoice
-from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.types import StrEnum
+
+if TYPE_CHECKING:
+    from pipelex.cogt.model_backends.model_type import ModelType
+    from pipelex.cogt.models.model_reference import ModelReferenceKind
 
 
 class CogtError(PipelexError):
@@ -31,10 +35,32 @@ class SdkTypeError(CogtError):
 
 
 class ModelChoiceNotFoundError(CogtError):
-    def __init__(self, message: str, model_type: ModelType, model_choice: LLMModelChoice | ExtractModelChoice | ImgGenModelChoice):
+    """Error raised when a model choice cannot be found in the model deck.
+
+    Includes available options and migration hints in error message.
+    """
+
+    def __init__(
+        self,
+        message: str,
+        model_type: ModelType,
+        model_choice: str,
+        reference_kind: ModelReferenceKind | None = None,
+        available_options: list[str] | None = None,
+    ):
         self.model_type = model_type
         self.model_choice = model_choice
-        super().__init__(message=message)
+        self.reference_kind = reference_kind
+        self.available_options = available_options or []
+
+        full_message = message
+        if self.available_options:
+            options_str = ", ".join(sorted(self.available_options)[:10])
+            if len(self.available_options) > 10:
+                options_str += f" ... and {len(self.available_options) - 10} more"
+            full_message += f"\n\nAvailable {reference_kind or 'options'}: {options_str}"
+
+        super().__init__(message=full_message)
 
 
 class LLMSettingsValidationError(CogtError):
@@ -100,7 +126,15 @@ class ExtractHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
-class LLMModelNotFoundError(CogtError):
+class ExtractOutputError(CogtError):
+    pass
+
+
+class GeneratedImageError(CogtError):
+    pass
+
+
+class LLMModelNotFoundError(ModelNotFoundError):
     pass
 
 
@@ -136,6 +170,14 @@ class PromptImageFormatError(CogtError):
     pass
 
 
+class PromptDocumentFactoryError(CogtError):
+    pass
+
+
+class ImgGenModelNotFoundError(ModelNotFoundError):
+    pass
+
+
 class ImgGenPromptError(CogtError):
     pass
 
@@ -152,20 +194,11 @@ class ImgGenGeneratedTypeError(ImgGenGenerationError):
     pass
 
 
-class MissingDependencyError(CogtError):
-    """Raised when a required dependency is not installed."""
-
-    def __init__(self, dependency_name: str, extra_name: str, message: str | None = None):
-        self.dependency_name = dependency_name
-        self.extra_name = extra_name
-        error_msg = f"Required dependency '{dependency_name}' is not installed."
-        if message:
-            error_msg += f" {message}"
-        error_msg += f" Please install it with 'pip install pipelex[{extra_name}]'."
-        super().__init__(error_msg)
-
-
 class ExtractCapabilityError(CogtError):
+    pass
+
+
+class ExtractJobFailureError(CogtError):
     pass
 
 

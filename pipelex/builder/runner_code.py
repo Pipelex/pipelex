@@ -1,351 +1,277 @@
 """Runner code generation utilities for Pipelex pipelines.
 
-This module provides functions to generate executable Python code and JSON input examples
-for Pipelex pipelines. It supports two output formats:
-
-1. **Python Code Format**: Generates Python code with class instantiations
-   Example: PDFContent(url="document.pdf")
-
-2. **JSON Format**: Generates pure JSON with concept metadata
-   Example: {"concept": "native.PDF", "content": {"url": "document.pdf"}}
+This module provides functions to generate executable Python code for Pipelex pipelines.
 
 Main Functions:
 --------------
 - generate_runner_code(pipe): Generate complete executable Python script
-- generate_input_memory_block_python(inputs): Generate just the Python inputs dict
-- generate_input_memory_json(inputs): Generate JSON inputs as dict
-- generate_input_memory_json_string(inputs): Generate JSON inputs as formatted string
+"""
 
-Example Usage:
--------------
-```python
-from pipelex.hub import get_required_pipe
-from pipelex.builder.runner_code import (
-    generate_runner_code,
-    generate_input_memory_block_python,
-    generate_input_memory_json,
-    generate_input_memory_json_string,
+from dataclasses import dataclass
+from typing import Any
+
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.concepts.concept_representation_generator import (
+    ConceptRepresentationFormat,
+    ConceptRepresentationGenerator,
 )
-
-# Get a pipe
-pipe = get_required_pipe("my_pipe")
-
-# Generate complete Python runner code
-python_code = generate_runner_code(pipe)
-print(python_code)
-
-# Generate just the Python input memory block
-python_inputs = generate_input_memory_block_python(pipe.inputs)
-print(f"inputs = {python_inputs}")
-
-# Generate JSON input memory (as dict)
-json_inputs = generate_input_memory_json(pipe.inputs)
-print(json_inputs)
-
-# Generate JSON input memory (as formatted string)
-json_string = generate_input_memory_json_string(pipe.inputs, indent=2)
-print(json_string)
-```
-
-Python Output Example:
----------------------
-```python
-import asyncio
-
-from pipelex.core.stuffs.image_content import ImageContent
-from pipelex.pipelex import Pipelex
-from pipelex.pipeline.execute import execute_pipeline
+from pipelex.core.concepts.native.concept_native import NativeConceptCode
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.tools.misc.string_utils import pascal_case_to_snake_case
 
 
-async def run_my_pipe():
-    return await execute_pipeline(
-        pipe_code="my_pipe",
-        inputs={
-            "image": ImageContent(url="image_url"),
-        },
+@dataclass
+class CustomClassInfo:
+    """Information about a custom structure class for import generation."""
+
+    class_name: str
+    domain_code: str
+    concept_code: str
+
+    @property
+    def module_name(self) -> str:
+        """Get the module name (filename without .py) for this class."""
+        concept_snake_case = pascal_case_to_snake_case(self.concept_code)
+        return f"{self.domain_code}__{concept_snake_case}"
+
+    @property
+    def import_statement(self) -> str:
+        """Get the import statement for this class (uses sys.path from script directory)."""
+        return f"from structures.{self.module_name} import {self.class_name}"
+
+
+def _is_multiple(multiplicity: VariableMultiplicity | None) -> bool:
+    """Check if the multiplicity indicates multiple items.
+
+    Args:
+        multiplicity: The multiplicity value (None, bool, or int)
+
+    Returns:
+        True if multiple items are expected
+    """
+    if multiplicity is None:
+        return False
+    if isinstance(multiplicity, bool):
+        return multiplicity
+    # int means specific count, which is multiple
+    return multiplicity > 1
+
+
+def _format_representation_as_python(representation: dict[str, Any], is_multiple: bool = False) -> str:
+    """Format a representation dict as Python code.
+
+    Args:
+        representation: Dict with concept and content
+        is_multiple: If True, wrap content in a list
+
+    Returns:
+        Python code string
+    """
+    concept = representation["concept"]
+    content = representation["content"]
+
+    # If multiple, wrap content in a list
+    if is_multiple:
+        content = f"[{content}]"
+
+    # Content is already a Python instantiation string from the generator
+    return f'{{\n            "concept": "{concept}",\n            "content": {content},\n        }}'
+
+
+def _get_structure_class_import(class_name: str) -> str | None:
+    """Get the import statement for a native structure class.
+
+    The import statement is generated dynamically from the class's actual module location,
+    so it will automatically reflect any file relocations.
+
+    Args:
+        class_name: The name of the structure class
+
+    Returns:
+        Import statement string, or None if not a native structure class
+    """
+    cls = NativeConceptCode.get_native_structure_class(class_name)
+    if cls is None:
+        return None
+    return f"from {cls.__module__} import {cls.__name__}"
+
+
+def _collect_concept_info(concept: Concept) -> CustomClassInfo | None:
+    """Collect information about a concept for import generation.
+
+    Args:
+        concept: The concept to collect info for
+
+    Returns:
+        CustomClassInfo if it's a custom concept, None if native
+    """
+    if SpecialDomain.is_native(concept.domain_code):
+        return None
+
+    # For custom concepts, use the concept code as the class name
+    # The structure class name should match the concept code
+    return CustomClassInfo(
+        class_name=concept.structure_class_name,
+        domain_code=concept.domain_code,
+        concept_code=concept.code,
     )
 
 
-if __name__ == "__main__":
-    Pipelex.make()
-    result = asyncio.run(run_my_pipe())
-```
-
-JSON Output Example:
--------------------
-```json
-{
-  "image": {
-    "concept": "native.Image",
-    "content": {
-      "url": "image_url"
-    }
-  }
-}
-```
-"""
-
-import json
-from typing import Any, cast
-
-from pipelex.core.concepts.concept import Concept
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.pipe_abstract import PipeAbstract
-
-
-def value_to_json(value: Any) -> Any:
-    """Convert a value to pure JSON representation (dict/list/primitives only).
-
-    Args:
-        value: The value to convert
-
-    Returns:
-        Pure JSON-serializable representation (no Python classes)
-    """
-    if isinstance(value, dict) and "_class" in value:
-        # Convert Content class instantiation to pure JSON
-        # E.g., {"_class": "PDFContent", "url": "..."} -> {"url": "..."}
-        class_name = value["_class"]  # pyright: ignore[reportUnknownVariableType]
-        if class_name in {"PDFContent", "ImageContent"}:
-            url = value.get("url", "your_url")  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportUnknownVariableType]
-            return {"url": cast("str", url)}
-        # For other classes, remove the _class key and return the rest
-        return {k: value_to_json(v) for k, v in value.items() if k != "_class"}  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
-    elif isinstance(value, dict) and "concept_code" in value and "content" in value:
-        # Convert concept_code format to concept format with pure JSON content
-        concept_code = value["concept_code"]  # pyright: ignore[reportUnknownVariableType]
-        content = value["content"]  # pyright: ignore[reportUnknownVariableType]
-
-        # Recursively convert content to JSON
-        content_json = value_to_json(content)
-
-        return {"concept": cast("str", concept_code), "content": content_json}
-    elif isinstance(value, str | bool | int | float):
-        return value
-    elif isinstance(value, list):
-        return [value_to_json(item) for item in value]  # pyright: ignore[reportUnknownVariableType]
-    elif isinstance(value, dict):
-        return {k: value_to_json(v) for k, v in value.items()}  # pyright: ignore[reportUnknownVariableType, reportUnknownArgumentType]
-    else:
-        # For other types, try to convert to string
-        return str(value)
-
-
-def value_to_python_code(value: Any, indent_level: int = 0) -> str:
-    """Convert a value to Python code representation recursively.
-
-    Args:
-        value: The value to convert (can be str, int, dict, list, etc.)
-        indent_level: Current indentation level for nested dicts
-
-    Returns:
-        String representation of Python code
-    """
-    indent = "    " * indent_level
-
-    if isinstance(value, dict) and "_class" in value:
-        # Special handling for Content class instantiation (e.g., PDFContent, ImageContent)
-        class_name = value["_class"]  # pyright: ignore[reportUnknownVariableType]
-        if class_name in {"PDFContent", "ImageContent"}:
-            url = value.get("url", "your_url")  # pyright: ignore[reportUnknownMemberType, reportUnknownArgumentType, reportUnknownVariableType]
-            return f'{class_name}(url="{url}")'
-        return str(value)  # pyright: ignore[reportUnknownArgumentType]
-    elif isinstance(value, dict) and "concept_code" in value and "content" in value:
-        # Special handling for refined concepts with explicit concept_code
-        # Format: {"concept": "domain.ConceptCode", "content": ContentClass(...)}
-        concept_code = value["concept_code"]  # pyright: ignore[reportUnknownVariableType]
-        content = value["content"]  # pyright: ignore[reportUnknownVariableType]
-
-        # Generate the content part
-        content_code = value_to_python_code(content, indent_level + 1)
-
-        # Return the full format with concept and content
-        return f'{{\n{indent}    "concept": "{concept_code}",\n{indent}    "content": {content_code},\n{indent}}}'
-    elif isinstance(value, str):
-        # String value - add quotes
-        return f'"{value}"'
-    elif isinstance(value, bool):
-        # Boolean - Python True/False
-        return str(value)
-    elif isinstance(value, (int, float)):
-        # Numeric value
-        return str(value)
-    elif isinstance(value, list):
-        # List - recursively convert items
-        if not value:
-            return "[]"
-        items: list[str] = [value_to_python_code(item, indent_level + 1) for item in value]  # pyright: ignore[reportUnknownVariableType]
-        return "[" + ", ".join(items) + "]"
-    elif isinstance(value, dict):
-        # Dict - recursively convert with proper formatting
-        if not value:
-            return "{}"
-        lines_dict: list[str] = []
-        for key, val in value.items():  # pyright: ignore[reportUnknownVariableType]
-            val_code = value_to_python_code(val, indent_level + 1)
-            lines_dict.append(f'{indent}    "{key}": {val_code}')
-        return "{\n" + ",\n".join(lines_dict) + f"\n{indent}}}"
-    else:
-        # Fallback - use repr
-        return repr(value)
-
-
-def generate_compact_memory_entry(var_name: str, concept: Concept) -> str:
-    """Generate the pipeline_inputs dictionary entry for a given input (Python code version)."""
-    example_value = concept.get_compact_memory_example(var_name)
-
-    # Convert the example value to a Python code string
-    value_str = value_to_python_code(example_value, indent_level=3)
-
-    return f'            "{var_name}": {value_str},'
-
-
-def generate_json_memory_entry(var_name: str, concept: Concept) -> dict[str, Any]:
-    """Generate the pipeline_inputs dictionary entry for a given input (pure JSON version).
-
-    Returns:
-        A tuple of (var_name, json_value) where json_value is pure JSON (dict/list/primitives)
-    """
-    example_value = concept.get_compact_memory_example(var_name)
-
-    # Convert to JSON - always wrap with concept if not already present
-    json_value = value_to_json(example_value)
-
-    # For simple values (strings for Text, numbers for Number), wrap with concept
-    if isinstance(json_value, str):
-        # This is a native Text concept - wrap it
-        return {
-            "concept": concept.concept_string,
-            "content": json_value,
-        }
-    elif isinstance(json_value, (int, float)) and not isinstance(json_value, bool):
-        # This is a native Number concept - wrap it
-        return {
-            "concept": concept.concept_string,
-            "content": json_value,
-        }
-    elif isinstance(json_value, dict) and "concept" not in json_value:
-        # Not yet wrapped with concept - wrap it now
-        return {
-            "concept": concept.concept_string,
-            "content": json_value,
-        }
-    else:
-        # Already has concept key or is properly formatted
-        # At this point, json_value should be a dict with "concept" key
-        return cast("dict[str, Any]", json_value)
-
-
-def generate_input_memory_block_python(inputs: InputRequirements) -> str:
-    """Generate just the Python input memory block (without surrounding code).
+def _collect_imports_for_inputs(inputs: InputStuffSpecs) -> tuple[set[str], dict[str, CustomClassInfo]]:
+    """Collect all imports needed for a pipe's inputs.
 
     Args:
         inputs: The pipe inputs
 
     Returns:
-        Python code string representing the inputs dictionary
+        Tuple of (set of native class names, dict mapping class name to CustomClassInfo)
     """
-    if inputs.nb_inputs == 0:
-        return "{}"
+    native_classes: set[str] = set()
+    custom_classes: dict[str, CustomClassInfo] = {}
 
-    input_memory_entries: list[str] = []
-    for var_name, input_req in inputs.root.items():
-        concept = input_req.concept
-        entry = generate_compact_memory_entry(var_name, concept)
-        input_memory_entries.append(entry)
-
-    # Join entries and format as a dictionary
-    entries_str = "\n".join(input_memory_entries)
-    return f"{{\n{entries_str}\n        }}"
-
-
-def generate_input_memory_json(inputs: InputRequirements) -> dict[str, Any]:
-    """Generate the input memory in pure JSON format.
-
-    Args:
-        inputs: The pipe inputs
-
-    Returns:
-        Dictionary with pure JSON values (no Python classes)
-    """
-    if inputs.nb_inputs == 0:
-        return {}
-
-    json_inputs: dict[str, Any] = {}
-    for var_name, input_req in inputs.root.items():
-        concept = input_req.concept
-        json_value = generate_json_memory_entry(var_name, concept)
-        json_inputs[var_name] = json_value
-
-    return json_inputs
-
-
-def generate_input_memory_json_string(inputs: InputRequirements, indent: int = 2) -> str:
-    """Generate the input memory in pure JSON format as a formatted string.
-
-    Args:
-        inputs: The pipe inputs
-        indent: Number of spaces for indentation (default: 2)
-
-    Returns:
-        Formatted JSON string
-    """
-    json_inputs = generate_input_memory_json(inputs)
-    return json.dumps(json_inputs, indent=indent, ensure_ascii=False)
-
-
-def generate_runner_code(pipe: PipeAbstract) -> str:
-    """Generate the complete Python runner code for a pipe."""
-    pipe_code = pipe.code
-    inputs = pipe.inputs
-
-    # Determine which imports are needed based on input concepts
-    needs_pdf = False
-    needs_image = False
     for input_req in inputs.root.values():
         concept = input_req.concept
-        if concept.structure_class_name == "PDFContent":
-            needs_pdf = True
-        elif concept.structure_class_name == "ImageContent":
-            needs_image = True
+        structure_class = concept.get_structure_class()
+
+        # Get imports from the representation generator
+        generator = ConceptRepresentationGenerator(ConceptRepresentationFormat.PYTHON)
+        generator.generate_representation(concept.concept_ref, structure_class)
+
+        for class_name in generator.imports_needed:
+            if NativeConceptCode.is_native_structure_class(class_name):
+                native_classes.add(class_name)
+            else:
+                # For custom classes, we need the concept info
+                # The class name should be the structure class name which is the concept code
+                custom_info = _collect_concept_info(concept)
+                if custom_info and custom_info.class_name == class_name:
+                    custom_classes[class_name] = custom_info
+
+    return native_classes, custom_classes
+
+
+def generate_runner_code(pipe: PipeAbstract, output_multiplicity: bool = False, library_dir: str | None = None) -> str:
+    """Generate the complete Python runner code for a pipe.
+
+    This generates a runnable Python script with:
+    - Import statements for all required structure classes
+    - An async function to run the pipeline with proper return type
+    - Example input values based on the pipe's input concepts
+    - Output handling with main_stuff_as (or main_stuff for Anything)
+
+    Args:
+        pipe: The pipe to generate runner code for
+        output_multiplicity: Whether the output is a list (e.g., Text[])
+        library_dir: Directory containing the MTHDS bundles to load
+    """
+    # Get output information
+    structure_class_name = pipe.output.concept.structure_class_name
+    is_native = NativeConceptCode.is_native_structure_class(structure_class_name)
+    custom_info = None if is_native else _collect_concept_info(pipe.output.concept)
+
+    # Check if output is the special "Anything" concept (no specific content type)
+    is_anything_output = pipe.output.concept.code == NativeConceptCode.ANYTHING
+
+    # Collect all imports needed for inputs
+    native_classes, custom_classes = _collect_imports_for_inputs(pipe.inputs)
+
+    # Track if we need to import Any from typing (for Anything output)
+    needs_any_import = is_anything_output
+
+    # Add output class to appropriate set (unless it's Anything)
+    if not is_anything_output:
+        if is_native:
+            native_classes.add(structure_class_name)
+        elif custom_info:
+            custom_classes[structure_class_name] = custom_info
 
     # Build import section
-    import_lines = ["import asyncio", ""]
+    import_lines: list[str] = []
 
-    # Add content class imports if needed
-    if needs_pdf:
-        import_lines.append("from pipelex.core.stuffs.pdf_content import PDFContent")
-    if needs_image:
-        import_lines.append("from pipelex.core.stuffs.image_content import ImageContent")
+    # Add path setup for custom structure imports (must be before other imports)
+    if custom_classes:
+        import_lines.extend(
+            [
+                "import sys",
+                "from pathlib import Path",
+                "",
+                "# Add script directory to path for local imports",
+                "sys.path.insert(0, str(Path(__file__).parent))",
+                "",
+            ]
+        )
+
+    import_lines.extend(["import asyncio", ""])
+
+    # Add typing import if needed (for Anything output)
+    if needs_any_import:
+        import_lines.append("from typing import Any")
+        import_lines.append("")
+
+    # Add native content class imports
+    native_imports: list[str] = []
+    for class_name in sorted(native_classes):
+        import_stmt = _get_structure_class_import(class_name)
+        if import_stmt:
+            native_imports.append(import_stmt)
+    import_lines.extend(native_imports)
+
+    # Add custom structure class imports from structures folder
+    if custom_classes:
+        import_lines.append("")
+        for class_name in sorted(custom_classes.keys()):
+            custom_info = custom_classes[class_name]
+            import_lines.append(custom_info.import_statement)
 
     import_lines.extend(
         [
+            "",
             "from pipelex.pipelex import Pipelex",
-            "from pipelex.pipeline.execute import execute_pipeline",
+            "from pipelex.pipeline.runner import PipelexRunner",
         ]
     )
 
     # Build inputs entries
-    if inputs.nb_inputs > 0:
-        input_memory_entries: list[str] = []
-        for var_name, input_req in inputs.root.items():
-            concept = input_req.concept
-            entry = generate_compact_memory_entry(var_name, concept)
-            input_memory_entries.append(entry)
-        input_memory_block = "\n".join(input_memory_entries)
+    if not pipe.inputs.is_empty:
+        input_entries: list[str] = []
+        for var_name, input_req in pipe.inputs.root.items():
+            is_multiple = _is_multiple(input_req.multiplicity)
+            result, _ = input_req.concept.render_concept_representation(
+                output_format=ConceptRepresentationFormat.PYTHON,
+                is_multiple=is_multiple,
+            )
+            python_code = _format_representation_as_python(result, is_multiple=is_multiple)
+            input_entries.append(f'            "{var_name}": {python_code},')
+        input_memory_block = "\n".join(input_entries)
     else:
-        input_memory_block = "        # No inputs required"
+        input_memory_block = "            # No inputs required"
+
+    # Determine return type annotation and result call
+    # Special case: Anything output uses Any type and main_stuff (no content type casting)
+    if is_anything_output:
+        return_type = "Any"
+        result_call = "pipe_output.main_stuff"
+    elif output_multiplicity:
+        return_type = f"list[{structure_class_name}]"
+        result_call = f"pipe_output.main_stuff_as_items(item_type={structure_class_name})"
+    else:
+        return_type = structure_class_name
+        result_call = f"pipe_output.main_stuff_as(content_type={structure_class_name})"
 
     # Build the main function
     function_lines = [
         "",
         "",
-        f"async def run_{pipe_code}():",
-        "    return await execute_pipeline(",
-        f'        pipe_code="{pipe_code}",',
+        f"async def run_{pipe.code}() -> {return_type}:",
+        "    runner = PipelexRunner()",
+        "    response = await runner.execute_pipeline(",
+        f'        pipe_code="{pipe.code}",',
     ]
 
-    if inputs.nb_inputs > 0:
+    if not pipe.inputs.is_empty:
         function_lines.extend(
             [
                 "        inputs={",
@@ -357,14 +283,25 @@ def generate_runner_code(pipe: PipeAbstract) -> str:
     function_lines.extend(
         [
             "    )",
+            "    pipe_output = response.pipe_output",
+            f"    return {result_call}",
             "",
             "",
             'if __name__ == "__main__":',
             "    # Initialize Pipelex",
-            "    Pipelex.make()",
-            "",
-            "    # Run the pipeline",
-            f"    result = asyncio.run(run_{pipe_code}())",
+        ]
+    )
+
+    # Add Pipelex.make() with library_dirs if provided
+    if library_dir:
+        function_lines.append(f'    with Pipelex.make(library_dirs=["{library_dir}"]):')
+    else:
+        function_lines.append("    with Pipelex.make():")
+
+    function_lines.extend(
+        [
+            "        # Run the pipeline",
+            f"        result = asyncio.run(run_{pipe.code}())",
             "",
         ]
     )

@@ -1,6 +1,6 @@
 # PipeSequence
 
-The `PipeSequence` controller is used to execute a series of pipes one after another. It is the fundamental building block for creating linear workflows where the output of one step becomes the input for the next.
+The `PipeSequence` controller is used to execute a series of pipes one after another. It is the fundamental building block for creating linear methods where the output of one step becomes the input for the next.
 
 ## How it works
 
@@ -12,9 +12,9 @@ A `PipeSequence` defines a list of `steps`. Each step calls another pipe and giv
 
 ## Configuration
 
-`PipeSequence` is configured in your pipeline's `.plx` file.
+`PipeSequence` is configured in your pipeline's `.mthds` file.
 
-### PLX Parameters
+### MTHDS Parameters
 
 | Parameter  | Type            | Description                                                                                                    | Required |
 | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------- | -------- |
@@ -40,7 +40,7 @@ Each entry in the `steps` array is a table with the following keys:
 
 Let's imagine a pipeline that first extracts text from an image, then summarizes that text, and finally translates the summary into French.
 
-```plx
+```toml
 [pipe.extract_text_from_image]
 type = "PipeExtract"
 description = "Extract text from an image"

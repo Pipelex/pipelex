@@ -1,35 +1,46 @@
-<!-- BEGIN_PIPELEX_RULES -->
 # Pipelex Coding Rules
 
 ## Commands
 
 ### Linting
 
-   After making code changes, you must always lint using `make check`.
+   After making code changes, you must always lint using `make agent-check`.
 
    ```bash
-   make check
-   # If the current system doesn't have the `make` command, lookup the "check" target in the Makefile and run the command manually.
+   make agent-check
+   # If the current system doesn't have the `make` command,
+   # lookup the "agent-check" target in the Makefile and run the commands one by one (targets fix-unused-imports format lint pyright mypy)
    ```
 
    This runs multiple code quality tools:
    - Pyright: Static type checking
-   - Ruff: Fast Python linter  
+   - Ruff: Fix unused imports, lint, format  
    - Mypy: Static type checker
+   - plxt: Format and lint TOML, MTHDS, and PLX files
 
    Always fix any issues reported by these tools before proceeding.
 
-### Running Tests
+### Cleaning Derived Files
 
-   After you're finished making code changes, you must always run tests using `make test-xdist`.
+   If you need to clean derived files and caches, typically after you erased files or moved tests, the linters can get confused, the pytest collection can be off...
 
    ```bash
-   make test-xdist
-   # If the current system doesn't have the `make` command, lookup the "test-xdist" target in the Makefile and run the command manually.
-   # If some test failes, re-run it with `-s -vv` to see more details
+   make cleanderived
+   ```
+
+### Running Tests
+
+   After you're finished making code changes, you must always run tests using `make agent-test`.
+
+   ```bash
+   make agent-test
+   # If the current system doesn't have the `make` command, lookup the "agent-test" target in the Makefile and run the command manually.
+   # Zero output on success; full output on failure.
    ```
 
 ### Running Tests with Prints
+
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
 
    If anything went wrong, you can run the tests with prints to see the error:
 
@@ -40,6 +51,8 @@
 
 ### Running specific Tests
 
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
+
    ```bash
    make tp TEST=TestClassName
    # or
@@ -48,6 +61,8 @@
    Note: Matches names starting with the provided string.
 
 ### Running Last Failed Tests
+
+   > **LOCAL ONLY**: The commands below are meant for a human developer running on their local machine. If you are an AI agent (Claude Code, Cursor, Codex, or any other agent running in the cloud or in a sandboxed environment), **do NOT use these commands**. Use `make agent-test` instead.
 
    To rerun only the tests that failed in the previous run, use:
 
@@ -61,41 +76,47 @@
 
 ---
 
-### Prerequisites for running command lines: activate virtual environment
+### Prerequisites for running command lines: use virtual environment
 
-   **CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST activate the appropriate Python virtual environment. The only exceptions are our `make` commands which already include the env activation.
+   **CRITICAL**: Before running any `pipelex` commands or `pytest`, you MUST use the appropriate Python virtual environment. The only exceptions are our `make` commands which already include the env activation.
 
-   Do this:
-
-   ```bash
-   source .venv/bin/activate
-   pytest -s -v -k test_render_jinja2_from_text
-   pipelex validate all
-   ```
-
-   or do that:
+   Call the CLI directly from the virtual environment:
 
    ```bash
-   .venv/bin/python -m pytest -s -v -k test_render_jinja2_from_text
-   .venv/bin/pipelex validate all
+   .venv/bin/pytest -s -v -k test_render_jinja2_from_text
+   .venv/bin/pipelex validate --all
    ```
 
-   (adapt the above command to the OS and available virtual environment name)
+   For standard installations, the virtual environment is named `.venv`. Always check this first. On Windows, the path is `.venv\Scripts\` instead of `.venv/bin/`.
 
-   For standard installations, the virtual environment is named `.venv`. Always check this first:
+### Pipelex Dev CLI (`pipelex-dev`)
+
+   The `pipelex-dev` CLI provides internal development tools that are not distributed with the package. It is available in the virtual environment.
 
    ```bash
-   # Activate the virtual environment (standard installation)
-   source .venv/bin/activate  # On macOS/Linux
-   # or
-   .venv\Scripts\activate  # On Windows
+   .venv/bin/pipelex-dev --help
    ```
 
-   If the installation uses a different venv name or location, activate that one instead. All subsequent `pipelex` and `pytest` commands assume the venv is active.
+   Key commands:
+
+   - **`generate-mthds-schema`**: Regenerate the MTHDS JSON Schema (`derived/mthds_schema.json`). Run this after modifying `mthds_schema_generator.py`.
+
+     ```bash
+     .venv/bin/pipelex-dev generate-mthds-schema
+     ```
 
 ## Coding Standards & Best Practices for Python Code
 
 This document outlines the core coding standards, best practices, and quality control procedures for the codebase.
+
+### Python Version Compatibility
+
+    - The project supports Python 3.10+ (`requires-python = ">=3.10,<3.15"`). Never use features introduced after Python 3.10 without a compatibility fallback.
+    - Common pitfalls:
+      - `datetime.UTC` was added in Python 3.11. Use `datetime.timezone.utc` instead.
+      - `StrEnum` was added in Python 3.11. Always import it from `pipelex.types` which handles retrocompatibility.
+      - `type` statement (PEP 695) was added in Python 3.12. Use `TypeAlias` from `typing` instead.
+      - `ExceptionGroup` / `except*` was added in Python 3.11. Avoid unless using the `exceptiongroup` backport.
 
 ### Variables, loops and indexes
 
@@ -107,12 +128,17 @@ This document outlines the core coding standards, best practices, and quality co
 ### Enums and tests
 
     - When defining enums related to string values, always inherit from `StrEnum`
-    - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
+    - When you need the enum value as a string, don't use `str(enum_var)` or `enum_var.value`, just use `enum_var` itself, that is the point of using StrEnum!
+    - Never test equality to an enum value: use match/case, even to single out 1 case out of 10 cases. To avoid heavy match/case code in awkward places, add @property methods to the enum class such as `is_foobar()`. This is to avoid bugs: when new enum values are added we want the linter to complain. Use the `|` operator to group cases
     - As our match/case constructs over enums are always exhaustive, NEVER add a default `case _: ...`. Otherwise, you won't pass linting.
     - `StrEnum` must be imported from `pipelex.types` (handles python retrocompatibility):
     ```python
     from pipelex.types import StrEnum
     ```
+
+### Optionals
+
+- Don't write things like `a = b if b else c`, write `a = b or c` instead.
 
 ### Imports
 
@@ -120,7 +146,17 @@ This document outlines the core coding standards, best practices, and quality co
 
     - Import all necessary libraries at the top of the file
     - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
-    - Do not bother with ordering the imports, our Ruff linter will handle it for us. Same goes with removing unused imports.
+    - Do not bother with ordering the imports or removing unused imports, our Ruff linter will handle it for us.
+    - `if TYPE_CHECKING:` blocks must always be the **last** block in the imports section, placed after all regular imports.
+
+#### **Removing unused imports**
+
+    - To remove unused imports, run `make fix-unused-imports` or `make fui` (shorthand). This is faster and cheaper than rewriting with LLM.
+
+#### **No re-exports in `__init__.py`**
+
+    - Do NOT fill `__init__.py` files with re-exports.
+    - Always use direct full-path imports everywhere. For example:
 
 - **Logging and Pretty Printing**:
 
@@ -221,11 +257,24 @@ This document outlines the core coding standards, best practices, and quality co
        """
    ```
 
+## Standards related to developing the Pipelex codebase
+
+### Main config
+
+- The main config model is defined using `ConfigModel` classes, derived from `pydantic BaseModel`
+- The model is defined in `pipelex/system/configuration/configs.py`, some of the submodels being defined in their respective sub-packages
+- When adding new configs, place them where it makes most sense, ask the user if you need arbitrage
+- As per our python standards, use StrEnum for multiple-value enums. In that case they must not be strict pydantic fields, i.e. add `= Field(strict=False)`
+- **Important**: NEVER EVER set default values for config attributes in the class definition. All the default values are defined in the main config file `pipelex/pipelex.toml`. The only exception si for Optional values which must be set to `None` in the class definition.
+- If (and only if) you add some config that will clearly make sense for client projects to override, for instance if it's a case of user preference, then you can also add a copy of the settings to the project override config file `.pipelex/pipelex.toml` but leaving them commented out, as an invitation to override.
+- The different `pipelex.toml` files and the python model `configs.py` must be up to date with each other in terms of structure and attributes, otherwise the loading of teh config fails. To check quickly that you're good, just run `make tb` which tests the boot sequence, which includes the config loading.
+
 ## Writing tests
 
 ### Unit test generalities
 
-NEVER USE unittest.mock. YOU MUST USE pytest-mock instead.
+NEVER USE unittest.mock. Instead YOU MUST USE pytest-mock: `from pytest_mock import MockerFixture`.
+NEVER EVER put more than one TestClass into a test module.
 
 #### Test file structure
 
@@ -233,20 +282,23 @@ NEVER USE unittest.mock. YOU MUST USE pytest-mock instead.
 - Place test files in the appropriate test category directory:
     - `tests/unit/` - for unit tests that test individual functions/classes in isolation
     - `tests/integration/` - for integration tests that test component interactions
-    - `tests/e2e/` - for end-to-end tests that test complete workflows
-    - `tests/test_pipelines/` - for test pipeline definitions (PLX files and their structuring python files)
+    - `tests/e2e/` - for end-to-end tests that test complete methods
+- Do NOT add `__init__.py` files to test directories. Test directories do not need to be Python packages.
 - Fixtures are defined in conftest.py modules at different levels of the hierarchy, their scope is handled by pytest
 - Test data is placed inside test_data.py at different levels of the hierarchy, they must be imported with package paths from the root like `from tests.integration.pipelex.cogt.test_data`. Their content is all constants, regrouped inside classes to keep things tidy.
-- Always put test inside Test classes: 1 TestClass per module.
+- Always put tests inside Test classes: 1 TestClass per module.
+- NEVER EVER put more than one TestClass into a test module.
+- Put fixtures into conftest.py files for easy sharing.
 
 #### Markers
 
 Apply the appropriate markers:
+- "gha_disabled: will not be able to run properly on GitHub Actions"
 - "llm: uses an LLM to generate text or objects"
 - "img_gen: uses an image generation AI"
 - "extract: uses text/image extraction from documents"
 - "inference: uses either an LLM or an image generation AI"
-- "gha_disabled: will not be able to run properly on GitHub Actions"
+- never add "@pytest.mark.dry_runnable" if you haven't set the "inference" marker
 
 Several markers may be applied. For instance, if the test uses an LLM, then it uses inference, so you must mark with both `inference`and `llm`.
 
@@ -281,7 +333,6 @@ class TestFooBar:
 
 - Never more than 1 class per test module.
 - When testing one method, if possible, limit the number of test functions, but with different test cases in parameters
-- Sometimes it can be convenient to access the test's name in its body, for instance to include into a job_id. To achieve that, add the argument `request: FixtureRequest` into the signature and then you can get the test name using `cast(str, request.node.originalname),  # type: ignore`. 
 
 #### Test Data Organization
 
@@ -297,7 +348,7 @@ class TestFooBar:
 - Verify working memory state
 - Check output structure and content
 - Use meaningful test case names
-- Include docstrings explaining test purpose but not on top of the file and not on top of the class.
+- Include concise docstrings explaining test purpose but not on top of the file and not on top of the class.
 - Log outputs for debugging
 
 ## Writing Docs
@@ -326,4 +377,3 @@ This document outlines our test-driven development (TDD) process and the tools a
 4. **Validate tests**
 
 Remember: The key to TDD is writing the test first and letting it drive your implementation. Then, always run the full test suite and quality checks before considering a feature complete.
-<!-- END_PIPELEX_RULES -->

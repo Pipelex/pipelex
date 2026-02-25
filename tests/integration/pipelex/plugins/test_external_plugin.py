@@ -18,6 +18,7 @@ from pipelex.hub import get_inference_manager, get_pipe_router, get_report_deleg
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 from tests.integration.pipelex.cogt.test_data import LLMTestConstants, Person
 from tests.integration.pipelex.test_data import PipeTestCases
@@ -68,7 +69,7 @@ class MockExternalLLMWorker(LLMWorkerAbstract):
 
 @pytest.mark.asyncio(loop_scope="class")
 class TestExternalPlugin:
-    async def test_external_llm_worker(self, load_empty_library: Callable[[], None]):
+    async def test_external_llm_worker(self, job_metadata: JobMetadata, load_empty_library: Callable[[], None]):
         load_empty_library()
         llm_worker = MockExternalLLMWorker(reporting_delegate=get_report_delegate())
         llm_job = LLMJobFactory.make_llm_job(
@@ -76,9 +77,11 @@ class TestExternalPlugin:
                 system_text=None,
                 user_text=LLMTestConstants.USER_TEXT_SHORT,
             ),
+            job_metadata=job_metadata,
             llm_job_params=LLMJobParams(
                 temperature=0.5,
                 max_tokens=None,
+                image_detail=None,
                 seed=None,
             ),
         )
@@ -89,7 +92,7 @@ class TestExternalPlugin:
         assert generated_object
         pretty_print(generated_object)
 
-    async def test_pipe_llm_with_external_llm_handle(self, load_empty_library: Callable[[], None]):
+    async def test_pipe_llm_with_external_llm_handle(self, job_metadata: JobMetadata, load_empty_library: Callable[[], None]):
         load_empty_library()
         llm_handle = EXTERNAL_PLUGIN_NAME
         get_inference_manager().set_llm_worker_from_external_plugin(
@@ -115,6 +118,7 @@ class TestExternalPlugin:
                 pipe_code="adhoc_for_test_pipe_llm_with_external_llm_handle",
                 blueprint=pipe_llm_blueprint,
             ),
+            job_metadata=job_metadata,
         )
         pipe_llm_output = await get_pipe_router().run(
             pipe_job=pipe_job,

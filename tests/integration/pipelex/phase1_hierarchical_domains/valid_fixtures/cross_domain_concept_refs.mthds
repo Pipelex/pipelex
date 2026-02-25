@@ -1,0 +1,11 @@
+domain      = "analysis"
+description = "Analysis domain using cross-domain concept references"
+
+[pipe]
+[pipe.analyze_clause]
+type        = "PipeLLM"
+description = "Analyze a non-compete clause from the legal.contracts domain"
+inputs      = { clause = "legal.contracts.NonCompeteClause" }
+output      = "Text"
+model       = "$quick-reasoning"
+prompt      = "Analyze @clause"

@@ -8,7 +8,8 @@ from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.sub_pipe_spec import SubPipeSpec
-from pipelex.core.concepts.validation import validate_concept_string_or_code
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
+from pipelex.core.concepts.validation import validate_concept_ref_or_code
 from pipelex.pipe_controllers.parallel.pipe_parallel_blueprint import PipeParallelBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
 from pipelex.types import Self
@@ -22,24 +23,28 @@ class PipeParallelSpec(PipeSpec):
     and their outputs can be combined or kept separate.
 
     Validation Rules:
-        1. Parallels list must not be empty.
-        2. Each parallel step must be a valid SubPipeSpec.
+        1. Branches list must not be empty.
+        2. Each branch must be a valid SubPipeSpec.
         3. combined_output, when specified, must be a valid ConceptCode in PascalCase.
-        4. Pipe codes in parallels must reference existing pipes (snake_case).
+        4. Pipe codes in branches must reference existing pipes (snake_case).
 
     """
 
     type: Literal["PipeParallel"] = "PipeParallel"
     pipe_category: Literal["PipeController"] = "PipeController"
-    parallels: list[SubPipeSpec] = Field(description="List of SubPipeSpec instances to execute concurrently.")
+    branches: list[SubPipeSpec] = Field(description="List of SubPipeSpec instances to execute concurrently.")
     add_each_output: bool = Field(description="Whether to include individual pipe outputs in the combined result.")
-    combined_output: str | None = Field(default=None, description="Optional ConceptCode in PascalCasefor the combined output structure.")
+    combined_output: str | None = Field(
+        default=None,
+        description="Optional ConceptCode in PascalCase for the combined output structure.",
+        json_schema_extra={"mock_format": MockFormat.PASCAL_CASE},
+    )
 
     @field_validator("combined_output", mode="before")
     @classmethod
     def validate_combined_output(cls, combined_output: str) -> str:
         if combined_output:
-            validate_concept_string_or_code(concept_string_or_code=combined_output)
+            validate_concept_ref_or_code(concept_ref_or_code=combined_output)
         return combined_output
 
     @model_validator(mode="after")
@@ -69,7 +74,7 @@ class PipeParallelSpec(PipeSpec):
 
         # Add parallel branches as a table
         parallel_group.renderables.append(Text())  # Blank line
-        parallels_table = Table(
+        branches_table = Table(
             title="Parallel Branches:",
             title_justify="left",
             title_style="not italic",
@@ -79,28 +84,28 @@ class PipeParallelSpec(PipeSpec):
             show_lines=True,
             border_style="dim",
         )
-        parallels_table.add_column("Branch", style="dim", width=6, justify="right")
-        parallels_table.add_column("Pipe", style="red")
-        parallels_table.add_column("Result name", style="cyan")
+        branches_table.add_column("Branch", style="dim", width=6, justify="right")
+        branches_table.add_column("Pipe", style="red")
+        branches_table.add_column("Result name", style="cyan")
 
-        for idx, parallel in enumerate(self.parallels, start=1):
-            parallels_table.add_row(str(idx), parallel.pipe_code, parallel.result)
+        for idx, branch in enumerate(self.branches, start=1):
+            branches_table.add_row(str(idx), branch.pipe_code, branch.result)
 
-        parallel_group.renderables.append(parallels_table)
+        parallel_group.renderables.append(branches_table)
 
         return parallel_group
 
     @override
     def to_blueprint(self) -> PipeParallelBlueprint:
         base_blueprint = super().to_blueprint()
-        core_parallels = [parallel.to_blueprint() for parallel in self.parallels]
+        core_branches = [branch.to_blueprint() for branch in self.branches]
         return PipeParallelBlueprint(
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             type=self.type,
             pipe_category=self.pipe_category,
-            parallels=core_parallels,
+            branches=core_branches,
             add_each_output=self.add_each_output,
             combined_output=self.combined_output,
         )

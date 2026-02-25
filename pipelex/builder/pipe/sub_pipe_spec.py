@@ -1,5 +1,6 @@
-from pydantic import ConfigDict
+from pydantic import ConfigDict, Field
 
+from pipelex.cogt.content_generation.dry_run_factory import MockFormat
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipe_controllers.sub_pipe_blueprint import SubPipeBlueprint
 
@@ -22,13 +23,15 @@ class SubPipeSpec(StructuredContent):
 
     model_config = ConfigDict(extra="forbid")
 
-    pipe_code: str
-    result: str
+    pipe_code: str = Field(json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
+    result: str = Field(json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
+    batch_over: str | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
+    batch_as: str | None = Field(default=None, json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
 
     def to_blueprint(self) -> SubPipeBlueprint:
         return SubPipeBlueprint(
             pipe=self.pipe_code,
             result=self.result,
-            batch_over=None,
-            batch_as=None,
+            batch_over=self.batch_over,
+            batch_as=self.batch_as,
         )

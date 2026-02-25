@@ -1,0 +1,10 @@
+[package]
+address = "github.com/mthds/consumer-app"
+version = "1.0.0"
+description = "Consumer package that depends on scoring-lib"
+
+[dependencies]
+scoring_dep = { address = "github.com/mthds/scoring-lib", version = "2.0.0", path = "../scoring_dep" }
+
+[exports.pkg_test_consumer_analysis]
+pipes = ["pkg_test_analyze_item"]

@@ -3,6 +3,10 @@ import os
 import shutil
 from pathlib import Path
 
+import aiofiles
+
+MAX_FILE_PATH_LENGTH = 4096
+
 ########################################################
 # Save & Load
 ########################################################
@@ -89,6 +93,16 @@ def failable_load_text_from_path(path: str) -> str | None:
     if not path_exists(path):
         return None
     return load_text_from_path(path)
+
+
+def load_binary(path: str) -> bytes:
+    with open(path, "rb") as file_pointer:
+        return file_pointer.read()
+
+
+async def load_binary_async(path: str) -> bytes:
+    async with aiofiles.open(path, "rb") as fp:  # pyright: ignore[reportUnknownMemberType]
+        return await fp.read()
 
 
 ########################################################
@@ -306,7 +320,7 @@ def get_incremental_file_path(
     extension: str,
     start_at: int = 1,
     avoid_suffix_if_possible: bool = False,
-) -> str:
+) -> Path:
     """Generates a unique file path by incrementing a counter until an unused path is found.
 
     This function creates a file path in the format 'base_path/base_name_XX.extension' where XX
@@ -321,14 +335,14 @@ def get_incremental_file_path(
         avoid_suffix_if_possible (bool, optional): If True, avoids adding a suffix if possible. Defaults to False.
 
     Returns:
-        str: A unique file path that does not exist in the filesystem.
+        Path: A unique file path that does not exist in the filesystem.
 
     """
     if avoid_suffix_if_possible:
         # try without adding the suffix
         tested_path = f"{base_path}/{base_name}.{extension}"
         if not path_exists(tested_path):
-            return tested_path
+            return Path(tested_path)
 
     # we must add a number to the base name
     counter = start_at
@@ -337,7 +351,7 @@ def get_incremental_file_path(
         if not path_exists(tested_path):
             break
         counter += 1
-    return tested_path
+    return Path(tested_path)
 
 
 ########################################################
@@ -373,9 +387,26 @@ def find_files_in_dir(
         files = list(path.rglob(pattern))
     else:
         files = list(path.glob(pattern))
-
     for file in files:
-        is_excluded = excluded_dirs is not None and any(excluded_dir in file.parts for excluded_dir in excluded_dirs)
+        # Check if file is under any excluded directory
+        is_excluded = False
+        if excluded_dirs is not None:
+            for excluded_dir in excluded_dirs:
+                excluded_path = Path(excluded_dir)
+                # If excluded_dir is an absolute path, check if file is under it
+                if excluded_path.is_absolute():
+                    try:
+                        # Resolve both paths to handle symlinks (e.g., /var -> /private/var on macOS)
+                        file.resolve().relative_to(excluded_path.resolve())
+                        is_excluded = True
+                        break
+                    except ValueError:
+                        # file is not relative to excluded_path
+                        continue
+                # If excluded_dir is just a directory name, check if it's in the file path parts
+                elif excluded_dir in file.parts:
+                    is_excluded = True
+                    break
 
         # Check if file is in a force include directory (forced inclusion despite exclusions)
         # Force include dirs can be full paths or directory names
@@ -400,4 +431,5 @@ def find_files_in_dir(
         # Include if not excluded, or if force included
         if not is_excluded or should_force_include:
             filtered_files.append(file)
+
     return filtered_files

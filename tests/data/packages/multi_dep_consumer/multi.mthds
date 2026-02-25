@@ -1,0 +1,26 @@
+domain    = "pkg_test_multi_dep"
+main_pipe = "pkg_test_multi_analyze"
+
+[concept.PkgTestMultiResult]
+description = "Result combining scoring and analytics"
+
+[pipe.pkg_test_multi_analyze]
+type = "PipeSequence"
+description = "Analyze using both scoring and analytics"
+output = "PkgTestMultiResult"
+steps = [
+  { pipe = "scoring_dep->pkg_test_scoring_dep.pkg_test_compute_score" },
+  { pipe = "pkg_test_summarize_multi" },
+]
+
+[pipe.pkg_test_multi_analyze.inputs]
+item = "Text"
+
+[pipe.pkg_test_summarize_multi]
+type        = "PipeLLM"
+description = "Summarize multi-dep analysis"
+output      = "PkgTestMultiResult"
+prompt      = "Summarize: {{ item }}"
+
+[pipe.pkg_test_summarize_multi.inputs]
+item = "Text"

@@ -3,16 +3,23 @@ from typing import Literal
 from pydantic import Field
 from typing_extensions import override
 
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, OutputFormat
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.image_utils import ImageFormat
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class PipeImgGenBlueprint(PipeBlueprint):
     type: Literal["PipeImgGen"] = "PipeImgGen"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
-    img_gen_prompt: str | None = None
-    img_gen_prompt_var_name: str | None = None
+    prompt: str
+    negative_prompt: str | None = None
 
     model: ImgGenModelChoice | None = None
 
@@ -21,23 +28,42 @@ class PipeImgGenBlueprint(PipeBlueprint):
     is_raw: bool | None = None
     seed: int | Literal["auto"] | None = None
     background: Background | None = Field(default=None, strict=False)
-    output_format: OutputFormat | None = Field(default=None, strict=False)
+    output_format: ImageFormat | None = Field(default=None, strict=False)
 
     @override
     def validate_inputs(self):
-        # check that we have either an img_gen_prompt passed as attribute or as a single text input
-        if not self.inputs:
-            if not self.img_gen_prompt:
-                msg = "If no inputs are provided, you must provide an 'img_gen_prompt' as attribute."
-                raise ValueError(msg)
+        # Get all required variables from prompt
+        template_category = TemplateCategory.IMG_GEN_PROMPT
+        preprocessed_template = preprocess_template(self.prompt)
+        try:
+            check_jinja2_parsing(
+                template_source=preprocessed_template,
+                template_category=template_category,
+            )
+        except Jinja2TemplateSyntaxError as exc:
+            msg = f"Could not parse template for PipeImgGen: {exc}"
+            raise ValueError(msg) from exc
+        # Filter out internal variables that start with underscore
+        full_paths = detect_jinja2_required_variables(
+            template_category=template_category,
+            template_source=preprocessed_template,
+        )
+        required_variables: set[str] = set()
+        for path in full_paths:
+            root = get_root_from_dotted_path(path)
+            if not root.startswith("_"):
+                required_variables.add(root)
 
-        if self.inputs and self.img_gen_prompt:
-            msg = "You must provide either an 'img_gen_prompt' as attribute or as a single text input, but not both"
-            raise ValueError(msg)
+        # Check that all required variables are in inputs
+        input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
+        missing_variables: set[str] = required_variables - input_names
 
-        nb_inputs = self.nb_inputs
-        if nb_inputs > 1:
-            msg = f"Too many inputs provided for PipeImgGen: {self.input_names}. Only one input is allowed."
+        if missing_variables:
+            missing_vars_str = ", ".join(sorted(missing_variables))
+            msg = (
+                f"Missing input variable(s) in prompt template: {missing_vars_str}. "
+                "These variables are used in the prompt but not declared in inputs."
+            )
             raise ValueError(msg)
 
     @override

@@ -1,0 +1,120 @@
+# =============================================================================
+# Pipelex TOML Configuration for pipelex-demo
+# =============================================================================
+# Configures MTHDS/TOML formatting and linting behaviour for this project.
+# Powered by the Pipelex extension (plxt / taplo engine).
+#
+# Docs: https://taplo.tamasfe.dev/configuration/
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# File discovery
+# ---------------------------------------------------------------------------
+
+# Glob patterns for files to process.
+include = ["**/*.toml", "**/*.mthds", "**/*.plx"]
+
+exclude = [
+  ".venv/**",
+  ".mypy_cache/**",
+  ".ruff_cache/**",
+  ".pytest_cache/**",
+  "__pycache__/**",
+  "target/**",
+  "node_modules/**",
+  ".git/**",
+  "*.lock",
+] # Glob patterns for files to ignore.
+# These are evaluated relative to the config file location.
+
+# =============================================================================
+# Global formatting defaults
+# =============================================================================
+# These apply to every file matched by `include` unless overridden by a
+# [[rule]].formatting section below.  Every option is shown at its built-in
+# default so you can tune any of them in one place.
+
+[formatting]
+align_entries = false         # line up "=" signs across consecutive entries
+align_comments = true         # align end-of-line comments on consecutive lines
+align_single_comments = true  # also align lone comments (requires align_comments)
+array_trailing_comma = true
+array_auto_expand = true      # go multiline when array exceeds column_width
+array_auto_collapse = false   # don't re-collapse multiline arrays that fit
+inline_table_expand = true    # expand inline tables exceeding column_width
+compact_arrays = true         # [1, 2] not [ 1, 2 ]
+compact_inline_tables = false # keep spaces inside braces: { a = 1 }
+compact_entries = false       # keep spaces around "=": key = value
+column_width = 80
+indent_tables = false
+indent_entries = false
+indent_string = "  "
+trailing_newline = true
+reorder_keys = false
+reorder_arrays = false
+reorder_inline_tables = false
+allowed_blank_lines = 2
+crlf = false
+
+# =============================================================================
+# Per-file-type rules
+# =============================================================================
+# Each [[rule]] can narrow its scope with `include` / `exclude` globs and
+# provide its own [rule.formatting] overrides.  Options not listed here fall
+# back to the global [formatting] section above.
+
+
+# ---------------------------------------------------------------------------
+# Rule: TOML files
+# ---------------------------------------------------------------------------
+[[rule]]
+# Which files this rule applies to (relative globs).
+include = ["**/*.toml"]
+
+# Per-rule formatting overrides — all at defaults so you can tweak them
+# independently of .mthds files.
+[rule.formatting]
+# align_entries = false
+# align_comments = true
+# align_single_comments = true
+# array_trailing_comma = true
+# array_auto_expand = true
+# array_auto_collapse = true
+# inline_table_expand = true
+# compact_arrays = true
+# compact_inline_tables = false
+# compact_entries = false
+# column_width = 80
+# indent_tables = false
+# indent_entries = false
+# indent_string = "  "
+# trailing_newline = true
+# allowed_blank_lines = 2
+
+
+# ---------------------------------------------------------------------------
+# Rule: MTHDS files (Pipelex pipeline definitions)
+# ---------------------------------------------------------------------------
+[[rule]]
+# Which files this rule applies to (relative globs).
+include = ["**/*.mthds", "**/*.plx"]
+
+# Per-rule formatting overrides — all at defaults so you can tweak them
+# independently of .toml files.
+[rule.formatting]
+align_entries = true
+# align_comments = true
+# align_single_comments = true
+# array_trailing_comma = true
+# array_auto_expand = true
+# array_auto_collapse = true
+# inline_table_expand = true
+# compact_arrays = true
+# compact_inline_tables = false
+# compact_entries = false
+# column_width = 80
+# indent_tables = false
+# indent_entries = false
+# indent_string = "  "
+# trailing_newline = true
+# allowed_blank_lines = 2

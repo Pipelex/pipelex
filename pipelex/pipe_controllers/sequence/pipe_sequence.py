@@ -5,17 +5,17 @@ from typing_extensions import override
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
-from pipelex.core.pipes.inputs.exceptions import PipeInputNotFoundError
-from pipelex.core.pipes.inputs.input_requirements import InputRequirements
-from pipelex.core.pipes.inputs.input_requirements_factory import InputRequirementsFactory
+from pipelex.core.pipes.inputs.exceptions import InputStuffSpecNotFoundError
+from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
+from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_concept_library, get_required_pipe
-from pipelex.pipe_controllers.exceptions import PipeControllerOutputConceptMismatchError
+from pipelex.core.pipes.variable_multiplicity import is_multiplicity_compatible
+from pipelex.core.qualified_ref import QualifiedRef
+from pipelex.hub import get_concept_library, get_optional_pipe, get_required_pipe
 from pipelex.pipe_controllers.parallel.pipe_parallel import PipeParallel
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
-from pipelex.pipe_run.exceptions import PipeRunError, PipeRunParamsError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -51,43 +51,80 @@ class PipeSequence(PipeController):
     @override
     def validate_output_with_library(self):
         """Validate the output for the pipe sequence.
-        The output of the pipe sequence should match the output of the last step.
+
+        The output of the pipe sequence should match the output of the last step,
+        both in terms of concept compatibility and multiplicity.
         """
         last_step_pipe_code = self.sequential_sub_pipes[-1].pipe_code
+        # Skip output validation if the last step is an unresolved cross-package ref
+        if QualifiedRef.has_cross_package_prefix(last_step_pipe_code) and get_optional_pipe(pipe_code=last_step_pipe_code) is None:
+            return
         last_step_pipe = get_required_pipe(pipe_code=last_step_pipe_code)
-        last_step_output_concept = last_step_pipe.output
-        if not get_concept_library().is_compatible(tested_concept=last_step_output_concept, wanted_concept=self.output):
+
+        # Check concept compatibility
+        if not get_concept_library().is_compatible(tested_concept=last_step_pipe.output.concept, wanted_concept=self.output.concept):
             msg = (
-                f"PipeSequence concept mismatch: the output concept '{last_step_output_concept.concept_string}' "
-                f"of the last step '{last_step_pipe_code}' of sequence pipe '{self.code}' "
-                f"is not compatible with the output concept '{self.output.concept_string}' of the sequence."
+                f"PipeSequence concept mismatch: the output concept '{last_step_pipe.output.concept.concept_ref}' "
+                f"of the last step '{last_step_pipe.code}' of sequence pipe '{self.code}' "
+                f"is not compatible with the output concept '{self.output.concept.concept_ref}' of the sequence."
             )
             raise PipeValidationError(
                 message=msg,
                 error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_CONCEPT,
-                domain=self.domain,
+                domain_code=self.domain_code,
                 pipe_code=self.code,
-                provided_concept_code=last_step_output_concept.concept_string,
-                required_concept_codes=[self.output.concept_string],
+                provided_concept_code=last_step_pipe.output.concept.concept_ref,
+                required_concept_codes=[self.output.concept.concept_ref],
+            )
+
+        last_sub_pipe = self.sequential_sub_pipes[-1]
+        effective_last_step_output_multiplicity = last_sub_pipe.output_multiplicity
+        if not effective_last_step_output_multiplicity:
+            effective_last_step_output_multiplicity = get_required_pipe(pipe_code=last_sub_pipe.pipe_code).output.multiplicity
+
+        # Check multiplicity compatibility
+        if not is_multiplicity_compatible(
+            source_multiplicity=effective_last_step_output_multiplicity,
+            target_multiplicity=self.output.multiplicity,
+        ):
+            msg = (
+                f"PipeSequence output multiplicity mismatch: the sequence '{self.code}' declares "
+                f"output multiplicity={self.output.multiplicity}, but the last step '{last_step_pipe.code}' "
+                f"has output multiplicity={effective_last_step_output_multiplicity}. They are not compatible. "
+                "Update one of them to match the other."
+            )
+            raise PipeValidationError(
+                message=msg,
+                error_type=PipeValidationErrorType.INADEQUATE_OUTPUT_MULTIPLICITY,
+                domain_code=self.domain_code,
+                pipe_code=self.code,
+                provided_concept_code=last_step_pipe.output.concept.concept_ref,
+                required_concept_codes=[self.output.concept.concept_ref],
             )
 
     @override
-    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputRequirements:
+    def needed_inputs(self, visited_pipes: set[str] | None = None) -> InputStuffSpecs:
         if visited_pipes is None:
             visited_pipes = set()
 
         # If we've already visited this pipe, stop recursion
         if self.code in visited_pipes:
-            return InputRequirementsFactory.make_empty()
+            return InputStuffSpecsFactory.make_empty()
 
         # Add this pipe to visited set for recursive calls
         visited_pipes_with_current = visited_pipes | {self.code}
 
-        needed_inputs = InputRequirementsFactory.make_empty()
+        needed_inputs = InputStuffSpecsFactory.make_empty()
         generated_outputs: set[str] = set()
 
         for sequential_sub_pipe in self.sequential_sub_pipes:
-            sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
+            # Skip cross-package pipe refs that aren't loaded yet (dependency not resolved)
+            if QualifiedRef.has_cross_package_prefix(sequential_sub_pipe.pipe_code):
+                sub_pipe = get_optional_pipe(pipe_code=sequential_sub_pipe.pipe_code)
+                if sub_pipe is None:
+                    continue
+            else:
+                sub_pipe = get_required_pipe(pipe_code=sequential_sub_pipe.pipe_code)
             # Use the centralized recursion detection
             sub_pipe_needed_inputs = sub_pipe.needed_inputs(visited_pipes_with_current)
 
@@ -99,31 +136,32 @@ class PipeSequence(PipeController):
             if sequential_sub_pipe.batch_params:
                 if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
                     try:
-                        requirement = sub_pipe_needed_inputs.get_required_input_requirement(
+                        stuff_spec = sub_pipe_needed_inputs.get_required_stuff_spec(
                             variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
                         )
-                    except PipeInputNotFoundError as exc:
+                    except InputStuffSpecNotFoundError as exc:
                         msg = (
                             f"Batch input item named '{sequential_sub_pipe.batch_params.input_item_stuff_name}' is not "
-                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs}"
+                            f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs.format_for_display()}"
                         )
                         raise PipeSequenceValueError(msg) from exc
-                    needed_inputs.add_requirement(
+                    needed_inputs.add_stuff_spec(
                         variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
-                        concept=requirement.concept,
+                        concept=stuff_spec.concept,
                         multiplicity=True,
                     )
-                    for input_name, requirement in sub_pipe_needed_inputs.items:
+                    for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                         if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:
-                            needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+                            needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
             else:
-                for input_name, requirement in sub_pipe_needed_inputs.items:
+                for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                     if input_name not in generated_outputs:
-                        needed_inputs.add_requirement(input_name, requirement.concept, requirement.multiplicity)
+                        needed_inputs.add_stuff_spec(input_name, stuff_spec.concept, stuff_spec.multiplicity)
 
             # Add this step's output to generated outputs
             if sequential_sub_pipe.output_name:
                 generated_outputs.add(sequential_sub_pipe.output_name)
+
         return needed_inputs
 
     @override
@@ -131,18 +169,13 @@ class PipeSequence(PipeController):
         return {sub_pipe.pipe_code for sub_pipe in self.sequential_sub_pipes}
 
     @override
-    async def _run_controller_pipe(
+    async def _live_run_controller_pipe(
         self,
         job_metadata: JobMetadata,
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        pipe_run_params.push_pipe_layer(pipe_code=self.code)
-        if pipe_run_params.is_multiple_output_required:
-            msg = f"{self.__class__.__name__} does not support multiple outputs, got output_multiplicity = {pipe_run_params.output_multiplicity}"
-            raise PipeRunParamsError(msg)
-
         evolving_memory = working_memory
 
         for sub_pipe_index, sub_pipe in enumerate(self.sequential_sub_pipes):
@@ -171,23 +204,21 @@ class PipeSequence(PipeController):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeOutput:
-        if not pipe_run_params.run_mode.is_dry:
-            msg = f"PipeSequence._dry_run_controller_pipe() called with run_mode = {pipe_run_params.run_mode} in pipe {self.code}"
-            raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode)
-        # Verify the output of this pipe is matching the output of the last step.
-        concept_of_last_step = get_required_pipe(pipe_code=self.sequential_sub_pipes[-1].pipe_code).output
-        # if self.output.concept_string != concept_string_of_last_step:
-        if not get_concept_library().is_compatible(tested_concept=concept_of_last_step, wanted_concept=self.output):
-            msg = f"""PipeSequence concept mismatch:
-the output concept '{concept_of_last_step.concept_string}' of the last step '{self.sequential_sub_pipes[-1].pipe_code}'
-of sequence pipe '{self.code}' is not compatible with the output concept '{self.output.concept_string}' of the sequence.
-"""
-            raise PipeControllerOutputConceptMismatchError(
-                message=msg, tested_concept=concept_of_last_step.concept_string, wanted_concept=self.output.concept_string
-            )
-        return await self._run_controller_pipe(
+        return await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
         )
+
+    @override
+    async def _validate_before_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass
+
+    @override
+    async def _validate_after_run(
+        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+    ):
+        pass

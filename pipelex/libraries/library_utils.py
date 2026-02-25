@@ -1,50 +1,48 @@
-from importlib.abc import Traversable
 from importlib.resources import files
 from pathlib import Path
 
 from pipelex import log
 from pipelex.builder import builder
 from pipelex.config import get_config
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.tools.misc.file_utils import find_files_in_dir
+from pipelex.types import Traversable
 
 
-def get_pipelex_plx_files_from_package() -> list[Path]:
-    """Get all PLX files from the pipelex package using importlib.resources.
+def get_pipelex_mthds_files_from_package() -> list[Path]:
+    """Get all MTHDS files from the pipelex package using importlib.resources.
 
     This works reliably whether pipelex is installed as a wheel, from source,
     or as a relative path import.
 
     Returns:
-        List of Path objects to PLX files in pipelex package
+        List of Path objects to MTHDS files in pipelex package
     """
-    plx_files: list[Path] = []
+    mthds_files: list[Path] = []
     pipelex_package = files("pipelex")
 
-    def _find_plx_in_traversable(traversable: Traversable, collected: list[Path]) -> None:
-        """Recursively find .plx files in a Traversable."""
+    def _find_mthds_in_traversable(traversable: Traversable, collected: list[Path]) -> None:
+        """Recursively find .mthds files in a Traversable."""
         excluded_dirs = get_config().pipelex.scan_config.excluded_dirs
         try:
             if not traversable.is_dir():
                 return
 
             for child in traversable.iterdir():
-                if child.is_file() and child.name.endswith(".plx"):
-                    # Convert to path string for validation
-                    plx_path_str = str(child)
-                    if PipelexInterpreter.is_pipelex_file(Path(plx_path_str)):
-                        collected.append(Path(plx_path_str))
-                        log.verbose(f"Found pipelex package PLX file: {plx_path_str}")
+                if child.is_file() and is_pipelex_file(Path(child.name)):
+                    mthds_path_str = str(child)
+                    collected.append(Path(mthds_path_str))
+                    log.verbose(f"Found pipelex package MTHDS file: {mthds_path_str}")
                 elif child.is_dir():
                     # Skip excluded directories
                     if child.name not in excluded_dirs:
-                        _find_plx_in_traversable(child, collected)
+                        _find_mthds_in_traversable(child, collected)
         except (PermissionError, OSError) as exc:
             log.warning(f"Could not access {traversable}: {exc}")
 
-    _find_plx_in_traversable(pipelex_package, plx_files)
-    log.verbose(f"Found {len(plx_files)} PLX files in pipelex package")
-    return plx_files
+    _find_mthds_in_traversable(pipelex_package, mthds_files)
+    log.verbose(f"Found {len(mthds_files)} MTHDS files in pipelex package")
+    return mthds_files
 
 
 def get_pipelex_package_dir_for_imports() -> Path | None:
@@ -64,28 +62,27 @@ def get_pipelex_package_dir_for_imports() -> Path | None:
     return None
 
 
-def get_pipelex_plx_files_from_dirs(dirs: set[Path]) -> list[Path]:
-    """Get all valid Pipelex PLX files from the given directories."""
-    all_plx_paths: list[Path] = []
+def get_pipelex_mthds_files_from_dirs(dirs: set[Path]) -> list[Path]:
+    """Get all valid Pipelex MTHDS files from the given directories."""
+    all_mthds_paths: list[Path] = []
 
     for dir_path in dirs:
         if not dir_path.exists():
             log.debug(f"Directory does not exist, skipping: {dir_path}")
             continue
 
-        # Find all .plx files in the directory, excluding problematic directories
-        plx_files = find_files_in_dir(
+        # Find all .mthds files in the directory, excluding problematic directories
+        mthds_files = find_files_in_dir(
             dir_path=str(dir_path),
-            pattern="*.plx",
+            pattern=f"*{MTHDS_EXTENSION}",
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
             force_include_dirs=[str(Path(builder.__file__).parent)],
         )
 
         # Filter to only include valid Pipelex files
-        for plx_file in plx_files:
-            if PipelexInterpreter.is_pipelex_file(plx_file):
-                all_plx_paths.append(plx_file)
+        for mthds_file in mthds_files:
+            if is_pipelex_file(mthds_file):
+                all_mthds_paths.append(mthds_file)
             else:
-                log.debug(f"Skipping non-Pipelex PLX file: {plx_file}")
-
-    return all_plx_paths
+                log.debug(f"Skipping non-Pipelex MTHDS file: {mthds_file}")
+    return all_mthds_paths

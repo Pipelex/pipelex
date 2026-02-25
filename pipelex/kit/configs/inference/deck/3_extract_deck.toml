@@ -1,0 +1,42 @@
+####################################################################################################
+# Pipelex Model Deck - Base Configuration
+####################################################################################################
+#
+# This file defines model aliases and presets for Document extraction models, including
+# extraction of text and images from documents and OCR and text extraction from images.
+#
+# Model Reference Syntax:
+# - Preset:    $preset_name or preset:preset_name
+# - Alias:     @alias_name or alias:alias_name
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# Document Extraction Default Choices
+####################################################################################################
+
+[extract]
+choice_default = "@default-extract-document"
+
+####################################################################################################
+# Aliases
+####################################################################################################
+
+[extract.aliases]
+default-premium = "azure-document-intelligence"
+default-extract-document = "mistral-document-ai-2505"
+default-extract-image = "mistral-document-ai-2505"
+default-text-from-pdf = "pypdfium2-extract-pdf"
+default-no-inference = "pypdfium2-extract-pdf"
+
+####################################################################################################
+# Extract Presets
+####################################################################################################
+
+[extract.presets]
+
+# Testing
+extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50, description = "Testing preset for document extraction" }

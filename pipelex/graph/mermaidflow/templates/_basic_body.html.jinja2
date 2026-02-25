@@ -1,0 +1,19 @@
+<div class="header">
+    <h1>{{ title }}</h1>
+    <div class="theme-selector">
+        <label for="theme-select">Theme:</label>
+        <select id="theme-select">
+            <option value="default">Default</option>
+            <option value="dark">Dark</option>
+            <option value="forest">Forest</option>
+            <option value="neutral">Neutral</option>
+            <option value="base">Base</option>
+        </select>
+    </div>
+</div>
+<div class="mermaid-container">
+    <div class="mermaid" id="mermaid-diagram"></div>
+</div>
+
+<!-- Embedded mermaid code as JSON for safe rendering -->
+<script type="application/json" id="mermaid-code-data">{{ mermaid_code | tojson }}</script>

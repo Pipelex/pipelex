@@ -21,12 +21,12 @@ is_log_costs_to_console = false
 ### Cost Report File Generation
 
 ```toml
-is_generate_cost_report_file_enabled = true
+is_generate_cost_report_file_enabled = false
 ```
 
 - Controls whether cost report files are generated after the execution of the pipeline
 - When enabled, creates detailed reports in CSV format in the directory `reports/` by default.
-- Default: `true`
+- Default: `false`
 
 ### Report File Location
 
@@ -71,7 +71,7 @@ cost_report_unit_scale = 1.0
 is_log_costs_to_console = true
 
 # Generate report files
-is_generate_cost_report_file_enabled = true
+is_generate_cost_report_file_enabled = false
 
 # Store reports in a custom directory
 cost_report_dir_path = "analytics/cost_reports"

@@ -23,12 +23,12 @@
             "args": [
                 "-s",
                 "-vv",
-                "-k test_discord_newsletter_dry_run_working_memory"
+                "-k test_compose_image_content_multiple"
             ],
             "console": "integratedTerminal"
         },
         {
-            "name": "Debug test inference",
+            "name": "Debug test inference LLM structured",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
@@ -41,27 +41,95 @@
             "console": "integratedTerminal"
         },
         {
+            "name": "Debug test inference Img Gen",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_img_gen_single_opaque"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug test inference PipeExtract",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-s",
+                "-vv",
+                "-m inference",
+                "-k test_pipe_extract_from_pdf"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug validate bundle",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "validate",
+                "temp/bundle.mthds",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
             "name": "Debug validate pipe",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "validate",
-                "temp/bundle.plx",
+                "analyze_image_collection",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
         },
         {
-            "name": "Debug run pipe",
+            "name": "Debug run pipe bundle no inputs",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
-                "results/pipeline_01/bundle.plx",
+                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug run pipe bundle with inputs",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "run",
+                "tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds",
+                "--pipe",
+                "describe_image",
                 "--inputs",
-                "results/pipeline_01/inputs.json",
+                "tests/data/pipeline_inputs/input_image.json",
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Debug run pipe code",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/pipelex",
+            "args": [
+                "run",
+                "write_discord_newsletter",
+                "--inputs",
+                "tests/data/discord_newsletter/discord_sample_input.json",
             ],
             "console": "integratedTerminal",
             "justMyCode": false

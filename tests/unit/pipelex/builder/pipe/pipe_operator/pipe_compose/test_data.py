@@ -3,7 +3,8 @@ from typing import ClassVar
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle, TextFormat
+from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
+from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.pipe_operators.compose.pipe_compose_blueprint import PipeComposeBlueprint
 
 
@@ -34,6 +35,35 @@ class PipeComposeTestCases:
         ),
     )
 
+    CONSTRUCT_COMPOSE = (
+        "construct_compose",
+        PipeComposeSpec.model_validate(
+            {
+                "pipe_code": "compose_sheet",
+                "description": "Compose interview sheet",
+                "inputs": {"analysis": "MatchAnalysis", "questions": "InterviewQuestion[]"},
+                "output": "InterviewSheet",
+                "construct": {
+                    "score": {"from": "analysis.overall_score"},
+                    "questions": {"from": "questions"},
+                },
+            }
+        ),
+        # Use model_validate to create the expected blueprint via the same validation path
+        PipeComposeBlueprint.model_validate(
+            {
+                "description": "Compose interview sheet",
+                "inputs": {"analysis": "MatchAnalysis", "questions": "InterviewQuestion[]"},
+                "output": "InterviewSheet",
+                "construct": {
+                    "score": {"from": "analysis.overall_score"},
+                    "questions": {"from": "questions"},
+                },
+            }
+        ),
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, PipeComposeSpec, PipeComposeBlueprint]]] = [
         SIMPLE_COMPOSE,
+        CONSTRUCT_COMPOSE,
     ]

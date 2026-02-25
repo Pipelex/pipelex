@@ -1,20 +1,19 @@
+import html
 import json
-from typing import Any
+import re
 
-import markdown
+from rich.markdown import Markdown
+from rich.syntax import Syntax
 from typing_extensions import override
 
-from pipelex import pretty_print_md
 from pipelex.core.stuffs.stuff_content import StuffContent
-from pipelex.tools.misc.file_utils import ensure_directory_exists, save_text_to_path
+from pipelex.tools.misc.pretty import PrettyPrintable
+
+HTML_PATTERN = re.compile(r"^\s*<(!DOCTYPE|!--|[a-zA-Z])", re.IGNORECASE)
 
 
 class TextContent(StuffContent):
     text: str
-
-    @override
-    def smart_dump(self) -> str | dict[str, Any] | list[str] | list[dict[str, Any]]:
-        return self.text
 
     @property
     @override
@@ -22,17 +21,14 @@ class TextContent(StuffContent):
         return f"some text ({len(self.text)} chars)"
 
     @override
-    def __str__(self) -> str:
-        return self.text
-
-    @override
     def rendered_plain(self) -> str:
         return self.text
 
     @override
     def rendered_html(self) -> str:
-        # Convert a markdown string to HTML and return HTML as a Unicode string.
-        return markdown.markdown(self.text)
+        # Always escape HTML special characters so text displays literally in browsers.
+        # If you need to render trusted HTML content, use HtmlContent instead.
+        return html.escape(self.text)
 
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
@@ -42,11 +38,12 @@ class TextContent(StuffContent):
     def rendered_json(self) -> str:
         return json.dumps({"text": self.text})
 
-    def save_to_directory(self, directory: str):
-        ensure_directory_exists(directory)
-        filename = "text_content.txt"
-        save_text_to_path(text=self.text, path=f"{directory}/{filename}")
+    def _looks_like_html(self) -> bool:
+        """Check if the text content appears to be HTML."""
+        return bool(HTML_PATTERN.match(self.text))
 
     @override
-    def pretty_print_content(self, title: str | None = None) -> None:
-        pretty_print_md(self.text, title=title)
+    def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
+        if self._looks_like_html():
+            return Syntax(self.text, "html", word_wrap=True)
+        return Markdown(self.text)

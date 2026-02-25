@@ -2,7 +2,6 @@ from pathlib import Path
 from typing import Callable, cast
 
 import pytest
-from pytest import FixtureRequest
 
 from pipelex import pretty_print
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -30,38 +29,38 @@ class TestPipeBatchSimple:
 
     async def test_simple_batch_processing(
         self,
-        request: FixtureRequest,
+        job_metadata: JobMetadata,
         pipe_run_mode: PipeRunMode,
         load_test_library: Callable[[list[Path]], None],
     ):
         load_test_library([Path("tests/integration/pipelex/pipes/controller/pipe_batch")])
-        domain = "test_integration"
+        domain_code = "test_integration"
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept1",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Lorem Ipsum"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             concept_code="TestConcept2",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Lorem Ipsum"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_library = get_concept_library()
         concept_library.add_concepts([concept_1, concept_2])
 
         pipe_batch_blueprint = PipeBatchBlueprint(
             description="Simple batch processing test",
-            branch_pipe_code="uppercase_transformer",  # This exists in the PLX file
+            branch_pipe_code="uppercase_transformer",  # This exists in the MTHDS file
             inputs={
-                "text_list": concept_1.concept_string,
+                "text_list": concept_1.concept_ref,
             },
-            output=concept_2.concept_string,
+            output=concept_2.concept_ref,
             input_list_name="text_list",
             input_item_name="text_item",
         )
 
         pipe_batch = PipeFactory[PipeBatch].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="simple_batch",
             blueprint=pipe_batch_blueprint,
         )
@@ -83,7 +82,7 @@ class TestPipeBatchSimple:
 
         # Verify the PipeBatch instance was created correctly
         assert pipe_batch is not None
-        assert pipe_batch.domain == domain
+        assert pipe_batch.domain_code == domain_code
         assert pipe_batch.code == "simple_batch"
         assert pipe_batch.branch_pipe_code == "uppercase_transformer"
         assert pipe_batch.batch_params is not None
@@ -107,7 +106,7 @@ class TestPipeBatchSimple:
 
         # Actually run the PipeBatch pipe
         pipe_output = await pipe_batch.run_pipe(  # pyright: ignore[reportPrivateUsage]
-            job_metadata=JobMetadata(job_name=cast("str", request.node.originalname)),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
             output_name="batch_result",
@@ -129,7 +128,7 @@ class TestPipeBatchSimple:
         expected_results = ["UPPER: HELLO", "UPPER: WORLD", "UPPER: TEST"]
         for i, item in enumerate(output_list.items):
             assert isinstance(item, TextContent)
-            if pipe_run_mode != PipeRunMode.DRY:
+            if pipe_run_mode.is_live:
                 assert item.text == expected_results[i], f"Item {i}: expected '{expected_results[i]}', got '{item.text}'"
 
         # Verify working memory contains all the expected elements
@@ -147,13 +146,13 @@ class TestPipeBatchSimple:
         batch_result = final_working_memory.get_stuff("batch_result")
         assert batch_result is not None
         assert batch_result.concept.code == concept_2.code
-        assert batch_result.concept.domain == domain
+        assert batch_result.concept.domain_code == domain_code
 
         # Verify the batch result content matches exactly
         assert isinstance(batch_result.content, ListContent)
         result_list = batch_result.as_list_of_fixed_content_type(item_type=TextContent)
         assert len(result_list.items) == 3
-        if pipe_run_mode != PipeRunMode.DRY:
+        if pipe_run_mode.is_live:
             assert result_list.items[0].text == "UPPER: HELLO"
             assert result_list.items[1].text == "UPPER: WORLD"
             assert result_list.items[2].text == "UPPER: TEST"

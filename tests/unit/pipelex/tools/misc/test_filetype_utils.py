@@ -28,7 +28,7 @@ class TestFileType:
         assert file_type.mime == "image/png"
 
 
-class TestFileTypeException:
+class TestFileTypeError:
     def test_file_type_exception_inheritance(self):
         error = FileTypeError("test message")
         assert isinstance(error, Exception)
@@ -144,7 +144,7 @@ class TestDetectFileTypeFromBase64:
         assert isinstance(result, FileType)
         assert result.extension == "gif"
         assert result.mime == "image/gif"
-        mock_detect_bytes.assert_called_once_with(buf=gif_bytes)
+        mock_detect_bytes.assert_called_once_with(raw_bytes=gif_bytes)
 
     def test_detect_file_type_from_base64_bytes_success(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
@@ -162,7 +162,7 @@ class TestDetectFileTypeFromBase64:
         assert isinstance(result, FileType)
         assert result.extension == "jpg"
         assert result.mime == "image/jpeg"
-        mock_detect_bytes.assert_called_once_with(buf=jpeg_bytes)
+        mock_detect_bytes.assert_called_once_with(raw_bytes=jpeg_bytes)
 
     def test_detect_file_type_from_base64_data_url_success(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
@@ -181,7 +181,7 @@ class TestDetectFileTypeFromBase64:
         assert isinstance(result, FileType)
         assert result.extension == "png"
         assert result.mime == "image/png"
-        mock_detect_bytes.assert_called_once_with(buf=png_bytes)
+        mock_detect_bytes.assert_called_once_with(raw_bytes=png_bytes)
 
     def test_detect_file_type_from_base64_data_url_with_whitespace(self, mocker: MockerFixture):
         # Mock detect_file_type_from_bytes
@@ -200,20 +200,20 @@ class TestDetectFileTypeFromBase64:
         assert isinstance(result, FileType)
         assert result.extension == "txt"
         assert result.mime == "text/plain"
-        mock_detect_bytes.assert_called_once_with(buf=test_bytes)
+        mock_detect_bytes.assert_called_once_with(raw_bytes=test_bytes)
 
     def test_detect_file_type_from_base64_invalid_base64_string(self, mocker: MockerFixture):  # noqa: ARG002
         # Test with invalid base64 string
         invalid_b64 = "invalid!base64!string!"
 
-        with pytest.raises(FileTypeError, match="Could not identify file type of given bytes because input is not valid Base-64"):
+        with pytest.raises(FileTypeError, match="Could not identify file type of given bytes because input is not valid base64"):
             detect_file_type_from_base64(invalid_b64)
 
     def test_detect_file_type_from_base64_invalid_base64_bytes(self, mocker: MockerFixture):  # noqa: ARG002
         # Test with invalid base64 bytes
         invalid_b64_bytes = b"invalid!base64!bytes!"
 
-        with pytest.raises(FileTypeError, match="Could not identify file type of given bytes because input is not valid Base-64"):
+        with pytest.raises(FileTypeError, match="Could not identify file type of given bytes because input is not valid base64"):
             detect_file_type_from_base64(invalid_b64_bytes)
 
     def test_detect_file_type_from_base64_data_url_no_comma(self, mocker: MockerFixture):

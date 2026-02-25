@@ -3,195 +3,118 @@
 !!! warning "Beta Feature"
     The Pipe Builder is currently in beta and progressing fast. Expect frequent improvements and changes.
 
-The Pipe Builder is an AI-powered tool that generates Pipelex pipelines from natural language descriptions. It helps you quickly prototype pipelines by describing what you want to achieve, and the builder translates your requirements into working `.plx` files.
+The Pipe Builder is an AI-powered tool that generates complete Pipelex pipelines from natural language descriptions. Describe what you want to achieve, and the builder creates a production-ready `.mthds` file with concepts, pipes, and all the necessary structure.
 
-## Overview
+## What It Does
 
-The Pipe Builder uses AI to:
+The Pipe Builder takes a brief description like:
 
-- Understand your pipeline requirements from a brief description
-- Generate domain concepts, pipe specifications, and complete pipeline structure
-- Validate the generated pipeline for common errors
-- Automatically fix certain deterministic issues
+> "Take a CV and Job offer in PDF, analyze if they match and generate 5 questions for the interview"
 
-## Usage
+And generates:
 
-Generate a pipeline with one validation/fix loop that automatically corrects deterministic issues:
-
-```bash
-pipelex build pipe "Brief description of what the pipeline should do" -o path/to/output.plx
-```
-
-**Example:**
-
-```bash
-pipelex build pipe "Given an expense report, apply company rules" -o results/expense_pipeline.plx
-```
-
-This command:
-
-1. Generates a complete pipeline from your brief
-2. Validates the pipeline structure
-3. Attempts to automatically fix common errors
-4. Saves the final pipeline to the specified path
-
-## Options
-
-The build command supports the following options:
-
-- `--output`, `-o`: Path to save the generated file
-- `--no-output`: Skip saving the file (useful for testing)
+- **Domain concepts** - Data structures for your method (e.g., `CVAnalysis`, `InterviewQuestion`)
+- **Pipe operators** - LLM calls, extractions, image generation steps
+- **Pipe controllers** - Sequences, batches, parallel branches, conditions to orchestrate the flow
+- **A complete bundle** - Ready to validate and run
 
 ## How It Works
 
-The Pipe Builder follows this process:
+!!! tip "Built with Pipelex"
+    The Pipe Builder is itself a Pipelex pipeline! This showcases the power of Pipelex: a tool that builds pipelines... using a pipeline.
 
-1. **Analysis**: Analyzes your brief to understand the domain and requirements
-2. **Concept Generation**: Creates appropriate domain concepts for your workflow
-3. **Pipe Generation**: Generates pipe operators and controllers to implement the logic
-4. **Validation**: Validates the generated pipeline structure
-5. **Automatic Fixes**: Fixes common errors like missing inputs or incorrect pipe connections
+The builder follows a multi-step process:
 
-## Generate Runner Code
+### 1. Draft the Plan
 
-After creating a pipeline, you can generate Python code to run it with the `build runner` command. This creates a ready-to-use Python script with all necessary imports and example input values.
+First, the AI analyzes your brief and creates a narrative plan describing:
 
-### Usage
+- The sequence of steps needed
+- Inputs and outputs for each step
+- Where structured data or lists are needed
+- Which orchestration patterns to use (sequence, batch, parallel, condition)
 
-```bash
-pipelex build runner [TARGET] [OPTIONS]
+### 2. Draft the Concepts
+
+Based on the plan, it identifies and defines the concepts needed:
+
+- What data structures are required
+- Which fields each concept needs
+- How concepts relate to each other
+- Which native concepts to reuse (Text, Image, PDF, etc.)
+
+### 3. Structure the Concepts
+
+The concept drafts are formalized into proper Pipelex concept specifications with:
+
+- Field names and types
+- Descriptions
+- Required/optional flags
+- Default values
+
+### 4. Design the Flow
+
+The plan is translated into a structured flow with:
+
+- Pipe operators (PipeLLM, PipeExtract, PipeImgGen)
+- Pipe controllers (PipeSequence, PipeBatch, PipeParallel, PipeCondition)
+- Input/output contracts for each pipe
+- Memory flow between steps
+
+### 5. Review and Refine
+
+The flow is reviewed for consistency:
+
+- Are inputs and outputs properly connected?
+- Is the main pipe correctly identified?
+- Are batches and lists handled properly?
+
+### 6. Generate Pipe Signatures
+
+Each pipe gets a formal signature with:
+
+- Unique pipe code
+- Description
+- Input/output types with multiplicity
+- Dependencies on other pipes
+
+### 7. Assemble the Bundle
+
+Finally, everything is assembled into a complete Pipelex bundle:
+
+- Domain header with name and description
+- All concept definitions
+- All pipe definitions
+- Main pipe identification
+
+## The Builder Pipeline
+
+The Pipe Builder is defined in [`pipelex/builder/builder.mthds`](https://github.com/Pipelex/pipelex/blob/main/pipelex/builder/builder.mthds). The main orchestrator is a `PipeSequence` called `pipe_builder` that chains together:
+
+```
+draft_the_plan → draft_the_concepts → structure_concepts → draft_flow → review_flow → design_pipe_signatures → write_bundle_header → detail_pipe_spec (batched) → assemble_pipelex_bundle_spec
 ```
 
-**Arguments:**
+Each step uses `PipeLLM` with carefully crafted prompts to guide the AI through the generation process.
 
-- `TARGET` - Either a pipe code or a bundle file path, auto-detected according to presence of the .plx file extension
+## Using the Pipe Builder
 
-**Options:**
-
-- `--pipe` - Pipe code to use (alternative to positional argument)
-- `--bundle` - Bundle file path (alternative to positional argument)
-- `--output`, `-o` - Path to save the generated Python file (defaults to `results/run_{pipe_code}.py`)
-
-### Examples
-
-**Generate runner for a pipe:**
+To use the Pipe Builder, use the CLI command:
 
 ```bash
-pipelex build runner my_pipe
+pipelex build pipe "Your description here"
 ```
 
-**Generate runner from a bundle file:**
+See the [Build Pipe CLI documentation](cli/build/pipe.md) for:
 
-```bash
-pipelex build runner my_bundle.plx
-```
+- Command options
+- Generated file structure
+- Example use cases
+- Tips for best results
 
-**Specify a pipe from a bundle:**
+## Related Documentation
 
-```bash
-pipelex build runner --bundle my_bundle.plx --pipe my_pipe
-```
-
-**Custom output path:**
-
-```bash
-pipelex build runner my_pipe --output custom_runner.py
-```
-
-### What Gets Generated
-
-The generated Python file includes:
-
-1. **All necessary imports** - Imports for Pipelex execution, content types, and any custom structures
-2. **Input memory setup** - Example input values based on the pipe's input types
-3. **Pipeline execution** - Async function that executes the pipeline
-4. **Output handling** - Code to extract and display the results
-5. **Main execution block** - Pipelex initialization and asyncio setup
-
-### Input Type Handling
-
-- **Native concepts** (Text, Image, PDF, etc.) - Automatically generates appropriate content objects
-- **Custom concepts** - Recursively generates the structure with example values
-- **Structured content** - Creates example data matching the concept's fields
-
-### Next Steps
-
-After generating the runner file:
-
-1. Open the generated Python file
-2. Review and customize the example input values
-3. Run the script: `python results/run_{pipe_code}.py`
-4. Iterate and adjust as needed
-
-For the complete CLI reference, see [CLI Commands](cli.md).
-
-## Example Use Cases
-
-**Document Processing:**
-
-```bash
-pipelex build pipe "Take a CV in a PDF file and a Job offer text, and analyze if they match"
-```
-
-**Data Transformation:**
-
-```bash
-pipelex build pipe "Extract structured data from invoice images"
-```
-
-**Multi-step Workflows:**
-
-```bash
-pipelex build pipe "Given an RFP PDF, build a compliance matrix"
-```
-
-## Current Limitations
-
-The Pipe Builder is in active development and currently:
-
-- Can automatically fix input/output connection errors
-- May require manual adjustments for complex conditional logic or custom functions
-- Validation focuses on structural correctness, not business logic
-
-## Tips for Best Results
-
-- You can be specific in your brief about inputs, outputs, data formats, or structures if you know what you need
-- If you're uncertain about the details, let the AI figure it out and see what it generates
-- Include any domain-specific requirements you're aware of upfront
-
-## Iterating on Generated Pipelines
-
-After generating a pipeline, you can continue refining it using any Software Engineering (SWE) agent. The generated `.plx` file can be iteratively improved through natural language instructions.
-
-Pipelex provides specialized agent rules (`write_pipelex.md` and `run_pipelex.md`) that guide AI assistants in working with pipelines. You can install these rules for your preferred AI coding assistant using:
-
-```bash
-pipelex kit rules
-```
-
-This command installs the rules for:
-
-- **Cursor**
-- **Claude Code**
-- **OpenAI Codex**
-- **GitHub Copilot**
-- **Windsurf**
-- **Blackbox AI**
-
-These rules help AI assistants understand Pipelex syntax, best practices, and common patterns, making it easier to iterate and refine your generated pipelines.
-
-## Next Steps
-
-After generating a pipeline:
-
-1. Review the generated `.plx` file
-2. Test it with sample inputs: `pipelex run <pipe_code> --input-memory-from-json input.json`
-3. Continue iterating using your preferred SWE agent with the Pipelex agent rules
-4. Adjust concepts or pipe configurations as needed
-
-For more information on pipeline structure and customization, see:
-
-- [Design and Run Pipelines](../../home/6-build-reliable-ai-workflows/pipes/index.md)
-- [Pipe Operators](../../home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md)
-- [Pipe Controllers](../../home/6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md)
+- [Build Pipe CLI](cli/build/pipe.md) - Command reference and options
+- [Design and Run Pipelines](../6-build-reliable-ai-workflows/pipes/index.md) - Pipeline concepts
+- [Concepts](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md) - Understanding concept definitions
 

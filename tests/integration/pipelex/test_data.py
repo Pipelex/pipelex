@@ -1,17 +1,20 @@
 from typing import ClassVar
 
+from pipelex.builder.bundle_header_spec import BundleHeaderSpec
+from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.list_content import ListContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_factory import StuffBlueprint, StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.exceptions import PipeRouterError
-from tests.cases import ImageTestCases, PDFTestCases
+from tests.cases import DocumentTestCases, ImageTestCases
 
 
 class SomeContentWithImageAttribute(StructuredContent):
@@ -41,7 +44,7 @@ class PipeTestCases:
         The moon is white.
     """
     MULTI_IMG_DESC_PROMPT = "If there is one image, describe it. If there are multiple images, compare them."
-    URL_IMG_GANTT_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/diagrams/gantt_tree_house.png"  # AI generated
+    URL_IMG_GANTT_PNG = "https://pipelex-web.s3.amazonaws.com/tests/gantt_tree_house.png"  # AI generated
     URL_IMG_FASHION_PHOTO_1 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_1.jpg"  # AI generated
     URL_IMG_FASHION_PHOTO_2 = "https://storage.googleapis.com/public_test_files_7fa6_4277_9ab/fashion/fashion_photo_2.png"  # AI generated
 
@@ -56,18 +59,18 @@ class PipeTestCases:
         concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.IMAGE),
         content=ImageContent(url=URL_IMG_FASHION_PHOTO_1),
     )
-    SIMPLE_STUFF_PDF = StuffFactory.make_stuff(
+    SIMPLE_STUFF_DOCUMENT = StuffFactory.make_stuff(
         name="document",
-        concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.PDF),
-        content=PDFContent(url=PDFTestCases.DOCUMENT_URLS[0]),
+        concept=ConceptFactory.make_native_concept(native_concept_code=NativeConceptCode.DOCUMENT),
+        content=DocumentContent(url=DocumentTestCases.DOCUMENT_URLS[0]),
     )
     COMPLEX_STUFF = StuffFactory.make_stuff(
         name="complex",
-        concept=ConceptFactory.make(concept_code="Complex", domain="tests", description="tests.Complex", structure_class_name="Complex"),
+        concept=ConceptFactory.make(concept_code="Complex", domain_code="tests", description="tests.Complex", structure_class_name="Complex"),
         content=ListContent(
             items=[
                 TextContent(text="The quick brown fox jumps over the lazy dog"),
-                ImageContent(url=URL_IMG_GANTT_1),
+                ImageContent(url=URL_IMG_GANTT_PNG),
             ],
         ),
     )
@@ -107,7 +110,7 @@ class PipeTestCases:
     ]
     TRICKY_QUESTION_BLUEPRINT = StuffBlueprint(
         stuff_name="question",
-        concept_string="answer.Question",
+        concept_ref="answer.Question",
         content=USER_TEXT_TRICKY_2,
     )
     NO_INPUT: ClassVar[list[tuple[str, str]]] = [  # topic, pipe
@@ -156,24 +159,17 @@ class PipeTestCases:
 
 class PipeExtractTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
-        ImageTestCases.IMAGE_FILE_PATH_PNG,
+        ImageTestCases.IMAGE_FILE_PATH_PNG_2,
         ImageTestCases.IMAGE_URL_PNG,
     ]
-    PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = PDFTestCases.DOCUMENT_FILE_PATHS + PDFTestCases.DOCUMENT_URLS
+    PIPE_OCR_PDF_TEST_CASES: ClassVar[list[str]] = DocumentTestCases.DOCUMENT_FILE_PATHS + DocumentTestCases.DOCUMENT_URLS
 
 
 class ImageGenTestCases:
-    IMG_GEN_PROMPT_1 = "woman wearing marino cargo pants"
-    IMG_GEN_PROMPT_2 = "wide legged denim pants with hippy addition"
-    IMG_GEN_PROMPT_3 = """
-Woman typing on a laptop. On the laptop screen you see python code to generate code to write a prompt for an AI model.
-"""
-
-    IMAGE_DESC: ClassVar[list[tuple[str, str]]] = [  # topic, img_gen_prompt_text
-        # (IMG_GEN_PROMPT_1, IMG_GEN_PROMPT_1),
-        # (IMG_GEN_PROMPT_2, IMG_GEN_PROMPT_2),
-        # (IMG_GEN_PROMPT_3, IMG_GEN_PROMPT_3),
-        ("coding girl with dragon tatoo", "a girl with a dragon tatoo, coding in python"),
+    IMAGE_GEN_PROMPT_CONTENTS: ClassVar[list[tuple[str, str, str | None]]] = [  # topic, positive_text, negative_text
+        # ("dog wearing sunglasses", "a dog wearing sunglasses", "blue sky"),
+        # ("otter playing poker", "an otter playing poker", None),
+        ("coding woman with dragon tatoo", "a woman with a dragon tatoo, wearing a tank top, coding in python", "nude"),
     ]
 
 
@@ -420,3 +416,38 @@ Extract information from the following text:
         ("Nested unions complex", NESTED_UNIONS_COMPLEX, "ConceptWithNestedUnions"),
         ("Nested unions mixed", NESTED_UNIONS_MIXED, "ConceptWithNestedUnions"),
     ]
+
+
+class AssemblePipelexBundleSpecTestCases:
+    """Test data for assemble_pipelex_bundle_spec tests."""
+
+    CONCEPT_SPECS: ClassVar[list[ConceptSpec]] = [
+        ConceptSpec(
+            the_concept_code="UserBrief",
+            description="A short, natural-language description of what the user wants.",
+            refines="Text",
+        ),
+        ConceptSpec(
+            the_concept_code="PlanDraft",
+            description="Natural-language pipeline plan text describing sequences, inputs, outputs.",
+            refines="Text",
+        ),
+    ]
+
+    PIPE_SPECS: ClassVar[list[PipeLLMSpec]] = [
+        PipeLLMSpec(
+            pipe_code="generate_plan",
+            description="Generate a plan from a user brief.",
+            inputs={"brief": "UserBrief"},
+            output="PlanDraft",
+            llm_talent="engineer",
+            prompt="Generate a plan for: @brief",
+        ),
+    ]
+
+    BUNDLE_HEADER = BundleHeaderSpec(
+        domain_code="test_domain",
+        description="A test domain for assembly testing.",
+        system_prompt=None,
+        main_pipe="generate_plan",
+    )

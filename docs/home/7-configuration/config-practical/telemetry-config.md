@@ -2,9 +2,15 @@
 
 ## Overview
 
-Telemetry configuration is stored in `.pipelex/telemetry.toml`, separate from the main `pipelex.toml` configuration. This file is created automatically the first time you run a Pipelex command (after `pipelex init config`) and are prompted to choose your telemetry preference.
+Telemetry configuration is stored in `.pipelex/telemetry.toml`. This file controls **your custom telemetry** destinations—where you want to send observability data for your own analytics and monitoring.
 
-For a user-friendly introduction to telemetry, see [Telemetry Setup](../../../home/5-setup/telemetry.md).
+!!! info "Two Telemetry Streams"
+    Pipelex has two independent telemetry streams:
+
+    1. **Gateway Telemetry** (Pipelex-controlled): Automatic when using Pipelex Gateway, tied to your API key
+    2. **Custom Telemetry** (User-controlled): Configured in this file, sent to your own backends
+
+    For an overview, see [Telemetry Setup](../../5-setup/telemetry.md).
 
 ## Configuration File Location
 
@@ -12,153 +18,234 @@ For a user-friendly introduction to telemetry, see [Telemetry Setup](../../../ho
 .pipelex/telemetry.toml
 ```
 
-This file is created in the `.pipelex` directory at your project root.
+This file is created when you run `pipelex init telemetry` or `pipelex init`.
 
-## Configuration Options
-
-### Example Configuration
+## Full Example Configuration
 
 ```toml
-telemetry_mode = "off"
-host = "https://eu.i.posthog.com"
-project_api_key = "phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"
-respect_dnt = true
-redact = ["prompt", "system_prompt", "response", "file_path", "url"]
-geoip_enabled = true
-dry_mode_enabled = false
-verbose_enabled = false
-user_id = ""
+# PostHog Configuration (Event tracking + AI span tracing)
+[custom_posthog]
+mode = "anonymous"                                   # "off" | "anonymous" | "identified"
+# user_id = "your_user_id"                           # Required when mode = "identified"
+endpoint = "${POSTHOG_ENDPOINT}"                     # Default: https://us.i.posthog.com
+api_key = "${POSTHOG_API_KEY}"                       # Get from PostHog Project Settings
+geoip = true                                         # Enable GeoIP lookup
+debug = false                                        # Enable PostHog debug mode
+redact_properties = [
+    "prompt",
+    "system_prompt", 
+    "response",
+    "file_path",
+    "url",
+]                                                    # Event properties to redact
+
+# AI span tracing to YOUR PostHog
+[custom_posthog.tracing]
+enabled = true                                       # Send AI spans to your PostHog
+
+# Privacy controls for data sent to YOUR PostHog only
+[custom_posthog.tracing.capture]
+content = false                                      # Capture prompt/completion content
+content_max_length = 1000                            # Max length for captured content
+pipe_codes = true                                    # Include pipe codes in span names
+output_class_names = true                            # Include output class names in spans
+
+# Portkey SDK Configuration
+[custom_portkey]
+force_debug_enabled = false                          # Force-enable Portkey SDK debug mode
+force_tracing_enabled = false                        # Force-enable Portkey SDK tracing
+
+# Langfuse Integration (receives FULL span data, no redaction)
+[langfuse]
+enabled = true
+endpoint = "https://cloud.langfuse.com"              # Override for self-hosted Langfuse
+public_key = "${LANGFUSE_PUBLIC_KEY}"
+secret_key = "${LANGFUSE_SECRET_KEY}"
+
+# Additional OTLP Exporters (array, receives FULL span data)
+[[otlp]]
+name = "my-collector"                                # Identifier for logging
+endpoint = "https://otel.example.com/v1/traces"      # OTLP endpoint URL
+headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 ```
 
-### Settings Reference
+---
 
-#### `telemetry_mode`
+## PostHog Configuration
 
-- **Type**: `string`
-- **Default**: `"off"`
-- **Allowed values**: `"off"`, `"anonymous"`, `"identified"`
-- **Description**: Controls the telemetry collection mode.
-  - `"off"`: No telemetry data is collected
-  - `"anonymous"`: Anonymous usage data only (no user identification)
-  - `"identified"`: Usage data with user identification (requires `user_id` to be set)
+The `[custom_posthog]` section configures event tracking and optional AI span tracing to your own PostHog instance.
 
-#### `host`
+### `[custom_posthog]` Settings
 
-- **Type**: `string`
-- **Default**: `"https://eu.i.posthog.com"`
-- **Description**: The PostHog server host URL. We use the EU-hosted instance for privacy compliance.
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `mode` | string | `"off"` | Telemetry mode: `"off"`, `"anonymous"`, or `"identified"` |
+| `user_id` | string | (none) | Required when `mode = "identified"` |
+| `endpoint` | string | `"https://us.i.posthog.com"` | PostHog endpoint URL |
+| `api_key` | string | (required) | Your PostHog project API key |
+| `geoip` | boolean | `true` | Enable GeoIP lookup for location data |
+| `debug` | boolean | `false` | Log events locally without sending |
+| `redact_properties` | array | `[]` | Event properties to redact before sending |
 
-**Note**: This is typically not changed unless you're self-hosting PostHog.
+#### Mode Options
 
-#### `project_api_key`
+- **`"off"`**: No events sent to your PostHog
+- **`"anonymous"`**: Events sent without user identification
+- **`"identified"`**: Events sent with your `user_id` for cross-session tracking
 
-- **Type**: `string`
-- **Default**: `"phc_HPJnNKpIXh0SxNDYyTAyUtnq9KxNNZJWQszynsWVx4Y"`
-- **Description**: The PostHog project API key for the Pipelex telemetry project.
+### `[custom_posthog.tracing]` Settings
 
-**Note**: This is typically not changed unless you're using a custom telemetry backend.
+Controls AI span tracing to your PostHog instance.
 
-#### `respect_dnt`
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `enabled` | boolean | `false` | Send AI spans to your PostHog |
 
-- **Type**: `boolean`
-- **Default**: `true`
-- **Description**: When `true`, Pipelex respects the `DO_NOT_TRACK` environment variable. If `DO_NOT_TRACK` is set to any value except `false` or `0`, telemetry is automatically disabled.
+### `[custom_posthog.tracing.capture]` Settings
 
-#### `redact`
+Privacy controls for what data is included in spans sent to **your** PostHog.
 
-- **Type**: `array` of `string`
-- **Default**: `["prompt", "system_prompt", "response", "file_path", "url"]`
-- **Description**: List of event properties to redact from telemetry data. These sensitive fields are automatically filtered out before any data is sent.
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `content` | boolean | `false` | Capture prompt/completion content |
+| `content_max_length` | integer | (unlimited) | Max length for captured content |
+| `pipe_codes` | boolean | `false` | Include pipe codes in span names/attributes |
+| `output_class_names` | boolean | `false` | Include output class names in spans |
 
-**Privacy protection**: This ensures that your actual prompts, LLM responses, and file paths are never transmitted to telemetry servers.
+!!! warning "Privacy Note"
+    These capture settings only affect data sent to **your** PostHog. Langfuse and OTLP exporters always receive full span data without redaction.
 
-#### `debug`
+---
 
-- **Type**: `boolean`
-- **Default**: `false`
-- **Description**: When `true`, telemetry events are logged locally but not actually sent to PostHog. Useful for debugging telemetry implementation.
+## Portkey SDK Configuration
 
-#### `user_id`
+The `[custom_portkey]` section configures the Portkey SDK behavior when using a custom Portkey backend (not the Pipelex Gateway).
 
-- **Type**: `string`
-- **Default**: `""`
-- **Description**: User identifier for the `"identified"` telemetry mode. If `telemetry_mode` is set to `"identified"` but `user_id` is empty, telemetry falls back to anonymous mode.
+### `[custom_portkey]` Settings
 
-**Usage**: Set this to your email, username, or any identifier you prefer when using identified mode.
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `force_debug_enabled` | boolean | `false` | Force-enable Portkey SDK debug mode regardless of backend setting |
+| `force_tracing_enabled` | boolean | `false` | Force-enable Portkey SDK tracing regardless of backend setting |
 
-## Manually Changing Settings
+!!! info "When to Use"
+    These settings are useful when you want to enable Portkey debugging or tracing globally without modifying individual backend configurations.
 
-Edit `.pipelex/telemetry.toml` directly. Changes take effect on the next command run.
+---
+
+## Langfuse Configuration
+
+The `[langfuse]` section enables integration with [Langfuse](https://langfuse.com/) for LLM observability.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `enabled` | boolean | `false` | Enable Langfuse integration |
+| `endpoint` | string | `"https://cloud.langfuse.com"` | Langfuse endpoint (override for self-hosted) |
+| `public_key` | string | (required if enabled) | Langfuse public key |
+| `secret_key` | string | (required if enabled) | Langfuse secret key |
+
+!!! info "Full Data"
+    Langfuse receives **full span data** including prompts, completions, and all metadata. There is no redaction applied.
+
+---
+
+## OTLP Exporters Configuration
+
+The `[[otlp]]` section is an **array** that allows you to configure multiple OpenTelemetry Protocol exporters.
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `name` | string | (required) | Identifier for logging |
+| `endpoint` | string | (required) | OTLP endpoint URL |
+| `headers` | object | `{}` | HTTP headers for authentication |
+
+### Example: Multiple OTLP Exporters
 
 ```toml
-telemetry_mode = "off"         # Disable telemetry
-telemetry_mode = "anonymous"   # Enable anonymous telemetry
+[[otlp]]
+name = "datadog"
+endpoint = "https://trace.agent.datadoghq.com/v1/traces"
+headers = { "DD-API-KEY" = "${DD_API_KEY}" }
+
+[[otlp]]
+name = "honeycomb"
+endpoint = "https://api.honeycomb.io/v1/traces"
+headers = { "x-honeycomb-team" = "${HONEYCOMB_API_KEY}" }
 ```
 
-### Example: Enable Identified Telemetry
+!!! info "Full Data"
+    OTLP exporters receive **full span data** including prompts, completions, and all metadata. There is no redaction applied.
+
+---
+
+## Environment Variable Substitution
+
+All string values in `telemetry.toml` support environment variable substitution using the `${VAR_NAME}` syntax:
 
 ```toml
-telemetry_mode = "identified"
-user_id = "user@example.com"
+[custom_posthog]
+endpoint = "${POSTHOG_ENDPOINT}"
+api_key = "${POSTHOG_API_KEY}"
+
+[langfuse]
+public_key = "${LANGFUSE_PUBLIC_KEY}"
+secret_key = "${LANGFUSE_SECRET_KEY}"
+
+[[otlp]]
+headers = { Authorization = "Bearer ${OTLP_AUTH_TOKEN}" }
 ```
 
-## Re-triggering the Configuration Prompt
+This allows you to keep sensitive credentials in environment variables or `.env` files rather than committing them to version control.
 
-If you want to see the configuration prompt again (for example, to change your choice through the interactive interface), delete the `.pipelex/telemetry.toml` file:
+### Variable Syntax Options
+
+| Syntax | Description |
+|--------|-------------|
+| `${VAR_NAME}` | Use secrets provider (default: environment variable) |
+| `${env:VAR_NAME}` | Force environment variable |
+| `${secret:VAR_NAME}` | Force secrets provider |
+| `${env:VAR\|secret:FALLBACK}` | Try env first, then secret as fallback |
+
+---
+
+## DO_NOT_TRACK Override
+
+The `DO_NOT_TRACK` environment variable disables **all** telemetry globally:
 
 ```bash
-rm .pipelex/telemetry.toml
-```
-
-The next time you run a Pipelex command (except `pipelex init`), you'll be prompted to choose your telemetry preference.
-
-## Environment Variable Override
-
-The `DO_NOT_TRACK` environment variable provides a universal way to disable telemetry:
-
-```bash
-# Linux/MacOS
+# Linux/macOS
 export DO_NOT_TRACK=1
 
 # Windows PowerShell
-$env:DO_NOT_TRACK="1"
+$env:DO_NOT_TRACK = "1"
 
 # Windows CMD
 set DO_NOT_TRACK=1
 ```
 
-When `respect_dnt = true` (the default), this will disable all telemetry regardless of the `telemetry_mode` setting.
+When set, this disables:
 
-## What Data is Collected?
+- All custom telemetry (PostHog, Langfuse, OTLP)
+- Gateway telemetry (note: Gateway won't work without telemetry)
 
-When telemetry is enabled (anonymous or identified mode), Pipelex collects:
+---
 
-- Whole pipeline execution events (start, success, failure)
-- Each pipe execution events (start, success, failure)
+## Resetting Configuration
 
-soon to be added:
-- Error types (without error messages)
-- Command usage (which CLI commands are run)
-- Feature usage patterns (which pipe types are used)
-- Performance metrics (execution time, token usage)
+To reset your telemetry configuration to defaults:
 
-**Never collected** (automatically redacted):
+```bash
+rm .pipelex/telemetry.toml
+pipelex init telemetry
+```
 
-- Your prompts or system prompts
-- LLM responses
-- File paths
-- URLs
-- Any content from your documents or images
-- Personal data (unless you explicitly set a `user_id` in identified mode)
+---
 
 ## Privacy and Compliance
 
-- Telemetry is **opt-in** via the first-run prompt
-- All sensitive data is **automatically redacted**
-- We use **PostHog** (EU-hosted) for telemetry infrastructure
-- We **respect DO_NOT_TRACK** by default
-- You can **completely disable** telemetry at any time
-- Telemetry configuration is **stored locally** in your project
+- **Custom telemetry** gives you full control over what data is captured and where it's sent
+- **PostHog tracing** includes granular privacy controls via the `capture` settings
+- **Langfuse and OTLP** receive full data—configure these only if you're comfortable with that
+- The `DO_NOT_TRACK` environment variable provides a global kill switch
 
-For more information about our data practices, see our [privacy policy](https://pipelex.com/privacy-policy).
-
+For more information about our data practices, see our [Privacy Policy](https://go.pipelex.com/privacy-policy).

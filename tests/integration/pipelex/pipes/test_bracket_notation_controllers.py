@@ -19,19 +19,19 @@ class TestBracketNotationInControllers:
     def test_pipe_parallel_with_bracket_notation(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test PipeParallel factory with bracket notation."""
-        domain = "test"
+        domain_code = "test"
         concept_library = get_concept_library()
 
         concept_data_item = ConceptFactory.make_from_blueprint(
             concept_code="DataItem",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Data item"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Data item"),
         )
         concept_library.add_concepts([concept_data_item])
         concept_processed_data = ConceptFactory.make_from_blueprint(
             concept_code="ProcessedData",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Processed data"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Processed data"),
         )
         concept_library.add_concepts([concept_processed_data])
 
@@ -39,37 +39,37 @@ class TestBracketNotationInControllers:
             description="Process items in parallel",
             inputs={"data": "DataItem[2]"},
             output="ProcessedData",
-            parallels=[],
+            branches=[],
             add_each_output=True,
         )
 
         pipe = PipeFactory[PipeParallel].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="test_parallel",
             blueprint=blueprint,
             concept_codes_from_the_same_domain=[concept_data_item.code, concept_processed_data.code],
         )
 
         assert pipe.inputs.root["data"].multiplicity == 2
-        assert pipe.output.code == "ProcessedData"
+        assert pipe.output.concept.code == "ProcessedData"
 
         concept_library.teardown()
 
     def test_pipe_condition_with_bracket_notation(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test PipeCondition factory with bracket notation."""
-        domain = "test"
+        domain_code = "test"
         concept_library = get_concept_library()
 
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="Category",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Category"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Category"),
         )
         concept_2 = ConceptFactory.make_from_blueprint(
             concept_code="Result",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Result"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Result"),
         )
         concept_library.add_concepts([concept_1, concept_2])
 
@@ -83,32 +83,32 @@ class TestBracketNotationInControllers:
         )
 
         pipe = PipeFactory[PipeCondition].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="test_condition",
             blueprint=blueprint,
             concept_codes_from_the_same_domain=[concept_1.code, concept_2.code],
         )
 
         assert pipe.inputs.root["items"].multiplicity is True
-        assert pipe.output.code == "Result"
+        assert pipe.output.concept.code == "Result"
 
         concept_library.teardown()
 
     def test_pipe_batch_with_bracket_notation(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         """Test PipeBatch factory with bracket notation."""
-        domain = "test"
+        domain_code = "test"
         concept_library = get_concept_library()
 
         concept_item = ConceptFactory.make_from_blueprint(
             concept_code="Item",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Item"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Item"),
         )
         concept_processed_item = ConceptFactory.make_from_blueprint(
             concept_code="ProcessedItem",
-            domain=domain,
-            blueprint=ConceptBlueprint(description="Processed item"),
+            domain_code=domain_code,
+            blueprint_or_string_description=ConceptBlueprint(description="Processed item"),
         )
         concept_library.add_concepts([concept_item, concept_processed_item])
 
@@ -122,13 +122,13 @@ class TestBracketNotationInControllers:
         )
 
         pipe = PipeFactory[PipeBatch].make_from_blueprint(
-            domain_code=domain,
+            domain_code=domain_code,
             pipe_code="test_batch",
             blueprint=blueprint,
             concept_codes_from_the_same_domain=[concept_item.code, concept_processed_item.code],
         )
 
         assert pipe.inputs.root["items"].multiplicity is True
-        assert pipe.output.code == "ProcessedItem"
+        assert pipe.output.concept.code == "ProcessedItem"
 
         concept_library.teardown()

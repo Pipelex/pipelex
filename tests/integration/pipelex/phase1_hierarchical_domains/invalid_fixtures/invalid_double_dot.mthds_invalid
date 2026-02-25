@@ -1,0 +1,5 @@
+domain = "legal..contracts"
+description = "Invalid domain with double dots"
+
+[concept]
+TestConcept = "A test concept"

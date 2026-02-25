@@ -1,0 +1,8 @@
+{
+    "image": {
+        "concept": "Image",
+        "content": {
+            "url": "tests/data/images/eiffel_tower.jpg"
+        }
+    }
+}

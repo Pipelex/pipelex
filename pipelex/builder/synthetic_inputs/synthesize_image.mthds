@@ -1,0 +1,93 @@
+domain      = "synthetic_data"
+description = "Generate synthetic test images based on category and optional description. Supports photograph, screenshot, chart, diagram, document_scan, and handwritten categories."
+main_pipe   = "synthesize_image"
+
+# ============================================================================
+# CONCEPTS
+# ============================================================================
+
+[concept.ImageRequest]
+description = "Request for synthetic image generation"
+
+[concept.ImageRequest.structure]
+category = { choices = [
+  "photograph",
+  "screenshot",
+  "chart",
+  "diagram",
+  "document_scan",
+  "handwritten",
+], description = "Image category", required = true }
+description = "Optional description of the image to generate"
+
+# ============================================================================
+# PIPES
+# ============================================================================
+
+# Main orchestration - creates prompt then routes rendering by category
+[pipe.synthesize_image]
+type = "PipeSequence"
+description = "Generate synthetic image: create prompt then render with category-specific model"
+inputs = { request = "ImageRequest" }
+output = "Image"
+steps = [
+  { pipe = "create_image_prompt", result = "img_prompt" },
+  { pipe = "route_rendering", result = "image" },
+]
+
+# ----------------------------------------------------------------------------
+# Unified Prompt Generation
+# ----------------------------------------------------------------------------
+
+[pipe.create_image_prompt]
+type = "PipeLLM"
+description = "Create an image generation prompt based on category and description"
+inputs = { request = "ImageRequest" }
+output = "ImgGenPrompt"
+model = "$pipe-builder-img-gen-prompting"
+prompt = """
+Create an image generation prompt based on the category and description.
+
+@request
+
+Generate a typical description of the image.
+
+If the user description is empty or minimal, imagine something reasonable based on the category.
+"""
+
+# ----------------------------------------------------------------------------
+# Category-based Rendering Router
+# ----------------------------------------------------------------------------
+
+[pipe.route_rendering]
+type            = "PipeCondition"
+description     = "Route to appropriate image generation model based on category"
+inputs          = { request = "ImageRequest", img_prompt = "ImgGenPrompt" }
+output          = "Image"
+expression      = "request.category"
+outcomes        = { photograph = "render_photo", document_scan = "render_ui", handwritten = "render_photo", screenshot = "render_ui", diagram = "render_ui", chart = "render_chart" }
+default_outcome = "render_photo"
+
+[pipe.render_photo]
+type        = "PipeImgGen"
+description = "Render photorealistic image"
+inputs      = { img_prompt = "ImgGenPrompt" }
+output      = "Image"
+prompt      = "$img_prompt"
+model       = "$synthesize-photo"
+
+[pipe.render_ui]
+type        = "PipeImgGen"
+description = "Render UI/diagram image"
+inputs      = { img_prompt = "ImgGenPrompt" }
+output      = "Image"
+prompt      = "$img_prompt"
+model       = "$synthesize-ui"
+
+[pipe.render_chart]
+type        = "PipeImgGen"
+description = "Render chart image"
+inputs      = { img_prompt = "ImgGenPrompt" }
+output      = "Image"
+prompt      = "$img_prompt"
+model       = "$synthesize-chart"

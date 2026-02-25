@@ -1,19 +1,19 @@
 # Designing Pipelines
 
-In Pipelex, a pipeline is not just a rigid sequence of steps; it's a dynamic and intelligent workflow built by composing individual, reusable components called **pipes**. This approach allows you to break down complex AI tasks into manageable, testable, and reliable units.
+In Pipelex, a pipeline is not just a rigid sequence of steps; it's a dynamic and intelligent method built by composing individual, reusable components called **pipes**. This approach allows you to break down complex AI tasks into manageable, testable, and reliable units.
 
 This guide provides an overview of how to design your pipelines.
 
 ## The Building Blocks: Pipes
 
-A pipeline is composed of pipes. There are two fundamental types of pipes you will use to build your workflows:
+A pipeline is composed of pipes. There are two fundamental types of pipes you will use to build your methods:
 
 *   **[Pipe Operators](./pipe-operators/index.md)**: These are the "workers" of your pipeline. They perform concrete actions like calling an LLM (`PipeLLM`), extracting text from a document (`PipeExtract`), or running a Python function (`PipeFunc`). Each operator is a specialized tool designed for a specific task.
-*   **[Pipe Controllers](./pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your workflow, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
+*   **[Pipe Controllers](./pipe-controllers/index.md)**: These are the "managers" of your pipeline. They don't perform tasks themselves but orchestrate the execution flow of other pipes. They define the logic of your method, such as running pipes in sequence (`PipeSequence`), in parallel (`PipeParallel`), or based on a condition (`PipeCondition`).
 
-## Designing a Pipeline: Composition in PLX
+## Designing a Pipeline: Composition in MTHDS
 
-The most common way to design a pipeline is by defining and composing pipes in a `.plx` configuration file. This provides a clear, declarative way to see the structure of your workflow.
+The most common way to design a pipeline is by defining and composing pipes in a `.mthds` configuration file. This provides a clear, declarative way to see the structure of your method.
 
 Each pipe, whether it's an operator or a controller, is defined in its own `[pipe.<pipe_code>]` table. The `<pipe_code>` becomes the unique identifier for that pipe.
 
@@ -21,7 +21,7 @@ Each pipe, whether it's an operator or a controller, is defined in its own `[pip
     Pipe codes **MUST** be in `snake_case` (lowercase with underscores). Use descriptive names that clearly indicate what the pipe does.
     
     **Valid pipe codes:**
-    ```plx
+    ```toml
     ✅ [pipe.generate_tagline]
     ✅ [pipe.extract_invoice]
     ✅ [pipe.validate_and_process]
@@ -29,21 +29,21 @@ Each pipe, whether it's an operator or a controller, is defined in its own `[pip
     ```
     
     **Invalid pipe codes:**
-    ```plx
+    ```toml
     ❌ [pipe.GenerateTagline]     # PascalCase not allowed
     ❌ [pipe.generateTagline]      # camelCase not allowed
     ❌ [pipe.generate-tagline]     # Hyphens not allowed
     ❌ [pipe.GENERATE_TAGLINE]     # All caps not allowed
     ```
 
-Let's look at a simple example. Imagine we want a workflow that:
+Let's look at a simple example. Imagine we want a method that:
 1.  Takes a product description.
 2.  Generates a short, catchy marketing tagline for it.
 
 We can achieve this with a `PipeLLM` operator.
 
-`marketing_pipeline.plx`
-```plx
+`marketing_pipeline.mthds`
+```toml
 domain = "marketing"
 description = "Marketing content generation domain"
 
@@ -75,7 +75,7 @@ The output concept is very important. Indeed, the output of your pipe will be co
 
 ### Understanding the Pipe Contract
 
-Every pipe defines a **contract** through its `inputs` and `output` fields. This contract is fundamental to how Pipelex ensures reliability in your workflows:
+Every pipe defines a **contract** through its `inputs` and `output` fields. This contract is fundamental to how Pipelex ensures reliability in your methods:
 
 *   **`inputs`**: This dictionary defines the **mandatory and necessary** data that must be present in the [Working Memory](working-memory.md) before the pipe can execute. Each key in the dictionary becomes a variable name that you can reference in your pipe's logic (e.g., in prompts), and each value specifies the concept type that the data must conform to. If any required input is missing or doesn't match the expected concept, the pipeline will fail a clear error message.
 You can specify multiple inputs by using a list of concepts. For example, `inputs = { description = "ProductDescription", keywords = "Keyword[]" }` will require a `ProductDescription` and a list of `Keyword`s. (See more about [Understanding Multiplicity](./understanding-multiplicity.md) for details.)
@@ -83,13 +83,13 @@ You can specify multiple inputs by using a list of concepts. For example, `input
 *   **`output`**: This field declares what the pipe will produce. The output will always be an instance of the specified concept. The structure and type of the output depend on the concept definition (See more about concepts [here](../concepts/native-concepts.md)).
     *   You can specify **multiple outputs** using bracket notation (e.g., `Keyword[]` for a variable list, or `Image[3]` for exactly 3 images)
 
-### Multi-Step Workflows
+### Multi-Step Methods
 
-To create a multi-step workflow, you use a controller. The `PipeSequence` controller is the most common one. It executes a series of pipes in a specific order.
+To create a multi-step method, you use a controller. The `PipeSequence` controller is the most common one. It executes a series of pipes in a specific order.
 
 
-`marketing_pipeline.plx`
-```plx
+`marketing_pipeline.mthds`
+```toml
 domain = "marketing"
 description = "Marketing content generation domain"
 

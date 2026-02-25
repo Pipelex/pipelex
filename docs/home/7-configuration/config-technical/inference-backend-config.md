@@ -6,7 +6,7 @@ The Inference Backend Configuration System manages how Pipelex handles AI model 
 
 Pipelex supports three flexible approaches for accessing AI models:
 
-### Option A: Pipelex Inference (Optional & Free)
+### Option A: Pipelex Gateway (Optional & Free)
 
 Get a single API key that works with all major providers (OpenAI, Anthropic, Google, Mistral, FAL, and more). This is the **recommended approach for getting started quickly**.
 
@@ -14,6 +14,9 @@ Get a single API key that works with all major providers (OpenAI, Anthropic, Goo
 - ✅ Simplified configuration
 - ✅ Automatic model routing
 - ✅ Free on Discord (limited time offer)
+
+!!! note "Terms of Service"
+    Using Pipelex Gateway requires accepting our terms of service. When you run `pipelex init`, you'll be prompted to review and accept the terms. Gateway usage enables identified telemetry (tied to your hashed API key) for service monitoring. See our [Privacy Policy](https://go.pipelex.com/privacy-policy) for details.
 
 ### Option B: Bring Your Own Keys
 
@@ -28,7 +31,7 @@ See [Inference Backends](#inference-backends) section below for configuration.
 
 ### Option C: Mix & Match (Custom Routing)
 
-Configure custom routing profiles to use your own keys for some models and Pipelex Inference for others. This gives you full flexibility to optimize for cost, performance, or rate limits.
+Configure custom routing profiles to use your own keys for some models and Pipelex Gateway for others. This gives you full flexibility to optimize for cost, performance, or rate limits.
 
 - ✅ Hybrid approach
 - ✅ Cost optimization
@@ -65,83 +68,143 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     │   ├── internal.toml       # Internal/local models (OCR)
     │   └── ...
     └── deck/                   # Model deck configurations
-        ├── base_deck.toml      # Core aliases and presets
-        └── overrides.toml      # Custom overrides
+        ├── 1_llm_deck.toml           # LLM aliases & presets
+        ├── 2_img_gen_deck.toml       # Image generation config
+        ├── 3_extract_deck.toml       # Document extraction config
+        ├── x_custom_llm_deck.toml    # Custom LLM waterfalls/overrides
+        └── x_custom_extract_deck.toml # Custom extract waterfalls
 ```
 
-## Pipelex Inference (Optional & Free)
+Deck files are loaded in order by their numeric prefix (`1_`, `2_`, `3_`), with custom/override files (`x_` prefix) loaded last.
 
-Pipelex Inference is a unified inference backend that provides access to all major AI providers through a single API key. This is the **recommended approach for getting started quickly** with Pipelex, and it's **completely optional**.
+## Pipelex Gateway (Optional & Free)
+
+Pipelex Gateway is a unified inference backend that provides access to all major AI providers through a single API key. This is the **recommended approach for getting started quickly** with Pipelex and **unlocking its full power**—with many models already available and new ones being added constantly. Using Pipelex Gateway is **completely optional**.
 
 ### Benefits
 
 - **Single API Key**: Access OpenAI, Anthropic, Google, Mistral, FAL, and more with one key
-- **Free to Get Started**: Available free on Discord (no credit card required, limited time offer)
+- **Free to Get Started**: Available free on [app.pipelex.com](https://app.pipelex.com/) (no credit card required, limited time offer)
 - **Simplified Configuration**: No need to manage multiple provider credentials
 - **Automatic Routing**: All AI models (LLMs, OCR, image generation) are automatically routed to their respective providers
 - **Unified Interface**: Same configuration system for text generation, OCR, and image generation
 
+### Terms of Service & Telemetry
+
+Using Pipelex Gateway requires accepting our terms of service. When you enable Gateway and run `pipelex init`, you'll be prompted with a terms panel explaining:
+
+- **What we collect**: Model names, token counts, latency, error rates (technical data only)
+- **What we do NOT collect**: Your prompts, completions, pipe codes, or business data
+- **Why**: To monitor service quality, enforce fair usage, and provide better support
+- **Your choice**: If you decline, Gateway is disabled and you can use direct provider backends instead
+
+Your API key is hashed for security. Gateway telemetry operates independently from your `telemetry.toml` settings. See our [Privacy Policy](https://go.pipelex.com/privacy-policy) for details.
+
 ### Setup
 
 1. **Get your API key:**
-- Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join our Discord
-- Request your free API key in the appropriate channel
-- No credit card required (limited time offer)
+
+    - Visit [https://go.pipelex.com/discord](https://go.pipelex.com/discord) to join our Discord
+    - Request your free API key in the appropriate channel
+    - No credit card required (limited time offer)
 
 2. **Configure environment variables:**
-   ```bash
-   # Copy the example environment file
-   cp .env.example .env
-   
-   # Edit .env and add your Pipelex Inference API key
-   # PIPELEX_INFERENCE_API_KEY="your-api-key"
-   ```
 
-3. **Verify backend configuration:**
+    ```bash
+    # Copy the example environment file
+    cp .env.example .env
+    
+    # Edit .env and add your Pipelex Gateway API key
+    PIPELEX_GATEWAY_API_KEY="your-api-key"
+    ```
+
+3. **Accept terms and verify configuration:**
+
+    ```bash
+    pipelex init
+    ```
+    
+    When prompted, review and accept the Gateway terms of service.
+
+4. **Verify backend configuration:**
    
-   The `pipelex_inference` backend should already be enabled in `.pipelex/inference/backends.toml`:
+   The `pipelex_gateway` backend should be enabled in `.pipelex/inference/backends.toml`:
    
    ```toml
-   [pipelex_inference]
+   [pipelex_gateway]
+   display_name = "⭐ Pipelex Gateway"
    enabled = true
-   endpoint = "https://inference.pipelex.com/v1"
-   api_key = "${PIPELEX_INFERENCE_API_KEY}"
+   api_key = "${PIPELEX_GATEWAY_API_KEY}"
    ```
    
-   The environment variable `${PIPELEX_INFERENCE_API_KEY}` will be automatically loaded from your `.env` file.
+   The environment variable `${PIPELEX_GATEWAY_API_KEY}` will be automatically loaded from your environment.
+
+!!! warning "Migrating from pipelex_inference"
+    The `pipelex_inference` backend is **deprecated** and will be removed in a future release. To migrate:
+    
+    1. **Get your new Gateway API key**:
+        - If you had a `pipelex_inference` key: get your new key at [app.pipelex.com](https://app.pipelex.com/)
+        - New users: join the [waitlist](https://app.pipelex.com/waitlist) and the community on [Discord](https://go.pipelex.com/discord)
+    2. Update your `.env`: set `PIPELEX_GATEWAY_API_KEY` with your new key
+    3. Run `pipelex init` and accept the Gateway terms
+    4. Update any routing profiles that reference `pipelex_inference` to use `pipelex_gateway`
 
 4. **Verify routing configuration:**
-   
-   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `pipelex_first`:
-   
+
+   The default routing profile in `.pipelex/inference/routing_profiles.toml` should be set to `all_pipelex_gateway`:
+
    ```toml
-   active = "pipelex_first"
-   
-   [profiles.pipelex_first]
-   description = "Use Pipelex Inference backend for all its supported models"
-   default = "pipelex_inference"
+   active = "all_pipelex_gateway"
+
+   [profiles.all_pipelex_gateway]
+   description = "Use Pipelex Gateway for all its supported models"
+   default = "pipelex_gateway"
    ```
 
 ### Usage
 
 Once configured, all models are available through the unified backend. Use standard model names in your pipelines:
 
-```plx
+```toml
 [pipe.example]
 type = "PipeLLM"
 model = { model = "claude-4.5-sonnet", temperature = 0.7 }
-# Model automatically routed through Pipelex Inference
+# Model automatically routed through Pipelex Gateway
 ```
+
+### Gateway Model Overrides
+
+!!! warning "Advanced Feature - Use at Your Own Risk"
+    The Pipelex Gateway model configuration is fetched remotely from Pipelex servers. Any local override may cause unexpected behavior or failures, as the remote configuration may change at any time.
+
+If you need to customize how a specific model behaves through the Gateway, you can add per-model overrides in `.pipelex/inference/backends/pipelex_gateway.toml`. However, only two keys are supported:
+
+- `sdk`: The SDK to use for the model (e.g., `gateway_completions`)
+- `structure_method`: The method for structured output (e.g., `instructor/openai_tools`)
+
+All other keys will be ignored.
+
+```toml
+# .pipelex/inference/backends/pipelex_gateway.toml
+
+# Per-model overrides example:
+[gpt-4o]
+sdk = "gateway_completions"
+structure_method = "instructor/openai_tools"
+```
+
+!!! tip "Prefer Direct Backends for Custom Configurations"
+    If you need custom configurations beyond `sdk` and `structure_method`, consider using your own API keys with direct provider backends (openai, anthropic, etc.) instead of Gateway overrides.
 
 ### Model Availability Note
 
-While Pipelex Inference provides access to most AI models through a unified API, certain specialized models require their native backend to be enabled directly:
+While Pipelex Gateway provides access to most AI models through a unified API, certain specialized models require their native backend to be enabled directly:
 
 - **FAL image generation models** (e.g., Flux models) - Enable the FAL backend
 - **OpenAI image generation** (`gpt-image-1`) - Enable the OpenAI backend (should also work via Azure OpenAI, but we haven't been able to test this - if you've successfully used it on Azure, please let us know on [Discord](https://go.pipelex.com/discord) so we can validate this configuration)
 - **Mistral OCR models** - Enable the Mistral backend
 
-These models are not proxied through Pipelex Inference and require direct configuration of their respective backends with appropriate API keys.
+These models are not proxied through Pipelex Gateway and require direct configuration of their respective backends with appropriate API keys.
 
 ## Inference Backends
 
@@ -165,8 +228,8 @@ cp .env.example .env
 The `.env.example` file contains all available providers with helpful comments:
 
 ```bash
-# [OPTIONAL] Free Pipelex Inference API key - Get yours on Discord: https://go.pipelex.com/discord
-PIPELEX_INFERENCE_API_KEY=
+# [OPTIONAL] Free Pipelex Gateway API key - Get yours on Discord: https://go.pipelex.com/discord
+PIPELEX_GATEWAY_API_KEY=
 
 OPENAI_API_KEY=
 
@@ -253,22 +316,22 @@ Routing profiles determine which backend handles specific models. This is where 
 
 ### Profile Examples
 
-**All Pipelex Inference (Option A):**
+**All Pipelex Gateway (Option A):**
 
 Setup:
 ```bash
 # In .env
-PIPELEX_INFERENCE_API_KEY="your-pipelex-key"
+PIPELEX_GATEWAY_API_KEY="your-pipelex-key"
 ```
 
 In `.pipelex/inference/routing_profiles.toml`:
 ```toml
 # Which profile to use
-active = "pipelex_first"
+active = "all_pipelex_gateway"
 
-[profiles.pipelex_first]
-description = "Use Pipelex Inference backend for all its supported models"
-default = "pipelex_inference"
+[profiles.all_pipelex_gateway]
+description = "Use Pipelex Gateway for all its supported models"
+default = "pipelex_gateway"
 ```
 
 **Native Providers Only (Option B):**
@@ -304,7 +367,7 @@ default = "openai"
 Setup:
 ```bash
 # In .env - combine Pipelex with specific provider keys
-PIPELEX_INFERENCE_API_KEY="your-pipelex-key"
+PIPELEX_GATEWAY_API_KEY="your-pipelex-key"
 OPENAI_API_KEY="your-openai-key"  # For GPT models
 FAL_API_KEY="your-fal-key"        # For image generation
 ```
@@ -314,15 +377,15 @@ In `.pipelex/inference/routing_profiles.toml`:
 active = "hybrid"
 
 [profiles.hybrid]
-description = "Use Pipelex for most models, native providers for specific ones"
-default = "pipelex_inference"
+description = "Use Pipelex Gateway for most models, native providers for specific ones"
+default = "pipelex_gateway"
 
 [profiles.hybrid.routes]
 # Use your own OpenAI key for GPT models (better rate limits)
 "gpt-*" = "openai"
 # Use your own FAL key for image generation (direct billing)
 "flux-*" = "fal"
-# All other models use Pipelex Inference (claude, gemini, mistral, etc.)
+# All other models use Pipelex Gateway (claude, gemini, mistral, etc.)
 ```
 
 ### Routing System Features
@@ -334,16 +397,24 @@ The routing system supports:
   - Prefix: `"gpt-*" = "openai"`
   - Suffix: `"*-turbo" = "openai"`
   - Contains: `"*-vision-*" = "openai"`
-- **Default fallback**: `default = "pipelex_inference"`
+- **Default fallback**: `default = "pipelex_gateway"`
 
 ### Use Cases for Mix & Match
 
 Common scenarios for hybrid routing:
 
-1. **Cost Optimization**: Use Pipelex Inference for expensive models, your own keys for cheaper ones
+1. **Cost Optimization**: Use Pipelex Gateway for expensive models, your own keys for cheaper ones
 2. **Rate Limits**: Use your own keys for high-volume models to avoid shared rate limits
-3. **Gradual Migration**: Start with Pipelex Inference, gradually move to your own keys as usage grows
-4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Inference
+3. **Gradual Migration**: Start with Pipelex Gateway, gradually move to your own keys as usage grows
+4. **Provider Features**: Use native providers for models requiring specific features not proxied through Pipelex Gateway
+
+### Internal Backend (Always Available)
+
+The **internal backend** is a special backend containing software-only models that run locally without requiring AI services. These include models for PDF text extraction, local document parsing, and other processing tasks that don't need external API calls.
+
+Unlike other backends, internal backend models are **always available** regardless of which routing profile you select. This means you can use these models even when your routing profile is focused on a specific AI provider (e.g., `all_pipelex_gateway` or `all_openai`).
+
+This behavior is automatic and requires no additional configuration. To see which models are available from the internal backend, check `.pipelex/inference/backends/internal.toml`.
 
 ## Model Deck
 
@@ -351,63 +422,95 @@ The Model Deck is the unified configuration hub for all AI model-related setting
 
 ### Aliases
 
-Define user-friendly names that map to model names in `.pipelex/inference/deck/base_deck.toml`:
+Define user-friendly names that map to model names. Aliases are defined in the deck files (e.g., `.pipelex/inference/deck/1_llm_deck.toml`):
 
 ```toml
-[aliases]
-# LLM aliases
-base-claude = "claude-4.5-sonnet"
-base-gpt = "gpt-5"
-base-gemini = "gemini-2.5-flash"
-base-mistral = "mistral-medium"
-smart_llm = [
-    "claude-4.5-sonnet",
-    "claude-4.1-opus",
-    "claude-4.5-sonnet",
-    "gpt-5",
-    "gemini-2.5-pro",
-]
+[llm.aliases]
+# Simple aliases map to a single model
+best-claude = "claude-4.5-opus"
+best-gpt = "gpt-5.2"
+best-gemini = "gemini-3.0-pro"
 
-# Aliases can also define fallback chains
-llm_to_engineer = { model = "smart_llm", temperature = 0.2 }
+# Default aliases (used in presets)
+default-general = "claude-4.5-sonnet"
+default-premium = "claude-4.5-opus"
+default-large-context-text = "gemini-2.5-flash"
+default-small = "gemini-2.5-flash-lite"
+```
+
+When using aliases in `.mthds` files or other configurations, prefix them with `@`:
+
+```toml
+model = "@best-claude"           # References the best-claude alias
+model = "@default-general"       # References the default-general alias
 ```
 
 ### LLM Presets
 
-Presets combine model selection with optimized parameters for specific tasks:
+Presets combine model selection with optimized parameters for specific tasks. Defined in `.pipelex/inference/deck/1_llm_deck.toml`:
 
 ```toml
 [llm.presets]
-# General purpose presets
-cheap_llm_for_text = { model = "cheap_llm_for_text", temperature = 0.5 }
-cheap_llm_for_object = { model = "cheap_llm_for_object", temperature = 0.5 }
+# Writing presets
+writing-factual = { model = "@default-premium", temperature = 0.1 }
+writing-creative = { model = "@default-premium", temperature = 0.9 }
 
-# Task-specific presets
-llm_for_creative_writing = { model = "claude-4.5-sonnet", temperature = 0.9 }
-llm_to_extract_invoice = { model = "claude-4.5-sonnet", temperature = 0.1 }
-llm_for_complex_reasoning = { model = "base-claude", temperature = 1 }
+# Retrieval
+retrieval = { model = "@default-large-context-text", temperature = 0.1 }
 
-### OCR Presets
+# Engineering
+engineering-structured = { model = "@default-premium-structured", temperature = 0.2 }
+engineering-code = { model = "@default-premium", temperature = 0.1 }
 
-OCR presets combine OCR model selection with optimized parameters:
+# Vision
+vision = { model = "@default-premium-vision", temperature = 0.5 }
+vision-cheap = { model = "@default-small-vision", temperature = 0.5 }
+vision-diagram = { model = "@default-premium-vision", temperature = 0.3 }
+```
+
+When using presets in `.mthds` files, prefix them with `$`:
+
+```toml
+model = "$engineering-structured"   # Uses preset for structured extraction
+model = "$vision"                   # Uses preset for image-to-text
+model = "$writing-creative"         # Uses preset for creative writing
+```
+
+### Extract Presets
+
+Extract presets combine document extraction model selection with optimized parameters. Defined in `.pipelex/inference/deck/3_extract_deck.toml`:
 
 ```toml
 [extract.presets]
-# General purpose OCR
-extract_text_from_visuals = { ocr_handle = "mistral-ocr", max_nb_images = 100, image_min_size = 50 }
-extract_text_from_pdf = { model = "pypdfium2-extract-text", max_nb_images = 100, image_min_size = 50 }
+# Testing preset
+extract-testing = { model = "@default-extract-document", max_nb_images = 5, image_min_size = 50 }
+```
+
+You can also use aliases directly in `.mthds` files for document extraction:
+
+```toml
+model = "@default-extract-document"   # Uses default document extraction alias
+model = "@default-text-from-pdf"      # Uses alias for basic PDF text extraction
 ```
 
 ### Image Generation Presets
 
-Image generation presets combine model selection with generation parameters:
+Image generation presets combine model selection with generation parameters. Defined in `.pipelex/inference/deck/2_img_gen_deck.toml`:
 
 ```toml
 [img_gen.presets]
 # General purpose image generation
-gen_image_basic = { model = "base-img-gen", quality = "medium", guidance_scale = 7.5, is_moderated = true, safety_tolerance = 3 }
-gen_image_fast = { model = "fast-img-gen", nb_steps = 4, guidance_scale = 5.0, is_moderated = true, safety_tolerance = 3 }
-gen_image_high_quality = { model = "best-img-gen", quality = "high", guidance_scale = 8.0, is_moderated = true, safety_tolerance = 3 }
+gen-image = { model = "@default-general", quality = "medium" }
+gen-image-fast = { model = "@default-small", quality = "low" }
+gen-image-high-quality = { model = "@default-premium", quality = "high" }
+```
+
+When using image generation presets in `.mthds` files, prefix them with `$`:
+
+```toml
+model = "$gen-image"              # Uses default image generation preset
+model = "$gen-image-fast"         # Uses fast image generation preset
+model = "$gen-image-high-quality" # Uses high quality image generation preset
 ```
 
 ### Default Choices
@@ -416,38 +519,50 @@ Set default models for different types of AI operations:
 
 ```toml
 [llm.choice_defaults]
-for_text = "cheap_llm_for_text"
-for_object = "cheap_llm_for_object"
+for_text = "@default-general"
+for_object = "@default-general"
 
 [extract]
-choice_default = "extract_text_from_visuals"
+choice_default = "@default-extract-document"
 
 [img_gen]
-choice_default = "gen_image_basic"
+choice_default = "$gen-image"
 ```
+
+Note the sigil prefixes: `@` for aliases and `$` for presets.
 
 ## Customization
 
 ### Local Overrides
 
-Use `.pipelex/inference/deck/overrides.toml` for project-specific customizations:
+Use custom deck files (prefixed with `x_`) for project-specific customizations:
+
+**For LLMs** (`.pipelex/inference/deck/x_custom_llm_deck.toml`):
 
 ```toml
-# Override specific presets
-[llm.presets]
-llm_to_extract_invoice = { model = "gpt-4o-mini", temperature = 0.2 }
+# Override default choices
+[llm.choice_overrides]
+for_text = "@my-custom-alias"
+for_object = "@my-custom-alias"
 
-[extract.presets]
-my_custom_extract = { ocr_handle = "mistral-ocr", max_nb_images = 5 }
+# Add custom waterfalls - lists of models tried in order
+[llm.waterfalls]
+premium-llm = ["claude-4.5-opus", "gemini-3.0-pro", "gpt-5.2"]
+small-llm = ["gemini-2.5-flash-lite", "gpt-4o-mini", "claude-3-haiku"]
+```
 
-[img_gen.presets]
-my_custom_img_gen = { model = "flux-dev", quality = "medium" }
+**For Extract** (`.pipelex/inference/deck/x_custom_extract_deck.toml`):
 
-# Add custom aliases
-[aliases]
-my_custom_llm = "claude-3-sonnet"
-my_custom_extract = "pypdfium2-extract-text"
-my_custom_img_gen = "base-img-gen"
+```toml
+[extract.waterfalls]
+document_extractor = ["azure-document-intelligence", "mistral-document-ai-2505"]
+```
+
+When using waterfalls in `.mthds` files, prefix them with `~`:
+
+```toml
+model = "~premium-llm"    # Will try claude-4.5-opus, then gemini-3.0-pro, then gpt-5.2
+model = "~small-llm"      # Will try gemini-2.5-flash-lite, then gpt-4o-mini, etc.
 ```
 
 ### Adding New Backends
@@ -483,7 +598,7 @@ Common error types:
 ## Best Practices
 
 1. **Choosing Your Configuration Approach**:
-   - **Starting out?** Use Pipelex Inference (Option A) to get running quickly
+   - **Starting out?** Use Pipelex Gateway (Option A) to get running quickly
    - **Production deployment?** Consider bringing your own keys (Option B) for direct billing control
    - **Optimizing costs/performance?** Use Mix & Match (Option C) for maximum flexibility
    - You can switch between approaches at any time by changing your routing profile
@@ -501,7 +616,8 @@ Common error types:
 
 4. **Presets and Aliases**:
    - Create task-specific presets for consistency across your pipelines
-   - Use meaningful alias names that describe the use case (e.g., `llm_to_extract_invoice`)
+   - Use kebab-case naming (e.g., `engineering-structured`, `vision-diagram`)
+   - Use proper sigil prefixes: `$` for presets, `@` for aliases, `~` for waterfalls
    - Document custom presets and their use cases in your team documentation
 
 5. **Customization**:

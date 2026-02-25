@@ -3,14 +3,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from pytest_mock import MockerFixture
-
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cogt.model_backends.backend import PipelexBackend
+from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 from tests.helpers.init_cmd_helpers import MockedInitEnvironment, get_backend_indices_helper
+
+if TYPE_CHECKING:
+    from pytest_mock import MockerFixture
 
 
 class TestInitCommandIntegration:
@@ -20,15 +22,15 @@ class TestInitCommandIntegration:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_empty_dir()
 
-        # User inputs: confirm init, select all backends, select telemetry OFF
+        # User inputs: confirm init, select all backends
         env.add_confirm_input(True)  # Confirm initialization
+        env.add_confirm_input(True)  # Accept gateway terms of service (since "all" includes gateway)
         env.add_prompt_input("all")  # Select all backends
-        env.add_prompt_input("1")  # Telemetry: OFF
 
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify all backends are enabled (except internal which is separate)
         toml_doc = load_toml_with_tomlkit(str(env.inference_dir / "backends.toml"))
@@ -36,10 +38,10 @@ class TestInitCommandIntegration:
             if backend_key != "internal":
                 assert toml_doc[backend_key]["enabled"] is True  # type: ignore[index]
 
-        # Verify routing was set to pipelex_first (since pipelex_inference is in "all")
-        env.verify_routing("pipelex_first")
+        # Verify routing was set to all_pipelex_gateway (since pipelex_gateway is in "all")
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
 
-        # Verify telemetry
+        # Verify telemetry (always "off" - default from template)
         env.verify_telemetry("off")
 
     def test_init_with_multiple_backends_custom_routing(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -58,12 +60,11 @@ class TestInitCommandIntegration:
         env.add_prompt_input(indices_str)  # Select anthropic, mistral, openai
         env.add_prompt_input("1")  # Primary backend: first one (anthropic)
         env.add_prompt_input("")  # Accept default fallback order
-        env.add_prompt_input("2")  # Telemetry: ANONYMOUS
 
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends
         env.verify_backends_enabled(["openai", "anthropic", "mistral"])
@@ -71,8 +72,8 @@ class TestInitCommandIntegration:
         # Verify custom routing was created
         env.verify_routing("custom_routing", expected_default="anthropic")
 
-        # Verify telemetry
-        env.verify_telemetry("anonymous")
+        # Verify telemetry (always "off" - default from template)
+        env.verify_telemetry("off")
 
     def test_init_with_single_backend_auto_routing(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test initialization with single backend sets auto routing."""
@@ -88,12 +89,11 @@ class TestInitCommandIntegration:
         env.add_confirm_input(True)  # Confirm initialization
         env.add_prompt_input(str(indices[0]))  # Select only openai
         env.add_confirm_input(True)  # Confirm creating profile if needed
-        env.add_prompt_input("3")  # Telemetry: IDENTIFIED
 
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify only openai is enabled
         env.verify_backends_enabled(["openai"])
@@ -101,8 +101,8 @@ class TestInitCommandIntegration:
         # Verify routing is set to all_openai
         env.verify_routing("all_openai")
 
-        # Verify telemetry
-        env.verify_telemetry("identified")
+        # Verify telemetry (always "off" - default from template)
+        env.verify_telemetry("off")
 
     def test_init_config_only_focus(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test focused initialization: config files only."""
@@ -112,21 +112,21 @@ class TestInitCommandIntegration:
 
         # User inputs - CONFIG focus still runs full init on first time
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("1")  # Backend selection (pipelex_inference)
-        env.add_prompt_input("1")  # Telemetry
+        env.add_confirm_input(True)  # Accept gateway terms of service
+        env.add_prompt_input("1")  # Backend selection (pipelex_gateway)
 
         env.setup_mocks()
 
         # Execute with CONFIG focus
-        init_cmd(focus=InitFocus.CONFIG, reset=False)
+        init_cmd(focus=InitFocus.CONFIG)
 
         # Verify config files exist
         env.verify_file_exists("pipelex.toml")
         env.verify_file_exists("inference/backends.toml")
 
         # CONFIG focus on first init triggers full flow
-        env.verify_backends_enabled(["pipelex_inference"])
-        env.verify_routing("pipelex_first")
+        env.verify_backends_enabled([PipelexBackend.GATEWAY])
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)
         # Telemetry should be created
         if (env.pipelex_dir / "telemetry.toml").exists():
             env.verify_telemetry("off")
@@ -151,7 +151,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute with INFERENCE focus
-        init_cmd(focus=InitFocus.INFERENCE, reset=False)
+        init_cmd(focus=InitFocus.INFERENCE)
 
         # Verify backends
         env.verify_backends_enabled(["anthropic", "mistral"])
@@ -168,17 +168,16 @@ class TestInitCommandIntegration:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=False)
 
-        # User inputs
+        # Only need to confirm initialization
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input("2")  # Telemetry: ANONYMOUS
 
         env.setup_mocks()
 
         # Execute with TELEMETRY focus
-        init_cmd(focus=InitFocus.TELEMETRY, reset=False)
+        init_cmd(focus=InitFocus.TELEMETRY)
 
-        # Verify telemetry was created
-        env.verify_telemetry("anonymous")
+        # Verify telemetry was created with default mode (off)
+        env.verify_telemetry("off")
 
     def test_init_with_reset_flag(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Test initialization with reset flag overwrites existing config."""
@@ -186,10 +185,10 @@ class TestInitCommandIntegration:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Modify telemetry to a different value
+        # Modify telemetry to a different value (using new nested path)
         telemetry_path = env.pipelex_dir / "telemetry.toml"
         toml_doc = load_toml_with_tomlkit(str(telemetry_path))
-        toml_doc["telemetry_mode"] = "identified"
+        toml_doc["custom_posthog"]["mode"] = "identified"  # type: ignore[index]
         save_toml_to_path(toml_doc, str(telemetry_path))
 
         # Get index for mistral
@@ -200,17 +199,16 @@ class TestInitCommandIntegration:
         env.add_confirm_input(True)  # Confirm reset
         env.add_prompt_input(str(indices[0]))  # Select mistral only
         env.add_confirm_input(True)  # Confirm creating profile if needed
-        env.add_prompt_input("1")  # Telemetry: OFF
 
         env.setup_mocks()
 
         # Execute with reset flag
-        init_cmd(focus=InitFocus.ALL, reset=True)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends were reset
         env.verify_backends_enabled(["mistral"])
 
-        # Verify telemetry was reset to OFF
+        # Verify telemetry was reset to OFF (default from template)
         env.verify_telemetry("off")
 
     def test_init_reconfigure_existing_inference(self, tmp_path: Path, mocker: MockerFixture) -> None:
@@ -219,10 +217,10 @@ class TestInitCommandIntegration:
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)
 
-        # Set pipelex_inference as enabled initially
+        # Set pipelex_gateway as enabled initially
         backends_path = env.inference_dir / "backends.toml"
         toml_doc = load_toml_with_tomlkit(str(backends_path))
-        toml_doc["pipelex_inference"]["enabled"] = True  # type: ignore[index]
+        toml_doc[PipelexBackend.GATEWAY]["enabled"] = True  # type: ignore[index]
         save_toml_to_path(toml_doc, str(backends_path))
 
         # Get index for openai
@@ -237,7 +235,7 @@ class TestInitCommandIntegration:
         env.setup_mocks()
 
         # Execute with INFERENCE focus
-        init_cmd(focus=InitFocus.INFERENCE, reset=False)
+        init_cmd(focus=InitFocus.INFERENCE)
 
         # Verify backend was changed
         env.verify_backends_enabled(["openai"])
@@ -260,12 +258,11 @@ class TestInitCommandIntegration:
         env.add_confirm_input(True)  # Confirm initialization
         env.add_prompt_input(indices_str)  # Select anthropic, openai
         env.add_prompt_input("1")  # Primary backend: anthropic (first in selection)
-        env.add_prompt_input("1")  # Telemetry: OFF
 
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends
         env.verify_backends_enabled(["openai", "anthropic"])
@@ -273,29 +270,29 @@ class TestInitCommandIntegration:
         # Verify custom routing with automatic fallback order
         env.verify_routing("custom_routing", expected_default="anthropic", expected_fallback_order=["anthropic", "openai"])
 
-    def test_init_pipelex_inference_sets_pipelex_first(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test that selecting pipelex_inference automatically sets pipelex_first routing."""
+    def test_init_pipelex_gateway_sets_all_pipelex_gateway(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """Test that selecting pipelex_gateway automatically sets all_pipelex_gateway routing."""
         # Setup environment
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_empty_dir()
 
-        # Get indices for pipelex_inference and openai
+        # Get indices for pipelex_gateway and openai
         kit_backends = Path(str(get_kit_configs_dir())) / "inference" / "backends.toml"
-        indices = get_backend_indices_helper(str(kit_backends), ["pipelex_inference", "openai"])
+        indices = get_backend_indices_helper(str(kit_backends), [PipelexBackend.GATEWAY, "openai"])
         indices_str = ",".join(str(i) for i in indices)
 
-        # User inputs - no primary/fallback prompts because pipelex_inference is included
+        # User inputs - no primary/fallback prompts because pipelex_gateway is included
         env.add_confirm_input(True)  # Confirm initialization
-        env.add_prompt_input(indices_str)  # Select pipelex_inference and openai
-        env.add_prompt_input("1")  # Telemetry: OFF
+        env.add_confirm_input(True)  # Accept gateway terms of service
+        env.add_prompt_input(indices_str)  # Select pipelex_gateway and openai
 
         env.setup_mocks()
 
         # Execute
-        init_cmd(focus=InitFocus.ALL, reset=False)
+        init_cmd(focus=InitFocus.ALL)
 
         # Verify backends
-        env.verify_backends_enabled(["pipelex_inference", "openai"])
+        env.verify_backends_enabled([PipelexBackend.GATEWAY, "openai"])
 
-        # Verify routing is automatically set to pipelex_first
-        env.verify_routing("pipelex_first")
+        # Verify routing is automatically set to all_pipelex_gateway
+        env.verify_routing(PipelexRoutingProfile.ALL_PIPELEX_GATEWAY)

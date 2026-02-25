@@ -48,13 +48,13 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="TestFeatureAnalysis",
-            blueprint=blueprint,
+            blueprint_or_string_description=blueprint,
         )
 
         # Verify concept properties
-        assert concept.domain == "test_domain"
+        assert concept.domain_code == "test_domain"
         assert concept.code == "TestFeatureAnalysis"
         assert concept.description == "Analysis of a photo's visual content"
         assert concept.structure_class_name == "TestFeatureAnalysis"
@@ -88,14 +88,14 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="TestStringRef",
-            blueprint=blueprint,
+            blueprint_or_string_description=blueprint,
         )
 
         # Verify concept properties
         assert concept.code == "TestStringRef"
-        assert concept.domain == "test_domain"
+        assert concept.domain_code == "test_domain"
         assert concept.description == "Test with string reference"
         assert concept.structure_class_name == "TextContent"
 
@@ -106,13 +106,14 @@ class TestInlineStructureConcepts:
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="TestAutoDetect",
-            blueprint=blueprint,
+            blueprint_or_string_description=blueprint,
         )
 
         # Should default to TextContent since TestAutoDetect is not a registered class
-        assert concept.structure_class_name == "TextContent"
+        assert concept.structure_class_name == "TestAutoDetect"
+        assert concept.refines == "native.Text"
 
     def test_inline_structure_with_complex_types(self):
         """Test inline structure with complex field types."""
@@ -143,14 +144,14 @@ class TestInlineStructureConcepts:
         blueprint = ConceptBlueprint(description="Complex document structure", structure=inline_structure)
 
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="ComplexDocument",
-            blueprint=blueprint,
+            blueprint_or_string_description=blueprint,
         )
 
         # Verify concept creation
         assert concept.code == "ComplexDocument"
-        assert concept.domain == "test_domain"
+        assert concept.domain_code == "test_domain"
         assert concept.structure_class_name == "ComplexDocument"
 
         # Verify the generated class works
@@ -181,9 +182,9 @@ class TestInlineStructureConcepts:
 not a registered subclass of StuffContent",
         ):
             _ = ConceptFactory.make_from_blueprint(
-                domain="test_domain",
+                domain_code="test_domain",
                 concept_code="TestInvalidRef",
-                blueprint=ConceptBlueprint(description="Test invalid reference", structure="NonExistentClass"),
+                blueprint_or_string_description=ConceptBlueprint(description="Test invalid reference", structure="NonExistentClass"),
             )
 
     def test_multiple_inline_structures_do_not_conflict(self):
@@ -196,9 +197,9 @@ not a registered subclass of StuffContent",
 
         blueprint1 = ConceptBlueprint(description="Person information", structure=structure1)
         concept1 = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="Person",
-            blueprint=blueprint1,
+            blueprint_or_string_description=blueprint1,
         )
 
         # Second structure with same field names but different context
@@ -209,9 +210,9 @@ not a registered subclass of StuffContent",
 
         blueprint2 = ConceptBlueprint(description="Product information", structure=structure2)
         concept2 = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="Product",
-            blueprint=blueprint2,
+            blueprint_or_string_description=blueprint2,
         )
 
         # Both should be created successfully
@@ -259,13 +260,13 @@ not a registered subclass of StuffContent",
 
         # Create concept from blueprint
         concept = ConceptFactory.make_from_blueprint(
-            domain="test_domain",
+            domain_code="test_domain",
             concept_code="AnimalInfo",
-            blueprint=blueprint,
+            blueprint_or_string_description=blueprint,
         )
 
         # Verify concept properties
-        assert concept.domain == "test_domain"
+        assert concept.domain_code == "test_domain"
         assert concept.code == "AnimalInfo"
         assert concept.structure_class_name == "AnimalInfo"
 

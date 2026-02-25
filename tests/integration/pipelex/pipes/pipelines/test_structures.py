@@ -5,5 +5,6 @@ class Article(StructuredContent):
     """Test model for article data."""
 
     title: str
+    location: str
     description: str
-    date: str
+    year: int

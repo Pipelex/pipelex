@@ -1,0 +1,15 @@
+domain    = "pkg_test_refining"
+main_pipe = "pkg_test_refine_score"
+
+[concept.PkgTestRefinedScore]
+description = "A refined score that extends the dependency's weighted score"
+refines     = "scoring_dep->pkg_test_scoring_dep.PkgTestWeightedScore"
+
+[pipe.pkg_test_refine_score]
+type        = "PipeLLM"
+description = "Compute a refined score"
+output      = "PkgTestRefinedScore"
+prompt      = "Refine the score for: {{ item }}"
+
+[pipe.pkg_test_refine_score.inputs]
+item = "Text"

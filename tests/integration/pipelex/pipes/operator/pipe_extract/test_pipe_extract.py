@@ -8,9 +8,9 @@ from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.pdf_content import PDFContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_concept_library, get_pipe_router
 from pipelex.pipe_operators.extract.pipe_extract import PipeExtract
@@ -18,6 +18,7 @@ from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlu
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.test_data import PipeExtractTestCases
 
 
@@ -26,17 +27,14 @@ from tests.integration.pipelex.test_data import PipeExtractTestCases
 @pytest.mark.inference
 @pytest.mark.asyncio(loop_scope="class")
 class TestPipeExtract:
-    @pytest.fixture(
-        scope="class",
-        autouse=True,
-    )
+    @pytest.fixture(scope="class", autouse=True)
     def setup(self, load_empty_library: Callable[[], None]):
         load_empty_library()
         concept_library = get_concept_library()
         concept_1 = ConceptFactory.make_from_blueprint(
             concept_code="PageScan",
-            domain="extract",
-            blueprint=ConceptBlueprint(description="Lorem Ipsum"),
+            domain_code="extract",
+            blueprint_or_string_description=ConceptBlueprint(description="Lorem Ipsum"),
         )
         concept_library.add_new_concept(concept=concept_1)
 
@@ -48,6 +46,7 @@ class TestPipeExtract:
     @pytest.mark.parametrize("image_url", PipeExtractTestCases.PIPE_OCR_IMAGE_TEST_CASES)
     async def test_pipe_extract_image(
         self,
+        job_metadata: JobMetadata,
         extract_choice_for_image: str,
         pipe_run_mode: PipeRunMode,
         image_url: str,
@@ -56,7 +55,7 @@ class TestPipeExtract:
             description="OCR test for image processing",
             inputs={"page_scan": NativeConceptCode.IMAGE},
             output="Page[]",
-            page_images=True,
+            max_page_images=None,
             page_image_captions=False,
             page_views=True,
             page_views_dpi=72,
@@ -70,11 +69,12 @@ class TestPipeExtract:
                 blueprint=pipe_extract_blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
             working_memory=WorkingMemoryFactory.make_from_single_stuff(
                 stuff=StuffFactory.make_stuff(
                     concept=ConceptFactory.make(
                         concept_code="PageScan",
-                        domain="extract",
+                        domain_code="extract",
                         description="Lorem Ipsum",
                         structure_class_name="PageScan",
                     ),
@@ -94,6 +94,7 @@ class TestPipeExtract:
     @pytest.mark.parametrize("page_image_captions", [False])  # TODO: add True when captioning is implemented
     async def test_pipe_extract_from_pdf(
         self,
+        job_metadata: JobMetadata,
         extract_choice_for_pdf: str,
         pipe_run_mode: PipeRunMode,
         pdf_url: str,
@@ -102,10 +103,10 @@ class TestPipeExtract:
         input_name = "arbitrary_name"
         blueprint = PipeExtractBlueprint(
             description="OCR test for PDF processing",
-            inputs={input_name: NativeConceptCode.PDF},
+            inputs={input_name: NativeConceptCode.DOCUMENT},
             output="Page[]",
             model=extract_choice_for_pdf,
-            page_images=True,
+            max_page_images=None,
             page_image_captions=page_image_captions,
             page_views=True,
             page_views_dpi=72,
@@ -118,12 +119,13 @@ class TestPipeExtract:
                 blueprint=blueprint,
             ),
             pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
+            job_metadata=job_metadata,
             working_memory=WorkingMemoryFactory.make_from_single_stuff(
                 stuff=StuffFactory.make_stuff(
                     concept=ConceptFactory.make_native_concept(
-                        native_concept_code=NativeConceptCode.PDF,
+                        native_concept_code=NativeConceptCode.DOCUMENT,
                     ),
-                    content=PDFContent(url=pdf_url),
+                    content=DocumentContent(url=pdf_url),
                     name=input_name,
                 ),
             ),
@@ -131,5 +133,5 @@ class TestPipeExtract:
         pipe_extract_output = await get_pipe_router().run(
             pipe_job=pipe_job,
         )
-        extracted_text = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
-        pretty_print(extracted_text, title="extracted_text")
+        extracted_pages = pipe_extract_output.main_stuff_as_list(item_type=PageContent)
+        pretty_print(extracted_pages, title="Extracted pages")
