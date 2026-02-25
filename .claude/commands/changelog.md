@@ -20,7 +20,7 @@ Your job: update the repository changelog.
    - If the pasted changes do NOT include headings, classify each line into one of:
      - Added / Changed / Deprecated / Removed / Fixed / Security
      - Use best-effort classification by wording (add/introduce -> Added, fix/bug -> Fixed, remove/delete -> Removed, security/vuln -> Security, deprecate -> Deprecated, otherwise -> Changed)
-   - If onf of the pasted changes seems worthy of highlighting, propose to the user to do so and get their approval.
+   - If one of the pasted changes seems worthy of highlighting, propose to the user to do so and get their approval.
 4) De-duplicate:
    - If a very similar bullet already exists in Unreleased, do not add it again.
 5) Preserve order:

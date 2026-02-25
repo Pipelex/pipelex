@@ -14,7 +14,7 @@ pip install pipelex --pre
 pipelex init
 ```
 
-During the second step of the initialization, we recommand, for a quick start, to use the Pipelex Gateway. Get your API key at [app.pipelex.com](https://app.pipelex.com/) with free credits (no credit card required, limited time offer). If you have questions, join our [Discord](https://go.pipelex.com/discord).
+During the second step of the initialization, we recommend, for a quick start, to use the Pipelex Gateway. Get your API key at [app.pipelex.com](https://app.pipelex.com/) with free credits (no credit card required, limited time offer). If you have questions, join our [Discord](https://go.pipelex.com/discord).
 
 If you want to bring your own API keys, see [Configure AI Providers](../../home/5-setup/configure-ai-providers.md) for details.
 
