@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
+from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 from pipelex.config import get_config
 from pipelex.graph.graph_factory import generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
@@ -21,6 +23,7 @@ async def run_pipeline_core(
     mock_inputs: bool = False,
     library_dirs: list[str] | None = None,
     graph: bool = False,
+    with_memory: bool = False,
 ) -> dict[str, Any]:
     """Core logic for running a pipeline and returning JSON-serializable output.
 
@@ -33,6 +36,8 @@ async def run_pipeline_core(
         mock_inputs: Whether to generate mock data for missing inputs.
         library_dirs: List of library directories to search for pipe definitions.
         graph: Whether to generate execution graph visualizations.
+        with_memory: Whether to include full working memory in output (True) or
+            return compact concept JSON only (False, default).
 
     Returns:
         Dictionary with execution results suitable for JSON serialization.
@@ -69,13 +74,16 @@ async def run_pipeline_core(
             "html": await main_stuff.content.rendered_html_async(),
         }
 
-    result: dict[str, Any] = {
-        "success": True,
-        "pipe_code": pipe_code,
-        "dry_run": dry_run,
-        "main_stuff": main_stuff_json,
-        "working_memory": pipe_output.working_memory.smart_dump(),
-    }
+    compact_result: dict[str, Any] | None = None
+    if main_stuff:
+        compact_result = json.loads(await main_stuff.content.rendered_json_async())
+
+    result = build_run_output(
+        with_memory=with_memory,
+        main_stuff_json=main_stuff_json,
+        working_memory_dump=pipe_output.working_memory.smart_dump(),
+        compact_result=compact_result,
+    )
 
     # Determine output directory: next to the bundle, or pipelex-wip/ fallback
     output_dir: Path

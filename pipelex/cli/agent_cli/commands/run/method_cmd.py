@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import json
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -14,6 +13,7 @@ from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_ag
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.cli.agent_cli.commands.run._run_core import run_pipeline_core
 from pipelex.cli.agent_cli.commands.run._run_core_api import run_pipeline_core_api
+from pipelex.cli.agent_cli.commands.run.stdin_resolver import parse_cli_inputs
 from pipelex.cli.installed_methods import find_method_by_name
 from pipelex.cli.method_resolver import resolve_method_target
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION
@@ -21,7 +21,6 @@ from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
 from pipelex.pipeline.exceptions import PipelineExecutionError
-from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path
 
 
 def run_method_cmd(
@@ -54,6 +53,10 @@ def run_method_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
+    with_memory: Annotated[
+        bool,
+        typer.Option("--with-memory", help="Include full working memory in output (for piping to another method)"),
+    ] = False,
 ) -> None:
     """Execute a pipeline for an installed method and output JSON results.
 
@@ -94,21 +97,8 @@ def run_method_cmd(
     if library_dir:
         all_library_dirs.extend(library_dir)
 
-    # Load inputs if provided
-    pipeline_inputs: dict[str, Any] | None = None
-    if inputs:
-        if inputs.startswith("{"):
-            try:
-                pipeline_inputs = json.loads(inputs)
-            except json.JSONDecodeError as exc:
-                agent_error(f"Failed to parse inline JSON inputs: {exc}", "JSONDecodeError", cause=exc)
-        else:
-            try:
-                pipeline_inputs = load_json_dict_from_path(inputs)
-            except FileNotFoundError as exc:
-                agent_error(f"Input file not found: {inputs}", "FileNotFoundError", cause=exc)
-            except JsonTypeError as exc:
-                agent_error(f"Input file must be a valid JSON dictionary: {inputs}", "JsonTypeError", cause=exc)
+    # Load inputs: --inputs flag takes priority, then stdin fallback
+    pipeline_inputs: dict[str, Any] | None = parse_cli_inputs(inputs_arg=inputs, stdin_fallback=True)
 
     runner_type: RunnerType = ctx.obj["runner"]
 
@@ -128,6 +118,7 @@ def run_method_cmd(
                         pipe_code=pipe_code,
                         mthds_content=mthds_content,
                         inputs=pipeline_inputs,
+                        with_memory=with_memory,
                     )
                 )
                 agent_success(result)
@@ -155,6 +146,7 @@ def run_method_cmd(
                         mock_inputs=mock_inputs,
                         library_dirs=all_library_dirs,
                         graph=graph,
+                        with_memory=with_memory,
                     )
                 )
                 agent_success(result)
