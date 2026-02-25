@@ -13,12 +13,12 @@ from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
 from pipelex.cli.agent_cli.commands.graph_cmd import graph_cmd
-from pipelex.cli.agent_cli.commands.inputs_cmd import inputs_cmd
+from pipelex.cli.agent_cli.commands.inputs.app import inputs_app
 from pipelex.cli.agent_cli.commands.lint_cmd import lint_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
-from pipelex.cli.agent_cli.commands.run_cmd import run_cmd
-from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
+from pipelex.cli.agent_cli.commands.run.app import run_app
+from pipelex.cli.agent_cli.commands.validate.app import validate_app
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -109,11 +109,11 @@ def app_callback(
 
 
 app.command(name="build", help="Build a pipeline from a prompt")(build_cmd)
-app.command(name="run", help="Execute a pipeline and output JSON results")(run_cmd)
-app.command(name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")(validate_cmd)
+app.add_typer(run_app, name="run", help="Execute a pipeline and output JSON results")
+app.add_typer(validate_app, name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")
 app.command(name="fmt", help="Format a .mthds, .toml, or .plx file in-place")(fmt_cmd)
 app.command(name="lint", help="Lint a .mthds, .toml, or .plx file")(lint_cmd)
-app.command(name="inputs", help="Generate example input JSON for a pipe")(inputs_cmd)
+app.add_typer(inputs_app, name="inputs", help="Generate example input JSON for a pipe")
 app.command(name="concept", help="Structure a concept from JSON spec and output TOML")(concept_cmd)
 app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")(pipe_cmd)
 app.command(name="assemble", help="Assemble a complete .mthds bundle from TOML parts")(assemble_cmd)

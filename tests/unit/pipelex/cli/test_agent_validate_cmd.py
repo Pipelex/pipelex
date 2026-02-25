@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 
-from pipelex.cli.agent_cli.commands.validate_cmd import validate_cmd
+from pipelex.cli.agent_cli.commands.validate.pipe_cmd import validate_pipe_cmd
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipelineExecutionError
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-VALIDATE_CMD_MODULE = "pipelex.cli.agent_cli.commands.validate_cmd"
+VALIDATE_CMD_MODULE = "pipelex.cli.agent_cli.commands.validate.pipe_cmd"
 
 
 class TestValidateCmd:
@@ -51,7 +51,7 @@ class TestValidateCmd:
             "total_pipes": 1,
         }
         mocker.patch(
-            f"{VALIDATE_CMD_MODULE}._validate_bundle_core",
+            f"{VALIDATE_CMD_MODULE}.validate_bundle_core",
             new=mocker.AsyncMock(return_value=validation_result),
         )
 
@@ -69,7 +69,7 @@ class TestValidateCmd:
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            validate_cmd(
+            validate_pipe_cmd(
                 ctx=agent_ctx,
                 target=str(mthds_file),
                 graph=True,
