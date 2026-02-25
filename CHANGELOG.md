@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.18.1] - 2026-02-25
+
+### Fixed
+
+- Fix docs deployment failure caused by shell metacharacters (parentheses) in Makefile `PRINT_TITLE` macro argument for `docs-deploy-root` target
+- Fix `mike` unable to find `mkdocs` binary by adding venv `bin/` to PATH in all mike-based Makefile targets
+
 ## [v0.18.0] - 2026-02-25
 
 **Highlights:**

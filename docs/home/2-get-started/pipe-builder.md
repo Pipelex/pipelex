@@ -7,7 +7,7 @@ title: "Generate Methods with Pipe Builder"
 ## Install
 
 ```bash
-pip install pipelex --pre
+pip install pipelex
 ```
 
 ```bash
