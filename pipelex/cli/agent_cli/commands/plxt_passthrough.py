@@ -2,9 +2,10 @@
 
 import shutil
 import subprocess  # noqa: S404
-import sys
 
 import typer
+
+from pipelex.cli.agent_cli.commands.agent_output import agent_error
 
 
 def run_plxt(subcommand: str, file_path: str) -> None:
@@ -19,11 +20,10 @@ def run_plxt(subcommand: str, file_path: str) -> None:
     """
     plxt_path = shutil.which("plxt")
     if plxt_path is None:
-        print(
-            "plxt binary not found. It should be installed as part of pipelex-tools. Try: pip install pipelex-tools",
-            file=sys.stderr,
+        agent_error(
+            message="plxt binary not found. It should be installed as part of pipelex-tools. Try: pip install pipelex-tools",
+            error_type="BinaryNotFoundError",
         )
-        raise typer.Exit(1)
 
     result = subprocess.run(  # noqa: S603
         [plxt_path, subcommand, file_path],
