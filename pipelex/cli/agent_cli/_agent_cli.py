@@ -13,7 +13,6 @@ from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
-from pipelex.cli.agent_cli.commands.graph_cmd import graph_cmd
 from pipelex.cli.agent_cli.commands.inputs.app import inputs_app
 from pipelex.cli.agent_cli.commands.lint_cmd import lint_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
@@ -39,7 +38,6 @@ class PipelexAgentCLI(TyperGroup):
             "concept",
             "pipe",
             "assemble",
-            "graph",
             "models",
             "doctor",
         ]
@@ -131,6 +129,5 @@ app.add_typer(inputs_app, name="inputs", help="Generate example input JSON for a
 app.command(name="concept", help="Structure a concept from JSON spec and output TOML")(concept_cmd)
 app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")(pipe_cmd)
 app.command(name="assemble", help="Assemble a complete .mthds bundle from TOML parts")(assemble_cmd)
-app.command(name="graph", help="Generate graph visualization from a .mthds bundle")(graph_cmd)
 app.command(name="models", help="List available model presets, aliases, and talent mappings")(agent_models_cmd)
 app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")(agent_doctor_cmd)
