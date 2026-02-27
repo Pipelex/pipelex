@@ -18,13 +18,15 @@ class PipelexServiceAgreement(ConfigModel):
     )
 
 
-def update_service_terms_acceptance(accepted: bool) -> None:
+def update_service_terms_acceptance(accepted: bool, config_dir: str | None = None) -> None:
     """Update the service terms acceptance in pipelex_service.toml.
 
     Args:
         accepted: Whether the user accepted the terms.
+        config_dir: Explicit config directory path. If None, uses config_manager.pipelex_config_dir.
     """
-    service_config_path = os.path.join(config_manager.pipelex_config_dir, PIPELEX_SERVICE_CONFIG_FILE_NAME)
+    resolved_config_dir = config_dir or config_manager.pipelex_config_dir
+    service_config_path = os.path.join(resolved_config_dir, PIPELEX_SERVICE_CONFIG_FILE_NAME)
 
     if path_exists(service_config_path):
         toml_doc = load_toml_with_tomlkit(service_config_path)

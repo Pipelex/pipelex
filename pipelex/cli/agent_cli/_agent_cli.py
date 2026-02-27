@@ -12,6 +12,7 @@ from pipelex.cli.agent_cli.commands.assemble_cmd import assemble_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
+from pipelex.cli.agent_cli.commands.init_cmd import agent_init_cmd
 from pipelex.cli.agent_cli.commands.inputs.app import inputs_app
 from pipelex.cli.agent_cli.commands.lint_cmd import lint_cmd
 from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
@@ -28,6 +29,7 @@ class PipelexAgentCLI(TyperGroup):
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
         return [
+            "init",
             "run",
             "validate",
             "fmt",
@@ -118,6 +120,7 @@ def app_callback(
         )
 
 
+app.command(name="init", help="Initialize Pipelex configuration (non-interactive)")(agent_init_cmd)
 app.add_typer(run_app, name="run", help="Execute a pipeline and output JSON results")
 app.add_typer(validate_app, name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")
 app.command(name="fmt", help="Format a .mthds, .toml, or .plx file in-place")(fmt_cmd)

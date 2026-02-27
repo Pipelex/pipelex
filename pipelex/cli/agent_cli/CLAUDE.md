@@ -49,13 +49,15 @@ commands/
   pipe_cmd.py                  # pipe — JSON spec → pipe TOML
   assemble_cmd.py              # assemble — combine TOML parts into .mthds
   models_cmd.py                # models — list presets, aliases, talent mappings
-  doctor_cmd.py                # doctor — config health check
+  init_cmd.py                  # init — non-interactive config setup (--global/-g, --config/-c)
+  doctor_cmd.py                # doctor — config health check (--global/-g)
 ```
 
 ## Commands
 
 | Command | Does |
 |---------|------|
+| `init` | Initializes Pipelex configuration (non-interactive). Defaults to project `.pipelex/` at detected project root. Use `--global`/`-g` to target `~/.pipelex/`. Accepts `--config`/`-c` with inline JSON or file path for backends, routing, telemetry, and gateway terms. |
 | `run` | Executes a pipeline (pipe\|bundle\|method subcommands), returns JSON with main_stuff + working_memory. Graph visualizations on by default (`--no-graph` to disable). |
 | `validate` | Dry-runs pipes/bundles/methods (pipe\|bundle\|method subcommands), returns validation status per pipe. Bundle subcommand supports `--graph` for graph visualization. |
 | `fmt` | Formats a .mthds/.toml/.plx file in-place (delegates to plxt) |
@@ -65,7 +67,7 @@ commands/
 | `pipe` | Converts a JSON pipe spec (typed) into TOML |
 | `assemble` | Merges concept + pipe TOML sections into a complete `.mthds` file |
 | `models` | Lists available model presets, aliases, waterfalls, and talent mappings |
-| `doctor` | Checks config, credentials, models health |
+| `doctor` | Checks config, credentials, models health. Use `--global`/`-g` to check `~/.pipelex/` instead of auto-detected config dir. |
 
 ## Key Patterns
 

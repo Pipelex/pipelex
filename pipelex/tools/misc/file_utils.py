@@ -383,10 +383,13 @@ def find_files_in_dir(
     path = Path(dir_path)
     files: list[Path] = []
     filtered_files: list[Path] = []
+    # Sort results for consistent ordering across platforms and Python versions.
+    # Python < 3.13 returns rglob/glob results in filesystem order, which varies
+    # between macOS (APFS, always sorted) and Linux (ext4, inode order).
     if is_recursive:
-        files = list(path.rglob(pattern))
+        files = sorted(path.rglob(pattern))
     else:
-        files = list(path.glob(pattern))
+        files = sorted(path.glob(pattern))
     for file in files:
         # Check if file is under any excluded directory
         is_excluded = False

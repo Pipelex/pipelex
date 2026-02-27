@@ -4,15 +4,18 @@
 
 ### Added
 
-- **`pipelex run bundle` command** — New CLI subcommand to run a pipeline from a `.mthds` bundle file or pipeline directory. Supports auto-detection of `bundle.mthds`, `inputs.json`, and library directories. Available in both `pipelex` and `pipelex-agent` CLIs.
-- **`mthds run bundle` command** — New command in the mthds-js CLI for running bundles, with support for both pipelex and API runners. Agent passthrough (`mthds-agent pipelex run bundle`) also added.
 - **Inputs path resolution** — Relative file paths (e.g., `"url": "data/invoice.pdf"`) inside `inputs.json` are now resolved relative to the inputs file's parent directory, making bundle directories self-contained and portable. Applies to both user and agent CLIs. Handles HTTP, data:, pipelex-storage://, and absolute paths by leaving them unchanged.
 
 ### Changed
 
-- **`pipelex run pipe` simplified to code-only** — The `pipe` subcommand now accepts only a pipe code as its positional argument. File paths and directories are no longer accepted; a helpful error message directs users to `pipelex run bundle` instead. The `--pipe` and `--bundle` options have been removed.
-- **`mthds run pipe` simplified to code-only** — The mthds-js `pipe` subcommand now treats its argument strictly as a pipe code. Bundle detection logic moved to `mthds run bundle`.
-- **`PipelexRunner.execute()` updated** — The mthds-js pipelex runner now uses explicit `run bundle <path>` and `run pipe <code>` subcommands instead of the old `run <target>` form.
+- **`pipelex-agent init` defaults to local project** — The `init` command now targets the project-level `.pipelex/` directory by default (at detected project root) instead of auto-detecting. The `--local` flag has been removed. Use `--global`/`-g` to target `~/.pipelex/`. Errors out if no project root is found without `-g`.
+- **`pipelex-agent doctor` supports `--global`/`-g`** — The `doctor` command now accepts `--global`/`-g` to check the global `~/.pipelex/` directory. Without the flag, it auto-detects project `.pipelex/` if present, else falls back to `~/.pipelex/`.
+- **`pipelex-agent init --config` improved help** — The `--config` option help text now shows the JSON schema with field types upfront for better discoverability.
+
+### Fixed
+
+- **`pipelex-agent init -g` service agreement** — The `--global` flag now correctly writes the gateway service terms acceptance (`pipelex_service.toml`) to the target directory instead of always writing to the auto-detected config dir.
+- **Deterministic file discovery order** — `find_files_in_dir` now sorts `rglob`/`glob` results for consistent ordering across platforms and Python versions. On Linux with Python < 3.13, `rglob` returned filesystem-order results, which could cause `test_validate_all` to fail by picking up a test package's `METHODS.toml` before pipelex internal bundles.
 
 ## [v0.18.1] - 2026-02-25
 
