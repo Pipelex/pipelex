@@ -4,7 +4,7 @@ Machine-first CLI for running and validating Pipelex method bundles (`.mthds` fi
 
 ## Companion: Agent Skills
 
-The CLI is consumed by 7 Claude skills defined in a separate repo. Changes to the CLI often require corresponding skill updates, and vice versa.
+The CLI is consumed by 6 Claude skills defined in a separate repo. Changes to the CLI often require corresponding skill updates, and vice versa.
 
 - Skills repo: `../agent-skills/skills/` (relative to project root)
 - Skills: `run`, `check`, `edit`, `fix`, `explain`, `synthesize-inputs`

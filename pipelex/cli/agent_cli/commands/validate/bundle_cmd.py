@@ -105,7 +105,7 @@ def validate_bundle_cmd(
     # Convert library_dirs to list[str] for graph helper
     library_dir_strings = [str(lib_dir) for lib_dir in library_dirs] if library_dirs else None
 
-    make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"])
 
     try:
         if pipe:

@@ -63,7 +63,6 @@ Validates all pipes defined in a bundle file (`.mthds`) or a pipeline directory.
 
 **Options:**
 
-- `--pipe PIPE_CODE` - Require that a specific pipe exists in the bundle (the entire bundle is still validated)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 
 **Examples:**
@@ -76,18 +75,12 @@ pipelex validate bundle pipelines/invoice_processor.mthds
 # Validate a pipeline directory (auto-detects the bundle file)
 pipelex validate bundle pipelines/invoice_processor/
 
-# Validate bundle and ensure a specific pipe exists in it
-pipelex validate bundle my_pipeline.mthds --pipe extract_invoice
-
 # Validate with additional library directories
 pipelex validate bundle my_bundle.mthds -L ./shared_pipes
 ```
 
 !!! note
     When validating a bundle, ALL pipes in that bundle are validated, not just the main pipe.
-
-!!! important "Bundle Validation with --pipe"
-    The specified pipe must be defined in the bundle. This is useful when you want to validate a bundle and confirm a specific pipe is present and valid within it. However, the entire bundle will be validated regardless.
 
 ## Validate Method
 

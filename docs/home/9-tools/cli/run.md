@@ -33,7 +33,7 @@ Runs a pipe by code from your project's pipe library.
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers
-- `--mock-inputs` - Use mock inputs for the pipeline
+- `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
 
 **Examples:**
@@ -82,7 +82,7 @@ Runs a pipeline from a bundle file (`.mthds`) or a pipeline directory. When a di
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers
-- `--mock-inputs` - Use mock inputs for the pipeline
+- `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 
 **Examples:**
@@ -128,7 +128,7 @@ Runs a pipeline from an installed method package.
 - `--graph` / `--no-graph` - Enable/disable execution graph visualization
 - `--graph-full-data` / `--graph-no-data` - Include full data in the graph visualization
 - `--dry-run` - Dry-run the pipeline without calling AI providers
-- `--mock-inputs` - Use mock inputs for the pipeline
+- `--mock-inputs` - Use mock inputs for the pipeline (requires `--dry-run`)
 - `--library-dir`, `-L` - Directory to search for additional pipe definitions. Can be specified multiple times.
 
 **Examples:**

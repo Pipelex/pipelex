@@ -15,10 +15,6 @@ def validate_bundle_cmd(
         str,
         typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
     ],
-    pipe: Annotated[
-        str | None,
-        typer.Option("--pipe", help="Pipe code to validate (overrides bundle's main_pipe)"),
-    ] = None,
     library_dir: Annotated[
         list[str] | None,
         typer.Option(
@@ -32,11 +28,8 @@ def validate_bundle_cmd(
 
     Examples:
         pipelex validate bundle my_bundle.mthds
-        pipelex validate bundle my_bundle.mthds --pipe my_pipe
         pipelex validate bundle pipeline_01/
-        pipelex validate bundle pipeline_01/ --pipe my_pipe
     """
-    pipe_code: str | None = pipe
     bundle_path: str | None = None
     target_path = Path(path)
 
@@ -90,7 +83,7 @@ def validate_bundle_cmd(
     library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
 
     execute_validate(
-        pipe_code=pipe_code,
+        pipe_code=None,
         bundle_path=Path(bundle_path) if bundle_path else None,
         library_dirs=library_dirs_paths,
         telemetry_command_label=f"{COMMAND} bundle",

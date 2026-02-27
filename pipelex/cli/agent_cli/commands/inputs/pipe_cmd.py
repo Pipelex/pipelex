@@ -49,7 +49,13 @@ def inputs_pipe_cmd(
         )
 
     # Check installed methods' exports for additional library dirs
-    export_dirs = resolve_pipe_from_exports(pipe_code)
+    try:
+        export_dirs = resolve_pipe_from_exports(pipe_code)
+    except typer.Exit:
+        agent_error(
+            f"Ambiguous pipe code '{pipe_code}': found in multiple installed methods",
+            "ArgumentError",
+        )
     if export_dirs:
         if library_dir is None:
             library_dir = export_dirs
@@ -104,6 +110,9 @@ def inputs_pipe_cmd(
         if exc.pipe_stack:
             availability_extra["pipe_stack"] = exc.pipe_stack
         agent_error(exc.message, "PipeOperatorModelAvailabilityError", cause=exc, **availability_extra)
+
+    except typer.Exit:
+        raise
 
     except Exception as exc:
         agent_error(str(exc), type(exc).__name__, cause=exc)
