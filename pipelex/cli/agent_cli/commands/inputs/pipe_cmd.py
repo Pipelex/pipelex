@@ -51,10 +51,12 @@ def inputs_pipe_cmd(
     # Check installed methods' exports for additional library dirs
     try:
         export_dirs = resolve_pipe_from_exports(pipe_code)
-    except typer.Exit:
+    except typer.Exit as exc:
+        cause = exc.__cause__
         agent_error(
-            f"Ambiguous pipe code '{pipe_code}': found in multiple installed methods",
+            f"Ambiguous pipe code '{pipe_code}': {cause}" if cause else f"Ambiguous pipe code '{pipe_code}': found in multiple installed methods",
             "ArgumentError",
+            cause=cause,
         )
     if export_dirs:
         if library_dir is None:
