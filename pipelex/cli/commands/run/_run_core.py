@@ -10,6 +10,7 @@ from posthog import tag
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cli.cli_factory import make_pipelex_for_cli
+from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.cli.error_handlers import (
     ErrorContext,
     handle_model_availability_error,
@@ -94,6 +95,9 @@ async def _execute_run(
         else:
             try:
                 pipeline_inputs = load_json_dict_from_path(inputs)
+                # Resolve relative url paths against the inputs file's parent directory
+                base_dir = Path(inputs).parent.resolve()
+                pipeline_inputs = resolve_inputs_paths(pipeline_inputs, base_dir)
                 typer.echo(f"Loaded inputs from: {inputs}")
             except FileNotFoundError as file_not_found_exc:
                 typer.secho(f"Failed to load input file '{inputs}': file not found", fg=typer.colors.RED, err=True)
