@@ -97,7 +97,7 @@
 
    Key commands:
 
-   - **`generate-mthds-schema`**: Regenerate the MTHDS JSON Schema (`.pipelex/mthds_schema.json`). Run this after modifying `mthds_schema_generator.py`.
+   - **`generate-mthds-schema`**: Regenerate the MTHDS JSON Schema (`derived/mthds_schema.json`). Run this after modifying `mthds_schema_generator.py`.
 
      ```bash
      .venv/bin/pipelex-dev generate-mthds-schema
