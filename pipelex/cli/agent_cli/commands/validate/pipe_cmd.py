@@ -107,7 +107,15 @@ def validate_pipe_cmd(
         )
 
     # Check installed methods' exports for additional library dirs
-    export_dirs = resolve_pipe_from_exports(pipe_code)
+    try:
+        export_dirs = resolve_pipe_from_exports(pipe_code)
+    except typer.Exit as exc:
+        cause = exc.__cause__
+        agent_error(
+            f"Ambiguous pipe code '{pipe_code}': {cause}" if cause else f"Ambiguous pipe code '{pipe_code}': found in multiple installed methods",
+            "ArgumentError",
+            cause=cause,
+        )
     if export_dirs:
         export_paths = [Path(export_dir) for export_dir in export_dirs]
         if library_dirs is None:
@@ -115,7 +123,7 @@ def validate_pipe_cmd(
         else:
             library_dirs = [*export_paths, *library_dirs]
 
-    make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"])
 
     try:
         result = asyncio.run(validate_pipe_core(pipe_code=pipe_code, library_dirs=library_dirs))
