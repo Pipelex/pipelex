@@ -95,7 +95,15 @@ def run_pipe_cmd(
         raise typer.Exit(1)
 
     # Check installed methods' exports for additional library dirs
-    extra_dirs = resolve_pipe_from_exports(pipe_code)
+    try:
+        extra_dirs = resolve_pipe_from_exports(pipe_code)
+    except ValueError as exc:
+        typer.secho(
+            f"Ambiguous pipe code '{pipe_code}': {exc}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1) from exc
     if extra_dirs:
         if library_dir is None:
             library_dir = extra_dirs

@@ -23,7 +23,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     # Execution errors
     "PipelineExecutionError": "Check 'pipe_stack' to identify which pipe failed and 'cause_type' for the root cause",
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
-    "BuildPipeError": "Check 'failure_memory_path' for builder loop failure diagnostics if present",
     # File/input errors
     "FileNotFoundError": "Verify the file path exists and is accessible from the current working directory",
     "ArgumentError": "Check command usage with 'pipelex-agent <command> --help'",
@@ -99,7 +98,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     # runtime = execution failure
     "PipelineExecutionError": "runtime",
     "PipeExecutionError": "runtime",
-    "BuildPipeError": "runtime",
 }
 
 

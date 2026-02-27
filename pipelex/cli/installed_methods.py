@@ -43,6 +43,7 @@ class InstalledMethod(BaseModel):
 def discover_installed_methods(
     include_global: bool = True,
     include_project: bool = True,
+    extra_search_dirs: list[Path] | None = None,
 ) -> list[InstalledMethod]:
     """Scan ~/.mthds/methods/ and ./.mthds/methods/ for installed methods.
 
@@ -53,6 +54,7 @@ def discover_installed_methods(
     Args:
         include_global: Whether to scan the global methods directory
         include_project: Whether to scan the project-local methods directory
+        extra_search_dirs: Additional .mthds/methods/ directories to scan
 
     Returns:
         A list of discovered installed methods
@@ -66,6 +68,13 @@ def discover_installed_methods(
         if project_dir.is_dir():
             dirs_to_scan.append(project_dir)
             seen_dirs.add(project_dir)
+
+    if extra_search_dirs:
+        for extra_dir in extra_search_dirs:
+            resolved = extra_dir.resolve()
+            if resolved.is_dir() and resolved not in seen_dirs:
+                dirs_to_scan.append(resolved)
+                seen_dirs.add(resolved)
 
     if include_global:
         global_dir = GLOBAL_METHODS_DIR.resolve()
@@ -169,6 +178,37 @@ def discover_methods_from_library_dirs(
                 methods.append(sub_method)
 
     return methods
+
+
+def find_method_by_full_address(
+    full_address: str,
+    methods: list[InstalledMethod] | None = None,
+    extra_search_dirs: list[Path] | None = None,
+) -> InstalledMethod | None:
+    """Find an installed method by its full address (manifest address + "/" + name).
+
+    The full address is computed as ``manifest.address + "/" + name`` for each
+    discovered installed method. For example, a package with
+    ``address = "github.com/Pipelex/methods"`` and ``name = "documents"`` has
+    the full address ``"github.com/Pipelex/methods/documents"``.
+
+    Args:
+        full_address: The full package address to search for
+        methods: Pre-discovered methods list; if None, runs discovery
+        extra_search_dirs: Additional .mthds/methods/ directories to scan
+
+    Returns:
+        The matching InstalledMethod, or None if no match is found
+    """
+    if methods is None:
+        methods = discover_installed_methods(extra_search_dirs=extra_search_dirs)
+
+    for method in methods:
+        candidate_address = f"{method.manifest.address}/{method.name}"
+        if candidate_address == full_address:
+            return method
+
+    return None
 
 
 def find_method_by_name(
