@@ -15,6 +15,7 @@
 ### Fixed
 
 - **`pipelex-agent init -g` service agreement** — The `--global` flag now correctly writes the gateway service terms acceptance (`pipelex_service.toml`) to the target directory instead of always writing to the auto-detected config dir.
+- **Deterministic file discovery order** — `find_files_in_dir` now sorts `rglob`/`glob` results for consistent ordering across platforms and Python versions. On Linux with Python < 3.13, `rglob` returned filesystem-order results, which could cause `test_validate_all` to fail by picking up a test package's `METHODS.toml` before pipelex internal bundles.
 
 ## [v0.18.1] - 2026-02-25
 

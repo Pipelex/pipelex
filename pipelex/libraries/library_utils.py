@@ -28,7 +28,7 @@ def get_pipelex_mthds_files_from_package() -> list[Path]:
             if not traversable.is_dir():
                 return
 
-            for child in traversable.iterdir():
+            for child in sorted(traversable.iterdir(), key=lambda entry: entry.name):
                 if child.is_file() and is_pipelex_file(Path(child.name)):
                     mthds_path_str = str(child)
                     collected.append(Path(mthds_path_str))
