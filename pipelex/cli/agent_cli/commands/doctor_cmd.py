@@ -1,6 +1,8 @@
 """Agent CLI doctor command -- JSON health report with no interactive prompts."""
 
-from typing import Any
+from typing import Annotated, Any
+
+import typer
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.cli.commands.doctor_cmd import (
@@ -9,21 +11,36 @@ from pipelex.cli.commands.doctor_cmd import (
     check_models,
     check_telemetry_config,
 )
+from pipelex.system.configuration.config_loader import config_manager
 
 
-def agent_doctor_cmd() -> None:
+def agent_doctor_cmd(
+    global_: Annotated[
+        bool,
+        typer.Option(
+            "--global",
+            "-g",
+            help="Force checking the global ~/.pipelex/ directory.",
+        ),
+    ] = False,
+) -> None:
     """Check Pipelex configuration health and output a JSON report.
 
     Unlike the human CLI doctor, this command:
     - Outputs structured JSON to stdout (never Rich panels or colors)
     - Does not offer interactive fixes (diagnostic-only)
     - Includes ``recommended_actions`` for programmatic remediation
+
+    Target directory: auto-detects project .pipelex/ if present, else ~/.pipelex/.
+    Use --global/-g to force checking the global ~/.pipelex/ directory.
     """
     try:
-        config_healthy, config_missing_count, config_message = check_config_files()
-        telemetry_healthy, telemetry_message = check_telemetry_config()
-        backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
-        models_healthy, models_message, backend_file_reports = check_models()
+        config_dir = config_manager.global_config_dir if global_ else config_manager.pipelex_config_dir
+
+        config_healthy, config_missing_count, config_message = check_config_files(config_dir=config_dir)
+        telemetry_healthy, telemetry_message = check_telemetry_config(config_dir=config_dir)
+        backends_healthy, backend_credential_reports, backends_message = check_backend_credentials(config_dir=config_dir)
+        models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
     except Exception as exc:
         agent_error(f"Health check failed unexpectedly: {exc}", type(exc).__name__, cause=exc)
 
