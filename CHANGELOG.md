@@ -1,5 +1,19 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **`pipelex run bundle` command** — New CLI subcommand to run a pipeline from a `.mthds` bundle file or pipeline directory. Supports auto-detection of `bundle.mthds`, `inputs.json`, and library directories. Available in both `pipelex` and `pipelex-agent` CLIs.
+- **`mthds run bundle` command** — New command in the mthds-js CLI for running bundles, with support for both pipelex and API runners. Agent passthrough (`mthds-agent pipelex run bundle`) also added.
+- **Inputs path resolution** — Relative file paths (e.g., `"url": "data/invoice.pdf"`) inside `inputs.json` are now resolved relative to the inputs file's parent directory, making bundle directories self-contained and portable. Applies to both user and agent CLIs. Handles HTTP, data:, pipelex-storage://, and absolute paths by leaving them unchanged.
+
+### Changed
+
+- **`pipelex run pipe` simplified to code-only** — The `pipe` subcommand now accepts only a pipe code as its positional argument. File paths and directories are no longer accepted; a helpful error message directs users to `pipelex run bundle` instead. The `--pipe` and `--bundle` options have been removed.
+- **`mthds run pipe` simplified to code-only** — The mthds-js `pipe` subcommand now treats its argument strictly as a pipe code. Bundle detection logic moved to `mthds run bundle`.
+- **`PipelexRunner.execute()` updated** — The mthds-js pipelex runner now uses explicit `run bundle <path>` and `run pipe <code>` subcommands instead of the old `run <target>` form.
+
 ## [v0.18.1] - 2026-02-25
 
 ### Fixed
