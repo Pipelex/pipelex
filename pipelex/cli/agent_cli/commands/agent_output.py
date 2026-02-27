@@ -95,6 +95,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "RemoteConfigFetchError": "config",
     "BinaryNotFoundError": "config",
     "RemoteConfigValidationError": "config",
+    "InitConfigError": "config",
     # runtime = execution failure
     "PipelineExecutionError": "runtime",
     "PipeExecutionError": "runtime",

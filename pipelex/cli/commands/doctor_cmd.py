@@ -72,7 +72,10 @@ def check_config_files(config_dir: str | None = None) -> tuple[bool, int, str]:
     except Exception as exc:
         return False, 0, f"Error checking config files: {exc}"
 
-    # Check if main config can be loaded using the hub's setup
+    # Check if main config can be loaded using the hub's setup.
+    # Note: load_config() uses config_manager's own resolution chain (package → global → project)
+    # which may differ from config_dir when --global is used. This is acceptable for a diagnostic
+    # check — the existence check guards the path, while load_config() validates the merged config.
     pipelex_config_path = os.path.join(config_dir, "pipelex.toml") if config_dir else ".pipelex/pipelex.toml"
     if path_exists(pipelex_config_path):
         try:
