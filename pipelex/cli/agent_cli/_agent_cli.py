@@ -9,7 +9,6 @@ from typer.core import TyperGroup
 from typing_extensions import override
 
 from pipelex.cli.agent_cli.commands.assemble_cmd import assemble_cmd
-from pipelex.cli.agent_cli.commands.build_cmd import build_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
@@ -29,7 +28,6 @@ class PipelexAgentCLI(TyperGroup):
     def list_commands(self, ctx: Context) -> list[str]:
         """List commands in proper order."""
         return [
-            "build",
             "run",
             "validate",
             "fmt",
@@ -120,7 +118,6 @@ def app_callback(
         )
 
 
-app.command(name="build", help="Build a pipeline from a prompt")(build_cmd)
 app.add_typer(run_app, name="run", help="Execute a pipeline and output JSON results")
 app.add_typer(validate_app, name="validate", help="Validate a pipe, bundle, or all pipes and output JSON results")
 app.command(name="fmt", help="Format a .mthds, .toml, or .plx file in-place")(fmt_cmd)

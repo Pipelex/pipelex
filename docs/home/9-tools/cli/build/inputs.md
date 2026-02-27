@@ -4,44 +4,89 @@ Generate example input JSON for a pipe, showing the expected input structure bas
 
 ## Usage
 
+### By pipe code
+
 ```bash
-pipelex build inputs <TARGET> [OPTIONS]
+pipelex build inputs pipe <PIPE_CODE> [OPTIONS]
 ```
 
 **Arguments:**
 
-- `TARGET` - Either a pipe code or a bundle file path (`.mthds`) - auto-detected
+- `PIPE_CODE` - The pipe code (e.g. `my_domain.my_pipe`)
 
 **Options:**
 
-- `--pipe` - Pipe code to use (can be omitted if you specify a bundle that declares a `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated JSON file (defaults to bundle's directory if bundle provided, otherwise `results/`)
+- `--output`, `-o` - Path to save the generated JSON file (defaults to `results/`)
+
+### From a bundle
+
+```bash
+pipelex build inputs bundle <PATH> [OPTIONS]
+```
+
+**Arguments:**
+
+- `PATH` - Path to a `.mthds` bundle file or a pipeline directory
+
+**Options:**
+
+- `--pipe` - Pipe code to use (can be omitted if the bundle declares a `main_pipe`)
+- `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+- `--output`, `-o` - Path to save the generated JSON file (defaults to bundle's directory)
+
+### From an installed method
+
+```bash
+pipelex build inputs method <NAME> [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Name of the installed method
+
+**Options:**
+
+- `--pipe` - Pipe code (overrides method's `main_pipe`)
+- `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+- `--output`, `-o` - Path to save the generated JSON file
 
 ## Examples
+
+**Generate inputs for a pipe by code:**
+
+```bash
+pipelex build inputs pipe my_domain.my_pipe
+```
 
 **Generate inputs from a bundle (uses main_pipe):**
 
 ```bash
-pipelex build inputs my_bundle.mthds
+pipelex build inputs bundle my_bundle.mthds
+```
+
+**Generate inputs from a pipeline directory:**
+
+```bash
+pipelex build inputs bundle pipeline_01/
 ```
 
 **Specify which pipe to use from a bundle:**
 
 ```bash
-pipelex build inputs my_bundle.mthds --pipe my_pipe
+pipelex build inputs bundle my_bundle.mthds --pipe my_pipe
 ```
 
 **Generate inputs for a pipe using a library directory:**
 
 ```bash
-pipelex build inputs my_domain.my_pipe -L ./my_library/
+pipelex build inputs pipe my_domain.my_pipe -L ./my_library/
 ```
 
 **Custom output path:**
 
 ```bash
-pipelex build inputs my_bundle.mthds --output custom_inputs.json
+pipelex build inputs bundle my_bundle.mthds --output custom_inputs.json
 ```
 
 ## Output Format

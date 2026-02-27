@@ -32,7 +32,7 @@ Standard mock generators (like Polyfactory) produce random strings like `"uygNji
 
 ```mermaid
 flowchart TD
-    A[pipelex validate --all] --> B[dry_run_pipes]
+    A[pipelex validate pipe --all] --> B[dry_run_pipes]
     B --> C[WorkingMemoryFactory.make_mock_inputs]
     C --> D[DryRunFactory.make_dry_run_factory]
     D --> E[Polyfactory with custom providers]

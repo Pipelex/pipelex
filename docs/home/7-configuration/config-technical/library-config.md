@@ -14,10 +14,10 @@ If you just want to run a pipe from a single `.mthds` file, **you don't need any
 
 ```bash
 # CLI: run the bundle's main_pipe
-pipelex run path/to/my_bundle.mthds
+pipelex run bundle path/to/my_bundle.mthds
 
 # CLI: run a specific pipe from the bundle
-pipelex run path/to/my_bundle.mthds --pipe my_pipe
+pipelex run bundle path/to/my_bundle.mthds --pipe my_pipe
 ```
 
 ```python
@@ -121,16 +121,16 @@ When running pipelines from the command line, use the `-L` or `--library-dir` op
 
 ```bash
 # Single directory
-pipelex run my_pipe -L /path/to/pipelines
+pipelex run pipe my_pipe -L /path/to/pipelines
 
 # Multiple directories
-pipelex run my_pipe -L /path/to/shared_pipes -L /path/to/project_pipes
+pipelex run pipe my_pipe -L /path/to/shared_pipes -L /path/to/project_pipes
 
 # Combined with other options
-pipelex run my_bundle.mthds --inputs data.json -L /path/to/pipelines
+pipelex run bundle my_bundle.mthds --inputs data.json -L /path/to/pipelines
 
 # Available on multiple commands
-pipelex validate --all -L /path/to/pipelines/dir
+pipelex validate pipe --all -L /path/to/pipelines/dir
 pipelex show pipes -L /path/to/pipelines/dir
 pipelex which my_pipe -L /path/to/pipelines/dir
 ```
@@ -456,7 +456,7 @@ After making changes to your pipelines, validate them:
 
 ```bash
 # Validate all pipelines
-pipelex validate --all
+pipelex validate pipe --all
 
 # Validate a specific pipe
 pipelex validate pipe YOUR_PIPE_CODE
@@ -496,7 +496,7 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### 4. Validation
 
-- Run `pipelex validate --all` after making changes
+- Run `pipelex validate pipe --all` after making changes
 - Check for domain code consistency
 - Verify concept relationships
 - Test pipes individually before composing them
@@ -538,7 +538,7 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### Validation Errors
 
-**Problem:** `pipelex validate --all` shows errors.
+**Problem:** `pipelex validate pipe --all` shows errors.
 
 **Solutions:**
 
