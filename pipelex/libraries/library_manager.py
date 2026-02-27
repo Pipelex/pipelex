@@ -49,6 +49,43 @@ if TYPE_CHECKING:
     from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
     from pipelex.core.domains.domain import Domain
 
+MTHDS_METHODS_DIRNAME = ".mthds/methods"
+
+
+def _find_methods_dirs_from_blueprints(blueprints: list[PipelexBundleBlueprint]) -> list[Path]:
+    """Find .mthds/methods/ directories by walking up from blueprint source paths.
+
+    When a bundle file is located outside the CWD (e.g. validating a
+    pipelex-cookbook bundle from the pipelex repo), the standard discovery
+    only checks CWD/.mthds/methods/ and ~/.mthds/methods/. This function
+    walks up ancestor directories of each bundle source path to find
+    additional .mthds/methods/ directories.
+
+    Args:
+        blueprints: The parsed bundle blueprints (their ``source`` field
+            holds the original file path)
+
+    Returns:
+        Deduplicated list of existing .mthds/methods/ directories found
+    """
+    result: list[Path] = []
+    seen: set[Path] = set()
+    for blueprint in blueprints:
+        if not blueprint.source:
+            continue
+        current = Path(blueprint.source).resolve().parent
+        while True:
+            candidate = current / MTHDS_METHODS_DIRNAME
+            resolved_candidate = candidate.resolve()
+            if resolved_candidate not in seen and candidate.is_dir():
+                result.append(resolved_candidate)
+                seen.add(resolved_candidate)
+            parent = current.parent
+            if parent == current:
+                break
+            current = parent
+    return result
+
 
 class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
@@ -297,6 +334,12 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of all pipes that were loaded
         """
+        # Discover and load address-based cross-package dependencies before loading pipes
+        self._load_address_based_dependencies(
+            library_id=library_id,
+            blueprints=blueprints,
+        )
+
         library = self.get_library(library_id=library_id)
         all_pipes: list[PipeAbstract] = []
 
@@ -547,12 +590,6 @@ class LibraryManager(LibraryManagerAbstract):
                     manifest=manifest,
                     package_root=package_root,
                 )
-
-        # Discover and load address-based cross-package dependencies
-        self._load_address_based_dependencies(
-            library_id=library_id,
-            blueprints=blueprints,
-        )
 
         # Store resolved absolute paths for duplicate detection in the library
         library = self.get_library(library_id=library_id)
@@ -846,6 +883,10 @@ class LibraryManager(LibraryManagerAbstract):
         alias contains '/' (i.e. a full package address), and loads each
         unique address-based dependency.
 
+        Also searches for .mthds/methods/ directories relative to the bundle
+        source path, walking up ancestor directories to find installed methods
+        even when the CWD differs from the bundle's project root.
+
         Args:
             library_id: The library to load into
             blueprints: The parsed bundle blueprints to scan
@@ -864,12 +905,16 @@ class LibraryManager(LibraryManagerAbstract):
         if not address_aliases:
             return
 
+        # Derive extra search dirs from bundle source paths
+        extra_search_dirs = _find_methods_dirs_from_blueprints(blueprints)
+
         for full_address in sorted(address_aliases):
             if full_address in library.dependency_libraries:
                 continue
             self._load_address_based_dependency(
                 library=library,
                 full_address=full_address,
+                extra_search_dirs=extra_search_dirs,
             )
 
         # Wire concept resolver after all deps are loaded
@@ -880,6 +925,7 @@ class LibraryManager(LibraryManagerAbstract):
         self,
         library: "Library",
         full_address: str,
+        extra_search_dirs: list[Path] | None = None,
     ) -> bool:
         """Load an installed method package on demand using its full address.
 
@@ -890,11 +936,12 @@ class LibraryManager(LibraryManagerAbstract):
         Args:
             library: The main library to load into
             full_address: The full package address (e.g. "github.com/Pipelex/methods/documents")
+            extra_search_dirs: Additional .mthds/methods/ directories to scan
 
         Returns:
             True if the dependency was successfully loaded, False otherwise
         """
-        installed = find_method_by_full_address(full_address=full_address)
+        installed = find_method_by_full_address(full_address=full_address, extra_search_dirs=extra_search_dirs)
         if installed is None:
             log.warning(f"No installed method found for address '{full_address}'")
             return False
