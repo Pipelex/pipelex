@@ -1,0 +1,163 @@
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Annotated
+
+import typer
+
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
+from pipelex.cli.commands.run._run_core import COMMAND, execute_run
+from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
+
+
+def run_bundle_cmd(
+    path: Annotated[
+        str,
+        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
+    ],
+    pipe: Annotated[
+        str | None,
+        typer.Option("--pipe", help="Pipe code to run (overrides bundle's main_pipe)"),
+    ] = None,
+    inputs: Annotated[
+        str | None,
+        typer.Option("--inputs", "-i", help="Path to JSON file with inputs"),
+    ] = None,
+    save_working_memory: Annotated[
+        bool,
+        typer.Option("--save-working-memory/--no-save-working-memory", help="Save working memory to JSON file"),
+    ] = True,
+    working_memory_path: Annotated[
+        str | None,
+        typer.Option("--working-memory-path", help="Custom path to save working memory JSON"),
+    ] = None,
+    save_main_stuff: Annotated[
+        bool,
+        typer.Option("--save-main-stuff/--no-save-main-stuff", help="Save main_stuff in JSON and Markdown formats"),
+    ] = True,
+    no_pretty_print: Annotated[
+        bool,
+        typer.Option("--no-pretty-print", help="Skip pretty printing the main_stuff"),
+    ] = False,
+    graph: Annotated[
+        bool | None,
+        typer.Option(
+            "--graph/--no-graph",
+            help="Override config: enable or disable execution graph outputs (JSON, Mermaid, HTML)",
+        ),
+    ] = None,
+    graph_full_data: Annotated[
+        bool | None,
+        typer.Option(
+            "--graph-full-data/--graph-no-data",
+            help="Override config: include or exclude full serialized data in graph",
+        ),
+    ] = None,
+    output_dir: Annotated[
+        str,
+        typer.Option("--output-dir", "-o", help="Base directory for all outputs (working memory, main_stuff, graphs)"),
+    ] = "results",
+    dry_run: Annotated[
+        bool,
+        typer.Option("--dry-run", help="Run pipeline in dry mode (no actual inference calls)"),
+    ] = False,
+    mock_inputs: Annotated[
+        bool,
+        typer.Option("--mock-inputs", help="Generate mock data for missing required inputs (requires --dry-run)"),
+    ] = False,
+    library_dir: Annotated[
+        list[str] | None,
+        typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times."),
+    ] = None,
+) -> None:
+    """Run a pipeline from a bundle file (.mthds) or pipeline directory.
+
+    Examples:
+        pipelex run bundle pipeline_01/
+        pipelex run bundle pipeline_01/ --pipe my_pipe
+        pipelex run bundle my_bundle.mthds
+        pipelex run bundle my_bundle.mthds --pipe my_pipe --inputs data.json
+        pipelex run bundle pipeline_01/ --dry-run
+    """
+    # Validate --mock-inputs requires --dry-run
+    if mock_inputs and not dry_run:
+        typer.secho(
+            "Failed to run: --mock-inputs requires --dry-run",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    pipe_code: str | None = pipe
+    bundle_path: str | None = None
+    target_path = Path(path)
+
+    if target_path.is_dir():
+        # Directory mode: auto-detect bundle and inputs
+        bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
+        if bundle_file.is_file():
+            bundle_path = str(bundle_file)
+        else:
+            mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
+            if len(mthds_files) == 0:
+                typer.secho(
+                    f"Failed to run: no .mthds bundle file found in directory '{path}'",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+            if len(mthds_files) > 1:
+                mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
+                typer.secho(
+                    f"Failed to run: multiple .mthds files found in '{path}' ({mthds_names}) "
+                    f"and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
+                    f"Pass the .mthds file directly, e.g.: pipelex run bundle {target_path / mthds_files[0].name}",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+            bundle_path = str(mthds_files[0])
+
+        # Auto-detect inputs if --inputs not explicitly provided
+        inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
+        if not inputs and inputs_file.is_file():
+            inputs = str(inputs_file)
+            typer.echo(f"Auto-detected inputs: {inputs}")
+
+        # Add directory as library dir
+        target_dir_str = str(target_path)
+        if library_dir is None:
+            library_dir = [target_dir_str]
+        elif target_dir_str not in library_dir:
+            library_dir = [target_dir_str, *library_dir]
+
+        typer.echo(f"Auto-detected bundle: {bundle_path}")
+
+    elif is_pipelex_file(target_path):
+        bundle_path = path
+    else:
+        typer.secho(
+            f"Failed to run: '{path}' is not a .mthds file or directory.\n"
+            f"  To run a pipe by code, use: pipelex run pipe <code>\n"
+            f"  To run a bundle, pass a .mthds file or directory: pipelex run bundle <path>",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    execute_run(
+        pipe_code=pipe_code,
+        bundle_path=bundle_path,
+        inputs=inputs,
+        save_working_memory=save_working_memory,
+        working_memory_path=working_memory_path,
+        save_main_stuff=save_main_stuff,
+        no_pretty_print=no_pretty_print,
+        graph=graph,
+        graph_full_data=graph_full_data,
+        output_dir=output_dir,
+        dry_run=dry_run,
+        mock_inputs=mock_inputs,
+        library_dir=library_dir,
+        telemetry_command_label=f"{COMMAND} bundle",
+    )
