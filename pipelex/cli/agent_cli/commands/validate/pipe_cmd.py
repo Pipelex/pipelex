@@ -109,12 +109,11 @@ def validate_pipe_cmd(
     # Check installed methods' exports for additional library dirs
     try:
         export_dirs = resolve_pipe_from_exports(pipe_code)
-    except typer.Exit as exc:
-        cause = exc.__cause__
+    except ValueError as exc:
         agent_error(
-            f"Ambiguous pipe code '{pipe_code}': {cause}" if cause else f"Ambiguous pipe code '{pipe_code}': found in multiple installed methods",
+            f"Ambiguous pipe code '{pipe_code}': {exc}",
             "ArgumentError",
-            cause=cause,
+            cause=exc,
         )
     if export_dirs:
         export_paths = [Path(export_dir) for export_dir in export_dirs]

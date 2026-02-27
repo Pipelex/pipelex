@@ -78,7 +78,14 @@ def run_pipe_cmd(
         agent_error("--mock-inputs requires --dry-run", "ArgumentError")
 
     # Check installed methods' exports for additional library dirs
-    export_dirs = resolve_pipe_from_exports(pipe_code)
+    try:
+        export_dirs = resolve_pipe_from_exports(pipe_code)
+    except ValueError as exc:
+        agent_error(
+            f"Ambiguous pipe code '{pipe_code}': {exc}",
+            "ArgumentError",
+            cause=exc,
+        )
     if export_dirs:
         if library_dir is None:
             library_dir = export_dirs
