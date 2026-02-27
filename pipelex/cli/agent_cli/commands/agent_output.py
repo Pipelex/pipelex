@@ -54,6 +54,8 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "BundleError": "Bundle must declare a 'main_pipe' or use the --pipe flag to specify which pipe to run",
     "ValidationError": "Check that spec fields match the expected schema for the given type",
     "ValueError": "Check that the provided value is valid for the parameter (e.g., --type must be a valid pipe type)",
+    # Init errors
+    "InitConfigError": "Check the --config JSON and ensure backend keys match available backends in the template",
     # Unknown command
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }

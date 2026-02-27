@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import contextlib
 import io
+import os
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -56,20 +57,23 @@ class BackendFileReport(BaseModel):
     has_kit_template: bool = False
 
 
-def check_config_files() -> tuple[bool, int, str]:
+def check_config_files(config_dir: str | None = None) -> tuple[bool, int, str]:
     """Check if configuration files are present and main config is valid.
+
+    Args:
+        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
 
     Returns:
         Tuple of (is_healthy, missing_count, message)
     """
     # Check for missing files
     try:
-        missing_count = init_config(reset=False, dry_run=True)
+        missing_count = init_config(reset=False, dry_run=True, target_dir=config_dir)
     except Exception as exc:
         return False, 0, f"Error checking config files: {exc}"
 
     # Check if main config can be loaded using the hub's setup
-    pipelex_config_path = ".pipelex/pipelex.toml"
+    pipelex_config_path = os.path.join(config_dir, "pipelex.toml") if config_dir else ".pipelex/pipelex.toml"
     if path_exists(pipelex_config_path):
         try:
             # Suppress stderr and stdout to prevent tracebacks from being printed
@@ -89,14 +93,16 @@ def check_config_files() -> tuple[bool, int, str]:
     return False, missing_count, f"{missing_count} configuration file(s) missing"
 
 
-def check_telemetry_config() -> tuple[bool, str]:
+def check_telemetry_config(config_dir: str | None = None) -> tuple[bool, str]:
     """Check if telemetry configuration is valid.
+
+    Args:
+        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
 
     Returns:
         Tuple of (is_healthy, message)
     """
-    # Use hard-coded path to avoid needing Pipelex initialization
-    telemetry_config_path = f".pipelex/{TELEMETRY_CONFIG_FILE_NAME}"
+    telemetry_config_path = os.path.join(config_dir, TELEMETRY_CONFIG_FILE_NAME) if config_dir else f".pipelex/{TELEMETRY_CONFIG_FILE_NAME}"
 
     try:
         toml_doc = load_toml_from_path(telemetry_config_path)
@@ -115,14 +121,16 @@ def check_telemetry_config() -> tuple[bool, str]:
         return False, "Invalid configuration - run 'pipelex init telemetry --reset' to fix"
 
 
-def check_backend_credentials() -> tuple[bool, dict[str, BackendCredentialsReport], str]:
+def check_backend_credentials(config_dir: str | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
     """Check if backend credentials are properly configured.
+
+    Args:
+        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
 
     Returns:
         Tuple of (is_healthy, backend_reports_dict, summary_message)
     """
-    # Use hard-coded path to avoid needing Pipelex initialization
-    backends_toml_path = ".pipelex/inference/backends.toml"
+    backends_toml_path = os.path.join(config_dir, "inference", "backends.toml") if config_dir else ".pipelex/inference/backends.toml"
 
     if not path_exists(backends_toml_path):
         return False, {}, "Backend configuration file not found"
@@ -249,19 +257,22 @@ def replace_backend_file(backend_name: str, dry_run: bool = False) -> bool:
         return False
 
 
-def check_backend_files() -> tuple[bool, dict[str, BackendFileReport], str]:
+def check_backend_files(config_dir: str | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
     """Check individual backend configuration files for validity.
+
+    Args:
+        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
 
     Returns:
         Tuple of (is_healthy, backend_file_reports_dict, summary_message)
     """
-    backends_dir_path = ".pipelex/inference/backends"
+    backends_dir_path = os.path.join(config_dir, "inference", "backends") if config_dir else ".pipelex/inference/backends"
 
     if not path_exists(backends_dir_path):
         return True, {}, "No backend files to check"
 
     # Get list of enabled backends from backends.toml
-    backends_toml_path = ".pipelex/inference/backends.toml"
+    backends_toml_path = os.path.join(config_dir, "inference", "backends.toml") if config_dir else ".pipelex/inference/backends.toml"
     if not path_exists(backends_toml_path):
         return True, {}, "No backends.toml to check"
 
@@ -568,14 +579,17 @@ def display_health_report(
             console.print()
 
 
-def check_models() -> tuple[bool, str, dict[str, BackendFileReport]]:
+def check_models(config_dir: str | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
     """Check if models are valid, including backend file validation.
+
+    Args:
+        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
 
     Returns:
         Tuple of (is_healthy, message, backend_file_reports)
     """
     # First check backend files individually
-    backend_files_healthy, backend_file_reports, _ = check_backend_files()
+    backend_files_healthy, backend_file_reports, _ = check_backend_files(config_dir=config_dir)
 
     # If backend files have issues, report that immediately
     if not backend_files_healthy:
