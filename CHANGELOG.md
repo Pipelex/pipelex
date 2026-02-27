@@ -10,9 +10,16 @@
 
 ### Changed
 
+- **`pipelex-agent init` defaults to local project** — The `init` command now targets the project-level `.pipelex/` directory by default (at detected project root) instead of auto-detecting. The `--local` flag has been removed. Use `--global`/`-g` to target `~/.pipelex/`. Errors out if no project root is found without `-g`.
+- **`pipelex-agent doctor` supports `--global`/`-g`** — The `doctor` command now accepts `--global`/`-g` to check the global `~/.pipelex/` directory. Without the flag, it auto-detects project `.pipelex/` if present, else falls back to `~/.pipelex/`.
+- **`pipelex-agent init --config` improved help** — The `--config` option help text now shows the JSON schema with field types upfront for better discoverability.
 - **`pipelex run pipe` simplified to code-only** — The `pipe` subcommand now accepts only a pipe code as its positional argument. File paths and directories are no longer accepted; a helpful error message directs users to `pipelex run bundle` instead. The `--pipe` and `--bundle` options have been removed.
 - **`mthds run pipe` simplified to code-only** — The mthds-js `pipe` subcommand now treats its argument strictly as a pipe code. Bundle detection logic moved to `mthds run bundle`.
 - **`PipelexRunner.execute()` updated** — The mthds-js pipelex runner now uses explicit `run bundle <path>` and `run pipe <code>` subcommands instead of the old `run <target>` form.
+
+### Fixed
+
+- **`pipelex-agent init -g` service agreement** — The `--global` flag now correctly writes the gateway service terms acceptance (`pipelex_service.toml`) to the target directory instead of always writing to the auto-detected config dir.
 
 ## [v0.18.1] - 2026-02-25
 
