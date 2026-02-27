@@ -171,6 +171,35 @@ def discover_methods_from_library_dirs(
     return methods
 
 
+def find_method_by_full_address(
+    full_address: str,
+    methods: list[InstalledMethod] | None = None,
+) -> InstalledMethod | None:
+    """Find an installed method by its full address (manifest address + "/" + name).
+
+    The full address is computed as ``manifest.address + "/" + name`` for each
+    discovered installed method. For example, a package with
+    ``address = "github.com/Pipelex/methods"`` and ``name = "documents"`` has
+    the full address ``"github.com/Pipelex/methods/documents"``.
+
+    Args:
+        full_address: The full package address to search for
+        methods: Pre-discovered methods list; if None, runs discovery
+
+    Returns:
+        The matching InstalledMethod, or None if no match is found
+    """
+    if methods is None:
+        methods = discover_installed_methods()
+
+    for method in methods:
+        candidate_address = f"{method.manifest.address}/{method.name}"
+        if candidate_address == full_address:
+            return method
+
+    return None
+
+
 def find_method_by_name(
     method_name: str,
     methods: list[InstalledMethod] | None = None,

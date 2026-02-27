@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from kajson.kajson_manager import KajsonManager
-from mthds.package.dependency_resolver import ResolvedDependency, resolve_all_dependencies
+from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
 from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifest
@@ -13,6 +13,7 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.builder import builder
+from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -23,6 +24,7 @@ from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.pipes.pipe_factory import PipeFactory
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_current_library
@@ -546,6 +548,12 @@ class LibraryManager(LibraryManagerAbstract):
                     package_root=package_root,
                 )
 
+        # Discover and load address-based cross-package dependencies
+        self._load_address_based_dependencies(
+            library_id=library_id,
+            blueprints=blueprints,
+        )
+
         # Store resolved absolute paths for duplicate detection in the library
         library = self.get_library(library_id=library_id)
         for mthds_file_path in valid_mthds_paths:
@@ -825,6 +833,89 @@ class LibraryManager(LibraryManagerAbstract):
             library.pipe_library.add_dependency_pipe(alias=alias, pipe=pipe)
 
         log.verbose(f"Loaded dependency '{alias}': {len(dep_concepts)} concepts, pipes from {len(dep_blueprints)} bundles")
+
+    def _load_address_based_dependencies(
+        self,
+        library_id: str,
+        blueprints: list[PipelexBundleBlueprint],
+    ) -> None:
+        """Scan blueprints for cross-package pipe refs with address-based aliases and load them.
+
+        Collects all cross-package pipe references from controller blueprints
+        (sequences, batches, conditions, parallels), identifies those whose
+        alias contains '/' (i.e. a full package address), and loads each
+        unique address-based dependency.
+
+        Args:
+            library_id: The library to load into
+            blueprints: The parsed bundle blueprints to scan
+        """
+        library = self.get_library(library_id=library_id)
+
+        # Collect unique address-based aliases from all pipe references
+        address_aliases: set[str] = set()
+        for blueprint in blueprints:
+            for pipe_ref_str, _context in blueprint.collect_pipe_references():
+                if QualifiedRef.has_cross_package_prefix(pipe_ref_str):
+                    alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_ref_str)
+                    if QualifiedRef.is_address_based_alias(alias):
+                        address_aliases.add(alias)
+
+        if not address_aliases:
+            return
+
+        for full_address in sorted(address_aliases):
+            if full_address in library.dependency_libraries:
+                continue
+            self._load_address_based_dependency(
+                library=library,
+                full_address=full_address,
+            )
+
+        # Wire concept resolver after all deps are loaded
+        if address_aliases:
+            library.concept_library.set_concept_resolver(library.resolve_concept)
+
+    def _load_address_based_dependency(
+        self,
+        library: "Library",
+        full_address: str,
+    ) -> bool:
+        """Load an installed method package on demand using its full address.
+
+        Discovers the matching installed method, builds a ResolvedDependency,
+        and delegates to _load_single_dependency() to load it as a child
+        library with the full address as alias.
+
+        Args:
+            library: The main library to load into
+            full_address: The full package address (e.g. "github.com/Pipelex/methods/documents")
+
+        Returns:
+            True if the dependency was successfully loaded, False otherwise
+        """
+        installed = find_method_by_full_address(full_address=full_address)
+        if installed is None:
+            log.warning(f"No installed method found for address '{full_address}'")
+            return False
+
+        exported_pipe_codes = determine_exported_pipes(manifest=installed.manifest)
+
+        resolved_dep = ResolvedDependency(
+            alias=full_address,
+            address=installed.manifest.address,
+            manifest=installed.manifest,
+            package_root=installed.path,
+            mthds_files=installed.mthds_files,
+            exported_pipe_codes=exported_pipe_codes,
+        )
+
+        self._load_single_dependency(
+            library=library,
+            resolved_dep=resolved_dep,
+        )
+
+        return True
 
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()
