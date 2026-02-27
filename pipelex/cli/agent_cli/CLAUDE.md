@@ -4,12 +4,12 @@ Machine-first CLI for building, running, and validating Pipelex method bundles (
 
 ## Companion: Agent Skills
 
-The CLI is consumed by 7 Claude skills defined in a separate repo. Changes to the CLI often require corresponding skill updates, and vice versa.
+The CLI is consumed by 9 Claude skills defined in a separate repo. Changes to the CLI often require corresponding skill updates, and vice versa.
 
-- Skills repo: `../agent-skills/skills/` (relative to project root)
-- Skills: `build`, `run`, `check`, `edit`, `fix`, `explain`, `synthesize-inputs`
+- Skills repo: `../skills/skills/` (relative to project root)
+- Skills: `build`, `run`, `check`, `edit`, `fix`, `explain`, `inputs`, `install`, `pkg`
 - Each skill is a `SKILL.md` with optional `references/` dir
-- Shared reference docs: `../agent-skills/skills/shared/` (`error-handling.md`, `pipelex-agent-guide.md`, `pipelex-reference.md`, `prerequisites.md`)
+- Shared reference docs: `../skills/skills/shared/` (`error-handling.md`, `mthds-agent-guide.md`, `mthds-reference.md`, `native-content-types.md`)
 
 When changing CLI command signatures, output schemas, or error types, check whether the affected skills need updating.
 
