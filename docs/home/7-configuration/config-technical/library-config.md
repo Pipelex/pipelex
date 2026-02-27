@@ -130,7 +130,7 @@ pipelex run pipe my_pipe -L /path/to/shared_pipes -L /path/to/project_pipes
 pipelex run bundle my_bundle.mthds --inputs data.json -L /path/to/pipelines
 
 # Available on multiple commands
-pipelex validate pipe --all -L /path/to/pipelines/dir
+pipelex validate --all -L /path/to/pipelines/dir
 pipelex show pipes -L /path/to/pipelines/dir
 pipelex which my_pipe -L /path/to/pipelines/dir
 ```
@@ -456,10 +456,10 @@ After making changes to your pipelines, validate them:
 
 ```bash
 # Validate all pipelines
-pipelex validate pipe --all
+pipelex validate --all
 
 # Validate a specific pipe
-pipelex validate pipe YOUR_PIPE_CODE
+pipelex validate YOUR_PIPE_CODE
 
 # Show all available pipes
 pipelex show pipes
@@ -496,7 +496,7 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### 4. Validation
 
-- Run `pipelex validate pipe --all` after making changes
+- Run `pipelex validate --all` after making changes
 - Check for domain code consistency
 - Verify concept relationships
 - Test pipes individually before composing them
@@ -538,7 +538,7 @@ pipelex show pipe YOUR_PIPE_CODE
 
 ### Validation Errors
 
-**Problem:** `pipelex validate pipe --all` shows errors.
+**Problem:** `pipelex validate --all` shows errors.
 
 **Solutions:**
 

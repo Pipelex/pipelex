@@ -10,6 +10,9 @@ pipelex validate bundle ...    # Validate a bundle file or directory
 pipelex validate method ...    # Validate an installed method package
 ```
 
+!!! tip "Shorthand"
+    `pipelex validate --all` and `pipelex validate <pipe_code>` are shortcuts that default to the `pipe` subcommand. You can omit `pipe` for convenience.
+
 ## Validate Pipe
 
 ```bash
@@ -32,15 +35,18 @@ Validates and dry-runs a specific pipe from your imported packages, or all pipes
 
 ```bash
 # Validate a specific pipe
-pipelex validate pipe analyze_cv_matching
-pipelex validate pipe write_weekly_report
+pipelex validate analyze_cv_matching
+pipelex validate write_weekly_report
 
 # Validate all pipes
+pipelex validate --all
+
+# Explicit subcommand form also works
 pipelex validate pipe --all
 
 # Validate with custom library directories
-pipelex validate pipe my_pipe -L ./pipelines
-pipelex validate pipe --all -L ./pipelines -L ./shared_pipes
+pipelex validate my_pipe -L ./pipelines
+pipelex validate --all -L ./pipelines -L ./shared_pipes
 ```
 
 ## Validate Bundle
