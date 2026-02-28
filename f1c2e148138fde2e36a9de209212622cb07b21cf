@@ -1,0 +1,23 @@
+pipelex/deep_flow/test_extras/wf_test_content_generator_child.py
+  c57bea00aa376798 5,7,12,14,56,58,61-66,68,74,76,84,93,101,111,131-133
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "f1c2e148138fde2e36a9de209212622cb07b21cf",
+  "prompts": {
+    "c57bea00aa376798": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5b3052c9-3b2b-48c3-850c-6c2f1fd93baf",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 22,
+      "overriden_lines": 0
+    }
+  }
+}
