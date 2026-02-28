@@ -1,0 +1,25 @@
+pipelex/deep_flow/deep_flow_registry_models.py
+  ca0988f13efd2124 3
+pipelex/deep_flow/test_extras/deep_flow_registry_test_models.py
+  ca0988f13efd2124 5
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "4b1843eb2b4b23126060185289bc46ed7e5dc37e",
+  "prompts": {
+    "ca0988f13efd2124": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6f2f106e-5420-4dcd-92ba-fff73254dd85",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
