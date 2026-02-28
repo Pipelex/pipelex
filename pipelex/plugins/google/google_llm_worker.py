@@ -1,8 +1,8 @@
 import asyncio
 from typing import TYPE_CHECKING, cast
 
-from google import genai
 from google.genai import types as genai_types
+from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
@@ -31,7 +31,7 @@ class GoogleLLMWorkerError(PipelexError):
 class GoogleLLMWorker(LLMWorkerInternalAbstract):
     def __init__(
         self,
-        sdk_instance: genai.Client,
+        sdk_instance: GoogleGenAiClient,
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
@@ -39,7 +39,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             inference_model=inference_model,
             reporting_delegate=reporting_delegate,
         )
-        genai_client: genai.Client = sdk_instance
+        genai_client: GoogleGenAiClient = sdk_instance
         self.genai_async_client = genai_client.aio
         from instructor import from_genai  # noqa: PLC0415
 

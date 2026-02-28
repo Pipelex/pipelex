@@ -1,8 +1,8 @@
 import asyncio
 from typing import Any
 
-from google import genai
 from google.genai import types as genai_types
+from google.genai.client import Client as GoogleGenAiClient
 from typing_extensions import override
 
 from pipelex import log
@@ -32,11 +32,11 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
     ):
         super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
-        if not isinstance(sdk_instance, genai.Client):
-            msg = f"Provided ImgGen sdk_instance is not of type genai.Client: it's a '{type(sdk_instance)}'"
+        if not isinstance(sdk_instance, GoogleGenAiClient):
+            msg = f"Provided ImgGen sdk_instance is not of type GoogleGenAiClient: it's a '{type(sdk_instance)}'"
             raise SdkTypeError(msg)
 
-        self.genai_client: genai.Client = sdk_instance
+        self.genai_client: GoogleGenAiClient = sdk_instance
         self.genai_async_client = sdk_instance.aio
 
         # Capture the event loop at creation time if one is running
