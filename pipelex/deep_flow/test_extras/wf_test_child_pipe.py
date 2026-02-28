@@ -1,13 +1,11 @@
 from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
-    from pipelex.deep_flow.test_extras.models_for_tests import Mock
-
-    
-from pipelex.cogt.llm.llm_setting import LLMSettingChoices
-    from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.cogt.llm.llm_setting import LLMSettingChoices
+    from pipelex.core.pipes.pipe_output import PipeOutput  # noqa: TC001
     from pipelex.core.pipes.pipe_run_params import PipeRunParamsFactory
     from pipelex.deep_flow.log_temporal import workflow_log
+    from pipelex.deep_flow.test_extras.models_for_tests import Mock
     from pipelex.hub import get_pipe_router
     from pipelex.pipe_operators.pipe_llm import PipeLLM
     from pipelex.pipe_operators.pipe_llm_prompt import PipeLLMPrompt

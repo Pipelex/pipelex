@@ -6,7 +6,7 @@ from pipelex.deep_flow.tprl_content_generation.act_extract_generate import act_e
 from pipelex.deep_flow.tprl_content_generation.act_img_gen_generate import act_img_gen_gen_images
 from pipelex.deep_flow.tprl_content_generation.act_jinja2_generate import act_jinja2_gen_text
 from pipelex.deep_flow.tprl_content_generation.act_llm_generate import act_llm_gen_object, act_llm_gen_object_list, act_llm_gen_text
-from pipelex.deep_flow.tprl_content_generation.wf_make_extract import WfMakeOcr
+from pipelex.deep_flow.tprl_content_generation.wf_make_extract import WfMakeExtract
 from pipelex.deep_flow.tprl_content_generation.wf_make_images import WfMakeImages
 from pipelex.deep_flow.tprl_content_generation.wf_make_jinja2_text import WfMakeJinja2Text
 from pipelex.deep_flow.tprl_content_generation.wf_make_llm_text import WfMakeLLMText
@@ -29,7 +29,7 @@ class Tasks:
                 WfMakeObjectList,
                 WfMakeTextThenObjectList,
                 WfMakeImages,
-                WfMakeOcr,
+                WfMakeExtract,
                 WfMakeJinja2Text,
             ],
             activity_list=[

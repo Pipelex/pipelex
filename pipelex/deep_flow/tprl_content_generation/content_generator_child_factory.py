@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from temporalio.common import RetryPolicy
 
+from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.config import get_config
 from pipelex.deep_flow.tprl_content_generation.content_generator_child import ContentGeneratorChild
 
@@ -10,6 +11,7 @@ class ContentGeneratorChildFactory:
     @classmethod
     def make_content_generator_child(
         cls,
+        generated_content_factory: GeneratedContentFactory,
         task_queue: str | None = None,
         workflow_execution_timeout: timedelta | None = None,
         retry_policy: RetryPolicy | None = None,
@@ -21,6 +23,7 @@ class ContentGeneratorChildFactory:
         config = get_config().deep_flow.worker_config
 
         return ContentGeneratorChild(
+            generated_content_factory=generated_content_factory,
             task_queue=task_queue or config.task_queue,
             workflow_execution_timeout=workflow_execution_timeout or config.workflow_execution_timeout,
             retry_policy=retry_policy or config.retry_policy,

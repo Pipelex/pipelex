@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from temporalio.common import RetryPolicy
 
+from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.config import get_config
 from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
 from pipelex.deep_flow.tprl_content_generation.content_generator_top import ContentGeneratorTop
@@ -11,6 +12,7 @@ class ContentGeneratorTopFactory:
     @classmethod
     def make_content_generator_top(
         cls,
+        generated_content_factory: GeneratedContentFactory,
         workflow_execution_timeout: timedelta | None = None,
         retry_policy: RetryPolicy | None = None,
         task_queue: str | None = None,
@@ -21,6 +23,7 @@ class ContentGeneratorTopFactory:
         """
         worker_config = get_config().deep_flow.worker_config
         return ContentGeneratorTop(
+            generated_content_factory=generated_content_factory,
             task_queue=task_queue or worker_config.task_queue,
             workflow_execution_timeout=workflow_execution_timeout or worker_config.workflow_execution_timeout,
             retry_policy=retry_policy or worker_config.retry_policy_config.make_retry_policy(),

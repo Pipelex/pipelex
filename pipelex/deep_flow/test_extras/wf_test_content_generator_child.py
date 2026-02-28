@@ -57,7 +57,7 @@ class WfTestContentGeneratorChild:
         workflow_log.debug("Workflow start")
         child_crafter = ContentGeneratorChildFactory.make_content_generator_child()
 
-        llm_setting_for_text = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")
+        llm_setting_for_text = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_text")  # noqa: F821
         crafted_text = await child_crafter.make_llm_text(
             job_metadata=JobMetadata(
                 job_name=workflow.info().workflow_type,
@@ -67,7 +67,7 @@ class WfTestContentGeneratorChild:
         )
         pretty_print(crafted_text, title="make_llm_text")
 
-        llm_setting_for_object = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")
+        llm_setting_for_object = get_llm_deck().get_llm_setting(llm_setting_or_preset_id="llm_for_testing_gen_object")  # noqa: F821
         crafted_object_direct = await child_crafter.make_object_direct(
             job_metadata=JobMetadata(
                 job_name=workflow.info().workflow_type,
@@ -121,15 +121,15 @@ class WfTestContentGeneratorChild:
         context = {
             "the_answer": "elementary, my dear Watson",
         }
-        jinja2_text = await child_crafter.make_jinja2_text(
+        jinja2_text = await child_crafter.make_templated_text(
             context=context,
-            jinja2="♦️♦️ {{ the_answer }} ♦️♦️",
+            template="♦️♦️ {{ the_answer }} ♦️♦️",
         )
-        pretty_print(jinja2_text, title="jinja2_text")
+        pretty_print(jinja2_text, title="templated_text")
 
         workflow_log.debug("Workflow complete")
 
-        extract_output = await child_crafter.make_extract_extract_pages(
+        page_contents = await child_crafter.make_extract_pages(
             extract_input=ExtractInput(
                 image_uri=PipeTestCases.IMG_EXPENSE_REPORT_1,
             ),
@@ -138,4 +138,4 @@ class WfTestContentGeneratorChild:
                 job_name=workflow.info().workflow_type,
             ),
         )
-        pretty_print(extract_output, title="make_extract_extract_pages")
+        pretty_print(page_contents, title="make_extract_pages")

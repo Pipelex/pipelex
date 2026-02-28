@@ -19,7 +19,7 @@ with workflow.unsafe.imports_passed_through():
 
 
 @workflow.defn(name="wf_make_extract")
-class WfMakeOcr(WorkflowClass[ExtractAssignment, ExtractOutput]):
+class WfMakeExtract(WorkflowClass[ExtractAssignment, ExtractOutput]):
     @override
     @workflow.run
     async def run(

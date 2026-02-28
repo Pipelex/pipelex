@@ -1,8 +1,8 @@
 import asyncio
 import base64
 
-from google import genai
 from google.genai import types as genai_types
+from google.genai.client import Client as GoogleClient
 
 from pipelex.cogt.document.prompt_document import PromptDocument
 from pipelex.cogt.document.prompt_document_utils import prepare_prompt_document_as_base64
@@ -16,9 +16,9 @@ from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCateg
 
 class GoogleFactory:
     @classmethod
-    def make_google_client(cls, backend: InferenceBackend) -> genai.Client:
+    def make_google_client(cls, backend: InferenceBackend) -> GoogleClient:
         """Create a Google Gemini API client."""
-        return genai.Client(api_key=backend.api_key)
+        return GoogleClient(api_key=backend.api_key)
 
     @classmethod
     async def prepare_image_part(cls, prompt_image: PromptImage) -> genai_types.Part:
