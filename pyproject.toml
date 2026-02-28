@@ -229,9 +229,9 @@ typeCheckingMode = "strict"
 minversion = "9.0"
 addopts = [
   "--import-mode=importlib",
-  "-ra",                                                         # Show all test outcomes (including skips)
+  "-ra",                                                                     # Show all test outcomes (including skips)
   "-m",
-  "not (inference or llm or img_gen or extract or pipelex_api)",
+  "not (inference or llm or img_gen or extract or pipelex_api or temporal)",
 ]
 asyncio_default_fixture_loop_scope = "session"
 xfail_strict = true
@@ -252,6 +252,7 @@ markers = [
   "codex_disabled: tests that should not run in Codex",
   "dry_runnable: tests that can be run in dry-run mode",
   "pipelex_api: tests that require access to the Pipelex API",
+  "temporal: tests that require a Temporal server",
 ]
 
 [tool.coverage.run]

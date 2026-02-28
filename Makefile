@@ -27,7 +27,7 @@ SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract)) and not pipelex_api"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or temporal)) and not pipelex_api"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -118,6 +118,8 @@ make test-extract             - Run unit tests only for extract (with prints)
 make te                       - Shorthand -> test-extract
 make test-img-gen             - Run unit tests only for img_gen (with prints)
 make test-g					  - Shorthand -> test-img-gen
+make test-temporal            - Run unit tests only for temporal (with prints)
+make ttm                      - Shorthand -> test-temporal
 
 make check-unused-imports     - Check for unused imports without fixing
 make fix-unused-imports       - Fix unused imports with ruff
@@ -137,6 +139,9 @@ make docs-delete VERSION=x.y.z - Delete a deployed documentation version
 make serve-graph              - Start HTTP server to view ReactFlow graphs (PORT=8765, DIR=temp/test_outputs)
 make stop-graph-server        - Stop the graph viewer HTTP server
 make view-graph               - Start server and open ReactFlow graph in browser
+
+make temporal-server          - Start a local Temporal dev server (requires 'temporal' CLI)
+make ts                       - Shorthand -> temporal-server
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -164,7 +169,7 @@ export HELP
     rules up-kit-configs ukc check-config-sync ccs check-rules check-urls cu insert-skeleton \
 	cleanderived cleanenv cleanall \
 	test test-xdist t test-quiet tq test-with-prints tp test-inference ti \
-	test-llm tl test-img-gen tg test-extract te codex-tests gha-tests \
+	test-llm tl test-img-gen tg test-extract te test-temporal ttm codex-tests gha-tests \
 	run-all-tests run-manual-trigger-gha-tests run-gha_disabled-tests \
 	validate v check c cc agent-check agent-test \
 	test-durations td test-durations-serial tds test-time tt test-time-serial tts \
@@ -175,6 +180,7 @@ export HELP
 	update-gateway-models ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
+	temporal-server ts \
 	docs-deploy-root
 
 all help:
@@ -609,6 +615,21 @@ test-img-gen: env
 tg: test-img-gen
 	@echo "> done: tg = test-img-gen"
 
+test-temporal: env
+	$(call PRINT_TITLE,"Unit testing Temporal")
+	@if [ -n "$(TEST)" ]; then \
+		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
+			$(VENV_PYTEST) --exitfirst -m "temporal" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		else \
+			$(VENV_PYTEST) --exitfirst -m "temporal" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		fi; \
+	else \
+		$(VENV_PYTEST) --exitfirst -m "temporal" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+	fi
+
+ttm: test-temporal
+	@echo "> done: ttm = test-temporal"
+
 test-pipelex-api: env
 	$(call PRINT_TITLE,"Unit testing")
 	@if [ -n "$(TEST)" ]; then \
@@ -920,6 +941,19 @@ sg: serve-graph
 
 vg: view-graph
 	@echo "> done: vg = view-graph"
+
+temporal-server:
+	$(call PRINT_TITLE,"Starting local Temporal dev server")
+	@if ! command -v temporal >/dev/null 2>&1; then \
+		echo "Error: 'temporal' CLI not found. Install it with: brew install temporal"; \
+		exit 1; \
+	fi
+	@echo "• Temporal Web UI will be available at http://localhost:8233"
+	@echo "• Temporal gRPC service at localhost:7233"
+	@echo "• Press Ctrl+C to stop"
+	temporal server start-dev
+
+ts: temporal-server
 
 ##########################################################################################
 ### SHORTHANDS
