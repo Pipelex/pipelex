@@ -1,0 +1,58 @@
+pipelex/deep_flow/tprl_content_generation/content_generator_child.py
+  de4b8a7dc2914143 20,32,34-35,40,52-53,75-78,81,120,161,210,243,291-306,309-319,322,330,364-368,372,381,410-417,420,423-425,428,430-432,439,443,447,455-483,485,491-492,499,512
+pipelex/deep_flow/test_extras/wf_test_content_generator_child.py
+  de4b8a7dc2914143 60,70,124,126,128,132,141
+.claude/plans/spicy-chasing-sutton.md
+  a8c600872050950a 1-239
+pipelex/cogt/content_generation/content_generator.py
+  de4b8a7dc2914143 53,75,101,148,174,248,279,308,326,356
+pipelex/deep_flow/tprl_content_generation/content_generator_child_factory.py
+  de4b8a7dc2914143 5,14,26
+pipelex/deep_flow/test_extras/wf_test_child_pipe.py
+  de4b8a7dc2914143 5,8
+pipelex/cogt/content_generation/content_generator_dry.py
+  de4b8a7dc2914143 58,73,91,112,143,204,230,256,275,301
+pipelex/deep_flow/tprl_content_generation/content_generator_top_factory.py
+  de4b8a7dc2914143 5,15,26
+pipelex/cogt/content_generation/content_generator_protocol.py
+  de4b8a7dc2914143 52,61,72,82,94,117,128,137,147,157
+pipelex/deep_flow/tprl_content_generation/wf_make_extract.py
+  de4b8a7dc2914143 22
+pipelex/deep_flow/tprl_content_generation/content_generator_top.py
+  de4b8a7dc2914143 17,29,31-32,37,48-49,54-57,61,92,126,147,170,204,226,246-273,278,286,312-316,321,330,351-358,362,365-367,371,373-375,380,384,388,396-424,426,432-433,437,445
+pipelex/deep_flow/tasks.py
+  de4b8a7dc2914143 9,32
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "e3da42fa1f8049907adfee723bf21c87b373988e",
+  "prompts": {
+    "a8c600872050950a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "13cc1079-552b-4c58-b38e-2efae3c0cd5e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 239,
+      "total_deletions": 0,
+      "accepted_lines": 239,
+      "overriden_lines": 0
+    },
+    "de4b8a7dc2914143": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "188aa9b2-7817-4bca-8e49-c25cd2265f43",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 269,
+      "total_deletions": 82,
+      "accepted_lines": 266,
+      "overriden_lines": 0
+    }
+  }
+}
