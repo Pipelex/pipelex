@@ -37,7 +37,7 @@ def check_mthds_schema_cmd(show_diff: bool = True, quiet: bool = False) -> None:
     # Check if the schema file exists
     if not MTHDS_SCHEMA_PATH.exists():
         if quiet:
-            console.print("[red]✗ MTHDS schema check: FAILED[/red] - Schema file does not exist")
+            console.print("[red]✗ MTHDS schema check: FAILED[/red] - Schema file does not exist. Run [cyan]make gms[/cyan] to generate it.")
         else:
             error_panel = Panel(
                 f"[red]✗[/red] Schema file does not exist:\n\n[dim]  - {MTHDS_SCHEMA_PATH}[/dim]",
@@ -103,7 +103,7 @@ def check_mthds_schema_cmd(show_diff: bool = True, quiet: bool = False) -> None:
             console.print()
     else:
         if quiet:
-            console.print("[red]✗ MTHDS schema check: FAILED[/red] - Schema file out of date")
+            console.print("[red]✗ MTHDS schema check: FAILED[/red] - Schema file out of date. Run [cyan]make gms[/cyan] to regenerate it.")
         else:
             error_panel = Panel(
                 f"[red]✗[/red] Schema file is [bold]OUT OF DATE[/bold]!\n\n"

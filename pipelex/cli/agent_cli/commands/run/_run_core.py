@@ -85,12 +85,12 @@ async def run_pipeline_core(
         compact_result=compact_result,
     )
 
-    # Determine output directory: next to the bundle, or pipelex-wip/ fallback
+    # Determine output directory: next to the bundle, or mthds-wip/ fallback
     output_dir: Path
     if bundle_uri:
         output_dir = Path(bundle_uri).parent
     else:
-        output_dir = Path("pipelex-wip")
+        output_dir = Path("mthds-wip")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Side-effect metadata (file paths) is tracked separately so it never
