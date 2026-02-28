@@ -29,7 +29,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         working_memory = workflow_arg.working_memory
 
         pipe = workflow_arg.pipe
-        log.verbose(f"Routing {pipe.__class__.__name__} pipe '{workflow_arg.pipe.code}': {pipe.definition}")
+        log.verbose(f"Routing {pipe.__class__.__name__} pipe '{workflow_arg.pipe.code}': {pipe.description}")
 
         try:
             pipe_output = await pipe.run_pipe(

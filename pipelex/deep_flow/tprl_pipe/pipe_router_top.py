@@ -1,23 +1,18 @@
 from datetime import timedelta
-from typing import cast
 
 from temporalio.common import RetryPolicy
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.memory.working_memory import WorkingMemory
-from pipelex.core.pipes.pipe_output import PipeOutput, PipeOutputType
+from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
 from pipelex.deep_flow.tprl.conditional_worker import with_conditional_worker
 from pipelex.deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.deep_flow.tprl_pipe.wf_pipe_router import WfPipeRouter
-from pipelex.hub import get_required_pipe
+from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
-from pipelex.pipe_run.pipe_run_params import PipeRunParams
-from pipelex.pipeline.job_metadata import JobMetadata
 
 
 class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
@@ -38,50 +33,49 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
             worker_environment=worker_environment,
         )
         self.task_queue = task_queue
+        self.observer = ObserverNoOp()
 
     @override
     @with_conditional_worker
-    async def run_pipe_job(
+    async def _run_pipe_job(
         self,
         pipe_job: PipeJob,
         wfid: str | None = None,
-    ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
-        log.debug(f"PipeRouterTop run_pipe_job using task_queue: {self.task_queue} with worker_environment={self.worker_environment}")
+    ) -> PipeOutput:
+        log.debug(f"PipeRouterTop _run_pipe_job using task_queue: {self.task_queue} with worker_environment={self.worker_environment}")
         executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(
             task_queue=self.task_queue,
             should_auto_connect_temporal=self.should_auto_connect_temporal,
             worker_environment=self.worker_environment,
         )
-        pipe_output = await executor.execute_workflow(
+        return await executor.execute_workflow(
             workflow_class=WfPipeRouter,
             workflow_id=self.make_workflow_id(base_id=wfid or self.class_name),
             workflow_arg=pipe_job,
         )
-        return cast("PipeOutputType", pipe_output)
 
-    @override
-    async def run_pipe_code(
-        self,
-        pipe_code: str,
-        pipe_run_params: PipeRunParams | None = None,
-        job_metadata: JobMetadata | None = None,
-        working_memory: WorkingMemory | None = None,
-        output_name: str | None = None,
-        wfid: str | None = None,
-    ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
-        pipe = get_required_pipe(pipe_code)
-        pipe_job = PipeJobFactory.make_pipe_job(
-            pipe=pipe,
-            job_metadata=job_metadata,
-            working_memory=working_memory,
-            output_name=output_name,
-            pipe_run_params=pipe_run_params,
-        )
-        pipe_output: PipeOutputType = await self.run_pipe_job(
-            pipe_job=pipe_job,
-            wfid=wfid,
-        )
-        return pipe_output
+    # async def run_pipe_code(
+    #     self,
+    #     pipe_code: str,
+    #     pipe_run_params: PipeRunParams | None = None,
+    #     job_metadata: JobMetadata | None = None,
+    #     working_memory: WorkingMemory | None = None,
+    #     output_name: str | None = None,
+    #     wfid: str | None = None,
+    # ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
+    #     pipe = get_required_pipe(pipe_code)
+    #     pipe_job = PipeJobFactory.make_pipe_job(
+    #         pipe=pipe,
+    #         job_metadata=job_metadata,
+    #         working_memory=working_memory,
+    #         output_name=output_name,
+    #         pipe_run_params=pipe_run_params,
+    #     )
+    #     pipe_output: PipeOutputType = await self.run(
+    #         pipe_job=pipe_job,
+    #         wfid=wfid,
+    #     )
+    #     return pipe_output
 
 
 def make_tprl_pipe_router_top(

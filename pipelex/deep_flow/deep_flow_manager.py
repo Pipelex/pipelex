@@ -1,7 +1,6 @@
 import asyncio
 from datetime import timedelta
 
-import deep_flow.log_temporal
 from temporalio import workflow
 from temporalio.client import Client as TemporalClient
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker, WorkflowRunner
@@ -14,6 +13,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.deep_flow.deep_flow_registry_models import DeepFlowRegistryModels
+from pipelex.deep_flow.log_temporal import configure_temporal_logs
 from pipelex.deep_flow.sandbox_manager import sandbox_manager
 from pipelex.deep_flow.task_manager import TaskManager
 from pipelex.deep_flow.temporal_connect import connect_to_temporal
@@ -52,7 +52,7 @@ class DeepFlowManager(TaskManager):
         if runtime_manager.is_unit_testing:
             log.debug("Registering test models for unit testing")
             get_class_registry().register_classes(DeepFlowTestModels.get_all_models())
-        deep_flow.log_temporal.configure_temporal_logs()
+        configure_temporal_logs()
         # TODO: use direct tweaking of settings in Pipelex to apply the sandbox restrictions to loggers etc.
         sandbox_manager.set_sandbox_callable(sandbox_callable=is_in_temporal_sandbox)
         TemporalManager.setup(session_id=get_config().session_id)

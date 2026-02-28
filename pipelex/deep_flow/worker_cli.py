@@ -9,13 +9,13 @@ import asyncio
 import os
 from typing import Annotated
 
-import toml
 import typer
 
 from pipelex import log
 from pipelex.deep_flow.deep_flow_hub import get_task_manager
 from pipelex.system.runtime import RunMode, runtime_manager
 from pipelex.tools.misc.string_utils import snake_to_pascal_case
+from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 app = typer.Typer()
 
@@ -43,12 +43,11 @@ def configure(
     if is_unit_testing:
         runtime_manager.set_run_mode(RunMode.UNIT_TEST)
     if project is None:
-        with open("pyproject.toml", encoding="utf-8") as file_pointer:
-            pyproject = toml.load(file_pointer)
-            project = pyproject["tool"]["poetry"]["name"]
-            if not project:
-                msg = "Project name not found in pyproject.toml"
-                raise ValueError(msg)
+        pyproject = load_toml_from_path(path="pyproject.toml")
+        project = pyproject["tool"]["poetry"]["name"]
+        if not project:
+            msg = "Project name not found in pyproject.toml"
+            raise ValueError(msg)
     from importlib import import_module  # noqa: PLC0415
 
     project_name_pascal_case = snake_to_pascal_case(project)
