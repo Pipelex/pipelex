@@ -338,7 +338,7 @@ def build_structures_command(
 
         # Determine if target is a file or directory
         is_mthds_file = target_path.is_file() and is_pipelex_file(target_path)
-        pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD, library_dirs=library_dir)
+        pipelex_instance = make_pipelex_for_cli(context=ErrorContext.BUILD, library_dirs=library_dir, needs_inference=False)
 
         try:
             if is_mthds_file:

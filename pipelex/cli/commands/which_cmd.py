@@ -82,7 +82,7 @@ def which_cmd(
         pipelex which my_domain.my_pipe -L ./my_pipes
         PIPELEXPATH=/path/to/pipes pipelex which some_pipe
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE, needs_inference=False)
 
     try:
         library_manager = get_library_manager()

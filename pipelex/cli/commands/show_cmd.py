@@ -229,7 +229,7 @@ def show_pipe_cmd(
         raise typer.Exit(1)
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE, library_dirs=library_dirs)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE, library_dirs=library_dirs, needs_inference=False)
 
     try:
         library_manager = get_library_manager()
@@ -271,7 +271,7 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS, needs_inference=False)
 
     try:
         with get_telemetry_manager().telemetry_context():
@@ -301,7 +301,7 @@ def show_backends_cmd(
         pipelex show backends
         pipelex show backends --all
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS, needs_inference=False)
 
     try:
         with get_telemetry_manager().telemetry_context():

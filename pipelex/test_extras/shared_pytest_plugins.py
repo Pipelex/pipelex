@@ -208,18 +208,18 @@ def pytest_collection_modifyitems(config: Config, items: list[pytest.Item]) -> N
             item.add_marker(skip_inference)
 
 
-def is_inference_disabled_in_pipelex(request: FixtureRequest) -> bool:
-    """Check if inference is disabled for this test session.
+def needs_inference_in_pipelex(request: FixtureRequest) -> bool:
+    """Check if inference is needed for this test session.
 
-    Use this helper in your conftest.py to pass the disable_inference flag
+    Use this helper in your conftest.py to pass the needs_inference flag
     to Pipelex.make():
 
-        from pipelex.test_extras.shared_pytest_plugins import is_inference_disabled
+        from pipelex.test_extras.shared_pytest_plugins import needs_inference_in_pipelex
 
         @pytest.fixture(scope="module", autouse=True)
         def reset_pipelex_config_fixture(request):
             pipelex_instance = Pipelex.make(
-                disable_inference=is_inference_disabled(request),
+                needs_inference=needs_inference_in_pipelex(request),
             )
 
     Yield:
@@ -229,6 +229,14 @@ def is_inference_disabled_in_pipelex(request: FixtureRequest) -> bool:
         request: The pytest FixtureRequest object.
 
     Returns:
-        True if --disable-inference was passed, False otherwise.
+        True if inference is needed, False if --disable-inference was passed.
     """
-    return bool(request.config.getoption("--disable-inference", default=False))
+    return not bool(request.config.getoption("--disable-inference", default=False))
+
+
+def is_inference_disabled_in_pipelex(request: FixtureRequest) -> bool:
+    """Deprecated: use needs_inference_in_pipelex() instead.
+
+    Kept for backward compatibility with external repos.
+    """
+    return not needs_inference_in_pipelex(request)

@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 from pydantic import Field, RootModel, ValidationError
 
+from pipelex import log
 from pipelex.cogt.exceptions import (
     InferenceBackendCredentialsError,
     InferenceBackendCredentialsErrorType,
@@ -64,6 +65,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backends_dir_path: str,
         include_disabled: bool = False,
         gateway_model_specs: BackendModelSpecs | None = None,
+        lenient: bool = False,
     ):
         """Load backend configurations from TOML files.
 
@@ -75,6 +77,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backends_dir_path: Path to directory containing per-backend TOML files.
             include_disabled: Whether to include disabled backends.
             gateway_model_specs: Remote model specs for Pipelex Gateway backend.
+            lenient: When True, skip backends with credential errors instead of raising.
         """
         try:
             backends_dict = load_toml_from_path(path=backends_library_path)
@@ -103,6 +106,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             try:
                 inference_backend_blueprint_dict = apply_to_strings_recursive(inference_backend_blueprint_dict_raw, substitute_vars_with_provider)
             except VarFallbackPatternError as var_fallback_pattern_exc:
+                if lenient:
+                    log.verbose(f"Skipping backend '{backend_name}': variable fallback pattern error")
+                    continue
                 msg = f"Variable substitution failed due to a pattern error in file '{backends_library_path}':\n{var_fallback_pattern_exc}"
                 key_name = "unknown"
                 raise InferenceBackendCredentialsError(
@@ -112,6 +118,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     key_name=key_name,
                 ) from var_fallback_pattern_exc
             except VarNotFoundError as var_not_found_exc:
+                if lenient:
+                    log.verbose(f"Skipping backend '{backend_name}': missing credential variable '{var_not_found_exc.var_name}'")
+                    continue
                 msg = (
                     f"Variable substitution failed due to a 'variable not found' error in file '{backends_library_path}':\n"
                     f"Backend name: '{backend_name}', Variable name: '{var_not_found_exc.var_name}'\n"
@@ -124,6 +133,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     key_name=var_not_found_exc.var_name,
                 ) from var_not_found_exc
             except UnknownVarPrefixError as unknown_var_prefix_exc:
+                if lenient:
+                    log.verbose(f"Skipping backend '{backend_name}': unknown variable prefix for '{unknown_var_prefix_exc.var_name}'")
+                    continue
                 raise InferenceBackendCredentialsError(
                     error_type=InferenceBackendCredentialsErrorType.UNKNOWN_VAR_PREFIX,
                     backend_name=backend_name,
@@ -143,6 +155,9 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backend_config_source: str
             if PipelexBackend.is_gateway_backend(backend_name):
                 if gateway_model_specs is None:
+                    if lenient:
+                        log.verbose(f"Skipping backend '{backend_name}': gateway model specs not available")
+                        continue
                     msg = "Pipelex Gateway backend is enabled but remote model specs were not provided"
                     raise InferenceBackendLibraryError(msg)
                 model_specs_dict, backend_config_source = self._load_gateway_model_specs(

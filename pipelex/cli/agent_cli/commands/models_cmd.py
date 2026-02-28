@@ -229,7 +229,7 @@ def agent_models_cmd(
     that an agent needs to reference when building pipelines.
     """
     try:
-        make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
+        make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False)
 
         model_deck = get_model_deck()
         builder_config = get_config().pipelex.builder_config

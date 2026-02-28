@@ -55,6 +55,7 @@ def validate_pipe_cmd(
             make_pipelex_for_cli(
                 context=ErrorContext.VALIDATION,
                 library_dirs=library_dirs_paths,
+                needs_inference=False,
             )
             do_validate_all_libraries_and_dry_run(library_dirs=library_dirs_paths)
         finally:
