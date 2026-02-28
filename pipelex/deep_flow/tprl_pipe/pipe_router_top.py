@@ -6,17 +6,17 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.core.pipe_output import PipeOutput, PipeOutputType
-from pipelex.core.pipe_run_params import PipeRunParams
-from pipelex.core.working_memory import WorkingMemory
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.pipes.pipe_output import PipeOutput, PipeOutputType
 from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
 from pipelex.deep_flow.tprl.conditional_worker import with_conditional_worker
 from pipelex.deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.deep_flow.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.hub import get_required_pipe
-from pipelex.pipe_works.pipe_job import PipeJob
-from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
-from pipelex.pipe_works.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
+from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
