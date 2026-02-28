@@ -14,8 +14,8 @@ import typer
 
 from pipelex import log
 from pipelex.deep_flow.deep_flow_hub import get_task_manager
+from pipelex.system.runtime import RunMode, runtime_manager
 from pipelex.tools.misc.string_utils import snake_to_pascal_case
-from pipelex.tools.runtime_manager import RunMode, runtime_manager
 
 app = typer.Typer()
 

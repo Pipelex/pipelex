@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from pipelex.tools.registry_models import ModelType, RegistryModels
+from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
 class DeepFlowRegistryModels(RegistryModels):

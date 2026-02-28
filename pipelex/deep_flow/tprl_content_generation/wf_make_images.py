@@ -14,7 +14,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.deep_flow.log_temporal import workflow_log
     from pipelex.deep_flow.tprl.temporal_error import TemporalError
     from pipelex.deep_flow.tprl.workflow_caller import WorkflowClass
-    from pipelex.deep_flow.tprl_content_generation.act_img_gen_generate import act_img_gen_gen_images
+    from pipelex.deep_flow.tprl_content_generation.act_img_gen_generate import act_img_gen_images
 
 
 @workflow.defn(name="wf_make_image")
@@ -29,7 +29,7 @@ class WfMakeImages(WorkflowClass[ImgGenAssignment, list[GeneratedImageRawDetails
         worker_config = get_config().deep_flow.worker_config
         try:
             generated_image_list = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
-                activity=act_img_gen_gen_images,
+                activity=act_img_gen_images,
                 arg=workflow_arg,
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,

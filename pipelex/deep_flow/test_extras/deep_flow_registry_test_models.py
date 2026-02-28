@@ -2,7 +2,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, ConfigDict
 
-from pipelex.tools.registry_models import ModelType, RegistryModels
+from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
 # for testing & examples

@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from pipelex.deep_flow.temporal_tasks import TaskPack
 from pipelex.deep_flow.tprl_content_generation.act_extract_generate import act_extract_gen_extract_pages
-from pipelex.deep_flow.tprl_content_generation.act_img_gen_generate import act_img_gen_gen_images
+from pipelex.deep_flow.tprl_content_generation.act_img_gen_generate import act_img_gen_images
 from pipelex.deep_flow.tprl_content_generation.act_jinja2_generate import act_jinja2_gen_text
 from pipelex.deep_flow.tprl_content_generation.act_llm_generate import act_llm_gen_object, act_llm_gen_object_list, act_llm_gen_text
 from pipelex.deep_flow.tprl_content_generation.wf_make_extract import WfMakeExtract
@@ -36,7 +36,7 @@ class Tasks:
                 act_llm_gen_object,
                 act_llm_gen_text,
                 act_llm_gen_object_list,
-                act_img_gen_gen_images,
+                act_img_gen_images,
                 act_jinja2_gen_text,
                 act_extract_gen_extract_pages,
             ],

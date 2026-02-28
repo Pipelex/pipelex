@@ -9,7 +9,7 @@ from temporalio.exceptions import TemporalError
 from pipelex import log
 from pipelex.deep_flow.config_deep_flow import TemporalServerConfig
 from pipelex.deep_flow.temporal_connect import connect_to_temporal, connect_to_temporal_selected_server, connect_to_temporal_server
-from pipelex.tools.runtime_manager import RunMode, runtime_manager
+from pipelex.system.runtime import RunMode, runtime_manager
 
 
 class TemporalWorkerEnvironment(StrEnum):
@@ -99,6 +99,12 @@ class TemporalManager:
                 prefix = "ut-"
             case RunMode.NORMAL:
                 prefix = ""
+            case RunMode.CI_TEST:
+                prefix = "ci-"
+            case RunMode.CODEX_CLOUD:
+                prefix = "cc-"
+            case RunMode.CODEX_CLOUD_TEST:
+                prefix = "cct-"
         session_part = self.session_id[:5]
         random_part = shortuuid.uuid()[:5]
         return f"{prefix}{session_part}-{random_part}-{base_id}"
