@@ -1,0 +1,41 @@
+from typing import Self
+
+from citadel.config_citadel import get_config
+from deep_flow.log_temporal import workflow_log
+from temporalio.exceptions import ApplicationError
+
+from pipelex.tools.exceptions import RootException
+
+
+class TemporalError(ApplicationError):
+    def __init__(self, message: str, error_type: str | None):
+        super().__init__(
+            message=message,
+            type=error_type,
+        )
+
+    @classmethod
+    def from_app_error(cls, exc: ApplicationError) -> Self:
+        message = exc.message
+        error_type = exc.type
+        if error_type in get_config().deep_flow.worker_config.retry_policy_config.non_retryable_error_types:
+            workflow_log.critical(f"Non retryable error from ApplicationError[{error_type}]: {message}")
+        else:
+            workflow_log.error(f"Error from ApplicationError[{error_type}]: {message}")
+        return cls(
+            message=message,
+            error_type=error_type,
+        )
+
+    @classmethod
+    def from_message_exception(cls, exc: RootException) -> Self:
+        message = exc.message
+        error_type = exc.__class__.__name__
+        if error_type in get_config().deep_flow.worker_config.retry_policy_config.non_retryable_error_types:
+            workflow_log.critical(f"Non retryable error from RootException[{error_type}]: {message}")
+        else:
+            workflow_log.critical(f"Critical error from RootException[{error_type}]: {message}")
+        return cls(
+            message=message,
+            error_type=error_type,
+        )
