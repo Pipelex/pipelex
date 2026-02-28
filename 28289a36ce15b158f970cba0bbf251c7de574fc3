@@ -1,0 +1,25 @@
+pipelex/cogt/models/model_manager.py
+  a615bb0f25f84aed 72
+pipelex/cogt/model_routing/routing_profile_loader.py
+  a615bb0f25f84aed 13-14,16-23,53,55,63,67,69,71,73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "28289a36ce15b158f970cba0bbf251c7de574fc3",
+  "prompts": {
+    "a615bb0f25f84aed": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e5ac5423-e3bc-4b34-bcc8-0055d3b5d25e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 32,
+      "total_deletions": 15,
+      "accepted_lines": 18,
+      "overriden_lines": 2
+    }
+  }
+}
