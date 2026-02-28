@@ -52,7 +52,6 @@ def validate_method_cmd(
     )
     if not method.mthds_files:
         agent_error(f"Method '{name}' has no .mthds bundle files.", "MethodError")
-        return
 
     bundle_path = method.mthds_files[0]
 
