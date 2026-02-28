@@ -2,20 +2,6 @@ import asyncio
 from datetime import timedelta
 
 import deep_flow.log_temporal
-from citadel.config_citadel import get_config
-from deep_flow.deep_flow_registry_models import DeepFlowRegistryModels
-from deep_flow.sandbox_manager import sandbox_manager
-from deep_flow.task_manager import TaskManager
-from deep_flow.temporal_connect import connect_to_temporal
-from deep_flow.temporal_manager import TemporalManager
-from deep_flow.temporal_tasks import TaskPack, TemporalTasks
-from deep_flow.temporal_types import (
-    ActivityList,
-    ActivityType,
-    WorkflowList,
-    WorkflowType,
-)
-from deep_flow.test_extras.deep_flow_registry_test_models import DeepFlowTestModels
 from temporalio import workflow
 from temporalio.client import Client as TemporalClient
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker, WorkflowRunner
@@ -26,6 +12,20 @@ from temporalio.worker.workflow_sandbox import (
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.config import get_config
+from pipelex.deep_flow.deep_flow_registry_models import DeepFlowRegistryModels
+from pipelex.deep_flow.sandbox_manager import sandbox_manager
+from pipelex.deep_flow.task_manager import TaskManager
+from pipelex.deep_flow.temporal_connect import connect_to_temporal
+from pipelex.deep_flow.temporal_manager import TemporalManager
+from pipelex.deep_flow.temporal_tasks import TaskPack, TemporalTasks
+from pipelex.deep_flow.temporal_types import (
+    ActivityList,
+    ActivityType,
+    WorkflowList,
+    WorkflowType,
+)
+from pipelex.deep_flow.test_extras.deep_flow_registry_test_models import DeepFlowTestModels
 from pipelex.hub import get_class_registry
 from pipelex.tools.runtime_manager import WorkerMode, runtime_manager
 
@@ -146,7 +146,7 @@ class DeepFlowManager(TaskManager):
             if is_unit_testing:
                 log.debug(f"is_unit_testing={is_unit_testing} Registering test models")
                 runtime_manager.set_worker_mode(worker_mode=WorkerMode.UNIT_TEST)
-                from deep_flow.test_extras.temporal_test_tasks import (  # noqa: PLC0415
+                from pipelex.deep_flow.test_extras.temporal_test_tasks import (  # noqa: PLC0415
                     TEMPORAL_TEST_ACTIVITIES,
                     TEMPORAL_TEST_WORKFLOWS,
                 )

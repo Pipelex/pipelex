@@ -1,9 +1,9 @@
 import logging
 from typing import Any
 
-from citadel.config_citadel import get_config
 from typing_extensions import override
 
+from pipelex.config import get_config
 from pipelex.tools.log.log_formatter import LevelAndEmojiLogFormatter, log_level_color, log_level_tag
 from pipelex.tools.misc.terminal_utils import RESET_FONT, TerminalColor
 

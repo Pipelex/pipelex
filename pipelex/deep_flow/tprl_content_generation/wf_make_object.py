@@ -3,38 +3,25 @@ from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.content_generation.assignment_models import LLMAssignment, ObjectAssignment, TextThenObjectAssignment
-from pipelex.cogt.image.prompt_image import PromptImage, PromptImageBytes, PromptImagePath, PromptImageUrl
+from pipelex.cogt.content_generation.assignment_models import ObjectAssignment, TextThenObjectAssignment
 from pipelex.tools.exceptions import RootException
 
 with workflow.unsafe.imports_passed_through():
-    from citadel.config_citadel import get_config
-    from deep_flow.log_temporal import workflow_log
-    from deep_flow.tprl.temporal_error import TemporalError
-    from deep_flow.tprl.workflow_caller import WorkflowClass
-    from deep_flow.tprl_content_generation.act_llm_generate import (
-        act_llm_gen_object,
-        act_llm_gen_object_list,
-        act_llm_gen_text,
-    )
     from pydantic import BaseModel
 
-    import pipelex.cogt.llm.llm_models.llm_deck  # noqa: F401
-    import pipelex.cogt.llm.llm_models.llm_setting  # noqa: F401
-    import pipelex.cogt.llm.llm_prompt  # noqa: F401
-    import pipelex.cogt.llm.llm_prompt_factory_abstract  # noqa: F401
-    import pipelex.cogt.llm.llm_prompt_template  # noqa: F401
     from pipelex import log
     from pipelex.cogt.content_generation.assignment_models import (
-        LLMAssignment,  # noqa: F401
         ObjectAssignment,
         TextThenObjectAssignment,
     )
-    from pipelex.cogt.image.prompt_image import (
-        PromptImage,  # noqa: F401
-        PromptImageBytes,  # noqa: F401
-        PromptImagePath,  # noqa: F401
-        PromptImageUrl,  # noqa: F401
+    from pipelex.config import get_config
+    from pipelex.deep_flow.log_temporal import workflow_log
+    from pipelex.deep_flow.tprl.temporal_error import TemporalError
+    from pipelex.deep_flow.tprl.workflow_caller import WorkflowClass
+    from pipelex.deep_flow.tprl_content_generation.act_llm_generate import (
+        act_llm_gen_object,
+        act_llm_gen_object_list,
+        act_llm_gen_text,
     )
     from pipelex.tools.exceptions import RootException
 

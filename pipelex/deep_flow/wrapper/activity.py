@@ -1,9 +1,10 @@
 from datetime import timedelta
 from typing import Awaitable, Callable, ParamSpec, TypeVar
 
-from citadel.config_citadel import get_config
 from pydantic import BaseModel
 from temporalio import workflow
+
+from pipelex.config import get_config
 
 T = TypeVar("T")
 P = ParamSpec("P")

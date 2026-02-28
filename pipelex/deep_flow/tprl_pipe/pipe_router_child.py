@@ -1,14 +1,14 @@
 from typing import cast
 
-from citadel.config_citadel import get_config
-from deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
-from deep_flow.tprl_pipe.wf_pipe_router import WfPipeRouter
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.config import get_config
 from pipelex.core.pipe_output import PipeOutput, PipeOutputType
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
+from pipelex.deep_flow.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_works.pipe_job import PipeJob
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory

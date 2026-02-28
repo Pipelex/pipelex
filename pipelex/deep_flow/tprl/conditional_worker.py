@@ -2,11 +2,11 @@ from functools import wraps
 from typing import Any, Awaitable, Callable, TypeVar, cast
 
 import shortuuid
-from deep_flow.deep_flow_hub import get_task_manager
-from deep_flow.temporal_manager import TemporalWorkerEnvironment
-from deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowInput, WorkflowOutput
 
 from pipelex import log
+from pipelex.deep_flow.deep_flow_hub import get_task_manager
+from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
+from pipelex.deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowInput, WorkflowOutput
 
 FuncExecuteWorkflow = TypeVar("FuncExecuteWorkflow", bound=Callable[..., Awaitable[Any]])
 

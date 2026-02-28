@@ -1,18 +1,18 @@
 from datetime import timedelta
 from typing import cast
 
-from citadel.config_citadel import get_config
-from deep_flow.temporal_manager import TemporalWorkerEnvironment
-from deep_flow.tprl.conditional_worker import with_conditional_worker
-from deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
-from deep_flow.tprl_pipe.wf_pipe_router import WfPipeRouter
 from temporalio.common import RetryPolicy
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.config import get_config
 from pipelex.core.pipe_output import PipeOutput, PipeOutputType
 from pipelex.core.pipe_run_params import PipeRunParams
 from pipelex.core.working_memory import WorkingMemory
+from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
+from pipelex.deep_flow.tprl.conditional_worker import with_conditional_worker
+from pipelex.deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
+from pipelex.deep_flow.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.hub import get_required_pipe
 from pipelex.pipe_works.pipe_job import PipeJob
 from pipelex.pipe_works.pipe_job_factory import PipeJobFactory
@@ -91,7 +91,7 @@ def make_tprl_pipe_router_top(
     should_auto_connect_temporal: bool = True,
     worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
 ) -> PipeRouterTop:
-    """This factory is only passing your settings or using defaults from deep_flow's config."""
+    """This factory is only passing your settings or using defaults from pipelex.deep_flow's config."""
     worker_config = get_config().deep_flow.worker_config
     return PipeRouterTop(
         task_queue=task_queue or worker_config.task_queue,

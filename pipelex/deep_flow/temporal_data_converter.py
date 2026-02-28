@@ -27,7 +27,6 @@ For examples, see the tests in `test_top_crafter.py`:
 
 from typing import Any
 
-from deep_flow.exceptions import DeepFlowError
 from kajson import kajson
 from pydantic import BaseModel
 from temporalio.api.common.v1 import Payload
@@ -41,6 +40,7 @@ from temporalio.converter import (
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.deep_flow.exceptions import DeepFlowError
 
 
 class BaseModelPayloadConverterError(DeepFlowError):

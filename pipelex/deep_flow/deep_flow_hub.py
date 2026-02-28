@@ -1,4 +1,4 @@
-from deep_flow.task_manager import TaskManager
+from pipelex.deep_flow.task_manager import TaskManager
 
 
 class DeepFlowHub:

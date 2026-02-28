@@ -1,9 +1,10 @@
 from typing import Protocol
 
-from deep_flow.temporal_tasks import TaskPack
-from deep_flow.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 from temporalio.client import Client as TemporalClient
 from temporalio.worker import Worker
+
+from pipelex.deep_flow.temporal_tasks import TaskPack
+from pipelex.deep_flow.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 
 
 class TaskManager(Protocol):

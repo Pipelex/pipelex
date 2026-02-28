@@ -8,15 +8,15 @@ from pipelex.hub import get_llm_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 
 with workflow.unsafe.imports_passed_through():
-    from deep_flow.log_temporal import workflow_log
-    from deep_flow.test_extras.deep_flow_registry_test_models import Person
-    from deep_flow.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
     from tests.test_data import PipeTestCases
 
     from pipelex import pretty_print
     from pipelex.cogt.llm.llm_prompt import LLMPrompt
     from pipelex.cogt.ocr.ocr_handle import OcrHandle
     from pipelex.cogt.ocr.ocr_input import OcrInput
+    from pipelex.deep_flow.log_temporal import workflow_log
+    from pipelex.deep_flow.test_extras.deep_flow_registry_test_models import Person
+    from pipelex.deep_flow.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
     from pipelex.hub import get_llm_deck
     from pipelex.pipeline.job_metadata import JobMetadata
 

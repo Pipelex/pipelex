@@ -1,8 +1,9 @@
 from datetime import timedelta
 
-from citadel.config_citadel import get_config
-from deep_flow.tprl_content_generation.content_generator_child import ContentGeneratorChild
 from temporalio.common import RetryPolicy
+
+from pipelex.config import get_config
+from pipelex.deep_flow.tprl_content_generation.content_generator_child import ContentGeneratorChild
 
 
 class ContentGeneratorChildFactory:

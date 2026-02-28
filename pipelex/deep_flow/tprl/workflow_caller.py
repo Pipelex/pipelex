@@ -1,9 +1,6 @@
 from datetime import timedelta
 from typing import Any, Callable, Coroutine, Generic, Protocol, TypeVar, Union, cast
 
-from citadel.config_citadel import get_config
-from deep_flow.exceptions import WorkflowExecutionError
-from deep_flow.temporal_manager import TemporalWorkerEnvironment, get_temporal_client, get_temporal_manager
 from pydantic import BaseModel
 from temporalio import workflow
 from temporalio.client import Client as TemporalClient
@@ -13,6 +10,9 @@ from temporalio.exceptions import ApplicationError, ChildWorkflowError
 from temporalio.workflow import ChildWorkflowHandle
 
 from pipelex import log
+from pipelex.config import get_config
+from pipelex.deep_flow.exceptions import WorkflowExecutionError
+from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment, get_temporal_client, get_temporal_manager
 
 T = TypeVar("T")
 WorkflowOutput = TypeVar("WorkflowOutput", covariant=True)
@@ -222,7 +222,7 @@ class WorkflowExecutorFactory(Generic[WorkflowInput, WorkflowOutput]):
         should_auto_connect_temporal: bool = False,
         worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
     ) -> WorkflowExecutor[WorkflowInput, WorkflowOutput]:
-        """Creates a WorkflowExecutor with configuration from deep_flow's config if not provided."""
+        """Creates a WorkflowExecutor with configuration from pipelex.deep_flow's config if not provided."""
         config = get_config().deep_flow.worker_config
 
         return WorkflowExecutor[WorkflowInput, WorkflowOutput](

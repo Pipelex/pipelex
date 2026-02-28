@@ -1,9 +1,10 @@
 from datetime import timedelta
 
-from citadel.config_citadel import get_config
-from deep_flow.temporal_manager import TemporalWorkerEnvironment
-from deep_flow.tprl_content_generation.content_generator_top import ContentGeneratorTop
 from temporalio.common import RetryPolicy
+
+from pipelex.config import get_config
+from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
+from pipelex.deep_flow.tprl_content_generation.content_generator_top import ContentGeneratorTop
 
 
 class ContentGeneratorTopFactory:
@@ -15,7 +16,7 @@ class ContentGeneratorTopFactory:
         task_queue: str | None = None,
         worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
     ) -> ContentGeneratorTop:
-        """This factory is only passing your settings or using defaults from deep_flow's config.
+        """This factory is only passing your settings or using defaults from pipelex.deep_flow's config.
         Don't hesitate to create your own factory or your own TopCrafter according to your needs and context.
         """
         worker_config = get_config().deep_flow.worker_config

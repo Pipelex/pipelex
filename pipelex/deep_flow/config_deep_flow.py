@@ -1,12 +1,19 @@
 from datetime import timedelta
 from typing import Literal, Union
 
-from deep_flow.exceptions import TemporalConfigError
 from pydantic import Field, model_validator
 from temporalio.common import RetryPolicy
 from typing_extensions import Self
 
-from pipelex.tools.config.models import ConfigModel, SecretMethod
+from pipelex.deep_flow.exceptions import TemporalConfigError
+from pipelex.system.configuration.config_model import ConfigModel
+from pipelex.types import StrEnum
+
+
+class SecretMethod(StrEnum):
+    NONE = "none"
+    ENV_VAR = "env_var"
+    SECRET_PROVIDER = "secret_provider"
 
 
 class TemporalServerConfig(ConfigModel):

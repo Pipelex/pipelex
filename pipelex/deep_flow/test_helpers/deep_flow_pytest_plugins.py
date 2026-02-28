@@ -1,7 +1,8 @@
 from enum import StrEnum
 
-from deep_flow.temporal_manager import TemporalWorkerEnvironment
 from pytest import Parser
+
+from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
 
 
 class DeepFlowPytestOption(StrEnum):

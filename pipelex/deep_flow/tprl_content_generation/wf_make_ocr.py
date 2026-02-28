@@ -6,17 +6,16 @@ from pipelex.cogt.content_generation.assignment_models import OcrAssignment
 from pipelex.cogt.ocr.ocr_output import OcrOutput
 
 with workflow.unsafe.imports_passed_through():
-    from citadel.config_citadel import get_config
-    from deep_flow.log_temporal import workflow_log
-    from deep_flow.tprl.temporal_error import TemporalError
-    from deep_flow.tprl.workflow_caller import WorkflowClass
-    from deep_flow.tprl_content_generation.act_ocr_generate import act_ocr_gen_extract_pages
     from typing_extensions import override
 
-    import pipelex.cogt.content_generation.assignment_models  # noqa: F401
     from pipelex import log
     from pipelex.cogt.content_generation.assignment_models import OcrAssignment
     from pipelex.cogt.ocr.ocr_output import OcrOutput
+    from pipelex.config import get_config
+    from pipelex.deep_flow.log_temporal import workflow_log
+    from pipelex.deep_flow.tprl.temporal_error import TemporalError
+    from pipelex.deep_flow.tprl.workflow_caller import WorkflowClass
+    from pipelex.deep_flow.tprl_content_generation.act_ocr_generate import act_ocr_gen_extract_pages
 
 
 @workflow.defn(name="wf_make_ocr")

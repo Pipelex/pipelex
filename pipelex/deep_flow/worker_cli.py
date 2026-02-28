@@ -11,9 +11,9 @@ from typing import Annotated
 
 import toml
 import typer
-from deep_flow.deep_flow_hub import get_task_manager
 
 from pipelex import log
+from pipelex.deep_flow.deep_flow_hub import get_task_manager
 from pipelex.tools.misc.string_utils import snake_to_pascal_case
 from pipelex.tools.runtime_manager import RunMode, runtime_manager
 

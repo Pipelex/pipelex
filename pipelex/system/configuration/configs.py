@@ -5,6 +5,7 @@ from pipelex.base_exceptions import PipelexConfigError
 from pipelex.cogt.config_cogt import Cogt
 from pipelex.cogt.model_backends.prompting_target import PromptingTarget
 from pipelex.cogt.templating.templating_style import TemplatingStyle
+from pipelex.deep_flow.config_deep_flow import DeepFlow
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
@@ -200,5 +201,6 @@ class MigrationConfig(ConfigModel):
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
+    deep_flow: DeepFlow
     pipelex: Pipelex
     migration: MigrationConfig

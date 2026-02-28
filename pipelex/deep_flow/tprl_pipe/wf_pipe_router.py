@@ -7,13 +7,13 @@ from pipelex.core.pipe_output import PipeOutput
 from pipelex.pipe_works.pipe_job import PipeJob
 
 with workflow.unsafe.imports_passed_through():
-    from deep_flow.log_temporal import workflow_log
-    from deep_flow.tprl.temporal_error import TemporalError
-    from deep_flow.tprl.workflow_caller import WorkflowClass
     from temporalio import workflow
 
     from pipelex import log
     from pipelex.core.pipe_output import PipeOutput
+    from pipelex.deep_flow.log_temporal import workflow_log
+    from pipelex.deep_flow.tprl.temporal_error import TemporalError
+    from pipelex.deep_flow.tprl.workflow_caller import WorkflowClass
     from pipelex.pipe_works.pipe_job import PipeJob
 
 

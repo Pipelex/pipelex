@@ -1,9 +1,9 @@
 from typing import Self
 
-from citadel.config_citadel import get_config
-from deep_flow.log_temporal import workflow_log
 from temporalio.exceptions import ApplicationError
 
+from pipelex.config import get_config
+from pipelex.deep_flow.log_temporal import workflow_log
 from pipelex.tools.exceptions import RootException
 
 

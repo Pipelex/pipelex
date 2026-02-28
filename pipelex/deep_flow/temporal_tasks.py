@@ -1,6 +1,5 @@
-from deep_flow.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
-
 from pipelex import log
+from pipelex.deep_flow.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 
 
 class TaskPack:

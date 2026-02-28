@@ -1,11 +1,11 @@
 import logging
 from typing import Any, Union
 
-from citadel.config_citadel import get_config
-from deep_flow.log_formatter import DeepFlowTemporalLogFormatter
 from temporalio import activity, workflow
 
 from pipelex import log
+from pipelex.config import get_config
+from pipelex.deep_flow.log_formatter import DeepFlowTemporalLogFormatter
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_VERBOSE
 
 
