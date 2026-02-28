@@ -250,6 +250,9 @@ class MockedInitEnvironment:
         # Mock typer.echo to suppress output
         self.mocker.patch("typer.echo")
 
+        # Mock prompt_credentials to avoid env-dependent Prompt.ask calls for missing API keys
+        self.mocker.patch("pipelex.cli.commands.init.command.prompt_credentials")
+
     def get_backend_indices(self, backend_names: list[str]) -> list[int]:
         """Get 1-based indices for backend names.
 

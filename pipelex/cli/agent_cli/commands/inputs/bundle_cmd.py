@@ -1,4 +1,4 @@
-"""Agent CLI inputs pipe command - generate example inputs by pipe code."""
+"""Agent CLI inputs bundle command - generate example inputs from a bundle file or directory."""
 
 from __future__ import annotations
 
@@ -8,10 +8,10 @@ from typing import Annotated, Any
 
 import typer
 
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success, extract_validation_errors
 from pipelex.cli.agent_cli.commands.inputs._inputs_core import inputs_core
-from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
 from pipelex.core.pipes.inputs.exceptions import NoInputsRequiredError
@@ -20,58 +20,78 @@ from pipelex.pipelex import Pipelex
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 
 
-def inputs_pipe_cmd(
+def inputs_bundle_cmd(
     ctx: typer.Context,
-    pipe_code: Annotated[
+    path: Annotated[
         str,
-        typer.Argument(help="Pipe code to get inputs for"),
+        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
     ],
+    pipe: Annotated[
+        str | None,
+        typer.Option("--pipe", help="Pipe code to get inputs for (overrides bundle's main_pipe)"),
+    ] = None,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
     ] = None,
 ) -> None:
-    """Generate example input JSON for a pipe by code and output JSON results.
+    """Generate example input JSON from a bundle file (.mthds) or pipeline directory.
 
     Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
 
     Examples:
-        pipelex-agent inputs pipe my_pipe
-        pipelex-agent inputs pipe my_pipe -L ./my_pipes
+        pipelex-agent inputs bundle my_bundle.mthds
+        pipelex-agent inputs bundle my_bundle.mthds --pipe my_pipe
+        pipelex-agent inputs bundle pipeline_01/
+        pipelex-agent inputs bundle pipeline_01/ --pipe my_pipe
     """
-    # Helpful error if the user passes a path instead of a pipe code
-    target_path = Path(pipe_code)
-    if target_path.is_dir() or is_pipelex_file(target_path) or pipe_code.endswith(MTHDS_EXTENSION):
-        agent_error(
-            f"'{pipe_code}' looks like a file path or directory. "
-            f"Use 'inputs bundle {pipe_code}' for bundles/directories, or 'inputs pipe <code>' for pipe codes.",
-            "ArgumentError",
-        )
+    bundle_path: str | None = None
+    target_path = Path(path)
 
-    # Check installed methods' exports for additional library dirs
-    try:
-        export_dirs = resolve_pipe_from_exports(pipe_code)
-    except ValueError as exc:
-        agent_error(
-            f"Ambiguous pipe code '{pipe_code}': {exc}",
-            "ArgumentError",
-            cause=exc,
-        )
-    if export_dirs:
-        if library_dir is None:
-            library_dir = export_dirs
+    if target_path.is_dir():
+        # Directory mode: auto-detect bundle file
+        bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
+        if bundle_file.is_file():
+            bundle_path = str(bundle_file)
         else:
-            library_dir = [*export_dirs, *library_dir]
+            mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
+            if len(mthds_files) == 0:
+                agent_error(f"No .mthds bundle file found in directory '{path}'", "FileNotFoundError")
+            if len(mthds_files) > 1:
+                mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
+                agent_error(
+                    f"Multiple .mthds files found in '{path}' ({mthds_names}) and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
+                    f"Pass the .mthds file directly instead.",
+                    "ArgumentError",
+                )
+            bundle_path = str(mthds_files[0])
 
+        # Add directory as library dir
+        target_dir_str = str(target_path)
+        if library_dir is None:
+            library_dir = [target_dir_str]
+        elif target_dir_str not in library_dir:
+            library_dir = [target_dir_str, *library_dir]
+
+    elif is_pipelex_file(target_path):
+        bundle_path = path
+    else:
+        agent_error(
+            f"'{path}' is not a .mthds file or directory. "
+            f"Use 'inputs pipe <code>' for pipe codes, or 'inputs bundle <path>' for .mthds files/directories.",
+            "ArgumentError",
+        )
+
+    pipe_code: str | None = pipe
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
     make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"])
 
     try:
-        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=None, library_dirs=library_dirs))
+        result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=Path(bundle_path), library_dirs=library_dirs))  # type: ignore[arg-type]
         agent_success(result)
 
     except FileNotFoundError as exc:
-        agent_error(f"File not found: {exc}", "FileNotFoundError", cause=exc)
+        agent_error(f"Bundle file not found: {bundle_path}", "FileNotFoundError", cause=exc)
 
     except ValidateBundleError as exc:
         validation_errors = extract_validation_errors(exc)
@@ -81,7 +101,6 @@ def inputs_pipe_cmd(
         agent_error(exc.message, "ValidateBundleError", cause=exc, **extra)
 
     except NoInputsRequiredError as exc:
-        # Not really an error - just a pipe with no inputs
         agent_success(
             {
                 "success": True,

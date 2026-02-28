@@ -43,7 +43,7 @@ The pipe builder generates three files in a numbered directory (e.g., `results/p
 **Option 1: CLI**
 
 ```bash
-pipelex run results/cv_match.mthds --inputs inputs.json
+pipelex run bundle results/cv_match.mthds --inputs inputs.json
 ```
 
 The `--inputs` file should be a JSON dictionary where keys are input variable names and values are the input data. Learn more on how to provide the inputs of a pipe: [Providing Inputs to Pipelines](../../home/6-build-reliable-ai-workflows/pipes/provide-inputs.md)

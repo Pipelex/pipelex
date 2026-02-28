@@ -111,12 +111,12 @@ The Pipe Builder is in active development and currently:
 
 After generating your pipeline:
 
-1. **Validate it**: `pipelex validate your_pipe.mthds` - See [Validate Commands](../validate.md)
-2. **Run it**: `pipelex run your_pipe.mthds` - See [Run Command](../run.md)
-3. **Generate a runner**: `pipelex build runner your_pipe.mthds` - See [Build Runner](runner.md)
+1. **Validate it**: `pipelex validate bundle your_pipe.mthds` - See [Validate Commands](../validate.md)
+2. **Run it**: `pipelex run bundle your_pipe.mthds` - See [Run Command](../run.md)
+3. **Generate a runner**: `pipelex build runner bundle your_pipe.mthds` - See [Build Runner](runner.md)
 4. **Generate structures**: `pipelex build structures ./` - See [Build Structures](structures.md)
-5. **Generate input template**: `pipelex build inputs your_pipe.mthds` - See [Build Inputs](inputs.md)
-6. **View output structure**: `pipelex build output your_pipe.mthds` - See [Build Output](output.md)
+5. **Generate input template**: `pipelex build inputs bundle your_pipe.mthds` - See [Build Inputs](inputs.md)
+6. **View output structure**: `pipelex build output bundle your_pipe.mthds` - See [Build Output](output.md)
 
 ## Related Documentation
 

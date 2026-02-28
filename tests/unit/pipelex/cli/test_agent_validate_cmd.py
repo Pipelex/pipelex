@@ -1,4 +1,4 @@
-"""Unit tests for the agent CLI validate command."""
+"""Unit tests for the agent CLI validate bundle command."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 import typer
 
-from pipelex.cli.agent_cli.commands.validate.pipe_cmd import validate_pipe_cmd
+from pipelex.cli.agent_cli.commands.validate.bundle_cmd import validate_bundle_cmd
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.exceptions import PipelineExecutionError
 
@@ -17,11 +17,11 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-VALIDATE_CMD_MODULE = "pipelex.cli.agent_cli.commands.validate.pipe_cmd"
+VALIDATE_BUNDLE_CMD_MODULE = "pipelex.cli.agent_cli.commands.validate.bundle_cmd"
 
 
-class TestValidateCmd:
-    """Tests for the validate command error handling."""
+class TestValidateBundleCmd:
+    """Tests for the validate bundle command error handling."""
 
     def test_graph_generation_failure_emits_single_json_error(
         self,
@@ -40,8 +40,8 @@ class TestValidateCmd:
         mthds_file = tmp_path / "bundle.mthds"
         mthds_file.write_text('[bundle]\nmain_pipe = "my_pipe"\n[domain]\ncode = "test"')
 
-        mocker.patch(f"{VALIDATE_CMD_MODULE}.make_pipelex_for_agent_cli")
-        mocker.patch(f"{VALIDATE_CMD_MODULE}.Pipelex.teardown_if_needed")
+        mocker.patch(f"{VALIDATE_BUNDLE_CMD_MODULE}.make_pipelex_for_agent_cli")
+        mocker.patch(f"{VALIDATE_BUNDLE_CMD_MODULE}.Pipelex.teardown_if_needed")
 
         # Bundle validation succeeds
         validation_result: dict[str, Any] = {
@@ -51,7 +51,7 @@ class TestValidateCmd:
             "total_pipes": 1,
         }
         mocker.patch(
-            f"{VALIDATE_CMD_MODULE}.validate_bundle_core",
+            f"{VALIDATE_BUNDLE_CMD_MODULE}.validate_bundle_core",
             new=mocker.AsyncMock(return_value=validation_result),
         )
 
@@ -64,14 +64,14 @@ class TestValidateCmd:
             pipe_stack=["my_pipe"],
         )
         mocker.patch(
-            f"{VALIDATE_CMD_MODULE}.generate_graph_for_bundle",
+            f"{VALIDATE_BUNDLE_CMD_MODULE}.generate_graph_for_bundle",
             new=mocker.AsyncMock(side_effect=graph_error),
         )
 
         with pytest.raises(typer.Exit) as exc_info:
-            validate_pipe_cmd(
+            validate_bundle_cmd(
                 ctx=agent_ctx,
-                target=str(mthds_file),
+                path=str(mthds_file),
                 graph=True,
             )
 

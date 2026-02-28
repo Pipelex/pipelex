@@ -1,5 +1,22 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Inputs path resolution** — Relative file paths (e.g., `"url": "data/invoice.pdf"`) inside `inputs.json` are now resolved relative to the inputs file's parent directory, making bundle directories self-contained and portable. Applies to both user and agent CLIs. Handles HTTP, data:, pipelex-storage://, and absolute paths by leaving them unchanged.
+
+### Changed
+
+- **`pipelex-agent init` defaults to local project** — The `init` command now targets the project-level `.pipelex/` directory by default (at detected project root) instead of auto-detecting. The `--local` flag has been removed. Use `--global`/`-g` to target `~/.pipelex/`. Errors out if no project root is found without `-g`.
+- **`pipelex-agent doctor` supports `--global`/`-g`** — The `doctor` command now accepts `--global`/`-g` to check the global `~/.pipelex/` directory. Without the flag, it auto-detects project `.pipelex/` if present, else falls back to `~/.pipelex/`.
+- **`pipelex-agent init --config` improved help** — The `--config` option help text now shows the JSON schema with field types upfront for better discoverability.
+
+### Fixed
+
+- **`pipelex-agent init -g` service agreement** — The `--global` flag now correctly writes the gateway service terms acceptance (`pipelex_service.toml`) to the target directory instead of always writing to the auto-detected config dir.
+- **Deterministic file discovery order** — `find_files_in_dir` now sorts `rglob`/`glob` results for consistent ordering across platforms and Python versions. On Linux with Python < 3.13, `rglob` returned filesystem-order results, which could cause `test_validate_all` to fail by picking up a test package's `METHODS.toml` before pipelex internal bundles.
+
 ## [v0.18.1] - 2026-02-25
 
 ### Fixed

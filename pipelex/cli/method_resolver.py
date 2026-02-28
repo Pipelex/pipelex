@@ -126,17 +126,10 @@ def resolve_pipe_from_exports(
         Library dirs if the pipe code was found in an installed method, None otherwise.
 
     Raises:
-        typer.Exit: If the pipe code is found in multiple methods (ambiguous).
+        ValueError: If the pipe code is found in multiple methods (ambiguous).
     """
     try:
         method = _find_method_by_exported_pipe(pipe_code)
         return [str(method.path)]
     except LookupError:
         return None
-    except ValueError as exc:
-        typer.secho(
-            f"Ambiguous pipe code '{pipe_code}': {exc}",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1) from exc

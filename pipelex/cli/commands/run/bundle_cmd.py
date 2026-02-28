@@ -5,16 +5,20 @@ from typing import Annotated
 
 import typer
 
+from pipelex.builder.conventions import DEFAULT_BUNDLE_FILE_NAME, DEFAULT_INPUTS_FILE_NAME
 from pipelex.cli.commands.run._run_core import COMMAND, execute_run
-from pipelex.cli.method_resolver import resolve_pipe_from_exports
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 
 
-def run_pipe_cmd(
-    pipe_code: Annotated[
+def run_bundle_cmd(
+    path: Annotated[
         str,
-        typer.Argument(help="Pipe code to run"),
+        typer.Argument(help="Path to a .mthds bundle file or a pipeline directory"),
     ],
+    pipe: Annotated[
+        str | None,
+        typer.Option("--pipe", help="Pipe code to run (overrides bundle's main_pipe)"),
+    ] = None,
     inputs: Annotated[
         str | None,
         typer.Option("--inputs", "-i", help="Path to JSON file with inputs"),
@@ -66,25 +70,15 @@ def run_pipe_cmd(
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times."),
     ] = None,
 ) -> None:
-    """Run a pipe by code.
+    """Run a pipeline from a bundle file (.mthds) or pipeline directory.
 
     Examples:
-        pipelex run pipe my_pipe
-        pipelex run pipe my_pipe --inputs data.json
-        pipelex run pipe my_pipe --dry-run
-        pipelex run pipe my_pipe --dry-run --mock-inputs
+        pipelex run bundle pipeline_01/
+        pipelex run bundle pipeline_01/ --pipe my_pipe
+        pipelex run bundle my_bundle.mthds
+        pipelex run bundle my_bundle.mthds --pipe my_pipe --inputs data.json
+        pipelex run bundle pipeline_01/ --dry-run
     """
-    # Helpful error if the user passes a path instead of a pipe code
-    target_path = Path(pipe_code)
-    if target_path.is_dir() or is_pipelex_file(target_path) or pipe_code.endswith(MTHDS_EXTENSION):
-        typer.secho(
-            f"Failed to run: '{pipe_code}' looks like a file path or directory.\n"
-            f"  To run from a bundle or directory, use: pipelex run bundle {pipe_code}",
-            fg=typer.colors.RED,
-            err=True,
-        )
-        raise typer.Exit(1)
-
     # Validate --mock-inputs requires --dry-run
     if mock_inputs and not dry_run:
         typer.secho(
@@ -94,25 +88,66 @@ def run_pipe_cmd(
         )
         raise typer.Exit(1)
 
-    # Check installed methods' exports for additional library dirs
-    try:
-        extra_dirs = resolve_pipe_from_exports(pipe_code)
-    except ValueError as exc:
+    pipe_code: str | None = pipe
+    bundle_path: str | None = None
+    target_path = Path(path)
+
+    if target_path.is_dir():
+        # Directory mode: auto-detect bundle and inputs
+        bundle_file = target_path / DEFAULT_BUNDLE_FILE_NAME
+        if bundle_file.is_file():
+            bundle_path = str(bundle_file)
+        else:
+            mthds_files = list(target_path.glob(f"*{MTHDS_EXTENSION}"))
+            if len(mthds_files) == 0:
+                typer.secho(
+                    f"Failed to run: no .mthds bundle file found in directory '{path}'",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+            if len(mthds_files) > 1:
+                mthds_names = ", ".join(mthds_file.name for mthds_file in mthds_files)
+                typer.secho(
+                    f"Failed to run: multiple .mthds files found in '{path}' ({mthds_names}) "
+                    f"and no '{DEFAULT_BUNDLE_FILE_NAME}'. "
+                    f"Pass the .mthds file directly, e.g.: pipelex run bundle {target_path / mthds_files[0].name}",
+                    fg=typer.colors.RED,
+                    err=True,
+                )
+                raise typer.Exit(1)
+            bundle_path = str(mthds_files[0])
+
+        # Auto-detect inputs if --inputs not explicitly provided
+        inputs_file = target_path / DEFAULT_INPUTS_FILE_NAME
+        if not inputs and inputs_file.is_file():
+            inputs = str(inputs_file)
+            typer.echo(f"Auto-detected inputs: {inputs}")
+
+        # Add directory as library dir
+        target_dir_str = str(target_path)
+        if library_dir is None:
+            library_dir = [target_dir_str]
+        elif target_dir_str not in library_dir:
+            library_dir = [target_dir_str, *library_dir]
+
+        typer.echo(f"Auto-detected bundle: {bundle_path}")
+
+    elif is_pipelex_file(target_path):
+        bundle_path = path
+    else:
         typer.secho(
-            f"Ambiguous pipe code '{pipe_code}': {exc}",
+            f"Failed to run: '{path}' is not a .mthds file or directory.\n"
+            f"  To run a pipe by code, use: pipelex run pipe <code>\n"
+            f"  To run a bundle, pass a .mthds file or directory: pipelex run bundle <path>",
             fg=typer.colors.RED,
             err=True,
         )
-        raise typer.Exit(1) from exc
-    if extra_dirs:
-        if library_dir is None:
-            library_dir = extra_dirs
-        else:
-            library_dir = [*extra_dirs, *library_dir]
+        raise typer.Exit(1)
 
     execute_run(
         pipe_code=pipe_code,
-        bundle_path=None,
+        bundle_path=bundle_path,
         inputs=inputs,
         save_working_memory=save_working_memory,
         working_memory_path=working_memory_path,
@@ -124,5 +159,5 @@ def run_pipe_cmd(
         dry_run=dry_run,
         mock_inputs=mock_inputs,
         library_dir=library_dir,
-        telemetry_command_label=f"{COMMAND} pipe",
+        telemetry_command_label=f"{COMMAND} bundle",
     )

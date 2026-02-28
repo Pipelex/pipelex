@@ -154,6 +154,21 @@ class QualifiedRef(BaseModel):
         return self.domain_path != domain
 
     @staticmethod
+    def is_address_based_alias(alias: str) -> bool:
+        """True if alias looks like a package address (contains '/').
+
+        Regular aliases (e.g., "documents") never contain '/'.
+        Address-based aliases (e.g., "github.com/Pipelex/methods/documents") always do.
+
+        Args:
+            alias: The alias string to check
+
+        Returns:
+            True if the alias contains '/'
+        """
+        return "/" in alias
+
+    @staticmethod
     def has_cross_package_prefix(raw: str) -> bool:
         """Check if a raw reference string contains the cross-package '->' prefix.
 

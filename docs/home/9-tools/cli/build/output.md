@@ -4,54 +4,101 @@ Generate output representation for a pipe, showing the expected output structure
 
 ## Usage
 
+### By pipe code
+
 ```bash
-pipelex build output <TARGET> [OPTIONS]
+pipelex build output pipe <PIPE_CODE> [OPTIONS]
 ```
 
 **Arguments:**
 
-- `TARGET` - Either a pipe code or a bundle file path (`.mthds`) - auto-detected
+- `PIPE_CODE` - The pipe code (e.g. `my_domain.my_pipe`)
 
 **Options:**
 
-- `--pipe` - Pipe code to use (can be omitted if you specify a bundle that declares a `main_pipe`)
 - `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
-- `--output`, `-o` - Path to save the generated file (defaults to bundle's directory if bundle provided, otherwise `results/`)
+- `--output`, `-o` - Path to save the generated file (defaults to `results/`)
 - `--format`, `-f` - Output format (default: `json`):
     - `json` - JSON object with example placeholder data
     - `python` - Python class instantiation code
     - `schema` - JSON Schema definition, ideal for generating TypeScript interfaces or Zod schemas
 
+### From a bundle
+
+```bash
+pipelex build output bundle <PATH> [OPTIONS]
+```
+
+**Arguments:**
+
+- `PATH` - Path to a `.mthds` bundle file or a pipeline directory
+
+**Options:**
+
+- `--pipe` - Pipe code to use (can be omitted if the bundle declares a `main_pipe`)
+- `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+- `--output`, `-o` - Path to save the generated file (defaults to bundle's directory)
+- `--format`, `-f` - Output format (default: `json`): `json`, `python`, or `schema`
+
+### From an installed method
+
+```bash
+pipelex build output method <NAME> [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Name of the installed method
+
+**Options:**
+
+- `--pipe` - Pipe code (overrides method's `main_pipe`)
+- `--library-dir`, `-L` - Directory to search for pipe definitions. Can be specified multiple times.
+- `--output`, `-o` - Path to save the generated file
+- `--format`, `-f` - Output format (default: `json`): `json`, `python`, or `schema`
+
 ## Examples
+
+**Generate output for a pipe by code:**
+
+```bash
+pipelex build output pipe my_domain.my_pipe
+```
 
 **Generate output from a bundle (uses main_pipe):**
 
 ```bash
-pipelex build output my_bundle.mthds
+pipelex build output bundle my_bundle.mthds
 ```
 
-**Generate JSON Schema for TypeScript/Zod integration:**
+**Generate JSON Schema from a bundle for TypeScript/Zod integration:**
 
 ```bash
-pipelex build output my_bundle.mthds --format schema
+pipelex build output bundle my_bundle.mthds --format schema
+```
+
+**Generate output from a pipeline directory:**
+
+```bash
+pipelex build output bundle pipeline_01/
 ```
 
 **Specify which pipe to use from a bundle:**
 
 ```bash
-pipelex build output my_bundle.mthds --pipe my_pipe
+pipelex build output bundle my_bundle.mthds --pipe my_pipe
 ```
 
 **Generate output for a pipe using a library directory:**
 
 ```bash
-pipelex build output my_domain.my_pipe -L ./my_library/
+pipelex build output pipe my_domain.my_pipe -L ./my_library/
 ```
 
 **Custom output path:**
 
 ```bash
-pipelex build output my_bundle.mthds --output expected_output.json
+pipelex build output bundle my_bundle.mthds --output expected_output.json
 ```
 
 ## Output Formats

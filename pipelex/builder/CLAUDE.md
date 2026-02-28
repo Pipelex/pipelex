@@ -85,15 +85,6 @@ The loop applies these fixes automatically when validation fails:
 
 After fixing, `_prune_unreachable_specs()` removes pipes unreachable from `main_pipe` and their unused concepts.
 
-## Integration with Agent CLI
-
-The `build` command in `pipelex/cli/agent_cli/commands/build_cmd.py` calls `build_pipe_core()` from `build_core.py`, which:
-
-1. Runs a "builder pipe" (itself a Pipelex pipeline) that generates a `PipelexBundleSpec`
-2. Passes it to `BuilderLoop.build_and_fix()`
-3. Converts the result to MTHDS via `MthdsFactory.make_mthds_content()`
-4. Saves to `pipelex-wip/` with incremental naming
-
 ## Talent System
 
 Talents are abstract capability labels mapped to concrete model presets. Each talent enum (in `talents/`) maps to a `$preset` code used in MTHDS files. When modifying talents, update both the enum and its preset mapping dict.

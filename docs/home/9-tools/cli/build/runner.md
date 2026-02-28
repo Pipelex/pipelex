@@ -4,13 +4,15 @@ Generate Python code to run a pipe with all necessary imports and example inputs
 
 ## Usage
 
+### From a bundle
+
 ```bash
-pipelex build runner <TARGET> [OPTIONS]
+pipelex build runner bundle <PATH> [OPTIONS]
 ```
 
 **Arguments:**
 
-- `TARGET` - Bundle file path (`.mthds`)
+- `PATH` - Path to a `.mthds` bundle file or a pipeline directory
 
 **Options:**
 
@@ -18,30 +20,52 @@ pipelex build runner <TARGET> [OPTIONS]
 - `--output`, `-o` - Path to save the generated Python file (defaults to target's directory)
 - `--library-dirs`, `-L` - Directories to search for pipe definitions. Can be specified multiple times.
 
+### From an installed method
+
+```bash
+pipelex build runner method <NAME> [OPTIONS]
+```
+
+**Arguments:**
+
+- `NAME` - Name of the installed method
+
+**Options:**
+
+- `--pipe` - Pipe code (overrides method's `main_pipe`)
+- `--output`, `-o` - Path to save the generated Python file
+- `--library-dirs`, `-L` - Directories to search for pipe definitions. Can be specified multiple times.
+
 ## Examples
 
 **Generate runner from a bundle (uses main_pipe):**
 
 ```bash
-pipelex build runner my_bundle.mthds
+pipelex build runner bundle my_bundle.mthds
+```
+
+**Generate runner from a pipeline directory:**
+
+```bash
+pipelex build runner bundle pipeline_01/
 ```
 
 **Specify which pipe to use from a bundle:**
 
 ```bash
-pipelex build runner my_bundle.mthds --pipe my_pipe
+pipelex build runner bundle my_bundle.mthds --pipe my_pipe
 ```
 
 **With additional library directories:**
 
 ```bash
-pipelex build runner my_bundle.mthds -L ./shared_pipes/ -L ./common/
+pipelex build runner bundle my_bundle.mthds -L ./shared_pipes/ -L ./common/
 ```
 
 **Custom output path:**
 
 ```bash
-pipelex build runner my_bundle.mthds --output custom_runner.py
+pipelex build runner bundle my_bundle.mthds --output custom_runner.py
 ```
 
 ## What Gets Generated
@@ -77,4 +101,3 @@ After generating the runner file:
 - [Build Inputs](inputs.md) - Generate example input JSON for a pipe
 - [Build Output](output.md) - Generate example output JSON for a pipe
 - [Run Command](../run.md) - Run pipes directly from CLI
-
