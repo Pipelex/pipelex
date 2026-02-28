@@ -1,0 +1,31 @@
+pipelex/deep_flow/tprl_content_generation/act_jinja2_generate.py
+  ad2c17abd9a824b4 5,11
+pipelex/deep_flow/test_extras/wf_test_child_pipe.py
+  ad2c17abd9a824b4 4-5,9,11,31-44,46,49-50,53,62-75,77,80-81,84
+pipelex/deep_flow/tprl_pipe/wf_pipe_router.py
+  ad2c17abd9a824b4 7,17
+tests/integration/pipelex/deep_flow/test_data.py
+  ad2c17abd9a824b4 1,3-4,23,31,36,44
+pipelex/deep_flow/tprl_pipe/pipe_router_top.py
+  ad2c17abd9a824b4 16-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "59965c3cca4bbb16da664e30f93f306c884a8f04",
+  "prompts": {
+    "ad2c17abd9a824b4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "08872c3b-5b86-4dc3-9a17-276137b1aff5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 73,
+      "total_deletions": 62,
+      "accepted_lines": 56,
+      "overriden_lines": 0
+    }
+  }
+}
