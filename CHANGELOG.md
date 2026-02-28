@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.18.3] - 2026-02-27
+
+- Updated `pipelex-tools` dependency to `0.2.1`
+
 ## [v0.18.2] - 2026-02-27
 
 ### Added

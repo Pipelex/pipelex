@@ -4,12 +4,12 @@ Machine-first CLI for running and validating Pipelex method bundles (`.mthds` fi
 
 ## Companion: Agent Skills
 
-The CLI is consumed by 6 Claude skills defined in a separate repo. Changes to the CLI often require corresponding skill updates, and vice versa.
+The CLI is consumed by a set of Claude skills defined in a separate repo. Changes to the CLI often require corresponding skill updates, and vice versa.
 
-- Skills repo: `../agent-skills/skills/` (relative to project root)
-- Skills: `run`, `check`, `edit`, `fix`, `explain`, `synthesize-inputs`
+- Skills repo: `../skills/skills/` (relative to project root)
+- Skills: `mthds-build`, `mthds-check`, `mthds-edit`, `mthds-explain`, `mthds-fix`, `mthds-inputs`, `mthds-install`, `mthds-pkg`, `mthds-run`
 - Each skill is a `SKILL.md` with optional `references/` dir
-- Shared reference docs: `../agent-skills/skills/shared/` (`error-handling.md`, `pipelex-agent-guide.md`, `pipelex-reference.md`, `prerequisites.md`)
+- Shared reference docs: `../skills/skills/shared/` (`error-handling.md`, `mthds-agent-guide.md`, `mthds-reference.md`, `native-content-types.md`)
 
 When changing CLI command signatures, output schemas, or error types, check whether the affected skills need updating.
 
@@ -75,5 +75,5 @@ commands/
 - **Error classification**: Each error type maps to a domain (`input`, `config`, `runtime`), a hint string, and a `retryable` flag. See `AGENT_ERROR_HINTS` dict in `agent_output.py`.
 - **Init**: All commands that need Pipelex use `make_pipelex_for_agent_cli(library_dirs)`. It catches init errors and routes them through `agent_error()`.
 - **Async core**: Run and validate are async — commands use `asyncio.run()`.
-- **File convention**: Generated outputs go to `pipelex-wip/` with incremental naming (`pipeline_01/`, `pipeline_02/`).
+- **File convention**: Generated outputs go to `mthds-wip/` with incremental naming (`pipeline_01/`, `pipeline_02/`).
 - **TOML handling**: Uses `tomlkit` (not `tomllib`) to preserve formatting and inline tables.

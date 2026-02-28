@@ -928,8 +928,8 @@ vg: view-graph
 c: format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived regenerate-test-models-quiet c
-	@echo "> done: cc = cleanderived regenerate-test-models format lint pyright pylint mypy"
+cc: cleanderived regenerate-test-models-quiet generate-mthds-schema c
+	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema format lint pyright pylint mypy"
 
 up: generate-mthds-schema update-gateway-models up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
