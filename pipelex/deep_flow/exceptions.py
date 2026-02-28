@@ -1,11 +1,11 @@
-from pipelex.tools.exceptions import RootException
+from pipelex.base_exceptions import PipelexError
 
 
-class DeepFlowError(RootException):
+class DeepFlowError(PipelexError):
     pass
 
 
-class WorkflowInputError(RootException):
+class WorkflowInputError(PipelexError):
     pass
 
 

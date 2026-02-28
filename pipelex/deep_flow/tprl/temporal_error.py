@@ -2,9 +2,9 @@ from typing import Self
 
 from temporalio.exceptions import ApplicationError
 
+from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.deep_flow.log_temporal import workflow_log
-from pipelex.tools.exceptions import RootException
 
 
 class TemporalError(ApplicationError):
@@ -28,13 +28,13 @@ class TemporalError(ApplicationError):
         )
 
     @classmethod
-    def from_message_exception(cls, exc: RootException) -> Self:
+    def from_message_exception(cls, exc: PipelexError) -> Self:
         message = exc.message
         error_type = exc.__class__.__name__
         if error_type in get_config().deep_flow.worker_config.retry_policy_config.non_retryable_error_types:
-            workflow_log.critical(f"Non retryable error from RootException[{error_type}]: {message}")
+            workflow_log.critical(f"Non retryable error from PipelexError[{error_type}]: {message}")
         else:
-            workflow_log.critical(f"Critical error from RootException[{error_type}]: {message}")
+            workflow_log.critical(f"Critical error from PipelexError[{error_type}]: {message}")
         return cls(
             message=message,
             error_type=error_type,

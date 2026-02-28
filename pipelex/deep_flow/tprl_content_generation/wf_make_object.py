@@ -3,8 +3,8 @@ from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.assignment_models import ObjectAssignment, TextThenObjectAssignment
-from pipelex.tools.exceptions import RootException
 
 with workflow.unsafe.imports_passed_through():
     from pydantic import BaseModel
@@ -23,7 +23,6 @@ with workflow.unsafe.imports_passed_through():
         act_llm_gen_object_list,
         act_llm_gen_text,
     )
-    from pipelex.tools.exceptions import RootException
 
 
 @workflow.defn(name="wf_make_object")
@@ -113,7 +112,7 @@ class WfMakeTextThenObject(WorkflowClass[TextThenObjectAssignment, BaseModel]):
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
             )
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")
@@ -159,7 +158,7 @@ class WfMakeTextThenObjectList(WorkflowClass[TextThenObjectAssignment, list[Base
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
             )
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ActivityError as exc:
             log.error(f"ActivityError caused by: {exc.cause}")

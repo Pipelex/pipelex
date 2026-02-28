@@ -6,33 +6,35 @@ from temporalio.exceptions import ApplicationError, ChildWorkflowError
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.assignment_models import (
-    ImggAssignment,
-    Jinja2Assignment,
+    ExtractAssignment,
+    ImgGenAssignment,
     LLMAssignment,
     LLMAssignmentFactory,
     ObjectAssignment,
-    OcrAssignment,
+    TemplatingAssignment,
     TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.extract.extract_output import ExtractOutput
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
-from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.cogt.ocr.ocr_output import OcrOutput
+from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.model_backends.prompting_target import PromptingTarget
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.config import get_config
 from pipelex.deep_flow.exceptions import ContentGenerationError
 from pipelex.deep_flow.tprl.temporal_error import TemporalError
 from pipelex.deep_flow.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.deep_flow.tprl_content_generation.content_generator_models import AssignmentType, ResultType
+from pipelex.deep_flow.tprl_content_generation.wf_make_extract import WfMakeOcr
 from pipelex.deep_flow.tprl_content_generation.wf_make_images import WfMakeImages
 from pipelex.deep_flow.tprl_content_generation.wf_make_jinja2_text import WfMakeJinja2Text
 from pipelex.deep_flow.tprl_content_generation.wf_make_llm_text import WfMakeLLMText
@@ -42,12 +44,8 @@ from pipelex.deep_flow.tprl_content_generation.wf_make_object import (
     WfMakeTextThenObject,
     WfMakeTextThenObjectList,
 )
-from pipelex.deep_flow.tprl_content_generation.wf_make_ocr import WfMakeOcr
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.exceptions import RootException
-from pipelex.tools.runtime_manager import WorkerMode, runtime_manager
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
+from pipelex.system.runtime import WorkerMode, runtime_manager
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -98,7 +96,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 )
             )
 
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError caused by: {exc.cause}")
@@ -139,7 +137,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                     workflow_id=make_child_workflow_id(base_id=wfid or "craft-object-direct"),
                 )
             )
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError caused by: {exc.cause}")
@@ -171,7 +169,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             llm_assignment_factory_to_object = LLMAssignmentFactory(
                 job_metadata=job_metadata,
                 llm_setting=llm_setting_for_object,
-                llm_prompt_factory=llm_prompt_factory_for_object or LLMPromptTemplate.for_structure_from_preliminary_text(),
+                llm_prompt_factory=llm_prompt_factory_for_object or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
             )
             tto_assignment = TextThenObjectAssignment(
                 object_class_name=object_class.__name__,
@@ -188,7 +186,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                     workflow_id=make_child_workflow_id(base_id=wfid or "craft-text-then-object"),
                 )
             )
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError caused by: {exc.cause}")
@@ -254,7 +252,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             llm_assignment_factory_to_object = LLMAssignmentFactory(
                 job_metadata=job_metadata,
                 llm_setting=llm_setting_for_object_list,
-                llm_prompt_factory=llm_prompt_factory_for_object_list or LLMPromptTemplate.for_structure_from_preliminary_text(),
+                llm_prompt_factory=llm_prompt_factory_for_object_list or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
             )
             tto_assignment = TextThenObjectAssignment(
                 object_class_name=object_class.__name__,
@@ -271,7 +269,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                     workflow_id=make_child_workflow_id(base_id=wfid or "craft-text-then-object-list"),
                 )
             )
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError caused by: {exc.cause}")
@@ -286,30 +284,30 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
     async def make_single_image(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
-        imgg_prompt: ImggPrompt,
-        imgg_job_params: ImggJobParams | None = None,
-        imgg_job_config: ImggJobConfig | None = None,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
         wfid: str | None = None,
-    ) -> GeneratedImage:
-        imgg_config = get_config().cogt.imgg_config
+    ) -> GeneratedImageRawDetails:
+        img_gen_config = get_config().cogt.img_gen_config
         try:
             # We're using workflowWfMakeImages which can generate several images but we're asking for only one
-            imgg_assignment = ImggAssignment(
+            img_gen_assignment = ImgGenAssignment(
                 job_metadata=job_metadata,
-                imgg_handle=imgg_handle,
-                imgg_prompt=imgg_prompt,
-                imgg_job_params=imgg_job_params or imgg_config.make_default_imgg_job_params(),
-                imgg_job_config=imgg_job_config or imgg_config.imgg_job_config,
+                img_gen_handle=img_gen_handle,
+                img_gen_prompt=img_gen_prompt,
+                img_gen_job_params=img_gen_job_params or img_gen_config.make_default_img_gen_job_params(),
+                img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
                 nb_images=1,
             )
 
             generated_image_list = (
-                await WorkflowExecutorFactory[ImggAssignment, list[GeneratedImage]]
+                await WorkflowExecutorFactory[ImgGenAssignment, list[GeneratedImageRawDetails]]
                 .create_executor()
                 .execute_child_workflow(
                     workflow_class=WfMakeImages,
-                    workflow_arg=imgg_assignment,
+                    workflow_arg=img_gen_assignment,
                     workflow_id=make_child_workflow_id(base_id=wfid or "craft-image"),
                 )
             )
@@ -317,7 +315,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 msg = f"Expected 1 image, got {len(generated_image_list)}"
                 raise ContentGenerationError(msg)
             generated_image = generated_image_list[0]
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError caused by: {exc.cause}")
@@ -332,34 +330,34 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
     async def make_image_list(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
-        imgg_prompt: ImggPrompt,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
         nb_images: int,
-        imgg_job_params: ImggJobParams | None = None,
-        imgg_job_config: ImggJobConfig | None = None,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
         wfid: str | None = None,
-    ) -> list[GeneratedImage]:
-        imgg_config = get_config().cogt.imgg_config
+    ) -> list[GeneratedImageRawDetails]:
+        img_gen_config = get_config().cogt.img_gen_config
         try:
-            imgg_assignment = ImggAssignment(
+            img_gen_assignment = ImgGenAssignment(
                 job_metadata=job_metadata,
-                imgg_handle=imgg_handle,
-                imgg_prompt=imgg_prompt,
-                imgg_job_params=imgg_job_params or imgg_config.make_default_imgg_job_params(),
-                imgg_job_config=imgg_job_config or imgg_config.imgg_job_config,
+                img_gen_handle=img_gen_handle,
+                img_gen_prompt=img_gen_prompt,
+                img_gen_job_params=img_gen_job_params or img_gen_config.make_default_img_gen_job_params(),
+                img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
                 nb_images=nb_images,
             )
 
             generated_image_list = (
-                await WorkflowExecutorFactory[ImggAssignment, list[GeneratedImage]]
+                await WorkflowExecutorFactory[ImgGenAssignment, list[GeneratedImageRawDetails]]
                 .create_executor()
                 .execute_child_workflow(
                     workflow_class=WfMakeImages,
-                    workflow_arg=imgg_assignment,
+                    workflow_arg=img_gen_assignment,
                     workflow_id=make_child_workflow_id(base_id=wfid or "craft-image"),
                 )
             )
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError caused by: {exc.cause}")
@@ -375,11 +373,11 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
         context: dict[str, Any],
         jinja2_name: str | None = None,
         jinja2: str | None = None,
-        prompting_style: PromptingStyle | None = None,
+        prompting_style: PromptingTarget | None = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
         wfid: str | None = None,
     ) -> str:
-        jinja2_assignment = Jinja2Assignment(
+        jinja2_assignment = TemplatingAssignment(
             context=context,
             jinja2_name=jinja2_name,
             jinja2=jinja2,
@@ -387,7 +385,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             template_category=template_category,
         )
         jinja2_text = (
-            await WorkflowExecutorFactory[Jinja2Assignment, str]
+            await WorkflowExecutorFactory[TemplatingAssignment, str]
             .create_executor()
             .execute_child_workflow(
                 workflow_class=WfMakeJinja2Text,
@@ -399,39 +397,39 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
         return jinja2_text
 
     @override
-    async def make_ocr_extract_pages(
+    async def make_extract_extract_pages(
         self,
         job_metadata: JobMetadata,
-        ocr_input: OcrInput,
-        ocr_handle: OcrHandle,
-        ocr_job_params: OcrJobParams | None = None,
-        ocr_job_config: OcrJobConfig | None = None,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
+        extract_job_config: ExtractJobConfig | None = None,
         wfid: str | None = None,
-    ) -> OcrOutput:
+    ) -> ExtractOutput:
         try:
-            ocr_assignment = OcrAssignment(
+            extract_assignment = ExtractAssignment(
                 job_metadata=job_metadata,
-                ocr_handle=ocr_handle,
-                ocr_input=ocr_input,
-                ocr_job_params=ocr_job_params or OcrJobParams.make_default_ocr_job_params(),
-                ocr_job_config=ocr_job_config or OcrJobConfig(),
+                extract_handle=extract_handle,
+                extract_input=extract_input,
+                extract_job_params=extract_job_params or ExtractJobParams.make_default_extract_job_params(),
+                extract_job_config=extract_job_config or ExtractJobConfig(),
             )
 
-            ocr_output = (
-                await WorkflowExecutorFactory[OcrAssignment, OcrOutput]
+            extract_output = (
+                await WorkflowExecutorFactory[ExtractAssignment, ExtractOutput]
                 .create_executor()
                 .execute_child_workflow(
                     workflow_class=WfMakeOcr,
-                    workflow_arg=ocr_assignment,
-                    workflow_id=make_child_workflow_id(base_id=wfid or "ocr"),
+                    workflow_arg=extract_assignment,
+                    workflow_id=make_child_workflow_id(base_id=wfid or "extract"),
                 )
             )
-        except RootException as exc:
+        except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ChildWorkflowError as exc:
             log.error(f"ChildWorkflowError caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
-        log.verbose(f"ContentGeneratorChild generated ocr output: {ocr_output}")
-        return ocr_output
+        log.verbose(f"ContentGeneratorChild generated extract output: {extract_output}")
+        return extract_output

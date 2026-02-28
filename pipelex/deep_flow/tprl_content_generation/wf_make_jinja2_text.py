@@ -1,13 +1,13 @@
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
 
-from pipelex.cogt.content_generation.assignment_models import Jinja2Assignment
+from pipelex.cogt.content_generation.assignment_models import TemplatingAssignment
 
 with workflow.unsafe.imports_passed_through():
     from typing_extensions import override
 
     from pipelex.cogt.content_generation.assignment_models import (
-        Jinja2Assignment,
+        TemplatingAssignment,
     )
     from pipelex.config import get_config
     from pipelex.deep_flow.log_temporal import workflow_log
@@ -19,12 +19,12 @@ with workflow.unsafe.imports_passed_through():
 
 
 @workflow.defn(name="wf_make_jinja2_text")
-class WfMakeJinja2Text(WorkflowClass[Jinja2Assignment, str]):
+class WfMakeJinja2Text(WorkflowClass[TemplatingAssignment, str]):
     @override
     @workflow.run
     async def run(
         self,
-        workflow_arg: Jinja2Assignment,
+        workflow_arg: TemplatingAssignment,
     ) -> str:
         workflow_log.debug("Workflow start")
         worker_config = get_config().deep_flow.worker_config

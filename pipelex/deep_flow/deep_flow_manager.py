@@ -27,7 +27,7 @@ from pipelex.deep_flow.temporal_types import (
 )
 from pipelex.deep_flow.test_extras.deep_flow_registry_test_models import DeepFlowTestModels
 from pipelex.hub import get_class_registry
-from pipelex.tools.runtime_manager import WorkerMode, runtime_manager
+from pipelex.system.runtime import WorkerMode, runtime_manager
 
 
 def is_in_temporal_sandbox() -> bool:

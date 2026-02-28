@@ -2,19 +2,19 @@ from typing import Union
 
 from pydantic import BaseModel
 
-from pipelex.cogt.content_generation.assignment_models import ImggAssignment, LLMAssignment, ObjectAssignment, TextThenObjectAssignment
-from pipelex.cogt.image.generated_image import GeneratedImage
+from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment, LLMAssignment, ObjectAssignment, TextThenObjectAssignment
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 
 AssignmentType = Union[
     LLMAssignment,
     ObjectAssignment,
     TextThenObjectAssignment,
-    ImggAssignment,
+    ImgGenAssignment,
 ]
 
 ResultType = Union[
     str,
     BaseModel,
     list[BaseModel],
-    GeneratedImage,
+    GeneratedImageRawDetails,
 ]

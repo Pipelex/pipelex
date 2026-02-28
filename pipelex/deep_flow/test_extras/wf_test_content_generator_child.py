@@ -1,23 +1,19 @@
 from temporalio import workflow
 
 from pipelex import pretty_print
+from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
-from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.hub import get_llm_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 
 with workflow.unsafe.imports_passed_through():
     from tests.test_data import PipeTestCases
 
     from pipelex import pretty_print
+    from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.llm.llm_prompt import LLMPrompt
-    from pipelex.cogt.ocr.ocr_handle import OcrHandle
-    from pipelex.cogt.ocr.ocr_input import OcrInput
     from pipelex.deep_flow.log_temporal import workflow_log
     from pipelex.deep_flow.test_extras.deep_flow_registry_test_models import Person
     from pipelex.deep_flow.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
-    from pipelex.hub import get_llm_deck
     from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -119,7 +115,7 @@ class WfTestContentGeneratorChild:
         #     job_metadata=JobMetadata(
         #         job_name=workflow.info().workflow_type,
         #     ),
-        #     imgg_prompt=ImggPrompt(positive_text=POSITIVE_TEXT_FOR_IMAGE),
+        #     img_gen_prompt=ImgGenPrompt(positive_text=POSITIVE_TEXT_FOR_IMAGE),
         # )
         # pretty_print(crafted_image, title="craft_image")
         context = {
@@ -133,13 +129,13 @@ class WfTestContentGeneratorChild:
 
         workflow_log.debug("Workflow complete")
 
-        ocr_output = await child_crafter.make_ocr_extract_pages(
-            ocr_input=OcrInput(
+        extract_output = await child_crafter.make_extract_extract_pages(
+            extract_input=ExtractInput(
                 image_uri=PipeTestCases.IMG_EXPENSE_REPORT_1,
             ),
-            ocr_handle=OcrHandle.MISTRAL_OCR,
+            extract_handle="mistral_ocr",
             job_metadata=JobMetadata(
                 job_name=workflow.info().workflow_type,
             ),
         )
-        pretty_print(ocr_output, title="make_ocr_extract_pages")
+        pretty_print(extract_output, title="make_extract_extract_pages")

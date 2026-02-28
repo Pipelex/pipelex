@@ -5,32 +5,32 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import (
-    ImggAssignment,
-    Jinja2Assignment,
+    ExtractAssignment,
+    ImgGenAssignment,
     LLMAssignment,
     LLMAssignmentFactory,
     ObjectAssignment,
-    OcrAssignment,
+    TemplatingAssignment,
     TextThenObjectAssignment,
 )
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol, update_job_metadata
-from pipelex.cogt.image.generated_image import GeneratedImage
-from pipelex.cogt.imgg.imgg_handle import ImggHandle
-from pipelex.cogt.imgg.imgg_job_components import ImggJobConfig, ImggJobParams
-from pipelex.cogt.imgg.imgg_prompt import ImggPrompt
-from pipelex.cogt.llm.llm_models.llm_setting import LLMSetting
+from pipelex.cogt.extract.extract_input import ExtractInput
+from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
+from pipelex.cogt.extract.extract_output import ExtractOutput
+from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
 from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template import LLMPromptTemplate
-from pipelex.cogt.ocr.ocr_handle import OcrHandle
-from pipelex.cogt.ocr.ocr_input import OcrInput
-from pipelex.cogt.ocr.ocr_job_components import OcrJobConfig, OcrJobParams
-from pipelex.cogt.ocr.ocr_output import OcrOutput
+from pipelex.cogt.llm.llm_setting import LLMSetting
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.config import get_config
 from pipelex.deep_flow.exceptions import ContentGenerationError
 from pipelex.deep_flow.tprl.conditional_worker import with_conditional_worker
 from pipelex.deep_flow.tprl.workflow_caller import WorkflowExecutor
 from pipelex.deep_flow.tprl_content_generation.content_generator_models import AssignmentType, ResultType
+from pipelex.deep_flow.tprl_content_generation.wf_make_extract import WfMakeOcr
 from pipelex.deep_flow.tprl_content_generation.wf_make_images import WfMakeImages
 from pipelex.deep_flow.tprl_content_generation.wf_make_jinja2_text import WfMakeJinja2Text
 from pipelex.deep_flow.tprl_content_generation.wf_make_llm_text import WfMakeLLMText
@@ -40,10 +40,8 @@ from pipelex.deep_flow.tprl_content_generation.wf_make_object import (
     WfMakeTextThenObject,
     WfMakeTextThenObjectList,
 )
-from pipelex.deep_flow.tprl_content_generation.wf_make_ocr import WfMakeOcr
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.tools.templating.jinja2_template_category import Jinja2TemplateCategory
-from pipelex.tools.templating.templating_models import PromptingStyle
+from pipelex.tools.templating.templating_models import PromptingTarget
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -242,27 +240,27 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
     async def make_single_image(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
-        imgg_prompt: ImggPrompt,
-        imgg_job_params: ImggJobParams | None = None,
-        imgg_job_config: ImggJobConfig | None = None,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
         wfid: str | None = None,
-    ) -> GeneratedImage:
+    ) -> GeneratedImageRawDetails:
         workflow_id = self.make_workflow_id(base_id=wfid or "craft-image")
-        imgg_config = get_config().cogt.imgg_config
+        img_gen_config = get_config().cogt.img_gen_config
         # We're using workflowWfMakeImages which can generate several images but we're asking for only one
-        imgg_assignment = ImggAssignment(
+        img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
-            imgg_handle=imgg_handle,
-            imgg_prompt=imgg_prompt,
-            imgg_job_params=imgg_job_params or imgg_config.make_default_imgg_job_params(),
-            imgg_job_config=imgg_job_config or imgg_config.imgg_job_config,
+            img_gen_handle=img_gen_handle,
+            img_gen_prompt=img_gen_prompt,
+            img_gen_job_params=img_gen_job_params or img_gen_config.make_default_img_gen_job_params(),
+            img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
             nb_images=1,
         )
         temporal_client = await self.temporal_client()
         generated_image_list = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
             workflow=WfMakeImages.run,
-            arg=imgg_assignment,
+            arg=img_gen_assignment,
             id=workflow_id,
             task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
@@ -281,28 +279,28 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
     async def make_image_list(  # pyright: ignore[reportIncompatibleMethodOverride]
         self,
         job_metadata: JobMetadata,
-        imgg_handle: ImggHandle,
-        imgg_prompt: ImggPrompt,
+        img_gen_handle: str,
+        img_gen_prompt: ImgGenPrompt,
         nb_images: int,
-        imgg_job_params: ImggJobParams | None = None,
-        imgg_job_config: ImggJobConfig | None = None,
+        img_gen_job_params: ImgGenJobParams | None = None,
+        img_gen_job_config: ImgGenJobConfig | None = None,
         wfid: str | None = None,
-    ) -> list[GeneratedImage]:
+    ) -> list[GeneratedImageRawDetails]:
         workflow_id = self.make_workflow_id(base_id=wfid or "craft-image")
-        imgg_config = get_config().cogt.imgg_config
+        img_gen_config = get_config().cogt.img_gen_config
         # We're using workflowWfMakeImages which can generate several images but we're asking for only one
-        imgg_assignment = ImggAssignment(
+        img_gen_assignment = ImgGenAssignment(
             job_metadata=job_metadata,
-            imgg_handle=imgg_handle,
-            imgg_prompt=imgg_prompt,
-            imgg_job_params=imgg_job_params or imgg_config.make_default_imgg_job_params(),
-            imgg_job_config=imgg_job_config or imgg_config.imgg_job_config,
+            img_gen_handle=img_gen_handle,
+            img_gen_prompt=img_gen_prompt,
+            img_gen_job_params=img_gen_job_params or img_gen_config.make_default_img_gen_job_params(),
+            img_gen_job_config=img_gen_job_config or img_gen_config.img_gen_job_config,
             nb_images=nb_images,
         )
         temporal_client = await self.temporal_client()
         generated_image_list = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
             workflow=WfMakeImages.run,
-            arg=imgg_assignment,
+            arg=img_gen_assignment,
             id=workflow_id,
             task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
@@ -318,12 +316,12 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         context: dict[str, Any],
         jinja2_name: str | None = None,
         jinja2: str | None = None,
-        prompting_style: PromptingStyle | None = None,
+        prompting_style: PromptingTarget | None = None,
         template_category: Jinja2TemplateCategory = Jinja2TemplateCategory.LLM_PROMPT,
         wfid: str | None = None,
     ) -> str:
         workflow_id = self.make_workflow_id(base_id=wfid or "jinja2-text")
-        jinja2_assignment = Jinja2Assignment(
+        jinja2_assignment = TemplatingAssignment(
             context=context,
             jinja2_name=jinja2_name,
             jinja2=jinja2,
@@ -341,31 +339,31 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         return jinja2_text
 
     @override
-    async def make_ocr_extract_pages(
+    async def make_extract_extract_pages(
         self,
         job_metadata: JobMetadata,
-        ocr_input: OcrInput,
-        ocr_handle: OcrHandle,
-        ocr_job_params: OcrJobParams | None = None,
-        ocr_job_config: OcrJobConfig | None = None,
+        extract_input: ExtractInput,
+        extract_handle: str,
+        extract_job_params: ExtractJobParams | None = None,
+        extract_job_config: ExtractJobConfig | None = None,
         wfid: str | None = None,
-    ) -> OcrOutput:
-        workflow_id = self.make_workflow_id(base_id=wfid or "ocr")
-        ocr_assignment = OcrAssignment(
+    ) -> ExtractOutput:
+        workflow_id = self.make_workflow_id(base_id=wfid or "extract")
+        extract_assignment = ExtractAssignment(
             job_metadata=job_metadata,
-            ocr_handle=ocr_handle,
-            ocr_input=ocr_input,
-            ocr_job_params=ocr_job_params or OcrJobParams.make_default_ocr_job_params(),
-            ocr_job_config=ocr_job_config or OcrJobConfig(),
+            extract_handle=extract_handle,
+            extract_input=extract_input,
+            extract_job_params=extract_job_params or ExtractJobParams.make_default_extract_job_params(),
+            extract_job_config=extract_job_config or ExtractJobConfig(),
         )
         temporal_client = await self.temporal_client()
-        ocr_output = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
+        extract_output = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
             workflow=WfMakeOcr.run,
-            arg=ocr_assignment,
+            arg=extract_assignment,
             id=workflow_id,
             task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
-        log.dev(f"TopCrafter ocr output: {ocr_output}")
-        return ocr_output
+        log.dev(f"TopCrafter extract output: {extract_output}")
+        return extract_output
