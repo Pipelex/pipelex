@@ -7,13 +7,13 @@ When running Pipelex pipelines, you need to provide input data that matches what
 The Pipelex CLI can generate a template JSON file with all the required inputs for your pipeline:
 
 ```bash
-pipelex build inputs path/to/my_pipe.mthds
+pipelex build inputs bundle path/to/my_pipe.mthds
 ```
 
 This creates a `results/inputs.json` file with the structure needed for your pipeline. You can then fill in the values and use it with:
 
 ```bash
-pipelex run path/to/my_pipe.mthds --inputs results/inputs.json
+pipelex run bundle path/to/my_pipe.mthds --inputs results/inputs.json
 ```
 
 See more about the options of the CLI [here](../../9-tools/cli/index.md).

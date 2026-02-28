@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated
 
-import click
 import typer
 
 from pipelex.cli.cli_factory import make_pipelex_for_cli
@@ -13,25 +12,15 @@ from pipelex.cli.commands.validate._validate_core import (
     execute_validate,
 )
 from pipelex.cli.error_handlers import ErrorContext
-from pipelex.core.interpreter.helpers import is_pipelex_file
+from pipelex.cli.method_resolver import resolve_pipe_from_exports
+from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.pipelex import Pipelex
 
 
 def validate_pipe_cmd(
-    target: Annotated[
+    pipe_code: Annotated[
         str | None,
-        typer.Argument(help="Pipe code or bundle file path (auto-detected based on .mthds extension)"),
-    ] = None,
-    pipe: Annotated[
-        str | None,
-        typer.Option("--pipe", help="Pipe code to validate (optional when using --bundle)"),
-    ] = None,
-    bundle: Annotated[
-        str | None,
-        typer.Option(
-            "--bundle",
-            help="Bundle file path (.mthds) - validates all pipes in the bundle",
-        ),
+        typer.Argument(help="Pipe code to validate"),
     ] = None,
     validate_all: Annotated[
         bool,
@@ -46,19 +35,17 @@ def validate_pipe_cmd(
         ),
     ] = None,
 ) -> None:
-    """Validate and dry run a pipe or a bundle or all pipes.
+    """Validate and dry run a pipe by code, or all pipes.
 
     Examples:
         pipelex validate pipe my_pipe
-        pipelex validate pipe my_bundle.mthds
-        pipelex validate pipe --bundle my_bundle.mthds
-        pipelex validate pipe --bundle my_bundle.mthds --pipe my_pipe
         pipelex validate pipe --all
+        pipelex validate pipe my_pipe -L ./my_pipes
     """
     if validate_all:
-        if target or pipe or bundle:
+        if pipe_code:
             typer.secho(
-                "Failed to validate: --all cannot be used with a target, --pipe, or --bundle",
+                "Failed to validate: --all cannot be used with a pipe code",
                 fg=typer.colors.RED,
                 err=True,
             )
@@ -74,58 +61,47 @@ def validate_pipe_cmd(
             Pipelex.teardown_if_needed()
         return
 
-    # Validate mutual exclusivity
-    provided_options = sum([target is not None, pipe is not None, bundle is not None])
-    if provided_options == 0:
-        ctx: click.Context = click.get_current_context()
-        typer.echo(ctx.get_help())
-        raise typer.Exit(0)
-
-    pipe_code: str | None = None
-    bundle_path: Path | None = None
-    library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-
-    # Determine source
-    if target:
-        target_path = Path(target)
-        if is_pipelex_file(target_path):
-            bundle_path = target_path
-            if bundle:
-                typer.secho(
-                    "Failed to validate: cannot use option --bundle if you're already passing a bundle file (.mthds) as positional argument",
-                    fg=typer.colors.RED,
-                    err=True,
-                )
-                raise typer.Exit(1)
-        else:
-            pipe_code = target
-            if pipe:
-                typer.secho(
-                    "Failed to validate: cannot use option --pipe if you're already passing a pipe code as positional argument",
-                    fg=typer.colors.RED,
-                    err=True,
-                )
-                raise typer.Exit(1)
-
-    if bundle:
-        assert not bundle_path, "bundle_path should be None at this stage if --bundle is provided"
-        bundle_path = Path(bundle)
-
-    if pipe:
-        assert not pipe_code, "pipe_code should be None at this stage if --pipe is provided"
-        pipe_code = pipe
-
-    if not pipe_code and not bundle_path:
+    if not pipe_code:
         typer.secho(
-            "Failed to validate: no pipe code or bundle file specified",
+            "Failed to validate: no pipe code specified. Use --all to validate all pipes,\n"
+            "or use 'pipelex validate bundle <path>' to validate a bundle file.",
             fg=typer.colors.RED,
             err=True,
         )
         raise typer.Exit(1)
 
+    # Helpful error if the user passes a path instead of a pipe code
+    target_path = Path(pipe_code)
+    if target_path.is_dir() or is_pipelex_file(target_path) or pipe_code.endswith(MTHDS_EXTENSION):
+        typer.secho(
+            f"Failed to validate: '{pipe_code}' looks like a file path or directory.\n"
+            f"  To validate a bundle or directory, use: pipelex validate bundle {pipe_code}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1)
+
+    # Check installed methods' exports for additional library dirs
+    try:
+        extra_dirs = resolve_pipe_from_exports(pipe_code)
+    except ValueError as exc:
+        typer.secho(
+            f"Ambiguous pipe code '{pipe_code}': {exc}",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(1) from exc
+    if extra_dirs:
+        if library_dir is None:
+            library_dir = extra_dirs
+        else:
+            library_dir = [*extra_dirs, *library_dir]
+
+    library_dirs_paths = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
+
     execute_validate(
         pipe_code=pipe_code,
-        bundle_path=bundle_path,
-        library_dirs=library_dirs,
+        bundle_path=None,
+        library_dirs=library_dirs_paths,
         telemetry_command_label=f"{COMMAND} pipe",
     )

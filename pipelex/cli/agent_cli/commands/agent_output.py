@@ -23,7 +23,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     # Execution errors
     "PipelineExecutionError": "Check 'pipe_stack' to identify which pipe failed and 'cause_type' for the root cause",
     "PipeExecutionError": "A pipe input validation failed during pipeline execution. Check the error message for the failing model and field.",
-    "BuildPipeError": "Check 'failure_memory_path' for builder loop failure diagnostics if present",
     # File/input errors
     "FileNotFoundError": "Verify the file path exists and is accessible from the current working directory",
     "ArgumentError": "Check command usage with 'pipelex-agent <command> --help'",
@@ -54,6 +53,8 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "BundleError": "Bundle must declare a 'main_pipe' or use the --pipe flag to specify which pipe to run",
     "ValidationError": "Check that spec fields match the expected schema for the given type",
     "ValueError": "Check that the provided value is valid for the parameter (e.g., --type must be a valid pipe type)",
+    # Init errors
+    "InitConfigError": "Check the --config JSON and ensure backend keys match available backends in the template",
     # Unknown command
     "UnknownCommandError": "Check 'valid_commands' in this error response for available commands",
 }
@@ -93,10 +94,10 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "RemoteConfigFetchError": "config",
     "BinaryNotFoundError": "config",
     "RemoteConfigValidationError": "config",
+    "InitConfigError": "config",
     # runtime = execution failure
     "PipelineExecutionError": "runtime",
     "PipeExecutionError": "runtime",
-    "BuildPipeError": "runtime",
 }
 
 

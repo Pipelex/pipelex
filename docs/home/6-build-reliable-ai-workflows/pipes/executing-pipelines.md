@@ -10,17 +10,17 @@ The easiest way to execute a pipeline is to point directly to your `.mthds` bund
 
 ```bash
 # Run the bundle's main_pipe
-pipelex run path/to/my_bundle.mthds
+pipelex run bundle path/to/my_bundle.mthds
 
 # Run a specific pipe from the bundle
-pipelex run path/to/my_bundle.mthds --pipe my_specific_pipe
+pipelex run bundle path/to/my_bundle.mthds --pipe my_specific_pipe
 
 # Run with inputs
-pipelex run path/to/my_bundle.mthds --inputs inputs.json
+pipelex run bundle path/to/my_bundle.mthds --inputs inputs.json
 ```
 
 !!! tip "Preparing Inputs"
-    You can generate an input template with `pipelex build inputs path/to/my_bundle.mthds`, which creates a `results/inputs.json` file with the required input structure.
+    You can generate an input template with `pipelex build inputs bundle path/to/my_bundle.mthds`, which creates a `results/inputs.json` file with the required input structure.
 
 ### Using Python
 

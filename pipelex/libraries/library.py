@@ -93,7 +93,12 @@ class Library(BaseModel):
         self.validate_pipe_library_with_libraries()
 
     def validate_pipe_library_with_libraries(self) -> None:
-        for pipe in self.pipe_library.get_pipes():
+        for pipe_key, pipe in self.pipe_library.root.items():
+            # Determine if this pipe comes from a dependency (aliased key like "alias->pipe_code")
+            dep_alias: str | None = None
+            if QualifiedRef.has_cross_package_prefix(pipe_key):
+                dep_alias, _remainder = QualifiedRef.split_cross_package_ref(pipe_key)
+
             # Validate concept dependencies exist
             # Note: This should NEVER fail as concepts are validated during pipe construction via get_required_concept()
             # TODO: Make this non mandatory in production, or a test
@@ -115,6 +120,11 @@ class Library(BaseModel):
                     # Cross-package refs that aren't loaded are validated at package level, not library level
                     if QualifiedRef.has_cross_package_prefix(sub_pipe_code) and self.pipe_library.get_optional_pipe(sub_pipe_code) is None:
                         continue
+                    # For dependency pipes, look up bare sub-pipe codes in the child library
+                    if dep_alias is not None and not QualifiedRef.has_cross_package_prefix(sub_pipe_code):
+                        child_library = self.dependency_libraries.get(dep_alias)
+                        if child_library is not None and child_library.pipe_library.get_optional_pipe(sub_pipe_code) is not None:
+                            continue
                     try:
                         self.pipe_library.get_required_pipe(pipe_code=sub_pipe_code)
                     except PipeLibraryError as pipe_error:

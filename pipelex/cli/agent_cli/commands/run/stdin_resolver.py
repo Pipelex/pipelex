@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from typing import Any, cast
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from pipelex.cli.commands.run._inputs_path_resolver import resolve_inputs_paths
 from pipelex.tools.misc.json_utils import JsonTypeError, load_json_dict_from_path
 
 WORKING_MEMORY_KEY = "working_memory"
@@ -165,7 +167,10 @@ def _parse_inputs_arg(inputs_arg: str) -> dict[str, Any] | None:
             agent_error(f"Failed to parse inline JSON inputs: {exc}", "JSONDecodeError", cause=exc)
     else:
         try:
-            return load_json_dict_from_path(inputs_arg)
+            loaded = load_json_dict_from_path(inputs_arg)
+            # Resolve relative url paths against the inputs file's parent directory
+            base_dir = Path(inputs_arg).parent.resolve()
+            return resolve_inputs_paths(loaded, base_dir)
         except FileNotFoundError as exc:
             agent_error(f"Input file not found: {inputs_arg}", "FileNotFoundError", cause=exc)
         except JsonTypeError as exc:
