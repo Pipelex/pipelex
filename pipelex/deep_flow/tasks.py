@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import ClassVar
 
 from pipelex.deep_flow.temporal_tasks import TaskPack
@@ -12,6 +11,7 @@ from pipelex.deep_flow.tprl_content_generation.wf_make_jinja2_text import WfMake
 from pipelex.deep_flow.tprl_content_generation.wf_make_llm_text import WfMakeLLMText
 from pipelex.deep_flow.tprl_content_generation.wf_make_object import WfMakeObject, WfMakeObjectList, WfMakeTextThenObject, WfMakeTextThenObjectList
 from pipelex.deep_flow.tprl_pipe.wf_pipe_router import WfPipeRouter
+from pipelex.types import StrEnum
 
 
 class PackName(StrEnum):

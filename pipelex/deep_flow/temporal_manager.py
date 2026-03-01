@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import ClassVar, Optional
 
 import shortuuid
@@ -10,6 +9,7 @@ from pipelex import log
 from pipelex.deep_flow.config_deep_flow import TemporalServerConfig
 from pipelex.deep_flow.temporal_connect import connect_to_temporal, connect_to_temporal_selected_server, connect_to_temporal_server
 from pipelex.system.runtime import RunMode, runtime_manager
+from pipelex.types import StrEnum
 
 
 class TemporalWorkerEnvironment(StrEnum):
