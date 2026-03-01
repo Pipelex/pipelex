@@ -1,13 +1,15 @@
 from datetime import timedelta
-from typing import Literal, Union
+from typing import TYPE_CHECKING, Literal, Union
 
 from pydantic import Field, model_validator
-from temporalio.common import RetryPolicy
 from typing_extensions import Self
 
 from pipelex.deep_flow.exceptions import TemporalConfigError
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.types import StrEnum
+
+if TYPE_CHECKING:
+    from temporalio.common import RetryPolicy
 
 
 class SecretMethod(StrEnum):
@@ -93,12 +95,14 @@ class RetryPolicyConfig(ConfigModel):
     maximum_attempts: Union[int, Literal["unlimited"]]
     non_retryable_error_types: list[str]
 
-    def make_retry_policy(self) -> RetryPolicy:
+    def make_retry_policy(self) -> "RetryPolicy":
         """Create a RetryPolicy instance based on the configuration.
 
         Returns:
             RetryPolicy: A configured RetryPolicy object.
         """
+        from temporalio.common import RetryPolicy as _RetryPolicy  # noqa: PLC0415
+
         maximum_attempts: int
         if self.maximum_attempts == "unlimited":
             # This is according to the Temporal SDK's documentation
@@ -113,7 +117,7 @@ class RetryPolicyConfig(ConfigModel):
         else:
             maximum_interval = self.maximum_interval
 
-        return RetryPolicy(
+        return _RetryPolicy(
             initial_interval=self.initial_interval,
             backoff_coefficient=self.backoff_coefficient,
             maximum_interval=maximum_interval,
@@ -151,7 +155,7 @@ class WorkerConfig(ConfigModel):
     retry_policy_config: RetryPolicyConfig
 
     @property
-    def retry_policy(self) -> RetryPolicy:
+    def retry_policy(self) -> "RetryPolicy":
         """Create a RetryPolicy based on the configuration.
 
         Returns:

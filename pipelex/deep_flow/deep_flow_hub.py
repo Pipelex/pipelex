@@ -15,6 +15,9 @@ class DeepFlowHub:
     def set_task_manager(self, task_manager: TaskManager):
         self._task_manager = task_manager
 
+    def reset(self):
+        self._task_manager = None
+
     # Getters
 
     def get_required_task_manager(self) -> TaskManager:
