@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, Generator
+from typing import AsyncGenerator, Generator, cast
 
 import pytest
 import pytest_asyncio
@@ -14,7 +14,8 @@ from pipelex.deep_flow.tprl_content_generation.content_generator_child import Co
 from pipelex.deep_flow.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
 from pipelex.deep_flow.tprl_content_generation.content_generator_top import ContentGeneratorTop
 from pipelex.deep_flow.tprl_content_generation.content_generator_top_factory import ContentGeneratorTopFactory
-from pipelex.hub import get_class_registry
+from pipelex.hub import get_class_registry, get_report_delegate
+from pipelex.pipeline.job_metadata import JobMetadata
 from tests.integration.pipelex.deep_flow.test_utils import rprint
 
 
@@ -66,3 +67,19 @@ def child_crafter(generated_content_factory: GeneratedContentFactory) -> Generat
     yield crafter
     # Code to run after each test
     rprint("\n[magenta]ChildCrafter teardown[/magenta]")
+
+
+@pytest.fixture
+def tprl_job_metadata(request: FixtureRequest) -> Generator[JobMetadata, None, None]:
+    """Provide a JobMetadata instance with an open reporting registry.
+
+    Uses the test function name as pipeline_run_id, matching the convention
+    used by TestTprlCrafterTop tests.
+    """
+    pipeline_run_id = cast("str", request.node.originalname)  # pyright: ignore[reportUnknownMemberType]
+    get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
+    yield JobMetadata(
+        user_id="test",
+        pipeline_run_id=pipeline_run_id,
+    )
+    get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)

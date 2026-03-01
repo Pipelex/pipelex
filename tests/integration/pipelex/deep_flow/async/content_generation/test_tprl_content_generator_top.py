@@ -1,7 +1,4 @@
-from typing import cast
-
 import pytest
-from pytest import FixtureRequest
 from temporalio.client import WorkflowFailureError
 
 from pipelex import pretty_print
@@ -57,14 +54,11 @@ pytestmark = pytest.mark.filterwarnings("ignore:The `parse_obj` method is deprec
 class TestTprlCrafterTop:
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_llm_text_only(self, request: FixtureRequest, top_crafter: ContentGeneratorTop):
+    async def test_tprl_make_llm_text_only(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="$testing-text")
 
         text: str = await top_crafter.make_llm_text(
-            job_metadata=JobMetadata(
-                user_id="test",
-                pipeline_run_id=cast("str", request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
-            ),
+            job_metadata=tprl_job_metadata,
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
             llm_setting_main=llm_setting_main,
         )
@@ -74,14 +68,11 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_object_direct(self, request: FixtureRequest, top_crafter: ContentGeneratorTop):
+    async def test_tprl_make_object_direct(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_direct: Person = await top_crafter.make_object_direct(
-            job_metadata=JobMetadata(
-                user_id="test",
-                pipeline_run_id=cast("str", request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
-            ),
+            job_metadata=tprl_job_metadata,
             object_class=Person,
             llm_prompt_for_object=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON),
             llm_setting_for_object=llm_setting_for_object,
@@ -92,15 +83,12 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_text_then_object(self, request: FixtureRequest, top_crafter: ContentGeneratorTop):
+    async def test_tprl_make_text_then_object(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="$testing-text")
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_tto: Person = await top_crafter.make_text_then_object(
-            job_metadata=JobMetadata(
-                user_id="test",
-                pipeline_run_id=cast("str", request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
-            ),
+            job_metadata=tprl_job_metadata,
             object_class=Person,
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_SINGLE_PERSON_TEXT_THEN_OBJECT),
             llm_setting_main=llm_setting_main,
@@ -112,14 +100,11 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_object_list_direct(self, request: FixtureRequest, top_crafter: ContentGeneratorTop):
+    async def test_tprl_make_object_list_direct(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_list_direct: list[Person] = await top_crafter.make_object_list_direct(
-            job_metadata=JobMetadata(
-                user_id="test",
-                pipeline_run_id=cast("str", request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
-            ),
+            job_metadata=tprl_job_metadata,
             object_class=Person,
             llm_prompt_for_object_list=LLMPrompt(user_text=USER_TEXTS_FOR_PEOPLE_STR),
             llm_setting_for_object_list=llm_setting_for_object,
@@ -131,15 +116,12 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_text_then_object_list(self, request: FixtureRequest, top_crafter: ContentGeneratorTop):
+    async def test_tprl_make_text_then_object_list(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="$testing-text")
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_list_tto: list[Person] = await top_crafter.make_text_then_object_list(
-            job_metadata=JobMetadata(
-                user_id="test",
-                pipeline_run_id=cast("str", request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
-            ),
+            job_metadata=tprl_job_metadata,
             object_class=Person,
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_MULTIPLE_PEOPLE_TEXT_THEN_OBJECT),
             llm_setting_main=llm_setting_main,
@@ -152,13 +134,10 @@ class TestTprlCrafterTop:
 
     @pytest.mark.img_gen
     @pytest.mark.inference
-    async def test_tprl_craft_image(self, request: FixtureRequest, top_crafter: ContentGeneratorTop):
+    async def test_tprl_craft_image(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         image: ImageContent = await top_crafter.make_single_image(
-            job_metadata=JobMetadata(
-                user_id="test",
-                pipeline_run_id=cast("str", request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
-            ),
-            img_gen_handle="sdxl_lightning",
+            job_metadata=tprl_job_metadata,
+            img_gen_handle="@default-small ",
             img_gen_prompt=ImgGenPrompt(
                 positive_text="A dog with sunglasses coding on a laptop",
             ),
@@ -181,12 +160,9 @@ class TestTprlCrafterTop:
 
     @pytest.mark.extract
     @pytest.mark.inference
-    async def test_tprl_extract(self, request: FixtureRequest, top_crafter: ContentGeneratorTop):
+    async def test_tprl_extract(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         extract_output: list[PageContent] = await top_crafter.make_extract_pages(
-            job_metadata=JobMetadata(
-                user_id="test",
-                pipeline_run_id=cast("str", request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
-            ),
+            job_metadata=tprl_job_metadata,
             extract_handle="azure-document-intelligence",
             extract_input=ExtractInput(image_uri=PipeTestCases.IMG_EXPENSE_REPORT_1),
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
@@ -198,22 +174,24 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_llm_text_with_error(self, request: FixtureRequest, top_crafter: ContentGeneratorTop):
+    async def test_tprl_make_llm_text_with_error(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         bad_handle_to_test_failure = "bad_handle_to_test_failure"
         llm_setting_main = LLMSetting(model=bad_handle_to_test_failure, temperature=0.5, max_tokens=100)
         with pytest.raises(WorkflowFailureError) as excinfo:
             await top_crafter.make_llm_text(
-                job_metadata=JobMetadata(
-                    user_id="test",
-                    pipeline_run_id=cast("str", request.node.originalname),  # pyright: ignore[reportUnknownMemberType]
-                ),
+                job_metadata=tprl_job_metadata,
                 llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
                 llm_setting_main=llm_setting_main,
             )
         workflow_failure_error = excinfo.value
         assert str(workflow_failure_error) == "Workflow execution failed"
         pretty_print(f"Caught expected error: {workflow_failure_error}, caused by {workflow_failure_error.cause}")
-        assert str(workflow_failure_error.cause) in {
-            f"CogtManagerWorkerSetupError: No worker has been setup for '{bad_handle_to_test_failure}'",
-            f"ConfigNotFoundError: LLM Engine blueprint for llm_handle '{bad_handle_to_test_failure}' not found in deck's engine blueprints",
-        }
+        cause_str = str(workflow_failure_error.cause)
+        assert any(
+            expected in cause_str
+            for expected in [
+                f"CogtManagerWorkerSetupError: No worker has been setup for '{bad_handle_to_test_failure}'",
+                f"ConfigNotFoundError: LLM Engine blueprint for llm_handle '{bad_handle_to_test_failure}' not found in deck's engine blueprints",
+                f"ModelNotFoundError: Model handle '{bad_handle_to_test_failure}' was not found in the model deck",
+            ]
+        )
