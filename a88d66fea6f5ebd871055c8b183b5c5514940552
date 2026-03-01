@@ -1,0 +1,25 @@
+pipelex/cogt/model_backends/backend_library.py
+  ef6b9a8d66ba17bf 149,169-171,175-177,180-182,185-188,202-212,217-225
+pipelex/cli/commands/show_cmd.py
+  ef6b9a8d66ba17bf 82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "a88d66fea6f5ebd871055c8b183b5c5514940552",
+  "prompts": {
+    "ef6b9a8d66ba17bf": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "90d58cb2-ef81-4d88-8667-82b1285711cc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 76,
+      "total_deletions": 69,
+      "accepted_lines": 35,
+      "overriden_lines": 0
+    }
+  }
+}
