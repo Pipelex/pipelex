@@ -156,7 +156,7 @@ def graph_render_cmd(
         raise typer.Exit(1)
 
     # Initialize Pipelex (needed for logging and other utilities)
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
 
     try:
         with get_telemetry_manager().telemetry_context():

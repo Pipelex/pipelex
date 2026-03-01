@@ -22,6 +22,7 @@ from pipelex.tools.misc.pretty import PrettyPrinter, PrettyPrintMode
 def make_pipelex_for_agent_cli(
     library_dirs: list[str] | list[Path] | None = None,
     log_level: LogLevel = LogLevel.WARNING,
+    needs_inference: bool = True,
 ) -> Pipelex:
     """Initialize Pipelex for agent CLI commands with JSON error output.
 
@@ -33,6 +34,7 @@ def make_pipelex_for_agent_cli(
     Args:
         library_dirs: Optional library directories to use for the Pipelex instance.
         log_level: Log verbosity level (default WARNING for silent agent output).
+        needs_inference: When False, skip inference setup (credentials, gateway, telemetry).
 
     Returns:
         Initialized Pipelex instance.
@@ -41,7 +43,7 @@ def make_pipelex_for_agent_cli(
         typer.Exit: If initialization fails (after printing JSON error to stderr).
     """
     try:
-        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI, library_dirs=library_dirs)
+        pipelex_instance = Pipelex.make(integration_mode=IntegrationMode.CLI, library_dirs=library_dirs, needs_inference=needs_inference)
     except TelemetryConfigValidationError as exc:
         agent_error(exc.message, "TelemetryConfigValidationError", cause=exc)
     except GatewayTermsNotAcceptedError as exc:
