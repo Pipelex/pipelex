@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
+from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.types import Self, StrEnum
@@ -111,4 +112,4 @@ class ImgGenJobConfig(ConfigModel):
 
 
 class ImgGenJobReport(ConfigModel):
-    pass
+    img_gen_tokens_usage: ImgGenTokensUsage | None = None
