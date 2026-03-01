@@ -1,0 +1,42 @@
+pipelex/deep_flow/temporal_manager.py
+  273802151fdd6231 126
+pipelex/deep_flow/test_helpers/deep_flow_pytest_plugins.py
+  ff56556da17d9dbb 14
+pipelex/cli/commands/show_cmd.py
+  273802151fdd6231 274
+pipelex/deep_flow/tprl_content_generation/wf_make_images.py
+  ff56556da17d9dbb 13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "a4e3730bbf599c9919b1fe284945d10840643cef",
+  "prompts": {
+    "273802151fdd6231": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1ab4481-ed44-45d4-a645-c7803d3c0ee1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "ff56556da17d9dbb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0915171f-885d-414f-b4ec-ba744c8aa36c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 2,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
