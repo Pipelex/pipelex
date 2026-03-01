@@ -1,10 +1,6 @@
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
 
-from pipelex import log
-from pipelex.cogt.content_generation.assignment_models import ExtractAssignment
-from pipelex.cogt.extract.extract_output import ExtractOutput
-
 with workflow.unsafe.imports_passed_through():
     from typing_extensions import override
 

@@ -53,13 +53,6 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
     This extends the :py:class:`JSONPlainPayloadConverter` to override :py:meth:`to_payload`.
     """
 
-    def _unijson_serialize_to_payload(self, value: Any) -> Payload:
-        payload_str: str = kajson.dumps(value)
-        return Payload(
-            metadata={"encoding": self.encoding.encode()},
-            data=payload_str.encode(),
-        )
-
     @override
     def to_payload(self, value: Any) -> Payload | None:
         if isinstance(value, BaseModel):

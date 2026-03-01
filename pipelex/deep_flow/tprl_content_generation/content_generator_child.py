@@ -490,6 +490,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
         return page_view_images_resolved
 
     @override
+    @update_job_metadata
     async def make_extract_pages(
         self,
         job_metadata: JobMetadata,
