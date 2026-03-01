@@ -157,6 +157,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self,
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
+        temporal_enabled: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -176,6 +177,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if kwargs:
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
+
+        # Override deep_flow.is_enabled if temporal_enabled is explicitly provided
+        if temporal_enabled is not None:
+            config = get_config()
+            updated_deep_flow = config.deep_flow.model_copy(update={"is_enabled": temporal_enabled})
+            config.deep_flow = updated_deep_flow
+
+        self._deep_flow_manager: object | None = None
 
         # Initialize secrets provider early - needed for gateway check
         secrets_provider = secrets_provider or EnvSecretsProvider()
@@ -352,13 +361,48 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
 
+        # --- Deep Flow (Temporal) --------------------------------------------------------------
+
+        if get_config().deep_flow.is_enabled:
+            from pipelex.deep_flow.deep_flow_hub import deep_flow_hub  # noqa: PLC0415
+            from pipelex.deep_flow.deep_flow_manager import DeepFlowManager  # noqa: PLC0415
+            from pipelex.deep_flow.tasks import Tasks  # noqa: PLC0415
+
+            deep_flow_manager = DeepFlowManager()
+            deep_flow_hub.set_task_manager(deep_flow_manager)
+            deep_flow_manager.complement_catalog(
+                extra_catalog=Tasks.TASK_PACKS,
+                extra_workflows=[],
+                extra_activities=[],
+            )
+            deep_flow_manager.setup()
+            self._deep_flow_manager = deep_flow_manager
+
         # --- Pipe Router -----------------------------------------------------------------------
 
-        self.pipelex_hub.set_pipe_router(pipe_router or PipeRouter(observer=multi_observer))
+        effective_pipe_router: PipeRouterProtocol
+        if pipe_router:
+            effective_pipe_router = pipe_router
+        elif get_config().deep_flow.is_enabled:
+            from pipelex.deep_flow.tprl_pipe.pipe_router_top import make_tprl_pipe_router_top  # noqa: PLC0415
+
+            effective_pipe_router = make_tprl_pipe_router_top()
+        else:
+            effective_pipe_router = PipeRouter(observer=multi_observer)
+        self.pipelex_hub.set_pipe_router(effective_pipe_router)
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     def teardown(self):
+        # deep flow
+        if self._deep_flow_manager is not None:
+            from pipelex.deep_flow.deep_flow_hub import deep_flow_hub  # noqa: PLC0415
+            from pipelex.deep_flow.deep_flow_manager import DeepFlowManager  # noqa: PLC0415
+
+            if isinstance(self._deep_flow_manager, DeepFlowManager):
+                self._deep_flow_manager.teardown()
+            deep_flow_hub.reset()
+
         # pipelex
         self.pipeline_manager.teardown()
         if self.telemetry_manager:
@@ -395,6 +439,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         cls,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
+        temporal_enabled: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -422,6 +467,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 content generator and loading backends leniently (skipping those with missing
                 credentials). This skips gateway terms check and model deck validation.
                 Useful for commands like validate/show that don't call inference APIs.
+            temporal_enabled: When provided, overrides the deep_flow.is_enabled config value.
+                True forces Temporal workflow execution, False forces direct execution.
             class_registry: Custom class registry for dynamic loading
             secrets_provider: Custom secrets/credentials provider
             storage_provider: Custom storage backend
@@ -455,6 +502,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipelex_instance.setup(
                 integration_mode=integration_mode,
                 needs_inference=needs_inference,
+                temporal_enabled=temporal_enabled,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
                 storage_provider=storage_provider,

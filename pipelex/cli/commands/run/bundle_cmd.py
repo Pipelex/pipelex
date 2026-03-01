@@ -69,6 +69,10 @@ def run_bundle_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times."),
     ] = None,
+    temporal: Annotated[
+        bool | None,
+        typer.Option("--temporal/--no-temporal", help="Override config: enable or disable Temporal workflow execution"),
+    ] = None,
 ) -> None:
     """Run a pipeline from a bundle file (.mthds) or pipeline directory.
 
@@ -160,4 +164,5 @@ def run_bundle_cmd(
         mock_inputs=mock_inputs,
         library_dir=library_dir,
         telemetry_command_label=f"{COMMAND} bundle",
+        temporal=temporal,
     )

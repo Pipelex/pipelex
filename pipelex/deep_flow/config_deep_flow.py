@@ -166,5 +166,6 @@ class WorkerConfig(ConfigModel):
 class DeepFlow(ConfigModel):
     """Main configuration model for DeepFlow."""
 
+    is_enabled: bool
     temporal_config: TemporalConfig
     worker_config: WorkerConfig

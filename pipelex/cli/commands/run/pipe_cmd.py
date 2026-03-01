@@ -65,6 +65,10 @@ def run_pipe_cmd(
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files). Can be specified multiple times."),
     ] = None,
+    temporal: Annotated[
+        bool | None,
+        typer.Option("--temporal/--no-temporal", help="Override config: enable or disable Temporal workflow execution"),
+    ] = None,
 ) -> None:
     """Run a pipe by code.
 
@@ -125,4 +129,5 @@ def run_pipe_cmd(
         mock_inputs=mock_inputs,
         library_dir=library_dir,
         telemetry_command_label=f"{COMMAND} pipe",
+        temporal=temporal,
     )

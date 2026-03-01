@@ -461,6 +461,9 @@ preferred_agent_target = "claude"
 # Deep Flow Config
 ####################################################################################################
 
+[deep_flow]
+is_enabled = false
+
 [deep_flow.worker_config]
 task_queue = "deep_flow_task_queue"
 workflow_execution_timeout = "1:00:00"

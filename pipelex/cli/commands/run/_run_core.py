@@ -244,12 +244,13 @@ def execute_run(
     mock_inputs: bool,
     library_dir: list[str] | None,
     telemetry_command_label: str = COMMAND,
+    temporal: bool | None = None,
 ) -> None:
     """Synchronous entry point that wraps the async execution with Pipelex setup/teardown.
 
     Shared between the ``method`` and ``pipe`` subcommands.
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, library_dirs=library_dir)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, library_dirs=library_dir, temporal_enabled=temporal)
 
     try:
         with get_telemetry_manager().telemetry_context():

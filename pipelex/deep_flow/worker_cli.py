@@ -56,6 +56,14 @@ def configure(
     project_class = getattr(project_module, project_class_name)
     project_class.make()
 
+    # Force-enable Temporal when running as a worker, regardless of config
+    from pipelex.config import get_config  # noqa: PLC0415
+
+    if not get_config().deep_flow.is_enabled:
+        log.warning("deep_flow.is_enabled is false in config, but forcing it on for worker mode")
+        updated_deep_flow = get_config().deep_flow.model_copy(update={"is_enabled": True})
+        get_config().deep_flow = updated_deep_flow
+
     asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue))
 
 
