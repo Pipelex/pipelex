@@ -1,0 +1,27 @@
+tests/integration/pipelex/deep_flow/async/content_generation/test_tprl_content_generator_top.py
+  7e928a839d3bc8c9 57,61,71,75,86,91,103,107,119,124,137,139,163,165,177,182,189-192,194-197
+tests/integration/pipelex/deep_flow/async/content_generation/conftest.py
+  7e928a839d3bc8c9 1,17-18,70-85
+tests/integration/pipelex/deep_flow/async/content_generation/test_tprl_content_generator_child.py
+  7e928a839d3bc8c9 1-2,6-7,9,17-25,28-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "a97177b8fbdf03cd21b387d6eabfa98f602d7d3b",
+  "prompts": {
+    "7e928a839d3bc8c9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6a3e23d1-c0fa-45cc-b86f-18fd08edb558",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 227,
+      "total_deletions": 225,
+      "accepted_lines": 121,
+      "overriden_lines": 0
+    }
+  }
+}
