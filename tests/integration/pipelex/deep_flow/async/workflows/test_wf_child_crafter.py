@@ -13,9 +13,8 @@ from pipelex.deep_flow.test_extras.wf_test_content_generator_child import WfTest
 @pytest.mark.asyncio(loop_scope="class")
 @pytest.mark.temporal
 class TestWfChildCrafter:
-    async def test_wf_child_craft(self, temporal_client: TemporalClient):
+    async def test_wf_child_craft(self, temporal_client: TemporalClient, workflow_run_id: str):
         task_queue = str(uuid.uuid4())
-        workflow_id = str(uuid.uuid4())
         async with get_task_manager().make_worker(
             temporal_client,
             task_queue=task_queue,
@@ -25,6 +24,6 @@ class TestWfChildCrafter:
         ):
             await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
                 workflow=WfTestContentGeneratorChild.run,
-                id=workflow_id,
+                id=workflow_run_id,
                 task_queue=task_queue,
             )

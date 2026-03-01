@@ -1,11 +1,14 @@
-from typing import AsyncGenerator, cast
+import uuid
+from typing import AsyncGenerator, Generator, cast
 
+import pytest
 import pytest_asyncio
 from pytest import FixtureRequest, Parser
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 
 from pipelex.deep_flow.temporal_data_converter import data_converter
+from pipelex.hub import get_report_delegate
 
 
 def pytest_addoption(parser: Parser):
@@ -38,3 +41,16 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
 @pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
 async def temporal_client(env: WorkflowEnvironment) -> Client:  # noqa: RUF029
     return env.client
+
+
+@pytest.fixture
+def workflow_run_id() -> Generator[str, None, None]:
+    """Provide a workflow run ID with an open reporting registry.
+
+    Opens a registry for the run ID before the test and closes it after,
+    mirroring the job_metadata fixture pattern.
+    """
+    run_id = str(uuid.uuid4())
+    get_report_delegate().open_registry(pipeline_run_id=run_id)
+    yield run_id
+    get_report_delegate().close_registry(pipeline_run_id=run_id)

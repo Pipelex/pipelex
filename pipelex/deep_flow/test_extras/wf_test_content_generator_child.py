@@ -127,7 +127,7 @@ class WfTestContentGeneratorChild:
             extract_input=ExtractInput(
                 image_uri=PipeTestCases.IMG_EXPENSE_REPORT_1,
             ),
-            extract_handle="mistral_ocr",
+            extract_handle="azure-document-intelligence",
             job_metadata=job_metadata,
             extract_job_params=ExtractJobParams.make_default_extract_job_params(),
             extract_job_config=ExtractJobConfig(),
