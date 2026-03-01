@@ -79,6 +79,7 @@ def do_show_backends(show_all: bool = False) -> None:
                 backends_library_path=config_manager.backends_file_path,
                 backends_dir_path=config_manager.backends_dir_path,
                 include_disabled=True,
+                lenient=True,
             )
         else:
             backend_library = models_manager.inference_backend_library
@@ -271,7 +272,7 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS, needs_inference=False)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS)
 
     try:
         with get_telemetry_manager().telemetry_context():

@@ -146,77 +146,83 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                     key_name=unknown_var_prefix_exc.var_name,
                 ) from unknown_var_prefix_exc
 
-            for backend_blueprint_key in backend_dict:
-                if backend_blueprint_key not in backend_blueprint_standard_fields:
-                    extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
-            backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
+            try:
+                for backend_blueprint_key in backend_dict:
+                    if backend_blueprint_key not in backend_blueprint_standard_fields:
+                        extra_config[backend_blueprint_key] = inference_backend_blueprint_dict.pop(backend_blueprint_key)
+                backend_blueprint = InferenceBackendBlueprint.model_validate(inference_backend_blueprint_dict)
 
-            # Handle pipelex_gateway specially - use remote config
-            backend_config_source: str
-            if PipelexBackend.is_gateway_backend(backend_name):
-                if gateway_model_specs is None:
-                    if lenient:
-                        log.verbose(f"Skipping backend '{backend_name}': gateway model specs not available")
-                        continue
-                    msg = "Pipelex Gateway backend is enabled but remote model specs were not provided"
-                    raise InferenceBackendLibraryError(msg)
-                model_specs_dict, backend_config_source = self._load_gateway_model_specs(
-                    gateway_model_specs=gateway_model_specs,
-                    backends_dir_path=backends_dir_path,
-                    substitute_vars_with_provider=substitute_vars_with_provider,
-                )
-            else:
-                model_specs_dict, backend_config_source = self._load_local_model_specs(
-                    backend_name=backend_name,
-                    backends_dir_path=backends_dir_path,
-                    substitute_vars_with_provider=substitute_vars_with_provider,
-                )
-
-            defaults_dict: dict[str, Any] = model_specs_dict.pop("defaults", {})
-            backend_model_specs: dict[str, InferenceModelSpec] = {}
-            for model_spec_name, value in model_specs_dict.items():
-                if not isinstance(value, dict):
-                    msg = f"Model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source} is not a dictionary"
-                    raise InferenceModelSpecError(msg)
-                model_spec_dict: dict[str, Any] = cast("dict[str, Any]", value)
-                try:
-                    # Start from the defaults
-                    model_spec_blueprint_dict = defaults_dict.copy()
-                    # Override with the attributes from the model spec dict
-                    model_spec_blueprint_dict.update(model_spec_dict)
-
-                    # We'll split the read settings into standard fields and extra headers
-                    extra_headers: dict[str, str] = {}
-                    for model_spec_key in model_spec_dict:
-                        if model_spec_key not in model_spec_blueprint_standard_fields:
-                            extra_headers[model_spec_key] = model_spec_blueprint_dict.pop(model_spec_key)
-                    model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_blueprint_dict)
-                    model_spec = InferenceModelSpecFactory.make_inference_model_spec(
+                # Handle pipelex_gateway specially - use remote config
+                backend_config_source: str
+                if PipelexBackend.is_gateway_backend(backend_name):
+                    if gateway_model_specs is None:
+                        if lenient:
+                            log.verbose(f"Skipping backend '{backend_name}': gateway model specs not available")
+                            continue
+                        msg = "Pipelex Gateway backend is enabled but remote model specs were not provided"
+                        raise InferenceBackendLibraryError(msg)
+                    model_specs_dict, backend_config_source = self._load_gateway_model_specs(
+                        gateway_model_specs=gateway_model_specs,
+                        backends_dir_path=backends_dir_path,
+                        substitute_vars_with_provider=substitute_vars_with_provider,
+                    )
+                else:
+                    model_specs_dict, backend_config_source = self._load_local_model_specs(
                         backend_name=backend_name,
-                        name=model_spec_name,
-                        blueprint=model_spec_blueprint,
-                        backend_listed_constraints=backend_blueprint.listed_constraints,
-                        backend_valued_constraints=backend_blueprint.valued_constraints,
-                        extra_headers=extra_headers,
+                        backends_dir_path=backends_dir_path,
+                        substitute_vars_with_provider=substitute_vars_with_provider,
                     )
-                    backend_model_specs[model_spec_name] = model_spec
-                except ValidationError as validation_error:
-                    validation_error_msg = format_pydantic_validation_error(validation_error)
-                    msg = (
-                        f"Invalid inference model spec '{model_spec_name}' for backend '{backend_name}' "
-                        f"from {backend_config_source}: {validation_error_msg}"
-                    )
-                    raise InferenceBackendLibraryError(msg) from validation_error
-                except InferenceModelSpecError as exc:
-                    msg = f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source}"
-                    raise InferenceBackendLibraryError(msg) from exc
-            backend = InferenceBackendFactory.make_inference_backend(
-                name=backend_name,
-                blueprint=backend_blueprint,
-                extra_config=extra_config,
-                model_specs=backend_model_specs,
-            )
-            self.root[backend_name] = backend
+
+                defaults_dict: dict[str, Any] = model_specs_dict.pop("defaults", {})
+                backend_model_specs: dict[str, InferenceModelSpec] = {}
+                for model_spec_name, value in model_specs_dict.items():
+                    if not isinstance(value, dict):
+                        msg = f"Model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source} is not a dictionary"
+                        raise InferenceModelSpecError(msg)
+                    model_spec_dict: dict[str, Any] = cast("dict[str, Any]", value)
+                    try:
+                        # Start from the defaults
+                        model_spec_blueprint_dict = defaults_dict.copy()
+                        # Override with the attributes from the model spec dict
+                        model_spec_blueprint_dict.update(model_spec_dict)
+
+                        # We'll split the read settings into standard fields and extra headers
+                        extra_headers: dict[str, str] = {}
+                        for model_spec_key in model_spec_dict:
+                            if model_spec_key not in model_spec_blueprint_standard_fields:
+                                extra_headers[model_spec_key] = model_spec_blueprint_dict.pop(model_spec_key)
+                        model_spec_blueprint = InferenceModelSpecBlueprint.model_validate(model_spec_blueprint_dict)
+                        model_spec = InferenceModelSpecFactory.make_inference_model_spec(
+                            backend_name=backend_name,
+                            name=model_spec_name,
+                            blueprint=model_spec_blueprint,
+                            backend_listed_constraints=backend_blueprint.listed_constraints,
+                            backend_valued_constraints=backend_blueprint.valued_constraints,
+                            extra_headers=extra_headers,
+                        )
+                        backend_model_specs[model_spec_name] = model_spec
+                    except ValidationError as validation_error:
+                        validation_error_msg = format_pydantic_validation_error(validation_error)
+                        msg = (
+                            f"Invalid inference model spec '{model_spec_name}' for backend '{backend_name}' "
+                            f"from {backend_config_source}: {validation_error_msg}"
+                        )
+                        raise InferenceBackendLibraryError(msg) from validation_error
+                    except InferenceModelSpecError as exc:
+                        msg = f"Failed to load inference model spec '{model_spec_name}' for backend '{backend_name}' from {backend_config_source}"
+                        raise InferenceBackendLibraryError(msg) from exc
+                backend = InferenceBackendFactory.make_inference_backend(
+                    name=backend_name,
+                    blueprint=backend_blueprint,
+                    extra_config=extra_config,
+                    model_specs=backend_model_specs,
+                )
+                self.root[backend_name] = backend
+            except (InferenceBackendLibraryError, InferenceModelSpecError) as exc:
+                if lenient:
+                    log.verbose(f"Skipping backend '{backend_name}': {exc}")
+                    continue
+                raise
 
     def _load_gateway_model_specs(
         self,
