@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.18.4] - 2026-03-01
+
+### Added
+
+- Introduced a **lenient loading mode** for `InferenceBackendLibrary` and `RoutingProfileLoader`: when enabled, logs warnings instead of raising errors for missing credentials, variable fallback failures, or disabled backends — skipping individual backends gracefully rather than crashing the entire load process.
+- Added `needs_inference` parameter to `Pipelex.make`, `make_pipelex_for_cli`, and `make_pipelex_for_agent_cli` to control whether full inference setup (credentials, gateway checks, telemetry) is required.
+- Added `needs_inference_in_pipelex` helper to `shared_pytest_plugins` to replace the inverted logic of the previous helper.
+
+### Changed
+
+- **CLI Robustness:** `pipelex build`, `validate`, `show`, `graph`, `inputs`, and `which` commands now run with `needs_inference=False`, allowing them to succeed even when backend credentials are missing or incomplete.
+- Refactored `Pipelex.make`: renamed `disable_inference` to `needs_inference` (default `True`). When `False`, enables lenient backend loading, uses a dummy remote config, disables telemetry, and skips `validate_model_deck()`.
+
+### Deprecated
+
+- `is_inference_disabled_in_pipelex` in `shared_pytest_plugins` — migrate to `needs_inference_in_pipelex`.
+
 ## [v0.18.3] - 2026-02-27
 
 - Updated `pipelex-tools` dependency to `0.2.1`
