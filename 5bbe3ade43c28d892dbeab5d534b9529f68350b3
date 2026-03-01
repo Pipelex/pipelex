@@ -1,0 +1,68 @@
+pipelex/deep_flow/sandbox_manager.py
+  be34ec701ff76b8c 14
+pipelex/deep_flow/tprl_pipe/wf_pipe_router.py
+  be34ec701ff76b8c 30
+pipelex/deep_flow/tprl/workflow_caller.py
+  be34ec701ff76b8c 106,135
+pipelex/deep_flow/tprl/temporal_error.py
+  be34ec701ff76b8c 36
+tests/integration/pipelex/deep_flow/synchro/test_tasks.py
+  be34ec701ff76b8c 19
+pipelex/deep_flow/tprl_content_generation/wf_make_object.py
+  be34ec701ff76b8c 44,70,96,116,162
+pipelex/deep_flow/exceptions.py
+  be34ec701ff76b8c 8,24
+pipelex/deep_flow/worker_cli.py
+  be34ec701ff76b8c 47
+pipelex/deep_flow/tprl_content_generation/content_generator_child.py
+  be34ec701ff76b8c 219,237,239-245,436,450-458
+pipelex/deep_flow/test_extras/wf_test_content_generator_child.py
+  be34ec701ff76b8c 134-135
+pipelex/deep_flow/task_manager.py
+  be34ec701ff76b8c 39
+pipelex/deep_flow/tprl/conditional_worker.py
+  be34ec701ff76b8c 25,29,32,36-37
+pipelex/deep_flow/deep_flow_manager.py
+  be34ec701ff76b8c 196-197
+tests/unit/pipelex/deep_flow/tprl/test_conditional_worker.py
+  8e2c6490bfc8c2ff 1-86
+pipelex/deep_flow/tprl_content_generation/content_generator_top.py
+  be34ec701ff76b8c 383-384
+pipelex/deep_flow/temporal_tasks.py
+  be34ec701ff76b8c 75
+pipelex/deep_flow/temporal_data_converter.py
+  be34ec701ff76b8c 101
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.6",
+  "base_commit_sha": "5bbe3ade43c28d892dbeab5d534b9529f68350b3",
+  "prompts": {
+    "8e2c6490bfc8c2ff": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3178c0d-e550-4a4b-af9a-37df0fcb0556",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 91,
+      "total_deletions": 2,
+      "accepted_lines": 86,
+      "overriden_lines": 0
+    },
+    "be34ec701ff76b8c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f699b325-6a81-4227-99c2-e295763a49e8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 88,
+      "total_deletions": 65,
+      "accepted_lines": 49,
+      "overriden_lines": 0
+    }
+  }
+}
