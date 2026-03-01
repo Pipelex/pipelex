@@ -2,6 +2,8 @@ name: Documentation Check
 
 on:
   pull_request:
+    branches:
+      - main
     paths:
       - 'docs/**'
       - 'mkdocs.yml'
