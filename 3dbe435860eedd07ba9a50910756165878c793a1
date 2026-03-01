@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "3dbe435860eedd07ba9a50910756165878c793a1",
+  "prompts": {
+    "2858adc2d4fd7e9e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b0df3e0b-0679-4a79-bda8-e7138405092a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 214,
+      "total_deletions": 0,
+      "accepted_lines": 214,
+      "overriden_lines": 0
+    }
+  }
+}
