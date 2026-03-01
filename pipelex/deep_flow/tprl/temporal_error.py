@@ -1,10 +1,9 @@
-from typing import Self
-
 from temporalio.exceptions import ApplicationError
 
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.deep_flow.log_temporal import workflow_log
+from pipelex.types import Self
 
 
 class TemporalError(ApplicationError):
