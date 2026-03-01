@@ -2,12 +2,25 @@ name: Documentation Check
 
 on:
   pull_request:
-    paths:
-      - 'docs/**'
-      - 'mkdocs.yml'
 
 jobs:
+  check-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      should-run: ${{ github.base_ref == 'main' || steps.filter.outputs.docs == 'true' }}
+    steps:
+      - uses: dorny/paths-filter@v3
+        id: filter
+        if: github.base_ref != 'main'
+        with:
+          filters: |
+            docs:
+              - 'docs/**'
+              - 'mkdocs.yml'
+
   doc-check:
+    needs: check-changes
+    if: needs.check-changes.outputs.should-run == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,4 +37,4 @@ jobs:
           pip install mkdocs==1.6.1 mkdocs-material==9.6.14 mkdocs-glightbox==0.4.0 mkdocs-meta-manager==1.1.0
 
       - name: Check documentation build
-        run: mkdocs build --strict 
+        run: mkdocs build --strict

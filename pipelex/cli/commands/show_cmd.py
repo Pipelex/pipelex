@@ -79,6 +79,7 @@ def do_show_backends(show_all: bool = False) -> None:
                 backends_library_path=config_manager.backends_file_path,
                 backends_dir_path=config_manager.backends_dir_path,
                 include_disabled=True,
+                lenient=True,
             )
         else:
             backend_library = models_manager.inference_backend_library
