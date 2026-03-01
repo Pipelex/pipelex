@@ -11,7 +11,7 @@ class SandboxManager(BaseModel):
         and in particular prevent logging with default methods.
 
         Args:
-            sandbox_callable: A function that returns a boolean indicating if it's safe to log using default methods.
+            sandbox_callable: A function that returns True if we're in a sandbox, False otherwise.
         """
         self.is_in_sandbox_callable = sandbox_callable
 

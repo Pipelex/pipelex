@@ -121,8 +121,6 @@ class WfTestContentGeneratorChild:
         )
         pretty_print(jinja2_text, title="templated_text")
 
-        workflow_log.debug("Workflow complete")
-
         page_contents = await child_crafter.make_extract_pages(
             extract_input=ExtractInput(
                 image_uri=PipeTestCases.IMG_EXPENSE_REPORT_1,
@@ -133,3 +131,5 @@ class WfTestContentGeneratorChild:
             extract_job_config=ExtractJobConfig(),
         )
         pretty_print(page_contents, title="make_extract_pages")
+
+        workflow_log.debug("Workflow complete")

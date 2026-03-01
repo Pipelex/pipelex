@@ -216,25 +216,33 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
         nb_items: int | None = None,
         wfid: str | None = None,
     ) -> list[BaseModelTypeVar]:
-        llm_assignment_for_object = LLMAssignment(
-            job_metadata=job_metadata,
-            llm_setting=llm_setting_for_object_list,
-            llm_prompt=llm_prompt_for_object_list,
-        )
-        object_assignment = ObjectAssignment.make_for_class(
-            object_class=object_class,
-            llm_assignment=llm_assignment_for_object,
-        )
-
-        obj_list = (
-            await WorkflowExecutorFactory[ObjectAssignment, list[BaseModel]]
-            .create_executor()
-            .execute_child_workflow(
-                workflow_class=WfMakeObjectList,
-                workflow_arg=object_assignment,
-                workflow_id=make_child_workflow_id(base_id=wfid or "craft-object-list-direct"),
+        try:
+            llm_assignment_for_object = LLMAssignment(
+                job_metadata=job_metadata,
+                llm_setting=llm_setting_for_object_list,
+                llm_prompt=llm_prompt_for_object_list,
             )
-        )
+            object_assignment = ObjectAssignment.make_for_class(
+                object_class=object_class,
+                llm_assignment=llm_assignment_for_object,
+            )
+
+            obj_list = (
+                await WorkflowExecutorFactory[ObjectAssignment, list[BaseModel]]
+                .create_executor()
+                .execute_child_workflow(
+                    workflow_class=WfMakeObjectList,
+                    workflow_arg=object_assignment,
+                    workflow_id=make_child_workflow_id(base_id=wfid or "craft-object-list-direct"),
+                )
+            )
+        except PipelexError as exc:
+            raise TemporalError.from_message_exception(exc) from exc
+        except ChildWorkflowError as exc:
+            log.error(f"ChildWorkflowError caused by: {exc.cause}")
+            if isinstance(exc.cause, ApplicationError):
+                raise TemporalError.from_app_error(exc=exc.cause) from exc
+            raise
         log.verbose(f"ContentGeneratorChild generated object list direct: {obj_list}")
         return cast("list[BaseModelTypeVar]", obj_list)
 
@@ -425,21 +433,29 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
         template_category: TemplateCategory | None = None,
         wfid: str | None = None,
     ) -> str:
-        templating_assignment = TemplatingAssignment(
-            context=context,
-            template=template,
-            templating_style=templating_style,
-            category=template_category or TemplateCategory.BASIC,
-        )
-        jinja2_text = (
-            await WorkflowExecutorFactory[TemplatingAssignment, str]
-            .create_executor()
-            .execute_child_workflow(
-                workflow_class=WfMakeJinja2Text,
-                workflow_arg=templating_assignment,
-                workflow_id=make_child_workflow_id(base_id=wfid or "jinja2-text"),
+        try:
+            templating_assignment = TemplatingAssignment(
+                context=context,
+                template=template,
+                templating_style=templating_style,
+                category=template_category or TemplateCategory.BASIC,
             )
-        )
+            jinja2_text = (
+                await WorkflowExecutorFactory[TemplatingAssignment, str]
+                .create_executor()
+                .execute_child_workflow(
+                    workflow_class=WfMakeJinja2Text,
+                    workflow_arg=templating_assignment,
+                    workflow_id=make_child_workflow_id(base_id=wfid or "jinja2-text"),
+                )
+            )
+        except PipelexError as exc:
+            raise TemporalError.from_message_exception(exc) from exc
+        except ChildWorkflowError as exc:
+            log.error(f"ChildWorkflowError caused by: {exc.cause}")
+            if isinstance(exc.cause, ApplicationError):
+                raise TemporalError.from_app_error(exc=exc.cause) from exc
+            raise
         log.verbose(f"ContentGeneratorChild templated text: {jinja2_text}")
         return jinja2_text
 

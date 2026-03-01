@@ -32,7 +32,6 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
             should_auto_connect_temporal=should_auto_connect_temporal,
             worker_environment=worker_environment,
         )
-        self.task_queue = task_queue
         self.observer = ObserverNoOp()
 
     @override

@@ -5,7 +5,7 @@ class DeepFlowError(PipelexError):
     pass
 
 
-class WorkflowInputError(PipelexError):
+class WorkflowInputError(DeepFlowError):
     pass
 
 
@@ -21,5 +21,5 @@ class TemporalConfigError(ValueError, DeepFlowError):
     pass
 
 
-class TemporalServerError(ValueError, DeepFlowError):
+class TemporalServerError(DeepFlowError):
     pass

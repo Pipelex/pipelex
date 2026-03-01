@@ -72,6 +72,6 @@ class TemporalTasks:
                     the_activities.add(new_activity)
         return list(the_workflows), list(the_activities)
 
-    def worklows_and_activities_str(self) -> tuple[list[str], list[str]]:
+    def workflows_and_activities_str(self) -> tuple[list[str], list[str]]:
         workflows, activities = self.workflows_and_activities(test_workflows=None, test_activities=None)
         return [str(w.__name__) for w in workflows], [str(a.__name__) for a in activities]

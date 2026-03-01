@@ -103,6 +103,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 retry_policy=self.retry_policy,
                 run_timeout=self.run_timeout,
                 task_timeout=self.task_timeout,
+                start_delay=self.start_delay,
                 rpc_timeout=self.rpc_timeout,
             )
         except Exception as exc:
@@ -131,6 +132,7 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
                 retry_policy=self.retry_policy,
                 run_timeout=self.run_timeout,
                 task_timeout=self.task_timeout,
+                start_delay=self.start_delay,
                 rpc_timeout=self.rpc_timeout,
             )
         except Exception as exc:

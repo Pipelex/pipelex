@@ -16,7 +16,7 @@ class TestTasks:
             assert required_task_pack in packs, f"Required task pack '{required_task_pack}' not found in packs"
 
     def test_required_workflows_and_activities(self):
-        workflows, activities = get_task_manager().worklows_and_activities_str()
+        workflows, activities = get_task_manager().workflows_and_activities_str()
         log.verbose(workflows, title="Workflows")
         log.verbose(activities, title="Activities")
         temporal_tasks_config = get_config().deep_flow.temporal_config.temporal_tasks_config

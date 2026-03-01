@@ -34,7 +34,7 @@ def is_in_temporal_sandbox() -> bool:
     """Check if we're in a Temporal workflow sandbox.
 
     Returns:
-        bool: True if not in a workflow sandbox, False otherwise.
+        bool: True if in a workflow sandbox, False otherwise.
     """
     return workflow.unsafe.in_sandbox()
 
@@ -193,5 +193,5 @@ class DeepFlowManager(TaskManager):
         )
 
     @override
-    def worklows_and_activities_str(self) -> tuple[list[str], list[str]]:
-        return self.temporal_tasks.worklows_and_activities_str()
+    def workflows_and_activities_str(self) -> tuple[list[str], list[str]]:
+        return self.temporal_tasks.workflows_and_activities_str()

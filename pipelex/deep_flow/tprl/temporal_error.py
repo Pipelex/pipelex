@@ -33,7 +33,7 @@ class TemporalError(ApplicationError):
         if error_type in get_config().deep_flow.worker_config.retry_policy_config.non_retryable_error_types:
             workflow_log.critical(f"Non retryable error from PipelexError[{error_type}]: {message}")
         else:
-            workflow_log.critical(f"Critical error from PipelexError[{error_type}]: {message}")
+            workflow_log.error(f"Retryable error from PipelexError[{error_type}]: {message}")
         return cls(
             message=message,
             error_type=error_type,

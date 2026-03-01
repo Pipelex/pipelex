@@ -68,7 +68,7 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
                 metadata={"encoding": self.encoding.encode()},
                 data=payload_str.encode(),
             )
-        elif isinstance(value, (list, list)) and value and isinstance(value[0], BaseModel):
+        elif isinstance(value, list) and value and isinstance(value[0], BaseModel):
             list_payload_str: str = kajson.dumps(value)
             return Payload(
                 metadata={"encoding": self.encoding.encode()},
@@ -98,7 +98,7 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
         origin = getattr(type_hint, "__origin__", None)
         args = getattr(type_hint, "__args__", None)
         log.verbose(f"Type hint origin: {origin}, args: {args}")
-        if (origin is list or origin is list) and args and len(args) == 1 and issubclass(args[0], BaseModel):
+        if origin is list and args and len(args) == 1 and issubclass(args[0], BaseModel):
             log.debug(f"Type hint is a List of BaseModel: {args[0]}")
             return self._kajson_deserialize_from_payload(payload=payload)
 

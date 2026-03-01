@@ -2,14 +2,12 @@ from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_job import PipeJob
 
 with workflow.unsafe.imports_passed_through():
     from temporalio import workflow
 
-    from pipelex import log
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.deep_flow.log_temporal import workflow_log
     from pipelex.deep_flow.tprl.temporal_error import TemporalError
@@ -29,7 +27,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         working_memory = workflow_arg.working_memory
 
         pipe = workflow_arg.pipe
-        log.verbose(f"Routing {pipe.__class__.__name__} pipe '{workflow_arg.pipe.code}': {pipe.description}")
+        workflow_log.verbose(f"Routing {pipe.__class__.__name__} pipe '{workflow_arg.pipe.code}': {pipe.description}")
 
         try:
             pipe_output = await pipe.run_pipe(

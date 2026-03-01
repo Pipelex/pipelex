@@ -2,14 +2,12 @@ from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.content_generation.assignment_models import ObjectAssignment, TextThenObjectAssignment
 
 with workflow.unsafe.imports_passed_through():
     from pydantic import BaseModel
 
-    from pipelex import log
     from pipelex.cogt.content_generation.assignment_models import (
         ObjectAssignment,
         TextThenObjectAssignment,
@@ -43,7 +41,7 @@ class WfMakeObject(WorkflowClass[ObjectAssignment, BaseModel]):
                 retry_policy=worker_config.retry_policy,
             )
         except ActivityError as exc:
-            log.error(f"ActivityError caused by: {exc.cause}")
+            workflow_log.error(f"ActivityError caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
@@ -69,7 +67,7 @@ class WfMakeObjectList(WorkflowClass[ObjectAssignment, list[BaseModel]]):
                 retry_policy=worker_config.retry_policy,
             )
         except ActivityError as exc:
-            log.error(f"ActivityError caused by: {exc.cause}")
+            workflow_log.error(f"ActivityError caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
@@ -95,7 +93,7 @@ class WfMakeTextThenObject(WorkflowClass[TextThenObjectAssignment, BaseModel]):
                 retry_policy=worker_config.retry_policy,
             )
 
-            log.dev(f"preliminary_text: {preliminary_text}")
+            workflow_log.dev(f"preliminary_text: {preliminary_text}")
 
             fup_llm_assignment = await workflow_arg.llm_assignment_factory_to_object.make_llm_assignment(
                 preliminary_text=preliminary_text,
@@ -115,7 +113,7 @@ class WfMakeTextThenObject(WorkflowClass[TextThenObjectAssignment, BaseModel]):
         except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ActivityError as exc:
-            log.error(f"ActivityError caused by: {exc.cause}")
+            workflow_log.error(f"ActivityError caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
@@ -161,7 +159,7 @@ class WfMakeTextThenObjectList(WorkflowClass[TextThenObjectAssignment, list[Base
         except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ActivityError as exc:
-            log.error(f"ActivityError caused by: {exc.cause}")
+            workflow_log.error(f"ActivityError caused by: {exc.cause}")
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise

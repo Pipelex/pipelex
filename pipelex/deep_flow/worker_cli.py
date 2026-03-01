@@ -44,7 +44,7 @@ def configure(
         runtime_manager.set_run_mode(RunMode.UNIT_TEST)
     if project is None:
         pyproject = load_toml_from_path(path="pyproject.toml")
-        project = pyproject["tool"]["poetry"]["name"]
+        project = pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name")
         if not project:
             msg = "Project name not found in pyproject.toml"
             raise ValueError(msg)

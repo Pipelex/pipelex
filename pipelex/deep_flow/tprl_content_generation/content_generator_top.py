@@ -380,6 +380,8 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             arg=templating_assignment,
             id=workflow_id,
             task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            execution_timeout=self.execution_timeout,
+            retry_policy=self.retry_policy,
         )
         log.dev(f"TopCrafter templated text: {jinja2_text}")
         return jinja2_text

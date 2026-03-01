@@ -2,11 +2,10 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Literal, Union
 
 from pydantic import Field, model_validator
-from typing_extensions import Self
 
 from pipelex.deep_flow.exceptions import TemporalConfigError
 from pipelex.system.configuration.config_model import ConfigModel
-from pipelex.types import StrEnum
+from pipelex.types import Self, StrEnum
 
 if TYPE_CHECKING:
     from temporalio.common import RetryPolicy

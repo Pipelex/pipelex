@@ -22,15 +22,19 @@ def with_conditional_worker(execute_workflow: FuncExecuteWorkflow) -> FuncExecut
         match self.worker_environment:
             case TemporalWorkerEnvironment.INTERNAL:
                 # add some random to task_queue to avoid this worker to take over other (possibly failed) tasks scheduled by preceding tests
+                original_task_queue = self.task_queue
                 self.task_queue = f"{self.task_queue}-{shortuuid.uuid()[:5]}"
 
                 temporal_client = await self.temporal_client()
-                async with get_task_manager().make_worker(
-                    temporal_client=temporal_client,
-                    task_queue=self.task_queue,
-                    is_not_sandboxed=True,
-                ):
-                    return await execute_workflow(self, *args, **kwargs)
+                try:
+                    async with get_task_manager().make_worker(
+                        temporal_client=temporal_client,
+                        task_queue=self.task_queue,
+                        is_not_sandboxed=True,
+                    ):
+                        return await execute_workflow(self, *args, **kwargs)
+                finally:
+                    self.task_queue = original_task_queue
             case TemporalWorkerEnvironment.EXTERNAL:
                 return await execute_workflow(self, *args, **kwargs)
 
