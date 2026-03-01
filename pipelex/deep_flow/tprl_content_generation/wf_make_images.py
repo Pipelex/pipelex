@@ -10,6 +10,7 @@ with workflow.unsafe.imports_passed_through():
 
     from pipelex import log
     from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
+    from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
     from pipelex.config import get_config
     from pipelex.deep_flow.log_temporal import workflow_log
     from pipelex.deep_flow.tprl.temporal_error import TemporalError

@@ -123,5 +123,5 @@ def is_in_temporal_workflow() -> bool:
         # This will raise an error if not inside a workflow
         workflow.info()
         return True
-    except TemporalError:
+    except (TemporalError, RuntimeError):
         return False

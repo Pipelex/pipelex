@@ -11,6 +11,7 @@ class DeepFlowPytestOption(StrEnum):
 def pytest_addoption(parser: Parser):
     parser.addoption(
         DeepFlowPytestOption.WORKER_ENVIRONMENT,
+        type=TemporalWorkerEnvironment,
         default=TemporalWorkerEnvironment.INTERNAL,
         help="Which temporal worker environment to use ('internal', 'external')",
     )

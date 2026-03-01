@@ -271,7 +271,7 @@ def show_models_cmd(
         pipelex show models openai
         pipelex show models anthropic --flat
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS, needs_inference=False)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_MODELS, needs_inference=True)
 
     try:
         with get_telemetry_manager().telemetry_context():
