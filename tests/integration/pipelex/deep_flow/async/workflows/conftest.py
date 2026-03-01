@@ -24,7 +24,7 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
     env_type: str = cast("str", request.config.getoption("--workflow-environment"))
     workflow_env: WorkflowEnvironment
     if env_type == "local":
-        workflow_env = await WorkflowEnvironment.start_local(data_converter=data_converter)
+        workflow_env = await WorkflowEnvironment.start_local(data_converter=data_converter)  # pyright: ignore[reportUnknownMemberType]
     elif env_type == "time-skipping":
         workflow_env = await WorkflowEnvironment.start_time_skipping(data_converter=data_converter)
     else:
