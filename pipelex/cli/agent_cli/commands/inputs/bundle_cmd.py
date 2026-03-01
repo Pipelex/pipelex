@@ -84,7 +84,7 @@ def inputs_bundle_cmd(
 
     pipe_code: str | None = pipe
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"])
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"], needs_inference=False)
 
     try:
         result = asyncio.run(inputs_core(pipe_code=pipe_code, bundle_path=Path(bundle_path), library_dirs=library_dirs))  # type: ignore[arg-type]

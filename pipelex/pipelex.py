@@ -156,7 +156,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def setup(
         self,
         integration_mode: IntegrationMode,
-        disable_inference: bool = False,
+        needs_inference: bool = True,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -189,11 +189,11 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         remote_config: RemoteConfig | None = None
         gateway_model_specs: BackendModelSpecs | None = None
         if is_pipelex_service_enabled:
-            if disable_inference:
-                # Use dummy config when inference is disabled (for testing without network access)
+            if not needs_inference:
+                # Use dummy config when inference is not needed (for testing without network access)
                 remote_config = RemoteConfigFetcher.make_dummy_remote_config()
                 gateway_model_specs = remote_config.backend_model_specs
-                log.verbose("Using dummy remote config (inference disabled)")
+                log.verbose("Using dummy remote config (inference not needed)")
             else:
                 # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
                 if integration_mode.requires_terms_acceptance:
@@ -206,8 +206,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 log.verbose("Successfully fetched Pipelex Gateway remote configuration")
                 gateway_model_specs = remote_config.backend_model_specs
 
-        # Disable Pipelex telemetry when inference is disabled (no remote config available)
-        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and not disable_inference
+        # Disable Pipelex telemetry when inference is not needed (no remote config available)
+        is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference
         self.telemetry_manager = TelemetryFactory.make_telemetry_manager(
             secrets_provider=secrets_provider,
             integration_mode=integration_mode,
@@ -268,6 +268,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
                 gateway_model_specs=gateway_model_specs,
+                needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:
             msg = self._get_config_file_not_found_error_msg("routing profile library")
@@ -301,7 +302,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             raise PipelexSetupError(error_msg) from credentials_exc
 
         if content_generator is None:
-            if disable_inference:
+            if not needs_inference:
                 content_generator = ContentGeneratorDry()
             else:
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
@@ -393,7 +394,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def make(
         cls,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
-        disable_inference: bool = False,
+        needs_inference: bool = True,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -417,9 +418,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         Args:
             integration_mode: Integration mode (CLI, FASTAPI, DOCKER, MCP, N8N, PYTHON, PYTEST)
-            disable_inference: When True, disables all inference functionality by using a mock
-                content generator. This skips gateway terms acceptance check and auto-skips
-                inference tests. Useful for CI/testing scenarios where inference is not needed.
+            needs_inference: When False, disables inference functionality by using a mock
+                content generator and loading backends leniently (skipping those with missing
+                credentials). This skips gateway terms check and model deck validation.
+                Useful for commands like validate/show that don't call inference APIs.
             class_registry: Custom class registry for dynamic loading
             secrets_provider: Custom secrets/credentials provider
             storage_provider: Custom storage backend
@@ -452,7 +454,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         try:
             pipelex_instance.setup(
                 integration_mode=integration_mode,
-                disable_inference=disable_inference,
+                needs_inference=needs_inference,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
                 storage_provider=storage_provider,
@@ -468,7 +470,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 library_dirs=library_dirs,
                 **kwargs,
             )
-            pipelex_instance.models_manager.validate_model_deck()
+            if needs_inference:
+                pipelex_instance.models_manager.validate_model_deck()
         except BaseException:
             # Cleanup the singleton instance if setup fails to avoid "already initialized" errors
             if cls in MetaSingleton.instances:

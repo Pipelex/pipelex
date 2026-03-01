@@ -79,6 +79,7 @@ def do_show_backends(show_all: bool = False) -> None:
                 backends_library_path=config_manager.backends_file_path,
                 backends_dir_path=config_manager.backends_dir_path,
                 include_disabled=True,
+                lenient=True,
             )
         else:
             backend_library = models_manager.inference_backend_library
@@ -229,7 +230,7 @@ def show_pipe_cmd(
         raise typer.Exit(1)
 
     library_dirs = [Path(lib_dir) for lib_dir in library_dir] if library_dir else None
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE, library_dirs=library_dirs)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_PIPE, library_dirs=library_dirs, needs_inference=False)
 
     try:
         library_manager = get_library_manager()
@@ -301,7 +302,7 @@ def show_backends_cmd(
         pipelex show backends
         pipelex show backends --all
     """
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_SHOW_BACKENDS, needs_inference=False)
 
     try:
         with get_telemetry_manager().telemetry_context():

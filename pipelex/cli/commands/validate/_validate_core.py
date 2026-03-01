@@ -130,7 +130,7 @@ def execute_validate(
     telemetry_command_label: str = COMMAND,
 ) -> None:
     """Synchronous entry point wrapping the async validation with Pipelex setup/teardown."""
-    make_pipelex_for_cli(context=ErrorContext.VALIDATION)
+    make_pipelex_for_cli(context=ErrorContext.VALIDATION, needs_inference=False)
 
     try:
         with get_telemetry_manager().telemetry_context():

@@ -22,6 +22,7 @@ class ModelManagerAbstract(ABC):
         self,
         secrets_provider: SecretsProviderAbstract,
         gateway_model_specs: BackendModelSpecs | None,
+        needs_inference: bool = True,
     ) -> None:
         pass
 
