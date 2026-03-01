@@ -415,6 +415,8 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         return page_view_images_resolved
 
     @override
+    @with_conditional_worker
+    @update_job_metadata
     async def make_extract_pages(
         self,
         job_metadata: JobMetadata,

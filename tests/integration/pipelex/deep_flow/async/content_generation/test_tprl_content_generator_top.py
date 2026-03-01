@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 from temporalio.client import WorkflowFailureError
 
@@ -177,12 +179,24 @@ class TestTprlCrafterTop:
     async def test_tprl_make_llm_text_with_error(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
         bad_handle_to_test_failure = "bad_handle_to_test_failure"
         llm_setting_main = LLMSetting(model=bad_handle_to_test_failure, temperature=0.5, max_tokens=100)
-        with pytest.raises(WorkflowFailureError) as excinfo:
-            await top_crafter.make_llm_text(
-                job_metadata=tprl_job_metadata,
-                llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
-                llm_setting_main=llm_setting_main,
-            )
+        # Filter out Temporal's "Completing activity as failed" traceback for this expected failure
+
+        class _ActivityFailedFilter(logging.Filter):
+            def filter(self, record: logging.LogRecord) -> bool:  # pyright: ignore[reportImplicitOverride]
+                return "Completing activity as failed" not in record.getMessage()
+
+        activity_failed_filter = _ActivityFailedFilter()
+        activity_logger = logging.getLogger("temporalio.activity")
+        activity_logger.addFilter(activity_failed_filter)
+        try:
+            with pytest.raises(WorkflowFailureError) as excinfo:
+                await top_crafter.make_llm_text(
+                    job_metadata=tprl_job_metadata,
+                    llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
+                    llm_setting_main=llm_setting_main,
+                )
+        finally:
+            activity_logger.removeFilter(activity_failed_filter)
         workflow_failure_error = excinfo.value
         assert str(workflow_failure_error) == "Workflow execution failed"
         pretty_print(f"Caught expected error: {workflow_failure_error}, caused by {workflow_failure_error.cause}")
