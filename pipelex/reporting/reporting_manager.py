@@ -5,6 +5,8 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.exceptions import ReportingManagerError
+from pipelex.cogt.extract.extract_job import ExtractJob
+from pipelex.cogt.extract.extract_report import ExtractTokensUsage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
@@ -20,7 +22,7 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 if TYPE_CHECKING:
     from pathlib import Path
 
-TokensUsage = LLMTokensUsage | ImgGenTokensUsage
+TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage
 UsageRegistryRoot = list[TokensUsage]
 
 
@@ -90,6 +92,20 @@ class ReportingManager(ReportingProtocol):
             img_gen_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=img_gen_tokens_usage)
             log.verbose(img_gen_token_cost_report, title="Token Cost report")
 
+    def _report_extract_job(self, extract_job: ExtractJob):
+        extract_tokens_usage = extract_job.job_report.extract_tokens_usage
+
+        if not extract_tokens_usage:
+            log.warning("Extract job has no extract_tokens_usage")
+            return
+
+        pipeline_run_id = extract_job.job_metadata.pipeline_run_id
+        self._get_registry(pipeline_run_id).add_tokens_usage(extract_tokens_usage)
+
+        if self._reporting_config.is_log_costs_to_console:
+            extract_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=extract_tokens_usage)
+            log.verbose(extract_token_cost_report, title="Token Cost report")
+
     ############################################################
     # ReportingProtocol
     ############################################################
@@ -108,6 +124,8 @@ class ReportingManager(ReportingProtocol):
             self._report_llm_job(llm_job=inference_job)
         elif isinstance(inference_job, ImgGenJob):
             self._report_img_gen_job(img_gen_job=inference_job)
+        elif isinstance(inference_job, ExtractJob):
+            self._report_extract_job(extract_job=inference_job)
         else:
             log.warning(f"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}")
 

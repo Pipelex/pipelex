@@ -5,7 +5,7 @@ from pipelex.cogt.content_generation.generated_content_factory import GeneratedC
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_job_factory import ExtractJobFactory
-from pipelex.hub import get_extract_worker
+from pipelex.hub import get_extract_worker, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
 from tests.cases import DocumentTestCases, ImageTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
@@ -48,6 +48,7 @@ class TestExtract:
         assert page_contents
         for page_index, page_content in enumerate(page_contents):
             pretty_print(page_content, title=f"Page {page_index}")
+        get_report_delegate().generate_report()
 
     @pytest.mark.parametrize("url", DocumentTestCases.DOCUMENT_URLS)
     async def test_extract_pdf_url(

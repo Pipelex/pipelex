@@ -71,3 +71,6 @@ mthds-wip
 
 # Derived artifacts (auto-generated, not tracked)
 derived/
+
+# Claude plans
+.claude/plans/

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
@@ -134,15 +135,50 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
                 return cls._make_extract_output_from_response_deepseek(response=response)
 
     @classmethod
+    def _extract_pages_from_choices_content(
+        cls,
+        response: GenericResponse,
+    ) -> list[dict[str, Any]] | None:
+        """Try to extract pages from choices[0].message.content (JSON string).
+
+        When Portkey proxies the response, custom top-level fields like `pages` are stripped.
+        The relay also puts pages in choices[0].message.content as a JSON string, which is
+        preserved because it's a standard OpenAI chat completion field.
+        """
+        try:
+            response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
+            choices = response_dict.get("choices")
+            if not choices or not isinstance(choices, list) or len(choices) == 0:  # pyright: ignore[reportUnknownArgumentType]
+                return None
+            first_choice = cast("dict[str, Any]", choices[0])
+            message_raw: Any = first_choice.get("message")
+            if not message_raw or not isinstance(message_raw, dict):
+                return None
+            message_dict = cast("dict[str, Any]", message_raw)
+            content: Any = message_dict.get("content")
+            if not content or not isinstance(content, str):
+                return None
+            parsed_content = json.loads(content)
+            if isinstance(parsed_content, list):
+                return cast("list[dict[str, Any]]", parsed_content)
+            return None
+        except (json.JSONDecodeError, KeyError, IndexError, TypeError, AttributeError):
+            return None
+
+    @classmethod
     def _make_extract_output_from_response_azure(
         cls,
         response: GenericResponse,
     ) -> ExtractOutput:
-        if not hasattr(response, "pages"):
-            msg = "Gateway extract response does not have pages"
+        response_page_dicts: list[dict[str, Any]]
+        if hasattr(response, "pages"):
+            response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+        elif (fallback_pages := cls._extract_pages_from_choices_content(response=response)) is not None:
+            response_page_dicts = fallback_pages
+        else:
+            msg = "Gateway extract response does not have pages (neither as top-level field nor in choices[0].message.content)"
             raise GatewayExtractResponseError(msg)
         try:
-            response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
             pages: dict[int, Page] = {}
             for response_page_dict in response_page_dicts:
                 response_page = GatewayExtractPageAzure.model_validate(response_page_dict)
