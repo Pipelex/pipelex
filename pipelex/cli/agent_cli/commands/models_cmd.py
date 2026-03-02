@@ -15,6 +15,7 @@ from pipelex.pipelex import Pipelex
 from pipelex.types import StrEnum
 
 
+# TODO: get this from somewhere else, not hardcoded here.
 class ModelCategory(StrEnum):
     LLM = "llm"
     EXTRACT = "extract"
