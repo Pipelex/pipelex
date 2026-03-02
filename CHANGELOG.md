@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.18.5] - 2026-03-01
+
+### Changed
+
+- `pipelex-agent assemble` command now outputs JSON to stdout by default.
+
 ## [v0.18.4] - 2026-03-01
 
 ### Added
