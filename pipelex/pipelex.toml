@@ -73,6 +73,10 @@ pdf-basic-text-extractor = "@default-text-from-pdf"
 image-text-extractor = "@default-extract-image"
 full-document-extractor = "@default-extract-document"
 
+[pipelex.builder_config.talent_preset_mappings.search]
+web-search = "$linkup-standard"
+web-search-deep = "$linkup-deep"
+
 [pipelex.feature_config]
 # WIP/Experimental feature flags
 is_reporting_enabled = true
