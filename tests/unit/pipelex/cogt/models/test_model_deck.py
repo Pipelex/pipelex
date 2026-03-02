@@ -8,6 +8,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
+from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.usage.cost_category import CostCategory
 from pipelex.system.runtime import ProblemReaction
 
@@ -57,6 +58,7 @@ class TestModelDeckGetOptionalInferenceModel:
             img_gen_presets={},
             img_gen_choice_default="gen_image_basic",
             # Search-specific
+            search_default_depth=SearchDepth.STANDARD,
             search_choice_default="@default-search",
             model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
         )
@@ -334,6 +336,7 @@ class TestModelDeckPrefixedAliasReferences:
             img_gen_presets={},
             img_gen_choice_default="gen_image_basic",
             # Search-specific
+            search_default_depth=SearchDepth.STANDARD,
             search_choice_default="@default-search",
             model_deck_config=ModelDeckConfig(is_model_fallback_enabled=is_model_fallback_enabled, missing_presets_reaction=ProblemReaction.NONE),
         )
@@ -487,6 +490,7 @@ class TestModelDeckGetLLMSettingWithPresets:
             img_gen_presets={},
             img_gen_choice_default="gen_image_basic",
             # Search-specific
+            search_default_depth=SearchDepth.STANDARD,
             search_choice_default="@default-search",
             model_deck_config=ModelDeckConfig(is_model_fallback_enabled=False, missing_presets_reaction=ProblemReaction.NONE),
         )
