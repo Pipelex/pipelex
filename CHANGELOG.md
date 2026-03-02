@@ -8,6 +8,11 @@
 - **Local path support for CLI method targets** — Method targets can now also be local filesystem paths pointing to a directory containing a `METHODS.toml`. This works for both `pipelex` and `pipelex-agent` CLIs.
 - Added `clone_default_branch()` in `mthds` package for shallow-cloning a git repository's default branch.
 - Added `examples.py` demonstrating how to resolve a method from a GitHub URL, dry-run it, and print the mermaid graph.
+## [v0.18.5] - 2026-03-01
+
+### Changed
+
+- `pipelex-agent assemble` command now outputs JSON to stdout by default.
 
 ## [v0.18.4] - 2026-03-01
 
