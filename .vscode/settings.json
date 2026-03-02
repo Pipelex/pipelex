@@ -35,5 +35,6 @@
     "[mthds]": {
         "editor.defaultFormatter": "Pipelex.pipelex",
         "editor.formatOnSave": true
-    }
+    },
+    "pipelex.mthds.runPipeCodeLens": false
 }

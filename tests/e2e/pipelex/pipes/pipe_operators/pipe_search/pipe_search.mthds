@@ -6,7 +6,9 @@ type        = "PipeSearch"
 description = "Search the web for recent news"
 inputs      = { topic = "Text" }
 output      = "SearchResult"
-prompt      = "What's the latest news about $topic?"
+model       = "$linkup-standard"
+prompt      = "What's the latest news about $topic in the last 24 hours?"
+
 [pipe.search_sourced_e2e_using_preset]
 type        = "PipeSearch"
 description = "Search the web for sourced information using the standard preset"

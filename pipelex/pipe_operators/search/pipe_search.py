@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
 from pipelex.cogt.search.search_depth import SearchDepth
@@ -79,6 +80,10 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeSearchOutput:
+        # 0. Log the search run
+        search_choice_desc = self.search_choice or "default"
+        log.dev(f"✨ PipeSearch '{self.code}' running with search choice '{search_choice_desc}' ✨")
+
         # 1. Render the prompt template against working memory context
         query_text = await render_template(
             template=self.prompt_blueprint.template,
