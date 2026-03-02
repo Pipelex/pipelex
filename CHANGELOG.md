@@ -1,9 +1,9 @@
 # Changelog
 
-## Unreleased
+## [v0.19.0] - 2026-03-02
 
 ### Added
- - **Web Search Integration**: Introduced a comprehensive system for performing web searches within pipelines, including a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models with presets (e.g., `$linkup-standard`, `$linkup-deep`), aliases, and waterfalls.
+ - **Web Search Integration**: Introduced a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models with presets (e.g., `$linkup-standard`, `$linkup-deep`), aliases, and waterfalls.
  - **Graph View Generation**: Added a `--view` option to `pipelex validate bundle` that generates a `ViewSpec` JSON (compatible with ReactFlow) for client-side graph rendering without writing files to disk.
 
 ### Changed
