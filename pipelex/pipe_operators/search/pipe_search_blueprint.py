@@ -4,12 +4,19 @@ from typing_extensions import override
 
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchModelChoice
+from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_preprocessor import preprocess_template
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint
+from pipelex.tools.jinja2.jinja2_errors import Jinja2TemplateSyntaxError
+from pipelex.tools.jinja2.jinja2_parsing import check_jinja2_parsing
+from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class PipeSearchBlueprint(PipeBlueprint):
     type: Literal["PipeSearch"] = "PipeSearch"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
+    prompt: str
     model: SearchModelChoice | None = None
     depth: SearchDepth | None = None
     include_images: bool | None = None
@@ -21,7 +28,34 @@ class PipeSearchBlueprint(PipeBlueprint):
 
     @override
     def validate_inputs(self):
-        nb_inputs = self.nb_inputs
-        if self.inputs is None or nb_inputs != 1:
-            msg = f"Exactly one input must be provided for PipeSearch, and it must be a Text concept. {nb_inputs} inputs were provided."
+        template_category = TemplateCategory.BASIC
+        preprocessed_template = preprocess_template(self.prompt)
+        try:
+            check_jinja2_parsing(
+                template_source=preprocessed_template,
+                template_category=template_category,
+            )
+        except Jinja2TemplateSyntaxError as exc:
+            msg = f"Could not parse template for PipeSearch: {exc}"
+            raise ValueError(msg) from exc
+
+        full_paths = detect_jinja2_required_variables(
+            template_category=template_category,
+            template_source=preprocessed_template,
+        )
+        required_variables: set[str] = set()
+        for path in full_paths:
+            root = get_root_from_dotted_path(path)
+            if not root.startswith("_"):
+                required_variables.add(root)
+
+        input_names: set[str] = set(self.inputs.keys()) if self.inputs else set()
+        missing_variables: set[str] = required_variables - input_names
+
+        if missing_variables:
+            missing_vars_str = ", ".join(sorted(missing_variables))
+            msg = (
+                f"Missing input variable(s) in prompt template: {missing_vars_str}. "
+                "These variables are used in the prompt but not declared in inputs."
+            )
             raise ValueError(msg)

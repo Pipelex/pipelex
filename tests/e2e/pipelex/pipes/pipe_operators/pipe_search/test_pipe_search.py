@@ -20,7 +20,7 @@ class TestPipeSearch:
     """E2E tests for PipeSearch operator."""
 
     @pytest.mark.parametrize(
-        ("variant", "pipe_code", "query"),
+        ("variant", "pipe_code", "input_name", "input_value"),
         PipeSearchTestCases.SOURCED_QUERIES,
     )
     async def test_search_sourced(
@@ -28,7 +28,8 @@ class TestPipeSearch:
         pipe_run_mode: PipeRunMode,
         variant: str,
         pipe_code: str,
-        query: str,
+        input_name: str,
+        input_value: str,
     ) -> None:
         """Test a sourced web search that returns an answer with sources."""
         runner = PipelexRunner(
@@ -38,7 +39,7 @@ class TestPipeSearch:
         pipeline_response = await runner.execute_pipeline(
             pipe_code=pipe_code,
             inputs={
-                "query": TextContent(text=query),
+                input_name: TextContent(text=input_value),
             },
         )
 

@@ -7,6 +7,8 @@ from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.cogt.search.search_worker_factory import get_search_worker
+from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -16,6 +18,7 @@ from pipelex.hub import get_model_deck
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 if TYPE_CHECKING:
     from pipelex.core.stuffs.stuff_content import StuffContent
@@ -28,7 +31,7 @@ class PipeSearchOutput(PipeOutput):
 class PipeSearch(PipeOperator[PipeSearchOutput]):
     type: Literal["PipeSearch"] = "PipeSearch"
     search_choice: SearchModelChoice | None
-    query_stuff_name: str
+    prompt_blueprint: TemplateBlueprint
     depth_override: SearchDepth | None = None
     include_images_override: bool | None = None
     max_results_override: int | None = None
@@ -44,7 +47,8 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
 
     @override
     def required_variables(self) -> set[str]:
-        return set(self.inputs.required_names)
+        full_paths = self.prompt_blueprint.required_variables()
+        return {get_root_from_dotted_path(path) for path in full_paths}
 
     @override
     def validate_inputs_static(self):
@@ -75,8 +79,12 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeSearchOutput:
-        # 1. Read query text from working memory
-        query_text = working_memory.get_stuff_as_str(name=self.query_stuff_name)
+        # 1. Render the prompt template against working memory context
+        query_text = await render_template(
+            template=self.prompt_blueprint.template,
+            category=self.prompt_blueprint.category,
+            context=working_memory.generate_context(),
+        )
 
         # 2. Resolve SearchSetting from deck
         model_deck = get_model_deck()
