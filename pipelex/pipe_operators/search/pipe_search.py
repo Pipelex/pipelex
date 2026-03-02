@@ -5,6 +5,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
@@ -97,7 +98,13 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         search_choice: SearchModelChoice = self.search_choice or model_deck.search_choice_default
         search_setting: SearchSetting = model_deck.get_search_setting(search_choice=search_choice)
 
-        # 3. Apply pipe-level overrides
+        # 3. Resolve the model handle (waterfalls/aliases → actual provider/variant handle)
+        inference_model = model_deck.get_required_inference_model(model_handle=search_setting.model, model_type=ModelType.SEARCH)
+        resolved_model_handle = inference_model.name
+        if resolved_model_handle != search_setting.model:
+            search_setting = search_setting.model_copy(update={"model": resolved_model_handle})
+
+        # 4. Apply pipe-level overrides
         if self.depth_override is not None:
             search_setting = search_setting.model_copy(update={"depth": self.depth_override})
         if self.include_images_override is not None:
@@ -105,10 +112,10 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         if self.max_results_override is not None:
             search_setting = search_setting.model_copy(update={"max_results": self.max_results_override})
 
-        # 4. Get search worker from factory
+        # 5. Get search worker from factory
         worker = get_search_worker(model_handle=search_setting.model)
 
-        # 5/6. Execute search based on output type
+        # 6. Execute search based on output type
         content: StuffContent
         if not self.is_structured_output:
             content = await worker.search_sourced_answer(
@@ -132,7 +139,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             )
             content = output_structure_class.model_validate(result_dict)
 
-        # 7. Create Stuff, set in working memory, return output
+        # 7. Create Stuff, set in working memory, and return output
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
             concept=self.output.concept,
