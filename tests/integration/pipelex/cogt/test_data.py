@@ -244,7 +244,7 @@ class SearchTestCases:
     ]
 
     STRUCTURED_QUERIES: ClassVar[list[tuple[str, str]]] = [  # topic, query
-        ("Python language", "Latest events in the middle east"),
+        ("Python language", "What is the Python programming language and what are its main features?"),
         ("Machine learning", "What is machine learning and its main applications?"),
     ]
 

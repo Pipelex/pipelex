@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Literal
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
 from pipelex.cogt.search.search_depth import SearchDepth
@@ -49,7 +50,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     @override
     def required_variables(self) -> set[str]:
         full_paths = self.prompt_blueprint.required_variables()
-        return {get_root_from_dotted_path(path) for path in full_paths}
+        return {get_root_from_dotted_path(path) for path in full_paths if not path.startswith("_")}
 
     @override
     def validate_inputs_static(self):
@@ -154,10 +155,16 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
     ) -> PipeSearchOutput:
-        content = SearchResultContent(
-            answer="[DRY RUN] Mock search result",
-            sources=[],
-        )
+        content: StuffContent
+        if not self.is_structured_output:
+            content = SearchResultContent(
+                answer="[DRY RUN] Mock search result",
+                sources=[],
+            )
+        else:
+            output_structure_class = self.output.concept.get_structure_class()
+            object_factory = DryRunFactory.make_dry_run_factory(output_structure_class)
+            content = object_factory.build()
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,

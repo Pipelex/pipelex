@@ -185,6 +185,7 @@ class TestModelDeckReferences:
             (ModelType.LLM, "LLM"),
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
+            (ModelType.SEARCH, "Search"),
         ],
     )
     def test_aliases_reference_valid_targets(
@@ -217,6 +218,7 @@ class TestModelDeckReferences:
             (ModelType.LLM, "LLM"),
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
+            (ModelType.SEARCH, "Search"),
         ],
     )
     def test_presets_reference_valid_models(
@@ -249,6 +251,7 @@ class TestModelDeckReferences:
             (ModelType.LLM, "LLM"),
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
+            (ModelType.SEARCH, "Search"),
         ],
     )
     def test_waterfalls_contain_valid_models(
@@ -280,6 +283,7 @@ class TestModelDeckReferences:
             (ModelType.LLM, "LLM"),
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
+            (ModelType.SEARCH, "Search"),
         ],
     )
     def test_aliases_no_circular_references(

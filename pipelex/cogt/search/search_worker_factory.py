@@ -1,5 +1,4 @@
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
-from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker
 
 # Cache of search worker instances by provider prefix
 _search_workers: dict[str, SearchWorkerAbstract] = {}
@@ -25,6 +24,8 @@ def get_search_worker(model_handle: str) -> SearchWorkerAbstract:
     worker: SearchWorkerAbstract
     match provider:
         case "linkup":
+            from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker  # noqa: PLC0415
+
             worker = LinkupSearchWorker()
         case _:
             msg = f"Unknown search provider: '{provider}' (from model handle '{model_handle}')"
