@@ -80,4 +80,4 @@ model = "$linkup-deep"
 prompt = "What are the main details about $topic?"
 ```
 
-The output of PipeSearch must be a concept compatible with the native `SearchResult` concept. After execution, the output `SearchResultContent` contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets.
+The output of PipeSearch must be a concept compatible with the native `SearchResult` concept. After execution, the output `SearchResult` contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets.
