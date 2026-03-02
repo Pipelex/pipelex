@@ -43,6 +43,7 @@ Operators perform concrete actions:
 - **PipeImgGen** - Generate images
 - **PipeFunc** - Execute custom Python functions
 - **PipeCompose** - Compose content from templates
+- **PipeSearch** - Search the web for information
 
 ### Core Domain
 
@@ -66,6 +67,7 @@ The COGT layer abstracts AI provider details from business logic:
 - **LLM Workers** - Prompt construction, structured output, templating
 - **Extract Workers** - Document processing and OCR
 - **Image Generation Workers** - Image creation
+- **Search Workers** - Web search and information retrieval
 - **Model Catalog & Model Deck** - Manages available models, aliases, and presets
 - **Content Generation** - Unified generation interface
 
@@ -112,6 +114,7 @@ flowchart TB
             O3["PipeFunc"]
             O4["PipeImgGen"]
             O5["PipeCompose"]
+            O6["PipeSearch"]
         end
         subgraph Core["Core Domain"]
             CR1["Concepts"]
@@ -128,8 +131,9 @@ flowchart TB
         subgraph COGT["COGT Layer"]
             CG1["LLM Workers"]
             CG2["Extract Workers"]
-            CG3["Model Catalog"]
-            CG4["Content Gen"]
+            CG3["Search Workers"]
+            CG4["Model Catalog"]
+            CG5["Content Gen"]
         end
         subgraph Plugins["Plugins"]
             P1["OpenAI"]

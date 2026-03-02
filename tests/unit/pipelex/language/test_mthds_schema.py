@@ -98,6 +98,7 @@ class TestMthdsSchemaGeneration:
             "PipeComposeBlueprint",
             "PipeLLMBlueprint",
             "PipeExtractBlueprint",
+            "PipeSearchBlueprint",
             "PipeBatchBlueprint",
             "PipeConditionBlueprint",
             "PipeParallelBlueprint",
@@ -107,8 +108,8 @@ class TestMthdsSchemaGeneration:
         for blueprint_name in expected_blueprint_names:
             assert blueprint_name in definitions, f"{blueprint_name} should be present in schema definitions"
 
-        # Also verify we have 9 pipe types matching the PipeType enum
-        assert len(PipeType.value_list()) == 9, "Should have exactly 9 pipe types"
+        # Also verify we have 10 pipe types matching the PipeType enum
+        assert len(PipeType.value_list()) == 10, "Should have exactly 10 pipe types"
 
     def test_construct_schema_matches_mthds_format(self, schema: dict[str, Any]) -> None:
         """Verify ConstructBlueprint uses additionalProperties, not 'fields' wrapper."""

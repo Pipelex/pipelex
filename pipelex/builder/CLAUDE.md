@@ -37,6 +37,7 @@ pipe/
   pipe_func_spec.py            # PipeFunc — Python function operator
   pipe_img_gen_spec.py         # PipeImgGen — image generation operator
   pipe_extract_spec.py         # PipeExtract — OCR/text extraction operator
+  pipe_search_spec.py          # PipeSearch — web search operator
   pipe_compose_spec.py         # PipeCompose — template/construct operator
   pipe_sequence_spec.py        # PipeSequence — sequential controller
   pipe_parallel_spec.py        # PipeParallel — concurrent controller
@@ -46,13 +47,14 @@ talents/
   llm_talent.py                # LLMTalent enum + preset mapping
   extract_talent.py            # ExtractTalent enum + preset mapping
   img_gen_talent.py            # ImgGenTalent enum + preset mapping
+  search_talent.py             # SearchTalent enum + preset mapping
 ```
 
 ## Spec Architecture
 
 All specs are Pydantic models (`StructuredContent` base). Two categories of pipes:
 
-**Operators** (data transformation): `PipeLLM`, `PipeFunc`, `PipeImgGen`, `PipeExtract`, `PipeCompose`
+**Operators** (data transformation): `PipeLLM`, `PipeFunc`, `PipeImgGen`, `PipeExtract`, `PipeSearch`, `PipeCompose`
 
 **Controllers** (execution flow): `PipeSequence`, `PipeParallel`, `PipeCondition`, `PipeBatch`
 

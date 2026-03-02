@@ -58,6 +58,11 @@ display_name = "Hugging Face"
 enabled = true
 api_key = "${HF_TOKEN}"
 
+[linkup]
+display_name = "Linkup"
+enabled = true
+api_key = "${LINKUP_API_KEY}"
+
 [mistral]
 display_name = "Mistral AI"
 enabled = true

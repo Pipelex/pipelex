@@ -1,0 +1,37 @@
+################################################################################
+# Linkup Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for Linkup search models.
+# Linkup provides web search capabilities with sourced answers and structured
+# data extraction.
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "search"
+sdk = "linkup"
+thinking_mode = "none"
+
+################################################################################
+# SEARCH MODELS
+################################################################################
+
+["linkup/standard"]
+model_id = "standard"
+inputs = ["text"]
+outputs = ["structured"]
+costs = {}
+
+["linkup/deep"]
+model_id = "deep"
+inputs = ["text"]
+outputs = ["structured"]
+costs = {}

@@ -18,6 +18,7 @@ from pipelex.cogt.models.model_deck import (
 from pipelex.cogt.models.model_deck_loader import load_model_deck_blueprint
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind
+from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.system.configuration.config_loader import config_manager
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.tools.misc.file_utils import find_files_in_dir
@@ -114,7 +115,7 @@ class TestModelDeckReferences:
 
     def _find_invalid_preset_references(
         self,
-        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting],
+        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting],
         all_aliases: dict[str, str],
         all_waterfalls: dict[str, list[str]],
         known_model_handles: dict[str, ModelType],
@@ -175,6 +176,8 @@ class TestModelDeckReferences:
                 return model_deck_blueprint.extract
             case ModelType.IMG_GEN:
                 return model_deck_blueprint.img_gen
+            case ModelType.SEARCH:
+                return model_deck_blueprint.search
 
     @pytest.mark.parametrize(
         ("model_type", "deck_name"),
@@ -182,6 +185,7 @@ class TestModelDeckReferences:
             (ModelType.LLM, "LLM"),
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
+            (ModelType.SEARCH, "Search"),
         ],
     )
     def test_aliases_reference_valid_targets(
@@ -214,6 +218,7 @@ class TestModelDeckReferences:
             (ModelType.LLM, "LLM"),
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
+            (ModelType.SEARCH, "Search"),
         ],
     )
     def test_presets_reference_valid_models(
@@ -246,6 +251,7 @@ class TestModelDeckReferences:
             (ModelType.LLM, "LLM"),
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
+            (ModelType.SEARCH, "Search"),
         ],
     )
     def test_waterfalls_contain_valid_models(
@@ -277,6 +283,7 @@ class TestModelDeckReferences:
             (ModelType.LLM, "LLM"),
             (ModelType.TEXT_EXTRACTOR, "Extract"),
             (ModelType.IMG_GEN, "ImgGen"),
+            (ModelType.SEARCH, "Search"),
         ],
     )
     def test_aliases_no_circular_references(

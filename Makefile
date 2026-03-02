@@ -27,7 +27,7 @@ SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract)) and not pipelex_api"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])

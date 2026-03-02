@@ -10,6 +10,7 @@ from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
+from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 
 PipeSpecUnion = Annotated[
@@ -18,6 +19,7 @@ PipeSpecUnion = Annotated[
     | PipeComposeSpec
     | PipeLLMSpec
     | PipeExtractSpec
+    | PipeSearchSpec
     | PipeBatchSpec
     | PipeConditionSpec
     | PipeParallelSpec
