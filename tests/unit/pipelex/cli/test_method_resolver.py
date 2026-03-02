@@ -181,10 +181,12 @@ class TestResolveMethodTarget:
             ("my-method", False),
             ("simple_name", False),
             ("", False),
+            ("https://gitlab.com/org/repo", False),
+            ("http://bitbucket.org/org/repo", False),
         ],
     )
     def test_is_local_path(self, target: str, expected: bool) -> None:
-        """Strings with path separators are detected as local paths."""
+        """Strings with path separators are detected as local paths; URLs are not."""
         assert is_local_path(target) is expected
 
     def test_resolve_method_from_path_success(self, tmp_path: Path) -> None:

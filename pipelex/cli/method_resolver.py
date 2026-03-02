@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import atexit
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -124,6 +126,8 @@ def parse_github_url(url: str) -> tuple[str, str | None]:
 
 def is_local_path(target: str) -> bool:
     """Return True if *target* looks like a filesystem path (absolute or relative with separators)."""
+    if target.startswith(("https://", "http://")):
+        return False
     return "/" in target or "\\" in target
 
 
@@ -183,6 +187,7 @@ def resolve_method_from_url(url: str) -> InstalledMethod:
     """
     clone_url, sub_path = parse_github_url(url)
     dest = Path(tempfile.mkdtemp(prefix="mthds_remote_"))
+    atexit.register(shutil.rmtree, dest, True)
 
     try:
         clone_default_branch(clone_url, dest)
