@@ -130,7 +130,7 @@ def run_method_cmd(
                 agent_error(str(exc), type(exc).__name__, cause=exc)
 
         case RunnerType.PIPELEX:
-            make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"])
+            make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=not dry_run)
 
             try:
                 result = asyncio.run(

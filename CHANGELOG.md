@@ -1,5 +1,31 @@
 # Changelog
 
+## [v0.19.0] - 2026-03-02
+
+### Added
+ - **Web Search Integration**: Introduced a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models with presets (e.g., `$linkup-standard`, `$linkup-deep`), aliases, and waterfalls.
+ - **Graph View Generation**: Added a `--view` option to `pipelex validate bundle` that generates a `ViewSpec` JSON (compatible with ReactFlow) for client-side graph rendering without writing files to disk.
+
+### Changed
+ - **Test Configuration**: Added a `search` pytest marker, excluded from default test runs.
+ - `mthds` bumped to `>=0.1.0`.
+ - `pipelex-tools` bumped to `>=0.2.3`.
+ - `linkup-sdk>=0.12.0` added as optional dependency for the Linkup search provider.
+
+## [v0.18.6] - 2026-03-01
+
+### Added
+
+- **GitHub URL support for CLI method targets** — All CLI commands accepting a method target (`pipelex validate method`, `pipelex run method`, `pipelex build inputs method`, etc.) now accept a public GitHub URL (e.g., `https://github.com/org/repo/tree/main/methods/my-method`). The repository is cloned automatically, and the method package is discovered and validated. Subdirectory URLs are supported.
+- **Local path support for CLI method targets** — Method targets can now also be local filesystem paths pointing to a directory containing a `METHODS.toml`. This works for both `pipelex` and `pipelex-agent` CLIs.
+- Added `clone_default_branch()` in `mthds` package for shallow-cloning a git repository's default branch.
+
+## [v0.18.5] - 2026-03-01
+
+### Changed
+
+- `pipelex-agent assemble` command now outputs JSON to stdout by default.
+
 ## [v0.18.4] - 2026-03-01
 
 ### Added

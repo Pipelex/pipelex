@@ -11,9 +11,12 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
+from pipelex.graph.reactflow.viewspec import LayoutSpec
+from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexRunner
 from pipelex.tools.misc.chart_utils import FlowchartDirection
@@ -92,25 +95,21 @@ async def render_graph_from_spec(
     return save_graph_outputs_to_dir(graph_outputs=graph_outputs, output_dir=output_dir)
 
 
-async def generate_graph_for_bundle(
+async def _dry_run_bundle(
     bundle_path: Path,
-    graph_format: GraphFormat,
     library_dirs: list[str] | None = None,
-    direction: FlowchartDirection | None = None,
-) -> dict[str, Any]:
-    """Generate graph visualization for a bundle via dry-run pipeline execution.
+) -> tuple[GraphSpec, str]:
+    """Perform a dry-run pipeline execution on a bundle to produce a GraphSpec.
 
-    Reads the bundle, parses main_pipe, performs a dry-run with graph tracing,
-    then renders and saves graph HTML files alongside the bundle.
+    Reads the bundle, parses main_pipe, builds a runner, and executes a dry-run
+    with graph tracing enabled.
 
     Args:
         bundle_path: Path to the .mthds bundle file.
-        graph_format: Which graph format(s) to generate.
         library_dirs: Optional library directories for pipe resolution.
-        direction: Flowchart layout direction (default: None, uses TB).
 
     Returns:
-        Dictionary with graph_files, graph_output_dir, and direction.
+        Tuple of (GraphSpec, pipe_code).
 
     Raises:
         PipelexInterpreterError: If bundle parsing fails or main_pipe is missing.
@@ -157,7 +156,40 @@ async def generate_graph_for_bundle(
         msg = "Pipeline execution did not produce a graph spec"
         raise PipelexError(msg)
 
-    graph_spec = pipe_output.graph_spec
+    return pipe_output.graph_spec, pipe_code
+
+
+async def generate_graph_for_bundle(
+    bundle_path: Path,
+    graph_format: GraphFormat,
+    library_dirs: list[str] | None = None,
+    direction: FlowchartDirection | None = None,
+) -> dict[str, Any]:
+    """Generate graph visualization for a bundle via dry-run pipeline execution.
+
+    Reads the bundle, parses main_pipe, performs a dry-run with graph tracing,
+    then renders and saves graph HTML files alongside the bundle.
+
+    Args:
+        bundle_path: Path to the .mthds bundle file.
+        graph_format: Which graph format(s) to generate.
+        library_dirs: Optional library directories for pipe resolution.
+        direction: Flowchart layout direction (default: None, uses TB).
+
+    Returns:
+        Dictionary with graph_files, graph_output_dir, and direction.
+
+    Raises:
+        PipelexInterpreterError: If bundle parsing fails or main_pipe is missing.
+        PipelexError: If pipeline execution does not produce a graph spec.
+        PipelineExecutionError: If dry-run execution fails.
+    """
+    graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs)
+
+    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        generate_graph=True,
+        mock_inputs=True,
+    )
 
     include_mermaidflow: bool
     include_reactflow: bool
@@ -188,4 +220,53 @@ async def generate_graph_for_bundle(
         "graph_output_dir": str(output_dir),
         "pipe_code": pipe_code,
         "direction": str(direction) if direction else None,
+    }
+
+
+# TODO: refactor to do only one dry run and generate both graph and ViewSpec
+async def generate_view_for_bundle(
+    bundle_path: Path,
+    library_dirs: list[str] | None = None,
+    direction: FlowchartDirection | None = None,
+) -> dict[str, Any]:
+    """Generate a ViewSpec for a bundle via dry-run pipeline execution.
+
+    Returns structured JSON data (ViewSpec) suitable for client-side rendering,
+    without writing any files to disk.
+
+    Args:
+        bundle_path: Path to the .mthds bundle file.
+        library_dirs: Optional library directories for pipe resolution.
+        direction: Flowchart layout direction (default: None, uses config default).
+
+    Returns:
+        Dictionary with viewspec (JSON-serializable dict), pipe_code, and direction.
+
+    Raises:
+        PipelexInterpreterError: If bundle parsing fails or main_pipe is missing.
+        PipelexError: If pipeline execution does not produce a graph spec.
+        PipelineExecutionError: If dry-run execution fails.
+    """
+    graph_spec, pipe_code = await _dry_run_bundle(bundle_path, library_dirs)
+
+    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
+        generate_graph=True,
+        mock_inputs=True,
+    )
+    rf_config = execution_config.graph_config.reactflow_config
+    effective_direction = direction or rf_config.layout_direction
+
+    analysis = GraphAnalysis.from_graphspec(graph_spec)
+    layout = LayoutSpec(
+        direction=effective_direction,
+        nodesep=rf_config.nodesep,
+        ranksep=rf_config.ranksep,
+    )
+    viewspec = graphspec_to_viewspec(graph_spec, analysis, layout=layout)
+
+    return {
+        "viewspec": viewspec.model_dump(mode="json"),
+        "graphspec": graph_spec.model_dump(mode="json", by_alias=True),
+        "pipe_code": pipe_code,
+        "direction": str(effective_direction) if effective_direction else None,
     }

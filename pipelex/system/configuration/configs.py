@@ -103,6 +103,7 @@ class TalentPresetMappings(ConfigModel):
     llm: dict[str, str]
     img_gen: dict[str, str]
     extract: dict[str, str]
+    search: dict[str, str]
 
 
 class BuilderConfig(ConfigModel):

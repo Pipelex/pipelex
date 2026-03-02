@@ -68,9 +68,9 @@ def assemble_cmd(
         typer.Option("--main-pipe", "-m", help="Main pipe code for the bundle"),
     ],
     output: Annotated[
-        str,
-        typer.Option("--output", "-o", help="Output file path for the assembled bundle (.mthds)"),
-    ],
+        str | None,
+        typer.Option("--output", "-o", help="Output file path (.mthds). Omit to return TOML in JSON response."),
+    ] = None,
     description: Annotated[
         str | None,
         typer.Option("--description", help="Description of the bundle"),
@@ -98,11 +98,10 @@ def assemble_cmd(
 
     Examples:
         pipelex-agent assemble --domain my_domain --main-pipe main
-            --concepts concepts.toml --pipes pipes.toml --output bundle.mthds
+            --concepts concepts.toml --pipes pipes.toml
 
         pipelex-agent assemble --domain my_domain --main-pipe main
-            --concepts '[concept.MyInput]' --pipes '[pipe.main]'
-            --output bundle.mthds
+            --concepts concepts.toml --pipes pipes.toml --output bundle.mthds
     """
     try:
         # Create base document with domain header
@@ -139,25 +138,33 @@ def assemble_cmd(
                 except Exception as exc:
                     agent_error(f"Failed to load pipes from '{pipe_source}': {exc}", "PipeLoadError", cause=exc)
 
-        # Write output file
-        output_path = Path(output)
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+        toml_content = tomlkit.dumps(doc)
+        if not toml_content.endswith("\n"):
+            toml_content += "\n"
 
-        with open(output_path, "w", encoding="utf-8") as out_file:
-            tomlkit.dump(doc, out_file)
-
-        # Ensure file ends with newline (POSIX standard)
-        with open(output_path, "a", encoding="utf-8") as out_file:
-            out_file.write("\n")
-
-        agent_success(
-            {
-                "success": True,
-                "bundle_path": str(output_path.resolve()),
-                "domain": domain,
-                "main_pipe": main_pipe,
-            }
-        )
+        if output is None:
+            # Stdout mode (default): return TOML in JSON response
+            agent_success(
+                {
+                    "success": True,
+                    "toml": toml_content,
+                    "domain": domain,
+                    "main_pipe": main_pipe,
+                }
+            )
+        else:
+            # File mode: write to disk
+            output_path = Path(output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            Path(output_path).write_text(toml_content, encoding="utf-8")
+            agent_success(
+                {
+                    "success": True,
+                    "bundle_path": str(output_path.resolve()),
+                    "domain": domain,
+                    "main_pipe": main_pipe,
+                }
+            )
 
     except typer.Exit:
         raise
