@@ -2,7 +2,7 @@
 
 import pytest
 
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams, Quality
 from pipelex.tools.misc.image_utils import ImageFormat
 
 # ================================================================================================
@@ -23,26 +23,26 @@ from pipelex.tools.misc.image_utils import ImageFormat
             is_raw=None,
             output_format=ImageFormat.PNG,
         ),
-        # ImgGenJobParams(
-        #     aspect_ratio=AspectRatio.PORTRAIT_9_16,
-        #     background=Background.OPAQUE,
-        #     quality=Quality.MEDIUM,
-        #     guidance_scale=2.5,
-        #     is_moderated=None,
-        #     safety_tolerance=1,
-        #     is_raw=None,
-        #     output_format=ImageFormat.PNG,
-        # ),
-        # ImgGenJobParams(
-        #     aspect_ratio=AspectRatio.LANDSCAPE_4_3,
-        #     background=Background.OPAQUE,
-        #     quality=Quality.HIGH,
-        #     guidance_scale=2.5,
-        #     is_moderated=None,
-        #     safety_tolerance=1,
-        #     is_raw=None,
-        #     output_format=ImageFormat.JPEG,
-        # ),
+        ImgGenJobParams(
+            aspect_ratio=AspectRatio.PORTRAIT_9_16,
+            background=Background.OPAQUE,
+            quality=Quality.MEDIUM,
+            guidance_scale=2.5,
+            is_moderated=None,
+            safety_tolerance=1,
+            is_raw=None,
+            output_format=ImageFormat.PNG,
+        ),
+        ImgGenJobParams(
+            aspect_ratio=AspectRatio.LANDSCAPE_4_3,
+            background=Background.OPAQUE,
+            quality=Quality.HIGH,
+            guidance_scale=2.5,
+            is_moderated=None,
+            safety_tolerance=1,
+            is_raw=None,
+            output_format=ImageFormat.JPEG,
+        ),
     ],
 )
 def img_gen_job_params(request: pytest.FixtureRequest) -> ImgGenJobParams:

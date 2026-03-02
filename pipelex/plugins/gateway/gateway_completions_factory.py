@@ -259,11 +259,15 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         cls,
         response: GenericResponse,
     ) -> ExtractOutput:
-        if not hasattr(response, "pages"):
-            msg = "Gateway extract response does not have pages"
+        response_page_dicts: list[dict[str, Any]]
+        if hasattr(response, "pages"):
+            response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
+        elif (fallback_pages := cls._extract_pages_from_choices_content(response=response)) is not None:
+            response_page_dicts = fallback_pages
+        else:
+            msg = "Gateway extract response does not have pages (neither as top-level field nor in choices[0].message.content)"
             raise GatewayExtractResponseError(msg)
         try:
-            response_page_dicts = cast("list[dict[str, Any]]", response.pages)  # pyright: ignore[reportUnknownMemberType, reportAttributeAccessIssue]
             pages: dict[int, Page] = {}
             for response_page_dict in response_page_dicts:
                 response_page = GatewayExtractPageDeepseek.model_validate(response_page_dict)
