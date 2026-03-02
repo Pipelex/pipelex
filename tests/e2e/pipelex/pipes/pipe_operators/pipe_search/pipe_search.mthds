@@ -1,0 +1,16 @@
+domain      = "pipe_search_e2e"
+description = "Test PipeSearch with sourced search queries"
+
+[pipe.search_sourced_e2e_using_preset]
+type        = "PipeSearch"
+description = "Search the web for sourced information using the standard preset"
+inputs      = { query = "Text" }
+output      = "SearchResult"
+model       = "$linkup-standard"
+
+[pipe.search_sourced_e2e_deep]
+type        = "PipeSearch"
+description = "Search the web for sourced information using the deep preset"
+inputs      = { query = "Text" }
+output      = "SearchResult"
+model       = "$linkup-deep"
