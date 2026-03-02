@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from mthds.client.models.pipeline_inputs import PipelineInputs
+from mthds.models.pipeline_inputs import PipelineInputs
 
 from pipelex import log
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
