@@ -407,58 +407,6 @@ class ModelDeck(ConfigModel):
                     presets=self.extract_presets,
                 )
 
-    def check_search_choice(self, search_choice: SearchModelChoice):
-        if isinstance(search_choice, SearchSetting):
-            return
-
-        ref = ensure_model_reference(search_choice)
-        match ref.kind:
-            case ModelReferenceKind.PRESET:
-                if ref.name in self.search_presets:
-                    return
-                msg = f"Search preset '{ref.name}' was not found in the model deck"
-                raise ModelChoiceNotFoundError(
-                    message=msg,
-                    model_type=ModelType.SEARCH,
-                    model_choice=ref.raw,
-                    reference_kind=ModelReferenceKind.PRESET,
-                    available_options=list(self.search_presets.keys()),
-                )
-            case ModelReferenceKind.ALIAS:
-                if ref.name in self.search_aliases:
-                    return
-                msg = f"Alias '{ref.name}' was not found in the model deck"
-                raise ModelChoiceNotFoundError(
-                    message=msg,
-                    model_type=ModelType.SEARCH,
-                    model_choice=ref.raw,
-                    reference_kind=ModelReferenceKind.ALIAS,
-                    available_options=list(self.search_aliases.keys()),
-                )
-            case ModelReferenceKind.WATERFALL:
-                if ref.name in self.search_waterfalls:
-                    return
-                msg = f"Waterfall '{ref.name}' was not found in the model deck"
-                raise ModelChoiceNotFoundError(
-                    message=msg,
-                    model_type=ModelType.SEARCH,
-                    model_choice=ref.raw,
-                    reference_kind=ModelReferenceKind.WATERFALL,
-                    available_options=list(self.search_waterfalls.keys()),
-                )
-            case ModelReferenceKind.HANDLE:
-                self._warn_if_ambiguous_search(ref.name)
-                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.SEARCH):
-                    return
-                msg = f"Model handle '{ref.name}' was not found in the model deck"
-                raise ModelChoiceNotFoundError(
-                    message=msg,
-                    model_type=ModelType.SEARCH,
-                    model_choice=ref.raw,
-                    reference_kind=ModelReferenceKind.HANDLE,
-                    available_options=list(self.inference_models.keys()),
-                )
-
     def get_search_setting(self, search_choice: SearchModelChoice) -> SearchSetting:
         if isinstance(search_choice, SearchSetting):
             return search_choice
