@@ -26,6 +26,9 @@ version = "0.1.0"
 description = "A test method"
 {name_line}
 main_pipe = "test_pipe"
+
+[exports.test]
+pipes = ["test_pipe"]
 """
 
 

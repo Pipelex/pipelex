@@ -108,7 +108,7 @@ def discover_installed_methods(
     return methods
 
 
-def _discover_method_at(method_dir: Path, seen_dirs: set[Path]) -> InstalledMethod | None:
+def discover_method_at(method_dir: Path, seen_dirs: set[Path]) -> InstalledMethod | None:
     """Try to discover a single method at *method_dir*.
 
     Returns an ``InstalledMethod`` if the directory contains a ``METHODS.toml``,
@@ -165,7 +165,7 @@ def discover_methods_from_library_dirs(
             continue
 
         # First, check if the directory itself is a method
-        method = _discover_method_at(lib_dir, seen_dirs)
+        method = discover_method_at(lib_dir, seen_dirs)
         if method is not None:
             methods.append(method)
             continue
@@ -173,7 +173,7 @@ def discover_methods_from_library_dirs(
         # Otherwise, recursively find all METHODS.toml files below this directory
         for manifest_path in sorted(lib_dir.rglob(MANIFEST_FILENAME)):
             method_dir = manifest_path.parent
-            sub_method = _discover_method_at(method_dir, seen_dirs)
+            sub_method = discover_method_at(method_dir, seen_dirs)
             if sub_method is not None:
                 methods.append(sub_method)
 
