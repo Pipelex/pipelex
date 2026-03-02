@@ -12,6 +12,14 @@
  - `pipelex-tools` bumped to `>=0.2.3`.
  - `linkup-sdk>=0.12.0` added as optional dependency for the Linkup search provider.
 
+## [v0.18.6] - 2026-03-01
+
+### Added
+
+- **GitHub URL support for CLI method targets** — All CLI commands accepting a method target (`pipelex validate method`, `pipelex run method`, `pipelex build inputs method`, etc.) now accept a public GitHub URL (e.g., `https://github.com/org/repo/tree/main/methods/my-method`). The repository is cloned automatically, and the method package is discovered and validated. Subdirectory URLs are supported.
+- **Local path support for CLI method targets** — Method targets can now also be local filesystem paths pointing to a directory containing a `METHODS.toml`. This works for both `pipelex` and `pipelex-agent` CLIs.
+- Added `clone_default_branch()` in `mthds` package for shallow-cloning a git repository's default branch.
+
 ## [v0.18.5] - 2026-03-01
 
 ### Changed
