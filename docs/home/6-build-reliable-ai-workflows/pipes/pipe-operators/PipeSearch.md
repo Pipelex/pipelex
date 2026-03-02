@@ -6,7 +6,7 @@ The `PipeSearch` operator searches the web using a configurable search provider 
 
 `PipeSearch` takes a search prompt (which can include `$variable` template references) and sends it to a web search provider (such as Linkup). The provider returns a synthesized answer along with a list of sources.
 
-The output is always a `SearchResult`, which contains:
+The output is a `SearchResult` (or a concept that refines it), which contains:
 
 -   `answer`: The synthesized answer text from the search
 -   `sources`: A list of sources, each with a `name`, `url`, and optional `snippet`
@@ -35,7 +35,7 @@ Common search presets:
 | `type`        | string     | The type of the pipe: `PipeSearch`                                                                                                                  | Yes      |
 | `description` | string     | A description of the search operation.                                                                                                              | Yes      |
 | `inputs`      | dictionary | The input concept(s) for the search query, as a dictionary mapping input names to concept codes. Required when the prompt references variables.     | No       |
-| `output`      | string     | The output concept produced by the search. Must be compatible with the native `SearchResult` concept.                                               | Yes      |
+| `output`      | string     | The output concept produced by the search. Must be `SearchResult` or a concept that refines `SearchResult`.                                         | Yes      |
 | `model`       | string     | The search model preset to use (e.g., `"$linkup-standard"`, `"$linkup-deep"`). Defaults to the model specified in the global config.                | No       |
 | `prompt`      | string     | The search query. Can be a static string or reference input variables using `$` prefix (e.g., `"What is $topic?"`).                                 | Yes      |
 
@@ -80,4 +80,4 @@ model = "$linkup-deep"
 prompt = "What are the main details about $topic?"
 ```
 
-The output of PipeSearch must be a concept compatible with the native `SearchResult` concept. After execution, the output `SearchResult` contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets.
+The output of PipeSearch must be `SearchResult` or a concept that refines `SearchResult`. After execution, the output contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets.
