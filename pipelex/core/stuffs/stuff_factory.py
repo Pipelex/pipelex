@@ -1,7 +1,7 @@
 from typing import Any, cast
 
 import shortuuid
-from mthds.client.models.pipeline_inputs import StuffContentOrData
+from mthds.models.pipeline_inputs import StuffContentOrData
 from pydantic import BaseModel, ValidationError, field_validator
 
 from pipelex.core.concepts.concept import Concept

@@ -54,6 +54,9 @@ dependencies = [
   "typing-extensions>=4.13.2",
 ]
 
+[tool.uv.sources]
+mthds = { path = "../../mthds-ai/mthds-python", editable = true }
+
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
