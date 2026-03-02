@@ -2406,7 +2406,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.0.7"
+version = "0.1.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
@@ -2417,9 +2417,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ba/09/9291d9dee7ea35a49eee3119a3ba26059038d0a9ed719aec76ba9d824b05/mthds-0.0.7.tar.gz", hash = "sha256:ef36899caa41d07a75662bc142d9068a789e2f5050ac94c96c6fa93baa80518b", size = 112046, upload-time = "2026-03-02T01:07:31.42Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/61/93/5b95749725fa69a764e6c10cb1c0e90a728f9ce2419c821dcee20dcfe8e3/mthds-0.1.0.tar.gz", hash = "sha256:010f1a7155251ddb6a86467564f4d9241fec8328ac4223f4dca348b4131a7c2c", size = 112115, upload-time = "2026-03-02T18:02:11.334Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/57/7b/c6919613a73480f6070f7eca2a23d69fa4b402548fd3fc427a2708c91ee3/mthds-0.0.7-py3-none-any.whl", hash = "sha256:a53565819f414c8d2f1f9af3ff64c23ad2fd7d96a1299a171750f666c2139eb9", size = 49165, upload-time = "2026-03-02T01:07:29.949Z" },
+    { url = "https://files.pythonhosted.org/packages/8a/c1/573c636947bd7241d4a4116f8fe317f2dc44c268e5ccfaafa4339c0cd30d/mthds-0.1.0-py3-none-any.whl", hash = "sha256:f580a33b0b710dfd9d2c999ba996baf3307f8b4dbe5fbecabc0685730feebe83", size = 49143, upload-time = "2026-03-02T18:02:09.98Z" },
 ]
 
 [[package]]
@@ -3448,7 +3448,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.14" },
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = ">=0.0.7" },
+    { name = "mthds", specifier = ">=0.1.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=1.108.1" },

@@ -28,7 +28,7 @@ MINIMAL_MANIFEST = """\
 address = "github.com/test/remote-method"
 version = "0.1.0"
 description = "A remote test method"
-name = "remote-method"
+name = "remote_method"
 main_pipe = "test_pipe"
 
 [exports.test]
@@ -111,7 +111,7 @@ class TestResolveMethodTarget:
 
         method = resolve_method_from_url("https://github.com/test/remote-method")
 
-        assert method.name == "remote-method"
+        assert method.name == "remote_method"
         assert method.manifest.main_pipe == "test_pipe"
         assert len(method.mthds_files) == 1
 
@@ -128,7 +128,7 @@ class TestResolveMethodTarget:
 
         method = resolve_method_from_url("https://github.com/test/repo/methods/my-method")
 
-        assert method.name == "remote-method"
+        assert method.name == "remote_method"
         assert method.manifest.main_pipe == "test_pipe"
 
     def test_resolve_method_from_url_clone_failure(self, mocker: MockerFixture, tmp_path: Path) -> None:
@@ -168,7 +168,7 @@ class TestResolveMethodTarget:
         pipe_code, lib_dirs, method = resolve_method_target("https://github.com/test/remote-method")
 
         assert pipe_code == "test_pipe"
-        assert method.name == "remote-method"
+        assert method.name == "remote_method"
         assert len(lib_dirs) == 1
 
     @pytest.mark.parametrize(
@@ -196,7 +196,7 @@ class TestResolveMethodTarget:
 
         method = resolve_method_from_path(str(method_dir))
 
-        assert method.name == "remote-method"
+        assert method.name == "remote_method"
         assert method.manifest.main_pipe == "test_pipe"
         assert len(method.mthds_files) == 1
 
@@ -221,5 +221,5 @@ class TestResolveMethodTarget:
         pipe_code, lib_dirs, method = resolve_method_target(str(method_dir))
 
         assert pipe_code == "test_pipe"
-        assert method.name == "remote-method"
+        assert method.name == "remote_method"
         assert len(lib_dirs) == 1
