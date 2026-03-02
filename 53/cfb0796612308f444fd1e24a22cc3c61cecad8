@@ -1,0 +1,23 @@
+docs/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeSearch.md
+  ff22dab0ec5897de 9,38,83
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "53cfb0796612308f444fd1e24a22cc3c61cecad8",
+  "prompts": {
+    "ff22dab0ec5897de": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a3e3e3c9-bb72-4752-b3e2-9a00b26d44d2",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
