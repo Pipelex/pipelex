@@ -31,7 +31,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> SearchResultContent:
-        depth_value = search_setting.depth.value
+        depth_value = search_setting.depth
         response: LinkupSourcedAnswer = await asyncio.to_thread(
             self._client.search,
             query=query,
@@ -72,7 +72,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> dict[str, Any]:
-        depth_value = search_setting.depth.value
+        depth_value = search_setting.depth
         response = await asyncio.to_thread(
             self._client.search,
             query=query,

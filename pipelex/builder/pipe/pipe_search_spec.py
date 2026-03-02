@@ -37,7 +37,7 @@ class PipeSearchSpec(PipeSpec):
         try:
             return SearchTalent(search_talent_value)
         except ValueError:
-            valid = [talent.value for talent in SearchTalent]
+            valid = list(SearchTalent)
             msg = f"'{search_talent_value}' is not a valid SearchTalent. Valid values: {valid}"
             raise ValueError(msg) from None
 

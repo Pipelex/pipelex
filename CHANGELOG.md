@@ -8,7 +8,7 @@
 
 ### Changed
  - **Test Configuration**: Added a `search` pytest marker, excluded from default test runs.
- - `mthds` bumped to `>=0.0.6`.
+ - `mthds` bumped to `>=0.1.0`.
  - `pipelex-tools` bumped to `>=0.2.3`.
  - `linkup-sdk>=0.12.0` added as optional dependency for the Linkup search provider.
 
