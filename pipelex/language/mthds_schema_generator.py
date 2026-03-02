@@ -29,6 +29,7 @@ _PIPE_DEFINITION_NAMES = {
     "PipeComposeBlueprint",
     "PipeLLMBlueprint",
     "PipeExtractBlueprint",
+    "PipeSearchBlueprint",
     "PipeBatchBlueprint",
     "PipeConditionBlueprint",
     "PipeParallelBlueprint",

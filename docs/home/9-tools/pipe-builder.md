@@ -56,7 +56,7 @@ The concept drafts are formalized into proper Pipelex concept specifications wit
 
 The plan is translated into a structured flow with:
 
-- Pipe operators (PipeLLM, PipeExtract, PipeImgGen)
+- Pipe operators (PipeLLM, PipeExtract, PipeImgGen, PipeSearch)
 - Pipe controllers (PipeSequence, PipeBatch, PipeParallel, PipeCondition)
 - Input/output contracts for each pipe
 - Memory flow between steps

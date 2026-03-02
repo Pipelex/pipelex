@@ -28,7 +28,7 @@ dependencies = [
   "json2html>=1.3.0",
   "kajson==0.3.1",
   "markdown>=3.6",
-  "mthds>=0.0.7",
+  "mthds>=0.1.0",
   "networkx>=3.4.2",
   "openai>=1.108.1",
   "opentelemetry-api",
@@ -36,7 +36,7 @@ dependencies = [
   "opentelemetry-semantic-conventions",
   "opentelemetry-sdk",
   "pillow>=11.2.1",
-  "pipelex-tools>=0.2.1",                               # plxt CLI for MTHDS/TOML/PLX formatting & linting, needed by client projects too
+  "pipelex-tools>=0.2.3",                               # plxt CLI for MTHDS/TOML/PLX formatting & linting, needed by client projects too
   "polyfactory>=2.21.0",
   "portkey-ai>=2.1.0",
   "posthog>=6.7.0",
@@ -70,6 +70,7 @@ gcp-storage = ["google-cloud-storage>=2.10.0"]
 google = ["google-auth-oauthlib>=1.2.1"]
 google-genai = ["google-genai", "instructor[google-genai]"]
 huggingface = ["huggingface_hub>=0.23,<1.0.0"]
+linkup = ["linkup-sdk>=0.12.0"]
 mistralai = ["mistralai>=1.12.0"]
 s3 = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
 docs = [
@@ -228,9 +229,9 @@ typeCheckingMode = "strict"
 minversion = "9.0"
 addopts = [
   "--import-mode=importlib",
-  "-ra",                                                         # Show all test outcomes (including skips)
+  "-ra",                                                                   # Show all test outcomes (including skips)
   "-m",
-  "not (inference or llm or img_gen or extract or pipelex_api)",
+  "not (inference or llm or img_gen or extract or search or pipelex_api)",
 ]
 asyncio_default_fixture_loop_scope = "session"
 xfail_strict = true
@@ -247,6 +248,7 @@ markers = [
   "llm: slow and costly due to llm inference calls",
   "img_gen: slow and costly due to image generation inference calls",
   "extract: slow and costly due to doc extraction inference calls",
+  "search: slow and costly due to search inference calls",
   "gha_disabled: tests that should not run in GitHub Actions",
   "codex_disabled: tests that should not run in Codex",
   "dry_runnable: tests that can be run in dry-run mode",

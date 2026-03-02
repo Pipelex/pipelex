@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Added
+ - **Web Search Integration**: Introduced a comprehensive system for performing web searches within pipelines, including a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models with presets (e.g., `$linkup-standard`, `$linkup-deep`), aliases, and waterfalls.
+ - **Graph View Generation**: Added a `--view` option to `pipelex validate bundle` that generates a `ViewSpec` JSON (compatible with ReactFlow) for client-side graph rendering without writing files to disk.
+
+### Changed
+ - **Test Configuration**: Added a `search` pytest marker, excluded from default test runs.
+ - `mthds` bumped to `>=0.1.0`.
+ - `pipelex-tools` bumped to `>=0.2.3`.
+ - `linkup-sdk>=0.12.0` added as optional dependency for the Linkup search provider.
+
 ## [v0.18.6] - 2026-03-01
 
 ### Added

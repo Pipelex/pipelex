@@ -167,6 +167,12 @@ class ModelManager(ModelManagerAbstract):
             img_gen_waterfalls=model_deck_blueprint.img_gen.waterfalls,
             img_gen_presets=model_deck_blueprint.img_gen.presets,
             img_gen_choice_default=model_deck_blueprint.img_gen.choice_default,
+            # Search
+            search_default_depth=model_deck_blueprint.search.default_depth,
+            search_aliases=model_deck_blueprint.search.aliases,
+            search_waterfalls=model_deck_blueprint.search.waterfalls,
+            search_presets=model_deck_blueprint.search.presets,
+            search_choice_default=model_deck_blueprint.search.choice_default,
             model_deck_config=get_config().cogt.model_deck_config,
         )
 
