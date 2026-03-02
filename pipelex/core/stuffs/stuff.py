@@ -2,7 +2,7 @@
 from typing import Any, cast, get_args, get_origin
 
 from kajson import kajson
-from mthds.client.models.stuff import DictStuffAbstract, StuffAbstract
+from mthds.models.stuff import DictStuffAbstract, StuffAbstract
 from pydantic import ValidationError
 from typing_extensions import override
 

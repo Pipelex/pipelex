@@ -27,10 +27,10 @@ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 if TYPE_CHECKING:
     import asyncio
 
-    from mthds.client.models.pipe_output import VariableMultiplicity
-    from mthds.client.models.pipeline_inputs import PipelineInputs
-    from mthds.client.models.working_memory import WorkingMemoryAbstract
     from mthds.client.pipeline import PipelineStartResponse
+    from mthds.models.pipe_output import VariableMultiplicity
+    from mthds.models.pipeline_inputs import PipelineInputs
+    from mthds.models.working_memory import WorkingMemoryAbstract
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
