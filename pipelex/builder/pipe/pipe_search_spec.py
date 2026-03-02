@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
 from rich.console import Group
+from rich.panel import Panel
 from rich.text import Text
 from typing_extensions import override
 
@@ -52,7 +53,15 @@ class PipeSearchSpec(PipeSpec):
         # Add search specific information
         search_group.renderables.append(Text())  # Blank line
         search_group.renderables.append(Text.from_markup(f"Search Talent: [bold yellow]{self.search_talent}[/bold yellow]"))
-        search_group.renderables.append(Text.from_markup(f"Prompt: [bold cyan]{self.prompt}[/bold cyan]"))
+        prompt_panel = Panel(
+            self.prompt,
+            title="Search Prompt",
+            title_align="left",
+            border_style="cyan",
+            padding=(0, 1),
+        )
+        search_group.renderables.append(Text())  # Blank line
+        search_group.renderables.append(prompt_panel)
 
         return search_group
 
