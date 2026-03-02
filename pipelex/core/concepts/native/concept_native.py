@@ -9,6 +9,7 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
@@ -25,6 +26,7 @@ class NativeConceptCode(StrEnum):
     IMG_GEN_PROMPT = "ImgGenPrompt"
     PAGE = "Page"
     JSON = "JSON"
+    SEARCH_RESULT = "SearchResult"
     ANYTHING = "Anything"
 
     @property
@@ -65,6 +67,8 @@ class NativeConceptCode(StrEnum):
                 return PageContent
             case NativeConceptCode.JSON:
                 return JSONContent
+            case NativeConceptCode.SEARCH_RESULT:
+                return SearchResultContent
             case NativeConceptCode.IMG_GEN_PROMPT | NativeConceptCode.ANYTHING:
                 # These don't have dedicated content classes
                 return None
@@ -120,6 +124,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
             ):
                 return False
 
@@ -142,6 +147,7 @@ class NativeConceptCode(StrEnum):
                 | NativeConceptCode.PAGE
                 | NativeConceptCode.ANYTHING
                 | NativeConceptCode.JSON
+                | NativeConceptCode.SEARCH_RESULT
             ):
                 return False
             case NativeConceptCode.DYNAMIC:

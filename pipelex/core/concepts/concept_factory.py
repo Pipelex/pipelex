@@ -162,6 +162,13 @@ class ConceptFactory:
                     description="A JSON object",
                     structure_class_name=structure_class_name,
                 )
+            case NativeConceptCode.SEARCH_RESULT:
+                return Concept(
+                    code=native_concept_code,
+                    domain_code=SpecialDomain.NATIVE,
+                    description="A search result with answer and sources",
+                    structure_class_name=structure_class_name,
+                )
 
     @classmethod
     def make_domain_and_concept_code_from_concept_ref_or_code(

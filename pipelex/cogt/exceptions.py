@@ -126,6 +126,13 @@ class ExtractHandleNotFoundError(CogtError):
         super().__init__(message)
 
 
+class SearchHandleNotFoundError(CogtError):
+    def __init__(self, message: str, preset_id: str, model_handle: str):
+        self.preset_id = preset_id
+        self.model_handle = model_handle
+        super().__init__(message)
+
+
 class ExtractOutputError(CogtError):
     pass
 

@@ -1877,6 +1877,19 @@ wheels = [
 ]
 
 [[package]]
+name = "linkup-sdk"
+version = "0.12.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "httpx" },
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/cb/bd/3b7a03430b25e971cc75242725e44e90373b116926918939a2132c94fed2/linkup_sdk-0.12.0.tar.gz", hash = "sha256:1ae72141d9576ed7442770d2d4adf65e22351869e97f8efba1250ead5bbfd0a1", size = 76083, upload-time = "2026-02-16T18:02:14.089Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/57/1c/52dfe0bf0cff747bbde6656293d1cf1eb9906a4b7dabf6fa5f2a994f25a6/linkup_sdk-0.12.0-py3-none-any.whl", hash = "sha256:8f675748ff6ab9ed62ee4e20377e8535f6f5c0bc3fba3b766b89ca0ad101c520", size = 11492, upload-time = "2026-02-16T18:02:12.427Z" },
+]
+
+[[package]]
 name = "lxml"
 version = "6.0.2"
 source = { registry = "https://pypi.org/simple" }
@@ -3392,6 +3405,9 @@ google-genai = [
 huggingface = [
     { name = "huggingface-hub" },
 ]
+linkup = [
+    { name = "linkup-sdk" },
+]
 mistralai = [
     { name = "mistralai" },
 ]
@@ -3423,6 +3439,7 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
     { name = "kajson", specifier = "==0.3.1" },
+    { name = "linkup-sdk", marker = "extra == 'linkup'", specifier = ">=0.12.0" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mike", marker = "extra == 'docs'", specifier = ">=2.1.3" },
     { name = "mistralai", marker = "extra == 'mistralai'", specifier = ">=1.12.0" },
@@ -3471,7 +3488,7 @@ requires-dist = [
     { name = "types-pyyaml", marker = "extra == 'dev'", specifier = ">=6.0.12.20250326" },
     { name = "typing-extensions", specifier = ">=4.13.2" },
 ]
-provides-extras = ["anthropic", "bedrock", "docling", "fal", "gcp-storage", "google", "google-genai", "huggingface", "mistralai", "s3", "docs", "dev"]
+provides-extras = ["anthropic", "bedrock", "docling", "fal", "gcp-storage", "google", "google-genai", "huggingface", "linkup", "mistralai", "s3", "docs", "dev"]
 
 [[package]]
 name = "pipelex-tools"

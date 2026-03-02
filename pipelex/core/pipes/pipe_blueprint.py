@@ -43,6 +43,7 @@ class PipeType(StrEnum):
     PIPE_COMPOSE = "PipeCompose"
     PIPE_LLM = "PipeLLM"
     PIPE_EXTRACT = "PipeExtract"
+    PIPE_SEARCH = "PipeSearch"
     # Pipe Controller
     PIPE_BATCH = "PipeBatch"
     PIPE_CONDITION = "PipeCondition"
@@ -65,6 +66,8 @@ class PipeType(StrEnum):
             case PipeType.PIPE_LLM:
                 return PipeCategory.PIPE_OPERATOR
             case PipeType.PIPE_EXTRACT:
+                return PipeCategory.PIPE_OPERATOR
+            case PipeType.PIPE_SEARCH:
                 return PipeCategory.PIPE_OPERATOR
             case PipeType.PIPE_BATCH:
                 return PipeCategory.PIPE_CONTROLLER

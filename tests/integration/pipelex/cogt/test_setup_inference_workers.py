@@ -16,3 +16,5 @@ class TestSetupInferenceWorkers:
                     _ = inference_manager.get_extract_worker(extract_handle=model_handle)
                 case ModelType.IMG_GEN:
                     _ = inference_manager.get_img_gen_worker(img_gen_handle=model_handle)
+                case ModelType.SEARCH:
+                    pass

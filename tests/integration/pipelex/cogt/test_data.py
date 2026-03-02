@@ -234,6 +234,21 @@ class SerDeTestLLMCases:
     ]
 
 
+class SearchTestCases:
+    """Test cases for search integration tests."""
+
+    SOURCED_ANSWER_QUERIES: ClassVar[list[tuple[str, str]]] = [  # topic, query
+        ("Middle East", "Latest events in the middle east"),
+        # ("Capital of France", "What is the capital of France?"),
+        # ("Python creator", "Who created the Python programming language?"),
+    ]
+
+    STRUCTURED_QUERIES: ClassVar[list[tuple[str, str]]] = [  # topic, query
+        ("Python language", "Latest events in the middle east"),
+        ("Machine learning", "What is machine learning and its main applications?"),
+    ]
+
+
 class LLMReasoningTestCases:
     """Test cases for LLM reasoning/thinking integration tests."""
 
