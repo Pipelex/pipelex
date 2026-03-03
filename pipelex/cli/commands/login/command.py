@@ -21,8 +21,6 @@ PIPELEX_GATEWAY_API_KEY_VAR = "PIPELEX_GATEWAY_API_KEY"
 class CallbackHandler(BaseHTTPRequestHandler):
     """HTTP handler that receives the API key callback from the browser."""
 
-    api_key: str | None = None
-
     def __init__(self, result: dict[str, str | None], *args: object, **kwargs: object) -> None:
         self._result = result
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
@@ -106,8 +104,12 @@ def login_cmd() -> None:
 
 def serve_until_callback(server: HTTPServer, result: dict[str, str | None]) -> None:
     """Handle requests until we get the API key or timeout."""
-    while result["api_key"] is None:
-        server.handle_request()
+    try:
+        while result["api_key"] is None:
+            server.handle_request()
+    except OSError:
+        # Socket closed by main thread after timeout — expected during shutdown.
+        pass
 
 
 def save_api_key(api_key: str) -> None:

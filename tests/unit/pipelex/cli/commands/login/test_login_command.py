@@ -86,7 +86,7 @@ class TestLoginCommand:
         assert response.status == 400
         assert result["api_key"] is None
 
-    def testsave_api_key_creates_env_file(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    def test_save_api_key_creates_env_file(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """save_api_key writes the key to ~/.pipelex/.env."""
         env_path = tmp_path / ".env"
         mocker.patch(
@@ -98,7 +98,7 @@ class TestLoginCommand:
         entries = read_env_file(env_path)
         assert entries[PIPELEX_GATEWAY_API_KEY_VAR] == "pk_live_test123"
 
-    def testsave_api_key_preserves_existing_entries(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    def test_save_api_key_preserves_existing_entries(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """save_api_key preserves existing .env entries when adding the API key."""
         env_path = tmp_path / ".env"
         write_env_file(env_path, {"EXISTING_KEY": "existing_value"})
@@ -113,7 +113,7 @@ class TestLoginCommand:
         assert entries["EXISTING_KEY"] == "existing_value"
         assert entries[PIPELEX_GATEWAY_API_KEY_VAR] == "pk_live_test456"
 
-    def testsave_api_key_updates_existing_key(self, tmp_path: Path, mocker: MockerFixture) -> None:
+    def test_save_api_key_updates_existing_key(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """save_api_key overwrites an existing PIPELEX_GATEWAY_API_KEY."""
         env_path = tmp_path / ".env"
         write_env_file(env_path, {PIPELEX_GATEWAY_API_KEY_VAR: "old_key"})
