@@ -1,4 +1,3 @@
-import asyncio
 from datetime import date
 from typing import Any
 
@@ -14,7 +13,7 @@ from pipelex.hub import get_secrets_provider
 class LinkupSearchWorker(SearchWorkerAbstract):
     def __init__(self) -> None:
         api_key = get_secrets_provider().get_secret(secret_id="LINKUP_API_KEY")
-        self._client = LinkupClient(api_key=api_key)
+        self._linkup_client = LinkupClient(api_key=api_key)
 
     def _parse_date(self, date_str: str | None) -> date | None:
         if date_str is None:
@@ -32,8 +31,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         to_date: str | None = None,
     ) -> SearchResultContent:
         depth_value = search_setting.depth
-        response: LinkupSourcedAnswer = await asyncio.to_thread(
-            self._client.search,
+        response: LinkupSourcedAnswer = await self._linkup_client.async_search(
             query=query,
             depth=depth_value,  # type: ignore[arg-type]
             output_type="sourcedAnswer",
@@ -73,8 +71,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         to_date: str | None = None,
     ) -> dict[str, Any]:
         depth_value = search_setting.depth
-        response = await asyncio.to_thread(
-            self._client.search,
+        response = await self._linkup_client.async_search(
             query=query,
             depth=depth_value,  # type: ignore[arg-type]
             output_type="structured",

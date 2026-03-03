@@ -58,6 +58,10 @@ class TestSearch:
         )
         pretty_print(result, title=f"Structured Search Result ({topic})")
         assert isinstance(result, dict), "Expected a dict result"
-        assert "title" in result, "Expected 'title' key in result"
-        assert "summary" in result, "Expected 'summary' key in result"
-        assert "key_points" in result, "Expected 'key_points' key in result"
+        assert "data" in result, "Expected 'data' key in result"
+        assert "sources" in result, "Expected 'sources' key in result"
+        data = result["data"]
+        assert "title" in data, "Expected 'title' key in data"
+        assert "summary" in data, "Expected 'summary' key in data"
+        assert "key_points" in data, "Expected 'key_points' key in data"
+        assert len(result["sources"]) > 0, "Expected at least one source"
