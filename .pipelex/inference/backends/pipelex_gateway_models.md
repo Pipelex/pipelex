@@ -446,13 +446,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">❌</td>
 </tr>
-<tr>
-<td>mistral-document-ai-2505</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">❌</td>
-</tr>
 </tbody>
 </table>
 
@@ -522,6 +515,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-02T23:49:25Z
+> Last updated: 2026-03-03T18:00:27Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

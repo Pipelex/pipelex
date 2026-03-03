@@ -163,9 +163,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **deepseek-ocr**
   - inputs: image
   - outputs: pages
-- **mistral-document-ai-2505**
-  - inputs: image, pdf
-  - outputs: pages
 
 
 **About extracted pages:** Each page contains Markdown text (based on AI-interpreted layout) and optional extracted images. A single image input is treated as one page. Pipelex also wraps the `pypdfium2` library for raw text (without any AI interpretation) and images extraction and page views rendering. All these elements can be used as inputs into downstream pipes, including LLM prompts.
@@ -196,6 +193,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-02T23:49:25Z
+> Last updated: 2026-03-03T18:00:27Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

@@ -1,7 +1,9 @@
+from pipelex.cogt.search.fetch_worker_abstract import FetchWorkerAbstract
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 
 # Cache of search worker instances by provider prefix
 _search_workers: dict[str, SearchWorkerAbstract] = {}
+_fetch_workers: dict[str, FetchWorkerAbstract] = {}
 
 
 def get_search_worker(model_handle: str) -> SearchWorkerAbstract:
@@ -24,12 +26,38 @@ def get_search_worker(model_handle: str) -> SearchWorkerAbstract:
     worker: SearchWorkerAbstract
     match provider:
         case "linkup":
-            from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker  # noqa: PLC0415
+            from pipelex.plugins.linkup.linkup_worker import LinkupWorker  # noqa: PLC0415
 
-            worker = LinkupSearchWorker()
+            worker = LinkupWorker()
         case _:
             msg = f"Unknown search provider: '{provider}' (from model handle '{model_handle}')"
             raise ValueError(msg)
 
     _search_workers[provider] = worker
+    return worker
+
+
+def get_fetch_worker(provider: str) -> FetchWorkerAbstract:
+    """Get a fetch worker instance for the given provider.
+
+    Args:
+        provider: The fetch provider name (e.g., "linkup")
+
+    Returns:
+        A FetchWorkerAbstract instance for the provider
+    """
+    if provider in _fetch_workers:
+        return _fetch_workers[provider]
+
+    worker: FetchWorkerAbstract
+    match provider:
+        case "linkup":
+            from pipelex.plugins.linkup.linkup_worker import LinkupWorker  # noqa: PLC0415
+
+            worker = LinkupWorker()
+        case _:
+            msg = f"Unknown fetch provider: '{provider}'"
+            raise ValueError(msg)
+
+    _fetch_workers[provider] = worker
     return worker

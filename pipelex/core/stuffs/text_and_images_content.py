@@ -16,6 +16,7 @@ from pipelex.tools.misc.pretty import PrettyPrintable
 class TextAndImagesContent(StuffContent):
     text: TextContent | None = Field(default=None, description="A text content")
     images: list[ImageContent] | None = Field(default=None, description="A list of images that were extracted from the text")
+    raw_html: str | None = Field(default=None, description="The raw HTML of the fetched page, if requested")
 
     @property
     @override
@@ -43,6 +44,8 @@ class TextAndImagesContent(StuffContent):
     # TODO: include the images into the HTML rendering
     @override
     def rendered_html(self) -> str:
+        if self.raw_html:
+            return self.raw_html
         if self.text:
             return self.text.rendered_html()
         return ""
@@ -62,6 +65,8 @@ class TextAndImagesContent(StuffContent):
     # TODO: include the images into the HTML rendering
     @override
     async def rendered_html_async(self) -> str:
+        if self.raw_html:
+            return self.raw_html
         if self.text:
             rendered = await self.text.rendered_html_async()
         else:

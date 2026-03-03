@@ -17,6 +17,7 @@ class TestData:
     EXPECTED_SMART_DUMP_TEXT_ONLY: ClassVar[dict[str, Any]] = {
         "text": {"text": "Hello World"},
         "images": None,
+        "raw_html": None,
     }
 
     # Expected outputs for smart_dump (text and images)
@@ -44,6 +45,7 @@ class TestData:
                 "filename": None,
             },
         ],
+        "raw_html": None,
     }
 
     # Expected outputs for render methods
@@ -54,5 +56,5 @@ class TestData:
     EXPECTED_RENDERED_HTML = "Hello World"
 
     # Empty content test cases
-    EXPECTED_SMART_DUMP_EMPTY: ClassVar[dict[str, Any]] = {"text": None, "images": None}
+    EXPECTED_SMART_DUMP_EMPTY: ClassVar[dict[str, Any]] = {"text": None, "images": None, "raw_html": None}
     EXPECTED_RENDERED_PLAIN_EMPTY = ""

@@ -19,6 +19,7 @@ class TestData:
         "text_and_images": {
             "text": {"text": "Page content text"},
             "images": None,
+            "raw_html": None,
         },
         "page_view": None,
     }
@@ -28,6 +29,7 @@ class TestData:
         "text_and_images": {
             "text": {"text": "Page content text"},
             "images": None,
+            "raw_html": None,
         },
         "page_view": {
             "url": URLs.png_example_1,
@@ -42,7 +44,11 @@ class TestData:
     }
 
     # Expected outputs for render methods
-    EXPECTED_RENDERED_MARKDOWN = "# text_and_images\n\n## text: ### text: Page content text\n\n## images: None\n\n# page_view: None"
-    EXPECTED_RENDERED_FOR_PROMPT = "# text_and_images\n\n## text: ### text: Page content text\n\n## images: None\n\n# page_view: None"
+    EXPECTED_RENDERED_MARKDOWN = (
+        "# text_and_images\n\n## text: ### text: Page content text\n\n## images: None\n\n## raw_html: None\n\n# page_view: None"
+    )
+    EXPECTED_RENDERED_FOR_PROMPT = (
+        "# text_and_images\n\n## text: ### text: Page content text\n\n## images: None\n\n## raw_html: None\n\n# page_view: None"
+    )
     # TextAndImagesContent.rendered_html returns the text content (table format, skips None values)
     EXPECTED_RENDERED_HTML = "<table><tr><th>text_and_images</th><td>Page content text</td></tr></table>"
