@@ -32,7 +32,7 @@ class TestCostRegistry:
             },
         )
 
-        cost_report = CostRegistry.complete_cost_report(llm_tokens_usage=llm_tokens_usage)
+        cost_report = CostRegistry.complete_cost_report(tokens_usage=llm_tokens_usage)
         cost_registry = CostRegistry(root=[cost_report])
 
         # Convert to records
@@ -234,7 +234,7 @@ class TestCostRegistry:
         csv_file = tmp_path / "aggregation_test.csv"
         CostRegistry.generate_report(
             pipeline_run_id="test-pipeline",
-            llm_tokens_usages=llm_tokens_usages,
+            tokens_usages=llm_tokens_usages,
             unit_scale=1.0,
             cost_report_file_path=csv_file,
         )
@@ -284,7 +284,7 @@ class TestCostRegistry:
         # Test with non-untitled pipeline
         CostRegistry.generate_report(
             pipeline_run_id="test-pipeline",
-            llm_tokens_usages=[],
+            tokens_usages=[],
             unit_scale=1.0,
             cost_report_file_path=None,
         )
@@ -293,7 +293,7 @@ class TestCostRegistry:
         # Test with untitled pipeline
         CostRegistry.generate_report(
             pipeline_run_id="untitled",
-            llm_tokens_usages=[],
+            tokens_usages=[],
             unit_scale=1.0,
             cost_report_file_path=None,
         )
@@ -325,7 +325,7 @@ class TestCostRegistry:
         csv_file = tmp_path / "cost_report.csv"
         CostRegistry.generate_report(
             pipeline_run_id="test-pipeline",
-            llm_tokens_usages=[llm_tokens_usage],
+            tokens_usages=[llm_tokens_usage],
             unit_scale=1.0,
             cost_report_file_path=csv_file,
         )
@@ -388,7 +388,7 @@ class TestCostRegistry:
         # Generate report
         CostRegistry.generate_report(
             pipeline_run_id="test-pipeline",
-            llm_tokens_usages=[llm_tokens_usage],
+            tokens_usages=[llm_tokens_usage],
             unit_scale=unit_scale,
             cost_report_file_path=None,
         )
@@ -412,11 +412,11 @@ class TestCostRegistry:
 
         assert data_row_call is not None, "Could not find data row call"
 
-        # Extract the cost value from the formatted string (6th argument, index 6)
-        # Columns: Model, Input Cached tokens, Input Non Cached tokens, Input Joined tokens, Output tokens,
-        #          Input Cached Cost (5), Input Non Cached Cost (6), Input Joined Cost (7), Output Cost (8), Total Cost (9)
+        # Extract the cost value from the formatted string (7th argument, index 7)
+        # Columns: Model, Type, Input Cached tokens, Input Non Cached tokens, Input Joined tokens, Output tokens,
+        #          Input Cached Cost (6), Input Non Cached Cost (7), Input Joined Cost (8), Output Cost (9), Total Cost (10)
         args: tuple[Any, ...] = data_row_call[0]
-        cost_str: str = str(args[6])  # Input Non Cached Cost column
+        cost_str: str = str(args[7])  # Input Non Cached Cost column
 
         # Extract the numeric value and verify it matches expected scaled cost
         actual_cost = float(cost_str)

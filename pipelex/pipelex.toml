@@ -5,7 +5,7 @@
 [pipelex.storage_config]
 is_fetch_remote_content_enabled = true
 is_upload_local_content_enabled = true
-method = "in_memory"                   # local, in_memory, s3, gcp
+method = "local"                       # local, in_memory, s3, gcp
 
 [pipelex.storage_config.local]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"

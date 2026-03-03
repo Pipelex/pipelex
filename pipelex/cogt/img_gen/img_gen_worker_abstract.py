@@ -54,7 +54,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         img_gen_job.job_metadata.unit_job_id = UnitJobId.IMG_GEN_TEXT_TO_IMAGE
 
         # Prepare job
-        img_gen_job.img_gen_job_before_start()
+        img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
 
         # Execute job
         result = await self._gen_image(img_gen_job=img_gen_job)
@@ -90,7 +90,7 @@ class ImgGenWorkerAbstract(InferenceWorkerAbstract):
         img_gen_job.job_metadata.unit_job_id = UnitJobId.IMG_GEN_TEXT_TO_IMAGE
 
         # Prepare job
-        img_gen_job.img_gen_job_before_start()
+        img_gen_job.img_gen_job_before_start(inference_model=self.inference_model)
 
         # Execute job
         result = await self._gen_image_list(img_gen_job=img_gen_job, nb_images=nb_images)
