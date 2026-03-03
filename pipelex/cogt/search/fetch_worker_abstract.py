@@ -1,13 +1,19 @@
 from abc import ABC, abstractmethod
 
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
+from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class FetchWorkerAbstract(ABC):
+    def __init__(self, reporting_delegate: ReportingProtocol | None = None):
+        self.reporting_delegate = reporting_delegate
+
     @abstractmethod
     async def fetch_url(
         self,
         url: str,
+        job_metadata: JobMetadata,
         include_raw_html: bool | None = None,
         render_js: bool | None = None,
         extract_images: bool | None = None,
@@ -17,6 +23,7 @@ class FetchWorkerAbstract(ABC):
 
         Args:
             url: The URL of the web page to fetch
+            job_metadata: Job metadata for cost reporting
             include_raw_html: Whether to include the raw HTML of the webpage in the response
             render_js: Whether to render the JavaScript of the webpage before fetching
             extract_images: Whether to extract images from the webpage

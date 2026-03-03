@@ -121,6 +121,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             content = await worker.search_sourced_answer(
                 query=query_text,
                 search_setting=search_setting,
+                job_metadata=job_metadata,
                 include_domains=self.include_domains,
                 exclude_domains=self.exclude_domains,
                 from_date=self.from_date,
@@ -132,6 +133,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
                 query=query_text,
                 search_setting=search_setting,
                 output_schema=output_structure_class,
+                job_metadata=job_metadata,
                 include_domains=self.include_domains,
                 exclude_domains=self.exclude_domains,
                 from_date=self.from_date,

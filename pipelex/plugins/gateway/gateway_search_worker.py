@@ -10,14 +10,19 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.search.search_job import SearchJob
+from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.core.stuffs.search_result_content import SearchResultContent, SearchSourceContent
+from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_search_schemas import GatewaySearchRequestParams
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class GatewaySearchWorker(SearchWorkerAbstract):
@@ -27,7 +32,10 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
+        super().__init__(reporting_delegate=reporting_delegate)
+
         if not isinstance(sdk_instance, AsyncPortkey):
             msg = f"Provided sdk_instance for {self.__class__.__name__} is not of type AsyncPortkey: it's a '{type(sdk_instance)}'"
             raise SdkTypeError(msg)
@@ -55,11 +63,16 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         self,
         query: str,
         search_setting: SearchSetting,
+        job_metadata: JobMetadata,
         include_domains: list[str] | None = None,
         exclude_domains: list[str] | None = None,
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> SearchResultContent:
+        job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
+        search_job = SearchJobFactory.make_search_job(job_metadata=job_metadata)
+        search_job.search_job_before_start(inference_model=self.inference_model)
+
         params = GatewaySearchRequestParams(
             query=query,
             depth=search_setting.depth,
@@ -76,6 +89,11 @@ class GatewaySearchWorker(SearchWorkerAbstract):
             model="linkup/sourced-answer",
             content=params.model_dump_json(),
         )
+
+        self._extract_usage(response=response, search_job=search_job)
+        search_job.search_job_after_complete()
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=search_job)
 
         content_str = self._extract_content(response)
         result_dict: dict[str, Any] = json.loads(content_str)
@@ -100,11 +118,16 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         query: str,
         search_setting: SearchSetting,
         output_schema: type,
+        job_metadata: JobMetadata,
         include_domains: list[str] | None = None,
         exclude_domains: list[str] | None = None,
         from_date: str | None = None,
         to_date: str | None = None,
     ) -> dict[str, Any]:
+        job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
+        search_job = SearchJobFactory.make_search_job(job_metadata=job_metadata)
+        search_job.search_job_before_start(inference_model=self.inference_model)
+
         # Convert Pydantic model class to JSON Schema dict for the relay
         schema_dict: dict[str, Any]
         if hasattr(output_schema, "model_json_schema"):
@@ -130,9 +153,26 @@ class GatewaySearchWorker(SearchWorkerAbstract):
             content=params.model_dump_json(),
         )
 
+        self._extract_usage(response=response, search_job=search_job)
+        search_job.search_job_after_complete()
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=search_job)
+
         content_str = self._extract_content(response)
         result: dict[str, Any] = json.loads(content_str)
         return result
+
+    def _extract_usage(self, response: GenericResponse, search_job: SearchJob) -> None:
+        """Extract token usage from the GenericResponse and populate the search job report."""
+        response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
+        search_tokens_usage = search_job.job_report.search_tokens_usage
+        if (usage_dict := response_dict.get("usage")) and search_tokens_usage:
+            nb_tokens: NbTokensByCategoryDict = {}
+            if input_tokens := usage_dict.get("prompt_tokens") or usage_dict.get("input_tokens"):
+                nb_tokens[TokenCategory.INPUT] = input_tokens
+            if output_tokens := usage_dict.get("completion_tokens") or usage_dict.get("output_tokens"):
+                nb_tokens[TokenCategory.OUTPUT] = output_tokens
+            search_tokens_usage.nb_tokens_by_category = nb_tokens
 
     async def _call_relay(self, model: str, content: str) -> GenericResponse:
         """Send a request through Portkey to the relay.

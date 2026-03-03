@@ -28,10 +28,10 @@ thinking_mode = "none"
 model_id = "standard"
 inputs = ["text"]
 outputs = ["structured"]
-costs = {}
+costs = { input = 0.005, output = 0 }
 
 ["linkup-deep"]
 model_id = "deep"
 inputs = ["text"]
 outputs = ["structured"]
-costs = {}
+costs = { input = 0.05, output = 0 }

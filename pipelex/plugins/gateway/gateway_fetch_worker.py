@@ -10,15 +10,20 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.search.fetch_job import FetchJob
 from pipelex.cogt.search.fetch_worker_abstract import FetchWorkerAbstract
+from pipelex.cogt.search.search_job_factory import FetchJobFactory
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.text_and_images_content import TextAndImagesContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_search_schemas import GatewayFetchRequestParams
+from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
 class GatewayFetchWorker(FetchWorkerAbstract):
@@ -28,7 +33,10 @@ class GatewayFetchWorker(FetchWorkerAbstract):
         self,
         sdk_instance: Any,
         inference_model: InferenceModelSpec,
+        reporting_delegate: ReportingProtocol | None = None,
     ):
+        super().__init__(reporting_delegate=reporting_delegate)
+
         if not isinstance(sdk_instance, AsyncPortkey):
             msg = f"Provided sdk_instance for {self.__class__.__name__} is not of type AsyncPortkey: it's a '{type(sdk_instance)}'"
             raise SdkTypeError(msg)
@@ -55,11 +63,16 @@ class GatewayFetchWorker(FetchWorkerAbstract):
     async def fetch_url(
         self,
         url: str,
+        job_metadata: JobMetadata,
         include_raw_html: bool | None = None,
         render_js: bool | None = None,
         extract_images: bool | None = None,
         timeout: float | None = None,  # noqa: ASYNC109
     ) -> TextAndImagesContent:
+        job_metadata.unit_job_id = UnitJobId.FETCH_URL
+        fetch_job = FetchJobFactory.make_fetch_job(job_metadata=job_metadata)
+        fetch_job.fetch_job_before_start(inference_model=self.inference_model)
+
         params = GatewayFetchRequestParams(
             url=url,
             include_raw_html=include_raw_html,
@@ -98,10 +111,16 @@ class GatewayFetchWorker(FetchWorkerAbstract):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
 
-        # Extract content from response
+        self._extract_usage(response=response, fetch_job=fetch_job)
+        fetch_job.fetch_job_after_complete()
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=fetch_job)
+
+        # Extract content from response — use dict access (GenericResponse uses extra="allow")
         try:
-            raw_content = cast("object", response.choices[0].message.content)  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
-        except (AttributeError, IndexError) as exc:
+            choice: dict[str, Any] = response.choices[0]  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+            raw_content = cast("object", choice["message"]["content"])
+        except (KeyError, IndexError, TypeError) as exc:
             msg = "Could not extract content from gateway fetch response"
             raise GatewaySearchResponseError(msg) from exc
 
@@ -129,6 +148,18 @@ class GatewayFetchWorker(FetchWorkerAbstract):
             images=images or None,
             raw_html=result_dict.get("raw_html"),
         )
+
+    def _extract_usage(self, response: GenericResponse, fetch_job: FetchJob) -> None:
+        """Extract token usage from the GenericResponse and populate the fetch job report."""
+        response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
+        fetch_tokens_usage = fetch_job.job_report.fetch_tokens_usage
+        if (usage_dict := response_dict.get("usage")) and fetch_tokens_usage:
+            nb_tokens: NbTokensByCategoryDict = {}
+            if input_tokens := usage_dict.get("prompt_tokens") or usage_dict.get("input_tokens"):
+                nb_tokens[TokenCategory.INPUT] = input_tokens
+            if output_tokens := usage_dict.get("completion_tokens") or usage_dict.get("output_tokens"):
+                nb_tokens[TokenCategory.OUTPUT] = output_tokens
+            fetch_tokens_usage.nb_tokens_by_category = nb_tokens
 
     def _is_retryable_portkey_error(self, exc: BaseException) -> bool:
         if isinstance(exc, portkey_exceptions.NotFoundError):
