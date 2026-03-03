@@ -3,7 +3,6 @@ from pydantic import BaseModel
 
 from pipelex import pretty_print
 from pipelex.cogt.model_backends.model_type import ModelType
-from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.hub import get_model_deck, get_report_delegate
@@ -33,7 +32,6 @@ class TestSearch:
         worker = SearchWorkerFactory.make_search_worker(inference_model=inference_model)
         search_setting = SearchSetting(
             model=search_combo.handle,
-            depth=SearchDepth.STANDARD,
             max_results=2,
         )
         result = await worker.search_sourced_answer(
@@ -60,7 +58,6 @@ class TestSearch:
         worker = SearchWorkerFactory.make_search_worker(inference_model=inference_model)
         search_setting = SearchSetting(
             model=search_combo.handle,
-            depth=SearchDepth.STANDARD,
         )
         result = await worker.search_structured(
             query=query,

@@ -246,7 +246,8 @@ class SearchTestCases:
     """Test cases for search integration tests."""
 
     SOURCED_ANSWER_QUERIES: ClassVar[list[tuple[str, str]]] = [  # topic, query
-        ("Middle East", "Latest events in the middle east"),
+        ("Declarative languages", "What makes declarative languages different from imperative languages?"),
+        # ("Middle East", "Latest events in the middle east"),
         # ("Capital of France", "What is the capital of France?"),
         # ("Python creator", "Who created the Python programming language?"),
     ]

@@ -3,20 +3,18 @@ from typing import Annotated, Union
 from pydantic import BeforeValidator, Field
 
 from pipelex.cogt.models.model_reference import ModelReference, parse_model_reference
-from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.system.configuration.config_model import ConfigModel
 
 
 class SearchSetting(ConfigModel):
     model: str
-    depth: SearchDepth = Field(strict=False)
     include_images: bool = False
     include_inline_citations: bool = True
     max_results: int | None = Field(default=None, ge=1)
     description: str | None = None
 
     def desc(self) -> str:
-        return f"SearchSetting(model={self.model}, depth={self.depth}, max_results={self.max_results})"
+        return f"SearchSetting(model={self.model}, max_results={self.max_results})"
 
 
 # SearchModelChoice accepts SearchSetting, ModelReference, or a string (which gets parsed to ModelReference)

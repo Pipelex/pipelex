@@ -80,7 +80,6 @@ class PipeSearchSpec(PipeSpec):
             output=base_blueprint.output,
             prompt=self.prompt,
             model=search_choice,
-            depth=None,
             include_images=None,
             max_results=None,
             from_date=None,

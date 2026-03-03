@@ -51,7 +51,7 @@ class LinkupWorker(SearchWorkerAbstract, FetchWorkerAbstract):
         search_job = SearchJobFactory.make_search_job(job_metadata=job_metadata)
         search_job.search_job_before_start(inference_model=self.inference_model)
 
-        depth_value = search_setting.depth
+        depth_value = self.inference_model.model_id
         response: LinkupSourcedAnswer = await self._linkup_client.async_search(
             query=query,
             depth=depth_value,  # type: ignore[arg-type]
@@ -103,7 +103,7 @@ class LinkupWorker(SearchWorkerAbstract, FetchWorkerAbstract):
         search_job = SearchJobFactory.make_search_job(job_metadata=job_metadata)
         search_job.search_job_before_start(inference_model=self.inference_model)
 
-        depth_value = search_setting.depth
+        depth_value = self.inference_model.model_id
         response = await self._linkup_client.async_search(
             query=query,
             depth=depth_value,  # type: ignore[arg-type]

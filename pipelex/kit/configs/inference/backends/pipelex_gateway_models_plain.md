@@ -193,6 +193,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-03T18:00:27Z
+> Last updated: 2026-03-03T22:21:10Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

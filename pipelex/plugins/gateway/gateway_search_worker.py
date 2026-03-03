@@ -75,7 +75,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
 
         params = GatewaySearchRequestParams(
             query=query,
-            depth=search_setting.depth,
+            depth=self.inference_model.model_id,
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
             max_results=search_setting.max_results,
@@ -86,7 +86,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         )
 
         response = await self._call_relay(
-            model="linkup/sourced-answer",
+            model=self.inference_model.model_id,
             content=params.model_dump_json(),
         )
 
@@ -137,7 +137,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
 
         params = GatewaySearchRequestParams(
             query=query,
-            depth=search_setting.depth,
+            depth=self.inference_model.model_id,
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
             max_results=search_setting.max_results,
@@ -149,7 +149,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         )
 
         response = await self._call_relay(
-            model="linkup/structured",
+            model=self.inference_model.model_id,
             content=params.model_dump_json(),
         )
 

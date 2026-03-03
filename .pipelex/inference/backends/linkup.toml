@@ -27,11 +27,11 @@ thinking_mode = "none"
 ["linkup-standard"]
 model_id = "standard"
 inputs = ["text"]
-outputs = ["structured"]
+outputs = ["sourced-answers", "structured"]
 costs = { input = 0.005, output = 0 }
 
 ["linkup-deep"]
 model_id = "deep"
 inputs = ["text"]
-outputs = ["structured"]
+outputs = ["sourced-answers", "structured"]
 costs = { input = 0.05, output = 0 }

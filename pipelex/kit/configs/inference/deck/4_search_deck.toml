@@ -19,7 +19,6 @@
 ####################################################################################################
 
 [search]
-default_depth = "standard"
 choice_default = "@default-search"
 
 ####################################################################################################
@@ -34,5 +33,5 @@ default-search = "linkup-standard"
 ####################################################################################################
 
 [search.presets]
-linkup-standard = { model = "linkup-standard", depth = "standard", include_images = false, include_inline_citations = true }
-linkup-deep = { model = "linkup-deep", depth = "deep", include_images = false, include_inline_citations = true }
+standard = { model = "linkup-standard", include_images = false, include_inline_citations = true }
+deep = { model = "linkup-deep", include_images = false, include_inline_citations = true }

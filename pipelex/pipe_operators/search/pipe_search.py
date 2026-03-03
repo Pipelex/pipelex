@@ -7,7 +7,6 @@ from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
-from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -35,7 +34,6 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     type: Literal["PipeSearch"] = "PipeSearch"
     search_choice: SearchModelChoice | None
     prompt_blueprint: TemplateBlueprint
-    depth_override: SearchDepth | None = None
     include_images_override: bool | None = None
     max_results_override: int | None = None
     from_date: str | None = None
@@ -105,8 +103,6 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             search_setting = search_setting.model_copy(update={"model": resolved_model_handle})
 
         # 4. Apply pipe-level overrides
-        if self.depth_override is not None:
-            search_setting = search_setting.model_copy(update={"depth": self.depth_override})
         if self.include_images_override is not None:
             search_setting = search_setting.model_copy(update={"include_images": self.include_images_override})
         if self.max_results_override is not None:
