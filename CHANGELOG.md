@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.19.1] - 2026-03-02
+
+### Added
+
+- **`pipelex login`** — new CLI command for browser-based Pipelex Gateway authentication. Starts a local HTTP server, opens the browser for OAuth login (GitHub or Google), and saves the Gateway API key to `~/.pipelex/.env`. The key never appears in terminal output. Includes a 120-second timeout with helpful fallback instructions.
+- Added `app_cli_auth` URL to `URLs` class pointing to `https://app.pipelex.com/auth/cli`.
+
 ## [v0.19.0] - 2026-03-02
 
 ### Added
