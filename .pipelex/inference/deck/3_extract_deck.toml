@@ -27,8 +27,8 @@ choice_default = "@default-extract-document"
 
 [extract.aliases]
 default-premium = "azure-document-intelligence"
-default-extract-document = "mistral-document-ai-2505"
-default-extract-image = "mistral-document-ai-2505"
+default-extract-document = "azure-document-intelligence"
+default-extract-image = "azure-document-intelligence"
 default-text-from-pdf = "pypdfium2-extract-pdf"
 default-no-inference = "pypdfium2-extract-pdf"
 

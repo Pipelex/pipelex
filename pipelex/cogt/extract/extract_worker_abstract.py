@@ -84,8 +84,8 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         # Execute job
         result = await self._extract_pages(extract_job=extract_job)
 
-        # Populate page count as usage
-        if extract_tokens_usage := extract_job.job_report.extract_tokens_usage:
+        # Populate page count as fallback usage (only if no real usage was reported)
+        if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:
             nb_tokens: NbTokensByCategoryDict = {
                 TokenCategory.INPUT: len(result.pages) * 1_000_000,
                 TokenCategory.OUTPUT: len(result.pages) * 1_000_000,

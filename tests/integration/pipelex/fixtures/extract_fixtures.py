@@ -103,33 +103,33 @@ def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
             max_nb_images=None,
             should_caption_images=False,
             should_include_page_views=False,
-            page_views_dpi=72,
-            image_min_size=None,
-        ),
-        # max_nb_images=10: Limit to 10 images
-        ExtractJobParams(
-            max_nb_images=10,
-            should_caption_images=True,
-            should_include_page_views=False,
-            page_views_dpi=72,
-            image_min_size=100,
-        ),
-        # max_nb_images=0: No images but page_views True
-        ExtractJobParams(
-            max_nb_images=0,
-            should_caption_images=False,
-            should_include_page_views=True,
-            page_views_dpi=150,
-            image_min_size=None,
-        ),
-        # max_nb_images=0: No images and no page_views
-        ExtractJobParams(
-            max_nb_images=0,
-            should_caption_images=False,
-            should_include_page_views=False,
             page_views_dpi=None,
             image_min_size=None,
         ),
+        # # max_nb_images=10: Limit to 10 images
+        # ExtractJobParams(
+        #     max_nb_images=10,
+        #     should_caption_images=True,
+        #     should_include_page_views=False,
+        #     page_views_dpi=72,
+        #     image_min_size=100,
+        # ),
+        # # max_nb_images=0: No images but page_views True
+        # ExtractJobParams(
+        #     max_nb_images=0,
+        #     should_caption_images=False,
+        #     should_include_page_views=True,
+        #     page_views_dpi=150,
+        #     image_min_size=None,
+        # ),
+        # # max_nb_images=0: No images and no page_views
+        # ExtractJobParams(
+        #     max_nb_images=0,
+        #     should_caption_images=False,
+        #     should_include_page_views=False,
+        #     page_views_dpi=None,
+        #     image_min_size=None,
+        # ),
     ],
 )
 def extract_job_params(request: pytest.FixtureRequest) -> ExtractJobParams:

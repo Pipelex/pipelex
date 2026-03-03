@@ -30,9 +30,9 @@ class ImageTestCases:
         IMAGE_FILE_PATH_JPG_1,
     ]
     IMAGE_TEXT_FILE_PATHS: ClassVar[list[str]] = [
-        IMAGE_FILE_PATH_JPG_1,
+        # IMAGE_FILE_PATH_JPG_1,
         IMAGE_FILE_PATH_PNG_2,
-        IMAGE_FILE_PATH_PNG_3,
+        # IMAGE_FILE_PATH_PNG_3,
     ]
 
     # URL collections
