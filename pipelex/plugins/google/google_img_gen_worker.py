@@ -13,6 +13,7 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -116,6 +117,13 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
         usage_metadata: genai_types.GenerateContentResponseUsageMetadata | None = response.usage_metadata
         if not usage_metadata:
             log.warning("No usage metadata returned from Google")
+
+        if usage_metadata and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
+            request_tokens = GoogleFactory.extract_token_usage(usage_metadata)
+            for token_category, nb_tokens in request_tokens.items():
+                img_gen_tokens_usage.nb_tokens_by_category[token_category] = (
+                    img_gen_tokens_usage.nb_tokens_by_category.get(token_category, 0) + nb_tokens
+                )
 
         # Extract image from response
         if not response.candidates:

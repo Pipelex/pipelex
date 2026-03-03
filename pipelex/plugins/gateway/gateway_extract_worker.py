@@ -21,20 +21,6 @@ from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri
-from pipelex.types import StrEnum
-
-
-class DocumentKind(StrEnum):
-    IMAGE = "image"
-    DOCUMENT = "document"
-
-    @property
-    def document_tag(self) -> str:
-        match self:
-            case DocumentKind.IMAGE:
-                return "image_url"
-            case DocumentKind.DOCUMENT:
-                return "document_url"
 
 
 class GatewayExtractWorker(ExtractWorkerAbstract):
@@ -93,7 +79,6 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             extract_output = await self._extract_base64_url(
                 extract_job=extract_job,
                 base64_url=base64_url,
-                document_type=DocumentKind.IMAGE,
                 should_include_images=False,
             )
 
@@ -105,7 +90,6 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             extract_output = await self._extract_base64_url(
                 extract_job=extract_job,
                 base64_url=base64_url,
-                document_type=DocumentKind.DOCUMENT,
                 should_include_images=should_include_images,
             )
         else:
@@ -117,15 +101,11 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         self,
         extract_job: ExtractJob,
         base64_url: str,
-        document_type: DocumentKind,
         should_include_images: bool = False,
     ) -> ExtractOutput:
         config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
         log.dev(f"Extracting using config '{config_id}' with should_include_images: {should_include_images}")
 
-        doc_tag = document_type.document_tag
-        base_body: dict[str, Any] = {}
-        base_body[document_type.value] = {"type": doc_tag, doc_tag: base64_url}
         attempt_number = 0
         response: GenericResponse | None = None
         retryer = self._make_retryer()
@@ -133,12 +113,20 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
             extra_headers, extra_body = GatewayFactory.make_extras(
                 inference_model=self.inference_model, inference_job=extract_job, output_desc=InferenceOutputType.PAGES
             )
-            extra_body.update(base_body)
+            # Encode document/image as an image_url content part inside messages.
+            # Portkey forwards messages but strips custom top-level fields like document/image.
+            if extra_body.get("messages"):
+                first_msg = extra_body["messages"][0]
+                text_content = first_msg["content"]
+                first_msg["content"] = [
+                    {"type": "text", "text": text_content},
+                    {"type": "image_url", "image_url": {"url": base64_url}},
+                ]
             async for attempt in retryer:
                 with attempt:
                     attempt_number += 1
                     response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
-                        "/",
+                        "/chat/completions",
                         model=self.inference_model.model_id,
                         headers=extra_headers,
                         **extra_body,

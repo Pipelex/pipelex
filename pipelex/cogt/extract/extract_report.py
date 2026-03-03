@@ -8,18 +8,18 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.types import StrEnum
 
 
-class LLMTokenCostReportField(StrEnum):
+class ExtractTokenCostReportField(StrEnum):
     MODEL_TYPE = "model_type"
-    LLM_NAME = "llm_name"
-    PLATFORM_LLM_ID = "platform_llm_id"
+    EXTRACT_NAME = "extract_name"
+    PLATFORM_EXTRACT_ID = "platform_extract_id"
     NB_TOKENS_INPUT = "nb_tokens_input"
     NB_TOKENS_INPUT_CACHED = "nb_tokens_input_cached"
     NB_TOKENS_INPUT_NON_CACHED = "nb_tokens_input_non_cached"
-    NB_TOKENS_INPUT_JOINED = "nb_tokens_input_joined"  # joined = cached + non-cached
+    NB_TOKENS_INPUT_JOINED = "nb_tokens_input_joined"
     NB_TOKENS_OUTPUT = "nb_tokens_output"
     COST_INPUT_CACHED = "cost_input_cached"
     COST_INPUT_NON_CACHED = "cost_input_non_cached"
-    COST_INPUT_JOINED = "cost_input_joined"  # joined = cached + non-cached
+    COST_INPUT_JOINED = "cost_input_joined"
     COST_OUTPUT = "cost_output"
 
     @staticmethod
@@ -31,11 +31,11 @@ class LLMTokenCostReportField(StrEnum):
         return f"cost_{token_category}"
 
 
-class LLMTokenCostReport(BaseModel):
-    model_type: str = "llm"
+class ExtractTokenCostReport(BaseModel):
+    model_type: str = "extract"
     job_metadata: JobMetadata
     inference_model_name: str
-    platform_llm_id: str
+    platform_model_id: str
 
     nb_tokens_by_category: NbTokensByCategoryDict
     costs_by_token_category: CostsByCategoryDict
@@ -44,27 +44,27 @@ class LLMTokenCostReport(BaseModel):
         the_dict: dict[str, Any] = {}
         dict_for_job_metadata = self.job_metadata.model_dump(serialize_as_any=True)
         the_dict.update(dict_for_job_metadata)
-        dict_for_llm: dict[str, Any] = {
-            LLMTokenCostReportField.MODEL_TYPE: self.model_type,
-            LLMTokenCostReportField.LLM_NAME: self.inference_model_name,
-            LLMTokenCostReportField.PLATFORM_LLM_ID: self.platform_llm_id,
+        dict_for_model: dict[str, Any] = {
+            ExtractTokenCostReportField.MODEL_TYPE: self.model_type,
+            ExtractTokenCostReportField.EXTRACT_NAME: self.inference_model_name,
+            ExtractTokenCostReportField.PLATFORM_EXTRACT_ID: self.platform_model_id,
         }
-        the_dict.update(dict_for_llm)
+        the_dict.update(dict_for_model)
         dict_for_nb_tokens = {
-            LLMTokenCostReportField.report_field_for_nb_tokens_by_category(token_category): nb_tokens
+            ExtractTokenCostReportField.report_field_for_nb_tokens_by_category(token_category): nb_tokens
             for token_category, nb_tokens in self.nb_tokens_by_category.items()
         }
         the_dict.update(dict_for_nb_tokens)
         dict_for_costs = {
-            LLMTokenCostReportField.report_field_for_cost_by_category(token_category): cost
+            ExtractTokenCostReportField.report_field_for_cost_by_category(token_category): cost
             for token_category, cost in self.costs_by_token_category.items()
         }
         the_dict.update(dict_for_costs)
         return the_dict
 
 
-class LLMTokensUsage(BaseModel):
-    model_type: str = "llm"
+class ExtractTokensUsage(BaseModel):
+    model_type: str = "extract"
     job_metadata: JobMetadata
     inference_model_name: str
     unit_costs: CostsByCategoryDict

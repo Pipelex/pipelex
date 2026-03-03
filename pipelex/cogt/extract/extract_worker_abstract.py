@@ -9,6 +9,7 @@ from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -78,10 +79,18 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         extract_job.job_metadata.unit_job_id = UnitJobId.EXTRACT_PAGES
 
         # Prepare job
-        extract_job.extract_job_before_start()
+        extract_job.extract_job_before_start(inference_model=self.inference_model)
 
         # Execute job
         result = await self._extract_pages(extract_job=extract_job)
+
+        # Populate page count as fallback usage (only if no real usage was reported)
+        if (extract_tokens_usage := extract_job.job_report.extract_tokens_usage) and not extract_tokens_usage.nb_tokens_by_category:
+            nb_tokens: NbTokensByCategoryDict = {
+                TokenCategory.INPUT: len(result.pages) * 1_000_000,
+                TokenCategory.OUTPUT: len(result.pages) * 1_000_000,
+            }
+            extract_tokens_usage.nb_tokens_by_category = nb_tokens
 
         # Report job
         extract_job.extract_job_after_complete()

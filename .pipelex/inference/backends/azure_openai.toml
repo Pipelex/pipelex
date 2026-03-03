@@ -170,6 +170,15 @@ costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 thinking_mode = "manual"
 
+# --- GPT-5.3 Series -------------------------------------------------------------
+["gpt-5.3-codex"]
+model_id = "gpt-5.3-codex-2026-02-24"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
 ################################################################################
 # IMAGE GENERATION MODELS
 ################################################################################

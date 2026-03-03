@@ -100,6 +100,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gpt-5.2-codex**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **gpt-5.3-codex**
+  - inputs: text, images, pdf
+  - outputs: text, structured
 - **gpt-oss-120b**
   - inputs: text
   - outputs: text, structured
@@ -184,12 +187,15 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **nano-banana**
   - inputs: text, images
   - outputs: image
+- **nano-banana-2**
+  - inputs: text, images
+  - outputs: image
 - **nano-banana-pro**
   - inputs: text, images
   - outputs: image
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-02T17:46:49Z
+> Last updated: 2026-03-02T23:49:25Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
