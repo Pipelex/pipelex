@@ -60,7 +60,7 @@ api_key = "${HF_TOKEN}"
 
 [linkup]
 display_name = "Linkup"
-enabled = true
+enabled = false
 api_key = "${LINKUP_API_KEY}"
 
 [mistral]

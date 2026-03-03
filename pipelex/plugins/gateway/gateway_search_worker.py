@@ -177,14 +177,19 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         return response
 
     def _extract_content(self, response: GenericResponse) -> str:
-        """Extract the content string from a GenericResponse."""
+        """Extract the content string from a GenericResponse.
+
+        GenericResponse uses Pydantic's extra="allow", so `choices` is a raw
+        list[dict] rather than a list of typed objects — use dict access.
+        """
         try:
-            content = cast("object", response.choices[0].message.content)  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+            choice: dict[str, Any] = response.choices[0]  # type: ignore[attr-defined]  # pyright: ignore[reportAttributeAccessIssue, reportUnknownMemberType]
+            content = cast("object", choice["message"]["content"])
             if not isinstance(content, str):
                 msg = f"Expected string content in response, got {type(content)}"
                 raise GatewaySearchResponseError(msg)
             return content
-        except (AttributeError, IndexError) as exc:
+        except (KeyError, IndexError, TypeError) as exc:
             msg = "Could not extract content from gateway search response"
             raise GatewaySearchResponseError(msg) from exc
 

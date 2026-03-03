@@ -6,7 +6,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
-from pipelex.hub import get_model_deck
+from pipelex.hub import get_model_deck, get_report_delegate
 from tests.integration.pipelex.cogt.test_data import SearchTestCases
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
@@ -33,6 +33,7 @@ class TestSearch:
         search_setting = SearchSetting(
             model=search_combo.handle,
             depth=SearchDepth.STANDARD,
+            max_results=2,
         )
         result = await worker.search_sourced_answer(
             query=query,
@@ -44,6 +45,7 @@ class TestSearch:
         for source in result.sources:
             assert source.name, "Expected source to have a name"
             assert source.url, "Expected source to have a URL"
+        get_report_delegate().generate_report()
 
     @pytest.mark.parametrize(
         ("topic", "query"),
