@@ -8,6 +8,7 @@ from .fixtures.combo_fixtures import (
     extract_combo,
     img_gen_combo,
     llm_combo,
+    search_combo,
 )
 from .fixtures.extract_fixtures import (
     extract_choice_for_image,
@@ -33,6 +34,7 @@ __all__ = [
     "llm_combo",
     "img_gen_combo",
     "extract_combo",
+    "search_combo",
     # Plugin fixtures
     "plugin_for_openai",
     "plugin_for_anthropic",

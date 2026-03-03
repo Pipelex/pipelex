@@ -27,12 +27,12 @@ choice_default = "@default-search"
 ####################################################################################################
 
 [search.aliases]
-default-search = "linkup/standard"
+default-search = "linkup-standard"
 
 ####################################################################################################
 # Search Presets
 ####################################################################################################
 
 [search.presets]
-linkup-standard = { model = "linkup/standard", depth = "standard", include_images = false, include_inline_citations = true }
-linkup-deep = { model = "linkup/deep", depth = "deep", include_images = false, include_inline_citations = true }
+linkup-standard = { model = "linkup-standard", depth = "standard", include_images = false, include_inline_citations = true }
+linkup-deep = { model = "linkup-deep", depth = "deep", include_images = false, include_inline_citations = true }

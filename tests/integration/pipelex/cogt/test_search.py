@@ -2,10 +2,13 @@ import pytest
 from pydantic import BaseModel
 
 from pipelex import pretty_print
+from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchSetting
-from pipelex.cogt.search.search_worker_factory import get_search_worker
+from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
+from pipelex.hub import get_model_deck
 from tests.integration.pipelex.cogt.test_data import SearchTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 class TopicSummary(BaseModel):
@@ -22,11 +25,13 @@ class TestSearch:
         ("topic", "query"),
         SearchTestCases.SOURCED_ANSWER_QUERIES,
     )
-    async def test_search_sourced_answer(self, topic: str, query: str) -> None:
+    async def test_search_sourced_answer(self, search_combo: ModelCombo, topic: str, query: str) -> None:
         """Verify that search_sourced_answer returns a non-empty answer with sources."""
-        worker = get_search_worker("linkup/standard")
+        model_deck = get_model_deck()
+        inference_model = model_deck.get_required_inference_model(model_handle=search_combo.handle, model_type=ModelType.SEARCH)
+        worker = SearchWorkerFactory.make_search_worker(inference_model=inference_model)
         search_setting = SearchSetting(
-            model="linkup/standard",
+            model=search_combo.handle,
             depth=SearchDepth.STANDARD,
         )
         result = await worker.search_sourced_answer(
@@ -44,11 +49,13 @@ class TestSearch:
         ("topic", "query"),
         SearchTestCases.STRUCTURED_QUERIES,
     )
-    async def test_search_structured(self, topic: str, query: str) -> None:
+    async def test_search_structured(self, search_combo: ModelCombo, topic: str, query: str) -> None:
         """Verify that search_structured returns a dict with the expected schema keys."""
-        worker = get_search_worker("linkup/standard")
+        model_deck = get_model_deck()
+        inference_model = model_deck.get_required_inference_model(model_handle=search_combo.handle, model_type=ModelType.SEARCH)
+        worker = SearchWorkerFactory.make_search_worker(inference_model=inference_model)
         search_setting = SearchSetting(
-            model="linkup/standard",
+            model=search_combo.handle,
             depth=SearchDepth.STANDARD,
         )
         result = await worker.search_structured(

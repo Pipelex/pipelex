@@ -9,7 +9,7 @@ from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
-from pipelex.cogt.search.search_worker_factory import get_search_worker
+from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
 from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
@@ -113,7 +113,7 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             search_setting = search_setting.model_copy(update={"max_results": self.max_results_override})
 
         # 5. Get search worker from factory
-        worker = get_search_worker(model_handle=search_setting.model)
+        worker = SearchWorkerFactory.make_search_worker(inference_model=inference_model)
 
         # 6. Execute search based on output type
         content: StuffContent

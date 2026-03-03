@@ -1,8 +1,11 @@
 import pytest
 
 from pipelex import pretty_print
-from pipelex.cogt.search.search_worker_factory import get_fetch_worker
+from pipelex.cogt.model_backends.model_type import ModelType
+from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
+from pipelex.hub import get_model_deck
 from tests.integration.pipelex.cogt.test_data import FetchTestCases
+from tests.integration.pipelex.fixtures.model_combo import ModelCombo
 
 
 @pytest.mark.search
@@ -13,9 +16,11 @@ class TestFetch:
         ("topic", "url"),
         FetchTestCases.FETCH_URLS,
     )
-    async def test_fetch_url(self, topic: str, url: str) -> None:
+    async def test_fetch_url(self, search_combo: ModelCombo, topic: str, url: str) -> None:
         """Verify that fetch_url returns non-empty text content."""
-        worker = get_fetch_worker("linkup")
+        model_deck = get_model_deck()
+        inference_model = model_deck.get_required_inference_model(model_handle=search_combo.handle, model_type=ModelType.SEARCH)
+        worker = SearchWorkerFactory.make_fetch_worker(inference_model=inference_model)
         result = await worker.fetch_url(url=url)
         pretty_print(result, title=f"Fetch Result ({topic})")
         assert result.text is not None, "Expected non-empty text content"
@@ -27,9 +32,11 @@ class TestFetch:
         ("topic", "url"),
         FetchTestCases.FETCH_URLS,
     )
-    async def test_fetch_url_with_raw_html(self, topic: str, url: str) -> None:
+    async def test_fetch_url_with_raw_html(self, search_combo: ModelCombo, topic: str, url: str) -> None:
         """Verify that fetch_url returns raw HTML when requested."""
-        worker = get_fetch_worker("linkup")
+        model_deck = get_model_deck()
+        inference_model = model_deck.get_required_inference_model(model_handle=search_combo.handle, model_type=ModelType.SEARCH)
+        worker = SearchWorkerFactory.make_fetch_worker(inference_model=inference_model)
         result = await worker.fetch_url(url=url, include_raw_html=True)
         pretty_print(result, title=f"Fetch Result with HTML ({topic})")
         assert result.text is not None, "Expected non-empty text content"
@@ -40,9 +47,11 @@ class TestFetch:
         ("topic", "url"),
         FetchTestCases.FETCH_URLS,
     )
-    async def test_fetch_url_with_images(self, topic: str, url: str) -> None:
+    async def test_fetch_url_with_images(self, search_combo: ModelCombo, topic: str, url: str) -> None:
         """Verify that fetch_url returns images when requested."""
-        worker = get_fetch_worker("linkup")
+        model_deck = get_model_deck()
+        inference_model = model_deck.get_required_inference_model(model_handle=search_combo.handle, model_type=ModelType.SEARCH)
+        worker = SearchWorkerFactory.make_fetch_worker(inference_model=inference_model)
         result = await worker.fetch_url(url=url, extract_images=True)
         pretty_print(result, title=f"Fetch Result with Images ({topic})")
         assert result.text is not None, "Expected non-empty text content"

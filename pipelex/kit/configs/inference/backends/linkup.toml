@@ -24,13 +24,13 @@ thinking_mode = "none"
 # SEARCH MODELS
 ################################################################################
 
-["linkup/standard"]
+["linkup-standard"]
 model_id = "standard"
 inputs = ["text"]
 outputs = ["structured"]
 costs = {}
 
-["linkup/deep"]
+["linkup-deep"]
 model_id = "deep"
 inputs = ["text"]
 outputs = ["structured"]

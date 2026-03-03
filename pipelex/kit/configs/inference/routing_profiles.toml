@@ -28,7 +28,7 @@ active = "all_pipelex_gateway"
 description = "Use Pipelex Gateway for all its supported models"
 default = "pipelex_gateway"
 [profiles.all_pipelex_gateway.routes]
-"linkup/*" = "linkup"
+"linkup-*" = "linkup"
 
 [profiles.all_anthropic]
 description = "Use Anthropic backend for all its supported models"
