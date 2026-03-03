@@ -1,0 +1,59 @@
+tests/integration/pipelex/conftest.py
+  b99f9817564ccafd 11,37
+pipelex/plugins/gateway/gateway_exceptions.py
+  b99f9817564ccafd 22-25
+.pipelex/inference/backends/linkup.toml
+  b99f9817564ccafd 27,33
+pipelex/pipe_operators/search/pipe_search.py
+  b99f9817564ccafd 12,116
+.pipelex/inference/deck/4_search_deck.toml
+  b99f9817564ccafd 30,37-38
+pipelex/cli/dev_cli/commands/preprocess_test_models_cmd.py
+  b99f9817564ccafd 35,63,101,116,161,383,433,441,538-545,585,590
+.pipelex/inference/routing_profiles.toml
+  b99f9817564ccafd 31
+tests/integration/pipelex/fixtures/model_selection.py
+  b99f9817564ccafd 86-103
+tests/integration/pipelex/fixtures/combo_fixtures.py
+  b99f9817564ccafd 37,154-168
+pipelex/plugins/gateway/gateway_search_schemas.py
+  b99f9817564ccafd 1-26
+pipelex/kit/configs/inference/routing_profiles.toml
+  b99f9817564ccafd 31
+tests/integration/pipelex/cogt/test_fetch.py
+  b99f9817564ccafd 4-6,8,19,21-23,35,37-39,50,52-54
+pipelex/kit/configs/inference/backends/linkup.toml
+  b99f9817564ccafd 27,33
+pipelex/kit/configs/inference/deck/4_search_deck.toml
+  b99f9817564ccafd 30,37-38
+tests/integration/pipelex/cogt/test_search.py
+  b99f9817564ccafd 5,8-9,11,28,30-32,34,52,54-56,58
+pipelex/plugins/gateway/gateway_fetch_worker.py
+  b99f9817564ccafd 1-148
+pipelex/plugins/gateway/gateway_search_worker.py
+  b99f9817564ccafd 1-110,112-206
+.pipelex-dev/test_profiles.toml
+  b99f9817564ccafd 209-212,250,261,277,288,299,310
+pipelex/cogt/search/search_worker_factory.py
+  b99f9817564ccafd 1,4-12,14-28,31-41,43-51,53-67,70-80,82-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "24b52850f01d3eb421aadd568acfe6229c4caae4",
+  "prompts": {
+    "b99f9817564ccafd": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0279814a-a8fe-4dc2-be7c-3a95c5206400",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 645,
+      "total_deletions": 161,
+      "accepted_lines": 566,
+      "overriden_lines": 3
+    }
+  }
+}
