@@ -25,7 +25,7 @@ class CallbackHandler(BaseHTTPRequestHandler):
         self._result = result
         super().__init__(*args, **kwargs)  # type: ignore[arg-type]
 
-    def do_GET(self) -> None:
+    def do_GET(self) -> None:  # pylint: disable=invalid-name
         """Handle GET /callback?api_key=xxx."""
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query)
