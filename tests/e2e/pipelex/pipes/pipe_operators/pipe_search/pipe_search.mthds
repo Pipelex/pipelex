@@ -6,7 +6,7 @@ type        = "PipeSearch"
 description = "Search the web for recent news"
 inputs      = { topic = "Text" }
 output      = "SearchResult"
-model       = "$linkup-standard"
+model       = "$standard"
 prompt      = "What's the latest news about $topic in the last 24 hours?"
 
 [pipe.search_sourced_e2e_using_preset]
@@ -14,7 +14,7 @@ type        = "PipeSearch"
 description = "Search the web for sourced information using the standard preset"
 inputs      = { topic = "Text" }
 output      = "SearchResult"
-model       = "$linkup-standard"
+model       = "$standard"
 prompt      = "What is $topic?"
 
 [pipe.search_sourced_e2e_deep]
@@ -22,5 +22,5 @@ type        = "PipeSearch"
 description = "Search the web for sourced information using the deep preset"
 inputs      = { topic = "Text" }
 output      = "SearchResult"
-model       = "$linkup-deep"
+model       = "$deep"
 prompt      = "What are the main details about $topic?"

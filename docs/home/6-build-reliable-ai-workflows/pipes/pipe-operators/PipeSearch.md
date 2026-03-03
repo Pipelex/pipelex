@@ -25,8 +25,8 @@ PipeSearch uses the unified inference backend system to manage search providers.
 
 Common search presets:
 
-- `$linkup-standard`: Standard web search with fast results
-- `$linkup-deep`: Deep web search for more thorough results
+- `$standard`: Standard web search with fast results
+- `$deep`: Deep web search for more thorough results
 
 ### MTHDS Parameters
 
@@ -36,7 +36,7 @@ Common search presets:
 | `description` | string     | A description of the search operation.                                                                                                              | Yes      |
 | `inputs`      | dictionary | The input concept(s) for the search query, as a dictionary mapping input names to concept codes. Required when the prompt references variables.     | No       |
 | `output`      | string     | The output concept produced by the search. Must be `SearchResult` or a concept that refines `SearchResult`.                                         | Yes      |
-| `model`       | string     | The search model preset to use (e.g., `"$linkup-standard"`, `"$linkup-deep"`). Defaults to the model specified in the global config.                | No       |
+| `model`       | string     | The search model preset to use (e.g., `"$standard"`, `"$deep"`). Defaults to the model specified in the global config.                | No       |
 | `prompt`      | string     | The search query. Can be a static string or reference input variables using `$` prefix (e.g., `"What is $topic?"`).                                 | Yes      |
 
 ### Example: Static search query
@@ -48,7 +48,7 @@ This pipe performs a fixed search query without any inputs.
 type = "PipeSearch"
 description = "Search for the latest AI news"
 output = "SearchResult"
-model = "$linkup-standard"
+model = "$standard"
 prompt = "What are the latest developments in artificial intelligence?"
 ```
 
@@ -62,7 +62,7 @@ type = "PipeSearch"
 description = "Search the web for information about a topic"
 inputs = { topic = "Text" }
 output = "SearchResult"
-model = "$linkup-standard"
+model = "$standard"
 prompt = "What is $topic?"
 ```
 
@@ -76,7 +76,7 @@ type = "PipeSearch"
 description = "Perform deep research on a topic"
 inputs = { topic = "Text" }
 output = "SearchResult"
-model = "$linkup-deep"
+model = "$deep"
 prompt = "What are the main details about $topic?"
 ```
 
