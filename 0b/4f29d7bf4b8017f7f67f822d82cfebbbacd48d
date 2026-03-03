@@ -1,0 +1,25 @@
+pipelex/plugins/linkup/linkup_search_worker.py
+  d91ad3c36deb313e 16,34,74
+tests/integration/pipelex/cogt/test_search.py
+  d91ad3c36deb313e 61-67
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.7",
+  "base_commit_sha": "0b4f29d7bf4b8017f7f67f822d82cfebbbacd48d",
+  "prompts": {
+    "d91ad3c36deb313e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "03135d14-fd5a-4ec3-a9b9-1284000f990d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 10,
+      "total_deletions": 9,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    }
+  }
+}
