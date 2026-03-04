@@ -310,7 +310,7 @@ type = "PipeSearch"
 description = "Search the web for information"
 inputs = { topic = "Text" }
 output = "SearchResult"
-model = "$linkup-standard"
+model = "$standard"
 prompt = "What is $topic?"
 ```
 

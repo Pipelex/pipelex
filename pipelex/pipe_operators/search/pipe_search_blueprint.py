@@ -2,7 +2,6 @@ from typing import Literal
 
 from typing_extensions import override
 
-from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchModelChoice
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
@@ -18,7 +17,6 @@ class PipeSearchBlueprint(PipeBlueprint):
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     prompt: str
     model: SearchModelChoice | None = None
-    depth: SearchDepth | None = None
     include_images: bool | None = None
     max_results: int | None = None
     from_date: str | None = None

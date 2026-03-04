@@ -19,3 +19,7 @@ class GatewayDeckError(GatewayError):
 
 class GatewayExtractResponseError(GatewayError):
     pass
+
+
+class GatewaySearchResponseError(GatewayError):
+    pass

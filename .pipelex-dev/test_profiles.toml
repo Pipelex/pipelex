@@ -206,6 +206,10 @@ google = ["nano-banana", "nano-banana-pro"]
 # --- Qwen Models ---
 qwen = ["qwen-image"]
 
+[collections.search]
+# --- Search Models ---
+linkup = ["linkup-standard", "linkup-deep"]
+
 [collections.extract]
 # --- PDF Extraction Models ---
 from_pdf = [
@@ -243,6 +247,7 @@ backends = ["azure_openai"]
 llm_models = ["gpt-4o-mini"]
 img_gen_models = []
 extract_models = []
+search_models = []
 
 ################################################################################
 # Dev Profile
@@ -253,6 +258,7 @@ backends = ["pipelex_gateway", "internal"]
 llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["@from_pdf"]
+search_models = ["linkup-standard"]
 
 ################################################################################
 # Coverage Profile
@@ -268,6 +274,7 @@ llm_models = [
 ]
 img_gen_models = ["gpt-image-1", "nano-banana"]
 extract_models = ["pypdfium2-extract-pdf"]
+search_models = ["linkup-standard"]
 
 ################################################################################
 # Claude Latest Profile
@@ -278,6 +285,7 @@ backends = ["anthropic", "pipelex_gateway"]
 llm_models = ["claude-4.5-*"]
 img_gen_models = []
 extract_models = []
+search_models = []
 
 ################################################################################
 # GPT No Codex Profile
@@ -288,6 +296,7 @@ backends = ["openai", "pipelex_gateway"]
 llm_models = ["gpt-*", "!*-codex", "!*-codex-*"]
 img_gen_models = ["gpt-image-*"]
 extract_models = []
+search_models = []
 
 ################################################################################
 # All Backends Profile - Test across all backends with select models
@@ -298,6 +307,7 @@ backends = ["@all"]
 llm_models = ["claude-4.5-haiku", "gpt-4o-mini", "gemini-2.5-flash-lite"]
 img_gen_models = ["gpt-image-1-mini"]
 extract_models = ["@from_pdf"]
+search_models = ["@linkup"]
 
 ################################################################################
 # Full Profile - All available models (use with caution)

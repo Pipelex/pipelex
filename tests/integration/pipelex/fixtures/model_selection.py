@@ -83,3 +83,21 @@ def get_extract_combos() -> list[ModelCombo]:
     )
 
     return list(EXTRACT_COMBOS)
+
+
+@cache
+def get_search_combos() -> list[ModelCombo]:
+    """Get the list of valid (search_model, backend) combinations.
+
+    Returns:
+        List of ModelCombo(handle, backend).
+
+    Raises:
+        FileNotFoundError: If the generated fixtures file does not exist.
+    """
+    _ensure_generated_fixtures_exist()
+    from tests.integration.pipelex.fixtures._generated_model_sets import (  # noqa: PLC0415
+        SEARCH_COMBOS,  # noqa: PLC2701
+    )
+
+    return list(SEARCH_COMBOS)

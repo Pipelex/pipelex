@@ -30,7 +30,6 @@ from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError, ensure_model_reference
-from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
@@ -69,7 +68,6 @@ class ImgGenDeckBlueprint(ConfigModel):
 
 
 class SearchDeckBlueprint(ConfigModel):
-    default_depth: SearchDepth = Field(strict=False)
     aliases: dict[str, str] = Field(default_factory=dict)
     waterfalls: dict[str, list[str]] = Field(default_factory=dict)
     presets: dict[str, SearchSetting] = Field(default_factory=dict)
@@ -115,7 +113,6 @@ class ModelDeck(ConfigModel):
     img_gen_choice_default: ImgGenModelChoice
 
     # Search-specific
-    search_default_depth: SearchDepth = Field(strict=False)
     search_aliases: dict[str, str] = Field(default_factory=dict)
     search_waterfalls: dict[str, list[str]] = Field(default_factory=dict)
     search_presets: dict[str, SearchSetting] = Field(default_factory=dict)
@@ -426,7 +423,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.ALIAS:
                 if alias_target := self.search_aliases.get(ref.name):
-                    return SearchSetting(model=alias_target, depth=self.search_default_depth)
+                    return SearchSetting(model=alias_target)
                 msg = f"Alias '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -437,7 +434,7 @@ class ModelDeck(ConfigModel):
                 )
             case ModelReferenceKind.WATERFALL:
                 if ref.name in self.search_waterfalls:
-                    return SearchSetting(model=ref.name, depth=self.search_default_depth)
+                    return SearchSetting(model=ref.name)
                 msg = f"Waterfall '{ref.name}' was not found in the model deck"
                 raise ModelChoiceNotFoundError(
                     message=msg,
@@ -449,7 +446,7 @@ class ModelDeck(ConfigModel):
             case ModelReferenceKind.HANDLE:
                 self._warn_if_ambiguous_search(ref.name)
                 if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.SEARCH):
-                    return SearchSetting(model=ref.name, depth=self.search_default_depth)
+                    return SearchSetting(model=ref.name)
                 self._raise_handle_not_found_error(
                     ref=ref,
                     model_type=ModelType.SEARCH,
