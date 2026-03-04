@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.20.3] - 2026-03-04
+
+### Fixed
+
+- Rewrote README with updated CV Batch Screening example, corrected CLI command, inputs schema, Python snippet, and pipe descriptions.
+
 ## [v0.20.2] - 2026-03-04
 
 ### Fixed
