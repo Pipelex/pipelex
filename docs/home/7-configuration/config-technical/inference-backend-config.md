@@ -65,12 +65,14 @@ All inference backend configurations are stored in the `.pipelex/inference/` dir
     │   ├── mistral.toml        # Mistral models (LLMs, OCR)
     │   ├── vertexai.toml       # Google Vertex AI models (LLMs)
     │   ├── fal.toml            # FAL models (image generation)
+    │   ├── linkup.toml          # Linkup models (web search)
     │   ├── internal.toml       # Internal/local models (OCR)
     │   └── ...
     └── deck/                   # Model deck configurations
         ├── 1_llm_deck.toml           # LLM aliases & presets
         ├── 2_img_gen_deck.toml       # Image generation config
         ├── 3_extract_deck.toml       # Document extraction config
+        ├── 4_search_deck.toml        # Web search config
         ├── x_custom_llm_deck.toml    # Custom LLM waterfalls/overrides
         └── x_custom_extract_deck.toml # Custom extract waterfalls
 ```
@@ -251,6 +253,8 @@ GCP_LOCATION=
 GCP_CREDENTIALS_FILE_PATH=gcp_credentials.json
 
 FAL_API_KEY=
+
+LINKUP_API_KEY=
 # ... (see .env.example for full list)
 ```
 
@@ -274,6 +278,10 @@ api_key = "${MISTRAL_API_KEY}"
 [fal]
 enabled = true
 api_key = "${FAL_API_KEY}"
+
+[linkup]
+enabled = true
+api_key = "${LINKUP_API_KEY}"
 
 [internal]
 enabled = true
@@ -513,6 +521,29 @@ model = "$gen-image-fast"         # Uses fast image generation preset
 model = "$gen-image-high-quality" # Uses high quality image generation preset
 ```
 
+### Search Presets
+
+Search presets combine a search model with result options. Defined in `.pipelex/inference/deck/4_search_deck.toml`:
+
+```toml
+[search.presets]
+standard = { model = "linkup-standard", include_images = false, include_inline_citations = true }
+deep = { model = "linkup-deep", include_images = false, include_inline_citations = true }
+```
+
+When using search presets in `.mthds` files, prefix them with `$`:
+
+```toml
+model = "$standard"    # Standard web search
+model = "$deep"        # More thorough web search
+```
+
+Search presets support the following options:
+
+- `model`: The search model to use (e.g., `linkup-standard`, `linkup-deep`)
+- `include_images`: Whether to include images in search results
+- `include_inline_citations`: Whether to include inline citations in the answer
+
 ### Default Choices
 
 Set default models for different types of AI operations:
@@ -527,6 +558,9 @@ choice_default = "@default-extract-document"
 
 [img_gen]
 choice_default = "$gen-image"
+
+[search]
+choice_default = "@default-search"
 ```
 
 Note the sigil prefixes: `@` for aliases and `$` for presets.

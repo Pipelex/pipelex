@@ -76,7 +76,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
 
         params = GatewaySearchRequestParams(
             query=query,
-            depth=SearchDepth(self.inference_model.model_id),
+            depth=SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1]),
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
             max_results=search_setting.max_results,
@@ -139,7 +139,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
 
         params = GatewaySearchRequestParams(
             query=query,
-            depth=SearchDepth(self.inference_model.model_id),
+            depth=SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1]),
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
             max_results=search_setting.max_results,

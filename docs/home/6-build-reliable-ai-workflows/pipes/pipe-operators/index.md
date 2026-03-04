@@ -88,4 +88,4 @@ Searches the web and returns structured results with sources.
 - Web search via configurable providers
 - Structured results with answer and source citations
 - Dynamic prompt templates with `$variable` syntax
-- Configurable search depth (standard vs deep)
+- Standard and deep search models

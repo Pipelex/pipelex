@@ -103,7 +103,14 @@ Combines text with one or more images:
 class TextAndImagesContent(StuffContent):
     text: Optional[TextContent]
     images: Optional[List[ImageContent]]
+    raw_html: Optional[str]
 ```
+
+**Fields:**
+
+- `text`: The text content
+- `images`: A list of images extracted from the content
+- `raw_html`: The raw HTML of the fetched page, when requested via `include_raw_html`
 
 **Use for:** Rich content combining text and visuals, extracted document content, reports with diagrams.
 

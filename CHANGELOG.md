@@ -4,8 +4,18 @@
 
 ### Added
 
-- **`pipelex login`** — new CLI command for browser-based Pipelex Gateway authentication. Starts a local HTTP server, opens the browser for OAuth login (GitHub or Google), and saves the Gateway API key to `~/.pipelex/.env`. The key never appears in terminal output. Includes a 120-second timeout with helpful fallback instructions.
-- Added `app_cli_auth` URL to `URLs` class pointing to `https://app.pipelex.com/auth/cli`.
+- **CLI Authentication**: `pipelex login` command that initiates a browser-based OAuth flow (GitHub/Google) to authenticate with the Pipelex Gateway and save the API key locally.
+- **Search Filtering**: `from_date`, `to_date`, `include_domains`, and `exclude_domains` options on the `PipeSearch` operator, routed through a new `GatewaySearchWorker`.
+- **Expanded Cost Reporting**: Token usage and cost tracking now covers Search, Fetch, Extraction, and Image Generation jobs, in addition to LLMs.
+- **New Models**: Added `gpt-5.3-codex` (text, images, pdf inputs) and `nano-banana-2`.
+
+### Changed
+
+- **Search Configuration**: Renamed Linkup model IDs from `linkup/standard` to `linkup-standard` (and `deep` variant), simplified presets to `$standard` and `$deep`.
+- **Default Pipeline Execution**: Changed from `in_memory` to `local`.
+- **Default Extraction Model**: Changed from `mistral-document-ai-2505` to `azure-document-intelligence`; removed `mistral-document-ai-2505` from the supported Gateway models list.
+- **Content Handling**: `TextAndImagesContent` now supports an optional `raw_html` field.
+- **Dev Experience**: `Makefile` commands (`generate-mthds-schema`, `update-gateway-models`) run in quiet mode by default.
 
 ## [v0.19.0] - 2026-03-02
 

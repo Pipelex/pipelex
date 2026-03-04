@@ -30,6 +30,12 @@ class PipeSearchSpec(PipeSpec):
         examples=list(SearchTalent),
     )
     prompt: str = Field(description="A finalized search prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).")
+    from_date: str | None = Field(
+        default=None, description="Start date filter in ISO 8601 format (YYYY-MM-DD). Only return results from this date onwards."
+    )
+    to_date: str | None = Field(default=None, description="End date filter in ISO 8601 format (YYYY-MM-DD). Only return results up to this date.")
+    include_domains: list[str] | None = Field(default=None, description="Restrict search to these domains only (e.g., ['reuters.com', 'bbc.com']).")
+    exclude_domains: list[str] | None = Field(default=None, description="Exclude results from these domains.")
 
     @field_validator("search_talent", mode="before")
     @classmethod
@@ -63,6 +69,21 @@ class PipeSearchSpec(PipeSpec):
         search_group.renderables.append(Text())  # Blank line
         search_group.renderables.append(prompt_panel)
 
+        # Show filter fields when set
+        filter_lines: list[str] = []
+        if self.from_date is not None:
+            filter_lines.append(f"From date: {self.from_date}")
+        if self.to_date is not None:
+            filter_lines.append(f"To date: {self.to_date}")
+        if self.include_domains is not None:
+            filter_lines.append(f"Include domains: {', '.join(self.include_domains)}")
+        if self.exclude_domains is not None:
+            filter_lines.append(f"Exclude domains: {', '.join(self.exclude_domains)}")
+        if filter_lines:
+            search_group.renderables.append(Text())  # Blank line
+            for filter_line in filter_lines:
+                search_group.renderables.append(Text.from_markup(f"[dim]{filter_line}[/dim]"))
+
         return search_group
 
     @override
@@ -82,8 +103,8 @@ class PipeSearchSpec(PipeSpec):
             model=search_choice,
             include_images=None,
             max_results=None,
-            from_date=None,
-            to_date=None,
-            include_domains=None,
-            exclude_domains=None,
+            from_date=self.from_date,
+            to_date=self.to_date,
+            include_domains=self.include_domains,
+            exclude_domains=self.exclude_domains,
         )
