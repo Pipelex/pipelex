@@ -1,3 +1,4 @@
+import re
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
@@ -31,11 +32,25 @@ class PipeSearchSpec(PipeSpec):
     )
     prompt: str = Field(description="A finalized search prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).")
     from_date: str | None = Field(
-        default=None, description="Start date filter in ISO 8601 format (YYYY-MM-DD). Only return results from this date onwards."
+        default=None,
+        description="Start date filter in ISO 8601 format (YYYY-MM-DD). Only return results from this date onwards.",
     )
-    to_date: str | None = Field(default=None, description="End date filter in ISO 8601 format (YYYY-MM-DD). Only return results up to this date.")
+    to_date: str | None = Field(
+        default=None,
+        description="End date filter in ISO 8601 format (YYYY-MM-DD). Only return results up to this date.",
+    )
     include_domains: list[str] | None = Field(default=None, description="Restrict search to these domains only (e.g., ['reuters.com', 'bbc.com']).")
     exclude_domains: list[str] | None = Field(default=None, description="Exclude results from these domains.")
+
+    @field_validator("from_date", "to_date", mode="before")
+    @classmethod
+    def validate_date_format(cls, date_value: str | None) -> str | None:
+        if date_value is None:
+            return date_value
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_value):
+            msg = f"'{date_value}' is not a valid date (expected YYYY-MM-DD)"
+            raise ValueError(msg)
+        return date_value
 
     @field_validator("search_talent", mode="before")
     @classmethod
