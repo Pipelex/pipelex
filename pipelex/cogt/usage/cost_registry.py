@@ -222,7 +222,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
                 model_type=tokens_usage.model_type,
                 job_metadata=tokens_usage.job_metadata,
                 inference_model_name=tokens_usage.inference_model_name,
-                platform_llm_id=tokens_usage.inference_model_id,
+                platform_model_id=tokens_usage.inference_model_id,
                 nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
                 costs_by_token_category=costs_by_token_category,
             )

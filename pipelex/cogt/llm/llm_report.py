@@ -35,7 +35,7 @@ class LLMTokenCostReport(BaseModel):
     model_type: str = "llm"
     job_metadata: JobMetadata
     inference_model_name: str
-    platform_llm_id: str
+    platform_model_id: str
 
     nb_tokens_by_category: NbTokensByCategoryDict
     costs_by_token_category: CostsByCategoryDict
@@ -47,7 +47,7 @@ class LLMTokenCostReport(BaseModel):
         dict_for_llm: dict[str, Any] = {
             LLMTokenCostReportField.MODEL_TYPE: self.model_type,
             LLMTokenCostReportField.LLM_NAME: self.inference_model_name,
-            LLMTokenCostReportField.PLATFORM_LLM_ID: self.platform_llm_id,
+            LLMTokenCostReportField.PLATFORM_LLM_ID: self.platform_model_id,
         }
         the_dict.update(dict_for_llm)
         dict_for_nb_tokens = {
