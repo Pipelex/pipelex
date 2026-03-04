@@ -1,0 +1,29 @@
+docs/home/6-build-reliable-ai-workflows/concepts/native-concepts.md
+  c86603d3bf46423b 106,109-113
+docs/home/7-configuration/config-technical/inference-backend-config.md
+  c86603d3bf46423b 68,75,256-257,282-285,524-546,561-563
+docs/home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md
+  c86603d3bf46423b 91
+docs/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeSearch.md
+  c86603d3bf46423b 23,41-46,89-104
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "5b5bb5147a6817dc3a01d30c98930a85a9ada24a",
+  "prompts": {
+    "c86603d3bf46423b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b8edb42-722d-4538-945b-047bebd8d782",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 65,
+      "total_deletions": 2,
+      "accepted_lines": 65,
+      "overriden_lines": 0
+    }
+  }
+}
