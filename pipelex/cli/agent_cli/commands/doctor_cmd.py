@@ -78,7 +78,7 @@ def agent_doctor_cmd(
     if not config_healthy and config_missing_count > 0:
         recommended_actions.append("Run 'pipelex init config' to install missing configuration files")
     if not config_healthy and config_missing_count == 0:
-        recommended_actions.append("Fix validation errors in .pipelex/pipelex.toml or run 'pipelex init config --reset'")
+        recommended_actions.append("Fix validation errors in .pipelex/pipelex.toml or run 'pipelex init config'")
     if not telemetry_healthy:
         recommended_actions.append(f"Run 'pipelex init telemetry' to fix telemetry: {telemetry_message}")
     if not backends_healthy:
