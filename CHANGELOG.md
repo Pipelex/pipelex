@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.20.1] - 2026-03-03
+
+### Changed
+
+- **Cost Report Consistency**: Renamed `platform_llm_id` field to `platform_model_id` in `LLMTokenCostReport`, aligning with all other report types (ImgGen, Extract, Search, Fetch) that already use `platform_model_id`.
+- **Test Coverage**: Added `linkup` backend to the coverage test profile.
+
 ## [v0.20.0] - 2026-03-03
 
 ### Added
