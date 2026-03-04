@@ -20,7 +20,7 @@ The output is a `SearchResult` (or a concept that refines it), which contains:
 PipeSearch uses the unified inference backend system to manage search providers. This means you can:
 
 - Use different search providers (e.g., Linkup)
-- Configure search depth (standard vs deep) through presets
+- Choose between standard and deep search models, with presets for each
 - Route search requests through the same backend system as LLMs and other operators
 
 Common search presets:
@@ -38,6 +38,12 @@ Common search presets:
 | `output`      | string     | The output concept produced by the search. Must be `SearchResult` or a concept that refines `SearchResult`.                                         | Yes      |
 | `model`       | string     | The search model preset to use (e.g., `"$standard"`, `"$deep"`). Defaults to the model specified in the global config.                | No       |
 | `prompt`      | string     | The search query. Can be a static string or reference input variables using `$` prefix (e.g., `"What is $topic?"`).                                 | Yes      |
+| `include_images` | boolean | Whether to include images in search results. Overrides the preset setting.                                                                        | No       |
+| `max_results`    | integer | Maximum number of results to return. Overrides the preset setting.                                                                                | No       |
+| `from_date`      | string  | Start date filter in YYYY-MM-DD format. Only return results from this date onwards.                                                               | No       |
+| `to_date`        | string  | End date filter in YYYY-MM-DD format. Only return results up to this date.                                                                        | No       |
+| `include_domains` | list of strings | Restrict search to these domains only.                                                                                                    | No       |
+| `exclude_domains` | list of strings | Exclude results from these domains.                                                                                                       | No       |
 
 ### Example: Static search query
 
@@ -78,6 +84,22 @@ inputs = { topic = "Text" }
 output = "SearchResult"
 model = "$deep"
 prompt = "What are the main details about $topic?"
+```
+
+### Example: Filtering by date and domain
+
+Use date filters and domain restrictions to narrow search results.
+
+```toml
+[pipe.search_recent_from_sources]
+type = "PipeSearch"
+description = "Search specific sources for recent news"
+inputs = { topic = "Text" }
+output = "SearchResult"
+model = "$standard"
+prompt = "What are the latest developments about $topic?"
+from_date = "2026-01-01"
+include_domains = ["reuters.com", "apnews.com", "bbc.com"]
 ```
 
 The output of PipeSearch must be `SearchResult` or a concept that refines `SearchResult`. After execution, the output contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets.
