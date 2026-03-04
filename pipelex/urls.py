@@ -13,6 +13,7 @@ class URLs:
     pipe_func_docs = "https://docs.pipelex.com/latest/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc/"
     backend_provider_docs = "https://docs.pipelex.com/latest/home/5-setup/configure-ai-providers/"
     native_concepts_docs = "https://docs.pipelex.com/latest/home/6-build-reliable-ai-workflows/concepts/native-concepts/"
+    app_cli_auth = "https://app.pipelex.com/auth/cli"
 
     jpg_example_1 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_1.jpg"
     jpg_example_2 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_2.jpg"

@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+from pipelex.cogt.extract.extract_report import ExtractTokensUsage
 from pipelex.system.configuration.config_model import ConfigModel
 
 
@@ -44,4 +45,4 @@ class ExtractJobConfig(ConfigModel):
 
 
 class ExtractJobReport(ConfigModel):
-    pass
+    extract_tokens_usage: ExtractTokensUsage | None = None

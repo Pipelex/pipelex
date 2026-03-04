@@ -10,6 +10,7 @@ from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
@@ -87,6 +88,13 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         if not usage:
             msg = "No usage received from OpenAI"
             raise ImgGenGenerationError(msg)
+
+        if img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage:
+            nb_tokens: NbTokensByCategoryDict = {
+                TokenCategory.INPUT: usage.input_tokens,
+                TokenCategory.OUTPUT: usage.output_tokens,
+            }
+            img_gen_tokens_usage.nb_tokens_by_category = nb_tokens
 
         generated_images: list[GeneratedImageRawDetails] = []
         for image_data in images_response.data:

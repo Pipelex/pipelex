@@ -50,7 +50,6 @@ class PipeSearchFactory(PipeFactoryProtocol[PipeSearchBlueprint, PipeSearch]):
             inputs=inputs,
             search_choice=blueprint.model,
             prompt_blueprint=prompt_blueprint,
-            depth_override=blueprint.depth,
             include_images_override=blueprint.include_images,
             max_results_override=blueprint.max_results,
             from_date=blueprint.from_date,

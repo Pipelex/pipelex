@@ -11,6 +11,7 @@ from pipelex.cli.commands.doctor_cmd import doctor_cmd
 from pipelex.cli.commands.graph_cmd import graph_app
 from pipelex.cli.commands.init.command import init_cmd
 from pipelex.cli.commands.init.ui.types import InitFocus
+from pipelex.cli.commands.login.command import login_cmd
 from pipelex.cli.commands.run.app import run_app
 from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate.app import validate_app
@@ -26,7 +27,7 @@ class PipelexCLI(TyperGroup):
     @override
     def list_commands(self, ctx: Context) -> list[str]:
         # List the commands in the proper order because natural ordering doesn't work between Typer groups and commands
-        return ["init", "doctor", "build", "validate", "run", "graph", "show", "which"]
+        return ["login", "init", "doctor", "build", "validate", "run", "graph", "show", "which"]
 
     @override
     def get_command(self, ctx: Context, cmd_name: str) -> Command | None:
@@ -115,11 +116,17 @@ def app_callback(
 """
         )
     # Skip checks if no command is being run (e.g., just --help) or if running init/doctor command
-    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"init", "doctor"}:
+    if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"login", "init", "doctor"}:
         return
 
     # Check system readiness (dependencies and venv for dev installs)
     check_readiness()
+
+
+@app.command(name="login", help="Log in to Pipelex Gateway via the browser and save your API key")
+def login_command() -> None:
+    """Open the browser to authenticate and save your Pipelex Gateway API key."""
+    login_cmd()
 
 
 @app.command(name="init", help="Initialize Pipelex configuration, backends, credentials, routing, and telemetry")

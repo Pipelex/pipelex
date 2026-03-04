@@ -1,9 +1,26 @@
 # Changelog
 
+## [v0.20.0] - 2026-03-03
+
+### Added
+
+- **CLI Authentication**: `pipelex login` command that initiates a browser-based OAuth flow (GitHub/Google) to authenticate with the Pipelex Gateway and save the API key locally.
+- **Search Filtering**: `from_date`, `to_date`, `include_domains`, and `exclude_domains` options on the `PipeSearch` operator, routed through a new `GatewaySearchWorker`.
+- **Expanded Cost Reporting**: Token usage and cost tracking now covers Search, Fetch, Extraction, and Image Generation jobs, in addition to LLMs.
+- **New Models**: Added `gpt-5.3-codex` (text, images, pdf inputs) and `nano-banana-2`.
+
+### Changed
+
+- **Search Configuration**: Renamed Linkup model IDs from `linkup/standard` to `linkup-standard` (and `deep` variant), simplified presets to `$standard` and `$deep`.
+- **Default Pipeline Execution**: Changed from `in_memory` to `local`.
+- **Default Extraction Model**: Changed from `mistral-document-ai-2505` to `azure-document-intelligence`; removed `mistral-document-ai-2505` from the supported Gateway models list.
+- **Content Handling**: `TextAndImagesContent` now supports an optional `raw_html` field.
+- **Dev Experience**: `Makefile` commands (`generate-mthds-schema`, `update-gateway-models`) run in quiet mode by default.
+
 ## [v0.19.0] - 2026-03-02
 
 ### Added
- - **Web Search Integration**: Introduced a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models with presets (e.g., `$linkup-standard`, `$linkup-deep`), aliases, and waterfalls.
+ - **Web Search Integration**: Introduced a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models.
  - **Graph View Generation**: Added a `--view` option to `pipelex validate bundle` that generates a `ViewSpec` JSON (compatible with ReactFlow) for client-side graph rendering without writing files to disk.
 
 ### Changed

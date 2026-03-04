@@ -5,7 +5,7 @@
 [pipelex.storage_config]
 is_fetch_remote_content_enabled = true
 is_upload_local_content_enabled = true
-method = "in_memory"                   # local, in_memory, s3, gcp
+method = "local"                       # local, in_memory, s3, gcp
 
 [pipelex.storage_config.local]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
@@ -74,8 +74,8 @@ image-text-extractor = "@default-extract-image"
 full-document-extractor = "@default-extract-document"
 
 [pipelex.builder_config.talent_preset_mappings.search]
-web-search = "$linkup-standard"
-web-search-deep = "$linkup-deep"
+web-search = "$standard"
+web-search-deep = "$deep"
 
 [pipelex.feature_config]
 # WIP/Experimental feature flags

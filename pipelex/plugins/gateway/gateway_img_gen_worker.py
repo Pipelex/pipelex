@@ -16,6 +16,7 @@ from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
+from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.fal.fal_poller import FalPoller
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
@@ -90,9 +91,19 @@ class GatewayImgGenWorker(ImgGenWorkerAbstract):
             msg = "Response is not of type GenericResponse"
             raise TypeError(msg)
 
-        # Giv en that different backends and different models can be used with this worker, we must interpret the response,
-        # so we do it according to the shape we detext
+        # Given that different backends and different models can be used with this worker, we must interpret the response,
+        # so we do it according to the shape we detect
         response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
+
+        # Extract usage tokens if available
+        if (usage_dict := response_dict.get("usage")) and (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage):
+            nb_tokens: NbTokensByCategoryDict = {}
+            if input_tokens := usage_dict.get("prompt_tokens") or usage_dict.get("input_tokens"):
+                nb_tokens[TokenCategory.INPUT] = input_tokens
+            if output_tokens := usage_dict.get("completion_tokens") or usage_dict.get("output_tokens"):
+                nb_tokens[TokenCategory.OUTPUT] = output_tokens
+            img_gen_tokens_usage.nb_tokens_by_category = nb_tokens
+
         generated_images: list[GeneratedImageRawDetails] = []
         if images := response_dict.get("data"):
             # Azure-shaped responses, model is either OpenAI's GPT Image or Black Forest Labs' Flux 2 Pro

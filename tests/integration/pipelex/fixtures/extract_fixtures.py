@@ -103,7 +103,7 @@ def extract_choice_for_image(request: pytest.FixtureRequest) -> str:
             max_nb_images=None,
             should_caption_images=False,
             should_include_page_views=False,
-            page_views_dpi=72,
+            page_views_dpi=None,
             image_min_size=None,
         ),
         # max_nb_images=10: Limit to 10 images

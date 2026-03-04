@@ -32,7 +32,7 @@ TEST_PROFILES_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_profiles.toml
 TEST_PROFILES_OVERRIDE_PATH = Path(ConfigPaths.DEV_CONFIG_DIR_PATH) / "test_profiles_override.toml"
 
 # Model types we care about
-MODEL_TYPES = ["llm", "img_gen", "text_extractor"]
+MODEL_TYPES = ["llm", "img_gen", "text_extractor", "search"]
 
 # Default model type from backend config
 DEFAULT_MODEL_TYPE = "llm"
@@ -60,6 +60,7 @@ def _extract_models_from_backend_toml(backend_path: Path) -> dict[str, list[str]
         "llm": [],
         "img_gen": [],
         "text_extractor": [],
+        "search": [],
     }
 
     for key, value in config.items():
@@ -97,7 +98,7 @@ def _fetch_gateway_models() -> dict[str, list[str]]:
         remote_config = RemoteConfigFetcher.fetch_remote_config()
         model_specs = dict(remote_config.backend_model_specs)
     except (RemoteConfigFetchError, RemoteConfigValidationError):
-        return {"llm": [], "img_gen": [], "text_extractor": []}
+        return {"llm": [], "img_gen": [], "text_extractor": [], "search": []}
 
     # Get defaults
     defaults = model_specs.get("defaults", {})
@@ -112,6 +113,7 @@ def _fetch_gateway_models() -> dict[str, list[str]]:
         "llm": [],
         "img_gen": [],
         "text_extractor": [],
+        "search": [],
     }
 
     for key, value in model_specs.items():
@@ -156,6 +158,7 @@ def _collect_all_model_availability() -> dict[str, Any]:
         "llm": {},
         "img_gen": {},
         "text_extractor": {},
+        "search": {},
     }
 
     backends_dir = Path(config_manager.backends_dir_path)
@@ -377,6 +380,7 @@ def _filter_models_by_profile(
         "llm": [],
         "img_gen": [],
         "text_extractor": [],
+        "search": [],
     }
 
     # If include_all is set, return all valid pairs
@@ -426,6 +430,7 @@ def _filter_models_by_profile(
         "llm_models": "llm",
         "img_gen_models": "img_gen",
         "extract_models": "text_extractor",
+        "search_models": "search",
     }
 
     # Model type to collection type mapping (internal name -> TOML section name)
@@ -433,6 +438,7 @@ def _filter_models_by_profile(
         "llm": "llm",
         "img_gen": "img_gen",
         "text_extractor": "extract",
+        "search": "search",
     }
 
     # Resolve model lists from profile using advanced specifiers
@@ -529,6 +535,14 @@ def _generate_fixtures_python(
     lines.append("]")
     lines.append("")
 
+    # Search combos
+    search_pairs = combo_pairs.get("search", [])
+    lines.append("SEARCH_COMBOS: list[ModelCombo] = [")
+    for model, backend in sorted(search_pairs):
+        lines.append(f"    ModelCombo({model!r}, {backend!r}),")
+    lines.append("]")
+    lines.append("")
+
     return "\n".join(lines)
 
 
@@ -568,10 +582,12 @@ def _display_summary(
     llm_total = sum(len(models) for models in availability.get("llm", {}).values())
     img_gen_total = sum(len(models) for models in availability.get("img_gen", {}).values())
     extract_total = sum(len(models) for models in availability.get("text_extractor", {}).values())
+    search_total = sum(len(models) for models in availability.get("search", {}).values())
 
     table.add_row("LLM Models", str(llm_total), str(len(combo_pairs.get("llm", []))))
     table.add_row("Image Gen Models", str(img_gen_total), str(len(combo_pairs.get("img_gen", []))))
     table.add_row("Extract Models", str(extract_total), str(len(combo_pairs.get("text_extractor", []))))
+    table.add_row("Search Models", str(search_total), str(len(combo_pairs.get("search", []))))
     table.add_row("", "", "")
     table.add_row("Total Backends", str(len(total_backends)), "-")
     table.add_row("Total Model/Backend Pairs", str(total_models), str(filtered_models))

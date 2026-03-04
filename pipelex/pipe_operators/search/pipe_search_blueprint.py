@@ -1,8 +1,9 @@
+import re
 from typing import Literal
 
+from pydantic import field_validator
 from typing_extensions import override
 
-from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_setting import SearchModelChoice
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.template_preprocessor import preprocess_template
@@ -18,13 +19,22 @@ class PipeSearchBlueprint(PipeBlueprint):
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     prompt: str
     model: SearchModelChoice | None = None
-    depth: SearchDepth | None = None
     include_images: bool | None = None
     max_results: int | None = None
     from_date: str | None = None
     to_date: str | None = None
     include_domains: list[str] | None = None
     exclude_domains: list[str] | None = None
+
+    @field_validator("from_date", "to_date", mode="before")
+    @classmethod
+    def validate_date_format(cls, date_value: str | None) -> str | None:
+        if date_value is None:
+            return date_value
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_value):
+            msg = f"'{date_value}' is not a valid ISO 8601 date (expected YYYY-MM-DD)"
+            raise ValueError(msg)
+        return date_value
 
     @override
     def validate_inputs(self):

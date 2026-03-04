@@ -59,13 +59,17 @@ ranksep = 30         # Vertical spacing between ranks/levels
 initial_zoom = 1.0   # Initial zoom level (1.0 = 100%)
 pan_to_top = true    # Pan to show top of graph on load
 
+[pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
+theme = "dark"
+palette = "dracula"
+
 ####################################################################################################
 # Storage Config
 ####################################################################################################
 
 [pipelex.storage_config]
 # Storage method: "local", "in_memory" (default), "s3", or "gcp"
-method = "in_memory"
+method = "local"
 # Whether to fetch remote HTTP URLs and store them locally
 is_fetch_remote_content_enabled = true
 # Whether to upload local file paths to storage and replace with pipelex-storage:// URIs

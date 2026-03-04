@@ -4,7 +4,7 @@ from pipelex import pretty_print, pretty_print_url
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
-from pipelex.hub import get_img_gen_worker
+from pipelex.hub import get_img_gen_worker, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo
@@ -50,6 +50,7 @@ class TestImageGeneration:
         pretty_print(image_content, title=f"Image content for topic '{topic}'")
         assert image_content.public_url is not None
         pretty_print_url(image_content.public_url, title=f"Image URL for topic '{topic}'")
+        get_report_delegate().generate_report()
 
     @pytest.mark.parametrize(("topic", "positive_text", "negative_text"), ImageGenTestCases.IMAGE_GEN_PROMPT_CONTENTS)
     async def test_img_gen_single_transparent(

@@ -1,3 +1,4 @@
+import re
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import Field, field_validator
@@ -30,6 +31,28 @@ class PipeSearchSpec(PipeSpec):
         examples=list(SearchTalent),
     )
     prompt: str = Field(description="A finalized search prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).")
+    from_date: str | None = Field(
+        default=None,
+        description="Start date filter in ISO 8601 format (YYYY-MM-DD). Only return results from this date onwards.",
+        examples=["2025-01-01"],
+    )
+    to_date: str | None = Field(
+        default=None,
+        description="End date filter in ISO 8601 format (YYYY-MM-DD). Only return results up to this date.",
+        examples=["2025-01-01"],
+    )
+    include_domains: list[str] | None = Field(default=None, description="Restrict search to these domains only (e.g., ['reuters.com', 'bbc.com']).")
+    exclude_domains: list[str] | None = Field(default=None, description="Exclude results from these domains.")
+
+    @field_validator("from_date", "to_date", mode="before")
+    @classmethod
+    def validate_date_format(cls, date_value: str | None) -> str | None:
+        if date_value is None:
+            return date_value
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_value):
+            msg = f"'{date_value}' is not a valid date (expected YYYY-MM-DD)"
+            raise ValueError(msg)
+        return date_value
 
     @field_validator("search_talent", mode="before")
     @classmethod
@@ -63,6 +86,21 @@ class PipeSearchSpec(PipeSpec):
         search_group.renderables.append(Text())  # Blank line
         search_group.renderables.append(prompt_panel)
 
+        # Show filter fields when set
+        filter_lines: list[str] = []
+        if self.from_date is not None:
+            filter_lines.append(f"From date: {self.from_date}")
+        if self.to_date is not None:
+            filter_lines.append(f"To date: {self.to_date}")
+        if self.include_domains is not None:
+            filter_lines.append(f"Include domains: {', '.join(self.include_domains)}")
+        if self.exclude_domains is not None:
+            filter_lines.append(f"Exclude domains: {', '.join(self.exclude_domains)}")
+        if filter_lines:
+            search_group.renderables.append(Text())  # Blank line
+            for filter_line in filter_lines:
+                search_group.renderables.append(Text.from_markup(f"[dim]{filter_line}[/dim]"))
+
         return search_group
 
     @override
@@ -80,11 +118,10 @@ class PipeSearchSpec(PipeSpec):
             output=base_blueprint.output,
             prompt=self.prompt,
             model=search_choice,
-            depth=None,
             include_images=None,
             max_results=None,
-            from_date=None,
-            to_date=None,
-            include_domains=None,
-            exclude_domains=None,
+            from_date=self.from_date,
+            to_date=self.to_date,
+            include_domains=self.include_domains,
+            exclude_domains=self.exclude_domains,
         )
