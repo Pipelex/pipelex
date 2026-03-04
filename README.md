@@ -44,11 +44,20 @@ Readable by humans, executable by agents. No boilerplate, no lock-in.</p>
 
 ## Path A: With Claude Code (Recommended)
 
-Install the MTHDS skills plugin:
+Install the MTHDS skills marketplace:
 
 ```bash
 /plugin marketplace add mthds-ai/skills
+```
+
+then install the MTHDS skills plugin:
+```bash
 /plugin install mthds@mthds-ai-skills
+```
+
+then you must exit Claude Code and reopen it.
+```bash
+/exit
 ```
 
 Build your first method:
