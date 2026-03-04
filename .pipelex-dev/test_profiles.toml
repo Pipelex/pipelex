@@ -265,7 +265,7 @@ search_models = ["linkup-standard"]
 ################################################################################
 [profiles.coverage]
 description = "One model per backend for coverage"
-backends = ["anthropic", "openai", "google", "mistral", "internal"]
+backends = ["anthropic", "openai", "google", "mistral", "linkup", "internal"]
 llm_models = [
   "claude-4.5-haiku",
   "gpt-4o-mini",

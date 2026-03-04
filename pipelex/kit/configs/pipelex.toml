@@ -68,7 +68,7 @@ palette = "dracula"
 ####################################################################################################
 
 [pipelex.storage_config]
-# Storage method: "local", "in_memory" (default), "s3", or "gcp"
+# Storage method: "local", "in_memory", "s3", or "gcp"
 method = "local"
 # Whether to fetch remote HTTP URLs and store them locally
 is_fetch_remote_content_enabled = true
