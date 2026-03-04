@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.20.2] - 2026-03-04
+
+### Fixed
+
+- Fixed removal of the --reset flag from the init command docs.
+- Fixed the name of the `PipeSequence` results within a batch.
+
 ## [v0.20.1] - 2026-03-03
 
 ### Changed
