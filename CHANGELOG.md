@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.20.4] - 2026-03-04
+
+- Improve README.md instructions for Claude Code and MTHDS skills.
+
 ## [v0.20.3] - 2026-03-04
 
 ### Fixed

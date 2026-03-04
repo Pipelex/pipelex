@@ -42,13 +42,37 @@ Readable by humans, executable by agents. No boilerplate, no lock-in.</p>
 
 # Quick Start
 
+```bash
+pip install pipelex
+pipelex init
+```
+
 ## Path A: With Claude Code (Recommended)
 
-Install the MTHDS skills plugin:
+Install the `mthds` npm package:
 
 ```bash
+npm install -g mthds
+```
+
+Start Claude Code:
+```bash
+claude
+```
+
+Tell Claude to install the MTHDS skills marketplace:
+```bash
 /plugin marketplace add mthds-ai/skills
+```
+
+then install the MTHDS skills plugin:
+```bash
 /plugin install mthds@mthds-ai-skills
+```
+
+then you must exit Claude Code and reopen it.
+```bash
+/exit
 ```
 
 Build your first method:
@@ -64,13 +88,6 @@ Run it:
 ```
 
 ## Path B: Without Claude Code
-
-```bash
-pip install pipelex
-pipelex init
-```
-
-Then:
 
 1. Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting
 2. Browse methods on the [MTHDS Hub](https://mthds.sh) for inspiration
