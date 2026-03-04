@@ -1,11 +1,13 @@
 from pydantic import BaseModel, Field
 
+from pipelex.cogt.search.search_depth import SearchDepth
+
 
 class GatewaySearchRequestParams(BaseModel):
     """Parameters for a web search request sent to the relay."""
 
     query: str = Field(description="The search query text")
-    depth: str = Field(default="standard", description="Search depth: 'standard' or 'deep'")
+    depth: SearchDepth = Field(default=SearchDepth.STANDARD, strict=False, description="Search depth: 'standard' or 'deep'")
     include_images: bool = Field(default=False, description="Whether to include images in results")
     include_inline_citations: bool = Field(default=True, description="Whether to include inline citations")
     max_results: int | None = Field(default=None, description="Maximum number of results to return")

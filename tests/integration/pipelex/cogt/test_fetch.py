@@ -60,4 +60,5 @@ class TestFetch:
         assert result.text is not None, "Expected non-empty text content"
         assert result.images is not None, "Expected images to be present when requested"
         assert isinstance(result.images, list), "Expected images to be a list"
+        assert len(result.images) > 0, "Expected images list to be non-empty"
         get_report_delegate().generate_report()

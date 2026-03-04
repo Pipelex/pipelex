@@ -10,6 +10,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_setting import SearchSetting
@@ -75,7 +76,7 @@ class GatewaySearchWorker(SearchWorkerAbstract):
 
         params = GatewaySearchRequestParams(
             query=query,
-            depth=self.inference_model.model_id,
+            depth=SearchDepth(self.inference_model.model_id),
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
             max_results=search_setting.max_results,
@@ -133,11 +134,12 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         if hasattr(output_schema, "model_json_schema"):
             schema_dict = cast("dict[str, Any]", output_schema.model_json_schema())  # pyright: ignore[reportUnknownMemberType]
         else:
-            schema_dict = {}
+            msg = f"output_schema must be a Pydantic model class with model_json_schema(), got {output_schema}"
+            raise SdkTypeError(msg)
 
         params = GatewaySearchRequestParams(
             query=query,
-            depth=self.inference_model.model_id,
+            depth=SearchDepth(self.inference_model.model_id),
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
             max_results=search_setting.max_results,

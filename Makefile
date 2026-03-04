@@ -935,7 +935,7 @@ c: format lint pyright mypy
 	@echo "> done: c = check"
 
 cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet c
-	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema update-gateway-models format lint pyright pylint mypy"
+	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema update-gateway-models format lint pyright mypy"
 
 up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"

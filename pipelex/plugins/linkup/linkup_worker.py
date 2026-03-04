@@ -6,6 +6,7 @@ from typing_extensions import override
 
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.fetch_worker_abstract import FetchWorkerAbstract
+from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job_factory import FetchJobFactory, SearchJobFactory
 from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
@@ -51,10 +52,10 @@ class LinkupWorker(SearchWorkerAbstract, FetchWorkerAbstract):
         search_job = SearchJobFactory.make_search_job(job_metadata=job_metadata)
         search_job.search_job_before_start(inference_model=self.inference_model)
 
-        depth_value = self.inference_model.model_id
+        depth_value = SearchDepth(self.inference_model.model_id)
         response: LinkupSourcedAnswer = await self._linkup_client.async_search(
             query=query,
-            depth=depth_value,  # type: ignore[arg-type]
+            depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
             output_type="sourcedAnswer",
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
@@ -103,10 +104,10 @@ class LinkupWorker(SearchWorkerAbstract, FetchWorkerAbstract):
         search_job = SearchJobFactory.make_search_job(job_metadata=job_metadata)
         search_job.search_job_before_start(inference_model=self.inference_model)
 
-        depth_value = self.inference_model.model_id
+        depth_value = SearchDepth(self.inference_model.model_id)
         response = await self._linkup_client.async_search(
             query=query,
-            depth=depth_value,  # type: ignore[arg-type]
+            depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
             output_type="structured",
             structured_output_schema=output_schema,
             include_images=search_setting.include_images,
