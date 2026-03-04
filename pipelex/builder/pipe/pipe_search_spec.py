@@ -34,10 +34,12 @@ class PipeSearchSpec(PipeSpec):
     from_date: str | None = Field(
         default=None,
         description="Start date filter in ISO 8601 format (YYYY-MM-DD). Only return results from this date onwards.",
+        examples=["2025-01-01"],
     )
     to_date: str | None = Field(
         default=None,
         description="End date filter in ISO 8601 format (YYYY-MM-DD). Only return results up to this date.",
+        examples=["2025-01-01"],
     )
     include_domains: list[str] | None = Field(default=None, description="Restrict search to these domains only (e.g., ['reuters.com', 'bbc.com']).")
     exclude_domains: list[str] | None = Field(default=None, description="Exclude results from these domains.")
