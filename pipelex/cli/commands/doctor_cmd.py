@@ -121,7 +121,7 @@ def check_telemetry_config(config_dir: str | None = None) -> tuple[bool, str]:
         # Check if this looks like the old config format (has telemetry_mode at root level)
         if "custom_posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
             return False, "Config format has changed - run 'pipelex init telemetry' to update"
-        return False, "Invalid configuration - run 'pipelex init telemetry --reset' to fix"
+        return False, "Invalid configuration - run 'pipelex init telemetry' to fix"
 
 
 def check_backend_credentials(config_dir: str | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
@@ -527,18 +527,18 @@ def display_health_report(
 
             if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
                 console.print("  • Fix validation errors in [cyan].pipelex/telemetry.toml[/cyan]")
-                console.print("    or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate")
+                console.print("    or run [cyan]pipelex init telemetry[/cyan] to regenerate")
 
             # Backend file issues
             if can_auto_fix_backends:
                 if fix_mode:
                     # We're in fix mode, show what's happening next and the alternative
                     console.print("  • Interactive fixes for outdated backend configurations will be offered below")
-                    console.print("  • Alternatively, run [cyan]pipelex init config --reset[/cyan] to reset all configuration files")
+                    console.print("  • Alternatively, run [cyan]pipelex init config[/cyan] to reset all configuration files")
                 else:
                     # Not in fix mode, suggest running --fix
                     console.print("  • Run [cyan]pipelex doctor --fix[/cyan] to replace outdated backend configurations")
-                    console.print("    [dim]or run[/dim] [cyan]pipelex init config --reset[/cyan] [dim]to reset all configuration files[/dim]")
+                    console.print("    [dim]or run[/dim] [cyan]pipelex init config[/cyan] [dim]to reset all configuration files[/dim]")
 
             if has_custom_backend_issues:
                 invalid_custom = [name for name, report in backend_file_reports.items() if not report.is_valid and not report.has_kit_template]
@@ -810,7 +810,7 @@ def do_doctor_cmd(
             console.print(f"  {config_message}")
             console.print()
             console.print("You can fix this manually by editing [cyan].pipelex/pipelex.toml[/cyan]")
-            console.print("or run [cyan]pipelex init config --reset[/cyan] to regenerate from template.")
+            console.print("or run [cyan]pipelex init config[/cyan] to regenerate from template.")
             console.print()
 
         # Telemetry validation errors (skip if message already contains the fix command)
@@ -819,7 +819,7 @@ def do_doctor_cmd(
             console.print(f"  {telemetry_message}")
             console.print()
             console.print("You can fix this manually by editing [cyan].pipelex/telemetry.toml[/cyan]")
-            console.print("or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate from template.")
+            console.print("or run [cyan]pipelex init telemetry[/cyan] to regenerate from template.")
             console.print()
 
         # Backend credentials

@@ -148,7 +148,7 @@ class Pipelex(metaclass=MetaSingleton):
 {report}
 
 Config files are invalid for the {component_name}.
-You can fix them manually, or run `pipelex init config --reset` to regenerate them.
+You can fix them manually, or run `pipelex init config` to regenerate them.
 Note that this command resets all config files to their default values.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 """
