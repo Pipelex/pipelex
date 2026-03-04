@@ -1,5 +1,7 @@
+from datetime import date
 from typing import Literal
 
+from pydantic import field_validator
 from typing_extensions import override
 
 from pipelex.cogt.search.search_setting import SearchModelChoice
@@ -23,6 +25,18 @@ class PipeSearchBlueprint(PipeBlueprint):
     to_date: str | None = None
     include_domains: list[str] | None = None
     exclude_domains: list[str] | None = None
+
+    @field_validator("from_date", "to_date", mode="before")
+    @classmethod
+    def validate_date_format(cls, date_value: str | None) -> str | None:
+        if date_value is None:
+            return date_value
+        try:
+            date.fromisoformat(date_value)
+        except ValueError:
+            msg = f"'{date_value}' is not a valid ISO 8601 date (expected YYYY-MM-DD)"
+            raise ValueError(msg) from None
+        return date_value
 
     @override
     def validate_inputs(self):
