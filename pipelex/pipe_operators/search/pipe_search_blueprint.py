@@ -1,4 +1,4 @@
-from datetime import date
+import re
 from typing import Literal
 
 from pydantic import field_validator
@@ -31,11 +31,9 @@ class PipeSearchBlueprint(PipeBlueprint):
     def validate_date_format(cls, date_value: str | None) -> str | None:
         if date_value is None:
             return date_value
-        try:
-            date.fromisoformat(date_value)
-        except ValueError:
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", date_value):
             msg = f"'{date_value}' is not a valid ISO 8601 date (expected YYYY-MM-DD)"
-            raise ValueError(msg) from None
+            raise ValueError(msg)
         return date_value
 
     @override
