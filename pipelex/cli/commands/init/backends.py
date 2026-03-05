@@ -89,14 +89,16 @@ def disable_gateway_backend(backends_toml_path: str) -> None:
         save_toml_to_path(toml_doc, backends_toml_path)
 
 
-def customize_backends_config(is_first_time_setup: bool = False) -> None:
+def customize_backends_config(is_first_time_setup: bool = False, target_config_dir: str | None = None) -> None:
     """Interactively customize which inference backends are enabled in backends.toml.
 
     Args:
         is_first_time_setup: Whether this is the first time backends.toml is being set up.
+        target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
     """
     console = get_console()
-    backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
+    effective_config_dir = target_config_dir or config_manager.pipelex_config_dir
+    backends_toml_path = os.path.join(effective_config_dir, "inference", "backends.toml")
     template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
 
     if not path_exists(backends_toml_path):

@@ -259,7 +259,7 @@ def execute_initialization(
 
             first_time_setup = True  # Treat as first-time setup since we just replaced the files
 
-        customize_backends_config(is_first_time_setup=first_time_setup)
+        customize_backends_config(is_first_time_setup=first_time_setup, target_config_dir=target_config_dir)
 
         # Automatically set up routing after backends (unless routing is the specific focus)
         if not check_routing:

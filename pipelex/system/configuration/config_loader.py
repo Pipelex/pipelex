@@ -89,15 +89,28 @@ class ConfigLoader:
             return project_dir
         return self.global_config_dir
 
-    def _resolve_inference_file(self, relative_path: str) -> str:
-        """Resolve an inference file path, checking project dir first, then global.
+    def resolve_config_file(self, relative_path: str, config_dir: str | None = None) -> str:
+        """Resolve a config file path with layered resolution.
+
+        When config_dir is provided (e.g. for --global override), the file is
+        resolved directly under that directory.
+
+        Otherwise, the project .pipelex/ directory is checked first; if the file
+        exists there it wins, otherwise the global ~/.pipelex/ is used.
+        This works on all platforms (macOS, Linux, Windows) because Path.home()
+        returns the correct home directory everywhere.
 
         Args:
-            relative_path: Path relative to the .pipelex directory (e.g. "inference/backends.toml").
+            relative_path: Path relative to the .pipelex directory (e.g. "telemetry.toml",
+                "inference/backends.toml").
+            config_dir: Explicit config directory override. When set, skips layered
+                resolution and uses this directory directly.
 
         Returns:
             The resolved absolute path.
         """
+        if config_dir is not None:
+            return os.path.join(config_dir, relative_path)
         project_dir = self.project_config_dir
         if project_dir is not None:
             candidate = os.path.join(project_dir, relative_path)
@@ -108,22 +121,22 @@ class ConfigLoader:
     @property
     def backends_file_path(self) -> str:
         """Resolve backends.toml from project dir or global dir."""
-        return self._resolve_inference_file(os.path.join(INFERENCE_DIR_NAME, BACKENDS_FILE_NAME))
+        return self.resolve_config_file(os.path.join(INFERENCE_DIR_NAME, BACKENDS_FILE_NAME))
 
     @property
     def backends_dir_path(self) -> str:
         """Resolve backends/ directory from project dir or global dir."""
-        return self._resolve_inference_file(os.path.join(INFERENCE_DIR_NAME, BACKENDS_DIR_NAME))
+        return self.resolve_config_file(os.path.join(INFERENCE_DIR_NAME, BACKENDS_DIR_NAME))
 
     @property
     def routing_profiles_file_path(self) -> str:
         """Resolve routing_profiles.toml from project dir or global dir."""
-        return self._resolve_inference_file(os.path.join(INFERENCE_DIR_NAME, ROUTING_PROFILES_FILE_NAME))
+        return self.resolve_config_file(os.path.join(INFERENCE_DIR_NAME, ROUTING_PROFILES_FILE_NAME))
 
     @property
     def model_decks_dir_path(self) -> str:
         """Resolve model decks directory from project dir or global dir."""
-        return self._resolve_inference_file(os.path.join(INFERENCE_DIR_NAME, MODEL_DECKS_DIR_NAME))
+        return self.resolve_config_file(os.path.join(INFERENCE_DIR_NAME, MODEL_DECKS_DIR_NAME))
 
     def ensure_global_config_exists(self) -> None:
         """Create the global ~/.pipelex/ directory with kit template files if it doesn't exist."""
