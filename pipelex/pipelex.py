@@ -92,7 +92,7 @@ PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
-        config_dir_path: str | None = None,
+        config_dir_path: Path | None = None,
         config_cls: type[ConfigRoot] | None = None,
     ) -> None:
         self.is_pipelex_service_enabled = False  # Will be set during setup

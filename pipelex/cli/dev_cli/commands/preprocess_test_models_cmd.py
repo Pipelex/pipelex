@@ -161,7 +161,7 @@ def _collect_all_model_availability() -> dict[str, Any]:
         "search": {},
     }
 
-    backends_dir = Path(config_manager.backends_dir_path)
+    backends_dir = config_manager.backends_dir_path
 
     # Process each backend TOML file
     for backend_file in sorted(backends_dir.glob("*.toml")):
@@ -621,7 +621,7 @@ def preprocess_test_models_cmd(
         console.print()
 
     # Collect model availability
-    backends_dir = Path(config_manager.backends_dir_path)
+    backends_dir = config_manager.backends_dir_path
     if not backends_dir.exists():
         if quiet:
             console.print(f"[red]✗ Preprocessing failed:[/red] Backends directory not found: {backends_dir}")

@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Config paths use `pathlib.Path`**: All `ConfigLoader` properties and methods now return `Path` instead of `str`. Consumer code across the config system (doctor, init, backends, routing, credentials, telemetry, agent CLI) updated accordingly.
+- **Layered config resolution for `pipelex doctor` and `pipelex init`**: Config files are now resolved with project-first, global-fallback layering per file. Fixed `replace_backend_file` using CWD-relative path that broke when run from another directory.
+- **Gateway terms are explicitly global**: `update_service_terms_acceptance` now targets `~/.pipelex/` by default, since gateway terms are a user-level agreement, not project-level.
+
 ## [v0.20.4] - 2026-03-04
 
 - Improve README.md instructions for Claude Code and MTHDS skills.

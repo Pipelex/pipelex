@@ -29,7 +29,8 @@ class TestBackendCustomization:
 
         # Mock config_manager
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
+        mock_config_manager.pipelex_config_dir = tmp_path / ".pipelex"
+        mock_config_manager.global_config_dir = tmp_path / ".pipelex"
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         # Mock console provider
@@ -91,7 +92,7 @@ class TestBackendCustomization:
 
         # Mock config_manager
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
+        mock_config_manager.pipelex_config_dir = tmp_path / ".pipelex"
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         # Mock console provider
@@ -145,7 +146,8 @@ class TestBackendCustomization:
 
         # Mock config_manager
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(tmp_path / ".pipelex")
+        mock_config_manager.pipelex_config_dir = tmp_path / ".pipelex"
+        mock_config_manager.global_config_dir = tmp_path / ".pipelex"
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         # Mock console provider
@@ -207,7 +209,7 @@ class TestBackendCustomization:
         # Mock config_manager
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=str(kit_configs_dir))
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
         mocker.patch("typer.echo")
 
@@ -228,7 +230,7 @@ class TestBackendCustomization:
         config_dir.mkdir()
 
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(config_dir)
+        mock_config_manager.pipelex_config_dir = config_dir
         mocker.patch("pipelex.cli.commands.init.backends.config_manager", mock_config_manager)
 
         mock_console = mocker.MagicMock()

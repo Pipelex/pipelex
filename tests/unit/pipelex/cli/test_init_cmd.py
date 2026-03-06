@@ -27,7 +27,7 @@ class TestInitCmd:
         # Mock get_configs_dir and config manager
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         # Execute
@@ -51,7 +51,7 @@ class TestInitCmd:
         # Mock get_configs_dir and config manager
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         # Execute
@@ -78,7 +78,7 @@ class TestInitCmd:
         # Mock get_configs_dir and config manager
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         # Execute
@@ -110,7 +110,7 @@ class TestInitCmd:
         # Mock get_configs_dir and config manager
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         # Execute
@@ -137,7 +137,7 @@ class TestInitCmd:
         # Mock get_configs_dir and config manager
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
         mocker.patch("shutil.copy2", side_effect=PermissionError("Permission denied"))
 
@@ -158,7 +158,7 @@ class TestInitCmd:
         # Mock get_configs_dir and config manager
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         # Execute
@@ -188,7 +188,7 @@ class TestInitCmd:
         # Mock config_manager
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         # Execute dry-run
@@ -216,7 +216,7 @@ class TestInitCmd:
         # Mock config_manager and customize function
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         mock_customize = mocker.patch("pipelex.cli.commands.init.backends.customize_backends_config")
@@ -240,7 +240,7 @@ class TestInitCmd:
         # Mock config_manager and customize function
         mocker.patch("pipelex.cli.commands.init.config_files.get_kit_configs_dir", return_value=kit_configs_dir)
         mock_config_manager = mocker.MagicMock()
-        mock_config_manager.pipelex_config_dir = str(target_dir)
+        mock_config_manager.pipelex_config_dir = target_dir
         mocker.patch("pipelex.cli.commands.init.config_files.config_manager", mock_config_manager)
 
         mock_customize = mocker.patch("pipelex.cli.commands.init.backends.customize_backends_config")

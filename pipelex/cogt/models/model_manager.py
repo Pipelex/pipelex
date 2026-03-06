@@ -60,18 +60,18 @@ class ModelManager(ModelManagerAbstract):
     ) -> None:
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
-            backends_library_path=config_manager.backends_file_path,
-            backends_dir_path=config_manager.backends_dir_path,
+            backends_library_path=str(config_manager.backends_file_path),
+            backends_dir_path=str(config_manager.backends_dir_path),
             gateway_model_specs=gateway_model_specs,
             lenient=not needs_inference,
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
         self._routing_profile = load_active_routing_profile(
-            routing_profile_library_path=config_manager.routing_profiles_file_path,
+            routing_profile_library_path=str(config_manager.routing_profiles_file_path),
             enabled_backends=enabled_backends,
             lenient=not needs_inference,
         )
-        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=config_manager.model_decks_dir_path)
+        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=str(config_manager.model_decks_dir_path))
         deck_blueprint = load_model_deck_blueprint(model_deck_paths=model_deck_paths)
         self.model_deck = self.build_deck(enabled_backends=enabled_backends, model_deck_blueprint=deck_blueprint)
 
