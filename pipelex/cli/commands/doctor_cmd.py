@@ -57,7 +57,7 @@ class BackendFileReport(BaseModel):
     has_kit_template: bool = False
 
 
-def check_config_files(config_dir: str | None = None) -> tuple[bool, int, str]:
+def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
     """Check if configuration files are present and main config is valid.
 
     Args:
@@ -71,7 +71,7 @@ def check_config_files(config_dir: str | None = None) -> tuple[bool, int, str]:
 
     # Check for missing files
     try:
-        missing_count = init_config(reset=False, dry_run=True, target_dir=effective_config_dir)
+        missing_count = init_config(reset=False, dry_run=True, target_dir=str(effective_config_dir))
     except Exception as exc:
         return False, 0, f"Error checking config files: {exc}"
 
@@ -99,7 +99,7 @@ def check_config_files(config_dir: str | None = None) -> tuple[bool, int, str]:
     return False, missing_count, f"{missing_count} configuration file(s) missing"
 
 
-def check_telemetry_config(config_dir: str | None = None) -> tuple[bool, str]:
+def check_telemetry_config(config_dir: Path | None = None) -> tuple[bool, str]:
     """Check if telemetry configuration is valid.
 
     Args:
@@ -128,7 +128,7 @@ def check_telemetry_config(config_dir: str | None = None) -> tuple[bool, str]:
         return False, "Invalid configuration - run 'pipelex init telemetry' to fix"
 
 
-def check_backend_credentials(config_dir: str | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
+def check_backend_credentials(config_dir: Path | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
     """Check if backend credentials are properly configured.
 
     Args:
@@ -226,12 +226,13 @@ def check_kit_template_exists(backend_name: str) -> bool:
         return False
 
 
-def replace_backend_file(backend_name: str, dry_run: bool = False) -> bool:
+def replace_backend_file(backend_name: str, dry_run: bool = False, config_dir: Path | None = None) -> bool:
     """Replace a backend configuration file with the kit template.
 
     Args:
         backend_name: Name of the backend to replace
         dry_run: If True, only report what would be done without actually doing it
+        config_dir: Explicit config directory path. If None, uses config_manager.pipelex_config_dir.
 
     Returns:
         True if successful, False otherwise
@@ -248,7 +249,8 @@ def replace_backend_file(backend_name: str, dry_run: bool = False) -> bool:
         template_content = template_file.read_text(encoding="utf-8")
 
         # Determine target path
-        target_dir = Path(".pipelex") / "inference" / "backends"
+        resolved_config_dir = config_dir or config_manager.pipelex_config_dir
+        target_dir = Path(resolved_config_dir) / "inference" / "backends"
         target_file = target_dir / f"{backend_name}.toml"
 
         if dry_run:
@@ -265,7 +267,7 @@ def replace_backend_file(backend_name: str, dry_run: bool = False) -> bool:
         return False
 
 
-def check_backend_files(config_dir: str | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
+def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
     """Check individual backend configuration files for validity.
 
     Args:
@@ -328,8 +330,8 @@ def check_backend_files(config_dir: str | None = None) -> tuple[bool, dict[str, 
             # Try to load just this backend's specs
             temp_library.load(
                 secrets_provider=secrets_provider,
-                backends_library_path=backends_toml_path,
-                backends_dir_path=backends_dir_path,
+                backends_library_path=str(backends_toml_path),
+                backends_dir_path=str(backends_dir_path),
                 include_disabled=False,
             )
 
@@ -588,7 +590,7 @@ def display_health_report(
             console.print()
 
 
-def check_models(config_dir: str | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
+def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
     """Check if models are valid, including backend file validation.
 
     Args:

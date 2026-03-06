@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import os
-import pathlib
 from typing import TYPE_CHECKING
 
 import pytest
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from pytest_mock import MockerFixture
 
 from pipelex.cli.commands.doctor_cmd import (
@@ -62,15 +62,14 @@ class TestDoctorLayeredResolution:
         mock_check_backends.assert_called_once_with()
         mock_check_models.assert_called_once_with()
 
-    def test_telemetry_check_falls_back_to_global(self, mocker: MockerFixture, tmp_path: pytest.TempPathFactory) -> None:
+    def test_telemetry_check_falls_back_to_global(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """When project .pipelex/ exists but has no telemetry.toml, fall back to global ~/.pipelex/."""
-        global_dir = str(tmp_path / "global_pipelex")  # type: ignore[operator]
-        project_dir = str(tmp_path / "project_pipelex")  # type: ignore[operator]
-
+        global_dir = tmp_path / "global_pipelex"
+        project_dir = tmp_path / "project_pipelex"
         # Create both dirs but only put telemetry.toml in global
-        os.makedirs(global_dir)
-        os.makedirs(project_dir)
-        pathlib.Path(os.path.join(global_dir, TELEMETRY_CONFIG_FILE_NAME)).write_text(TELEMETRY_OFF, encoding="utf-8")
+        global_dir.mkdir()
+        project_dir.mkdir()
+        (global_dir / TELEMETRY_CONFIG_FILE_NAME).write_text(TELEMETRY_OFF, encoding="utf-8")
 
         mocker.patch.object(ConfigLoader, "project_config_dir", new_callable=mocker.PropertyMock, return_value=project_dir)
         mocker.patch.object(ConfigLoader, "global_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)
@@ -80,15 +79,14 @@ class TestDoctorLayeredResolution:
         assert healthy is True
         assert "off" in message
 
-    def test_telemetry_check_uses_project_override(self, mocker: MockerFixture, tmp_path: pytest.TempPathFactory) -> None:
+    def test_telemetry_check_uses_project_override(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """When project .pipelex/ has telemetry.toml, it should be used instead of global."""
-        global_dir = str(tmp_path / "global_pipelex")  # type: ignore[operator]
-        project_dir = str(tmp_path / "project_pipelex")  # type: ignore[operator]
-
-        os.makedirs(global_dir)
-        os.makedirs(project_dir)
-        pathlib.Path(os.path.join(global_dir, TELEMETRY_CONFIG_FILE_NAME)).write_text(TELEMETRY_OFF, encoding="utf-8")
-        pathlib.Path(os.path.join(project_dir, TELEMETRY_CONFIG_FILE_NAME)).write_text(TELEMETRY_ANONYMOUS, encoding="utf-8")
+        global_dir = tmp_path / "global_pipelex"
+        project_dir = tmp_path / "project_pipelex"
+        global_dir.mkdir()
+        project_dir.mkdir()
+        (global_dir / TELEMETRY_CONFIG_FILE_NAME).write_text(TELEMETRY_OFF, encoding="utf-8")
+        (project_dir / TELEMETRY_CONFIG_FILE_NAME).write_text(TELEMETRY_ANONYMOUS, encoding="utf-8")
 
         mocker.patch.object(ConfigLoader, "project_config_dir", new_callable=mocker.PropertyMock, return_value=project_dir)
         mocker.patch.object(ConfigLoader, "global_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)
@@ -97,27 +95,26 @@ class TestDoctorLayeredResolution:
         assert healthy is True
         assert "anonymous" in message
 
-    def test_telemetry_check_with_explicit_config_dir_skips_layering(self, tmp_path: pytest.TempPathFactory) -> None:
+    def test_telemetry_check_with_explicit_config_dir_skips_layering(self, tmp_path: Path) -> None:
         """When config_dir is explicitly provided (e.g. --global), use it directly without layering."""
-        explicit_dir = str(tmp_path / "explicit_pipelex")  # type: ignore[operator]
-        os.makedirs(explicit_dir)
-        pathlib.Path(os.path.join(explicit_dir, TELEMETRY_CONFIG_FILE_NAME)).write_text(TELEMETRY_OFF, encoding="utf-8")
+        explicit_dir = tmp_path / "explicit_pipelex"
+        explicit_dir.mkdir()
+        (explicit_dir / TELEMETRY_CONFIG_FILE_NAME).write_text(TELEMETRY_OFF, encoding="utf-8")
 
         healthy, _message = check_telemetry_config(config_dir=explicit_dir)
         assert healthy is True
 
-    def test_backend_credentials_falls_back_to_global(self, mocker: MockerFixture, tmp_path: pytest.TempPathFactory) -> None:
+    def test_backend_credentials_falls_back_to_global(self, mocker: MockerFixture, tmp_path: Path) -> None:
         """When project .pipelex/ exists but has no backends.toml, fall back to global."""
-        global_dir = str(tmp_path / "global_pipelex")  # type: ignore[operator]
-        project_dir = str(tmp_path / "project_pipelex")  # type: ignore[operator]
-
-        os.makedirs(project_dir)
-        global_inference_dir = os.path.join(global_dir, "inference")
-        os.makedirs(global_inference_dir)
+        global_dir = tmp_path / "global_pipelex"
+        project_dir = tmp_path / "project_pipelex"
+        project_dir.mkdir()
+        global_inference_dir = global_dir / "inference"
+        global_inference_dir.mkdir(parents=True)
 
         # Only global has backends.toml — with only the internal backend
         backends_content = "[internal]\nenabled = true\n"
-        pathlib.Path(os.path.join(global_inference_dir, "backends.toml")).write_text(backends_content, encoding="utf-8")
+        (global_inference_dir / "backends.toml").write_text(backends_content, encoding="utf-8")
 
         mocker.patch.object(ConfigLoader, "project_config_dir", new_callable=mocker.PropertyMock, return_value=project_dir)
         mocker.patch.object(ConfigLoader, "global_config_dir", new_callable=mocker.PropertyMock, return_value=global_dir)

@@ -1,4 +1,3 @@
-import os
 from functools import partial
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
@@ -240,9 +239,10 @@ def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> Telemetr
     Raises:
         TelemetryConfigValidationError: If configuration is invalid or variable substitution fails.
     """
-    telemetry_config_paths: list[str] = []
-    telemetry_config_paths.append(os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_FILE_NAME))
-    telemetry_config_paths.append(os.path.join(config_manager.pipelex_config_dir, TELEMETRY_CONFIG_OVERRIDE_FILE_NAME))
+    telemetry_config_paths = [
+        config_manager.pipelex_config_dir / TELEMETRY_CONFIG_FILE_NAME,
+        config_manager.pipelex_config_dir / TELEMETRY_CONFIG_OVERRIDE_FILE_NAME,
+    ]
     telemetry_config_toml_raw = load_toml_from_path_and_merge_with_overrides(paths=telemetry_config_paths)
 
     # Apply variable substitution to all string values (keep placeholders for missing vars)
@@ -250,7 +250,7 @@ def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> Telemetr
     try:
         telemetry_config_toml = apply_to_strings_recursive(telemetry_config_toml_raw, substitute_vars_with_provider)
     except UnknownVarPrefixError as exc:
-        paths_str = "\n".join(telemetry_config_paths)
+        paths_str = "\n".join(str(path) for path in telemetry_config_paths)
         msg = f"Variable substitution failed in telemetry configuration based on '{paths_str}': {exc}"
         raise TelemetryConfigValidationError(msg) from exc
 
@@ -258,7 +258,7 @@ def load_telemetry_config(secrets_provider: SecretsProviderAbstract) -> Telemetr
         telemetry_config = TelemetryConfig.model_validate(telemetry_config_toml)
     except ValidationError as exc:
         validation_error_msg = format_pydantic_validation_error(exc)
-        paths_str = "\n".join(telemetry_config_paths)
+        paths_str = "\n".join(str(path) for path in telemetry_config_paths)
         msg = f"Invalid telemetry configuration in '{paths_str}':\n{validation_error_msg}"
         raise TelemetryConfigValidationError(msg) from exc
     return telemetry_config

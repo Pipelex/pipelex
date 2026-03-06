@@ -96,7 +96,7 @@ class TestConfigResolution:
 
         loader = ConfigLoader()
 
-        assert loader.global_config_dir == str(fake_home / ".pipelex")
+        assert loader.global_config_dir == fake_home / ".pipelex"
 
     def test_project_config_dir_when_exists(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """project_config_dir returns the path when .pipelex exists at the project root."""
@@ -108,7 +108,7 @@ class TestConfigResolution:
 
         loader = ConfigLoader()
 
-        assert loader.project_config_dir == str((project_dir / ".pipelex").resolve())
+        assert loader.project_config_dir == (project_dir / ".pipelex").resolve()
 
     def test_project_config_dir_none_when_no_pipelex_dir(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """project_config_dir returns None when project root has no .pipelex directory."""
@@ -132,7 +132,7 @@ class TestConfigResolution:
 
         loader = ConfigLoader()
 
-        assert loader.pipelex_config_dir == str((project_dir / ".pipelex").resolve())
+        assert loader.pipelex_config_dir == (project_dir / ".pipelex").resolve()
 
     def test_effective_config_dir_falls_back_to_global(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """pipelex_config_dir returns global path when no project .pipelex exists."""
@@ -148,7 +148,7 @@ class TestConfigResolution:
 
         loader = ConfigLoader()
 
-        assert loader.pipelex_config_dir == str(fake_home / ".pipelex")
+        assert loader.pipelex_config_dir == fake_home / ".pipelex"
 
     def test_project_root_returns_str_when_found(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """project_root returns the project root as a string."""
@@ -161,7 +161,7 @@ class TestConfigResolution:
 
         loader = ConfigLoader()
 
-        assert loader.project_root == str(project_dir.resolve())
+        assert loader.project_root == project_dir.resolve()
 
     def test_project_root_returns_none_without_markers(self, mocker: MockerFixture) -> None:
         """project_root returns None when no project root markers are found.
@@ -193,10 +193,10 @@ class TestConfigResolution:
 
         loader = ConfigLoader()
 
-        assert loader.backends_file_path == str(inference_dir / "backends.toml")
-        assert loader.backends_dir_path == str(backends_dir)
-        assert loader.routing_profiles_file_path == str(inference_dir / "routing_profiles.toml")
-        assert loader.model_decks_dir_path == str(deck_dir)
+        assert loader.backends_file_path == inference_dir / "backends.toml"
+        assert loader.backends_dir_path == backends_dir
+        assert loader.routing_profiles_file_path == inference_dir / "routing_profiles.toml"
+        assert loader.model_decks_dir_path == deck_dir
 
     def test_inference_files_fallback_to_global(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Inference file paths fall back to global dir when project dir has no files."""
@@ -216,7 +216,7 @@ class TestConfigResolution:
         loader = ConfigLoader()
 
         # backends.toml exists in global, so it should resolve there
-        assert loader.backends_file_path == str(global_config / "backends.toml")
+        assert loader.backends_file_path == global_config / "backends.toml"
 
     def test_ensure_global_config_created_on_first_run(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """ensure_global_config_exists creates ~/.pipelex/ with template files when it doesn't exist."""
@@ -285,5 +285,5 @@ class TestConfigResolution:
         global_dir = loader.global_config_dir
 
         # Verify the path is valid and uses the correct separator for the platform
-        assert Path(global_dir).name == ".pipelex"
-        assert Path(global_dir).parent == fake_home
+        assert global_dir.name == ".pipelex"
+        assert global_dir.parent == fake_home

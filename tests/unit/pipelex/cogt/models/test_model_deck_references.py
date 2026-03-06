@@ -36,7 +36,7 @@ class TestModelDeckReferences:
     @pytest.fixture(scope="class")
     def model_deck_blueprint(self) -> ModelDeckBlueprint:
         """Load actual model deck blueprint from TOML files."""
-        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=config_manager.model_decks_dir_path)
+        model_deck_paths = ModelManager.get_model_deck_paths(deck_dir_path=str(config_manager.model_decks_dir_path))
         return load_model_deck_blueprint(model_deck_paths=model_deck_paths)
 
     @pytest.fixture(scope="class")
@@ -94,7 +94,7 @@ class TestModelDeckReferences:
         known_handles: dict[str, ModelType] = {}
         backends_dir = config_manager.backends_dir_path
 
-        toml_files = find_files_in_dir(backends_dir, pattern="*.toml", is_recursive=False)
+        toml_files = find_files_in_dir(str(backends_dir), pattern="*.toml", is_recursive=False)
         for toml_path in toml_files:
             backend_data = load_toml_from_path_if_exists(str(toml_path))
             if backend_data:

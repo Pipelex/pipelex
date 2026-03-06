@@ -126,7 +126,7 @@ class TestInitCredentials:
         mocker.patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"})
         mocker.patch(
             "pipelex.cli.commands.init.credentials.config_manager",
-            global_config_dir=str(tmp_path),
+            global_config_dir=tmp_path,
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
@@ -145,7 +145,7 @@ class TestInitCredentials:
 
         mocker.patch(
             "pipelex.cli.commands.init.credentials.config_manager",
-            global_config_dir=str(tmp_path),
+            global_config_dir=tmp_path,
         )
         mocker.patch(
             "pipelex.cli.commands.init.credentials.Prompt.ask",
@@ -175,7 +175,7 @@ class TestInitCredentials:
 
         mocker.patch(
             "pipelex.cli.commands.init.credentials.config_manager",
-            global_config_dir=str(tmp_path),
+            global_config_dir=tmp_path,
         )
         mocker.patch(
             "pipelex.cli.commands.init.credentials.Prompt.ask",
@@ -200,7 +200,7 @@ class TestInitCredentials:
 
         mocker.patch(
             "pipelex.cli.commands.init.credentials.config_manager",
-            global_config_dir=str(tmp_path),
+            global_config_dir=tmp_path,
         )
         mocker.patch(
             "pipelex.cli.commands.init.credentials.Prompt.ask",
@@ -222,7 +222,7 @@ class TestInitCredentials:
         backends_toml.write_text('[openai]\nenabled = false\napi_key = "${OPENAI_API_KEY}"\n\n[internal]\nenabled = true\n')
         mocker.patch(
             "pipelex.cli.commands.init.credentials.config_manager",
-            global_config_dir=str(tmp_path),
+            global_config_dir=tmp_path,
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()

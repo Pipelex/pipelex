@@ -17,7 +17,7 @@ from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 def get_global_env_path() -> Path:
     """Return the path to the global credentials file (~/.pipelex/.env)."""
-    return Path(config_manager.global_config_dir) / ".env"
+    return config_manager.global_config_dir / ".env"
 
 
 def read_env_file(env_path: Path) -> dict[str, str]:
