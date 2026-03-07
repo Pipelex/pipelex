@@ -65,7 +65,7 @@ class PipeImgGenSpec(PipeSpec):
 
     @override
     def to_blueprint(self) -> PipeImgGenBlueprint:
-        """Convert this PipeImgGenBlueprint to the core PipeImgGenBlueprint."""
+        """Convert this PipeImgGenSpec to the core PipeImgGenBlueprint."""
         base_blueprint = super().to_blueprint()
 
         # Get img_gen choice from config-based mapping

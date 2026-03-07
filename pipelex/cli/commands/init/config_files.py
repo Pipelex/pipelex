@@ -29,7 +29,7 @@ def init_config(reset: bool = False, dry_run: bool = False, target_dir: str | No
         The number of files copied.
     """
     config_template_dir = str(get_kit_configs_dir())
-    target_config_dir = target_dir or config_manager.pipelex_config_dir
+    target_config_dir = target_dir or str(config_manager.pipelex_config_dir)
 
     os.makedirs(target_config_dir, exist_ok=True)
 

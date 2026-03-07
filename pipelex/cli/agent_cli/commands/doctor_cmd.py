@@ -35,7 +35,8 @@ def agent_doctor_cmd(
     Use --global/-g to force checking the global ~/.pipelex/ directory.
     """
     try:
-        config_dir = config_manager.global_config_dir if global_ else config_manager.pipelex_config_dir
+        # When --global, force checking ~/.pipelex/ only; otherwise use layered resolution
+        config_dir = config_manager.global_config_dir if global_ else None
 
         config_healthy, config_missing_count, config_message = check_config_files(config_dir=config_dir)
         telemetry_healthy, telemetry_message = check_telemetry_config(config_dir=config_dir)
@@ -78,7 +79,7 @@ def agent_doctor_cmd(
     if not config_healthy and config_missing_count > 0:
         recommended_actions.append("Run 'pipelex init config' to install missing configuration files")
     if not config_healthy and config_missing_count == 0:
-        recommended_actions.append("Fix validation errors in .pipelex/pipelex.toml or run 'pipelex init config --reset'")
+        recommended_actions.append("Fix validation errors in .pipelex/pipelex.toml or run 'pipelex init config'")
     if not telemetry_healthy:
         recommended_actions.append(f"Run 'pipelex init telemetry' to fix telemetry: {telemetry_message}")
     if not backends_healthy:

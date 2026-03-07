@@ -234,6 +234,30 @@ class SerDeTestLLMCases:
     ]
 
 
+class FetchTestCases:
+    """Test cases for fetch integration tests."""
+
+    FETCH_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, url
+        ("Wikipedia Python", "https://en.wikipedia.org/wiki/Python_(programming_language)"),
+    ]
+
+
+class SearchTestCases:
+    """Test cases for search integration tests."""
+
+    SOURCED_ANSWER_QUERIES: ClassVar[list[tuple[str, str]]] = [  # topic, query
+        ("Declarative languages", "What makes declarative languages different from imperative languages?"),
+        # ("Middle East", "Latest events in the middle east"),
+        # ("Capital of France", "What is the capital of France?"),
+        # ("Python creator", "Who created the Python programming language?"),
+    ]
+
+    STRUCTURED_QUERIES: ClassVar[list[tuple[str, str]]] = [  # topic, query
+        ("Middle East", "Latest events in the middle east"),
+        # ("Python language", "What is the Python programming language and what are its main features?"),
+    ]
+
+
 class LLMReasoningTestCases:
     """Test cases for LLM reasoning/thinking integration tests."""
 

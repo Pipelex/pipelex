@@ -11,6 +11,7 @@ Here are the primary pipe operators available in Pipelex:
 -   [**`PipeLLM`**](./PipeLLM.md): The core operator for all interactions with Large Language Models (LLMs), including text generation, structured data extraction, and vision tasks.
 -   [**`PipeExtract`**](./PipeExtract.md): Performs Optical Character Recognition (OCR) on images and PDF documents to extract text and embedded images.
 -   [**`PipeImgGen`**](./PipeImgGen.md): Generates images from a text prompt using models like GPT Image, Flux, or other image generation models.
+-   [**`PipeSearch`**](./PipeSearch.md): Searches the web using a configurable search provider and returns structured results with an answer and source citations.
 -   [**`PipeFunc`**](./PipeFunc.md): An escape hatch that allows you to execute any custom Python function, giving you maximum flexibility.
 -   [**`PipeCompose`**](./PipeCompose.md): Renders a Jinja2 template using data from the working memory, perfect for creating formatted reports or complex prompts.
 
@@ -22,6 +23,7 @@ Pipelex provides the following pipe operators:
 - `PipeExtract`: For optical character recognition and document processing
 - `PipeFunc`: For executing custom functions
 - `PipeImgGen`: For AI-powered image generation
+- `PipeSearch`: For web search with structured results
 
 ## PipeLLM
 
@@ -76,3 +78,14 @@ Generates and manipulates images.
 - Multiple output formats
 - Batch processing
 - Parameter customization
+
+## PipeSearch
+
+Searches the web and returns structured results with sources.
+
+### Key Features
+
+- Web search via configurable providers
+- Structured results with answer and source citations
+- Dynamic prompt templates with `$variable` syntax
+- Standard and deep search models

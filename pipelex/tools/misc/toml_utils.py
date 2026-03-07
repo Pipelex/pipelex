@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+    from pathlib import Path
 
 import tomli
 import tomlkit
@@ -31,7 +35,7 @@ def load_toml_from_content(content: str) -> dict[str, Any]:
         raise TomlError.from_tomli_error(exc) from exc
 
 
-def load_toml_from_path(path: str) -> dict[str, Any]:
+def load_toml_from_path(path: str | Path) -> dict[str, Any]:
     """Load TOML from path.
 
     Args:
@@ -52,14 +56,14 @@ def load_toml_from_path(path: str) -> dict[str, Any]:
         raise TomlError(message=msg, doc=exc.doc, pos=exc.pos, lineno=exc.lineno, colno=exc.colno) from exc
 
 
-def load_toml_from_path_if_exists(path: str) -> dict[str, Any] | None:
+def load_toml_from_path_if_exists(path: str | Path) -> dict[str, Any] | None:
     """Load TOML from path if it exists."""
     if not path_exists(path):
         return None
     return load_toml_from_path(path)
 
 
-def load_toml_with_tomlkit(path: str) -> tomlkit.TOMLDocument:
+def load_toml_with_tomlkit(path: str | Path) -> tomlkit.TOMLDocument:
     """Load TOML using tomlkit to preserve formatting and comments.
 
     Args:
@@ -73,7 +77,7 @@ def load_toml_with_tomlkit(path: str) -> tomlkit.TOMLDocument:
         return tomlkit.load(file)
 
 
-def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str) -> None:
+def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str | Path) -> None:
     """Save dictionary as TOML to path, preserving formatting and comments.
 
     Args:
@@ -85,7 +89,7 @@ def save_toml_to_path(data: dict[str, Any] | tomlkit.TOMLDocument, path: str) ->
         tomlkit.dump(data, file)  # type: ignore[arg-type]
 
 
-def load_toml_from_path_and_merge_with_overrides(paths: list[str]) -> dict[str, Any]:
+def load_toml_from_path_and_merge_with_overrides(paths: Sequence[str | Path]) -> dict[str, Any]:
     """Load and merge toml files from paths if they exist, merged in sequence.
 
     Returns:

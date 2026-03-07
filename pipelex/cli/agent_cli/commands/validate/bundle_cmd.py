@@ -16,7 +16,7 @@ from pipelex.cli.agent_cli.commands.validate._validate_core import (
 from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.core.pipes.exceptions import PipeOperatorModelChoiceError
-from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle
+from pipelex.graph.graph_rendering import GraphFormat, generate_graph_for_bundle, generate_view_for_bundle
 from pipelex.libraries.pipe.exceptions import PipeNotFoundError
 from pipelex.pipe_operators.exceptions import PipeOperatorModelAvailabilityError
 from pipelex.pipelex import Pipelex
@@ -47,6 +47,10 @@ def validate_bundle_cmd(
         FlowchartDirection | None,
         typer.Option("--direction", help="Flowchart direction"),
     ] = None,
+    view: Annotated[
+        bool,
+        typer.Option("--view", help="On successful bundle validation, include a ViewSpec (structured JSON for graph rendering) in the output"),
+    ] = False,
     library_dir: Annotated[
         list[str] | None,
         typer.Option("--library-dir", "-L", help="Directory to search for pipe definitions (.mthds files)"),
@@ -142,6 +146,33 @@ def validate_bundle_cmd(
                 raise
             except Exception as exc:
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
+
+        # Generate view (ViewSpec JSON) if requested and validation succeeded
+        if view:
+            try:
+                view_result = asyncio.run(
+                    generate_view_for_bundle(
+                        bundle_path=Path(bundle_path),  # type: ignore[arg-type]
+                        library_dirs=library_dir_strings,
+                        direction=direction,
+                    )
+                )
+                result.update(view_result)
+            except PipelineExecutionError as exc:
+                view_extra: dict[str, Any] = {
+                    "pipe_code": exc.pipe_code,
+                    "pipe_stack": exc.pipe_stack,
+                }
+                if exc.__cause__:
+                    view_extra["cause_type"] = type(exc.__cause__).__name__
+                    view_extra["cause_message"] = str(exc.__cause__)
+                agent_error(f"View generation failed: {exc.message}", "PipelineExecutionError", cause=exc, **view_extra)
+            except (PipelexInterpreterError, MthdsDecodeError) as exc:
+                agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
+            except typer.Exit:
+                raise
+            except Exception as exc:
+                agent_error(f"View generation failed: {exc}", type(exc).__name__, cause=exc)
 
         agent_success(result)
 

@@ -88,7 +88,7 @@ class TestEdgeCases:
         env.verify_routing("custom_routing", expected_default="anthropic", expected_fallback_order=["anthropic", "openai"])
 
     def test_reset_all_with_flag(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """Test Case 6.1: Reset all with --reset flag."""
+        """Test Case 6.1: Reset all (init always resets)."""
         # Setup environment with existing config
         env = MockedInitEnvironment(tmp_path, mocker)
         env.setup_with_configs(include_backends=True, include_routing=True, include_telemetry=True)

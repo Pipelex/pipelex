@@ -1,8 +1,8 @@
 """Agent CLI init command -- non-interactive Pipelex initialization."""
 
 import json
-import os
 import shutil
+from pathlib import Path
 from typing import Annotated, Any, cast
 
 import typer
@@ -55,7 +55,7 @@ def _parse_config_arg(config_arg: str | None) -> dict[str, Any]:
     return {}
 
 
-def _resolve_target_dir(global_: bool) -> str:
+def _resolve_target_dir(global_: bool) -> Path:
     """Resolve the target directory for initialization.
 
     Args:
@@ -74,14 +74,14 @@ def _resolve_target_dir(global_: bool) -> str:
             "Use --global/-g to target the global ~/.pipelex/ directory.",
             "ArgumentError",
         )
-    return os.path.join(project_root, ".pipelex")
+    return project_root / ".pipelex"
 
 
 def _configure_backends(
     config: dict[str, Any],
     backends_toml_path: str,
     template_backends_path: str,
-    target_dir: str,
+    target_dir: Path,
 ) -> list[str]:
     """Configure backends in backends.toml based on config input.
 
@@ -131,7 +131,7 @@ def _configure_backends(
     return requested_backends
 
 
-def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any], target_dir: str) -> str:
+def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any], target_dir: Path) -> str:
     """Configure routing profile based on selected backends and config.
 
     Args:
@@ -142,7 +142,7 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     Returns:
         Name of the active routing profile.
     """
-    routing_profiles_toml_path = os.path.join(target_dir, "inference", "routing_profiles.toml")
+    routing_profiles_toml_path = str(target_dir / "inference" / "routing_profiles.toml")
 
     if not path_exists(routing_profiles_toml_path):
         agent_error("routing_profiles.toml not found after config initialization", "InitConfigError")
@@ -220,7 +220,7 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     return "custom_routing"
 
 
-def _configure_telemetry(target_dir: str, config: dict[str, Any]) -> str:
+def _configure_telemetry(target_dir: Path, config: dict[str, Any]) -> str:
     """Copy telemetry template to target directory and apply telemetry_mode if specified.
 
     Args:
@@ -230,13 +230,13 @@ def _configure_telemetry(target_dir: str, config: dict[str, Any]) -> str:
     Returns:
         The telemetry mode that was set.
     """
-    telemetry_config_path = os.path.join(target_dir, TELEMETRY_CONFIG_FILE_NAME)
-    template_path = os.path.join(str(get_kit_configs_dir()), TELEMETRY_CONFIG_FILE_NAME)
+    telemetry_config_path = target_dir / TELEMETRY_CONFIG_FILE_NAME
+    template_path = Path(str(get_kit_configs_dir() / TELEMETRY_CONFIG_FILE_NAME))
 
-    if not path_exists(str(template_path)):
+    if not template_path.exists():
         agent_error("Telemetry template not found in kit configs", "InitConfigError")
 
-    os.makedirs(os.path.dirname(telemetry_config_path), exist_ok=True)
+    telemetry_config_path.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy(template_path, telemetry_config_path)
 
     # Apply telemetry_mode if specified
@@ -316,11 +316,11 @@ def agent_init_cmd(
         target_dir = _resolve_target_dir(global_)
 
         # Step 1: Copy config files
-        config_files_copied = init_config(reset=True, target_dir=target_dir)
+        config_files_copied = init_config(reset=True, target_dir=str(target_dir))
 
         # Step 2: Configure backends
-        template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
-        backends_toml_path = os.path.join(target_dir, "inference", "backends.toml")
+        template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
+        backends_toml_path = str(target_dir / "inference" / "backends.toml")
         backends_enabled = _configure_backends(parsed_config, backends_toml_path, template_backends_path, target_dir)
 
         # Step 3: Configure routing
@@ -333,7 +333,7 @@ def agent_init_cmd(
         agent_success(
             {
                 "success": True,
-                "target_dir": target_dir,
+                "target_dir": str(target_dir),
                 "config_files_copied": config_files_copied,
                 "backends_enabled": backends_enabled,
                 "routing_profile": routing_profile,

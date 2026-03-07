@@ -29,6 +29,7 @@ Here are all the native concepts you can use out of the box:
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
 | `Dynamic` | A dynamic concept that adapts to context | `DynamicContent` |
 | `JSON` | A JSON object | `JSONContent` |
+| `SearchResult` | A web search result with answer and sources | `SearchResultContent` |
 | `Anything` | Any type of content | *No specific implementation* |
 
 ## Native Concept Structures
@@ -102,7 +103,14 @@ Combines text with one or more images:
 class TextAndImagesContent(StuffContent):
     text: Optional[TextContent]
     images: Optional[List[ImageContent]]
+    raw_html: Optional[str]
 ```
+
+**Fields:**
+
+- `text`: The text content
+- `images`: A list of images extracted from the content
+- `raw_html`: The raw HTML of the fetched page, when requested via `include_raw_html`
 
 **Use for:** Rich content combining text and visuals, extracted document content, reports with diagrams.
 
@@ -143,6 +151,26 @@ A concept that represents a JSON object. This enables pipes to receive as input 
 class JSONContent(StuffContent):
     json_obj: dict[str, Any]
 ```
+
+### SearchResultContent
+
+Represents the result of a web search query. Produced by `PipeSearch`:
+
+```python
+class SearchResultContent(StuffContent):
+    answer: str
+    sources: list[SearchSourceContent] = []
+```
+
+**Fields:**
+
+- `answer`: The synthesized answer text from the search
+- `sources`: A list of source citations, each containing:
+    - `name` (str): Source name/title
+    - `url` (str): Source URL
+    - `snippet` (str | None): Relevant excerpt from the source
+
+**Use for:** Web search results, research findings, information retrieval with citations.
 
 ### Anything
 
@@ -279,6 +307,18 @@ output = "Text"
 prompt = "Given this context: $context
 
 Analyze this image: $image"
+```
+
+### Web Search
+
+```toml
+[pipe.search_topic]
+type = "PipeSearch"
+description = "Search the web for information"
+inputs = { topic = "Text" }
+output = "SearchResult"
+model = "$standard"
+prompt = "What is $topic?"
 ```
 
 ## Related Documentation

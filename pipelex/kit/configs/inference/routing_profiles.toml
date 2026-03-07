@@ -60,6 +60,10 @@ default = "groq"
 description = "Use HuggingFace backend for all its supported models"
 default = "huggingface"
 
+[profiles.all_linkup]
+description = "Use Linkup backend for all its supported models"
+default = "linkup"
+
 [profiles.all_mistral]
 description = "Use Mistral backend for all its supported models"
 default = "mistral"

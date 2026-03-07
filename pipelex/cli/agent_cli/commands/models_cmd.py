@@ -15,16 +15,19 @@ from pipelex.pipelex import Pipelex
 from pipelex.types import StrEnum
 
 
+# TODO: get this from somewhere else, not hardcoded here.
 class ModelCategory(StrEnum):
     LLM = "llm"
     EXTRACT = "extract"
     IMG_GEN = "img_gen"
+    SEARCH = "search"
 
 
 CATEGORY_TO_MODEL_TYPE: dict[ModelCategory, ModelType] = {
     ModelCategory.LLM: ModelType.LLM,
     ModelCategory.EXTRACT: ModelType.TEXT_EXTRACTOR,
     ModelCategory.IMG_GEN: ModelType.IMG_GEN,
+    ModelCategory.SEARCH: ModelType.SEARCH,
 }
 
 
@@ -131,6 +134,8 @@ def _build_presets_for_category(
             presets_dict = model_deck.extract_presets
         case ModelCategory.IMG_GEN:
             presets_dict = model_deck.img_gen_presets
+        case ModelCategory.SEARCH:
+            presets_dict = model_deck.search_presets
 
     presets_list: list[dict[str, Any]] = []
     for preset_name, setting in presets_dict.items():
@@ -160,6 +165,8 @@ def _build_aliases_for_category(
             aliases = model_deck.extract_aliases
         case ModelCategory.IMG_GEN:
             aliases = model_deck.img_gen_aliases
+        case ModelCategory.SEARCH:
+            aliases = model_deck.search_aliases
 
     if backend is not None:
         aliases = _filter_aliases_by_backend(aliases, model_deck, model_type, backend)
@@ -182,6 +189,8 @@ def _build_waterfalls_for_category(
             waterfalls = model_deck.extract_waterfalls
         case ModelCategory.IMG_GEN:
             waterfalls = model_deck.img_gen_waterfalls
+        case ModelCategory.SEARCH:
+            waterfalls = model_deck.search_waterfalls
 
     if backend is not None:
         waterfalls = _filter_waterfalls_by_backend(waterfalls, model_deck, model_type, backend)
@@ -208,6 +217,8 @@ def _build_talent_mappings_for_category(
             presets_dict = model_deck.extract_presets
         case ModelCategory.IMG_GEN:
             presets_dict = model_deck.img_gen_presets
+        case ModelCategory.SEARCH:
+            presets_dict = model_deck.search_presets
 
     return _filter_talent_mappings_by_backend(mappings, presets_dict, model_deck, model_type, backend)
 
@@ -216,7 +227,7 @@ def agent_models_cmd(
     ctx: typer.Context,
     model_type: Annotated[
         list[ModelCategory] | None,
-        typer.Option("--type", "-t", help="Filter by model category (repeatable): llm, extract, img_gen"),
+        typer.Option("--type", "-t", help="Filter by model category (repeatable): llm, extract, img_gen, search"),
     ] = None,
     backend: Annotated[
         str | None,
@@ -258,6 +269,12 @@ def agent_models_cmd(
             waterfalls["extract"] = _build_waterfalls_for_category(model_deck, ModelCategory.EXTRACT, backend)
             talent["extract"] = _build_talent_mappings_for_category(model_deck, ModelCategory.EXTRACT, talent_mappings.extract, backend)
 
+        if _should_include(ModelCategory.SEARCH, model_type):
+            presets["search"] = _build_presets_for_category(model_deck, ModelCategory.SEARCH, backend)
+            aliases["search"] = _build_aliases_for_category(model_deck, ModelCategory.SEARCH, backend)
+            waterfalls["search"] = _build_waterfalls_for_category(model_deck, ModelCategory.SEARCH, backend)
+            talent["search"] = _build_talent_mappings_for_category(model_deck, ModelCategory.SEARCH, talent_mappings.search, backend)
+
         result: dict[str, Any] = {
             "success": True,
             "presets": presets,
@@ -265,7 +282,7 @@ def agent_models_cmd(
             "waterfalls": waterfalls,
             "talent_mappings": talent,
             "talent_mappings_usage_hint": (
-                "Use the talent name (key) as the value for llm_talent / extract_talent / img_gen_talent"
+                "Use the talent name (key) as the value for llm_talent / extract_talent / img_gen_talent / search_talent"
                 " in pipe specs passed to 'pipelex-agent pipe --spec'"
             ),
         }

@@ -141,7 +141,7 @@ For concepts that need structure, the builder:
 
 The builder designs the complete flow architecture:
 - Maps out pipe controllers (PipeSequence, PipeBatch, PipeParallel, PipeCondition)
-- Assigns pipe operators (PipeLLM, PipeExtract, PipeImgGen) to specific tasks
+- Assigns pipe operators (PipeLLM, PipeExtract, PipeImgGen, PipeSearch) to specific tasks
 - Ensures variables flow correctly through the memory system
 - Reviews the flow for consistency and fixes any issues
 
@@ -159,6 +159,7 @@ For each pipe signature, generates the complete specification:
 - **PipeLLM**: Creates prompts and configures LLM settings
 - **PipeExtract**: Sets up document/image extraction
 - **PipeImgGen**: Configures image generation from prompts
+- **PipeSearch**: Configures web search with structured results
 - **PipeSequence**: Defines step-by-step execution
 - **PipeBatch**: Sets up concurrent processing over lists
 - **PipeParallel**: Orchestrates concurrent different pipes

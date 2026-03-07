@@ -1,6 +1,6 @@
 """Routing profile configuration logic for the init command."""
 
-import os
+from pathlib import Path
 from typing import Any, cast
 
 from rich.markup import escape
@@ -65,16 +65,18 @@ def _migrate_profile_to_official_backend(profile: dict[str, Any]) -> None:
             optional_routes[pattern] = official_backend
 
 
-def customize_routing_profile(selected_backend_keys: list[str]) -> None:
+def customize_routing_profile(selected_backend_keys: list[str], target_config_dir: Path | None = None) -> None:
     """Interactively customize routing profile based on selected backends.
 
     Args:
         selected_backend_keys: List of backend keys that are enabled.
+        target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
     """
     console = get_console()
-    routing_profiles_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "routing_profiles.toml")
-    template_routing_path = os.path.join(str(get_kit_configs_dir()), "inference", "routing_profiles.toml")
-    backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
+    effective_config_dir = target_config_dir or config_manager.pipelex_config_dir
+    routing_profiles_toml_path = str(effective_config_dir / "inference" / "routing_profiles.toml")
+    template_routing_path = str(get_kit_configs_dir() / "inference" / "routing_profiles.toml")
+    backends_toml_path = str(effective_config_dir / "inference" / "backends.toml")
 
     if not path_exists(routing_profiles_toml_path):
         console.print("[yellow]⚠ Warning: routing_profiles.toml not found, skipping routing customization[/yellow]")
@@ -88,7 +90,7 @@ def customize_routing_profile(selected_backend_keys: list[str]) -> None:
         toml_doc = load_toml_with_tomlkit(routing_profiles_toml_path)
 
         # Get backend options for display names
-        template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
+        template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
         backend_options = get_backend_options_from_toml(template_backends_path, backends_toml_path)
 
         # Case 1: pipelex_gateway is enabled - use all_pipelex_gateway

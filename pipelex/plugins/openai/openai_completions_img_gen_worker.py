@@ -129,6 +129,10 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
         if not base64_str and not actual_url:
             msg = f"ImgGenCompletions response has no image. Model: {self.inference_model.desc}"
             raise ImgGenGenerationError(msg)
+
+        if (img_gen_tokens_usage := img_gen_job.job_report.img_gen_tokens_usage) and (usage := response.usage):
+            img_gen_tokens_usage.nb_tokens_by_category = self.openai_completions_factory.make_nb_tokens_by_category(usage=usage)
+
         # Size is None because the API doesn't return it. We now support various aspect ratios,
         # but detecting the size here (e.g., via Pillow) is left to downstream consumers if needed.
         return GeneratedImageRawDetails(

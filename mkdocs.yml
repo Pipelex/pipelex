@@ -145,6 +145,7 @@ nav:
           - PipeLLM: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md
           - PipeExtract: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeExtract.md
           - PipeImgGen: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeImgGen.md
+          - PipeSearch: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeSearch.md
           - PipeCompose: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeCompose.md
           - PipeFunc: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc.md
         - Pipe Controllers:

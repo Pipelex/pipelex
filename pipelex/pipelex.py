@@ -92,7 +92,7 @@ PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
 class Pipelex(metaclass=MetaSingleton):
     def __init__(
         self,
-        config_dir_path: str | None = None,
+        config_dir_path: Path | None = None,
         config_cls: type[ConfigRoot] | None = None,
     ) -> None:
         self.is_pipelex_service_enabled = False  # Will be set during setup
@@ -148,7 +148,7 @@ class Pipelex(metaclass=MetaSingleton):
 {report}
 
 Config files are invalid for the {component_name}.
-You can fix them manually, or run `pipelex init config --reset` to regenerate them.
+You can fix them manually, or run `pipelex init config` to regenerate them.
 Note that this command resets all config files to their default values.
 If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 """

@@ -10,6 +10,7 @@ from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent, SearchSourceContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -33,6 +34,8 @@ from pipelex.pipe_operators.img_gen.pipe_img_gen import PipeImgGen
 from pipelex.pipe_operators.img_gen.pipe_img_gen_factory import PipeImgGenFactory
 from pipelex.pipe_operators.llm.pipe_llm import PipeLLM
 from pipelex.pipe_operators.llm.pipe_llm_factory import PipeLLMFactory
+from pipelex.pipe_operators.search.pipe_search import PipeSearch
+from pipelex.pipe_operators.search.pipe_search_factory import PipeSearchFactory
 from pipelex.system.registries.registry_base import ModelType, RegistryModels
 
 
@@ -45,6 +48,7 @@ class CoreRegistryModels(RegistryModels):
         PipeCompose,
         PipeLLM,
         PipeExtract,
+        PipeSearch,
     ]
 
     PIPE_OPERATORS_FACTORY: ClassVar[list[PipeFactoryProtocol[Any, Any]]] = [
@@ -53,6 +57,7 @@ class CoreRegistryModels(RegistryModels):
         PipeComposeFactory,
         PipeLLMFactory,
         PipeExtractFactory,
+        PipeSearchFactory,
     ]
 
     PIPE_CONTROLLERS: ClassVar[list[PipeAbstractType]] = [
@@ -82,6 +87,8 @@ class CoreRegistryModels(RegistryModels):
         TextAndImagesContent,
         PageContent,
         JSONContent,
+        SearchResultContent,
+        SearchSourceContent,
     ]
 
     EXPERIMENTAL: ClassVar[list[ModelType]] = [

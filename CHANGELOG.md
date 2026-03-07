@@ -1,5 +1,80 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- **Config paths use `pathlib.Path`**: All `ConfigLoader` properties and methods now return `Path` instead of `str`. Consumer code across the config system (doctor, init, backends, routing, credentials, telemetry, agent CLI) updated accordingly.
+- **Layered config resolution for `pipelex doctor` and `pipelex init`**: Config files are now resolved with project-first, global-fallback layering per file. Fixed `replace_backend_file` using CWD-relative path that broke when run from another directory.
+- **Gateway terms are explicitly global**: `update_service_terms_acceptance` now targets `~/.pipelex/` by default, since gateway terms are a user-level agreement, not project-level.
+
+## [v0.20.4] - 2026-03-04
+
+- Improve README.md instructions for Claude Code and MTHDS skills.
+
+## [v0.20.3] - 2026-03-04
+
+### Fixed
+
+- Rewrote README with updated CV Batch Screening example, corrected CLI command, inputs schema, Python snippet, and pipe descriptions.
+
+## [v0.20.2] - 2026-03-04
+
+### Fixed
+
+- Fixed removal of the --reset flag from the init command docs.
+- Fixed the name of the `PipeSequence` results within a batch.
+
+## [v0.20.1] - 2026-03-03
+
+### Changed
+
+- **Cost Report Consistency**: Renamed `platform_llm_id` field to `platform_model_id` in `LLMTokenCostReport`, aligning with all other report types (ImgGen, Extract, Search, Fetch) that already use `platform_model_id`.
+- **Test Coverage**: Added `linkup` backend to the coverage test profile.
+
+## [v0.20.0] - 2026-03-03
+
+### Added
+
+- **CLI Authentication**: `pipelex login` command that initiates a browser-based OAuth flow (GitHub/Google) to authenticate with the Pipelex Gateway and save the API key locally.
+- **Search Filtering**: `from_date`, `to_date`, `include_domains`, and `exclude_domains` options on the `PipeSearch` operator, routed through a new `GatewaySearchWorker`.
+- **Expanded Cost Reporting**: Token usage and cost tracking now covers Search, Fetch, Extraction, and Image Generation jobs, in addition to LLMs.
+- **New Models**: Added `gpt-5.3-codex` (text, images, pdf inputs) and `nano-banana-2`.
+
+### Changed
+
+- **Search Configuration**: Renamed Linkup model IDs from `linkup/standard` to `linkup-standard` (and `deep` variant), simplified presets to `$standard` and `$deep`.
+- **Default Pipeline Execution**: Changed from `in_memory` to `local`.
+- **Default Extraction Model**: Changed from `mistral-document-ai-2505` to `azure-document-intelligence`; removed `mistral-document-ai-2505` from the supported Gateway models list.
+- **Content Handling**: `TextAndImagesContent` now supports an optional `raw_html` field.
+- **Dev Experience**: `Makefile` commands (`generate-mthds-schema`, `update-gateway-models`) run in quiet mode by default.
+
+## [v0.19.0] - 2026-03-02
+
+### Added
+ - **Web Search Integration**: Introduced a new `PipeSearch` operator, native support for Linkup as a search backend provider, `SearchResult` and `SearchResultContent` concepts for handling answers with citations, and Model Deck support for search models.
+ - **Graph View Generation**: Added a `--view` option to `pipelex validate bundle` that generates a `ViewSpec` JSON (compatible with ReactFlow) for client-side graph rendering without writing files to disk.
+
+### Changed
+ - **Test Configuration**: Added a `search` pytest marker, excluded from default test runs.
+ - `mthds` bumped to `>=0.1.0`.
+ - `pipelex-tools` bumped to `>=0.2.3`.
+ - `linkup-sdk>=0.12.0` added as optional dependency for the Linkup search provider.
+
+## [v0.18.6] - 2026-03-01
+
+### Added
+
+- **GitHub URL support for CLI method targets** — All CLI commands accepting a method target (`pipelex validate method`, `pipelex run method`, `pipelex build inputs method`, etc.) now accept a public GitHub URL (e.g., `https://github.com/org/repo/tree/main/methods/my-method`). The repository is cloned automatically, and the method package is discovered and validated. Subdirectory URLs are supported.
+- **Local path support for CLI method targets** — Method targets can now also be local filesystem paths pointing to a directory containing a `METHODS.toml`. This works for both `pipelex` and `pipelex-agent` CLIs.
+- Added `clone_default_branch()` in `mthds` package for shallow-cloning a git repository's default branch.
+
+## [v0.18.5] - 2026-03-01
+
+### Changed
+
+- `pipelex-agent assemble` command now outputs JSON to stdout by default.
+
 ## [v0.18.4] - 2026-03-01
 
 ### Added

@@ -57,18 +57,21 @@ class BackendFileReport(BaseModel):
     has_kit_template: bool = False
 
 
-def check_config_files(config_dir: str | None = None) -> tuple[bool, int, str]:
+def check_config_files(config_dir: Path | None = None) -> tuple[bool, int, str]:
     """Check if configuration files are present and main config is valid.
 
     Args:
-        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
+        config_dir: Explicit config directory override (e.g. for --global).
+            If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
     Returns:
         Tuple of (is_healthy, missing_count, message)
     """
+    effective_config_dir = config_dir or config_manager.pipelex_config_dir
+
     # Check for missing files
     try:
-        missing_count = init_config(reset=False, dry_run=True, target_dir=config_dir)
+        missing_count = init_config(reset=False, dry_run=True, target_dir=str(effective_config_dir))
     except Exception as exc:
         return False, 0, f"Error checking config files: {exc}"
 
@@ -76,7 +79,7 @@ def check_config_files(config_dir: str | None = None) -> tuple[bool, int, str]:
     # Note: load_config() uses config_manager's own resolution chain (package → global → project)
     # which may differ from config_dir when --global is used. This is acceptable for a diagnostic
     # check — the existence check guards the path, while load_config() validates the merged config.
-    pipelex_config_path = os.path.join(config_dir, "pipelex.toml") if config_dir else ".pipelex/pipelex.toml"
+    pipelex_config_path = config_manager.resolve_config_file("pipelex.toml", config_dir=config_dir)
     if path_exists(pipelex_config_path):
         try:
             # Suppress stderr and stdout to prevent tracebacks from being printed
@@ -96,16 +99,17 @@ def check_config_files(config_dir: str | None = None) -> tuple[bool, int, str]:
     return False, missing_count, f"{missing_count} configuration file(s) missing"
 
 
-def check_telemetry_config(config_dir: str | None = None) -> tuple[bool, str]:
+def check_telemetry_config(config_dir: Path | None = None) -> tuple[bool, str]:
     """Check if telemetry configuration is valid.
 
     Args:
-        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
+        config_dir: Explicit config directory override (e.g. for --global).
+            If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
     Returns:
         Tuple of (is_healthy, message)
     """
-    telemetry_config_path = os.path.join(config_dir, TELEMETRY_CONFIG_FILE_NAME) if config_dir else f".pipelex/{TELEMETRY_CONFIG_FILE_NAME}"
+    telemetry_config_path = config_manager.resolve_config_file(TELEMETRY_CONFIG_FILE_NAME, config_dir=config_dir)
 
     try:
         toml_doc = load_toml_from_path(telemetry_config_path)
@@ -121,19 +125,20 @@ def check_telemetry_config(config_dir: str | None = None) -> tuple[bool, str]:
         # Check if this looks like the old config format (has telemetry_mode at root level)
         if "custom_posthog" not in toml_doc and ("telemetry_mode" in toml_doc or "project_api_key" in toml_doc):
             return False, "Config format has changed - run 'pipelex init telemetry' to update"
-        return False, "Invalid configuration - run 'pipelex init telemetry --reset' to fix"
+        return False, "Invalid configuration - run 'pipelex init telemetry' to fix"
 
 
-def check_backend_credentials(config_dir: str | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
+def check_backend_credentials(config_dir: Path | None = None) -> tuple[bool, dict[str, BackendCredentialsReport], str]:
     """Check if backend credentials are properly configured.
 
     Args:
-        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
+        config_dir: Explicit config directory override (e.g. for --global).
+            If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
     Returns:
         Tuple of (is_healthy, backend_reports_dict, summary_message)
     """
-    backends_toml_path = os.path.join(config_dir, "inference", "backends.toml") if config_dir else ".pipelex/inference/backends.toml"
+    backends_toml_path = config_manager.resolve_config_file(os.path.join("inference", "backends.toml"), config_dir=config_dir)
 
     if not path_exists(backends_toml_path):
         return False, {}, "Backend configuration file not found"
@@ -221,12 +226,13 @@ def check_kit_template_exists(backend_name: str) -> bool:
         return False
 
 
-def replace_backend_file(backend_name: str, dry_run: bool = False) -> bool:
+def replace_backend_file(backend_name: str, dry_run: bool = False, config_dir: Path | None = None) -> bool:
     """Replace a backend configuration file with the kit template.
 
     Args:
         backend_name: Name of the backend to replace
         dry_run: If True, only report what would be done without actually doing it
+        config_dir: Explicit config directory path. If None, uses config_manager.pipelex_config_dir.
 
     Returns:
         True if successful, False otherwise
@@ -243,7 +249,8 @@ def replace_backend_file(backend_name: str, dry_run: bool = False) -> bool:
         template_content = template_file.read_text(encoding="utf-8")
 
         # Determine target path
-        target_dir = Path(".pipelex") / "inference" / "backends"
+        resolved_config_dir = config_dir or config_manager.pipelex_config_dir
+        target_dir = Path(resolved_config_dir) / "inference" / "backends"
         target_file = target_dir / f"{backend_name}.toml"
 
         if dry_run:
@@ -260,22 +267,23 @@ def replace_backend_file(backend_name: str, dry_run: bool = False) -> bool:
         return False
 
 
-def check_backend_files(config_dir: str | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
+def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str, BackendFileReport], str]:
     """Check individual backend configuration files for validity.
 
     Args:
-        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
+        config_dir: Explicit config directory override (e.g. for --global).
+            If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
     Returns:
         Tuple of (is_healthy, backend_file_reports_dict, summary_message)
     """
-    backends_dir_path = os.path.join(config_dir, "inference", "backends") if config_dir else ".pipelex/inference/backends"
+    backends_dir_path = config_manager.resolve_config_file(os.path.join("inference", "backends"), config_dir=config_dir)
 
     if not path_exists(backends_dir_path):
         return True, {}, "No backend files to check"
 
     # Get list of enabled backends from backends.toml
-    backends_toml_path = os.path.join(config_dir, "inference", "backends.toml") if config_dir else ".pipelex/inference/backends.toml"
+    backends_toml_path = config_manager.resolve_config_file(os.path.join("inference", "backends.toml"), config_dir=config_dir)
     if not path_exists(backends_toml_path):
         return True, {}, "No backends.toml to check"
 
@@ -322,8 +330,8 @@ def check_backend_files(config_dir: str | None = None) -> tuple[bool, dict[str, 
             # Try to load just this backend's specs
             temp_library.load(
                 secrets_provider=secrets_provider,
-                backends_library_path=backends_toml_path,
-                backends_dir_path=backends_dir_path,
+                backends_library_path=str(backends_toml_path),
+                backends_dir_path=str(backends_dir_path),
                 include_disabled=False,
             )
 
@@ -527,18 +535,18 @@ def display_health_report(
 
             if has_telemetry_validation_error and "pipelex init telemetry" not in telemetry_message:
                 console.print("  • Fix validation errors in [cyan].pipelex/telemetry.toml[/cyan]")
-                console.print("    or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate")
+                console.print("    or run [cyan]pipelex init telemetry[/cyan] to regenerate")
 
             # Backend file issues
             if can_auto_fix_backends:
                 if fix_mode:
                     # We're in fix mode, show what's happening next and the alternative
                     console.print("  • Interactive fixes for outdated backend configurations will be offered below")
-                    console.print("  • Alternatively, run [cyan]pipelex init config --reset[/cyan] to reset all configuration files")
+                    console.print("  • Alternatively, run [cyan]pipelex init config[/cyan] to reset all configuration files")
                 else:
                     # Not in fix mode, suggest running --fix
                     console.print("  • Run [cyan]pipelex doctor --fix[/cyan] to replace outdated backend configurations")
-                    console.print("    [dim]or run[/dim] [cyan]pipelex init config --reset[/cyan] [dim]to reset all configuration files[/dim]")
+                    console.print("    [dim]or run[/dim] [cyan]pipelex init config[/cyan] [dim]to reset all configuration files[/dim]")
 
             if has_custom_backend_issues:
                 invalid_custom = [name for name, report in backend_file_reports.items() if not report.is_valid and not report.has_kit_template]
@@ -582,11 +590,12 @@ def display_health_report(
             console.print()
 
 
-def check_models(config_dir: str | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
+def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, BackendFileReport]]:
     """Check if models are valid, including backend file validation.
 
     Args:
-        config_dir: Explicit config directory path. If None, uses CWD-relative .pipelex/.
+        config_dir: Explicit config directory override (e.g. for --global).
+            If None, uses layered resolution (project .pipelex/ → global ~/.pipelex/).
 
     Returns:
         Tuple of (is_healthy, message, backend_file_reports)
@@ -684,7 +693,7 @@ def do_doctor_cmd(
     Args:
         fix: If True, offer to fix detected issues interactively
     """
-    # Run health checks
+    # Run health checks (config_dir=None uses layered resolution: project → global)
     config_healthy, config_missing_count, config_message = check_config_files()
     telemetry_healthy, telemetry_message = check_telemetry_config()
     backends_healthy, backend_credential_reports, backends_message = check_backend_credentials()
@@ -810,7 +819,7 @@ def do_doctor_cmd(
             console.print(f"  {config_message}")
             console.print()
             console.print("You can fix this manually by editing [cyan].pipelex/pipelex.toml[/cyan]")
-            console.print("or run [cyan]pipelex init config --reset[/cyan] to regenerate from template.")
+            console.print("or run [cyan]pipelex init config[/cyan] to regenerate from template.")
             console.print()
 
         # Telemetry validation errors (skip if message already contains the fix command)
@@ -819,7 +828,7 @@ def do_doctor_cmd(
             console.print(f"  {telemetry_message}")
             console.print()
             console.print("You can fix this manually by editing [cyan].pipelex/telemetry.toml[/cyan]")
-            console.print("or run [cyan]pipelex init telemetry --reset[/cyan] to regenerate from template.")
+            console.print("or run [cyan]pipelex init telemetry[/cyan] to regenerate from template.")
             console.print()
 
         # Backend credentials

@@ -1,0 +1,37 @@
+####################################################################################################
+# Pipelex Model Deck - Search Configuration
+####################################################################################################
+#
+# This file defines model aliases and presets for Search models, including
+# web search providers like Linkup.
+#
+# Model Reference Syntax:
+# - Preset:    $preset_name or preset:preset_name
+# - Alias:     @alias_name or alias:alias_name
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+####################################################################################################
+
+####################################################################################################
+# Search Default Choices
+####################################################################################################
+
+[search]
+choice_default = "@default-search"
+
+####################################################################################################
+# Aliases
+####################################################################################################
+
+[search.aliases]
+default-search = "linkup-standard"
+
+####################################################################################################
+# Search Presets
+####################################################################################################
+
+[search.presets]
+standard = { model = "linkup-standard", include_images = false, include_inline_citations = true }
+deep = { model = "linkup-deep", include_images = false, include_inline_citations = true }

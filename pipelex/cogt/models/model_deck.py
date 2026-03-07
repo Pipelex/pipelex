@@ -14,6 +14,7 @@ from pipelex.cogt.exceptions import (
     ModelDeckValidatonError,
     ModelNotFoundError,
     ModelWaterfallError,
+    SearchHandleNotFoundError,
 )
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
@@ -29,6 +30,7 @@ from pipelex.cogt.model_backends.constraints import ValuedConstraint
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceKind, ModelReferenceParseError, ensure_model_reference
+from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.exceptions import ConfigValidationError
 from pipelex.system.runtime import ProblemReaction
@@ -65,10 +67,18 @@ class ImgGenDeckBlueprint(ConfigModel):
     choice_default: ImgGenModelChoice
 
 
+class SearchDeckBlueprint(ConfigModel):
+    aliases: dict[str, str] = Field(default_factory=dict)
+    waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+    presets: dict[str, SearchSetting] = Field(default_factory=dict)
+    choice_default: SearchModelChoice
+
+
 class ModelDeckBlueprint(ConfigModel):
     llm: LLMDeckBlueprint
     extract: ExtractDeckBlueprint
     img_gen: ImgGenDeckBlueprint
+    search: SearchDeckBlueprint
 
 
 class ModelDeck(ConfigModel):
@@ -102,6 +112,12 @@ class ModelDeck(ConfigModel):
     img_gen_presets: dict[str, ImgGenSetting] = Field(default_factory=dict)
     img_gen_choice_default: ImgGenModelChoice
 
+    # Search-specific
+    search_aliases: dict[str, str] = Field(default_factory=dict)
+    search_waterfalls: dict[str, list[str]] = Field(default_factory=dict)
+    search_presets: dict[str, SearchSetting] = Field(default_factory=dict)
+    search_choice_default: SearchModelChoice
+
     def _get_aliases_and_waterfalls_for_type(self, model_type: ModelType) -> tuple[dict[str, str], dict[str, list[str]]]:
         """Return the type-specific aliases and waterfalls dictionaries."""
         match model_type:
@@ -111,6 +127,8 @@ class ModelDeck(ConfigModel):
                 return self.extract_aliases, self.extract_waterfalls
             case ModelType.IMG_GEN:
                 return self.img_gen_aliases, self.img_gen_waterfalls
+            case ModelType.SEARCH:
+                return self.search_aliases, self.search_waterfalls
 
     def is_model_handle_defined(self, model_handle: str, model_type: ModelType) -> bool:
         """Check if a model handle is defined in the model deck.
@@ -182,11 +200,25 @@ class ModelDeck(ConfigModel):
                 f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
             )
 
+    def _warn_if_ambiguous_search(self, name: str) -> None:
+        """Log a warning if a bare string handle matches presets/aliases/waterfalls."""
+        matches: list[str] = []
+        if name in self.search_presets:
+            matches.append(f"search preset (use ${name} or preset:{name})")
+        if name in self.search_aliases:
+            matches.append(f"alias (use @{name} or alias:{name})")
+        if name in self.search_waterfalls:
+            matches.append(f"waterfall (use ~{name} or waterfall:{name})")
+        if matches:
+            log.warning(
+                f"Bare string '{name}' matches: {', '.join(matches)}. Using it as a direct model handle. Add explicit prefix to avoid ambiguity."
+            )
+
     def _raise_handle_not_found_error(
         self,
         ref: ModelReference,
         model_type: ModelType,
-        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting],
+        presets: dict[str, LLMSetting] | dict[str, ExtractSetting] | dict[str, ImgGenSetting] | dict[str, SearchSetting],
     ) -> NoReturn:
         """Raise ModelChoiceNotFoundError with migration hints if applicable."""
         msg = f"Model handle '{ref.name}' was not found in the model deck"
@@ -372,6 +404,55 @@ class ModelDeck(ConfigModel):
                     presets=self.extract_presets,
                 )
 
+    def get_search_setting(self, search_choice: SearchModelChoice) -> SearchSetting:
+        if isinstance(search_choice, SearchSetting):
+            return search_choice
+
+        ref = ensure_model_reference(search_choice)
+        match ref.kind:
+            case ModelReferenceKind.PRESET:
+                if preset := self.search_presets.get(ref.name):
+                    return preset
+                msg = f"Search preset '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.SEARCH,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.PRESET,
+                    available_options=list(self.search_presets.keys()),
+                )
+            case ModelReferenceKind.ALIAS:
+                if alias_target := self.search_aliases.get(ref.name):
+                    return SearchSetting(model=alias_target)
+                msg = f"Alias '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.SEARCH,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.ALIAS,
+                    available_options=list(self.search_aliases.keys()),
+                )
+            case ModelReferenceKind.WATERFALL:
+                if ref.name in self.search_waterfalls:
+                    return SearchSetting(model=ref.name)
+                msg = f"Waterfall '{ref.name}' was not found in the model deck"
+                raise ModelChoiceNotFoundError(
+                    message=msg,
+                    model_type=ModelType.SEARCH,
+                    model_choice=ref.raw,
+                    reference_kind=ModelReferenceKind.WATERFALL,
+                    available_options=list(self.search_waterfalls.keys()),
+                )
+            case ModelReferenceKind.HANDLE:
+                self._warn_if_ambiguous_search(ref.name)
+                if self.is_model_handle_defined(model_handle=ref.name, model_type=ModelType.SEARCH):
+                    return SearchSetting(model=ref.name)
+                self._raise_handle_not_found_error(
+                    ref=ref,
+                    model_type=ModelType.SEARCH,
+                    presets=self.search_presets,
+                )
+
     def get_img_gen_setting(self, img_gen_choice: ImgGenModelChoice) -> ImgGenSetting:
         if isinstance(img_gen_choice, ImgGenSetting):
             return img_gen_choice
@@ -514,6 +595,17 @@ class ModelDeck(ConfigModel):
                 )
         return self
 
+    def validate_search_presets(self) -> Self:
+        for search_preset_id, search_setting in self.search_presets.items():
+            if not self.is_model_handle_defined(model_handle=search_setting.model, model_type=ModelType.SEARCH):
+                msg = f"Search handle '{search_setting.model}' for search preset '{search_preset_id}' was not found in the model deck"
+                raise SearchHandleNotFoundError(
+                    message=msg,
+                    preset_id=search_preset_id,
+                    model_handle=search_setting.model,
+                )
+        return self
+
     def validate_registered_models(self):
         self.validate_inference_models()
         try:
@@ -563,6 +655,22 @@ class ModelDeck(ConfigModel):
                     ) from exc
                 case ProblemReaction.LOG:
                     log.warning(f"Extract handle not found: {exc}")
+                case ProblemReaction.NONE:
+                    pass
+        try:
+            self.validate_search_presets()
+        except SearchHandleNotFoundError as exc:
+            match self.model_deck_config.missing_presets_reaction:
+                case ProblemReaction.RAISE:
+                    msg = f"Failed to validate all Search presets: {exc}"
+                    raise ModelDeckPresetValidatonError(
+                        message=msg,
+                        model_type=ModelType.SEARCH,
+                        preset_id=exc.preset_id,
+                        model_handle=exc.model_handle,
+                    ) from exc
+                case ProblemReaction.LOG:
+                    log.warning(f"Search handle not found: {exc}")
                 case ProblemReaction.NONE:
                     pass
 

@@ -27,7 +27,7 @@ SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or temporal)) and not pipelex_api"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search or temporal)) and not pipelex_api"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -176,8 +176,8 @@ export HELP
 	merge-check-ruff-lint merge-check-ruff-format merge-check-mypy merge-check-pyright merge-check-plxt-format merge-check-plxt-lint \
 	li check-unused-imports fix-unused-imports check-TODOs check-uv \
 	docs docs-check docs-serve-versioned docs-list docs-deploy docs-deploy-stable docs-deploy-specific-version docs-delete \
-	generate-mthds-schema gms check-mthds-schema cms \
-	update-gateway-models ugm check-gateway-models cgm up \
+	generate-mthds-schema generate-mthds-schema-quiet gms check-mthds-schema cms \
+	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
 	temporal-server ts \
@@ -306,6 +306,9 @@ generate-mthds-schema: env
 	$(call PRINT_TITLE,"Generating MTHDS JSON Schema")
 	$(VENV_PIPELEX_DEV) generate-mthds-schema
 
+generate-mthds-schema-quiet: env
+	$(VENV_PIPELEX_DEV) generate-mthds-schema --quiet
+
 gms: generate-mthds-schema
 	@echo "> done: gms = generate-mthds-schema"
 
@@ -319,6 +322,9 @@ cms: check-mthds-schema
 update-gateway-models: env
 	$(call PRINT_TITLE,"Updating gateway models reference")
 	$(VENV_PIPELEX_DEV) update-gateway-models
+
+update-gateway-models-quiet: env
+	$(VENV_PIPELEX_DEV) update-gateway-models --quiet
 
 ugm: update-gateway-models
 	@echo "> done: ugm = update-gateway-models"
@@ -962,10 +968,10 @@ ts: temporal-server
 c: format lint pyright mypy
 	@echo "> done: c = check"
 
-cc: cleanderived regenerate-test-models-quiet generate-mthds-schema c
-	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema format lint pyright pylint mypy"
+cc: cleanderived regenerate-test-models-quiet generate-mthds-schema-quiet update-gateway-models-quiet c
+	@echo "> done: cc = cleanderived regenerate-test-models generate-mthds-schema update-gateway-models format lint pyright mypy"
 
-up: generate-mthds-schema update-gateway-models up-kit-configs rules
+up: generate-mthds-schema-quiet update-gateway-models-quiet up-kit-configs rules
 	@echo "> done: up = generate-mthds-schema update-gateway-models up-kit-configs rules"
 
 check: cc check-unused-imports check-config-sync check-rules check-urls check-gateway-models check-mthds-schema pylint
