@@ -1,0 +1,38 @@
+docs/under-the-hood/init-cli-flows.md
+  7ed513b1ae9c1bab 60
+pipelex/system/pipelex_service/pipelex_service_agreement.py
+  603d5f18a1be69f4 26,28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "8aa4f48d2bf73e6edad196f25833ff3b5549e5a7",
+  "prompts": {
+    "603d5f18a1be69f4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "616c4785-d314-4aaf-88a9-e2b195084487",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "7ed513b1ae9c1bab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8d1b5b22-836f-4e58-84fe-04600fed2944",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
