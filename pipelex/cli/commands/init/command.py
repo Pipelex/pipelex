@@ -284,6 +284,7 @@ def execute_initialization(
             effective_config_dir_for_routing = target_config_dir or config_manager.pipelex_config_dir
             routing_profiles_toml_path = str(effective_config_dir_for_routing / "inference" / "routing_profiles.toml")
             template_routing_path = Path(str(get_kit_configs_dir())) / "inference" / "routing_profiles.toml"
+            Path(routing_profiles_toml_path).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(template_routing_path, routing_profiles_toml_path)
             console.print("✅ Reset routing_profiles.toml from template")
 

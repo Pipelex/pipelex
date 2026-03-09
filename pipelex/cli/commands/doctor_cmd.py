@@ -842,7 +842,11 @@ def do_doctor_cmd(
 
                 if Confirm.ask("[bold]Replace with latest template from the Pipelex kit?[/bold]", default=True):
                     try:
-                        success = replace_backend_file(backend_name, dry_run=False)
+                        # Derive config_dir from the resolved file path so the fix targets the
+                        # same directory where the broken file was found (file lives at
+                        # {config_dir}/inference/backends/{name}.toml).
+                        resolved_config_dir = Path(backend_file_report.file_path).parent.parent.parent
+                        success = replace_backend_file(backend_name, dry_run=False, config_dir=resolved_config_dir)
                         if success:
                             console.print(f"[green]✓[/green] Replaced {backend_name} backend configuration")
                         else:

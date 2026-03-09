@@ -38,4 +38,5 @@ def update_service_terms_acceptance(accepted: bool, config_dir: Path | None = No
     # Update terms_accepted
     toml_doc["agreement"]["terms_accepted"] = accepted  # type: ignore[index]
 
+    resolved_config_dir.mkdir(parents=True, exist_ok=True)
     save_toml_to_path(toml_doc, service_config_path)
