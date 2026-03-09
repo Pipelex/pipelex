@@ -23,9 +23,9 @@ def update_service_terms_acceptance(accepted: bool, config_dir: Path | None = No
 
     Args:
         accepted: Whether the user accepted the terms.
-        config_dir: Explicit config directory path. If None, uses config_manager.pipelex_config_dir.
+        config_dir: Explicit config directory path. If None, uses config_manager.global_config_dir.
     """
-    resolved_config_dir = config_dir or config_manager.pipelex_config_dir
+    resolved_config_dir = config_dir or config_manager.global_config_dir
     service_config_path = resolved_config_dir / PIPELEX_SERVICE_CONFIG_FILE_NAME
 
     if path_exists(service_config_path):

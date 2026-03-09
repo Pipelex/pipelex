@@ -57,7 +57,7 @@ All commands except `agreement` and `credentials` perform a **full reset** (over
 | `pipelex_service.toml` | Gateway terms acceptance | **Always global** | `~/.pipelex/pipelex_service.toml` |
 
 !!! info "Project vs global"
-    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exception is `pipelex_service.toml` which is **always** written to and read from `~/.pipelex/` — see [Gateway Terms: Always Global](#gateway-terms-always-global).
+    Most files are written to the target directory chosen at init time (project `.pipelex/` or global `~/.pipelex/`). The exceptions are `.env` (credentials) and `pipelex_service.toml`, which are **always** written to and read from `~/.pipelex/` — see [Gateway Terms: Always Global](#gateway-terms-always-global).
 
 ---
 
