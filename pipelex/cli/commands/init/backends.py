@@ -137,26 +137,37 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
         except Exception as exc:
             log.debug(f"IDE extension suggestion failed: {exc}")
 
-        # Check if pipelex_gateway is selected and handle terms acceptance
+        # Check if pipelex_gateway is selected and handle terms acceptance prompt
+        gateway_terms_accepted: bool | None = None
         if PipelexBackend.GATEWAY in selected_backends:
             gateway_accepted = prompt_gateway_acceptance(console)
 
             if gateway_accepted:
                 display_gateway_accepted_message(console)
-                update_service_terms_acceptance(accepted=True, config_dir=config_manager.global_config_dir)
+                gateway_terms_accepted = True
             else:
                 display_gateway_declined_message(console)
-                update_service_terms_acceptance(accepted=False, config_dir=config_manager.global_config_dir)
+                gateway_terms_accepted = False
 
                 # Remove pipelex_gateway from selected indices
                 selected_indices = [idx for idx in selected_indices if backend_options[idx][0] != PipelexBackend.GATEWAY]
 
-        # Business logic: Update TOML
+        # Business logic: Update and save backends.toml first (local operation)
         update_backends_in_toml(toml_doc, selected_indices, backend_options)
         save_toml_to_path(toml_doc, backends_toml_path)
 
         # UI: Display confirmation
         display_selected_backends(console, selected_indices, backend_options)
+
+        # Save gateway terms acceptance to global config (separate from backends save)
+        if gateway_terms_accepted is not None:
+            try:
+                global_config_dir = config_manager.global_config_dir
+                global_config_dir.mkdir(parents=True, exist_ok=True)
+                update_service_terms_acceptance(accepted=gateway_terms_accepted, config_dir=global_config_dir)
+            except Exception as terms_exc:
+                log.warning(f"Could not save gateway terms acceptance to global config: {terms_exc}")
+                console.print("[yellow]⚠ Could not save gateway terms acceptance. You can run 'pipelex init agreement' later.[/yellow]")
 
     except Exception as exc:
         console.print(f"[yellow]⚠ Warning: Failed to customize backends: {escape(str(exc))}[/yellow]")
