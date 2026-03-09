@@ -66,6 +66,7 @@ def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) ->
     # Gateway is enabled but terms not accepted - prompt user
     gateway_accepted = prompt_gateway_acceptance(console)
 
+    config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
     if gateway_accepted:
         display_gateway_accepted_message(console)
         update_service_terms_acceptance(accepted=True, config_dir=config_manager.global_config_dir)
