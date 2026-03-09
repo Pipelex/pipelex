@@ -341,9 +341,9 @@ def build_pipe_cmd(
                     console.print(f"    [green]✓[/green] graphs/{graph_label}: {', '.join(graph_formats)}")
                 if has_inputs:
                     console.print(f"\n  [yellow]Note:[/yellow] Fill {DEFAULT_INPUTS_FILE_NAME} with actual data before running.")
-                    console.print(f"  To run: [cyan]pipelex run {extras_output_dir}[/cyan]")
+                    console.print(f"  To run: [cyan]pipelex run bundle {extras_output_dir}[/cyan]")
                 else:
-                    console.print(f"\n  To run: [cyan]pipelex run {extras_output_dir}[/cyan]")
+                    console.print(f"\n  To run: [cyan]pipelex run bundle {extras_output_dir}[/cyan]")
 
             except Exception as exc:
                 typer.secho(f"⚠️  Warning: Could not generate extras: {exc}", fg=typer.colors.YELLOW)
