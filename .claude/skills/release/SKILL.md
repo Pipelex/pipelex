@@ -1,0 +1,136 @@
+---
+name: release
+description: >
+  Automates the Pipelex release workflow: bumps the version in pyproject.toml,
+  finalizes the CHANGELOG.md Unreleased section, runs quality checks, creates a
+  release/vX.Y.Z branch, commits, pushes, and opens a PR to main. Use when user
+  says "release", "cut a release", "bump version", "prepare a release", "make a
+  release", "ship it", "create release branch", or any variation of shipping a
+  new version of pipelex.
+---
+
+# Pipelex Release Workflow
+
+This skill handles the full release cycle for the `pipelex` Python package.
+
+## Files touched
+
+- **`pyproject.toml`** — the `version` field (line 3)
+- **`CHANGELOG.md`** — promote `[Unreleased]` to `[vX.Y.Z] - YYYY-MM-DD`
+
+## Workflow
+
+### 1. Pre-flight checks
+
+- Read the current version from `pyproject.toml`.
+- Read `CHANGELOG.md` to understand the current state.
+- Run `git status` and `git log origin/main..HEAD` to assess the working tree:
+  - If there are **uncommitted changes** (staged or unstaged), warn the user and
+    ask whether to commit them as part of the release, stash them, or abort.
+  - If there are **unpushed commits** on the current branch, list them so the
+    user is aware — these will be included in the release branch.
+
+### 2. Determine the bump type
+
+Ask the user which kind of version bump they want — **patch**, **minor**, or
+**major** — unless they already specified it. Show the current version and what
+the new version would be for each option so the choice is concrete.
+
+### 3. Run quality checks
+
+Run `make agent-check`. This is the gate — if it fails, stop and report the
+errors so they can be fixed before retrying. Do not proceed past this step on
+failure.
+
+### 4. Finalize the changelog
+
+The `CHANGELOG.md` has an `## [Unreleased]` section at the top with pending
+changes.
+
+1. If the `[Unreleased]` section is **empty** (no bullet points), warn the user
+   and ask whether to proceed with an empty changelog entry or abort so they can
+   add notes first.
+2. If the `[Unreleased]` section has content:
+   - Rename `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD` (using today's
+     date).
+   - Insert a fresh empty `## [Unreleased]` section above the new version
+     heading, with a blank line separating them.
+3. The result should look like:
+
+```markdown
+# Changelog
+
+## [Unreleased]
+
+## [vX.Y.Z] - YYYY-MM-DD
+
+### Changed
+- ...
+```
+
+### 5. Bump the version in pyproject.toml
+
+Edit `pyproject.toml` line 3 to the new version string. Only change the version
+field — don't touch anything else.
+
+### 6. Ensure we're on the right branch
+
+The release branch must be named `release/vX.Y.Z` where X.Y.Z is the **new**
+version.
+
+- If already on `release/vX.Y.Z` matching the new version, stay on it.
+- If on `dev`, `main`, or any other branch, create and switch to
+  `release/vX.Y.Z` from the current HEAD.
+- If on a `release/` branch for a **different** version, warn the user and ask
+  how to proceed.
+
+### 7. Commit and push
+
+Stage all release-related changes. This includes at minimum `pyproject.toml` and
+`CHANGELOG.md`, plus any other files the user chose to include in step 1 (e.g.
+previously uncommitted work that belongs in this release).
+
+Commit with the message:
+
+```
+Release vX.Y.Z
+```
+
+Push the branch to origin with `-u` to set up tracking.
+
+### 8. Open a PR
+
+Create a pull request targeting `main` with:
+
+- **Title:** `Release vX.Y.Z`
+- **Body:** Include:
+  - The changelog entries for this version (copied from CHANGELOG.md)
+  - A note about the version bump from old to new
+
+Use this format for the PR body:
+
+```markdown
+## Release vX.Y.Z
+
+Bumps version from `A.B.C` to `X.Y.Z`.
+
+### Changelog
+
+<paste the changelog entries for this version here>
+```
+
+Report the PR URL back to the user.
+
+## Important details
+
+- The version follows semver: `MAJOR.MINOR.PATCH`.
+- Always confirm the bump type with the user before making changes.
+- If `make agent-check` fails, the release is blocked — help the user fix the
+  issues rather than skipping the checks.
+- The CI will validate that:
+  - The `pyproject.toml` version matches the branch name (`version-check.yml`)
+  - The `CHANGELOG.md` has an entry for the version (`changelog-check.yml`)
+- Both checks must pass for the PR to be mergeable, so getting the changelog and
+  version right is critical.
+- Today's date for the changelog entry: use the current date in `YYYY-MM-DD`
+  format.
