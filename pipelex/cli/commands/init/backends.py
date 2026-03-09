@@ -168,6 +168,10 @@ def customize_backends_config(is_first_time_setup: bool = False, target_config_d
             except Exception as terms_exc:
                 log.warning(f"Could not save gateway terms acceptance to global config: {terms_exc}")
                 console.print("[yellow]⚠ Could not save gateway terms acceptance. You can run 'pipelex init agreement' later.[/yellow]")
+                # If terms were accepted but persistence failed, disable gateway in backends.toml
+                # to prevent an inconsistent state where gateway is enabled but terms aren't recorded
+                if gateway_terms_accepted:
+                    disable_gateway_backend(backends_toml_path)
 
     except Exception as exc:
         console.print(f"[yellow]⚠ Warning: Failed to customize backends: {escape(str(exc))}[/yellow]")
