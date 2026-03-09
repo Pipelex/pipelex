@@ -81,7 +81,6 @@ def _configure_backends(
     config: dict[str, Any],
     backends_toml_path: str,
     template_backends_path: str,
-    target_dir: Path,
 ) -> list[str]:
     """Configure backends in backends.toml based on config input.
 
@@ -89,7 +88,6 @@ def _configure_backends(
         config: Parsed config dict with optional 'backends' key.
         backends_toml_path: Path to the user's backends.toml.
         template_backends_path: Path to the template backends.toml.
-        target_dir: Target config directory for writing service agreement.
 
     Returns:
         List of enabled backend keys.
@@ -126,7 +124,7 @@ def _configure_backends(
     # Handle pipelex_gateway terms acceptance
     if PipelexBackend.GATEWAY in requested_backends:
         accept_terms: bool = config.get("accept_gateway_terms", False)
-        update_service_terms_acceptance(accepted=accept_terms, config_dir=target_dir)
+        update_service_terms_acceptance(accepted=accept_terms, config_dir=config_manager.global_config_dir)
 
     return requested_backends
 
@@ -321,7 +319,7 @@ def agent_init_cmd(
         # Step 2: Configure backends
         template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
         backends_toml_path = str(target_dir / "inference" / "backends.toml")
-        backends_enabled = _configure_backends(parsed_config, backends_toml_path, template_backends_path, target_dir)
+        backends_enabled = _configure_backends(parsed_config, backends_toml_path, template_backends_path)
 
         # Step 3: Configure routing
         routing_profile = _configure_routing(backends_enabled, parsed_config, target_dir)

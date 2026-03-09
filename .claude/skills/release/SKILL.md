@@ -17,6 +17,8 @@ This skill handles the full release cycle for the `pipelex` Python package.
 
 - **`pyproject.toml`** — the `version` field (line 3)
 - **`CHANGELOG.md`** — promote `[Unreleased]` to `[vX.Y.Z] - YYYY-MM-DD`
+- **`uv.lock`** — regenerated via `make li` (lock + install)
+- **`.badges/tests.json`** — test count updated to match actual count
 
 ## Workflow
 
@@ -73,7 +75,22 @@ changes.
 Edit `pyproject.toml` line 3 to the new version string. Only change the version
 field — don't touch anything else.
 
-### 6. Ensure we're on the right branch
+### 6. Lock dependencies
+
+Run `make li` to regenerate `uv.lock` and reinstall. This ensures the lockfile
+reflects the new version in `pyproject.toml`. If this step fails, stop and
+report the error.
+
+### 7. Update the test count badge
+
+Run `make test-count` to get the current number of tests. Then update
+`.badges/tests.json` — set the `"message"` field to the count returned by
+`make test-count`. Keep all other fields unchanged.
+
+After updating, run `make check-test-badge` to verify the badge matches. If it
+fails, re-check the count and fix the badge file.
+
+### 8. Ensure we're on the right branch
 
 The release branch must be named `release/vX.Y.Z` where X.Y.Z is the **new**
 version.
@@ -84,11 +101,12 @@ version.
 - If on a `release/` branch for a **different** version, warn the user and ask
   how to proceed.
 
-### 7. Commit and push
+### 9. Commit and push
 
-Stage all release-related changes. This includes at minimum `pyproject.toml` and
-`CHANGELOG.md`, plus any other files the user chose to include in step 1 (e.g.
-previously uncommitted work that belongs in this release).
+Stage all release-related changes. This includes at minimum `pyproject.toml`,
+`CHANGELOG.md`, `uv.lock`, and `.badges/tests.json`, plus any other files the
+user chose to include in step 1 (e.g. previously uncommitted work that belongs
+in this release).
 
 Commit with the message:
 
@@ -98,7 +116,7 @@ Release vX.Y.Z
 
 Push the branch to origin with `-u` to set up tracking.
 
-### 8. Open a PR
+### 10. Open a PR
 
 Create a pull request targeting `main` with:
 
@@ -130,7 +148,9 @@ Report the PR URL back to the user.
 - The CI will validate that:
   - The `pyproject.toml` version matches the branch name (`version-check.yml`)
   - The `CHANGELOG.md` has an entry for the version (`changelog-check.yml`)
-- Both checks must pass for the PR to be mergeable, so getting the changelog and
-  version right is critical.
+  - The `.badges/tests.json` count matches the actual test count (`check-test-badge`)
+  - The `uv.lock` file is in sync with `pyproject.toml` (`uv-lock-check`)
+- All checks must pass for the PR to be mergeable, so getting the changelog,
+  version, test badge, and lockfile right is critical.
 - Today's date for the changelog entry: use the current date in `YYYY-MM-DD`
   format.
