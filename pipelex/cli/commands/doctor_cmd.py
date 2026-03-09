@@ -671,7 +671,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
     # Fetch gateway model specs if Gateway is enabled
     gateway_model_specs: BackendModelSpecs | None = None
     if is_pipelex_gateway_enabled():
-        pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+        pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
         if pipelex_service_config is None:
             return False, "Pipelex Gateway is enabled but service configuration is missing", backend_file_reports
         if not pipelex_service_config.agreement.terms_accepted:
