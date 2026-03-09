@@ -124,6 +124,7 @@ def _configure_backends(
     # Handle pipelex_gateway terms acceptance
     if PipelexBackend.GATEWAY in requested_backends:
         accept_terms: bool = config.get("accept_gateway_terms", False)
+        config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
         update_service_terms_acceptance(accepted=accept_terms, config_dir=config_manager.global_config_dir)
 
     return requested_backends
