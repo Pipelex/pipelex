@@ -91,15 +91,33 @@ extra_css:
 nav:
   - Home:
     - What is Pipelex?: index.md
-    - Releases:
-      - v0.18.0 "Chicago": home/1-releases/chicago.md
-    - Get Started:
-      - The Pipe Builder: home/2-get-started/pipe-builder.md
-      - Write Methods Manually: home/2-get-started/write-methods-manually.md
-    - Understand Pipelex:
-      - The Know-How Graph: home/3-understand-pipelex/viewpoint.md
-      - The Pipelex Paradigm: home/3-understand-pipelex/pipelex-paradigm/index.md
-      - Pipelex Language Spec v0.1.0: home/3-understand-pipelex/language-spec-v0-1-0.md
+    - Getting Started: home/2-get-started/write-methods-manually.md
+    - Features:
+      - Overview: home/1-features/index.md
+      - Declarative AI Methods:
+        - MTHDS Language: home/1-features/mthds-language.md
+        - Concepts & Structured Types: home/1-features/concepts.md
+        - Pipe Operators: home/1-features/pipe-operators.md
+        - Pipeline Orchestration: home/1-features/pipeline-orchestration.md
+      - AI Capabilities:
+        - Pipelex Gateway & Model Access: home/1-features/gateway.md
+        - LLM Integration: home/1-features/llm-integration.md
+        - Document Extraction: home/1-features/document-extraction.md
+        - Image Generation: home/1-features/image-generation.md
+        - Web Search: home/1-features/web-search.md
+      - Developer Tools:
+        - Claude Code Skills Plugin: home/1-features/claude-code-skills-plugin.md
+        - CLI: home/1-features/cli.md
+        - plxt Formatter & Linter: home/1-features/plxt.md
+        - Execution Graph Visualization: home/1-features/execution-graph.md
+      - Production & Operations:
+        - Validation & Dry Run: home/1-features/validation-dry-run.md
+        - Telemetry & Observability: home/1-features/telemetry.md
+        - Cloud Storage: home/1-features/cloud-storage.md
+        - Cost Tracking & Reporting: home/1-features/cost-tracking.md
+      - Configuration & Extensibility:
+        - Configuration System: home/1-features/configuration.md
+        - Advanced Customizations: home/1-features/advanced-customizations.md
     - Cookbook Examples:
       - Overview: home/4-cookbook-examples/index.md
       - Hello World: home/4-cookbook-examples/hello-world.md
@@ -122,7 +140,6 @@ nav:
       - Telemetry: home/5-setup/telemetry.md
     - Build Reliable AI Methods:
       - Kick off a Method Project: home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md
-      - Pipe Builder: home/6-build-reliable-ai-workflows/pipe-builder.md
       - Pipelex Bundle Specification: home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md
       - Domain: home/6-build-reliable-ai-workflows/domain.md
       - Concepts:
@@ -184,13 +201,11 @@ nav:
         - Pkg: home/9-tools/cli/pkg.md
         - Build:
           - Overview: home/9-tools/cli/build/index.md
-          - Pipe: home/9-tools/cli/build/pipe.md
           - Runner: home/9-tools/cli/build/runner.md
           - Structures: home/9-tools/cli/build/structures.md
           - Inputs: home/9-tools/cli/build/inputs.md
           - Output: home/9-tools/cli/build/output.md
         - Agent CLI: home/9-tools/cli/agent-cli.md
-      - Pipe Builder: home/9-tools/pipe-builder.md
       - plxt (Formatter & Linter): home/9-tools/plxt.md
       - Logging: home/9-tools/logging.md
     - Advanced Customizations:
@@ -198,11 +213,11 @@ nav:
       - Secrets Provider: home/10-advanced-customizations/secrets-provider-injection.md
       - Reporting Delegate: home/10-advanced-customizations/reporting-delegate-injection.md
       - Storage Provider: home/10-advanced-customizations/storage-provider-injection.md
-      - Template Provider: home/10-advanced-customizations/template-provider-injection.md
-      - Observer Provider: home/10-advanced-customizations/observer-provider-injection.md
+      - Observer: home/10-advanced-customizations/observer-provider-injection.md
       - Content Generator: home/10-advanced-customizations/content-generator-injection.md
-      - Plugin Injection: home/10-advanced-customizations/plugin-injection.md
       - Pipe Router: home/10-advanced-customizations/pipe-router-injection.md
+    - Viewpoint:
+      - The Know-How Graph: home/3-understand-pipelex/viewpoint.md
   - Under the Hood:
     - Overview: under-the-hood/index.md
     - Architecture Overview: under-the-hood/architecture-overview.md

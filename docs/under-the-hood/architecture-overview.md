@@ -158,5 +158,4 @@ flowchart TB
 
 ## Next Steps
 
-- [:material-book-open: Understand the Pipelex Paradigm](../home/3-understand-pipelex/pipelex-paradigm/index.md){ .md-button }
 - [:material-cog: Explore Configuration Internals](../contribute/configuration-defaults-and-overrides.md){ .md-button }

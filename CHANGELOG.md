@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [v0.20.5] - 2026-03-09
+
 ### Changed
 
 - **Config paths use `pathlib.Path`**: All `ConfigLoader` properties and methods now return `Path` instead of `str`. Consumer code across the config system (doctor, init, backends, routing, credentials, telemetry, agent CLI) updated accordingly.

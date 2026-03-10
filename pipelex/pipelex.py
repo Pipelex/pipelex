@@ -198,7 +198,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
                 if integration_mode.requires_terms_acceptance:
                     # Check if terms are accepted
-                    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+                    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
                     if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
                         raise GatewayTermsNotAcceptedError
                 # Fetch remote configuration
