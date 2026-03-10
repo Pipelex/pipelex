@@ -8,27 +8,34 @@ Text-to-image generation integrated directly into your pipelines.
 
 ## Overview
 
-<!-- TODO: Expand with image generation model -->
-
-PipeImgGen generates images from text prompts using state-of-the-art models. Generated images can be stored locally or in cloud storage with public or signed URLs.
+PipeImgGen generates images from text prompts using state-of-the-art models. Generated images can be stored locally or in cloud storage with public or signed URLs. Image generation supports both text-to-image and image-to-image workflows.
 
 ## Supported Models
 
-<!-- TODO: List all supported image generation models -->
+Via **Pipelex Gateway**:
 
-- **GPT-Image-1.5** — via Pipelex Gateway
-- **FLUX-2-pro** — via Pipelex Gateway
-- **Nano Banana / Nano Banana Pro** — via Pipelex Gateway
-- **qwen-image** — via Hugging Face Inference
+- **GPT-Image-1.5** — OpenAI's latest image generation model
+- **GPT-Image-1** — OpenAI image generation
+- **GPT-Image-1-mini** — Smaller, faster variant for quick generations
+- **FLUX-2-pro** — Black Forest Labs' high-quality generation model
+- **Nano Banana / Nano Banana Pro / Nano Banana 2** — Google Gemini-based image generation
+
+Via **direct provider SDKs**:
+
+- **OpenAI** — Direct OpenAI API for GPT Image models
+- **Google Gemini** — Native Google image generation
+- **fal** — FLUX and other models via the fal platform
+- **Hugging Face Inference** — Open-source models like qwen-image
+- **BlackboxAI** — Via completions-based image generation
+- **Azure REST** — Azure-hosted image generation
+- **OpenRouter** — Multi-provider image generation access
 
 ## Cloud Storage Integration
 
-<!-- TODO: Describe how generated images are stored -->
-
-Generated images can be automatically uploaded to AWS S3 or Google Cloud Storage with configurable URL signing.
+Generated images can be automatically uploaded to AWS S3 or Google Cloud Storage with configurable URL signing. See [Cloud Storage](cloud-storage.md) for details.
 
 ## Usage in Pipelines
 
-<!-- TODO: Show example of PipeImgGen in a .mthds file -->
+Use PipeImgGen in your `.mthds` files to generate images as part of a pipeline. The operator accepts a text prompt (or an ImgGenPrompt concept) and outputs an Image concept. Model presets let you configure quality levels and default models in `2_img_gen_deck.toml`.
 
-Placeholder for PipeImgGen usage examples.
+See [PipeImgGen reference](../6-build-reliable-ai-workflows/pipes/pipe-operators/PipeImgGen.md).

@@ -8,13 +8,9 @@ A dependency injection framework for extending and customizing Pipelex behavior.
 
 ## Overview
 
-<!-- TODO: Expand with injection philosophy -->
-
-Pipelex provides well-defined injection points that let you replace or extend core behaviors without modifying the framework itself. Each injection point follows a strict protocol contract.
+Pipelex provides well-defined injection points that let you replace or extend core behaviors without modifying the framework itself. Each injection point follows a strict protocol contract, making implementations testable and swappable. Register custom providers at initialization time and the runtime uses them throughout execution.
 
 ## Injection Points
-
-<!-- TODO: Brief description of each, linking to detailed docs -->
 
 | Injection Point | Purpose |
 |-----------------|---------|
@@ -27,6 +23,6 @@ Pipelex provides well-defined injection points that let you replace or extend co
 
 ## NoOp Defaults
 
-Each injection point has a safe no-op default, so features gracefully degrade when no custom implementation is provided.
+Each injection point has a safe no-op default, so features gracefully degrade when no custom implementation is provided. You only need to implement the injection points relevant to your use case.
 
 For detailed documentation, see [Advanced Customizations](../10-advanced-customizations/index.md).

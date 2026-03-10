@@ -8,20 +8,16 @@ Structured web search integrated into your pipelines.
 
 ## Overview
 
-<!-- TODO: Expand with search capabilities -->
-
-PipeSearch brings web search directly into your methods. Results come back as structured data with source citations, making them ready for downstream processing by LLMs or other pipes.
+PipeSearch brings web search directly into your methods. Results come back as structured data with source citations, making them ready for downstream processing by LLMs or other pipes. Search is powered by Linkup (direct SDK) or via Pipelex Gateway.
 
 ## Key Capabilities
 
-<!-- TODO: Detail each capability -->
-
-- **Structured results** — Search results returned as typed SearchResult concepts
-- **Source citations** — Automatic source tracking for provenance
-- **Advanced filters** — Control search scope and result quality
+- **Structured results** — Search results returned as typed SearchResult concepts with title, URL, and content
+- **Source citations** — Automatic source tracking for provenance and attribution
+- **Pipeline integration** — Feed search results directly into PipeLLM for grounded generation with real-time data
 
 ## Usage in Pipelines
 
-<!-- TODO: Show example of PipeSearch in a .mthds file -->
+Use PipeSearch in a PipeSequence to retrieve information from the web and then process it with an LLM. The search results are stored in working memory as SearchResult concepts, available to downstream pipes.
 
-Placeholder for PipeSearch usage examples.
+See [PipeSearch reference](../6-build-reliable-ai-workflows/pipes/pipe-operators/PipeSearch.md).

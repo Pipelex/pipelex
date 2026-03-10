@@ -8,9 +8,7 @@ Build, run, validate, and edit AI methods directly from Claude Code.
 
 ## Overview
 
-<!-- TODO: Expand with plugin capabilities -->
-
-The **MTHDS skills plugin** for Claude Code brings the full Pipelex workflow into your AI coding assistant. Build methods from natural language, validate them, run them, and iterate — all through conversational slash commands.
+The **MTHDS skills plugin** for Claude Code brings the full Pipelex workflow into your AI coding assistant. Build methods from natural language, validate them, run them, and iterate — all through conversational slash commands. The plugin leverages the `pipelex-agent` CLI under the hood for structured JSON communication.
 
 Install from [mthds-ai/skills](https://github.com/mthds-ai/skills).
 
@@ -31,8 +29,8 @@ Install from [mthds-ai/skills](https://github.com/mthds-ai/skills).
 
 ## Getting Started
 
-<!-- TODO: Installation and first-use instructions -->
-
 ```bash
 claude install-plugin mthds-ai/skills
 ```
+
+Once installed, type `/mthds-build` in Claude Code to create your first method from a natural language description.

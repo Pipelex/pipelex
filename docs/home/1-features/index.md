@@ -66,13 +66,13 @@ This section covers all Pipelex capabilities, organized by area.
 
 <div class="grid cards" markdown>
 
--   **[Claude Code Skills Plugin](pipe-builder.md)**
+-   **[Claude Code Skills Plugin](claude-code-skills-plugin.md)**
 
     Build, run, validate, and edit AI methods directly from Claude Code with the MTHDS skills plugin. 10+ slash commands for the full method lifecycle.
 
 -   **[CLI](cli.md)**
 
-    Full command-line interface: `run`, `validate`, `build`, `init`, `show`, `pkg`, and more. Dry run mode, graph generation, and agent CLI.
+    Full command-line interface: `login`, `init`, `doctor`, `build`, `validate`, `run`, `graph`, `show`, `which`, and more. Dry run mode, graph generation, and agent CLI.
 
 -   **[plxt Formatter & Linter](plxt.md)**
 

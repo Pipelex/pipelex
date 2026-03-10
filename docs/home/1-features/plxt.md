@@ -8,13 +8,9 @@ A Rust-based formatter and linter for TOML that supports schema-based validation
 
 ## Overview
 
-<!-- TODO: Expand with plxt capabilities -->
-
-`plxt` is a fast, Rust-based TOML formatter and linter with schema-based validation support. It has been customized to understand the MTHDS language, providing formatting and linting tailored to `.mthds` and `.plx` files.
+`plxt` is a fast, Rust-based TOML formatter and linter with schema-based validation support. It has been customized to understand the MTHDS language, providing formatting and linting tailored to `.mthds` and `.plx` files. It is distributed as part of the `pipelex-tools` package.
 
 ## Formatting
-
-<!-- TODO: Describe formatting capabilities -->
 
 - **TOML files** — Standard TOML formatting
 - **MTHDS files** — Schema-aware formatting for method definitions
@@ -24,14 +20,10 @@ A Rust-based formatter and linter for TOML that supports schema-based validation
 
 ## Linting
 
-<!-- TODO: Describe linting rules -->
-
-Schema-based validation that catches structural and semantic issues beyond basic syntax checking.
+Schema-based validation that catches structural and semantic issues beyond basic syntax checking. Detects invalid keys, missing required fields, type mismatches, and MTHDS-specific violations such as unknown pipe operators or invalid concept references.
 
 ## CI Integration
 
-<!-- TODO: Describe --check mode -->
-
-Use `--check` mode for validation without modification — perfect for CI pipelines.
+Use `--check` mode for validation without modification — perfect for CI pipelines. The command exits with a non-zero code if any file would be reformatted or has linting errors, making it easy to enforce formatting standards in automated workflows.
 
 For details, see the [plxt reference](../9-tools/plxt.md).

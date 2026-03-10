@@ -8,26 +8,18 @@ Automatic cost tracking for every AI operation in your methods.
 
 ## Overview
 
-<!-- TODO: Expand with cost tracking capabilities -->
-
 Pipelex automatically tracks token usage and calculates costs for every LLM call, extraction operation, and image generation. Stay informed about your AI spend at the method, pipe, and operation level.
 
 ## Console Reporting
 
-<!-- TODO: Describe console cost output -->
-
-Real-time cost information displayed in the console during pipeline execution.
+Real-time cost information displayed in the console during pipeline execution. Each inference call reports its token usage and estimated cost, with a summary total at the end of the run.
 
 ## CSV Export
 
-<!-- TODO: Describe CSV report generation -->
-
-Export detailed cost reports as CSV files for analysis and billing.
+Export detailed cost reports as CSV files for analysis, billing, and audit trails. Each row captures the pipe, model, token counts (input/output), and cost for a single operation.
 
 ## Custom Reporting
 
-<!-- TODO: Describe the reporting delegate injection -->
-
-Implement custom reporting backends via the [Reporting Delegate](advanced-customizations.md) injection point.
+Implement custom reporting backends via the [Reporting Delegate](advanced-customizations.md) injection point. The reporting protocol receives structured cost events during execution, allowing you to push data to your own analytics, dashboards, or billing systems.
 
 For configuration, see [Reporting Configuration](../7-configuration/config-practical/reporting-config.md).

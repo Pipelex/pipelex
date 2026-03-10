@@ -105,7 +105,7 @@ nav:
         - Image Generation: home/1-features/image-generation.md
         - Web Search: home/1-features/web-search.md
       - Developer Tools:
-        - Claude Code Skills Plugin: home/1-features/pipe-builder.md
+        - Claude Code Skills Plugin: home/1-features/claude-code-skills-plugin.md
         - CLI: home/1-features/cli.md
         - plxt Formatter & Linter: home/1-features/plxt.md
         - Execution Graph Visualization: home/1-features/execution-graph.md
@@ -118,12 +118,9 @@ nav:
         - Configuration System: home/1-features/configuration.md
         - Advanced Customizations: home/1-features/advanced-customizations.md
     - Get Started:
-      - The Pipe Builder: home/2-get-started/pipe-builder.md
       - Write Methods Manually: home/2-get-started/write-methods-manually.md
     - Understand Pipelex:
       - The Know-How Graph: home/3-understand-pipelex/viewpoint.md
-      - The Pipelex Paradigm: home/3-understand-pipelex/pipelex-paradigm/index.md
-      - Pipelex Language Spec v0.1.0: home/3-understand-pipelex/language-spec-v0-1-0.md
     - Cookbook Examples:
       - Overview: home/4-cookbook-examples/index.md
       - Hello World: home/4-cookbook-examples/hello-world.md
@@ -146,7 +143,6 @@ nav:
       - Telemetry: home/5-setup/telemetry.md
     - Build Reliable AI Methods:
       - Kick off a Method Project: home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md
-      - Pipe Builder: home/6-build-reliable-ai-workflows/pipe-builder.md
       - Pipelex Bundle Specification: home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md
       - Domain: home/6-build-reliable-ai-workflows/domain.md
       - Concepts:
@@ -208,13 +204,11 @@ nav:
         - Pkg: home/9-tools/cli/pkg.md
         - Build:
           - Overview: home/9-tools/cli/build/index.md
-          - Pipe: home/9-tools/cli/build/pipe.md
           - Runner: home/9-tools/cli/build/runner.md
           - Structures: home/9-tools/cli/build/structures.md
           - Inputs: home/9-tools/cli/build/inputs.md
           - Output: home/9-tools/cli/build/output.md
         - Agent CLI: home/9-tools/cli/agent-cli.md
-      - Pipe Builder: home/9-tools/pipe-builder.md
       - plxt (Formatter & Linter): home/9-tools/plxt.md
       - Logging: home/9-tools/logging.md
     - Advanced Customizations:

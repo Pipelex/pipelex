@@ -8,25 +8,17 @@ Full transparency into pipeline execution with interactive visualizations.
 
 ## Overview
 
-<!-- TODO: Expand with visualization philosophy -->
-
-Every pipeline execution can be visualized as an interactive graph, giving developers full transparency into what happened, in what order, and with what data at each step.
+Every pipeline execution can be visualized as an interactive graph, giving developers full transparency into what happened, in what order, and with what data at each step. Graphs are generated automatically when using the `--graph` flag and open in a browser.
 
 ## Interactive HTML Visualization
 
-<!-- TODO: Describe the ReactFlow-based interface -->
-
-Inspect any pipeline execution with a local ReactFlow-based interface. Nodes represent pipes, edges show data flow, and clicking any node reveals the data at that stage.
+Inspect any pipeline execution with a local ReactFlow-based interface. Nodes represent pipes, edges show data flow, and clicking any node reveals the data at that stage. The visualization supports zooming, panning, and collapsing nested controllers.
 
 ## Mermaid Chart Export
 
-<!-- TODO: Describe Mermaid diagram generation -->
-
-Render pipeline diagrams anywhere that supports Mermaid: VS Code, GitHub, web applications, and documentation.
+Render pipeline diagrams anywhere that supports Mermaid: VS Code, GitHub, web applications, and documentation. Mermaid charts provide a static, embeddable view of the pipeline structure.
 
 ## Step-by-Step Data Inspection
-
-<!-- TODO: Describe the data inspection capabilities -->
 
 View the actual data at each execution stage:
 
@@ -36,8 +28,6 @@ View the actual data at each execution stage:
 - **Embedded PDFs** — Document content
 
 ## CLI Flags
-
-<!-- TODO: Document the graph generation CLI flags -->
 
 - `--graph` — Generate an execution graph after running a pipeline
 - `--graph-full-data` — Include full data payloads in the graph

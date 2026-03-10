@@ -8,29 +8,23 @@ Multi-level TOML configuration for full control over Pipelex behavior.
 
 ## Overview
 
-<!-- TODO: Expand with configuration philosophy -->
-
-Pipelex uses a layered TOML configuration system that lets you define sensible defaults and override them at any level: project, environment, or run mode.
+Pipelex uses a layered TOML configuration system that lets you define sensible defaults and override them at any level: project, environment, or run mode. Each layer merges on top of the previous one, so you only need to specify what you want to change.
 
 ## Configuration Levels
 
-<!-- TODO: Describe each level with examples -->
-
 1. **Base defaults** — Built into Pipelex (`pipelex.toml` in the package)
-2. **Project overrides** — `.pipelex/pipelex.toml` in your project root
-3. **Environment-specific** — `pipelex_dev.toml`, `pipelex_prod.toml`, etc.
-4. **Local overrides** — `pipelex_local.toml` (git-ignored)
-5. **Run-mode-specific** — Overrides for specific execution contexts
+2. **Global overrides** — `~/.pipelex/pipelex.toml` for user-wide settings
+3. **Project overrides** — `{project_root}/.pipelex/pipelex.toml` for project-specific settings
+4. **Local overrides** — `pipelex_local.toml` (git-ignored) for machine-specific values
+5. **Environment / run-mode-specific** — `pipelex_dev.toml`, `pipelex_prod.toml`, `pipelex_testing.toml`, etc.
+
+A final `pipelex_override.toml` file can be used for last-resort overrides.
 
 ## Environment Variables
 
-<!-- TODO: Describe ${VAR_NAME} syntax -->
-
-Use `${VAR_NAME}` syntax in TOML files for dynamic configuration from environment variables.
+Use `${VAR_NAME}` syntax in TOML files for dynamic configuration from environment variables and secrets. Supports `${env:VAR}` for environment variables, `${secret:VAR}` for the secrets provider, and fallback chains like `${env:VAR|secret:VAR}`.
 
 ## Key Configuration Areas
-
-<!-- TODO: Brief overview linking to detailed docs -->
 
 - **[Inference Backends](../7-configuration/config-technical/inference-backend-config.md)** — LLM providers, models, and routing
 - **[Logging](../7-configuration/config-practical/logging-config.md)** — Log levels and output

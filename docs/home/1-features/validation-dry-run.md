@@ -8,35 +8,27 @@ Test your pipelines without making API calls.
 
 ## Overview
 
-<!-- TODO: Expand with validation philosophy -->
-
-Pipelex provides multiple layers of validation to catch issues before they cost time and money. From static syntax checking to full dry-run execution with mocked responses.
+Pipelex provides multiple layers of validation to catch issues before they cost time and money. From static syntax checking to full dry-run execution with mocked responses, you can verify your methods at every stage of development.
 
 ## Pipeline Validation
 
-<!-- TODO: Describe static validation capabilities -->
-
 Check pipeline syntax, structure, and compatibility without execution:
 
-- **Syntax validation** — Catch MTHDS language errors
-- **Structure validation** — Verify concept compatibility between pipes
+- **Syntax validation** — Catch MTHDS language errors via plxt linting
+- **Structure validation** — Verify concept compatibility between pipes, ensuring inputs and outputs match
 - **Input validation** — Ensure required inputs are provided and correctly typed
 
 ## Dry Run Mode
 
-<!-- TODO: Describe dry run execution -->
-
 Execute pipelines with mocked LLM responses to test pipeline logic, data flow, and orchestration without making API calls.
 
-- **Mock generation** — Format-compliant mock values for constrained fields
+- **Mock generation** — Format-compliant mock values for constrained fields, including structured outputs
 - **Configurable mock behavior** — Control mock list sizes, template handling, and response formats
 - **Full pipeline execution** — Working memory, controllers, and data flow all work as in production
 
 ## Allowed-to-Fail Pipes
 
-<!-- TODO: Describe error tolerance configuration -->
-
-Mark specific pipes that can fail without stopping the entire pipeline execution.
+Mark specific pipes as `allowed_to_fail` so they can fail without stopping the entire pipeline execution. When an allowed-to-fail pipe encounters an error, the pipeline continues and downstream pipes receive an empty result.
 
 ## CLI Usage
 
