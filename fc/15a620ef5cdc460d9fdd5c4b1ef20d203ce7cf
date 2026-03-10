@@ -1,0 +1,45 @@
+docs/home/1-features/claude-code-skills-plugin.md
+  78136d0a82b3c101 33-34
+docs/home/1-features/telemetry.md
+  78136d0a82b3c101 11
+docs/home/1-features/plxt.md
+  78136d0a82b3c101 27
+docs/home/1-features/cloud-storage.md
+  78136d0a82b3c101 27
+docs/home/1-features/pipe-operators.md
+  78136d0a82b3c101 45
+docs/home/1-features/advanced-customizations.md
+  78136d0a82b3c101 24,26
+docs/home/1-features/concepts.md
+  78136d0a82b3c101 36,44
+docs/home/1-features/mthds-language.md
+  78136d0a82b3c101 15,19
+docs/home/1-features/document-extraction.md
+  78136d0a82b3c101 20
+docs/home/1-features/pipeline-orchestration.md
+  78136d0a82b3c101 21
+docs/home/1-features/validation-dry-run.md
+  78136d0a82b3c101 31,36-37
+docs/home/1-features/web-search.md
+  78136d0a82b3c101 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "fc15a620ef5cdc460d9fdd5c4b1ef20d203ce7cf",
+  "prompts": {
+    "78136d0a82b3c101": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6b296f93-1140-48e8-b1a1-815e9a3b8362",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 18,
+      "total_deletions": 17,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}
