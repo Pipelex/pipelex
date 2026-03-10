@@ -28,12 +28,12 @@ Execute pipelines with mocked LLM responses to test pipeline logic, data flow, a
 
 ## Allowed-to-Fail Pipes
 
-Mark specific pipes as `allowed_to_fail` so they can fail without stopping the entire pipeline execution. When an allowed-to-fail pipe encounters an error, the pipeline continues and downstream pipes receive an empty result.
+List specific pipe codes in `pipelex.dry_run_config.allowed_to_fail_pipes` so dry-run validation can tolerate expected failures without failing the overall validation pass.
 
 ## CLI Usage
 
 - `pipelex validate` — Static validation
-- `pipelex run --dry-run` — Dry run execution
-- `pipelex run --mock-inputs` — Generate synthetic inputs
+- `pipelex run pipe my_pipe --dry-run` — Dry run execution
+- `pipelex run pipe my_pipe --dry-run --mock-inputs` — Generate synthetic inputs
 
 For configuration details, see [Dry Run Configuration](../7-configuration/config-pipeline-validation/dry-run-config.md).

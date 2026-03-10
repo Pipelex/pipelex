@@ -24,6 +24,6 @@ Schema-based validation that catches structural and semantic issues beyond basic
 
 ## CI Integration
 
-Use `--check` mode for validation without modification — perfect for CI pipelines. The command exits with a non-zero code if any file would be reformatted or has linting errors, making it easy to enforce formatting standards in automated workflows.
+Use `plxt fmt --check` to validate formatting without modifying files, and run `plxt lint` separately for schema and semantic checks. Both commands exit with a non-zero code on errors, making them easy to enforce in automated workflows.
 
 For details, see the [plxt reference](../9-tools/plxt.md).

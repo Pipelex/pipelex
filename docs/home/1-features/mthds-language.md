@@ -12,11 +12,11 @@ MTHDS (`.mthds` files) is a domain-specific language for defining AI methods. It
 
 ## Domains
 
-Semantic namespaces for organizing related concepts and pipes. Domains provide hierarchical naming and scoping, preventing name collisions across packages. Each `.mthds` file declares one or more domains, and all concepts and pipes within are scoped to their domain.
+Semantic namespaces for organizing related concepts and pipes. Domains provide hierarchical naming and scoping, preventing name collisions across packages. Each `.mthds` file declares a single domain, and multiple files can contribute to the same domain.
 
 ## Bundles
 
-A bundle is a complete method package defined in a single `.mthds` file. It contains domain definitions, concepts, and pipes, with a designated main pipe as the entry point. Bundles are self-contained and can be executed directly via the CLI or Python API.
+A bundle is a complete method package defined in a single `.mthds` file. It contains a domain declaration, concepts, and pipes, and can optionally designate a `main_pipe` as the entry point. Bundles are self-contained and can be executed via the CLI or Python API.
 
 ## Packages & Dependencies
 

@@ -30,7 +30,8 @@ Install from [mthds-ai/skills](https://github.com/mthds-ai/skills).
 ## Getting Started
 
 ```bash
-claude install-plugin mthds-ai/skills
+/plugin marketplace add mthds-ai/skills
+/plugin install mthds@mthds-ai-skills
 ```
 
 Once installed, type `/mthds-build` in Claude Code to create your first method from a natural language description.

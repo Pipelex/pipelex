@@ -33,7 +33,7 @@ Define your own concepts with natural language descriptions and optional structu
 
 ## Inline Structures
 
-Define structured fields directly in `.mthds` files without writing Python. Inline structures support typed fields (string, integer, boolean, float, list) and nested concepts for complex data shapes — making it possible to build fully structured methods without leaving the MTHDS language.
+Define structured fields directly in `.mthds` files without writing Python. Inline structures support typed fields (text, integer, boolean, number, list) and nested concepts for complex data shapes — making it possible to build fully structured methods without leaving the MTHDS language.
 
 ## Python StructuredContent Classes
 
@@ -41,6 +41,6 @@ For advanced use cases, generate Pydantic BaseModels from your declarative conce
 
 ## Concept Refinement & Hierarchies
 
-Create specialized versions of existing concepts using the `refines` keyword. Build multi-level concept hierarchies for domain modeling — for example, a `DetailedInvoice` that refines a base `Invoice` concept with additional fields while remaining compatible wherever `Invoice` is expected.
+Create specialized versions of existing concepts using the `refines` keyword. Build concept hierarchies for domain modeling — for example, a `DetailedInvoice` that refines a base `Invoice` concept, inheriting its structure and description.
 
 For detailed guidance, see [Define Your Concepts](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md).

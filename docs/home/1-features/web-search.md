@@ -12,7 +12,7 @@ PipeSearch brings web search directly into your methods. Results come back as st
 
 ## Key Capabilities
 
-- **Structured results** — Search results returned as typed SearchResult concepts with title, URL, and content
+- **Structured results** — Search results returned as typed SearchResult concepts with an answer and sourced citations
 - **Source citations** — Automatic source tracking for provenance and attribution
 - **Pipeline integration** — Feed search results directly into PipeLLM for grounded generation with real-time data
 

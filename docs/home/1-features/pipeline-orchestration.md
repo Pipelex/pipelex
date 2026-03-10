@@ -18,7 +18,7 @@ See [PipeSequence reference](../6-build-reliable-ai-workflows/pipes/pipe-control
 
 ## PipeParallel
 
-Execute multiple independent pipes concurrently for faster throughput. All branches share the same input working memory, and their outputs are merged back when all branches complete.
+Execute multiple independent pipes concurrently for faster throughput. Each branch starts with a deep copy of the current working memory, and their outputs are merged back when all branches complete.
 
 See [PipeParallel reference](../6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeParallel.md).
 

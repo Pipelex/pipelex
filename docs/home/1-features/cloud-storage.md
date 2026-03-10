@@ -24,6 +24,6 @@ Pipelex can automatically upload generated artifacts — images, extracted pages
 
 ## Configuration
 
-Storage is configured in `pipelex.toml` under the `[storage]` section. Set the storage method (`local`, `in_memory`, `s3`, or `gcp`) and provide provider-specific settings like bucket names, regions, and credential paths.
+Storage is configured in `pipelex.toml` under `[pipelex.storage_config]`. Set `method` to `local`, `in_memory`, `s3`, or `gcp`, then provide provider-specific settings such as `bucket_name`, `region`, or `project_id` in the matching subsection.
 
 For AWS configuration, see [AWS Configuration](../7-configuration/config-technical/aws-config.md).

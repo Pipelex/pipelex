@@ -21,8 +21,8 @@ Pipelex provides well-defined injection points that let you replace or extend co
 | **[Content Generator](../10-advanced-customizations/content-generator-injection.md)** | Override LLM output generation |
 | **[Pipe Router](../10-advanced-customizations/pipe-router-injection.md)** | Dynamic routing of pipes to implementations |
 
-## NoOp Defaults
+## Built-in Defaults
 
-Each injection point has a safe no-op default, so features gracefully degrade when no custom implementation is provided. You only need to implement the injection points relevant to your use case.
+Some injection points provide safe built-in defaults or no-op implementations, so you only need to implement the ones relevant to your use case.
 
 For detailed documentation, see [Advanced Customizations](../10-advanced-customizations/index.md).

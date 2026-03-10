@@ -17,7 +17,7 @@ Unlike LLM APIs (partly standardized around OpenAI's completions API), the OCR l
 | Provider | Type | Description |
 |----------|------|-------------|
 | **pypdfium2** | Built-in | Basic PDF text and image extraction without AI inference — works out of the box with no API keys |
-| **Mistral OCR** | Local SDK | Industry-leading document understanding for media, text, tables, and equations |
+| **Mistral OCR** | Cloud API | Industry-leading document understanding for media, text, tables, and equations |
 | **docling** | Local SDK | IBM's open-source extraction library with local CPU processing and optional GPU acceleration |
 | **Azure Document Intelligence** | Gateway | Enterprise-grade OCR with high accuracy for complex layouts, tables, and handwriting |
 | **Deepseek-OCR** | Gateway | Open-source model optimized for markdown extraction from images |
