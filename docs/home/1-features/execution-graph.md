@@ -33,4 +33,5 @@ View the actual data at each execution stage:
 - `--graph-full-data` — Include full data payloads in the graph
 - `--graph-no-data` — Generate a structural graph without data
 
+<!-- path verified: resolves to docs/images/flow-chart-example.png -->
 ![Execution Graph Example](../../images/flow-chart-example.png){ width="400" }
