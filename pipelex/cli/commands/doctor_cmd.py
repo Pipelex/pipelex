@@ -340,7 +340,7 @@ def check_backend_files(config_dir: Path | None = None) -> tuple[bool, dict[str,
             continue
 
         # Check if backend file exists
-        backend_file_path = f"{backends_dir_path}/{backend_name}.toml"
+        backend_file_path = str(backends_dir_path / f"{backend_name}.toml")
 
         if not path_exists(backend_file_path):
             # No separate file - this is OK, configuration might be inline
