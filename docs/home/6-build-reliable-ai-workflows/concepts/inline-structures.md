@@ -306,5 +306,5 @@ See [Python StructuredContent Classes](python-classes.md) for advanced features.
 
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
 - [Python StructuredContent Classes](python-classes.md) - Advanced features with Python
-- [Writing Methods Tutorial](../../2-get-started/pipe-builder.md) - Get started with structured outputs
+- [Writing Methods Tutorial](../../2-get-started/write-methods-manually.md) - Get started with structured outputs
 

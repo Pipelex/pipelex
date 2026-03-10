@@ -96,7 +96,6 @@ After generating the runner file:
 
 ## Related Documentation
 
-- [Build Pipe](pipe.md) - Generate pipelines from natural language
 - [Build Structures](structures.md) - Generate Pydantic models separately
 - [Build Inputs](inputs.md) - Generate example input JSON for a pipe
 - [Build Output](output.md) - Generate example output JSON for a pipe
