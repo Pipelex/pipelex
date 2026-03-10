@@ -56,6 +56,22 @@ EXTRACT_TALENT_TO_MODEL: dict[str, str] = {
     "full-document-extractor": "@default-extract-document",
 }
 
+# Reverse mappings: preset name → talent name (for fuzzy resolution)
+_MODEL_TO_LLM_TALENT: dict[str, str] = {}
+for _talent, _preset in LLM_TALENT_TO_MODEL.items():
+    _MODEL_TO_LLM_TALENT[_preset] = _talent
+    _MODEL_TO_LLM_TALENT[_preset.lstrip("$@")] = _talent
+
+_MODEL_TO_IMG_GEN_TALENT: dict[str, str] = {}
+for _talent, _preset in IMG_GEN_TALENT_TO_MODEL.items():
+    _MODEL_TO_IMG_GEN_TALENT[_preset] = _talent
+    _MODEL_TO_IMG_GEN_TALENT[_preset.lstrip("$@")] = _talent
+
+_MODEL_TO_EXTRACT_TALENT: dict[str, str] = {}
+for _talent, _preset in EXTRACT_TALENT_TO_MODEL.items():
+    _MODEL_TO_EXTRACT_TALENT[_preset] = _talent
+    _MODEL_TO_EXTRACT_TALENT[_preset.lstrip("$@")] = _talent
+
 # Maps pipe types to their talent field names and valid values.
 # Used to enrich validation errors with field_hints so the agent knows
 # what values are valid when a talent field is missing or wrong.
@@ -194,6 +210,26 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         pipe_table.add("function_name", pipe_spec.function_name)
 
 
+def _resolve_talent_value(pipe_type: str, raw_value: Any) -> Any:
+    """Attempt to resolve a talent value, accepting preset names as aliases."""
+    if not isinstance(raw_value, str):
+        return raw_value
+    reverse_maps: dict[str, dict[str, str]] = {
+        "PipeLLM": _MODEL_TO_LLM_TALENT,
+        "PipeImgGen": _MODEL_TO_IMG_GEN_TALENT,
+        "PipeExtract": _MODEL_TO_EXTRACT_TALENT,
+    }
+    reverse_map = reverse_maps.get(pipe_type)
+    if not reverse_map:
+        return raw_value
+    # If it's already a valid talent, return as-is
+    # Otherwise try reverse-mapping from preset
+    resolved = reverse_map.get(raw_value)
+    if resolved:
+        return resolved
+    return raw_value  # Let Pydantic validation handle the error
+
+
 def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     """Parse and validate a PipeSpec from JSON data.
 
@@ -218,9 +254,30 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
     # Add type to spec_data if not present
     spec_data["type"] = pipe_type
 
-    # Accept "code" as an alias for "pipe_code"
-    if "code" in spec_data and "pipe_code" not in spec_data:
-        spec_data["pipe_code"] = spec_data.pop("code")
+    # Accept common aliases for "pipe_code"
+    for alias in ("code", "the_pipe_code", "name"):
+        if alias in spec_data:
+            if "pipe_code" not in spec_data:
+                spec_data["pipe_code"] = spec_data.pop(alias)
+            else:
+                spec_data.pop(alias)
+
+    # Accept generic talent aliases and map to the type-specific field
+    talent_aliases = ("talent_name", "talent")
+    pipe_type_to_talent_field: dict[str, str] = {
+        "PipeLLM": "llm_talent",
+        "PipeExtract": "extract_talent",
+        "PipeImgGen": "img_gen_talent",
+        "PipeSearch": "search_talent",
+    }
+    talent_field = pipe_type_to_talent_field.get(pipe_type)
+    if talent_field:
+        for alias in talent_aliases:
+            if alias in spec_data:
+                if talent_field not in spec_data:
+                    spec_data[talent_field] = spec_data.pop(alias)
+                else:
+                    spec_data.pop(alias)
 
     # Handle steps/branches conversion - need to convert pipe to pipe_code
     if "steps" in spec_data:
@@ -243,6 +300,18 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
     if pipe_type == "PipeCondition" and "expression" in spec_data:
         if "jinja2_expression_template" not in spec_data:
             spec_data["jinja2_expression_template"] = spec_data.pop("expression")
+        else:
+            spec_data.pop("expression")
+
+    # Resolve preset names to talent names (tolerance for agent mistakes)
+    talent_field = pipe_type_to_talent_field.get(pipe_type)
+    if talent_field and talent_field in spec_data:
+        spec_data[talent_field] = _resolve_talent_value(pipe_type, spec_data[talent_field])
+
+    # Accept output as dict with "type" key → extract the type string
+    if "output" in spec_data and isinstance(spec_data["output"], dict):
+        if "type" in spec_data["output"]:
+            spec_data["output"] = spec_data["output"]["type"]
 
     return spec_class.model_validate(spec_data)
 
@@ -250,7 +319,7 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
 def pipe_cmd(
     pipe_type: Annotated[
         str | None,
-        typer.Option("--type", "-t", help=f"Pipe type. Must be one of: {PipeType.value_list()}"),
+        typer.Option("--type", "--pipe-type", "--pipe_type", "-t", help=f"Pipe type. Must be one of: {PipeType.value_list()}"),
     ] = None,
     spec: Annotated[
         str | None,
@@ -315,6 +384,12 @@ def pipe_cmd(
         agent_error(f"Spec file not found: {spec_file}", "FileNotFoundError", cause=exc)
     except json.JSONDecodeError as exc:
         agent_error(f"Invalid JSON: {exc.msg}", "JSONDecodeError", cause=exc)
+
+    # Accept "pipe_type" as an alias for "type" in the JSON spec
+    if "pipe_type" in spec_data and "type" not in spec_data:
+        spec_data["type"] = spec_data.pop("pipe_type")
+    elif "pipe_type" in spec_data:
+        spec_data.pop("pipe_type")
 
     # Resolve pipe type: CLI option takes precedence, then extract from spec JSON
     resolved_pipe_type: str
