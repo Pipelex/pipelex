@@ -6,10 +6,12 @@ import typer
 
 from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
 from pipelex.cli.commands.doctor_cmd import (
+    ConfigLocationInfo,
     check_backend_credentials,
     check_config_files,
     check_models,
     check_telemetry_config,
+    gather_config_location,
 )
 from pipelex.system.configuration.config_loader import config_manager
 
@@ -35,7 +37,19 @@ def agent_doctor_cmd(
     Use --global/-g to force checking the global ~/.pipelex/ directory.
     """
     try:
-        config_dir = config_manager.global_config_dir if global_ else config_manager.pipelex_config_dir
+        # When --global, force checking ~/.pipelex/ only; otherwise use layered resolution
+        config_dir = config_manager.global_config_dir if global_ else None
+
+        # Gather config location info (override for --global flag)
+        if global_:
+            config_location = ConfigLocationInfo(
+                config_dir=str(config_manager.global_config_dir),
+                is_project_local=False,
+                project_root=None,
+                global_config_dir=str(config_manager.global_config_dir),
+            )
+        else:
+            config_location = gather_config_location()
 
         config_healthy, config_missing_count, config_message = check_config_files(config_dir=config_dir)
         telemetry_healthy, telemetry_message = check_telemetry_config(config_dir=config_dir)
@@ -43,6 +57,7 @@ def agent_doctor_cmd(
         models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
     except Exception as exc:
         agent_error(f"Health check failed unexpectedly: {exc}", type(exc).__name__, cause=exc)
+        # agent_error has NoReturn
 
     all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
 
@@ -78,7 +93,7 @@ def agent_doctor_cmd(
     if not config_healthy and config_missing_count > 0:
         recommended_actions.append("Run 'pipelex init config' to install missing configuration files")
     if not config_healthy and config_missing_count == 0:
-        recommended_actions.append("Fix validation errors in .pipelex/pipelex.toml or run 'pipelex init config'")
+        recommended_actions.append(f"Fix validation errors in {config_location.config_dir}/pipelex.toml or run 'pipelex init config'")
     if not telemetry_healthy:
         recommended_actions.append(f"Run 'pipelex init telemetry' to fix telemetry: {telemetry_message}")
     if not backends_healthy:
@@ -94,11 +109,14 @@ def agent_doctor_cmd(
             if not file_report.is_valid and file_report.has_kit_template:
                 recommended_actions.append(f"Run 'pipelex doctor --fix' to replace outdated backend config: {file_report.backend_name}")
             elif not file_report.is_valid:
-                recommended_actions.append(f"Manually fix backend configuration in .pipelex/inference/backends/{file_report.backend_name}.toml")
+                recommended_actions.append(
+                    f"Manually fix backend configuration in {config_location.config_dir}/inference/backends/{file_report.backend_name}.toml"
+                )
 
     result: dict[str, Any] = {
         "success": True,
         "all_healthy": all_healthy,
+        "config_location": config_location.model_dump(),
         "checks": {
             "config_files": {
                 "healthy": config_healthy,

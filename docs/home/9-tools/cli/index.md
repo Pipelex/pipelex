@@ -42,7 +42,6 @@ The Pipelex CLI is organized into several command groups:
 
 ## Related Documentation
 
-- [Build Pipe](build/pipe.md) - Generate pipelines from natural language
 - [Configure AI Providers](../../5-setup/configure-ai-providers.md) - Set up LLM backends
 - [Design and Run Pipelines](../../6-build-reliable-ai-workflows/pipes/index.md) - Pipeline development guide
 

@@ -1,4 +1,3 @@
-import os
 import shutil
 from pathlib import Path
 from typing import Any
@@ -20,13 +19,13 @@ MODEL_DECKS_DIR_NAME = "deck"
 
 class ConfigLoader:
     @property
-    def pipelex_root_dir(self) -> str:
+    def pipelex_root_dir(self) -> Path:
         """Get the root directory of the installed pipelex package.
 
         Uses __file__ to locate the package directory, which works in both
         development and installed modes.
         """
-        return str(Path(__file__).resolve().parent.parent.parent)
+        return Path(__file__).resolve().parent.parent.parent
 
     @staticmethod
     def find_project_root(start_dir: Path) -> Path | None:
@@ -51,20 +50,17 @@ class ConfigLoader:
             current = parent
 
     @property
-    def global_config_dir(self) -> str:
+    def global_config_dir(self) -> Path:
         """Get the global config directory at ~/.pipelex."""
-        return str(Path.home() / CONFIG_DIR_NAME)
+        return Path.home() / CONFIG_DIR_NAME
 
     @property
-    def project_root(self) -> str | None:
+    def project_root(self) -> Path | None:
         """Get the detected project root directory, or None if no project root markers found."""
-        project_root = self.find_project_root(Path.cwd())
-        if project_root is None:
-            return None
-        return str(project_root)
+        return self.find_project_root(Path.cwd())
 
     @property
-    def project_config_dir(self) -> str | None:
+    def project_config_dir(self) -> Path | None:
         """Get the project config directory if it exists on disk.
 
         Returns the path to {project_root}/.pipelex if the project root was found
@@ -75,11 +71,11 @@ class ConfigLoader:
             return None
         project_config = project_root / CONFIG_DIR_NAME
         if project_config.is_dir():
-            return str(project_config)
+            return project_config
         return None
 
     @property
-    def pipelex_config_dir(self) -> str:
+    def pipelex_config_dir(self) -> Path:
         """Get the effective config directory (project if exists, else global).
 
         This preserves backwards compatibility for all current consumers.
@@ -89,68 +85,79 @@ class ConfigLoader:
             return project_dir
         return self.global_config_dir
 
-    def _resolve_inference_file(self, relative_path: str) -> str:
-        """Resolve an inference file path, checking project dir first, then global.
+    def resolve_config_file(self, relative_path: str, config_dir: Path | None = None) -> Path:
+        """Resolve a config file path with layered resolution.
+
+        When config_dir is provided (e.g. for --global override), the file is
+        resolved directly under that directory.
+
+        Otherwise, the project .pipelex/ directory is checked first; if the file
+        exists there it wins, otherwise the global ~/.pipelex/ is used.
+        This works on all platforms (macOS, Linux, Windows) because Path.home()
+        returns the correct home directory everywhere.
 
         Args:
-            relative_path: Path relative to the .pipelex directory (e.g. "inference/backends.toml").
+            relative_path: Path relative to the .pipelex directory (e.g. "telemetry.toml",
+                "inference/backends.toml").
+            config_dir: Explicit config directory override. When set, skips layered
+                resolution and uses this directory directly.
 
         Returns:
             The resolved absolute path.
         """
+        if config_dir is not None:
+            return config_dir / relative_path
         project_dir = self.project_config_dir
         if project_dir is not None:
-            candidate = os.path.join(project_dir, relative_path)
-            if os.path.exists(candidate):
+            candidate = project_dir / relative_path
+            if candidate.exists():
                 return candidate
-        return os.path.join(self.global_config_dir, relative_path)
+        return self.global_config_dir / relative_path
 
     @property
-    def backends_file_path(self) -> str:
+    def backends_file_path(self) -> Path:
         """Resolve backends.toml from project dir or global dir."""
-        return self._resolve_inference_file(os.path.join(INFERENCE_DIR_NAME, BACKENDS_FILE_NAME))
+        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / BACKENDS_FILE_NAME))
 
     @property
-    def backends_dir_path(self) -> str:
+    def backends_dir_path(self) -> Path:
         """Resolve backends/ directory from project dir or global dir."""
-        return self._resolve_inference_file(os.path.join(INFERENCE_DIR_NAME, BACKENDS_DIR_NAME))
+        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / BACKENDS_DIR_NAME))
 
     @property
-    def routing_profiles_file_path(self) -> str:
+    def routing_profiles_file_path(self) -> Path:
         """Resolve routing_profiles.toml from project dir or global dir."""
-        return self._resolve_inference_file(os.path.join(INFERENCE_DIR_NAME, ROUTING_PROFILES_FILE_NAME))
+        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / ROUTING_PROFILES_FILE_NAME))
 
     @property
-    def model_decks_dir_path(self) -> str:
+    def model_decks_dir_path(self) -> Path:
         """Resolve model decks directory from project dir or global dir."""
-        return self._resolve_inference_file(os.path.join(INFERENCE_DIR_NAME, MODEL_DECKS_DIR_NAME))
+        return self.resolve_config_file(str(Path(INFERENCE_DIR_NAME) / MODEL_DECKS_DIR_NAME))
 
     def ensure_global_config_exists(self) -> None:
         """Create the global ~/.pipelex/ directory with kit template files if it doesn't exist."""
-        global_dir = Path(self.global_config_dir)
+        global_dir = self.global_config_dir
         if global_dir.is_dir():
             return
 
         from pipelex.kit.paths import GIT_IGNORED_CONFIG_FILES, get_kit_configs_dir  # noqa: PLC0415
 
-        config_template_dir = str(get_kit_configs_dir())
-        global_dir_str = str(global_dir)
-        os.makedirs(global_dir_str, exist_ok=True)
+        config_template_dir = Path(str(get_kit_configs_dir()))
+        global_dir.mkdir(parents=True, exist_ok=True)
 
-        def copy_directory_structure(src_dir: str, dst_dir: str) -> None:
+        def copy_directory_structure(src_dir: Path, dst_dir: Path) -> None:
             """Recursively copy directory structure from kit templates."""
-            for item in os.listdir(src_dir):
-                if item in GIT_IGNORED_CONFIG_FILES or item == ".DS_Store":
+            for item in src_dir.iterdir():
+                if item.name in GIT_IGNORED_CONFIG_FILES or item.name == ".DS_Store":
                     continue
-                src_item = os.path.join(src_dir, item)
-                dst_item = os.path.join(dst_dir, item)
-                if os.path.isdir(src_item):
-                    os.makedirs(dst_item, exist_ok=True)
-                    copy_directory_structure(src_item, dst_item)
+                dst_item = dst_dir / item.name
+                if item.is_dir():
+                    dst_item.mkdir(parents=True, exist_ok=True)
+                    copy_directory_structure(item, dst_item)
                 else:
-                    shutil.copy2(src_item, dst_item)
+                    shutil.copy2(item, dst_item)
 
-        copy_directory_structure(src_dir=config_template_dir, dst_dir=global_dir_str)
+        copy_directory_structure(src_dir=config_template_dir, dst_dir=global_dir)
 
     def load_config(self) -> dict[str, Any]:
         """Load and merge configurations from pipelex and local config files.
@@ -170,36 +177,36 @@ class ConfigLoader:
         """
         self.ensure_global_config_exists()
 
-        list_of_configs: list[str] = []
+        list_of_configs: list[Path] = []
 
         # 1. Pipelex package defaults
-        list_of_configs.append(os.path.join(self.pipelex_root_dir, CONFIG_NAME))
+        list_of_configs.append(self.pipelex_root_dir / CONFIG_NAME)
 
         # 2. Global config
-        list_of_configs.append(os.path.join(self.global_config_dir, CONFIG_NAME))
+        list_of_configs.append(self.global_config_dir / CONFIG_NAME)
 
         # 3. Project config (if different from global)
         project_dir = self.project_config_dir
         if project_dir is not None and project_dir != self.global_config_dir:
-            list_of_configs.append(os.path.join(project_dir, CONFIG_NAME))
+            list_of_configs.append(project_dir / CONFIG_NAME)
 
         # Effective config dir for overrides
         effective_config_dir = self.pipelex_config_dir
 
         # 4. Override for local execution
-        list_of_configs.append(os.path.join(effective_config_dir, "pipelex_local.toml"))
+        list_of_configs.append(effective_config_dir / "pipelex_local.toml")
 
         # Override for environment
-        list_of_configs.append(os.path.join(effective_config_dir, f"pipelex_{runtime_manager.environment}.toml"))
+        list_of_configs.append(effective_config_dir / f"pipelex_{runtime_manager.environment}.toml")
 
         # Override for run mode
         if runtime_manager.is_unit_testing:
-            list_of_configs.append(os.path.join(os.getcwd(), "tests", f"pipelex_{runtime_manager.run_mode}.toml"))
+            list_of_configs.append(Path.cwd() / "tests" / f"pipelex_{runtime_manager.run_mode}.toml")
         else:
-            list_of_configs.append(os.path.join(effective_config_dir, f"pipelex_{runtime_manager.run_mode}.toml"))
+            list_of_configs.append(effective_config_dir / f"pipelex_{runtime_manager.run_mode}.toml")
 
         # Final override
-        list_of_configs.append(os.path.join(effective_config_dir, "pipelex_override.toml"))
+        list_of_configs.append(effective_config_dir / "pipelex_override.toml")
 
         return load_toml_from_path_and_merge_with_overrides(paths=list_of_configs)
 

@@ -277,14 +277,12 @@ Understanding how refined concepts interact with pipe inputs is crucial.
 ### How Refinement Affects Type Checking
 
 !!! important "Key Rule"
-    A pipe that accepts a **base concept** will **NOT** accept concepts that refine it.
+    A pipe that accepts a **base concept** will also accept any concept that **refines** it. Refined concepts are substitutable for their parent — this is standard subtype compatibility.
 
 ```toml
 [pipe.extract_text]
-inputs = { document = "Document" }  # Only accepts Document, not Invoice or Contract
+inputs = { document = "Document" }  # Accepts Document, Invoice, Contract, or any concept that refines Document
 ```
-
-    If you want a pipe to accept both a base concept and its refinements, you must explicitly define the pipe to accept the refined concepts or use a more general approach.
 
 ### Practical Example
 
@@ -295,19 +293,19 @@ refines = "Document"
 [concept.Contract]
 refines = "Document"
 
-# This pipe only accepts generic documents
+# This pipe accepts Document and any concept that refines it (Invoice, Contract, etc.)
 [pipe.extract_from_document]
 type = "PipeExtract"
 inputs = { document = "Document" }
-output = "Page"
+output = "Page[]"
 
-# This pipe only accepts Invoices
+# This pipe accepts Invoice (and any concept that refines Invoice)
 [pipe.process_invoice]
 type = "PipeLLM"
 inputs = { invoice = "Invoice" }
 output = "InvoiceData"
 
-# This pipe only accepts Contracts
+# This pipe accepts Contract (and any concept that refines Contract)
 [pipe.process_contract]
 type = "PipeLLM"
 inputs = { contract = "Contract" }
@@ -316,9 +314,9 @@ output = "ContractData"
 
 In this setup:
 
-- `extract_from_document` expects exactly `Document` (not `Invoice` or `Contract`)
-- `process_invoice` expects exactly `Invoice`
-- `process_contract` expects exactly `Contract`
+- `extract_from_document` accepts `Document`, `Invoice`, `Contract`, or any other concept that refines `Document`
+- `process_invoice` accepts `Invoice` or any concept that refines `Invoice`
+- `process_contract` accepts `Contract` or any concept that refines `Contract`
 
 ## Best Practices
 

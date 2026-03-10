@@ -1,4 +1,4 @@
-import os
+from pathlib import Path
 from typing import Any, cast
 
 from pydantic import ValidationError
@@ -19,7 +19,7 @@ class PipelexServiceConfig(ConfigModel):
     agreement: PipelexServiceAgreement
 
 
-def load_pipelex_service_config_if_exists(config_dir: str) -> PipelexServiceConfig | None:
+def load_pipelex_service_config_if_exists(config_dir: Path) -> PipelexServiceConfig | None:
     """Load Pipelex service configuration if the file exists.
 
     Args:
@@ -28,7 +28,7 @@ def load_pipelex_service_config_if_exists(config_dir: str) -> PipelexServiceConf
     Returns:
         PipelexServiceConfig instance or None if file doesn't exist.
     """
-    config_path = os.path.join(config_dir, PIPELEX_SERVICE_CONFIG_FILE_NAME)
+    config_path = config_dir / PIPELEX_SERVICE_CONFIG_FILE_NAME
     try:
         config_toml = load_toml_from_path(path=config_path)
         return PipelexServiceConfig.model_validate(config_toml)

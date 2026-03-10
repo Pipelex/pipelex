@@ -1,6 +1,6 @@
 """Backend configuration logic for the init command."""
 
-import os
+from pathlib import Path
 from typing import Any
 
 from rich.markup import escape
@@ -89,15 +89,17 @@ def disable_gateway_backend(backends_toml_path: str) -> None:
         save_toml_to_path(toml_doc, backends_toml_path)
 
 
-def customize_backends_config(is_first_time_setup: bool = False) -> None:
+def customize_backends_config(is_first_time_setup: bool = False, target_config_dir: Path | None = None) -> None:
     """Interactively customize which inference backends are enabled in backends.toml.
 
     Args:
         is_first_time_setup: Whether this is the first time backends.toml is being set up.
+        target_config_dir: Explicit target .pipelex directory. If None, uses config_manager.pipelex_config_dir.
     """
     console = get_console()
-    backends_toml_path = os.path.join(config_manager.pipelex_config_dir, "inference", "backends.toml")
-    template_backends_path = os.path.join(str(get_kit_configs_dir()), "inference", "backends.toml")
+    effective_config_dir = target_config_dir or config_manager.pipelex_config_dir
+    backends_toml_path = str(effective_config_dir / "inference" / "backends.toml")
+    template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
 
     if not path_exists(backends_toml_path):
         console.print("[yellow]⚠ Warning: backends.toml not found, skipping backend customization[/yellow]")
@@ -135,26 +137,48 @@ def customize_backends_config(is_first_time_setup: bool = False) -> None:
         except Exception as exc:
             log.debug(f"IDE extension suggestion failed: {exc}")
 
-        # Check if pipelex_gateway is selected and handle terms acceptance
+        # Check if pipelex_gateway is selected and handle terms acceptance prompt
+        gateway_terms_accepted: bool | None = None
         if PipelexBackend.GATEWAY in selected_backends:
             gateway_accepted = prompt_gateway_acceptance(console)
 
             if gateway_accepted:
                 display_gateway_accepted_message(console)
-                update_service_terms_acceptance(accepted=True)
+                gateway_terms_accepted = True
             else:
                 display_gateway_declined_message(console)
-                update_service_terms_acceptance(accepted=False)
+                gateway_terms_accepted = False
 
                 # Remove pipelex_gateway from selected indices
                 selected_indices = [idx for idx in selected_indices if backend_options[idx][0] != PipelexBackend.GATEWAY]
 
-        # Business logic: Update TOML
+        # Business logic: Update and save backends.toml first (local operation)
         update_backends_in_toml(toml_doc, selected_indices, backend_options)
         save_toml_to_path(toml_doc, backends_toml_path)
 
         # UI: Display confirmation
         display_selected_backends(console, selected_indices, backend_options)
+
+        # Save gateway terms acceptance to global config (separate from backends save)
+        if gateway_terms_accepted is not None:
+            try:
+                global_config_dir = config_manager.global_config_dir
+                global_config_dir.mkdir(parents=True, exist_ok=True)
+                update_service_terms_acceptance(accepted=gateway_terms_accepted, config_dir=global_config_dir)
+            except Exception as terms_exc:
+                log.warning(f"Could not save gateway terms acceptance to global config: {terms_exc}")
+                if gateway_terms_accepted:
+                    # Gateway enabled in backends.toml but terms not recorded — runtime will fail.
+                    # Disable gateway as a safety measure.
+                    try:
+                        disable_gateway_backend(backends_toml_path)
+                        console.print("[yellow]⚠ Could not save gateway terms. Gateway has been disabled to prevent errors.[/yellow]")
+                    except Exception as disable_exc:
+                        log.warning(f"Could not disable gateway backend: {disable_exc}")
+                        console.print(
+                            "[red]⚠ Could not save gateway terms or disable gateway. Please manually disable pipelex_gateway in backends.toml.[/red]"
+                        )
+                    console.print("[dim]Re-run 'pipelex init' to set up gateway again.[/dim]")
 
     except Exception as exc:
         console.print(f"[yellow]⚠ Warning: Failed to customize backends: {escape(str(exc))}[/yellow]")

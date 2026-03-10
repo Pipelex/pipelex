@@ -53,8 +53,8 @@ Learn more in our [Project Structure documentation](../../home/6-build-reliable-
 
 Now that you understand project organization:
 
-1. **Start building**: [Get Started](../../home/2-get-started/pipe-builder.md)
-2. **Learn the concepts**: [Writing Methods Tutorial](../../home/2-get-started/pipe-builder.md)
+1. **Start building**: [Get Started](../../home/2-get-started/write-methods-manually.md)
+2. **Learn the concepts**: [Writing Methods Tutorial](../../home/2-get-started/write-methods-manually.md)
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/main)
 4. **Deep dive**: [Build Reliable AI Methods](../../home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md)
 

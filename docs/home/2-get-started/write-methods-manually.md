@@ -2,9 +2,6 @@
 
 Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.mthds` language.
 
-!!! tip "Prefer Automated Method Generation?"
-    If you have access to **Claude 4.5 Sonnet** (via Pipelex Inference, Anthropic, Amazon Bedrock, or BlackBox AI), you can use our **pipe builder** to generate methods from natural language descriptions. See the [Pipe Builder guide](./pipe-builder.md) to learn how to use `pipelex build pipe` commands. This tutorial is for those who want to write methods manually or understand the `.mthds` language in depth.
-
 ## Write Your First Pipeline
 
 Let's build a **character generator** to understand the basics.
@@ -346,7 +343,7 @@ Now that you understand the basics, explore more:
 
 **Explore Tools:**
 
-- [Pipe Builder](../../home/9-tools/pipe-builder.md) - Generate pipelines from natural language
+- [Claude Code Skills Plugin](../../home/1-features/claude-code-skills-plugin.md) - Generate pipelines from natural language
 - [CLI Commands](../9-tools/cli/index.md) - Command-line interface reference
 
 **Configure:**

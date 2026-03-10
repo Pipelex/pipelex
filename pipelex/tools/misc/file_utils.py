@@ -272,7 +272,7 @@ def ensure_directory_for_file_path(file_path: str) -> None:
     ensure_directory_exists(os.path.dirname(file_path))
 
 
-def path_exists(path_str: str) -> bool:
+def path_exists(path_str: str | Path) -> bool:
     """Checks if a file or directory exists at the specified path.
 
     This function converts the input string path to a Path object and checks

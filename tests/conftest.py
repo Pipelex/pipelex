@@ -40,10 +40,10 @@ def _cached_fetch_remote_config() -> RemoteConfig:
 
 
 # Session-level cache for pipelex service config to avoid flaky tests from concurrent file reads
-_pipelex_service_config_cache: dict[str, PipelexServiceConfig | None] = {}
+_pipelex_service_config_cache: dict[Path, PipelexServiceConfig | None] = {}
 
 
-def _cached_load_pipelex_service_config(config_dir: str) -> PipelexServiceConfig | None:
+def _cached_load_pipelex_service_config(config_dir: Path) -> PipelexServiceConfig | None:
     """Wrapper that caches the pipelex service config for the entire test session.
 
     This prevents flaky tests caused by concurrent file reads during parallel pytest-xdist execution.
