@@ -41,6 +41,6 @@ For advanced use cases, generate Pydantic BaseModels from your declarative conce
 
 ## Concept Refinement & Hierarchies
 
-Create specialized versions of existing concepts using the `refines` keyword. Build concept hierarchies for domain modeling — for example, a `DetailedInvoice` that refines a base `Invoice` concept, inheriting its structure and description.
+Create specialized versions of existing concepts using the `refines` keyword. Build concept hierarchies for domain modeling — for example, a `DetailedInvoice` that refines a base `Invoice` concept, inheriting its structure while adding more specific semantics.
 
 For detailed guidance, see [Define Your Concepts](../6-build-reliable-ai-workflows/concepts/define_your_concepts.md).
