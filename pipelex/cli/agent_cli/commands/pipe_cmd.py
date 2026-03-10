@@ -210,8 +210,10 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         pipe_table.add("function_name", pipe_spec.function_name)
 
 
-def _resolve_talent_value(pipe_type: str, raw_value: str) -> str:
+def _resolve_talent_value(pipe_type: str, raw_value: Any) -> Any:
     """Attempt to resolve a talent value, accepting preset names as aliases."""
+    if not isinstance(raw_value, str):
+        return raw_value
     reverse_maps: dict[str, dict[str, str]] = {
         "PipeLLM": _MODEL_TO_LLM_TALENT,
         "PipeImgGen": _MODEL_TO_IMG_GEN_TALENT,
@@ -254,9 +256,11 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
 
     # Accept common aliases for "pipe_code"
     for alias in ("code", "the_pipe_code", "name"):
-        if alias in spec_data and "pipe_code" not in spec_data:
-            spec_data["pipe_code"] = spec_data.pop(alias)
-            break
+        if alias in spec_data:
+            if "pipe_code" not in spec_data:
+                spec_data["pipe_code"] = spec_data.pop(alias)
+            else:
+                spec_data.pop(alias)
 
     # Accept generic talent aliases and map to the type-specific field
     talent_aliases = ("talent_name", "talent")
@@ -269,9 +273,11 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
     talent_field = pipe_type_to_talent_field.get(pipe_type)
     if talent_field:
         for alias in talent_aliases:
-            if alias in spec_data and talent_field not in spec_data:
-                spec_data[talent_field] = spec_data.pop(alias)
-                break
+            if alias in spec_data:
+                if talent_field not in spec_data:
+                    spec_data[talent_field] = spec_data.pop(alias)
+                else:
+                    spec_data.pop(alias)
 
     # Handle steps/branches conversion - need to convert pipe to pipe_code
     if "steps" in spec_data:

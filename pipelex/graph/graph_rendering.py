@@ -23,6 +23,19 @@ from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.types import StrEnum
 
 
+def _sanitize_graph_name(graph_name: str) -> str:
+    """Sanitize graph_name to prevent path traversal.
+
+    Args:
+        graph_name: The requested filename for the graph output.
+
+    Returns:
+        A safe filename with no directory components.
+    """
+    sanitized = Path(graph_name).name
+    return sanitized or "graph.html"
+
+
 class GraphFormat(StrEnum):
     """Selectable graph output formats."""
 
@@ -219,8 +232,9 @@ async def generate_graph_for_bundle(
 
     # Rename reactflow.html to the requested filename
     reactflow_path = saved_files.get("reactflow_html")
-    if reactflow_path and graph_name:
-        final_path = reactflow_path.parent / graph_name
+    safe_name = _sanitize_graph_name(graph_name)
+    if reactflow_path and safe_name:
+        final_path = reactflow_path.parent / safe_name
         reactflow_path.rename(final_path)
         saved_files["reactflow_html"] = final_path
 

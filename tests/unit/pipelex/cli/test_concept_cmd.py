@@ -5,9 +5,6 @@ from __future__ import annotations
 import json
 from typing import Any, ClassVar
 
-import pytest
-from pydantic import ValidationError as PydanticValidationError
-
 from pipelex.builder.concept.concept_spec import ConceptStructureSpec, ConceptStructureSpecFieldType
 from pipelex.cli.agent_cli.commands.concept_cmd import (
     _concept_spec_to_toml,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
@@ -163,10 +160,16 @@ class TestConceptCodeAliases:
         assert result.the_concept_code == "Invoice"
 
     def test_canonical_ignores_alias(self) -> None:
-        """When the_concept_code is present, alias keys are left untouched (Pydantic rejects extra fields)."""
+        """When the_concept_code is present, alias keys are removed so Pydantic doesn't reject them."""
         spec = {**self._BASE, "the_concept_code": "Canonical", "name": "Alias"}
-        with pytest.raises(PydanticValidationError, match="name"):
-            _parse_concept_spec_from_json(spec)
+        result = _parse_concept_spec_from_json(spec)
+        assert result.the_concept_code == "Canonical"
+
+    def test_multiple_aliases_all_cleaned_up(self) -> None:
+        """When the_concept_code and multiple aliases are present, all aliases are removed."""
+        spec = {**self._BASE, "concept_code": "Invoice", "name": "Alt", "code": "Alt2"}
+        result = _parse_concept_spec_from_json(spec)
+        assert result.the_concept_code == "Invoice"
 
 
 class TestStructureFieldStringShorthand:

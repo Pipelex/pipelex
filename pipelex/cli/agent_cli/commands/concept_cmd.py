@@ -103,9 +103,11 @@ def _parse_concept_spec_from_json(spec_data: dict[str, Any]) -> ConceptSpec:
     """
     # Accept common aliases for "the_concept_code"
     for alias in ("concept_code", "code", "name", "concept_name"):
-        if alias in spec_data and "the_concept_code" not in spec_data:
-            spec_data["the_concept_code"] = spec_data.pop(alias)
-            break
+        if alias in spec_data:
+            if "the_concept_code" not in spec_data:
+                spec_data["the_concept_code"] = spec_data.pop(alias)
+            else:
+                spec_data.pop(alias)
 
     # Convert structure if present - need to add field names
     if spec_data.get("structure"):

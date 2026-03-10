@@ -103,6 +103,21 @@ class TestResolveTalentValue:
         """PipeSearch has no reverse mapping; values pass through."""
         assert _resolve_talent_value("PipeSearch", "web-search") == "web-search"
 
+    def test_dict_value_passes_through(self) -> None:
+        """Non-string values (dict) should pass through without crashing."""
+        result = _resolve_talent_value("PipeLLM", {"name": "creative-writer"})
+        assert result == {"name": "creative-writer"}
+
+    def test_list_value_passes_through(self) -> None:
+        """Non-string values (list) should pass through without crashing."""
+        result = _resolve_talent_value("PipeLLM", ["creative-writer"])
+        assert result == ["creative-writer"]
+
+    def test_int_value_passes_through(self) -> None:
+        """Non-string values (int) should pass through without crashing."""
+        result = _resolve_talent_value("PipeLLM", 42)
+        assert result == 42
+
 
 # ---------------------------------------------------------------------------
 # _parse_pipe_spec_from_json — pipe_code aliases
@@ -141,10 +156,22 @@ class TestPipeCodeAliases:
         assert result.pipe_code == "my_pipe"
 
     def test_canonical_ignores_alias(self) -> None:
-        """When pipe_code is present, alias keys are left untouched (Pydantic rejects extra fields)."""
+        """When pipe_code is present, alias keys are removed so Pydantic doesn't reject them."""
         spec = {**self._BASE_LLM, "pipe_code": "canonical", "code": "alias"}
-        with pytest.raises(ValidationError, match="code"):
-            _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        assert result.pipe_code == "canonical"
+
+    def test_multiple_aliases_all_cleaned_up(self) -> None:
+        """When pipe_code and multiple aliases are present, all aliases are removed."""
+        spec = {**self._BASE_LLM, "code": "my_pipe", "name": "alt"}
+        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        assert result.pipe_code == "my_pipe"
+
+    def test_three_aliases_all_cleaned_up(self) -> None:
+        """When pipe_code and all aliases are present, all aliases are removed."""
+        spec = {**self._BASE_LLM, "code": "my_pipe", "the_pipe_code": "alt", "name": "alt2"}
+        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        assert result.pipe_code == "my_pipe"
 
 
 # ---------------------------------------------------------------------------
@@ -174,10 +201,10 @@ class TestTalentFieldAliases:
         assert result.llm_talent == "engineer"  # type: ignore[attr-defined]
 
     def test_canonical_talent_field_ignores_alias(self) -> None:
-        """When llm_talent is present, generic alias is left untouched (Pydantic rejects extra fields)."""
+        """When llm_talent is present, generic alias is removed so Pydantic doesn't reject it."""
         spec = {**self._BASE, "llm_talent": "coder", "talent_name": "engineer"}
-        with pytest.raises(ValidationError, match="talent_name"):
-            _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        assert result.llm_talent == "coder"  # type: ignore[attr-defined]
 
     def test_talent_alias_for_extract(self) -> None:
         spec = {
