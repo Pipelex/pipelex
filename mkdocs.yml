@@ -91,8 +91,32 @@ extra_css:
 nav:
   - Home:
     - What is Pipelex?: index.md
-    - Releases:
-      - v0.18.0 "Chicago": home/1-releases/chicago.md
+    - Features:
+      - Overview: home/1-features/index.md
+      - Declarative AI Methods:
+        - MTHDS Language: home/1-features/mthds-language.md
+        - Concepts & Structured Types: home/1-features/concepts.md
+        - Pipe Operators: home/1-features/pipe-operators.md
+        - Pipeline Orchestration: home/1-features/pipeline-orchestration.md
+      - AI Capabilities:
+        - Pipelex Gateway & Model Access: home/1-features/gateway.md
+        - LLM Integration: home/1-features/llm-integration.md
+        - Document Extraction: home/1-features/document-extraction.md
+        - Image Generation: home/1-features/image-generation.md
+        - Web Search: home/1-features/web-search.md
+      - Developer Tools:
+        - Claude Code Skills Plugin: home/1-features/pipe-builder.md
+        - CLI: home/1-features/cli.md
+        - plxt Formatter & Linter: home/1-features/plxt.md
+        - Execution Graph Visualization: home/1-features/execution-graph.md
+      - Production & Operations:
+        - Validation & Dry Run: home/1-features/validation-dry-run.md
+        - Telemetry & Observability: home/1-features/telemetry.md
+        - Cloud Storage: home/1-features/cloud-storage.md
+        - Cost Tracking & Reporting: home/1-features/cost-tracking.md
+      - Configuration & Extensibility:
+        - Configuration System: home/1-features/configuration.md
+        - Advanced Customizations: home/1-features/advanced-customizations.md
     - Get Started:
       - The Pipe Builder: home/2-get-started/pipe-builder.md
       - Write Methods Manually: home/2-get-started/write-methods-manually.md
@@ -198,10 +222,8 @@ nav:
       - Secrets Provider: home/10-advanced-customizations/secrets-provider-injection.md
       - Reporting Delegate: home/10-advanced-customizations/reporting-delegate-injection.md
       - Storage Provider: home/10-advanced-customizations/storage-provider-injection.md
-      - Template Provider: home/10-advanced-customizations/template-provider-injection.md
-      - Observer Provider: home/10-advanced-customizations/observer-provider-injection.md
+      - Observer: home/10-advanced-customizations/observer-provider-injection.md
       - Content Generator: home/10-advanced-customizations/content-generator-injection.md
-      - Plugin Injection: home/10-advanced-customizations/plugin-injection.md
       - Pipe Router: home/10-advanced-customizations/pipe-router-injection.md
   - Under the Hood:
     - Overview: under-the-hood/index.md

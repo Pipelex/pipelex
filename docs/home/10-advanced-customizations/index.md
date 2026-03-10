@@ -14,7 +14,6 @@ There are two main ways to inject custom implementations:
 from pipelex import Pipelex
 
 pipelex = Pipelex.make(
-    template_provider=MyTemplateProvider(),
     reporting_delegate=MyReportingDelegate(),
     secrets_provider=MySecretsProvider(),
     content_generator=MyContentGenerator(),
@@ -28,7 +27,7 @@ pipelex = Pipelex.make(
 from pipelex.hub import PipelexHub
 
 hub = PipelexHub()
-hub.set_template_provider(MyTemplateProvider())
+hub.set_reporting_delegate(MyReportingDelegate())
 # ... and so on for other components
 ```
 
@@ -62,12 +61,6 @@ When a feature is disabled, the corresponding NoOp implementation is used automa
 ## Available Injectable Components
 
 Pipelex supports injection of the following components:
-
-**Template Provider** (`TemplateLibrary`)
-
-- Protocol: `TemplateProviderAbstract`
-- Default: `TemplateLibrary`
-- [Details](template-provider-injection.md)
 
 **Reporting Delegate** (`ReportingManager`)
 
