@@ -388,6 +388,8 @@ def pipe_cmd(
     # Accept "pipe_type" as an alias for "type" in the JSON spec
     if "pipe_type" in spec_data and "type" not in spec_data:
         spec_data["type"] = spec_data.pop("pipe_type")
+    elif "pipe_type" in spec_data:
+        spec_data.pop("pipe_type")
 
     # Resolve pipe type: CLI option takes precedence, then extract from spec JSON
     resolved_pipe_type: str
