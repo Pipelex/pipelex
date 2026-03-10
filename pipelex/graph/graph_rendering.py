@@ -164,6 +164,7 @@ async def generate_graph_for_bundle(
     graph_format: GraphFormat,
     library_dirs: list[str] | None = None,
     direction: FlowchartDirection | None = None,
+    graph_name: str = "dry_run.html",
 ) -> dict[str, Any]:
     """Generate graph visualization for a bundle via dry-run pipeline execution.
 
@@ -175,6 +176,7 @@ async def generate_graph_for_bundle(
         graph_format: Which graph format(s) to generate.
         library_dirs: Optional library directories for pipe resolution.
         direction: Flowchart layout direction (default: None, uses TB).
+        graph_name: Filename for the generated HTML graph (default: "dry_run.html").
 
     Returns:
         Dictionary with graph_files, graph_output_dir, and direction.
@@ -214,6 +216,13 @@ async def generate_graph_for_bundle(
         pipe_code=pipe_code,
         direction=direction,
     )
+
+    # Rename reactflow.html to the requested filename
+    reactflow_path = saved_files.get("reactflow_html")
+    if reactflow_path and graph_name:
+        final_path = reactflow_path.parent / graph_name
+        reactflow_path.rename(final_path)
+        saved_files["reactflow_html"] = final_path
 
     return {
         "graph_files": {key: str(path) for key, path in saved_files.items()},

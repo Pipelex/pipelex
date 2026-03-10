@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 from pydantic.json_schema import SkipJsonSchema
 from rich.console import Group
 from rich.panel import Panel
@@ -90,6 +90,8 @@ class PipeComposeSpec(PipeSpec):
     - Use `{ template = "..." }` ONLY for string composition (e.g., "INV-$order.id")
     - NEVER use templates to manually replicate object attributes
     """
+
+    model_config = ConfigDict(populate_by_name=True)
 
     type: SkipJsonSchema[Literal["PipeCompose"]] = "PipeCompose"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import Any
+from typing import Any, ClassVar
+
+import pytest
+from pydantic import ValidationError as PydanticValidationError
 
 from pipelex.builder.concept.concept_spec import ConceptStructureSpec, ConceptStructureSpecFieldType
 from pipelex.cli.agent_cli.commands.concept_cmd import (
@@ -124,6 +127,77 @@ class TestStructureFieldToDict:
 
         assert result["choices"] == ["active", "inactive", "pending"]
         assert result["default"] == "pending"
+
+
+class TestConceptCodeAliases:
+    """Tests for concept_code alias handling in _parse_concept_spec_from_json."""
+
+    _BASE: ClassVar[dict[str, Any]] = {
+        "description": "A test concept",
+        "refines": "Text",
+    }
+
+    def test_canonical_the_concept_code(self) -> None:
+        spec = {**self._BASE, "the_concept_code": "Invoice"}
+        result = _parse_concept_spec_from_json(spec)
+        assert result.the_concept_code == "Invoice"
+
+    def test_alias_concept_code(self) -> None:
+        spec = {**self._BASE, "concept_code": "Invoice"}
+        result = _parse_concept_spec_from_json(spec)
+        assert result.the_concept_code == "Invoice"
+
+    def test_alias_code(self) -> None:
+        spec = {**self._BASE, "code": "Invoice"}
+        result = _parse_concept_spec_from_json(spec)
+        assert result.the_concept_code == "Invoice"
+
+    def test_alias_name(self) -> None:
+        spec = {**self._BASE, "name": "Invoice"}
+        result = _parse_concept_spec_from_json(spec)
+        assert result.the_concept_code == "Invoice"
+
+    def test_alias_concept_name(self) -> None:
+        spec = {**self._BASE, "concept_name": "Invoice"}
+        result = _parse_concept_spec_from_json(spec)
+        assert result.the_concept_code == "Invoice"
+
+    def test_canonical_ignores_alias(self) -> None:
+        """When the_concept_code is present, alias keys are left untouched (Pydantic rejects extra fields)."""
+        spec = {**self._BASE, "the_concept_code": "Canonical", "name": "Alias"}
+        with pytest.raises(PydanticValidationError, match="name"):
+            _parse_concept_spec_from_json(spec)
+
+
+class TestStructureFieldStringShorthand:
+    """A bare string in structure should be treated as a text field with that description."""
+
+    def test_string_field_becomes_text(self) -> None:
+        spec: dict[str, Any] = {
+            "the_concept_code": "Simple",
+            "description": "A simple concept",
+            "structure": {
+                "title": "The title of the item",
+            },
+        }
+        result = _parse_concept_spec_from_json(spec)
+        assert result.structure is not None
+        assert result.structure["title"].type == ConceptStructureSpecFieldType.TEXT
+        assert result.structure["title"].description == "The title of the item"
+
+    def test_mixed_string_and_dict_fields(self) -> None:
+        spec: dict[str, Any] = {
+            "the_concept_code": "Mixed",
+            "description": "A mixed concept",
+            "structure": {
+                "name": "The person's name",
+                "age": {"type": "integer", "description": "Age in years"},
+            },
+        }
+        result = _parse_concept_spec_from_json(spec)
+        assert result.structure is not None
+        assert result.structure["name"].type == ConceptStructureSpecFieldType.TEXT
+        assert result.structure["age"].type == ConceptStructureSpecFieldType.INTEGER
 
 
 class TestParseConceptSpecFromJson:
