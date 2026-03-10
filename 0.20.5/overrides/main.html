@@ -1,0 +1,19 @@
+{# overrides/main.html #}
+{% extends "base.html" %}
+
+{% block extrahead %}
+{{ super() }} {# keep anything Material already outputs #}
+{% if page and page.title and page.meta %}
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ page.meta.title or page.title }}">
+<meta property="og:description" content="{{ page.meta.description }}">
+<meta property="og:image" content="{{ page.meta.image }}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="{{ page.canonical_url }}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ page.meta.title or page.title }}">
+<meta name="twitter:description" content="{{ page.meta.description }}">
+<meta name="twitter:image" content="{{ page.meta.image }}">
+{% endif %}
+{% endblock %}
