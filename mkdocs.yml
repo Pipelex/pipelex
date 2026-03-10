@@ -91,6 +91,7 @@ extra_css:
 nav:
   - Home:
     - What is Pipelex?: index.md
+    - Getting Started: home/2-get-started/write-methods-manually.md
     - Features:
       - Overview: home/1-features/index.md
       - Declarative AI Methods:
@@ -117,10 +118,6 @@ nav:
       - Configuration & Extensibility:
         - Configuration System: home/1-features/configuration.md
         - Advanced Customizations: home/1-features/advanced-customizations.md
-    - Get Started:
-      - Write Methods Manually: home/2-get-started/write-methods-manually.md
-    - Understand Pipelex:
-      - The Know-How Graph: home/3-understand-pipelex/viewpoint.md
     - Cookbook Examples:
       - Overview: home/4-cookbook-examples/index.md
       - Hello World: home/4-cookbook-examples/hello-world.md
@@ -219,6 +216,8 @@ nav:
       - Observer: home/10-advanced-customizations/observer-provider-injection.md
       - Content Generator: home/10-advanced-customizations/content-generator-injection.md
       - Pipe Router: home/10-advanced-customizations/pipe-router-injection.md
+    - Viewpoint:
+      - The Know-How Graph: home/3-understand-pipelex/viewpoint.md
   - Under the Hood:
     - Overview: under-the-hood/index.md
     - Architecture Overview: under-the-hood/architecture-overview.md
