@@ -300,6 +300,8 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
     if pipe_type == "PipeCondition" and "expression" in spec_data:
         if "jinja2_expression_template" not in spec_data:
             spec_data["jinja2_expression_template"] = spec_data.pop("expression")
+        else:
+            spec_data.pop("expression")
 
     # Resolve preset names to talent names (tolerance for agent mistakes)
     talent_field = pipe_type_to_talent_field.get(pipe_type)
