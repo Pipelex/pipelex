@@ -57,6 +57,7 @@ def agent_doctor_cmd(
         models_healthy, models_message, backend_file_reports = check_models(config_dir=config_dir)
     except Exception as exc:
         agent_error(f"Health check failed unexpectedly: {exc}", type(exc).__name__, cause=exc)
+        # agent_error has NoReturn
 
     all_healthy = config_healthy and telemetry_healthy and backends_healthy and models_healthy
 
