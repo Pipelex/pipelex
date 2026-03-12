@@ -1,0 +1,37 @@
+CHANGELOG.md
+  73641df75372b98c 7,9
+  f1ba635353a12dab 8,10
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "6ed67948194f906455313edc903c9a33b0c5c46f",
+  "prompts": {
+    "73641df75372b98c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f93328c1-af3d-46ae-8a1b-26b7ebb4a846",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    },
+    "f1ba635353a12dab": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7c95b28-88e4-40a8-8012-d8fca0b6c020",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 0,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
