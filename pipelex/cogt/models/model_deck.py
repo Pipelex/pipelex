@@ -750,11 +750,6 @@ class ModelDeck(ConfigModel):
                                 f"from the {PipelexBackend.GATEWAY.display_name} "
                                 f"and you can get free credits to try them out."
                             )
-                            if PipelexBackend.LEGACY_INFERENCE in enabled_backends:
-                                msg += (
-                                    f"\nAlso note that {PipelexBackend.LEGACY_INFERENCE.display_name} is deprecated "
-                                    "and will be removed in the near future."
-                                )
                             msg += (
                                 f"\nPlease see our docs for more details about setting up "
                                 f"{PipelexBackend.GATEWAY.display_name} or other inference backends:\n{URLs.backend_provider_docs}"
