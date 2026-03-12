@@ -7,14 +7,14 @@ from typing import Any, ClassVar
 import pytest
 from pydantic import ValidationError
 
-from pipelex.cli.agent_cli.commands.pipe_cmd import (
-    _MODEL_TO_EXTRACT_TALENT,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
-    _MODEL_TO_IMG_GEN_TALENT,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
-    _MODEL_TO_LLM_TALENT,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+from pipelex.builder.operations.pipe_ops import (
     LLM_TALENT_TO_MODEL,
-    _parse_pipe_spec_from_json,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
-    _pipe_spec_to_toml,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
-    _resolve_talent_value,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
+    MODEL_TO_EXTRACT_TALENT,
+    MODEL_TO_IMG_GEN_TALENT,
+    MODEL_TO_LLM_TALENT,
+    parse_pipe_spec,
+    pipe_spec_to_toml,
+    resolve_talent_value,
 )
 
 # ---------------------------------------------------------------------------
@@ -26,31 +26,31 @@ class TestReverseTalentMappings:
     """Verify the module-level reverse mappings are built correctly."""
 
     def test_llm_preset_with_prefix(self) -> None:
-        assert _MODEL_TO_LLM_TALENT["$writing-creative"] == "creative-writer"
+        assert MODEL_TO_LLM_TALENT["$writing-creative"] == "creative-writer"
 
     def test_llm_preset_without_prefix(self) -> None:
-        assert _MODEL_TO_LLM_TALENT["writing-creative"] == "creative-writer"
+        assert MODEL_TO_LLM_TALENT["writing-creative"] == "creative-writer"
 
     def test_llm_all_presets_have_reverse_entries(self) -> None:
         for talent, preset in LLM_TALENT_TO_MODEL.items():
-            assert _MODEL_TO_LLM_TALENT[preset] == talent or _MODEL_TO_LLM_TALENT[preset] in LLM_TALENT_TO_MODEL
-            assert _MODEL_TO_LLM_TALENT[preset.lstrip("$@")] == talent or _MODEL_TO_LLM_TALENT[preset.lstrip("$@")] in LLM_TALENT_TO_MODEL
+            assert MODEL_TO_LLM_TALENT[preset] == talent or MODEL_TO_LLM_TALENT[preset] in LLM_TALENT_TO_MODEL
+            assert MODEL_TO_LLM_TALENT[preset.lstrip("$@")] == talent or MODEL_TO_LLM_TALENT[preset.lstrip("$@")] in LLM_TALENT_TO_MODEL
 
     def test_img_gen_preset_with_prefix(self) -> None:
-        assert _MODEL_TO_IMG_GEN_TALENT["$gen-image"] == "gen-image"
+        assert MODEL_TO_IMG_GEN_TALENT["$gen-image"] == "gen-image"
 
     def test_img_gen_preset_without_prefix(self) -> None:
-        assert _MODEL_TO_IMG_GEN_TALENT["gen-image"] == "gen-image"
+        assert MODEL_TO_IMG_GEN_TALENT["gen-image"] == "gen-image"
 
     def test_extract_preset_with_prefix(self) -> None:
-        assert _MODEL_TO_EXTRACT_TALENT["@default-text-from-pdf"] == "pdf-basic-text-extractor"
+        assert MODEL_TO_EXTRACT_TALENT["@default-text-from-pdf"] == "pdf-basic-text-extractor"
 
     def test_extract_preset_without_prefix(self) -> None:
-        assert _MODEL_TO_EXTRACT_TALENT["default-text-from-pdf"] == "pdf-basic-text-extractor"
+        assert MODEL_TO_EXTRACT_TALENT["default-text-from-pdf"] == "pdf-basic-text-extractor"
 
 
 # ---------------------------------------------------------------------------
-# _resolve_talent_value
+# resolve_talent_value
 # ---------------------------------------------------------------------------
 
 
@@ -60,67 +60,67 @@ class TestResolveTalentValue:
     # --- PipeLLM ---
 
     def test_valid_talent_passes_through(self) -> None:
-        assert _resolve_talent_value("PipeLLM", "creative-writer") == "creative-writer"
+        assert resolve_talent_value("PipeLLM", "creative-writer") == "creative-writer"
 
     def test_preset_without_prefix_resolves(self) -> None:
-        assert _resolve_talent_value("PipeLLM", "writing-creative") == "creative-writer"
+        assert resolve_talent_value("PipeLLM", "writing-creative") == "creative-writer"
 
     def test_preset_with_dollar_prefix_resolves(self) -> None:
-        assert _resolve_talent_value("PipeLLM", "$writing-creative") == "creative-writer"
+        assert resolve_talent_value("PipeLLM", "$writing-creative") == "creative-writer"
 
     def test_invalid_talent_passes_through(self) -> None:
         """Unknown values pass through so Pydantic can produce a clear error."""
-        assert _resolve_talent_value("PipeLLM", "totally-wrong") == "totally-wrong"
+        assert resolve_talent_value("PipeLLM", "totally-wrong") == "totally-wrong"
 
     def test_engineering_code_resolves(self) -> None:
-        assert _resolve_talent_value("PipeLLM", "engineering-code") == "coder"
+        assert resolve_talent_value("PipeLLM", "engineering-code") == "coder"
 
     def test_retrieval_resolves(self) -> None:
-        assert _resolve_talent_value("PipeLLM", "retrieval") == "data-retrieval"
+        assert resolve_talent_value("PipeLLM", "retrieval") == "data-retrieval"
 
     # --- PipeImgGen ---
 
     def test_img_gen_preset_resolves(self) -> None:
-        assert _resolve_talent_value("PipeImgGen", "$gen-image-fast") == "gen-image-fast"
+        assert resolve_talent_value("PipeImgGen", "$gen-image-fast") == "gen-image-fast"
 
     def test_img_gen_valid_talent_passes_through(self) -> None:
-        assert _resolve_talent_value("PipeImgGen", "gen-image-high-quality") == "gen-image-high-quality"
+        assert resolve_talent_value("PipeImgGen", "gen-image-high-quality") == "gen-image-high-quality"
 
     # --- PipeExtract ---
 
     def test_extract_preset_resolves(self) -> None:
-        assert _resolve_talent_value("PipeExtract", "default-extract-document") == "full-document-extractor"
+        assert resolve_talent_value("PipeExtract", "default-extract-document") == "full-document-extractor"
 
     def test_extract_preset_with_at_resolves(self) -> None:
-        assert _resolve_talent_value("PipeExtract", "@default-extract-image") == "image-text-extractor"
+        assert resolve_talent_value("PipeExtract", "@default-extract-image") == "image-text-extractor"
 
     # --- Unknown pipe types ---
 
     def test_unknown_pipe_type_passes_through(self) -> None:
-        assert _resolve_talent_value("PipeCompose", "anything") == "anything"
+        assert resolve_talent_value("PipeCompose", "anything") == "anything"
 
     def test_pipe_search_passes_through(self) -> None:
         """PipeSearch has no reverse mapping; values pass through."""
-        assert _resolve_talent_value("PipeSearch", "web-search") == "web-search"
+        assert resolve_talent_value("PipeSearch", "web-search") == "web-search"
 
     def test_dict_value_passes_through(self) -> None:
         """Non-string values (dict) should pass through without crashing."""
-        result = _resolve_talent_value("PipeLLM", {"name": "creative-writer"})
+        result = resolve_talent_value("PipeLLM", {"name": "creative-writer"})
         assert result == {"name": "creative-writer"}
 
     def test_list_value_passes_through(self) -> None:
         """Non-string values (list) should pass through without crashing."""
-        result = _resolve_talent_value("PipeLLM", ["creative-writer"])
+        result = resolve_talent_value("PipeLLM", ["creative-writer"])
         assert result == ["creative-writer"]
 
     def test_int_value_passes_through(self) -> None:
         """Non-string values (int) should pass through without crashing."""
-        result = _resolve_talent_value("PipeLLM", 42)
+        result = resolve_talent_value("PipeLLM", 42)
         assert result == 42
 
 
 # ---------------------------------------------------------------------------
-# _parse_pipe_spec_from_json — pipe_code aliases
+# parse_pipe_spec — pipe_code aliases
 # ---------------------------------------------------------------------------
 
 
@@ -137,45 +137,45 @@ class TestPipeCodeAliases:
 
     def test_canonical_pipe_code(self) -> None:
         spec = {**self._BASE_LLM, "pipe_code": "my_pipe"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.pipe_code == "my_pipe"
 
     def test_alias_code(self) -> None:
         spec = {**self._BASE_LLM, "code": "my_pipe"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.pipe_code == "my_pipe"
 
     def test_alias_the_pipe_code(self) -> None:
         spec = {**self._BASE_LLM, "the_pipe_code": "my_pipe"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.pipe_code == "my_pipe"
 
     def test_alias_name(self) -> None:
         spec = {**self._BASE_LLM, "name": "my_pipe"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.pipe_code == "my_pipe"
 
     def test_canonical_ignores_alias(self) -> None:
         """When pipe_code is present, alias keys are removed so Pydantic doesn't reject them."""
         spec = {**self._BASE_LLM, "pipe_code": "canonical", "code": "alias"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.pipe_code == "canonical"
 
     def test_multiple_aliases_all_cleaned_up(self) -> None:
         """When pipe_code and multiple aliases are present, all aliases are removed."""
         spec = {**self._BASE_LLM, "code": "my_pipe", "name": "alt"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.pipe_code == "my_pipe"
 
     def test_three_aliases_all_cleaned_up(self) -> None:
         """When pipe_code and all aliases are present, all aliases are removed."""
         spec = {**self._BASE_LLM, "code": "my_pipe", "the_pipe_code": "alt", "name": "alt2"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.pipe_code == "my_pipe"
 
 
 # ---------------------------------------------------------------------------
-# _parse_pipe_spec_from_json — talent field aliases
+# parse_pipe_spec — talent field aliases
 # ---------------------------------------------------------------------------
 
 
@@ -192,18 +192,18 @@ class TestTalentFieldAliases:
 
     def test_talent_name_alias_for_llm(self) -> None:
         spec = {**self._BASE, "talent_name": "creative-writer"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.llm_talent == "creative-writer"  # type: ignore[attr-defined]
 
     def test_talent_alias_for_llm(self) -> None:
         spec = {**self._BASE, "talent": "engineer"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.llm_talent == "engineer"  # type: ignore[attr-defined]
 
     def test_canonical_talent_field_ignores_alias(self) -> None:
         """When llm_talent is present, generic alias is removed so Pydantic doesn't reject it."""
         spec = {**self._BASE, "llm_talent": "coder", "talent_name": "engineer"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.llm_talent == "coder"  # type: ignore[attr-defined]
 
     def test_talent_alias_for_extract(self) -> None:
@@ -214,7 +214,7 @@ class TestTalentFieldAliases:
             "output": "Page[]",
             "talent_name": "full-document-extractor",
         }
-        result = _parse_pipe_spec_from_json("PipeExtract", spec)
+        result = parse_pipe_spec("PipeExtract", spec)
         assert result.extract_talent == "full-document-extractor"  # type: ignore[attr-defined]
 
     def test_talent_alias_for_img_gen(self) -> None:
@@ -226,12 +226,12 @@ class TestTalentFieldAliases:
             "talent": "gen-image",
             "prompt": "Generate: $prompt_text",
         }
-        result = _parse_pipe_spec_from_json("PipeImgGen", spec)
+        result = parse_pipe_spec("PipeImgGen", spec)
         assert result.img_gen_talent == "gen-image"  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
-# _parse_pipe_spec_from_json — preset-to-talent resolution
+# parse_pipe_spec — preset-to-talent resolution
 # ---------------------------------------------------------------------------
 
 
@@ -248,28 +248,28 @@ class TestPresetToTalentResolution:
 
     def test_preset_name_resolved_to_talent_for_llm(self) -> None:
         spec = {**self._BASE_LLM, "llm_talent": "writing-creative"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.llm_talent == "creative-writer"  # type: ignore[attr-defined]
 
     def test_preset_with_dollar_resolved_for_llm(self) -> None:
         spec = {**self._BASE_LLM, "llm_talent": "$writing-creative"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.llm_talent == "creative-writer"  # type: ignore[attr-defined]
 
     def test_valid_talent_unchanged_for_llm(self) -> None:
         spec = {**self._BASE_LLM, "llm_talent": "creative-writer"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.llm_talent == "creative-writer"  # type: ignore[attr-defined]
 
     def test_invalid_talent_raises_validation_error(self) -> None:
         spec = {**self._BASE_LLM, "llm_talent": "totally-invalid"}
         with pytest.raises(ValidationError):
-            _parse_pipe_spec_from_json("PipeLLM", spec)
+            parse_pipe_spec("PipeLLM", spec)
 
     def test_preset_via_generic_alias_also_resolved(self) -> None:
         """talent_name alias + preset value should both be handled."""
         spec = {**self._BASE_LLM, "talent_name": "engineering-code"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.llm_talent == "coder"  # type: ignore[attr-defined]
 
     def test_extract_preset_resolved(self) -> None:
@@ -280,7 +280,7 @@ class TestPresetToTalentResolution:
             "output": "Page[]",
             "extract_talent": "default-text-from-pdf",
         }
-        result = _parse_pipe_spec_from_json("PipeExtract", spec)
+        result = parse_pipe_spec("PipeExtract", spec)
         assert result.extract_talent == "pdf-basic-text-extractor"  # type: ignore[attr-defined]
 
     def test_img_gen_preset_resolved(self) -> None:
@@ -292,12 +292,12 @@ class TestPresetToTalentResolution:
             "img_gen_talent": "$gen-image-high-quality",
             "prompt": "Generate: $prompt_text",
         }
-        result = _parse_pipe_spec_from_json("PipeImgGen", spec)
+        result = parse_pipe_spec("PipeImgGen", spec)
         assert result.img_gen_talent == "gen-image-high-quality"  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
-# _parse_pipe_spec_from_json — output dict tolerance
+# parse_pipe_spec — output dict tolerance
 # ---------------------------------------------------------------------------
 
 
@@ -314,23 +314,23 @@ class TestOutputDictTolerance:
 
     def test_output_as_string(self) -> None:
         spec = {**self._BASE_LLM, "output": "ImgGenPrompt"}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.output == "ImgGenPrompt"
 
     def test_output_as_dict_with_type_key(self) -> None:
         spec = {**self._BASE_LLM, "output": {"type": "ImgGenPrompt"}}
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.output == "ImgGenPrompt"
 
     def test_output_dict_without_type_key_passes_through(self) -> None:
         """If the dict has no 'type' key, let Pydantic handle the error."""
         spec = {**self._BASE_LLM, "output": {"name": "ImgGenPrompt"}}
         with pytest.raises(ValidationError):
-            _parse_pipe_spec_from_json("PipeLLM", spec)
+            parse_pipe_spec("PipeLLM", spec)
 
 
 # ---------------------------------------------------------------------------
-# _parse_pipe_spec_from_json — steps/branches 'pipe' → 'pipe_code' alias
+# parse_pipe_spec — steps/branches 'pipe' → 'pipe_code' alias
 # ---------------------------------------------------------------------------
 
 
@@ -348,7 +348,7 @@ class TestStepsBranchesAlias:
                 {"pipe": "step_two", "result": "final"},
             ],
         }
-        result = _parse_pipe_spec_from_json("PipeSequence", spec)
+        result = parse_pipe_spec("PipeSequence", spec)
         assert result.steps[0].pipe_code == "step_one"  # type: ignore[attr-defined]
         assert result.steps[1].pipe_code == "step_two"  # type: ignore[attr-defined]
 
@@ -362,7 +362,7 @@ class TestStepsBranchesAlias:
                 {"pipe_code": "step_one", "result": "intermediate"},
             ],
         }
-        result = _parse_pipe_spec_from_json("PipeSequence", spec)
+        result = parse_pipe_spec("PipeSequence", spec)
         assert result.steps[0].pipe_code == "step_one"  # type: ignore[attr-defined]
 
     def test_parallel_branches_pipe_alias(self) -> None:
@@ -377,13 +377,13 @@ class TestStepsBranchesAlias:
                 {"pipe": "branch_b", "result": "result_b"},
             ],
         }
-        result = _parse_pipe_spec_from_json("PipeParallel", spec)
+        result = parse_pipe_spec("PipeParallel", spec)
         assert result.branches[0].pipe_code == "branch_a"  # type: ignore[attr-defined]
         assert result.branches[1].pipe_code == "branch_b"  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
-# _parse_pipe_spec_from_json — PipeCondition expression alias
+# parse_pipe_spec — PipeCondition expression alias
 # ---------------------------------------------------------------------------
 
 
@@ -400,7 +400,7 @@ class TestConditionExpressionAlias:
             "outcomes": {"high": "handle_high", "low": "handle_low"},
             "default_outcome": "handle_default",
         }
-        result = _parse_pipe_spec_from_json("PipeCondition", spec)
+        result = parse_pipe_spec("PipeCondition", spec)
         assert result.jinja2_expression_template == "{{ status }}"  # type: ignore[attr-defined]
 
     def test_canonical_expression_field(self) -> None:
@@ -413,12 +413,12 @@ class TestConditionExpressionAlias:
             "outcomes": {"high": "handle_high", "low": "handle_low"},
             "default_outcome": "handle_default",
         }
-        result = _parse_pipe_spec_from_json("PipeCondition", spec)
+        result = parse_pipe_spec("PipeCondition", spec)
         assert result.jinja2_expression_template == "{{ status }}"  # type: ignore[attr-defined]
 
 
 # ---------------------------------------------------------------------------
-# _parse_pipe_spec_from_json — pipe_type alias in JSON
+# parse_pipe_spec — pipe_type alias in JSON
 # ---------------------------------------------------------------------------
 
 
@@ -438,12 +438,12 @@ class TestPipeTypeAlias:
         }
         # Simulate what pipe_cmd does: pop 'type' and pass it as pipe_type
         pipe_type = spec.pop("type")
-        result = _parse_pipe_spec_from_json(pipe_type, spec)
+        result = parse_pipe_spec(pipe_type, spec)
         assert result.pipe_code == "test"
 
 
 # ---------------------------------------------------------------------------
-# _parse_pipe_spec_from_json — invalid pipe type
+# parse_pipe_spec — invalid pipe type
 # ---------------------------------------------------------------------------
 
 
@@ -452,11 +452,11 @@ class TestInvalidPipeType:
 
     def test_invalid_pipe_type(self) -> None:
         with pytest.raises(ValueError, match="Invalid pipe type"):
-            _parse_pipe_spec_from_json("PipeNonExistent", {"pipe_code": "x", "description": "x"})
+            parse_pipe_spec("PipeNonExistent", {"pipe_code": "x", "description": "x"})
 
 
 # ---------------------------------------------------------------------------
-# _pipe_spec_to_toml — talent-to-model in TOML output
+# pipe_spec_to_toml — talent-to-model in TOML output
 # ---------------------------------------------------------------------------
 
 
@@ -473,18 +473,18 @@ class TestPipeSpecToToml:
     }
 
     def test_llm_talent_becomes_model_preset_in_toml(self) -> None:
-        spec = _parse_pipe_spec_from_json("PipeLLM", {**self._BASE_LLM})
-        toml = _pipe_spec_to_toml(spec)
+        spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM})
+        toml = pipe_spec_to_toml(spec)
         assert 'model = "$writing-creative"' in toml
 
     def test_llm_preset_input_still_maps_to_correct_model(self) -> None:
         """If the agent provides a preset name, it should resolve and then map to model."""
-        spec = _parse_pipe_spec_from_json("PipeLLM", {**self._BASE_LLM, "llm_talent": "engineering-structured"})
-        toml = _pipe_spec_to_toml(spec)
+        spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM, "llm_talent": "engineering-structured"})
+        toml = pipe_spec_to_toml(spec)
         assert 'model = "$engineering-structured"' in toml
 
     def test_extract_talent_becomes_model_in_toml(self) -> None:
-        spec = _parse_pipe_spec_from_json(
+        spec = parse_pipe_spec(
             "PipeExtract",
             {
                 "pipe_code": "my_extract",
@@ -494,11 +494,11 @@ class TestPipeSpecToToml:
                 "extract_talent": "full-document-extractor",
             },
         )
-        toml = _pipe_spec_to_toml(spec)
+        toml = pipe_spec_to_toml(spec)
         assert 'model = "@default-extract-document"' in toml
 
     def test_img_gen_talent_becomes_model_in_toml(self) -> None:
-        spec = _parse_pipe_spec_from_json(
+        spec = parse_pipe_spec(
             "PipeImgGen",
             {
                 "pipe_code": "my_img_gen",
@@ -509,22 +509,22 @@ class TestPipeSpecToToml:
                 "prompt": "Generate: $prompt_text",
             },
         )
-        toml = _pipe_spec_to_toml(spec)
+        toml = pipe_spec_to_toml(spec)
         assert 'model = "$gen-image"' in toml
 
     def test_toml_contains_pipe_section(self) -> None:
-        spec = _parse_pipe_spec_from_json("PipeLLM", {**self._BASE_LLM})
-        toml = _pipe_spec_to_toml(spec)
+        spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM})
+        toml = pipe_spec_to_toml(spec)
         assert "[pipe.my_llm_pipe]" in toml
         assert 'type = "PipeLLM"' in toml
 
     def test_toml_contains_prompt(self) -> None:
-        spec = _parse_pipe_spec_from_json("PipeLLM", {**self._BASE_LLM})
-        toml = _pipe_spec_to_toml(spec)
+        spec = parse_pipe_spec("PipeLLM", {**self._BASE_LLM})
+        toml = pipe_spec_to_toml(spec)
         assert 'prompt = "Write about @text"' in toml
 
     def test_sequence_toml_has_steps(self) -> None:
-        spec = _parse_pipe_spec_from_json(
+        spec = parse_pipe_spec(
             "PipeSequence",
             {
                 "pipe_code": "my_seq",
@@ -537,7 +537,7 @@ class TestPipeSpecToToml:
                 ],
             },
         )
-        toml = _pipe_spec_to_toml(spec)
+        toml = pipe_spec_to_toml(spec)
         assert "step_one" in toml
         assert "step_two" in toml
 
@@ -560,7 +560,7 @@ class TestEndToEndTolerance:
             "output": {"type": "ImgGenPrompt"},
             "prompt": "Generate a creative image prompt based on @idea",
         }
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
+        result = parse_pipe_spec("PipeLLM", spec)
         assert result.llm_talent == "creative-writer"  # type: ignore[attr-defined]
         assert result.output == "ImgGenPrompt"
 
@@ -574,7 +574,7 @@ class TestEndToEndTolerance:
             "output": {"type": "ImgGenPrompt"},
             "prompt": "Generate a creative image prompt based on @idea",
         }
-        result = _parse_pipe_spec_from_json("PipeLLM", spec)
-        toml = _pipe_spec_to_toml(result)
+        result = parse_pipe_spec("PipeLLM", spec)
+        toml = pipe_spec_to_toml(result)
         assert 'model = "$writing-creative"' in toml
         assert 'output = "ImgGenPrompt"' in toml

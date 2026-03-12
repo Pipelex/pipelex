@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from pipelex.hub import (
-    get_library_manager,
-    get_required_pipe,
-    resolve_library_dirs,
-    set_current_library,
+from pipelex.builder.operations.validate_ops import (
+    validate_all,
+    validate_bundle_file,
+    validate_pipe,
+    validate_pipe_in_bundle,
 )
-from pipelex.pipe_run.dry_run import DryRunStatus, dry_run_pipe, dry_run_pipes
-from pipelex.pipeline.validate_bundle import validate_bundle
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -31,31 +29,7 @@ async def validate_all_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    library_manager = get_library_manager()
-    library_id, library = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    effective_dirs, _ = resolve_library_dirs(library_dirs)
-
-    if effective_dirs:
-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
-
-    pipes = library.pipe_library.get_pipes()
-    for the_pipe in pipes:
-        the_pipe.validate_with_libraries()
-
-    dry_run_results = await dry_run_pipes(pipes=pipes, raise_on_failure=True)
-
-    validated_pipes: list[dict[str, str]] = []
-    for the_pipe in pipes:
-        dry_run_output = dry_run_results.get(the_pipe.code)
-        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
-        validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
-
-    return {
-        "success": True,
-        "validated_pipes": validated_pipes,
-        "total_pipes": len(pipes),
-    }
+    return await validate_all(library_dirs=library_dirs)
 
 
 async def validate_bundle_core(
@@ -74,16 +48,7 @@ async def validate_bundle_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
-
-    validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in result.pipes]
-
-    return {
-        "success": True,
-        "bundle_path": str(bundle_path),
-        "validated_pipes": validated_pipes,
-        "total_pipes": len(result.pipes),
-    }
+    return await validate_bundle_file(bundle_path=bundle_path, library_dirs=library_dirs)
 
 
 async def validate_pipe_core(
@@ -102,22 +67,7 @@ async def validate_pipe_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    set_current_library(library_id=library_id)
-    effective_dirs, _ = resolve_library_dirs(library_dirs)
-
-    if effective_dirs:
-        library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
-
-    the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
-
-    return {
-        "success": True,
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
-        "total_pipes": 1,
-    }
+    return await validate_pipe(pipe_code=pipe_code, library_dirs=library_dirs)
 
 
 async def validate_pipe_in_bundle_core(
@@ -141,17 +91,8 @@ async def validate_pipe_in_bundle_core(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    # Validate the bundle to load all its pipes into the library
-    # This ensures all dependencies are available
-    await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
-
-    # Now get the specific pipe and dry-run only that one
-    the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
-
-    return {
-        "success": True,
-        "bundle_path": str(bundle_path),
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
-        "total_pipes": 1,
-    }
+    return await validate_pipe_in_bundle(
+        bundle_path=bundle_path,
+        pipe_code=pipe_code,
+        library_dirs=library_dirs,
+    )

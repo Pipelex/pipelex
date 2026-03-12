@@ -1,13 +1,11 @@
-"""Unit tests for PipeCompose TOML serialization via _pipe_spec_to_toml."""
+"""Unit tests for PipeCompose TOML serialization via pipe_spec_to_toml."""
 
 from typing import Any, ClassVar
 
 import pytest
 
+from pipelex.builder.operations.pipe_ops import pipe_spec_to_toml
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
-from pipelex.cli.agent_cli.commands.pipe_cmd import (
-    _pipe_spec_to_toml,  # noqa: PLC2701 # pyright: ignore[reportPrivateUsage]
-)
 
 
 class _TomlTestCases:
@@ -56,7 +54,7 @@ class _TomlTestCases:
 
 
 class TestPipeComposeToToml:
-    """Tests for _pipe_spec_to_toml with PipeCompose specs."""
+    """Tests for pipe_spec_to_toml with PipeCompose specs."""
 
     @pytest.mark.parametrize(
         ("_test_name", "spec_data"),
@@ -66,14 +64,14 @@ class TestPipeComposeToToml:
             _TomlTestCases.TEMPLATE_MODE,
         ],
     )
-    def test_pipe_spec_to_toml_does_not_crash(
+    def testpipe_spec_to_toml_does_not_crash(
         self,
         _test_name: str,
         spec_data: dict[str, Any],
     ) -> None:
         """All PipeCompose modes should serialize to TOML without errors."""
         pipe_spec = PipeComposeSpec.model_validate({**spec_data, "type": "PipeCompose"})
-        result = _pipe_spec_to_toml(pipe_spec)
+        result = pipe_spec_to_toml(pipe_spec)
         assert isinstance(result, str)
         assert len(result) > 0
 
@@ -81,7 +79,7 @@ class TestPipeComposeToToml:
         """Construct mode should produce a [pipe.<code>.construct] section with inline tables."""
         spec_data = _TomlTestCases.CONSTRUCT_WITH_FROM_MAPPINGS[1]
         pipe_spec = PipeComposeSpec.model_validate({**spec_data, "type": "PipeCompose"})
-        result = _pipe_spec_to_toml(pipe_spec)
+        result = pipe_spec_to_toml(pipe_spec)
 
         assert "[pipe.compose_sheet.construct]" in result
         assert 'score = {from = "analysis.overall_score"}' in result
@@ -94,7 +92,7 @@ class TestPipeComposeToToml:
         """Non-dict values in construct spec should be serialized directly."""
         spec_data = _TomlTestCases.CONSTRUCT_WITH_STATIC_VALUES[1]
         pipe_spec = PipeComposeSpec.model_validate({**spec_data, "type": "PipeCompose"})
-        result = _pipe_spec_to_toml(pipe_spec)
+        result = pipe_spec_to_toml(pipe_spec)
 
         assert "[pipe.compose_report.construct]" in result
         assert 'title = {from = "title"}' in result
@@ -105,7 +103,7 @@ class TestPipeComposeToToml:
         """Template mode should produce target_format and template fields."""
         spec_data = _TomlTestCases.TEMPLATE_MODE[1]
         pipe_spec = PipeComposeSpec.model_validate({**spec_data, "type": "PipeCompose"})
-        result = _pipe_spec_to_toml(pipe_spec)
+        result = pipe_spec_to_toml(pipe_spec)
 
         assert 'target_format = "markdown"' in result
         assert 'template = "Hello @name!"' in result
