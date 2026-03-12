@@ -1,5 +1,18 @@
 # Changelog
 
+## [Unreleased]
+
+## [v0.20.6] - 2026-03-12
+
+### Removed
+
+- **Deprecated `pipelex_inference` backend**: Removed all traces of the legacy backend — config files, enum values, migration logic, deprecation warnings, and documentation admonitions. The transition to `pipelex_gateway` is complete.
+
+### Fixed
+
+- **`pipelex init inference --local`**: Fixed file filter to also copy `.md` files (e.g. Gateway model lists) to the backends directory, not just `.toml` files.
+- **Gateway terms persistence**: Hardened failure handling — when terms acceptance can't be persisted (e.g. unwritable global directory), gateway is now properly disabled in `backends.toml` as a fallback, preventing `GatewayTermsNotAcceptedError` at runtime.
+
 ## [v0.20.5] - 2026-03-09
 
 ### Changed
