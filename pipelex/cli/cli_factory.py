@@ -29,6 +29,7 @@ def make_pipelex_for_cli(
     context: ErrorContext,
     library_dirs: list[str] | list[Path] | None = None,
     needs_inference: bool = True,
+    needs_model_specs: bool | None = None,
 ) -> Pipelex:
     """Initialize Pipelex for CLI commands with proper error handling.
 
@@ -39,6 +40,7 @@ def make_pipelex_for_cli(
         context: The CLI context for error messages.
         library_dirs: The library directories to use for the Pipelex instance.
         needs_inference: When False, skip inference setup (credentials, gateway, telemetry).
+        needs_model_specs: When True, load real model specs even without inference.
 
     Returns:
         Initialized Pipelex instance.
@@ -47,7 +49,9 @@ def make_pipelex_for_cli(
         typer.Exit: If initialization fails with a handled error.
     """
     try:
-        return Pipelex.make(integration_mode=IntegrationMode.CLI, library_dirs=library_dirs, needs_inference=needs_inference)
+        return Pipelex.make(
+            integration_mode=IntegrationMode.CLI, library_dirs=library_dirs, needs_inference=needs_inference, needs_model_specs=needs_model_specs
+        )
     except TelemetryConfigValidationError as exc:
         handle_telemetry_config_validation_error(exc)
     except GatewayTermsNotAcceptedError as exc:

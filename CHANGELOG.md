@@ -4,6 +4,10 @@
 
 ## [v0.20.6] - 2026-03-12
 
+### Added
+
+- **`needs_model_specs` parameter**: New option on `Pipelex.make()` and CLI factories to load real gateway model specs without enabling full inference. Validation commands (`pipelex validate`, `pipelex-agent validate`) now fetch live model specs, improving accuracy of pipe/method/bundle validation.
+
 ### Removed
 
 - **Deprecated `pipelex_inference` backend**: Removed all traces of the legacy backend — config files, enum values, migration logic, deprecation warnings, and documentation admonitions. The transition to `pipelex_gateway` is complete.
