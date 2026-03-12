@@ -60,7 +60,7 @@ def validate_method_cmd(
     if library_dir:
         library_dirs_paths.extend(Path(lib_dir) for lib_dir in library_dir)
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, log_level=ctx.obj["log_level"], needs_inference=False)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs_paths, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
 
     try:
         if pipe:

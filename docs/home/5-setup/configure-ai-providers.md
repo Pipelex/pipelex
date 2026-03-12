@@ -35,15 +35,6 @@ That's it! Your pipelines can now access any supported LLM. See [Gateway Availab
     
     **We collect only technical data** (model names, token counts, latency, error rates). We do **NOT** collect your prompts, completions, or business data. See [Telemetry](./telemetry.md) for details and trade-offs, and our [Privacy Policy](https://go.pipelex.com/privacy-policy) for more.
 
-!!! note "Migration from pipelex_inference"
-    If you were using the deprecated `pipelex_inference` backend, migrate to `pipelex_gateway`:
-
-    1. Get your new Gateway API key at [app.pipelex.com](https://app.pipelex.com/)
-    2. Update your `.env`: set `PIPELEX_GATEWAY_API_KEY` with your new key
-    3. Run `pipelex init` and accept the Gateway terms
-
-    The `pipelex_inference` backend is deprecated and will be removed in a future release.
-
 ### Option 2: Bring Your Own API Keys
 
 Use your existing API keys from LLM providers. This is ideal if you:

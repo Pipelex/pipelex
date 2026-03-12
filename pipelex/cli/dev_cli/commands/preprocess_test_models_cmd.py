@@ -167,8 +167,8 @@ def _collect_all_model_availability() -> dict[str, Any]:
     for backend_file in sorted(backends_dir.glob("*.toml")):
         backend_name = backend_file.stem
 
-        # Skip pipelex_gateway (handled separately) and pipelex_inference (alias)
-        if backend_name in {"pipelex_gateway", "pipelex_inference"}:
+        # Skip pipelex_gateway (handled separately)
+        if backend_name == "pipelex_gateway":
             continue
 
         models_by_type = _extract_models_from_backend_toml(backend_file)

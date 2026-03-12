@@ -239,7 +239,7 @@ def execute_initialization(
             target_backends_dir = target_inference_dir / "backends"
             target_backends_dir.mkdir(parents=True, exist_ok=True)
             for backend_file in os.listdir(template_backends_dir):
-                if backend_file.endswith(".toml"):
+                if backend_file.endswith((".toml", ".md")):
                     src_path = template_backends_dir / backend_file
                     dst_path = target_backends_dir / backend_file
                     shutil.copy2(src_path, dst_path)

@@ -157,6 +157,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self,
         integration_mode: IntegrationMode,
         needs_inference: bool = True,
+        needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -186,10 +187,12 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # for now the only servic is the Pipelex Gateway
         is_pipelex_service_enabled = is_pipelex_gateway_enabled()
 
+        effective_needs_model_specs = needs_model_specs if needs_model_specs is not None else needs_inference
+
         remote_config: RemoteConfig | None = None
         gateway_model_specs: BackendModelSpecs | None = None
         if is_pipelex_service_enabled:
-            if not needs_inference:
+            if not effective_needs_model_specs:
                 # Use dummy config when inference is not needed (for testing without network access)
                 remote_config = RemoteConfigFetcher.make_dummy_remote_config()
                 gateway_model_specs = remote_config.backend_model_specs
@@ -395,6 +398,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         cls,
         integration_mode: IntegrationMode = IntegrationMode.PYTHON,
         needs_inference: bool = True,
+        needs_model_specs: bool | None = None,
         class_registry: ClassRegistryAbstract | None = None,
         secrets_provider: SecretsProviderAbstract | None = None,
         storage_provider: StorageProviderAbstract | None = None,
@@ -422,6 +426,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 content generator and loading backends leniently (skipping those with missing
                 credentials). This skips gateway terms check and model deck validation.
                 Useful for commands like validate/show that don't call inference APIs.
+            needs_model_specs: When True, load real model specs even if needs_inference
+                is False. When None (default), follows needs_inference. Useful for validate
+                commands that need gateway-provided model specs without enabling full inference.
             class_registry: Custom class registry for dynamic loading
             secrets_provider: Custom secrets/credentials provider
             storage_provider: Custom storage backend
@@ -455,6 +462,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             pipelex_instance.setup(
                 integration_mode=integration_mode,
                 needs_inference=needs_inference,
+                needs_model_specs=needs_model_specs,
                 class_registry=class_registry,
                 secrets_provider=secrets_provider,
                 storage_provider=storage_provider,
