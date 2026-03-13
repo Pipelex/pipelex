@@ -1,5 +1,6 @@
 ---
-title: Configuration System
+title: "Configuration System"
+description: "Multi-level TOML configuration for Pipelex: base defaults, project overrides, environment-specific, and run-mode-specific settings with environment variable support."
 ---
 
 # Configuration System

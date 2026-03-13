@@ -1,3 +1,8 @@
+---
+title: "Getting Started — Writing Methods"
+description: "Learn how to write Pipelex AI methods manually. Create pipelines, define concepts, and understand the .mthds language step by step."
+---
+
 # Writing Methods
 
 Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.mthds` language.

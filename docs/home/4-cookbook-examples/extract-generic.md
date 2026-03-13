@@ -1,3 +1,8 @@
+---
+title: "Generic Document Extraction Example"
+description: "Extract content from complex PDF documents containing text and images. This Pipelex pipeline merges extracted content into a single coherent output."
+---
+
 # Example: Generic Document Extraction
 
 This example demonstrates a powerful and generic pipeline for extracting content from complex PDF documents. It can handle documents that contain both text and images, and it merges the extracted content into a single, coherent output.

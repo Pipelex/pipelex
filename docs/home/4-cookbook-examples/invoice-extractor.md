@@ -1,3 +1,8 @@
+---
+title: "Invoice Extractor Example"
+description: "Process PDF invoices with Pipelex: extract key information into structured Invoice objects, generate reports, and track pipeline execution."
+---
+
 # Example: Invoice Extractor
 
 This example provides a comprehensive pipeline for processing invoices. It takes a PDF invoice, extracts key information, and returns a structured `Invoice` object. It also demonstrates how to generate reports and track pipeline execution.

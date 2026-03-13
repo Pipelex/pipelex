@@ -1,3 +1,8 @@
+---
+title: "Cookbook Examples"
+description: "Practical Pipelex examples and ready-to-use recipes: Hello World, OCR, document extraction, invoice processing, image generation, and more."
+---
+
 # Pipelex Cookbook Examples
 
 Welcome to the Pipelex Cookbook!

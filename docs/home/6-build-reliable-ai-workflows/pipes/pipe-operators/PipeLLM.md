@@ -1,3 +1,8 @@
+---
+title: "PipeLLM Operator"
+description: "PipeLLM is Pipelex's core operator for calling LLMs — supports text generation, summarization, classification, structured outputs, vision models, and document processing."
+---
+
 # PipeLLM
 
 `PipeLLM` is the core operator in Pipelex for leveraging Large Language Models (LLMs). It can be used for a wide range of tasks, including text generation, summarization, classification, and structured data extraction.

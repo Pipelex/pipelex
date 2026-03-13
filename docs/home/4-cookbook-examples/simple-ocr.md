@@ -1,3 +1,8 @@
+---
+title: "Simple OCR Example"
+description: "Build a basic OCR pipeline with Pipelex. Extract text from PDF pages and save the content — a fundamental building block for document processing methods."
+---
+
 # Example: Simple OCR
 
 This example demonstrates a basic OCR (Optical Character Recognition) pipeline. It takes a PDF file as input, extracts the text from each page, and saves the content.

@@ -1,5 +1,6 @@
 ---
 title: "What is Pipelex?"
+description: "Pipelex is an open-source language for building repeatable AI methods. Break complex AI tasks into focused steps with semantic typing, structured validation, and 60+ model support."
 ---
 
 ![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_banner_docs_v2.png)

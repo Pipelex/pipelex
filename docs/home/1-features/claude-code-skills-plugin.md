@@ -1,5 +1,6 @@
 ---
-title: Claude Code Skills Plugin
+title: "Claude Code Skills Plugin"
+description: "Build, run, validate, and edit AI methods directly from Claude Code. 10+ slash commands for the full Pipelex method lifecycle using the MTHDS skills plugin."
 ---
 
 # Claude Code Skills Plugin

@@ -1,5 +1,6 @@
 ---
-title: Pipeline Orchestration
+title: "Pipeline Orchestration"
+description: "Build complex AI workflows with pipeline controllers: PipeSequence, PipeParallel, PipeBatch, and PipeCondition — all declared in .mthds files."
 ---
 
 # Pipeline Orchestration

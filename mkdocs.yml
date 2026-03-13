@@ -6,6 +6,7 @@ repo_url: "https://github.com/Pipelex/pipelex"
 repo_name: "Pipelex on GitHub"
 theme:
   name: material
+  language: en
   custom_dir: docs/overrides
   favicon: images/pipelex-favicon-32.png
   logo: https://pipelex-web.s3.amazonaws.com/logo/Pipelex-logo-wot-mono-560x176.png
@@ -28,7 +29,7 @@ theme:
       icon: material/weather-sunny
       name: Switch to light mode
 
-copyright: "© 2025 Evotis S.A.S. <br/>Pipelex is a trademark of Evotis S.A.S."
+copyright: "© 2025–2026 Evotis S.A.S. <br/>Pipelex is a trademark of Evotis S.A.S."
 
 extra:
   social:
@@ -49,7 +50,8 @@ extra:
     provider: mike
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\-\.]+'
   - meta-manager
   - glightbox:
       touchNavigation: true

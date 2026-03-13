@@ -1,5 +1,6 @@
 ---
-title: Features
+title: "Pipelex Features"
+description: "Explore all Pipelex capabilities: declarative AI methods, 60+ model access, document extraction, image generation, pipeline orchestration, CLI tools, and production monitoring."
 ---
 
 # Pipelex Features

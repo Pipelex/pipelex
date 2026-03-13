@@ -1,5 +1,6 @@
 ---
-title: CLI
+title: "CLI"
+description: "The Pipelex command-line interface for developing, validating, and running AI methods. Covers login, init, build, validate, run, graph, show, and more."
 ---
 
 # Command-Line Interface

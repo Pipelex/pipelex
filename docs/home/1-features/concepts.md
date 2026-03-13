@@ -1,5 +1,6 @@
 ---
-title: Concepts & Structured Types
+title: "Concepts & Structured Types"
+description: "Learn about Pipelex Concepts — the semantic typing system that defines what kind of data flows through your AI pipelines, including native types, inline structures, and Python classes."
 ---
 
 # Concepts & Structured Types

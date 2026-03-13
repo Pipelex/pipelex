@@ -1,5 +1,6 @@
 ---
-title: Pipelex Gateway & Model Access
+title: "Pipelex Gateway & Model Access"
+description: "Access 60+ AI models through the Pipelex Gateway with a single API key, or bring your own keys for direct provider access. Supports OpenAI, Anthropic, Mistral, and more."
 ---
 
 # Pipelex Gateway & Model Access

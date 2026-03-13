@@ -1,3 +1,8 @@
+---
+title: "Hello World Example"
+description: "The Hello World of Pipelex — a simple pipeline demonstrating basic concepts. Verify your installation and get a first taste of how Pipelex works."
+---
+
 # Example: Hello World
 
 This is the "Hello World" of Pipelex, a simple pipeline that demonstrates the basic concepts of Pipelex.

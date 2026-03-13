@@ -1,5 +1,6 @@
 ---
-title: Document Extraction
+title: "Document Extraction"
+description: "Multi-provider OCR and document processing with Mistral OCR, Azure Document Intelligence, docling, and Deepseek-OCR. PDF processing, layout analysis, and table recognition."
 ---
 
 # Document Extraction

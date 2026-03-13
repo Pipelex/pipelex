@@ -1,5 +1,6 @@
 ---
-title: Telemetry & Observability
+title: "Telemetry & Observability"
+description: "Production monitoring for Pipelex AI methods with Langfuse, OpenTelemetry, and PostHog integration. Track costs, latency, errors, and execution patterns."
 ---
 
 # Telemetry & Observability

@@ -1,5 +1,6 @@
 ---
-title: Web Search
+title: "Web Search"
+description: "Structured web search integrated into Pipelex pipelines. PipeSearch returns results with source citations, ready for downstream LLM processing."
 ---
 
 # Web Search

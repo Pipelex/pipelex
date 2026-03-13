@@ -1,5 +1,6 @@
 ---
-title: Image Generation
+title: "Image Generation"
+description: "Generate images from text prompts using FLUX, GPT Image, and other providers. PipeImgGen integrates text-to-image generation directly into your Pipelex pipelines."
 ---
 
 # Image Generation

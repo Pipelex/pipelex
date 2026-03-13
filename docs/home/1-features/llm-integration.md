@@ -1,5 +1,6 @@
 ---
-title: LLM Integration
+title: "LLM Integration"
+description: "Pipelex LLM integration: text generation, structured outputs, vision models, prompting styles, and system prompt inheritance. Write once, run on any supported model."
 ---
 
 # LLM Integration

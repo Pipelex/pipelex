@@ -1,5 +1,6 @@
 ---
-title: MTHDS Language
+title: "MTHDS Language"
+description: "MTHDS is a declarative, TOML-based file format for defining AI methods without writing code. Method logic in .mthds files, execution by the Pipelex runtime."
 ---
 
 # MTHDS Language
