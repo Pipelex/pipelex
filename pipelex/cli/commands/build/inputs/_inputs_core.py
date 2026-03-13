@@ -116,7 +116,9 @@ def execute_generate_inputs(
     telemetry_command_label: str = f"{COMMAND} {SUB_COMMAND_INPUTS}",
 ) -> None:
     """Synchronous entry point wrapping the async inputs generation with Pipelex setup/teardown."""
-    pipelex_instance = make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS, library_dirs=library_dir, needs_inference=False)
+    pipelex_instance = make_pipelex_for_cli(
+        context=ErrorContext.VALIDATION_BEFORE_BUILD_INPUTS, library_dirs=library_dir, needs_inference=False, needs_model_specs=True
+    )
 
     try:
         with get_telemetry_manager().telemetry_context():
