@@ -20,7 +20,7 @@ Refined concepts make your pipeline's intent explicit:
 ```toml
 # ❌ Less clear
 [pipe.process_invoice]
-inputs = { invoice = "PDF" }
+inputs = { invoice = "Document" }
 
 # ✅ More clear
 [pipe.process_invoice]

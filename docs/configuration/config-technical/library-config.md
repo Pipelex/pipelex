@@ -401,7 +401,7 @@ Pipelex loads your pipelines in a specific order to ensure dependencies are reso
 
 ### 2. Concept Loading
 
-- Loads native concepts (Text, Image, PDF, etc.)
+- Loads native concepts (Text, Image, Document, etc.)
 - Loads custom concepts from `.mthds` files
 - Validates concept definitions and relationships
 - Links concepts to Python structure classes by name

@@ -1,5 +1,8 @@
 # Understanding Multiplicity
 
+!!! tip "MTHDS Standard Reference"
+    Multiplicity is part of the MTHDS open standard. For the authoritative language specification, see [Multiplicity](https://mthds.ai/latest/language/multiplicity/) on mthds.ai. This page documents Pipelex-specific behavior and usage.
+
 Multiplicity in Pipelex defines how many items a particular stuff can comprise in a particular context. This applies to any of the pipe input variables and also to the output of the pipe. This idea is fundamental to building flexible AI methods that can handle both single items and collections.
 
 This guide explains the philosophy behind multiplicity in Pipelex and how to use it effectively in your pipelines.

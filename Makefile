@@ -818,9 +818,22 @@ define ROOT_INDEX_HTML
     <title>Redirecting to latest documentation...</title>
     <meta http-equiv="refresh" content="0;url=/latest/">
     <link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #2e303e;
+            color: #ccc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        a { color: #45BF9F; text-decoration: none; }
+    </style>
 </head>
 <body>
-    <p>Redirecting to <a href="/latest/">latest documentation</a>...</p>
+    <p>Redirecting to <a href="/latest/">latest documentation</a>&#8230;</p>
 </body>
 </html>
 endef

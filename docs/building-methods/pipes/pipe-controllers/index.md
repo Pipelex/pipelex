@@ -1,5 +1,8 @@
 # Pipe Controllers
 
+!!! tip "MTHDS Standard Reference"
+    Pipe controllers are part of the MTHDS open standard. For the authoritative language specification, see [Pipes & Controllers](https://mthds.ai/latest/language/pipes-controllers/) on mthds.ai. This page documents Pipelex-specific behavior and usage.
+
 Pipe controllers are the orchestrators of a Pipelex pipeline. While [Pipe Operators](../pipe-operators/index.md) perform the work, pipe controllers define the method and manage the execution logic. They allow you to run other pipes in sequence, in parallel, or conditionally.
 
 ## Core Controllers

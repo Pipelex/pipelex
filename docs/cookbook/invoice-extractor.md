@@ -63,7 +63,7 @@ The entire method is defined in a MTHDS file. This declarative approach makes th
 [pipe.process_invoice]
 type = "PipeSequence"
 description = "Process relevant information from an invoice"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Invoice"
 steps = [
     { pipe = "extract_text_from_image", result = "invoice_pages" },
@@ -73,7 +73,7 @@ steps = [
 [pipe.extract_text_from_image]
 type = "PipeExtract"
 description = "Extract page contents from an image"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Page"
 page_views = true
 model = "base_extract_mistral"

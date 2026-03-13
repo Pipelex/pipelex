@@ -81,7 +81,7 @@ The generated Python file includes:
 
 ## Input Type Handling
 
-- **Native concepts** (Text, Image, PDF, etc.) - Automatically generates appropriate content objects
+- **Native concepts** (Text, Image, Document, etc.) - Automatically generates appropriate content objects
 - **Custom concepts** - Recursively generates the structure with example values
 - **Structured content** - Creates example data matching the concept's fields
 

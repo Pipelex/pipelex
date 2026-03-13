@@ -1,5 +1,8 @@
 # Pipe Operators
 
+!!! tip "MTHDS Standard Reference"
+    Pipe operators are part of the MTHDS open standard. For the authoritative language specification, see [Pipes & Operators](https://mthds.ai/latest/language/pipes-operators/) on mthds.ai. This page documents Pipelex-specific behavior and usage.
+
 Pipe operators are the fundamental building blocks in Pipelex, representing a single, focused task. They are the "verbs" of your pipeline that perform the actual work.
 
 Each operator specializes in a specific kind of action, from interacting with Large Language Models to executing custom Python code. You combine these operators using [Pipe Controllers](../pipe-controllers/index.md) to create complex methods.

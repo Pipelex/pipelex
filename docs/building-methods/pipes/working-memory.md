@@ -1,5 +1,8 @@
 # Working Memory
 
+!!! tip "MTHDS Standard Reference"
+    Working memory is part of the MTHDS open standard. For the authoritative language specification, see [Working Memory](https://mthds.ai/latest/language/working-memory/) on mthds.ai. This page documents Pipelex-specific behavior and usage.
+
 The **Working Memory** is the mechanism that enables data flow between pipes in your pipeline. It acts as a **temporary** storage space that exists for the duration of a single pipeline run.
 
 ## How Data Flows Between Pipes

@@ -4,7 +4,7 @@ The `PipeExtract` operator performs Optical Character Recognition (OCR) on image
 
 ## How it works
 
-`PipeExtract` takes a single input, which must be either an `Image` or a `Pdf`. It processes the document page by page and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from a single page.
+`PipeExtract` takes a single input, which must be a `Document` or an `Image` (or a concept that refines one of them). It processes the document page by page and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from a single page.
 
 The output is always a list, even if the input is a single image (in which case the list will contain just one item).
 
@@ -43,7 +43,7 @@ OCR presets are defined in your model deck configuration and can include paramet
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string  | The type of the pipe: `PipeExtract`                                                                          | Yes      |
 | `description`               | string  | A description of the OCR operation.                                                                   | Yes      |
-| `inputs`                    | Fixed  | The value is either of concept `Image` or `Pdf`.                                                     | Yes       |
+| `inputs`                    | Fixed  | The value must be of concept `Document` or `Image` (or a concept that refines one of them).                                                     | Yes       |
 | `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
 | `max_page_images`           | integer or null | Maximum number of images to extract from pages: `null` (or omit) for unlimited, `0` for no images, or a positive integer to limit. Defaults to the value in your Extract model preset. | No       |
 | `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |

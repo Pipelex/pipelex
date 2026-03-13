@@ -1,5 +1,8 @@
 # Understanding Domains
 
+!!! tip "MTHDS Standard Reference"
+    Domains are part of the MTHDS open standard. For the authoritative language specification, see [Domains](https://mthds.ai/latest/language/domains/) on mthds.ai. This page documents Pipelex-specific behavior and usage.
+
 A domain in Pipelex is a **semantic namespace** that organizes related concepts and pipes. It's declared at the top of every `.mthds` file and serves as an identifier for grouping related functionality.
 
 ## What is a Domain?

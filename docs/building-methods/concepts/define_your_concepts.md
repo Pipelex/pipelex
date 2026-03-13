@@ -1,5 +1,8 @@
 # Defining Your Concepts
 
+!!! tip "MTHDS Standard Reference"
+    Concepts are part of the MTHDS open standard. For the authoritative language specification, see [Concepts](https://mthds.ai/latest/language/concepts/) on mthds.ai. This page documents Pipelex-specific behavior and usage.
+
 Concepts are the foundation of reliable AI methods. They define what flows through your pipes—not just as data types, but as meaningful pieces of knowledge with clear boundaries and validation rules.
 
 ## Writing Concept Definitions
@@ -126,12 +129,12 @@ For advanced features like custom validation, computed properties, or reusable b
 
 ## Refining Concepts
 
-You can create more specific versions of existing concepts through refinement. For example, an `Invoice` is a specific kind of `PDF`:
+You can create more specific versions of existing concepts through refinement. For example, an `Invoice` is a specific kind of `Document`:
 
 ```toml
 [concept.Invoice]
 description = "A commercial document issued by a seller to a buyer"
-refines = "PDF"
+refines = "Document"
 ```
 
 The refined concept inherits the structure of the base concept while adding semantic specificity.
@@ -140,7 +143,7 @@ The refined concept inherits the structure of the base concept while adding sema
 
 ## Native Concepts
 
-Pipelex includes several built-in native concepts that cover common data types: `Text`, `Image`, `PDF`, `TextAndImages`, `Number`, `Page`, `Dynamic`, and `Anything`.
+Pipelex includes 12 built-in native concepts: `Text`, `Image`, `Document`, `Html`, `TextAndImages`, `Number`, `ImgGenPrompt`, `Page`, `Dynamic`, `JSON`, `SearchResult`, and `Anything`.
 
 These concepts are automatically available in all pipelines—no setup required. You can use them directly in your pipes or refine them to create more specific concepts.
 

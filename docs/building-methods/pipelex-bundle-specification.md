@@ -1,5 +1,8 @@
 # Pipelex Bundle Specification
 
+!!! tip "MTHDS Standard Reference"
+    The `.mthds` bundle format is defined by the MTHDS open standard. For the authoritative language specification, see [Bundles](https://mthds.ai/latest/language/bundles/) on mthds.ai. This page documents Pipelex-specific behavior and usage.
+
 A **Pipelex bundle** is the fundamental unit of organization in Pipelex. It's a single `.mthds` file that defines a cohesive set of concepts and pipes for a specific domain of work.
 
 ## What is a Pipelex Bundle?
@@ -50,7 +53,6 @@ Every bundle **must** declare a domain. Only the `domain` field is mandatory; al
 ```toml
 domain = "invoice_processing"
 description = "Tools for extracting and validating invoice data"
-source = "path/to/invoice_processing.mthds"
 system_prompt = "You are an expert in financial document processing."
 main_pipe = "extract_and_validate_invoice"
 ```
@@ -59,7 +61,6 @@ main_pipe = "extract_and_validate_invoice"
 
 - **`domain`** (required) - The unique identifier for this bundle's namespace
 - **`description`** (Optional) - A human-readable description of what this bundle does
-- **`source`** (Optional) - The file path of the bundle (usually set automatically)
 - **`system_prompt`** (Optional) - A system prompt that applies to all `PipeLLM` operators in this bundle
 - **`main_pipe`** (Optional) - The default pipe to execute when no specific pipe is requested when running the bundle (covered in section 2)
 
@@ -141,7 +142,7 @@ Pipes are the processing units that transform data. Like concepts, they're optio
 [pipe.extract_invoice]
 type = "PipeExtract"
 description = "Extract text and images from an invoice PDF"
-inputs = { document = "PDF" }
+inputs = { document = "Document" }
 output = "Page"
 ```
 See more about designing pipes in [Designing Pipelines](./pipes/index.md).
@@ -213,7 +214,7 @@ domain = "accounts_payable"
 [pipe.process_vendor_invoice]
 type = "PipeSequence"
 description = "Process a vendor invoice end-to-end"
-inputs = { pdf_document = "PDF" }
+inputs = { pdf_document = "Document" }
 output = "PaymentSchedule"
 steps = [
     # Call pipe from invoice_processing domain

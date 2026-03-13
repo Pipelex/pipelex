@@ -29,6 +29,8 @@ Here are all the native concepts you can use out of the box:
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
 | `Dynamic` | A dynamic concept that adapts to context | `DynamicContent` |
 | `JSON` | A JSON object | `JSONContent` |
+| `Html` | HTML content with inner HTML and CSS class | `HtmlContent` |
+| `ImgGenPrompt` | A prompt for image generation | *No specific implementation* |
 | `SearchResult` | A web search result with answer and sources | `SearchResultContent` |
 | `Anything` | Any type of content | *No specific implementation* |
 
@@ -151,6 +153,29 @@ A concept that represents a JSON object. This enables pipes to receive as input 
 class JSONContent(StuffContent):
     json_obj: dict[str, Any]
 ```
+
+### HtmlContent
+
+Represents HTML content with styling:
+
+```python
+class HtmlContent(StuffContent):
+    inner_html: str
+    css_class: str
+```
+
+**Fields:**
+
+- `inner_html`: The inner HTML of the content
+- `css_class`: The CSS class applied to the wrapping element
+
+**Use for:** Rendered HTML fragments, styled content blocks, HTML-based reports.
+
+### ImgGenPrompt
+
+A prompt for image generation. This concept is used as an intermediate representation in image generation pipelines (e.g., with `PipeImgGen`). It does not have a dedicated content class.
+
+**Use for:** Storing and passing image generation prompts between pipes.
 
 ### SearchResultContent
 
