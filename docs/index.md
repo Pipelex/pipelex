@@ -56,8 +56,8 @@ Pipelex solves these problems by:
 
 Ready to get started?
 
-- [:material-rocket-launch: Get Started](./home/2-get-started/write-methods-manually.md){ .md-button .md-button--primary }
-- [:material-book-open: Read the Know-How Graph](./home/3-understand-pipelex/viewpoint.md){ .md-button }
+- [:material-rocket-launch: Get Started](./get-started/write-methods-manually.md){ .md-button .md-button--primary }
+- [:material-book-open: Read the Know-How Graph](./viewpoint/viewpoint.md){ .md-button }
 
 **Explore Examples:**
 

@@ -453,5 +453,5 @@ Pages:
 
 ## Next Steps
 
-- [:material-book-open: Learn about PipeLLM](../home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md){ .md-button }
+- [:material-book-open: Learn about PipeLLM](../building-methods/pipes/pipe-operators/PipeLLM.md){ .md-button }
 - [:material-sitemap: Architecture Overview](./architecture-overview.md){ .md-button }

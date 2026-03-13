@@ -15,9 +15,33 @@
         // Check if we're on a version's root 404 page (exactly /{version}/404.html)
         const isVersionRoot404 = segments.length === 2 && segments[1] === '404.html';
 
+        // Rewrite old URL prefixes to new clean paths
+        const pathRewrites = {
+            'home/1-features/': 'features/',
+            'home/2-get-started/': 'get-started/',
+            'home/3-understand-pipelex/': 'viewpoint/',
+            'home/4-cookbook-examples/': 'cookbook/',
+            'home/5-setup/': 'setup/',
+            'home/6-build-reliable-ai-workflows/': 'building-methods/',
+            'home/7-configuration/': 'configuration/',
+            'home/8-analytics/': 'analytics/',
+            'home/9-tools/': 'tools/',
+            'home/10-advanced-customizations/': 'advanced/',
+        };
+
+        function rewritePath(p) {
+            for (const [oldPrefix, newPrefix] of Object.entries(pathRewrites)) {
+                if (p.includes(oldPrefix)) {
+                    return p.replace(oldPrefix, newPrefix);
+                }
+            }
+            return p;
+        }
+
         if (!hasVersion) {
-            // No version in URL, redirect to /latest/...
-            const newUrl = '/latest' + path + window.location.search + window.location.hash;
+            // No version in URL, rewrite old paths then redirect to /latest/...
+            const rewritten = rewritePath(path);
+            const newUrl = '/latest' + rewritten + window.location.search + window.location.hash;
             window.location.replace(newUrl);
         } else if (isVersionRoot404 && firstSegment !== 'latest') {
             // We tried a version's 404.html but it doesn't exist (invalid version)

@@ -111,11 +111,11 @@ Get **free credits** with a single API key for LLMs, document extraction, and im
 
 ### Option B: Bring Your Own Keys
 
-Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/).
+Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
 
 ### Option C: Local AI
 
-Run models locally with Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/).
+Run models locally with Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
 
 
 # Example: CV Batch Screening
@@ -535,12 +535,12 @@ pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,
 
 Pipelex supports two independent telemetry streams:
 
-- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#gateway-telemetry-pipelex-controlled)
-- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#custom-telemetry-user-controlled)
+- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/latest/setup/telemetry/#gateway-telemetry-pipelex-controlled)
+- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/latest/setup/telemetry/#custom-telemetry-user-controlled)
 
 **We only collect technical data** (model names, token counts, latency, error rates) — never your prompts, completions, or business data. Set `DO_NOT_TRACK=1` to disable all telemetry (note: Gateway requires telemetry to function).
 
-For more details, see the [Telemetry Documentation](https://docs.pipelex.com/home/5-setup/telemetry/) or read our [Privacy Policy](https://go.pipelex.com/privacy-policy).
+For more details, see the [Telemetry Documentation](https://docs.pipelex.com/latest/setup/telemetry/) or read our [Privacy Policy](https://go.pipelex.com/privacy-policy).
 
 ## Contributing
 

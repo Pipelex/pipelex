@@ -2,7 +2,7 @@
 
 This page is for **contributors**: it explains where Pipelex defaults live, how configuration is merged at runtime, and where to change the behavior in code.
 
-For the user-facing configuration guide, see [Configuration Overview](../home/7-configuration/index.md).
+For the user-facing configuration guide, see [Configuration Overview](../configuration/index.md).
 
 ## Mental model (for contributors)
 
