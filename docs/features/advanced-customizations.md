@@ -1,5 +1,6 @@
 ---
 title: Advanced Customizations
+description: "Customize Pipelex with dependency injection — plug in your own secrets, storage, reporting, and content generation providers without modifying the framework."
 ---
 
 # Advanced Customizations

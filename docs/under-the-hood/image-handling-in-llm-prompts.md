@@ -1,5 +1,6 @@
 ---
 title: "Image Handling in LLM Prompts"
+description: "How Pipelex routes images to LLM calls — a template-driven inclusion model where prompts control exactly which images are sent."
 ---
 
 # Image Handling in LLM Prompts

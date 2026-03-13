@@ -1,3 +1,7 @@
+---
+description: "Domains organize concepts and pipes into semantic namespaces within .mthds files. Learn how to structure declarative AI workflows in Pipelex."
+---
+
 # Understanding Domains
 
 !!! tip "MTHDS Standard Reference"

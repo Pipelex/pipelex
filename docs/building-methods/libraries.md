@@ -1,3 +1,7 @@
+---
+description: "Libraries collect domains, concepts, and pipes into a unified runtime context. Understand how Pipelex loads and resolves your Methods."
+---
+
 # Libraries
 
 A **Library** in Pipelex is a complete collection of domains, concepts, and pipes that can be loaded and used together. It represents the full set of Pipelex definitions available for execution within a specific context, typically for a single pipeline run.

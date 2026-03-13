@@ -1,3 +1,7 @@
+---
+description: "Generate ready-to-use Python code for running a pipe, complete with imports and example inputs from your .mthds bundles."
+---
+
 # Build Runner
 
 Generate Python code to run a pipe with all necessary imports and example inputs.

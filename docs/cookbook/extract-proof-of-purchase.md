@@ -1,3 +1,7 @@
+---
+description: "Build a pipeline that extracts structured data from receipts and invoices using declarative AI workflows and .mthds files."
+---
+
 # Example: Proof of Purchase Extraction
 
 This example demonstrates a pipeline designed to extract structured data from a proof of purchase, such as a receipt or an invoice.

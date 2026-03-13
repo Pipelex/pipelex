@@ -1,3 +1,7 @@
+---
+description: "Why AI agents need the MTHDS open standard — the Know-How Graph philosophy behind executable AI methods and the Pipelex runtime."
+---
+
 ### This is our viewpoint, this is why we built [Pipelex](https://pipelex.com).
 
 Web version: https://knowhowgraph.com/

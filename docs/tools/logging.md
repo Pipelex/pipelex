@@ -1,3 +1,7 @@
+---
+description: "Explore Pipelex logging — custom log levels like VERBOSE and DEV, Rich console formatting, and emoji support for better debugging."
+---
+
 # Pipelex Logging System
 
 ## Overview

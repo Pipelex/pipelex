@@ -1,3 +1,7 @@
+---
+description: "Set execution parameters for pipes, including stack depth limits and runtime behavior for nested pipe calls in your Pipelex project."
+---
+
 # Pipe Run Configuration
 
 The `PipeRunConfig` class controls execution parameters for pipes in Pipelex.

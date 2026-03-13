@@ -1,3 +1,7 @@
+---
+description: "Use the pipelex-agent CLI for machine-oriented JSON output — designed for AI agents, IDE extensions, and automation toolchains."
+---
+
 # Agent CLI (`pipelex-agent`)
 
 The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. All output is structured JSON written to stdout (success) or stderr (error), with no Rich formatting or interactive prompts.

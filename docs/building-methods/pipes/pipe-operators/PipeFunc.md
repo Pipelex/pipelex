@@ -1,3 +1,7 @@
+---
+description: "Run custom Python functions inside Pipelex pipelines with PipeFunc. Integrate business logic, external APIs, and data transformations."
+---
+
 # PipeFunc
 
 The `PipeFunc` operator provides an essential escape hatch, allowing you to execute arbitrary Python code from within a pipeline. This is useful for custom data manipulation, complex logic, or integrating with external services not supported by other operators.

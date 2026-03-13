@@ -1,3 +1,7 @@
+---
+description: "Extract tasks, dates, and dependencies from Gantt chart images using executable AI methods — a step-by-step Pipelex cookbook example."
+---
+
 # Example: Gantt Chart Extraction
 
 This example showcases the ability of Pipelex to extract structured information from images. In this case, it processes an image of a Gantt chart and extracts the tasks, dates, and dependencies.

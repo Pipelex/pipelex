@@ -1,13 +1,13 @@
 ---
 title: "What is Pipelex?"
-description: "Pipelex is an open-source language for building repeatable AI methods. Break complex AI tasks into focused steps with semantic typing, structured validation, and 60+ model support."
+description: "Pipelex is an open-source language for building executable AI methods. Break AI tasks into focused steps with semantic typing and 60+ model support."
 ---
 
 ![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_banner_docs_v2.png)
 
 # What is Pipelex?
 
-Pipelex is an open-source language that enables agents to build and run **repeatable AI methods**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+Pipelex is an open-source language that enables agents to build and run **executable AI methods**. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
 
 Each pipe processes information using **Concepts** (typing with meaning) to ensure your pipelines make sense. The Pipelex language (`.mthds` files) is simple and human-readable, even for non-technical users.
 

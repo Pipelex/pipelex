@@ -1,5 +1,6 @@
 ---
 title: plxt Formatter & Linter
+description: "Format and lint .mthds files with plxt, a fast Rust-based tool with schema validation. Catch structural errors in declarative AI workflows before runtime."
 ---
 
 # plxt Formatter & Linter

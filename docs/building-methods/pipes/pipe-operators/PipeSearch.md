@@ -1,3 +1,7 @@
+---
+description: "PipeSearch queries the web and returns structured results with citations. Add real-time knowledge retrieval to your executable AI methods."
+---
+
 # PipeSearch
 
 The `PipeSearch` operator searches the web using a configurable search provider and returns structured results with an answer and source citations.

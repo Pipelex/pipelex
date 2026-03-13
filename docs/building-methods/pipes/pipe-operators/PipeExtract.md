@@ -1,3 +1,7 @@
+---
+description: "PipeExtract performs OCR on images and PDFs to extract text and embedded visuals. Turn documents into structured data for your AI methods."
+---
+
 # PipeExtract
 
 The `PipeExtract` operator performs Optical Character Recognition (OCR) on images and PDF documents. It extracts text, embedded images, and provides full-page renderings.

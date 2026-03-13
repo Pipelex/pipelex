@@ -1,3 +1,7 @@
+---
+description: "Generate optimized tweets with style transfer using Pipelex — define your writing workflow once in .mthds files, then run it reliably."
+---
+
 # Example: Tweet Optimizer
 
 This example demonstrates how to create a pipeline that takes a draft of a tweet and a desired writing style, and then generates an optimized tweet. This is a practical example of "style transfer" for text.

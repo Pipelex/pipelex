@@ -1,3 +1,7 @@
+---
+description: "Initialize your Pipelex project configuration — create .pipelex directory structure, set up backends, and configure telemetry destinations."
+---
+
 # Init Commands
 
 Initialize project configuration files in your project's `.pipelex` directory.

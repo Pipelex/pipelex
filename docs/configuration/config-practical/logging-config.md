@@ -1,3 +1,7 @@
+---
+description: "Fine-tune Pipelex logging levels, Rich console output, and message formatting through TOML configuration settings in pipelex.toml."
+---
+
 # Logging Configuration
 
 Configuration section: `[pipelex.log_config]`

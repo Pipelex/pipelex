@@ -1,3 +1,7 @@
+---
+description: "Define typed concepts in .mthds files to give your AI methods clear data boundaries, validation rules, and structured outputs."
+---
+
 # Defining Your Concepts
 
 !!! tip "MTHDS Standard Reference"

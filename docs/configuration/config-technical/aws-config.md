@@ -1,3 +1,7 @@
+---
+description: "Configure AWS authentication for Pipelex — choose between environment variables or a custom secret provider for AWS service access."
+---
+
 # AWS Configuration
 
 Configuration section: `[pipelex.aws_config]`

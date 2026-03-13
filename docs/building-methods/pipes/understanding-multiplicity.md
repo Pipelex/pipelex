@@ -1,3 +1,7 @@
+---
+description: "Multiplicity defines whether a pipe handles single items or collections. Build flexible Methods that scale from one document to thousands."
+---
+
 # Understanding Multiplicity
 
 !!! tip "MTHDS Standard Reference"

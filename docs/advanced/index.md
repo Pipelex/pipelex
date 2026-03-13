@@ -1,3 +1,7 @@
+---
+description: "Extend Pipelex through dependency injection — swap in custom secrets providers, storage backends, observers, and reporting delegates."
+---
+
 # Dependency Injection
 
 ## Overview

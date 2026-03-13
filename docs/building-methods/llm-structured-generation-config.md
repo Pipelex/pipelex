@@ -1,3 +1,7 @@
+---
+description: "Control how Pipelex generates structured outputs from LLMs, including the two-step text-then-structure approach for typed JSON schemas."
+---
+
 # Structure Configuration
 
 The `StructureConfig` class controls how Pipelex handles structural processing of content, particularly in LLM-based pipes.

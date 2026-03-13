@@ -1,3 +1,7 @@
+---
+description: "Manage method package manifests — scan .mthds files, discover domains and pipes, and generate METHODS.toml for distribution."
+---
+
 # Pkg Commands
 
 Manage package manifests and dependencies for your Pipelex project.

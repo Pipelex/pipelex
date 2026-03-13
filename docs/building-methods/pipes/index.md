@@ -1,3 +1,7 @@
+---
+description: "Design composable pipelines by combining pipe operators and controllers. Break complex AI tasks into testable, deterministic units."
+---
+
 # Designing Pipelines
 
 In Pipelex, a pipeline is not just a rigid sequence of steps; it's a dynamic and intelligent method built by composing individual, reusable components called **pipes**. This approach allows you to break down complex AI tasks into manageable, testable, and reliable units.

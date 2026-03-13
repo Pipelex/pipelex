@@ -1,3 +1,7 @@
+---
+description: "Configure dry-run behavior in Pipelex — set mock generation rules, truncation limits, image URLs, and allowed-to-fail pipes via TOML."
+---
+
 # Dry Run Configuration
 
 The `DryRunConfig` class controls how Pipelex behaves during dry runs.

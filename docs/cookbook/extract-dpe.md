@@ -1,3 +1,7 @@
+---
+description: "Extract structured data from French energy performance diagnostics (DPE) using Pipelex declarative AI workflows and typed schemas."
+---
+
 # Example: DPE Extraction
 
 This example demonstrates how to extract information from a French "Diagnostic de Performance Énergétique" (DPE) document. This is a specialized document, and the pipeline is tailored to its specific structure.

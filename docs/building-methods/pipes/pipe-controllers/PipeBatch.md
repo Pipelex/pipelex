@@ -1,3 +1,7 @@
+---
+description: "PipeBatch maps a single pipe over a list of items in parallel. Process collections of documents or records efficiently in Pipelex pipelines."
+---
+
 # PipeBatch
 
 The `PipeBatch` controller provides a powerful "map" operation for your pipelines. It takes a list of items as input and runs the same pipe on each item in the list, executing them all in parallel for maximum efficiency.

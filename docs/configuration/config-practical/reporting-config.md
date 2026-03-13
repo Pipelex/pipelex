@@ -1,3 +1,7 @@
+---
+description: "Manage cost reporting for LLM usage, OCR processing, and other operations — configure console output and report file destinations."
+---
+
 # Reporting Configuration
 
 Configuration section: `[pipelex.reporting_config]`

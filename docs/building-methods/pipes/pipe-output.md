@@ -1,3 +1,7 @@
+---
+description: "Every pipe produces a Stuff object stored in working memory. Learn how to access, inspect, and use pipeline outputs in Pipelex."
+---
+
 # Pipe Output
 
 When you execute a pipeline, each pipe produces a `Stuff` that is automatically stored in the [Working Memory](working-memory.md). The final output of the pipeline execution is accessible through a `PipeOutput` object.

@@ -1,3 +1,7 @@
+---
+description: "Package your .mthds bundles with a METHODS.toml manifest to version, share, and control visibility of composable AI methods."
+---
+
 # Packages
 
 A **package** is a self-contained collection of `.mthds` bundles with a `METHODS.toml` manifest at the root. The manifest gives your project an identity, declares dependencies on other packages, and controls which pipes are visible to the outside world.

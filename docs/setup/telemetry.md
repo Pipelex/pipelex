@@ -1,3 +1,7 @@
+---
+description: "Understand Pipelex telemetry options — what data is collected, how to opt out, and how privacy works for gateway and anonymous usage streams."
+---
+
 # Telemetry
 
 Pipelex supports two independent telemetry streams that serve different purposes. Understanding how they work helps you make informed decisions about data collection.

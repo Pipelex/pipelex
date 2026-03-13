@@ -1,3 +1,3 @@
 image: https://d2cinlfp2qnig1.cloudfront.net/docs/pipelex_banner_1200x630.png?v=1
-description: Docs for Pipelex, open-source language for repeatable AI workflows.
-keywords: [pipelex, ai, llm, workflows, knowledge pipelines, pipelines, deterministic, repeatable, framework, language]
+description: "Pipelex documentation — build executable AI methods with structured validation, pipeline orchestration, and 60+ model support."
+keywords: [pipelex, ai, llm, methods, executable methods, pipelines, deterministic, structured outputs, declarative, workflows]

@@ -1,3 +1,7 @@
+---
+description: "Configure LLM handles, presets, and model decks in Pipelex to optimize cost, latency, and quality across your executable AI methods."
+---
+
 # LLM Settings Guide
 
 ## Overview

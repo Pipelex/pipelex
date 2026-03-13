@@ -1,3 +1,7 @@
+---
+description: "Generate Pydantic models from concept definitions in your .mthds files — turn declarative types into Python code automatically."
+---
+
 # Build Structures
 
 Generate Pydantic models from your concept definitions.

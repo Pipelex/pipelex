@@ -1,3 +1,7 @@
+---
+description: "Generate runner code, Pydantic structures, and JSON templates from your pipeline definitions using the Pipelex build commands."
+---
+
 # Build Commands
 
 Generate pipelines, runner code, Python structures, and JSON templates from natural language descriptions.

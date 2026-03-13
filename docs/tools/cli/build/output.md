@@ -1,3 +1,7 @@
+---
+description: "Generate output representations for a pipe — preview expected output structure in JSON or JSON Schema for TypeScript/Zod integration."
+---
+
 # Build Output
 
 Generate output representation for a pipe, showing the expected output structure based on the pipe's output concept type. Supports multiple output formats including JSON Schema for TypeScript/Zod integration.

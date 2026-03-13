@@ -1,3 +1,7 @@
+---
+description: "Validate your pipeline definitions, .mthds bundles, and installed method packages for correctness before running them in Pipelex."
+---
+
 # Validate Commands
 
 Validate your pipeline definitions and configuration for correctness.

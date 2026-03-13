@@ -1,3 +1,7 @@
+---
+description: "Get started with Pipelex in minutes — configure AI providers, organize your .mthds files, and set up your first executable AI methods project."
+---
+
 # Setup (first run)
 
 This section is for **first-time onboarding**: the key choices you need to make to get a project running quickly and safely.

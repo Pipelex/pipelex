@@ -1,3 +1,7 @@
+---
+description: "Extract execution data from Pipelex pipes — collect performance metrics, usage patterns, and debugging information automatically."
+---
+
 # Observer Data Extraction
 
 The Observer system in Pipelex automatically collects execution data from your pipes for later analysis. This data extraction feature is currently a work in progress but provides valuable insights into pipeline performance, usage patterns, and debugging information.

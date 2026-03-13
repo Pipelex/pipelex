@@ -1,3 +1,7 @@
+---
+description: "Configure cognitive tools in Pipelex — LLM inference, image generation, and OCR extraction settings through TOML configuration."
+---
+
 # Cognitive Tools (Cogt) Configuration
 
 The Cogt configuration manages all cognitive tools in Pipelex, including LLM (Language Models), Image Generation, and OCR (Optical Character Recognition) capabilities.

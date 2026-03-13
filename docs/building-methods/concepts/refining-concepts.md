@@ -1,3 +1,7 @@
+---
+description: "Refine concepts to create specialized subtypes that inherit structure while adding semantic specificity to your declarative AI workflows."
+---
+
 # Refining Concepts
 
 Concept refinement allows you to create more specific versions of existing concepts while inheriting their structure. This provides semantic clarity and type safety for domain-specific methods.

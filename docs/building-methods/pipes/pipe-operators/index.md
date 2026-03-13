@@ -1,3 +1,7 @@
+---
+description: "Pipe operators are the action units of Pipelex pipelines. Explore operators for LLM integration, document extraction, search, and more."
+---
+
 # Pipe Operators
 
 !!! tip "MTHDS Standard Reference"

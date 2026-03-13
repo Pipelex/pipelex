@@ -1,3 +1,7 @@
+---
+description: "Pipelex ships with built-in native concepts for text, images, documents, and numbers. Use them as ready-made building blocks in any pipeline."
+---
+
 # Native Concepts
 
 Pipelex includes several built-in native concepts that cover common data types in AI methods. These concepts come with predefined structures and are automatically available in all pipelines—no setup required.

@@ -1,3 +1,7 @@
+---
+description: "Keep your TOML configuration and .mthds files consistently formatted with plxt, the fast linter and formatter for Pipelex projects."
+---
+
 # plxt (Formatter & Linter)
 
 ## Overview

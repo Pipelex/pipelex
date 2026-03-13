@@ -1,3 +1,7 @@
+---
+description: "Run Pipelex pipelines from the CLI, Python API, or Pipelex Client. Execute .mthds bundles and retrieve structured outputs programmatically."
+---
+
 # Executing Pipelines
 
 Once your pipes are defined in `.mthds` files, you can execute them in multiple ways.

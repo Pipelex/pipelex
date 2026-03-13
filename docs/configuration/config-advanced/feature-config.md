@@ -1,3 +1,7 @@
+---
+description: "Toggle Pipelex feature flags — enable or disable the reporting system and other optional capabilities through TOML configuration."
+---
+
 # Feature Configuration
 
 The `FeatureConfig` class controls which features are enabled in Pipelex.

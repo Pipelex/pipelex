@@ -1,3 +1,7 @@
+---
+description: "Learn how to structure your Pipelex project so that .mthds files, Python code, and executable AI methods stay organized and easy to maintain."
+---
+
 # Project Organization
 
 ## Overview

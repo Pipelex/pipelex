@@ -1,3 +1,7 @@
+---
+description: "Tell Pipelex where to find your .mthds bundle files — point to a bundle directly or configure library directories for automatic discovery."
+---
+
 # Pipeline Discovery and Loading
 
 When running pipelines, Pipelex needs to find your `.mthds` bundle files. There are two approaches:

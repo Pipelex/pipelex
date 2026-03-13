@@ -1,5 +1,6 @@
 ---
 title: "Execution Graph Tracing"
+description: "Capture pipeline executions as directed graphs for visualization and debugging — render with Mermaid or ReactFlow backends."
 ---
 
 # Execution Graph Tracing

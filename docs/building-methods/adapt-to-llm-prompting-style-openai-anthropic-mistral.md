@@ -1,3 +1,7 @@
+---
+description: "Adapt prompting styles for OpenAI, Anthropic, Mistral, and other LLM providers to get the best results from your Pipelex methods."
+---
+
 # Prompting Configuration
 
 The `PromptingConfig` class controls how Pipelex handles prompting styles for different LLM targets.

@@ -1,3 +1,7 @@
+---
+description: "Set up AI model providers, routing profiles, and inference backends — use Pipelex Gateway, direct API keys, or custom configurations."
+---
+
 # Inference Backend Configuration
 
 The Inference Backend Configuration System manages how Pipelex handles AI model providers, model routing, and inference settings across LLMs, OCR, and image generation. This unified system provides a flexible and scalable way to configure multiple inference backends and route different types of AI models to the appropriate providers.

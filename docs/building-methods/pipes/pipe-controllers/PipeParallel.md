@@ -1,3 +1,7 @@
+---
+description: "Execute multiple pipes concurrently with PipeParallel. Speed up independent tasks while keeping each branch isolated in its own memory."
+---
+
 # PipeParallel
 
 The `PipeParallel` controller executes multiple pipes simultaneously. This is highly effective for running pipes concurrently in isolated branches.

@@ -1,3 +1,7 @@
+---
+description: "Generate images from text prompts within your Pipelex pipelines using PipeImgGen. Configure models, sizes, and output formats declaratively."
+---
+
 # PipeImgGen
 
 The `PipeImgGen` operator is used to generate images from a text prompt using a specified image generation model.

@@ -1,3 +1,7 @@
+---
+description: "Declare typed schemas directly in .mthds files with inline structures. Build structured AI workflows without Python boilerplate."
+---
+
 # Inline Structure Definition
 
 Define structured concepts directly in your `.mthds` files using pipelex syntax. This is the **recommended approach** for most use cases, offering rapid development without Python boilerplate.

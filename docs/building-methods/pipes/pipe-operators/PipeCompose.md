@@ -1,3 +1,7 @@
+---
+description: "PipeCompose renders Jinja2 templates or constructs structured objects from working memory. Combine pipeline data into new outputs deterministically."
+---
+
 # PipeCompose
 
 The `PipeCompose` operator composes data from your pipeline's working memory into new outputs. It supports two modes:

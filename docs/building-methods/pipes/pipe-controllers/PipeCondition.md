@@ -1,3 +1,7 @@
+---
+description: "Add if/else branching logic to your pipelines with PipeCondition. Route execution dynamically based on Jinja2 expressions and pipe maps."
+---
+
 # PipeCondition
 
 The `PipeCondition` controller adds branching logic to your pipelines. It evaluates an expression and, based on the string result, chooses which subsequent pipe to execute from a map of possibilities.

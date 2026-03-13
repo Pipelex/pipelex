@@ -1,3 +1,7 @@
+---
+description: "Set up your first Pipelex project with .mthds files, define concepts and pipes, and build executable AI methods from scratch."
+---
+
 # Kicking off a Pipelex Method Project
 
 ## Creating Your First Pipeline

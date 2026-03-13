@@ -1,3 +1,7 @@
+---
+description: "Configure Pipelex with its layered TOML configuration system — shipped defaults plus project-level overrides for executable AI methods."
+---
+
 # Configuration
 
 ## Overview

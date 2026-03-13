@@ -1,3 +1,7 @@
+---
+description: "Generate example input JSON for any pipe — see the expected input structure based on the pipe's declared input types in .mthds files."
+---
+
 # Build Inputs
 
 Generate example input JSON for a pipe, showing the expected input structure based on the pipe's input types.

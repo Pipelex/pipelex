@@ -1,3 +1,7 @@
+---
+description: "Master the Pipelex CLI — init, validate, run, show, build, and package commands for managing executable AI methods from the terminal."
+---
+
 # Pipelex CLI Documentation
 
 The Pipelex CLI provides a command-line interface for managing and interacting with your Pipelex projects. This document outlines all available commands and their usage.

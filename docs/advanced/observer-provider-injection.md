@@ -1,3 +1,7 @@
+---
+description: "Build a custom observer to monitor pipe executions — collect inputs, outputs, errors, and performance metrics at every stage."
+---
+
 # Observer Provider Injection
 
 The Observer system in Pipelex allows you to monitor and collect data about pipe executions. This guide explains how to implement your own observer by following the dependency injection pattern and the ObserverProtocol.

@@ -1,3 +1,7 @@
+---
+description: "Set up API keys for OpenAI, Anthropic, Mistral, and other providers to power your Pipelex executable AI methods — or use the gateway for instant access."
+---
+
 # Configure AI Providers
 
 ## Configure API Access

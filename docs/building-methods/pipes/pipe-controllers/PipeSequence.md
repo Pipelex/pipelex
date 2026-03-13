@@ -1,3 +1,7 @@
+---
+description: "PipeSequence runs pipes one after another, passing outputs forward through working memory. The core building block for linear AI methods."
+---
+
 # PipeSequence
 
 The `PipeSequence` controller is used to execute a series of pipes one after another. It is the fundamental building block for creating linear methods where the output of one step becomes the input for the next.

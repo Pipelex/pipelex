@@ -1,5 +1,6 @@
 ---
 title: Cloud Storage
+description: "Store pipeline artifacts on AWS S3, Google Cloud Storage, or local disk. Pipelex handles uploads, signed URLs, and access control out of the box."
 ---
 
 # Cloud Storage

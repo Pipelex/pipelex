@@ -1,5 +1,6 @@
 ---
 title: Execution Graph Visualization
+description: "Visualize pipeline execution as an interactive graph. Inspect data flow, step order, and intermediate outputs for full auditability of your AI workflows."
 ---
 
 # Execution Graph Visualization

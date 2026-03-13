@@ -1,3 +1,7 @@
+---
+description: "Working memory enables data flow between pipes during pipeline execution. Learn how Pipelex stores and passes typed data across steps."
+---
+
 # Working Memory
 
 !!! tip "MTHDS Standard Reference"

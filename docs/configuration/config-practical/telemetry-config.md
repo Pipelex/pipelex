@@ -1,3 +1,7 @@
+---
+description: "Set up custom telemetry destinations for observability data — send execution metrics to your own analytics and monitoring backends."
+---
+
 # Telemetry Configuration
 
 ## Overview

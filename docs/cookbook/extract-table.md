@@ -1,3 +1,7 @@
+---
+description: "Turn table images into structured HTML with Pipelex executable AI methods — ideal for processing scanned documents and reports."
+---
+
 # Example: Table Extraction from Image
 
 This example shows how to extract a table from an image and convert it into a structured HTML format. This is a common requirement when dealing with scanned documents or reports where data is presented in tabular form.

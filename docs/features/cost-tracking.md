@@ -1,5 +1,6 @@
 ---
 title: Cost Tracking & Reporting
+description: "Track inference costs across your Pipelex pipelines. Monitor spending per model, per step, and per run with built-in console reporting and CSV export."
 ---
 
 # Cost Tracking & Reporting

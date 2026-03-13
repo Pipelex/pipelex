@@ -1,3 +1,7 @@
+---
+description: "Extend concepts with Python StructuredContent classes for custom validation, computed properties, and advanced business logic in Pipelex."
+---
+
 # Python StructuredContent Classes
 
 For advanced features beyond inline structures, create explicit Python classes that inherit from `StructuredContent`. This approach gives you full Pydantic power with custom validation, computed properties, and reusable business logic.

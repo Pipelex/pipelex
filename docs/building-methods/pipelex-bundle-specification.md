@@ -1,3 +1,7 @@
+---
+description: "The .mthds bundle is the fundamental unit of Pipelex. Learn the TOML-based format for declaring concepts, pipes, and domain metadata."
+---
+
 # Pipelex Bundle Specification
 
 !!! tip "MTHDS Standard Reference"

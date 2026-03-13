@@ -1,5 +1,6 @@
 ---
 title: Validation & Dry Run
+description: "Catch errors before they cost time and money. Validate .mthds files statically and dry-run pipelines with mocked LLM responses — no API calls required."
 ---
 
 # Validation & Dry Run

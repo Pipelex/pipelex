@@ -1,5 +1,6 @@
 ---
 title: "Test Profile Configuration"
+description: "Configure test profiles to control which AI models run in parametrized tests — iterate fast with small sets, then test comprehensively."
 ---
 
 # Test Profile Configuration

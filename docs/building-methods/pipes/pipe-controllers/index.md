@@ -1,3 +1,7 @@
+---
+description: "Pipe controllers orchestrate execution flow in Pipelex. Sequence, parallelize, batch, or branch your pipes for structured AI workflows."
+---
+
 # Pipe Controllers
 
 !!! tip "MTHDS Standard Reference"

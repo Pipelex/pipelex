@@ -1,3 +1,7 @@
+---
+description: "Inspect your Pipelex configuration, browse pipeline definitions, and list available AI models directly from the command line."
+---
+
 # Show Commands
 
 Inspect your Pipelex configuration, pipelines, and available AI models.

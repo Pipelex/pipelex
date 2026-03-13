@@ -1,3 +1,7 @@
+---
+description: "Prepare and format pipeline inputs for Pipelex using the CLI, Python API, or Client. Generate input templates and pass data to your methods."
+---
+
 # Providing Inputs to Pipelines
 
 When running Pipelex pipelines, you need to provide input data that matches what your pipeline expects. This guide explains how to prepare and format inputs, whether you're using the CLI, Python API, or Pipelex Client.
