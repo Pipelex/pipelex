@@ -93,24 +93,26 @@
             "justMyCode": false
         },
         {
-            "name": "Debug run pipe bundle no inputs",
+            "name": "Debug run bundle no inputs",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
+                "bundle",
                 "tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds",
             ],
             "console": "integratedTerminal",
             "justMyCode": false
         },
         {
-            "name": "Debug run pipe bundle with inputs",
+            "name": "Debug run pipe from bundle with inputs",
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
+                "bundle",
                 "tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds",
                 "--pipe",
                 "describe_image",
@@ -127,6 +129,7 @@
             "program": "${workspaceFolder}/.venv/bin/pipelex",
             "args": [
                 "run",
+                "pipe",
                 "write_discord_newsletter",
                 "--inputs",
                 "tests/data/discord_newsletter/discord_sample_input.json",

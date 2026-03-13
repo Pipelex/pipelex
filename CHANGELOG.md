@@ -1,6 +1,8 @@
 # Changelog
 
-## [Unreleased]
+## [v0.20.7] - 2026-03-12
+
+- Bump `mthds` dependency to `>=0.1.1`.
 
 ## [v0.20.6] - 2026-03-12
 
