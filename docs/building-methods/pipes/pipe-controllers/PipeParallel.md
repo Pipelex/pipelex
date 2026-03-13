@@ -83,4 +83,8 @@ How this works:
 3.  The `extract_features` pipe runs in one branch, and the `analyze_sentiment` pipe runs in the other, simultaneously.
 4.  After both complete, `PipeParallel` collects the results. The output from `extract_features` is named `features`, and the output from `analyze_sentiment` is named `sentiment`.
 5.  Because `combined_output` is set to `ProductAnalysis`, a new structured object of type `ProductAnalysis` is created. This object is populated with the results, like `{"features": ..., "sentiment": ...}`.
-6.  This single `ProductAnalysis` object becomes the final output of the `analyze_product_in_parallel` pipe. 
+6.  This single `ProductAnalysis` object becomes the final output of the `analyze_product_in_parallel` pipe.
+
+## Related Documentation
+
+- [Pipeline Orchestration](../../../features/pipeline-orchestration.md) - Overview of pipeline orchestration capabilities

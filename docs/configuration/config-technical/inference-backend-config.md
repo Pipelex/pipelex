@@ -653,3 +653,9 @@ Common error types:
    - Keep base configurations unchanged to make upgrades easier
    - Version control your custom configurations
    - Share routing profiles and presets across your team
+
+## Related Documentation
+
+- [LLM Integration](../../features/llm-integration.md) - Overview of LLM provider support and capabilities
+- [PipeLLM Operator](../../building-methods/pipes/pipe-operators/PipeLLM.md) - The pipe operator that uses inference backends
+- [Configure AI Providers](../../setup/configure-ai-providers.md) - Setup guide for connecting AI providers

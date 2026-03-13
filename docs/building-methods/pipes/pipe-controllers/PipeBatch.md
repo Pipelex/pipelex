@@ -70,4 +70,8 @@ How this works:
 3.  In branch #1, it takes the first article from `ArticleList`, puts it into the branch's isolated working memory, and gives it the name `ArticleText` (as specified by `input_item_name`).
 4.  The `summarize_one_article` pipe is then executed in branch #1. It looks for an input named `ArticleText`, finds the injected article, and produces a summary.
 5.  Steps 3 and 4 happen simultaneously for all 10 articles in their respective branches.
-6.  Once all `summarize_one_article` pipes are done, `PipeBatch` collects the 10 `ArticleSummary` outputs and bundles them into a single `SummaryList`. This list is the final result. 
+6.  Once all `summarize_one_article` pipes are done, `PipeBatch` collects the 10 `ArticleSummary` outputs and bundles them into a single `SummaryList`. This list is the final result.
+
+## Related Documentation
+
+- [Understanding Multiplicity](../understanding-multiplicity.md) - How Pipelex handles lists and batch processing

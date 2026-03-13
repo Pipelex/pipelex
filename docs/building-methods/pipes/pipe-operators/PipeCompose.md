@@ -141,3 +141,8 @@ In this example:
 | Assemble structured data from multiple sources | Construct |
 | Combine fields from different inputs into one object | Construct |
 | Need to map/rename fields | Construct |
+
+## Related Documentation
+
+- [Working Memory](../working-memory.md) - How pipes access and share data
+- [Provide Inputs](../provide-inputs.md) - Passing inputs to pipes and pipelines

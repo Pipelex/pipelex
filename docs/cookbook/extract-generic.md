@@ -54,4 +54,10 @@ def merge_markdown_and_images(working_memory: WorkingMemory) -> TextAndImagesCon
     )
 ```
 
-This example shows the flexibility of Pipelex in handling complex, multi-modal documents and allowing for custom logic. 
+This example shows the flexibility of Pipelex in handling complex, multi-modal documents and allowing for custom logic.
+
+## Related Documentation
+
+- [PipeExtract Operator](../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
+- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
+- [Document Extraction](../features/document-extraction.md) - Overview of document extraction capabilities

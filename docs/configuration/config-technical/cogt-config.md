@@ -194,3 +194,10 @@ seed = "auto"
 [cogt.extract_config]
 default_page_views_dpi = 72
 ```
+
+## Related Documentation
+
+- [PipeExtract Operator](../../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
+- [PipeImgGen Operator](../../building-methods/pipes/pipe-operators/PipeImgGen.md) - Generate images with AI models
+- [Document Extraction](../../features/document-extraction.md) - Overview of document extraction capabilities
+- [Image Generation](../../features/image-generation.md) - Overview of image generation capabilities

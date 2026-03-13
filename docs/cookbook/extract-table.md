@@ -91,4 +91,9 @@ Rewrite the entire html table with your potential corrections.
 Make sure you do not forget any text.
 """
 ```
-This self-correction pattern is a key technique for building robust and reliable AI methods with Pipelex. 
+This self-correction pattern is a key technique for building robust and reliable AI methods with Pipelex.
+
+## Related Documentation
+
+- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
+- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows

@@ -87,3 +87,8 @@ Write a haiku about Hello World.
     ```
 
 Expected output: A haiku about "Hello World" displayed with pretty formatting.
+
+## Related Documentation
+
+- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
+- [Define Your Concepts](../building-methods/concepts/define_your_concepts.md) - How to define custom data types for your methods

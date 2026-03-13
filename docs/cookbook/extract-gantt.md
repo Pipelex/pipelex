@@ -213,3 +213,8 @@ class extract_details_of_task sub_b;
     QFEdmVvYVHdL6DsCRtwqHq-branch-11 -...- nCmpx
     nCmpx -- "Gather in a gantt chart" ----> NuMVc
 ```
+
+## Related Documentation
+
+- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
+- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows

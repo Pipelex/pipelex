@@ -79,3 +79,10 @@ page_views_dpi = 200
 The output of the PipeExtract must be exactly the native `Page` concept.
 
 To use this pipe, you would first need to load a PDF into the `ScannedDocument` concept. After the pipe runs, the `ExtractedPages` concept will contain a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.
+
+## Related Documentation
+
+- [Simple OCR Example](../../../cookbook/simple-ocr.md) - Basic OCR pipeline using PipeExtract
+- [Generic Extraction Example](../../../cookbook/extract-generic.md) - Multi-modal document extraction
+- [Invoice Extractor Example](../../../cookbook/invoice-extractor.md) - Complete invoice processing pipeline
+- [Document Extraction Feature](../../../features/document-extraction.md) - Overview of document extraction capabilities

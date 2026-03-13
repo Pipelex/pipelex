@@ -85,4 +85,9 @@ To help you do so, you are given the text extracted from the page by an OCR mode
 - You can use tables if it is relevant.
 """
 ```
-This is a great example of how to create a highly specialized extraction pipeline by combining a custom data model with a detailed, guiding prompt. 
+This is a great example of how to create a highly specialized extraction pipeline by combining a custom data model with a detailed, guiding prompt.
+
+## Related Documentation
+
+- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
+- [Document Extraction](../features/document-extraction.md) - Overview of document extraction capabilities

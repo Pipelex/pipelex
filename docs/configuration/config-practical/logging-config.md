@@ -195,3 +195,7 @@ keywords_to_hilight = ["error", "warning", "failed"]
     - Set noisy third-party packages to WARNING
     - Keep pipelex at INFO for important updates
     - Use VERBOSE only when debugging specific issues
+
+## Related Documentation
+
+- [Logging Tool](../../tools/logging.md) - Using Pipelex logging in your code

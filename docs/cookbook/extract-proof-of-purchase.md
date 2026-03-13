@@ -79,4 +79,9 @@ To help you do so, you are given the text extracted from the page by an OCR mode
 - You can use tables if it is relevant.
 """
 ```
-The combination of a detailed prompt, the OCR text, and the document image allows the LLM to accurately extract the required information and structure it as a `ProofOfPurchase` object. 
+The combination of a detailed prompt, the OCR text, and the document image allows the LLM to accurately extract the required information and structure it as a `ProofOfPurchase` object.
+
+## Related Documentation
+
+- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
+- [Document Extraction](../features/document-extraction.md) - Overview of document extraction capabilities

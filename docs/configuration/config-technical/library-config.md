@@ -550,3 +550,8 @@ pipelex show pipe YOUR_PIPE_CODE
 2. Check concept references are spelled correctly
 3. Verify pipe configurations match expected format
 4. Ensure all required fields are present
+
+## Related Documentation
+
+- [Libraries](../../building-methods/libraries.md) - Understanding method libraries
+- [Packages](../../building-methods/packages.md) - Organizing methods into packages

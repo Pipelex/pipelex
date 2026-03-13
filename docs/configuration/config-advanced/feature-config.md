@@ -44,3 +44,8 @@ is_reporting_enabled = true
 # Enable reporting for cost monitoring
 is_reporting_enabled = true
 ```
+
+## Related Documentation
+
+- [Cost Tracking](../../features/cost-tracking.md) - Track and monitor AI usage costs
+- [Reporting Config](../config-practical/reporting-config.md) - Detailed reporting configuration options

@@ -253,3 +253,8 @@ pipelex init telemetry
 - The `DO_NOT_TRACK` environment variable provides a global kill switch
 
 For more information about our data practices, see our [Privacy Policy](https://go.pipelex.com/privacy-policy).
+
+## Related Documentation
+
+- [Telemetry Feature](../../features/telemetry.md) - Overview of telemetry capabilities
+- [Telemetry Setup](../../setup/telemetry.md) - Step-by-step telemetry configuration guide

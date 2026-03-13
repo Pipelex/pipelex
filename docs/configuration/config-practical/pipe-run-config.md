@@ -36,3 +36,8 @@ The `pipe_stack_limit` prevents infinite recursion in pipe execution by:
 
 - Set a reasonable stack limit based on your pipeline complexity
 - Monitor stack usage in complex pipelines
+
+## Related Documentation
+
+- [Executing Pipelines](../../building-methods/pipes/executing-pipelines.md) - How to run pipes and pipelines
+- [Pipeline Orchestration](../../features/pipeline-orchestration.md) - Orchestrating complex multi-step pipelines

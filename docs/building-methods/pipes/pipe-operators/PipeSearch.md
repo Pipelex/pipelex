@@ -107,3 +107,7 @@ include_domains = ["reuters.com", "apnews.com", "bbc.com"]
 ```
 
 The output of PipeSearch must be `SearchResult` or a concept that refines `SearchResult`. After execution, the output contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets.
+
+## Related Documentation
+
+- [Web Search Feature](../../../features/web-search.md) - Overview of web search capabilities

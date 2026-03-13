@@ -29,4 +29,9 @@ async def simple_ocr(pdf_url: str) -> ListContent[PageContent]:
     return page_content_list
 ```
 
-This showcases how easy it is to kick off a complex process with just a few lines of code. The `inputs` dictionary simply maps the input name to the PDF content, and the pipeline handles the rest. 
+This showcases how easy it is to kick off a complex process with just a few lines of code. The `inputs` dictionary simply maps the input name to the PDF content, and the pipeline handles the rest.
+
+## Related Documentation
+
+- [PipeExtract Operator](../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
+- [Document Extraction](../features/document-extraction.md) - Overview of document extraction capabilities

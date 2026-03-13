@@ -115,3 +115,8 @@ class optimize_tweet_sequence sub_a;
     EWhtJ -- "Optimize tweet" ----> 65Eb2
     i34D5 -- "Optimize tweet" ----> 65Eb2
 ```
+
+## Related Documentation
+
+- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
+- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows

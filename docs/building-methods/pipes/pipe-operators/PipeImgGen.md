@@ -134,3 +134,8 @@ The output of the PipeImgGen has to be a concept compatible with the native `Ima
 
 To use this pipe, you would first load a text prompt (e.g., "A minimalist logo for a coffee shop, featuring a stylized mountain and a coffee bean") into the input stuff (`ImgGenPrompt` concept). After running, the output will be a list containing three generated `ImageContent` objects.
 
+## Related Documentation
+
+- [Image Generation Feature](../../../features/image-generation.md) - Overview of image generation capabilities
+- [Cloud Storage](../../../features/cloud-storage.md) - Store generated images in cloud storage
+

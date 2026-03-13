@@ -376,3 +376,11 @@ Analyze the following topic in depth, considering multiple perspectives:
 @topic
 """
 ```
+
+## Related Documentation
+
+- [Hello World Example](../../../cookbook/hello-world.md) - Simple introductory example using PipeLLM
+- [Invoice Extractor Example](../../../cookbook/invoice-extractor.md) - Complete invoice processing pipeline
+- [Write Tweet Example](../../../cookbook/write-tweet.md) - Multi-step tweet generation workflow
+- [Table Extraction Example](../../../cookbook/extract-table.md) - Extract and correct tables from images
+- [Gantt Extraction Example](../../../cookbook/extract-gantt.md) - Extract Gantt chart data from documents

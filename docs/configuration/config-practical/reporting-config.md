@@ -92,3 +92,8 @@ cost_report_unit_scale = 1000.0
 
 !!! warning "Under Construction"
     This section is currently under development.
+
+## Related Documentation
+
+- [Cost Tracking](../../features/cost-tracking.md) - Track and monitor AI usage costs
+- [Reporting Delegate Injection](../../advanced/reporting-delegate-injection.md) - Customize reporting behavior with dependency injection

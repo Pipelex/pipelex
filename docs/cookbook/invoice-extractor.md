@@ -125,3 +125,10 @@ class extract_invoice sub_a;
     RzjEzwGpkk5dXnrK3HXQJx-branch-0 -...- 5SXqJ
     ZynbH -...- ZynbH-branch-0
 ```
+
+## Related Documentation
+
+- [PipeExtract Operator](../building-methods/pipes/pipe-operators/PipeExtract.md) - Extract text and images from documents
+- [PipeLLM Operator](../building-methods/pipes/pipe-operators/PipeLLM.md) - The core operator for LLM interactions
+- [PipeSequence Controller](../building-methods/pipes/pipe-controllers/PipeSequence.md) - Chain pipes into sequential workflows
+- [Cost Tracking](../features/cost-tracking.md) - Track and monitor AI usage costs

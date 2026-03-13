@@ -111,3 +111,8 @@ description = "Combine two text inputs using a custom Python function"
 function_name = "concatenate_texts"
 output = "ConcatenatedText"
 ```
+
+## Related Documentation
+
+- [Advanced Customizations](../../../advanced/index.md) - Extend Pipelex with custom logic
+- [Working Memory](../working-memory.md) - How pipes access and share data

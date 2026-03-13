@@ -84,3 +84,8 @@ The `text_gen_truncate_length` controls:
 - Set appropriate truncation lengths
 - Enable template validation when testing templates
 - Review dry run logs for potential issues
+
+## Related Documentation
+
+- [Validation & Dry Run](../../features/validation-dry-run.md) - Overview of validation and dry run capabilities
+- [CLI validate](../../tools/cli/validate.md) - Using the CLI to validate methods

@@ -175,3 +175,8 @@ add_alias_from_expression_to = "category_type"
 - Creates an alias from the expression result
 - Makes the result available in working memory
 - Requires the target to exist in working memory beforehand
+
+## Related Documentation
+
+- [Pipeline Orchestration](../../../features/pipeline-orchestration.md) - Overview of pipeline orchestration capabilities
+- [Provide Inputs](../provide-inputs.md) - Passing inputs to pipes and pipelines
