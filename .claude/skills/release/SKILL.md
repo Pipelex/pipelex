@@ -16,7 +16,7 @@ This skill handles the full release cycle for the `pipelex` Python package.
 ## Files touched
 
 - **`pyproject.toml`** — the `version` field (line 3)
-- **`CHANGELOG.md`** — promote `[Unreleased]` to `[vX.Y.Z] - YYYY-MM-DD`
+- **`CHANGELOG.md`** — add `[vX.Y.Z] - YYYY-MM-DD` entry (remove `[Unreleased]` if present)
 - **`uv.lock`** — regenerated via `make li` (lock + install)
 - **`.badges/tests.json`** — test count updated to match actual count
 
@@ -46,28 +46,29 @@ failure.
 
 ### 4. Finalize the changelog
 
-The `CHANGELOG.md` has an `## [Unreleased]` section at the top with pending
-changes.
+Add a new version entry at the top of the changelog for the release.
 
-1. If the `[Unreleased]` section is **empty** (no bullet points), warn the user
-   and ask whether to proceed with an empty changelog entry or abort so they can
-   add notes first.
-2. If the `[Unreleased]` section has content:
-   - Rename `## [Unreleased]` to `## [vX.Y.Z] - YYYY-MM-DD` (using today's
-     date).
-   - Insert a fresh empty `## [Unreleased]` section above the new version
-     heading, with a blank line separating them.
-3. The result should look like:
+1. If there is an `## [Unreleased]` section, **remove it** (including any blank
+   lines that follow it) and replace it with the new version heading. Any
+   content that was under `[Unreleased]` becomes the content of the new version.
+2. If there is no `[Unreleased]` section, insert the new version heading
+   directly after the `# Changelog` title.
+3. **Never add an `[Unreleased]` heading.** The changelog should only contain
+   concrete version entries.
+4. If the release has no changelog content yet, ask the user what to include
+   before proceeding.
+5. The result should look like:
 
 ```markdown
 # Changelog
-
-## [Unreleased]
 
 ## [vX.Y.Z] - YYYY-MM-DD
 
 ### Changed
 - ...
+
+## [vPREVIOUS] - PREVIOUS-DATE
+...
 ```
 
 ### 5. Bump the version in pyproject.toml
