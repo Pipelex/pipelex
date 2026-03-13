@@ -1,5 +1,9 @@
 # Changelog
 
+## [v0.20.8] - 2026-03-13
+
+- Add `needs_model_specs=True` to agent CLI run and models commands.
+
 ## [v0.20.7] - 2026-03-12
 
 - Bump `mthds` dependency to `>=0.1.1`.
