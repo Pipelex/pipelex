@@ -69,7 +69,7 @@ Image generation presets are defined in your model deck configuration and can in
 | `output`                | string          | The output concept produced by the image generation operation. Use bracket notation for multiple images: `"Image[3]"` generates exactly 3 images.                                                | Yes      |
 | `model`           | string          | The choice of image generation model name, setting, or preset to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
 | `prompt`                | string          | The image generation prompt. Can be a static string or reference input variables using `$` prefix (e.g., `"$description"` or `"A sketch of: $subject"`). | Yes      |
-| `aspect_ratio`          | string          | The desired aspect ratio of the image (e.g., `"16:9"`, `"1:1"`).                                                              | No       |
+| `aspect_ratio`          | string          | The desired aspect ratio of the image. Valid values: `"square"`, `"landscape_4_3"`, `"landscape_3_2"`, `"landscape_16_9"`, `"landscape_21_9"`, `"portrait_3_4"`, `"portrait_2_3"`, `"portrait_9_16"`, `"portrait_9_21"`.                                                              | No       |
 | `seed`                  | integer or "auto" | A seed for the random number generator to ensure reproducibility. `"auto"` uses a random seed.                                | No       |
 
 ### Example: Generating a single image from a static prompt
@@ -83,8 +83,8 @@ description = "Generate a futuristic car image"
 output = "Image"
 prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
 model = "$gen-image"
-aspect_ratio = "16:9"
-quality = "hd"
+aspect_ratio = "landscape_16_9"
+quality = "high"
 ```
 
 ### Example: Generating an image from a dynamic prompt
@@ -127,7 +127,7 @@ inputs = { img_prompt = "ImgGenPrompt" }
 output = "Image[3]"
 prompt = "$img_prompt"
 model = "$gen-image"
-aspect_ratio = "1:1"
+aspect_ratio = "square"
 ```
 
 The output of the PipeImgGen has to be a concept compatible with the native `Image` concept. A concept is compatible with the `Image` concept if it refines the `Image` concept.
