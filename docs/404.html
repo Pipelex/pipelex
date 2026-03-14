@@ -51,7 +51,9 @@
             // Has version but not on 404 page, rewrite old paths then redirect to that version's styled 404 page
             const remainingPath = '/' + segments.slice(1).join('/');
             const rewrittenPath = rewritePath(remainingPath);
-            const version404Url = '/' + firstSegment + rewrittenPath + window.location.search + window.location.hash;
+            const version404Url = rewrittenPath !== remainingPath
+                ? '/' + firstSegment + rewrittenPath + window.location.search + window.location.hash
+                : '/' + firstSegment + '/404.html';
             window.location.replace(version404Url);
         } else {
             // We're on /latest/404.html and it still 404'd - show basic error

@@ -9,7 +9,9 @@ class URLs:
     discord = "https://go.pipelex.com/discord"
     privacy_policy = "https://go.pipelex.com/privacy-policy"
     telemetry_docs = "https://docs.pipelex.com/latest/setup/telemetry/"
-    gateway_docs = "https://docs.pipelex.com/latest/setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started"
+    gateway_docs = (
+        "https://docs.pipelex.com/latest/setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-and-most-powerful-for-getting-started"
+    )
     pipe_func_docs = "https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeFunc/"
     backend_provider_docs = "https://docs.pipelex.com/latest/setup/configure-ai-providers/"
     native_concepts_docs = "https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/"
