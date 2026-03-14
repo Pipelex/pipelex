@@ -166,7 +166,7 @@ pipe_output = response.pipe_output
 ```
 
 !!! tip "Listing available pipes"
-    Use the `pipelex show pipes` command to list all the pipes available in your project.
+    Use `pipelex show pipe --all` to list the pipes available in your project.
 
 ### Using MTHDS Content Directly
 
@@ -227,31 +227,6 @@ Pipelex has a REST API for executing pipelines. See more about it [here](https:/
 
 ---
 
-## Background Execution with `start_pipeline`
+## Background Execution
 
-For more complex scenarios where you need asynchronous control, use `start_pipeline`. This function immediately returns a `pipeline_run_id` and an `asyncio.Task`, allowing you to run pipelines in the background.
-
-```python
-from pipelex.pipelex import Pipelex
-from pipelex.pipeline.start import start_pipeline
-
-Pipelex.make()
-
-# Start the pipeline without waiting
-pipeline_run_id, task = await start_pipeline(
-    bundle_uri="path/to/my_bundle.mthds",
-    inputs={
-        "description": {
-            "concept": "ProductDescription",
-            "content": "...",
-        },
-    },
-)
-
-print(f"Pipeline started with ID: {pipeline_run_id}")
-
-# Do other work while the pipeline runs...
-
-# Wait for completion when ready
-pipe_output = await task
-```
+The current public Python entry point documented in this repo is `PipelexRunner.execute_pipeline()`. This page does not document a separate background-execution helper because the older `from pipelex.pipeline.start import start_pipeline` import path is no longer a current public entry point here.

@@ -35,3 +35,9 @@ Unlike LLM APIs (partly standardized around OpenAI's completions API), the OCR l
 ## Documents in LLM Prompts
 
 Include PDFs directly in your prompts using `@variable` syntax. PipeLLM automatically handles document rendering — single documents, multiple documents, and mixed content combining text, images, and PDFs are all supported.
+
+## Related Documentation
+
+- [PipeExtract](../building-methods/pipes/pipe-operators/PipeExtract.md) - Operator reference and MTHDS fields
+- [Simple OCR Example](../cookbook/simple-ocr.md) - Small end-to-end extraction example
+- [Generic Document Extraction](../cookbook/extract-generic.md) - Multi-step document method example

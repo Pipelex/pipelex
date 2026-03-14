@@ -1,5 +1,5 @@
 ---
-title: "Pipe Operators"
+title: "Pipe Operators Overview"
 description: "Pipe operators are the building blocks of Pipelex methods: PipeLLM, PipeExtract, PipeImgGen, PipeSearch, PipeCompose, and PipeFunc — each handling a specific type of AI processing."
 ---
 

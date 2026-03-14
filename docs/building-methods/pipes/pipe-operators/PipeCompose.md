@@ -6,7 +6,7 @@ description: "PipeCompose renders Jinja2 templates or constructs structured obje
 
 The `PipeCompose` operator composes data from your pipeline's working memory into new outputs. It supports two modes:
 
-1. **Template mode**: Render Jinja2 templates to produce `Text` or `Html` output
+1. **Template mode**: Render templates to produce `Text`-like output
 2. **Construct mode**: Build structured objects by mapping fields from inputs
 
 ## Template Mode
@@ -17,10 +17,7 @@ Template mode uses [Jinja2 templates](https://jinja.palletsprojects.com/) to dyn
 
 `PipeCompose` takes all the data currently in the `WorkingMemory` and uses it as the context for rendering a Jinja2 template. The resulting text is then saved back to the working memory as a new `Text` or `Html` output.
 
-The template can be provided as:
-
-- **Inline string**: A template string directly in the pipe definition
-- **Template section**: A `[pipe.name.template]` section with additional configuration
+The public authoring form uses a top-level `template` field plus a required `target_format`.
 
 ### Template Context
 
@@ -33,10 +30,11 @@ The Jinja2 template has access to all the "stuffs" currently in the working memo
 | `type`          | string          | The type of the pipe: `PipeCompose`                                         | Yes      |
 | `description`   | string          | A description of the operation                                              | Yes      |
 | `inputs`        | table           | Input variables needed for the template                                     | Yes      |
-| `output`        | string          | The concept for the output (typically `Text` or `Html`)                     | No       |
+| `output`        | string          | The concept for the output                                                  | No       |
 | `template`      | string          | An inline Jinja2 template string                                            | Yes*     |
+| `target_format` | string          | Output rendering target, such as `plain`, `markdown`, `html`, `json`, or `mermaid` | Yes*     |
 
-*Either `template` (inline) or a `[pipe.name.template]` section must be provided.
+*Template mode requires both `template` and `target_format`.
 
 ### Template Mode Examples
 
@@ -48,10 +46,11 @@ type = "PipeCompose"
 description = "Compose a greeting message"
 inputs = { user = "User" }
 output = "Text"
+target_format = "plain"
 template = "Hello $user.name, welcome to our platform!"
 ```
 
-**HTML template with section:**
+**HTML template:**
 
 ```toml
 [pipe.format_html_report]
@@ -59,9 +58,7 @@ type = "PipeCompose"
 description = "Format data as HTML"
 inputs = { summary = "Text", items = "Item[]" }
 output = "Html"
-
-[pipe.format_html_report.template]
-category = "html"
+target_format = "html"
 template = """
 <h1>Report</h1>
 <p>{{ summary }}</p>

@@ -1,8 +1,9 @@
 ---
-description: "Tell Pipelex where to find your .mthds bundle files — point to a bundle directly or configure library directories for automatic discovery."
+title: "Library Directories and Bundle Loading"
+description: "Tell Pipelex where to find your `.mthds` bundle files. Point to a bundle directly or configure library directories for automatic discovery."
 ---
 
-# Pipeline Discovery and Loading
+# Library Directories and Bundle Loading
 
 When running pipelines, Pipelex needs to find your `.mthds` bundle files. There are two approaches:
 
@@ -135,7 +136,7 @@ pipelex run bundle my_bundle.mthds --inputs data.json -L /path/to/pipelines
 
 # Available on multiple commands
 pipelex validate --all -L /path/to/pipelines/dir
-pipelex show pipes -L /path/to/pipelines/dir
+pipelex show pipe --all -L /path/to/pipelines/dir
 pipelex which my_pipe -L /path/to/pipelines/dir
 ```
 
@@ -466,7 +467,7 @@ pipelex validate --all
 pipelex validate YOUR_PIPE_CODE
 
 # Show all available pipes
-pipelex show pipes
+pipelex show pipe --all
 
 # Show details of a specific pipe
 pipelex show pipe YOUR_PIPE_CODE
@@ -516,7 +517,7 @@ pipelex show pipe YOUR_PIPE_CODE
 1. Ensure files have the `.mthds` extension
 2. Check that files are not in excluded directories
 3. Verify file permissions allow reading
-4. Run `pipelex show pipes` to see what was discovered
+4. Run `pipelex show pipe --all` to see what was discovered
 
 ### Structure Classes Not Registered
 

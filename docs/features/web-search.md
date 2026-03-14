@@ -21,4 +21,8 @@ PipeSearch brings web search directly into your methods. Results come back as st
 
 Use PipeSearch in a PipeSequence to retrieve information from the web and then process it with an LLM. The search results are stored in working memory as SearchResult concepts, available to downstream pipes.
 
-See [PipeSearch reference](../building-methods/pipes/pipe-operators/PipeSearch.md).
+## Related Documentation
+
+- [PipeSearch](../building-methods/pipes/pipe-operators/PipeSearch.md) - Operator reference and supported output shapes
+- [Pipeline Orchestration](./pipeline-orchestration.md) - Compose search with downstream pipes
+- [Working Memory](../building-methods/pipes/working-memory.md) - How search outputs flow through a method

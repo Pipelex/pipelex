@@ -8,9 +8,9 @@ The `PipeExtract` operator performs Optical Character Recognition (OCR) on image
 
 ## How it works
 
-`PipeExtract` takes a single input, which must be a `Document` or an `Image` (or a concept that refines one of them). It processes the document page by page and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from a single page.
+`PipeExtract` takes a single input, which must be a `Document` or an `Image` (or a concept that refines one of them). It processes the input and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from one page.
 
-The output is always a list, even if the input is a single image (in which case the list will contain just one item).
+The output is always a list. If the input is a single image, the output still contains one `Page` item.
 
 ### The `PageContent` Structure
 
@@ -48,7 +48,7 @@ OCR presets are defined in your model deck configuration and can include paramet
 | `type`                      | string  | The type of the pipe: `PipeExtract`                                                                          | Yes      |
 | `description`               | string  | A description of the OCR operation.                                                                   | Yes      |
 | `inputs`                    | Fixed  | The value must be of concept `Document` or `Image` (or a concept that refines one of them).                                                     | Yes       |
-| `output`                    | string  | The output concept produced by the OCR operation.                                                | Yes      |
+| `output`                    | string  | The output concept produced by the OCR operation. Use `Page[]`.                                  | Yes      |
 | `max_page_images`           | integer or null | Maximum number of images to extract from pages: `null` (or omit) for unlimited, `0` for no images, or a positive integer to limit. Defaults to the value in your Extract model preset. | No       |
 | `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
 | `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
@@ -71,14 +71,14 @@ refines = "Page"
 type = "PipeExtract"
 description = "Extract text from a scanned document"
 inputs = { document = "ScannedDocument" }
-output = "Page"
+output = "Page[]"
 page_views = true
 page_views_dpi = 200
 ```
 
-The output of the PipeExtract must be exactly the native `Page` concept.
+The output of `PipeExtract` must be `Page[]`.
 
-To use this pipe, you would first need to load a PDF into the `ScannedDocument` concept. After the pipe runs, the `ExtractedPages` concept will contain a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.
+To use this pipe, first load a PDF into the `ScannedDocument` concept. After the pipe runs, the output contains a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.
 
 ## Related Documentation
 

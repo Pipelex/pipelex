@@ -39,7 +39,7 @@ Common search presets:
 | `type`        | string     | The type of the pipe: `PipeSearch`                                                                                                                  | Yes      |
 | `description` | string     | A description of the search operation.                                                                                                              | Yes      |
 | `inputs`      | dictionary | The input concept(s) for the search query, as a dictionary mapping input names to concept codes. Required when the prompt references variables.     | No       |
-| `output`      | string     | The output concept produced by the search. Must be `SearchResult` or a concept that refines `SearchResult`.                                         | Yes      |
+| `output`      | string     | The output concept produced by the search. `SearchResult` is the default shape, but PipeSearch can also target a structured output concept.         | Yes      |
 | `model`       | string     | The search model preset to use (e.g., `"$standard"`, `"$deep"`). Defaults to the model specified in the global config.                | No       |
 | `prompt`      | string     | The search query. Can be a static string or reference input variables using `$` prefix (e.g., `"What is $topic?"`).                                 | Yes      |
 | `include_images` | boolean | Whether to include images in search results. Overrides the preset setting.                                                                        | No       |
@@ -106,7 +106,7 @@ from_date = "2026-01-01"
 include_domains = ["reuters.com", "apnews.com", "bbc.com"]
 ```
 
-The output of PipeSearch must be `SearchResult` or a concept that refines `SearchResult`. After execution, the output contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets.
+When the output concept is compatible with `SearchResult`, the output contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets. PipeSearch can also feed a structured output concept when your method needs a more specialized downstream shape.
 
 ## Related Documentation
 

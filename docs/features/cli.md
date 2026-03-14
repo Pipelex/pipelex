@@ -25,6 +25,14 @@ The `pipelex` CLI is the primary tool for working with Pipelex methods. It cover
 | **`pipelex show`** | Display configuration, pipes, and list AI models |
 | **`pipelex which`** | Locate where a pipe is defined, similar to `which` for executables |
 
+## Related CLI
+
+Package manifest management is currently exposed through the lowercase `mthds` CLI:
+
+- `mthds package init`
+- `mthds package list`
+- `mthds package validate`
+
 ## Execution Options
 
 - **Dry run** — `--dry-run` executes with mocked LLM responses to test pipeline logic without API calls
@@ -50,3 +58,9 @@ The `pipelex-agent` CLI is a machine-first interface designed for automated envi
 | `doctor` | Check configuration health and auto-fix issues |
 
 For detailed CLI documentation, see the [CLI reference](../tools/cli/index.md).
+
+## Related Documentation
+
+- [CLI Reference](../tools/cli/index.md) - Runtime CLI commands
+- [Agent CLI](../tools/cli/agent-cli.md) - Machine-oriented JSON interface
+- [Package Commands](../tools/cli/pkg.md) - Current `mthds package` manifest commands

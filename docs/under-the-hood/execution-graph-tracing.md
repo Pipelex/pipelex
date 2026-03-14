@@ -30,7 +30,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 
 | Scenario | CLI | API | Result |
 |----------|-----|-----|--------|
-| Generate execution graph | `pipelex run my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
+| Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
 | Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
 | Dry run with graph | `--dry-run --graph` | `dry_run_pipe_with_graph(pipe)` | Graph of mock execution |
@@ -46,16 +46,16 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 
 ```bash
 # Run pipeline and generate graph
-pipelex run my_pipe --graph
+pipelex run pipe my_pipe --graph
 
 # Include full serialized data
-pipelex run my_pipe --graph --graph-full-data
+pipelex run pipe my_pipe --graph --graph-full-data
 
 # Exclude data (previews only)
-pipelex run my_pipe --graph --graph-no-data
+pipelex run pipe my_pipe --graph --graph-no-data
 
 # Dry run with graph tracing
-pipelex run my_pipe --dry-run --graph --mock-inputs
+pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 ```
 
 ### API

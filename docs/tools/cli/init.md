@@ -4,15 +4,16 @@ description: "Initialize your Pipelex project configuration — create .pipelex 
 
 # Init Commands
 
-Initialize project configuration files in your project's `.pipelex` directory.
+Initialize Pipelex configuration files and related setup flows.
 
 ## Initialize Configuration
 
 ```bash
 pipelex init [FOCUS]
+pipelex init --local [FOCUS]
 ```
 
-Creates the `.pipelex` directory structure, copies default configuration files, and guides you through backend and telemetry setup.
+By default, `pipelex init` writes to the global config directory at `~/.pipelex/`. Use `--local` to create a project-level `.pipelex/` directory at the detected project root.
 
 !!! note "Config updates not yet supported"
     The `pipelex init` command always performs a full reset of the configuration. Incremental config updates will be supported in a future release.
@@ -21,7 +22,9 @@ Creates the `.pipelex` directory structure, copies default configuration files, 
 
 - `FOCUS` - What to initialize (optional):
     - `all` (default) - Initialize everything
+    - `agreement` - Review or accept Pipelex Gateway terms
     - `config` - Only configuration files
+    - `credentials` - Prompt for missing credentials only
     - `inference` - Only inference backend setup
     - `routing` - Only routing profile setup
     - `telemetry` - Only telemetry configuration
@@ -29,22 +32,31 @@ Creates the `.pipelex` directory structure, copies default configuration files, 
 **Examples:**
 
 ```bash
-# Initialize everything (recommended for first-time setup)
+# Initialize global config (recommended for first-time setup)
 pipelex init
+
+# Initialize project-local config
+pipelex init --local
 
 # Initialize only configuration files
 pipelex init config
+
+# Prompt only for missing credentials
+pipelex init credentials
 
 # Reconfigure inference backends
 pipelex init inference
 
 # Reconfigure telemetry settings
 pipelex init telemetry
+
+# Review gateway terms
+pipelex init agreement
 ```
 
 ## What Gets Initialized
 
-This command creates the `.pipelex/` directory with:
+This command creates or resets a Pipelex config directory with:
 
 - **pipelex.toml** - Main configuration file for logging, reporting, etc.
 - **inference/** - AI backend and routing configuration
@@ -56,11 +68,13 @@ This command creates the `.pipelex/` directory with:
 
 ## Interactive Setup Flow
 
-When you run `pipelex init`, you'll be guided through:
+When you run `pipelex init`, Pipelex can guide you through:
 
-1. **Backend Selection** - Choose which AI providers to enable (OpenAI, Anthropic, Mistral, Pipelex Gateway, etc.)
-2. **Routing Configuration** - Set up how models are routed to backends
-3. **Telemetry Setup** - Configure observability and analytics
+1. **Config reset** - Recreate the selected config files
+2. **Backend selection** - Choose which AI providers to enable
+3. **Credential prompts** - Fill in missing keys when relevant
+4. **Routing configuration** - Set up how models are routed to backends
+5. **Telemetry setup** - Configure observability and analytics
 
 ## Non-Interactive Init (`pipelex-agent init`)
 

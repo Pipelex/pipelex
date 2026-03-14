@@ -1,8 +1,9 @@
 ---
+title: "LLM Prompting Style Configuration"
 description: "Adapt prompting styles for OpenAI, Anthropic, Mistral, and other LLM providers to get the best results from your Pipelex methods."
 ---
 
-# Prompting Configuration
+# LLM Prompting Style Configuration
 
 The `PromptingConfig` class controls how Pipelex handles prompting styles for different LLM targets.
 
@@ -59,3 +60,9 @@ This allows for:
 - Configure specific styles for LLMs with unique requirements
 - Test prompting styles with each LLM target
 - Document any special formatting requirements
+
+## Related Documentation
+
+- [LLM Structured Generation Configuration](./llm-structured-generation-config.md) - Control text-then-structure behavior
+- [PipeLLM](./pipes/pipe-operators/PipeLLM.md) - Pipe-level prompting and output controls
+- [LLM Integration](../features/llm-integration.md) - High-level LLM capability overview

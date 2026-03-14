@@ -1,8 +1,9 @@
 ---
+title: "LLM Structured Generation Configuration"
 description: "Control how Pipelex generates structured outputs from LLMs, including the two-step text-then-structure approach for typed JSON schemas."
 ---
 
-# Structure Configuration
+# LLM Structured Generation Configuration
 
 The `StructureConfig` class controls how Pipelex handles structural processing of content, particularly in LLM-based pipes.
 
@@ -77,9 +78,8 @@ The two-step process uses:
 
 1. The pipe's configured prompts for initial text generation
 2. A specialized structure extraction prompt that can be customized in the `pipelex.toml` config in the `[cogt.llm_config.generic_templates]` section:
-
- - `structure_from_preliminary_text_system`: The system prompt for the second LLM call
- - `structure_from_preliminary_text_user`: The user prompt for the second LLM call
+    - `structure_from_preliminary_text_system`: The system prompt for the second LLM call
+    - `structure_from_preliminary_text_user`: The user prompt for the second LLM call
 
 
 ## Example Flow
@@ -95,3 +95,9 @@ graph TD
     B -->|false| G[Direct Structure Generation]
     G --> H
 ```
+
+## Related Documentation
+
+- [PipeLLM](./pipes/pipe-operators/PipeLLM.md) - Structured output behavior at the pipe level
+- [LLM Prompting Style Configuration](./adapt-to-llm-prompting-style-openai-anthropic-mistral.md) - Prompt formatting by target model
+- [LLM Integration](../features/llm-integration.md) - High-level LLM capability overview

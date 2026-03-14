@@ -1,5 +1,6 @@
 ---
-description: "Get started with Pipelex in minutes — configure AI providers, organize your .mthds files, and set up your first executable AI methods project."
+title: "Setup"
+description: "Set up Pipelex for your first MTHDS methods project. Configure AI providers, organize `.mthds` files, and choose your project layout."
 ---
 
 # Setup (first run)
@@ -15,7 +16,7 @@ If you already have a project running and want to tune behavior, jump to [Config
 
 ## Quick guide
 
-- **Need to run pipelines with LLMs?** Start with [Configure AI Providers](./configure-ai-providers.md).
+- **Need to run methods with LLMs?** Start with [Configure AI Providers](./configure-ai-providers.md).
 - **Need a recommended repo layout for `.mthds` and Python code?** See [Project Organization](./project-organization.md).
 - **Need to understand telemetry and privacy trade-offs?** See [Telemetry](./telemetry.md).
 - **Ready to tune the knobs?** Go to [Configuration Overview](../configuration/index.md).

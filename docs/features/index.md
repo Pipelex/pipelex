@@ -5,7 +5,7 @@ description: "Explore all Pipelex capabilities: declarative AI methods, 60+ mode
 
 # Pipelex Features
 
-Pipelex is the AI method framework that eliminates the complexity of building AI-powered applications. One framework for prompts, pipelines, and structured outputs. One API key for dozens of AI models. One method from prototype to production.
+Pipelex is the reference runtime for AI methods written in MTHDS. This section covers the main capabilities you use to define methods, run them, and operate them in production.
 
 This section covers all Pipelex capabilities, organized by area.
 
@@ -69,7 +69,7 @@ This section covers all Pipelex capabilities, organized by area.
 
 -   **[Claude Code Skills Plugin](claude-code-skills-plugin.md)**
 
-    Build, run, validate, and edit AI methods directly from Claude Code with the MTHDS skills plugin. 10+ slash commands for the full method lifecycle.
+    Build, run, validate, and edit AI methods directly from Claude Code with the MTHDS skills plugin. Slash commands cover the full method lifecycle.
 
 -   **[CLI](cli.md)**
 

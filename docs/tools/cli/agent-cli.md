@@ -95,25 +95,28 @@ These commands do not have subcommands:
 
 ## Output Contract
 
-Every command (except `fmt` and `lint`) returns structured JSON via one of two functions:
+Every command (except `fmt` and `lint`) returns structured JSON.
 
 **Success** — written to stdout:
 
 ```json
 {
-  "status": "success",
-  "data": { ... }
+  "success": true,
+  "target_dir": "/path/to/.pipelex",
+  "backends_enabled": ["openai"]
 }
 ```
+
+Successful commands return the result object directly. They are not wrapped in a `status` or `data` envelope.
 
 **Error** — written to stderr:
 
 ```json
 {
-  "status": "error",
+  "error": true,
   "error_type": "specific_error_type",
   "message": "Human-readable description",
-  "domain": "input | config | runtime",
+  "error_domain": "input",
   "hint": "Suggested fix or next step",
   "retryable": false
 }

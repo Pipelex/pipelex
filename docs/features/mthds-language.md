@@ -21,7 +21,7 @@ A bundle is a complete method package defined in a single `.mthds` file. It cont
 
 ## Packages & Dependencies
 
-Package management with `METHODS.toml` manifest files. Declare package identity, dependencies with semantic version constraints (exact, caret, tilde, comparison), and export visibility controls. Packages can be installed from GitHub repositories or local directories.
+Use `METHODS.toml` to declare package identity and exports. The current public package-manifest workflow is documented through the lowercase `mthds` CLI: `mthds package init`, `mthds package list`, and `mthds package validate`.
 
 ## Cross-Package References
 
@@ -33,4 +33,10 @@ Inline concept structures with nested concepts make Pipelex fully usable with ju
 
 ## Language Specification
 
-For the formal language specification, see [mthds.ai](https://mthds.ai).
+For the formal language specification, see [mthds.ai](https://mthds.ai). For package-manifest details, see [Packages](../building-methods/packages.md).
+
+## Related Documentation
+
+- [Packages](../building-methods/packages.md) - `METHODS.toml` manifests and exports
+- [Concepts](./concepts.md) - Semantic typing and structured content
+- [Pipe Operators](./pipe-operators.md) - The operators you can declare in `.mthds` files

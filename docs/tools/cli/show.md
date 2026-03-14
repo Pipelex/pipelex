@@ -4,7 +4,7 @@ description: "Inspect your Pipelex configuration, browse pipeline definitions, a
 
 # Show Commands
 
-Inspect your Pipelex configuration, pipelines, and available AI models.
+Inspect your Pipelex configuration, pipes, and available AI models.
 
 ## Show Configuration
 
@@ -27,7 +27,7 @@ pipelex show config
 ## List All Pipes
 
 ```bash
-pipelex show pipes
+pipelex show pipe --all
 ```
 
 Lists all pipes discovered in your project and imported packages, showing their pipe codes and basic information.
@@ -36,7 +36,7 @@ Lists all pipes discovered in your project and imported packages, showing their 
 
 ```bash
 # List all available pipes
-pipelex show pipes
+pipelex show pipe --all
 ```
 
 This includes:

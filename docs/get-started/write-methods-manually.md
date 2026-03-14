@@ -1,13 +1,13 @@
 ---
 title: "Getting Started — Writing Methods"
-description: "Learn how to write Pipelex AI methods manually. Create pipelines, define concepts, and understand the .mthds language step by step."
+description: "Learn how to write Pipelex AI methods manually. Create methods, define concepts, and understand the `.mthds` language step by step."
 ---
 
 # Writing Methods
 
-Ready to dive deeper? This section shows you how to manually create pipelines and understand the `.mthds` language.
+Ready to dive deeper? This section shows you how to manually create methods and understand the `.mthds` language.
 
-## Write Your First Pipeline
+## Write Your First Method
 
 Let's build a **character generator** to understand the basics.
 Create a `.mthds` file anywhere in your project (we recommend a `pipelines` directory):
@@ -34,7 +34,7 @@ This pipeline is a simple LLM call without any input, with the provided prompt a
 **CLI:**
 
 ```bash
-pipelex run create_character
+pipelex run pipe create_character
 ```
 
 **Python:**

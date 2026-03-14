@@ -1,5 +1,6 @@
 ---
-description: "Explore Pipelex logging — custom log levels like VERBOSE and DEV, Rich console formatting, and emoji support for better debugging."
+title: "Logging"
+description: "Explore Pipelex logging: custom log levels, Rich console formatting, caller information, and structured data logging for debugging."
 ---
 
 # Pipelex Logging System
@@ -124,3 +125,8 @@ log.verbose("Detailed debug information")
     - Use `include_exception=True` for error context
     - Include relevant data in error logs
     - Use appropriate log levels for exceptions
+
+## Related Documentation
+
+- [Logging Configuration](../configuration/config-practical/logging-config.md) - Configure log behavior in `pipelex.toml`
+- [CLI](./cli/index.md) - Commands that surface runtime logs during development

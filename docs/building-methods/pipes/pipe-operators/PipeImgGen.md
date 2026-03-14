@@ -69,8 +69,12 @@ Image generation presets are defined in your model deck configuration and can in
 | `output`                | string          | The output concept produced by the image generation operation. Use bracket notation for multiple images: `"Image[3]"` generates exactly 3 images.                                                | Yes      |
 | `model`           | string          | The choice of image generation model name, setting, or preset to use (e.g., `"gpt-image-1"`). Defaults to the model specified in the global config.    | No       |
 | `prompt`                | string          | The image generation prompt. Can be a static string or reference input variables using `$` prefix (e.g., `"$description"` or `"A sketch of: $subject"`). | Yes      |
+| `negative_prompt`       | string          | Optional negative prompt when supported by the selected model or provider.                                                    | No       |
 | `aspect_ratio`          | string          | The desired aspect ratio of the image. Valid values: `"square"`, `"landscape_4_3"`, `"landscape_3_2"`, `"landscape_16_9"`, `"landscape_21_9"`, `"portrait_3_4"`, `"portrait_2_3"`, `"portrait_9_16"`, `"portrait_9_21"`.                                                              | No       |
 | `seed`                  | integer or "auto" | A seed for the random number generator to ensure reproducibility. `"auto"` uses a random seed.                                | No       |
+| `background`            | string          | Optional background setting when supported by the selected provider.                                                          | No       |
+| `output_format`         | string          | Optional output image format when supported by the selected provider.                                                         | No       |
+| `is_raw`                | boolean         | Request a raw generation mode when supported by the selected provider.                                                        | No       |
 
 ### Example: Generating a single image from a static prompt
 
@@ -84,7 +88,6 @@ output = "Image"
 prompt = "A sleek, futuristic sports car driving on a neon-lit highway at night."
 model = "$gen-image"
 aspect_ratio = "landscape_16_9"
-quality = "high"
 ```
 
 ### Example: Generating an image from a dynamic prompt
