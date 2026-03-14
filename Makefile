@@ -802,6 +802,9 @@ check-TODOs: env
 DOCS_VERSION := $(shell grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
 SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
 
+# Authoritative robots.txt for the domain root (docs.pipelex.com/robots.txt).
+# Deployed by docs-deploy-root. Note: docs/robots.txt is a no-op — it only
+# lands at /latest/robots.txt, which crawlers ignore per RFC 9309.
 define ROOT_ROBOTS_TXT
 User-agent: *
 Allow: /latest/

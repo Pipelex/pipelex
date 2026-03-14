@@ -3,10 +3,10 @@
 
 {% block extrahead %}
 {{ super() }}
-{% if page and page.meta %}
-{% set desc = page.meta.description or config.site_description %}
-{% set title = page.meta.title or page.title %}
-{% set img = page.meta.image or "https://d2cinlfp2qnig1.cloudfront.net/docs/pipelex_banner_1200x630.png?v=1" %}
+{% if page %}
+{% set desc = page.meta.description if page.meta and page.meta.description else config.site_description %}
+{% set title = page.meta.title if page.meta and page.meta.title else page.title %}
+{% set img = page.meta.image if page.meta and page.meta.image else "https://d2cinlfp2qnig1.cloudfront.net/docs/pipelex_banner_1200x630.png?v=1" %}
 {% set og_type = "website" if page.is_homepage or page.file.url in ('.', './', 'index.html') else "article" %}
 <meta property="og:type" content="{{ og_type }}">
 <meta property="og:site_name" content="{{ config.site_name }}">

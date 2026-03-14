@@ -1,0 +1,7 @@
+{% extends "main.html" %}
+
+{% block extrahead %}
+{{ super() }}
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="{{ config.site_url }}">
+{% endblock %}

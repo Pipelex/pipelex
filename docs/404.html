@@ -2,7 +2,83 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>Redirecting...</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <link rel="canonical" href="https://docs.pipelex.com/latest/">
+    <title>Page not found | Pipelex Documentation</title>
+    <style>
+        :root {
+            color-scheme: dark;
+            --bg: #2e303e;
+            --panel: #393b4d;
+            --text: #f1f3f8;
+            --muted: #b6bdd1;
+            --accent: #45bf9f;
+            --accent-hover: #62d4b7;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 24px;
+            background: radial-gradient(circle at top, #3a3d52 0%, var(--bg) 55%);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        main {
+            max-width: 720px;
+            padding: 32px;
+            border-radius: 18px;
+            background: rgba(57, 59, 77, 0.92);
+            box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
+        }
+
+        h1 {
+            margin: 0 0 12px;
+            font-size: clamp(2rem, 4vw, 2.8rem);
+            line-height: 1.1;
+        }
+
+        p {
+            margin: 0 0 12px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+        a:hover {
+            color: var(--accent-hover);
+        }
+
+        .actions {
+            margin-top: 20px;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 18px;
+            border-radius: 999px;
+            background: var(--accent);
+            color: #102019;
+            font-weight: 600;
+        }
+
+        .button:hover {
+            color: #102019;
+            background: var(--accent-hover);
+        }
+    </style>
     <script>
         const path = window.location.pathname;
         // Get path segments (e.g., "/latest/foo/bar" → ["latest", "foo", "bar"])
@@ -55,16 +131,17 @@
                 ? '/' + firstSegment + rewrittenPath + window.location.search + window.location.hash
                 : '/' + firstSegment + '/404.html';
             window.location.replace(version404Url);
-        } else {
-            // We're on /latest/404.html and it still 404'd - show basic error
-            document.write('<h1>Page not found</h1><p>The page you requested does not exist. <a href="/latest/">Go to documentation</a>.</p>');
         }
     </script>
 </head>
 <body>
-    <noscript>
+    <main>
         <h1>Page not found</h1>
-        <p>Enable JavaScript for automatic redirects, or go to <a href="/latest/">the documentation</a>.</p>
-    </noscript>
+        <p>The page you requested does not exist in this documentation version.</p>
+        <p>If you followed an old link, the redirect rules may already have sent you to the closest matching page under <code>/latest/</code>.</p>
+        <div class="actions">
+            <a class="button" href="/latest/">Go to the latest docs</a>
+        </div>
+    </main>
 </body>
 </html>
