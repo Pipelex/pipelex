@@ -31,7 +31,7 @@
   "description": "{{ config.site_description }}"
 }
 </script>
-{% endif %}
+{% else %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -46,5 +46,6 @@
   }
 }
 </script>
+{% endif %}
 {% endif %}
 {% endblock %}

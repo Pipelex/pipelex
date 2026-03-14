@@ -186,7 +186,7 @@
 
     **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
 
-    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/#build-commands) for usage examples.
+    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
 
 - **New Backends & Models**:
     - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
@@ -558,7 +558,7 @@
 
     **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
 
-    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/#build-commands) for usage examples.
+    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
 
 - **New Backends & Models**:
     - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.

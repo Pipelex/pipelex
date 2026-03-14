@@ -3555,7 +3555,7 @@ requires-dist = [
     { name = "mkdocs-glightbox", marker = "extra == 'docs'", specifier = ">=0.4.0" },
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.6.14" },
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
-    { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = ">=1.2.1" },
+    { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
     { name = "mthds", specifier = ">=0.1.1" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },

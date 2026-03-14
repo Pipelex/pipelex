@@ -1,6 +1,6 @@
 # Pipelex Gateway — Available Models
 This file lists the LLMs, document extraction models, and image generation models currently available through Pipelex Gateway.
-For configuration details, see the [documentation](https://docs.pipelex.com/latest/home/5-setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started).
+For configuration details, see the [documentation](https://docs.pipelex.com/latest/setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started).
 
 ## Language Models (LLM)
 

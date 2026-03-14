@@ -48,8 +48,10 @@
             // Fall back to /latest/404.html
             window.location.replace('/latest/404.html');
         } else if (!isVersionRoot404) {
-            // Has version but not on 404 page, redirect to that version's styled 404 page
-            const version404Url = '/' + firstSegment + '/404.html';
+            // Has version but not on 404 page, rewrite old paths then redirect to that version's styled 404 page
+            const remainingPath = '/' + segments.slice(1).join('/');
+            const rewrittenPath = rewritePath(remainingPath);
+            const version404Url = '/' + firstSegment + rewrittenPath + window.location.search + window.location.hash;
             window.location.replace(version404Url);
         } else {
             // We're on /latest/404.html and it still 404'd - show basic error
