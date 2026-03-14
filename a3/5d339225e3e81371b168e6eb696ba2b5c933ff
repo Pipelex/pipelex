@@ -1,0 +1,23 @@
+docs/overrides/404.html
+  df18df0e95ee9b79 8-13
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "a35d339225e3e81371b168e6eb696ba2b5c933ff",
+  "prompts": {
+    "df18df0e95ee9b79": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b207f3e1-fd19-40bc-bfa6-e4e0238c1370",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
