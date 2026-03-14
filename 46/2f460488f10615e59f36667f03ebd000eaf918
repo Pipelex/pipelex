@@ -1,0 +1,23 @@
+docs/building-methods/pipes/pipe-operators/PipeImgGen.md
+  93cc3bf4453e8b16 72,86-87,130
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "462f460488f10615e59f36667f03ebd000eaf918",
+  "prompts": {
+    "93cc3bf4453e8b16": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1dc10149-2498-422f-b25f-4429a494b780",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 4,
+      "total_deletions": 4,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
