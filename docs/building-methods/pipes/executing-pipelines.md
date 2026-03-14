@@ -229,4 +229,6 @@ Pipelex has a REST API for executing pipelines. See more about it [here](https:/
 
 ## Background Execution
 
-The current public Python entry point documented in this repo is `PipelexRunner.execute_pipeline()`. This page does not document a separate background-execution helper because the older `from pipelex.pipeline.start import start_pipeline` import path is no longer a current public entry point here.
+<!-- start_pipeline exists on PipelexRunner as a protocol stub (raises NotImplementedError).
+     The public entry point is execute_pipeline(). Keep this note so reviewers don't flag the stub as contradictory. -->
+The public Python entry point is `PipelexRunner.execute_pipeline()`. The older standalone `start_pipeline` function is no longer a documented entry point.

@@ -13,7 +13,7 @@ pipelex init [FOCUS]
 pipelex init --local [FOCUS]
 ```
 
-By default, `pipelex init` writes to the global config directory at `~/.pipelex/`. Use `--local` to create a project-level `.pipelex/` directory at the detected project root.
+By default, `pipelex init` writes to the global config directory at `~/.pipelex/`. Use `--local` to create a project-level `.pipelex/` directory at the detected project root. Credentials and Gateway service terms always remain in the global `~/.pipelex/` directory regardless of `--local`.
 
 !!! note "Config updates not yet supported"
     The `pipelex init` command always performs a full reset of the configuration. Incremental config updates will be supported in a future release.

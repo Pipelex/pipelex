@@ -17,6 +17,9 @@ Template mode uses [Jinja2 templates](https://jinja.palletsprojects.com/) to dyn
 
 `PipeCompose` takes all the data currently in the `WorkingMemory` and uses it as the context for rendering a Jinja2 template. The resulting text is then saved back to the working memory as a new `Text` or `Html` output.
 
+<!-- target_format is a pipelex convenience field (PipeComposeSpec in pipe_compose_spec.py),
+     transformed to TemplateBlueprint at build time. The MTHDS standard uses category +
+     templating_style.text_format, but pipelex exposes target_format as a simpler authoring form. -->
 The public authoring form uses a top-level `template` field plus a required `target_format`.
 
 ### Template Context

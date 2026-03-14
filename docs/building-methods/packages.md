@@ -58,7 +58,7 @@ The `[exports]` section controls which pipes are visible outside the package.
 ### Default Behavior
 
 - **Without `METHODS.toml`**: local bundles are still available to your project
-- **With `METHODS.toml`**: exported pipes are declared explicitly in `[exports]`
+- **With `METHODS.toml`**: pipes are private by default — only pipes listed in `[exports]` (and each bundle's `main_pipe`) are visible from outside
 
 ### Declaring Exports
 
