@@ -1,0 +1,25 @@
+pipelex/kit/configs/inference/backends/pipelex_gateway_models.md
+  65ef41d44f4a45fc 3
+pipelex/kit/configs/inference/backends/pipelex_gateway_models_plain.md
+  65ef41d44f4a45fc 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "75d7c5cd06e4cd675abddb8801b8d9dbeb35a3bf",
+  "prompts": {
+    "65ef41d44f4a45fc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84be29fc-5156-42f2-bc53-5d95ca813de2",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
