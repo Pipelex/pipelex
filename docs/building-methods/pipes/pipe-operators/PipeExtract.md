@@ -82,7 +82,6 @@ To use this pipe, first load a PDF into the `ScannedDocument` concept. After the
 
 ## Related Documentation
 
-- [Simple OCR Example](../../../cookbook/simple-ocr.md) - Basic OCR pipeline using PipeExtract
-- [Generic Extraction Example](../../../cookbook/extract-generic.md) - Multi-modal document extraction
-- [Invoice Extractor Example](../../../cookbook/invoice-extractor.md) - Complete invoice processing pipeline
+- [Generic Document Extraction Example](../../../cookbook/extract-generic.md) - Extract markdown from complex PDFs using vision
+- [Invoice Extraction Example](../../../cookbook/extract-invoice.md) - Complete invoice processing pipeline
 - [Document Extraction Feature](../../../features/document-extraction.md) - Overview of document extraction capabilities

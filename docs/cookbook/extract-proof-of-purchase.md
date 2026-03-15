@@ -1,85 +1,73 @@
 ---
-description: "Build a pipeline that extracts structured data from receipts and invoices using declarative AI workflows and .mthds files."
+title: "Proof of Purchase Extraction"
+description: "Extract structured data from receipts and invoices using vision-based AI — including products, amounts, and payment details."
 ---
 
 # Example: Proof of Purchase Extraction
 
-This example demonstrates a pipeline designed to extract structured data from a proof of purchase, such as a receipt or an invoice.
+This example extracts structured data from receipts and invoices. It defines nested data concepts (`Product` inside `ProofOfPurchase`) and uses vision-based extraction to capture all details from the document.
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_proof_of_purchase/extract_proof_of_purchase.py)
+[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_proof_of_purchase/bundle.mthds)
 
-## The Pipeline Explained
+## What it demonstrates
 
-The pipeline `power_extractor_proof_of_purchase` is specifically designed to handle receipts and invoices. It extracts key information and returns a structured `ProofOfPurchase` object.
+- Nested structured concepts (`Product` referenced inside `ProofOfPurchase`)
+- Vision-based extraction with `$vision` model and `structuring_method = "preliminary_text"`
+- Using shared method packages for page extraction
+- Batching over pages to process each independently
 
-```python
-async def extract_proof_of_purchase(pdf_url: str) -> ProofOfPurchase:
-    pipe_output = await execute_pipeline(
-        pipe_code="power_extractor_proof_of_purchase",
-        inputs={
-            "document": DocumentContent(url=pdf_url),
-        },
-    )
-    working_memory = pipe_output.working_memory
-    proof_of_purchase: ProofOfPurchase = working_memory.get_list_stuff_first_item_as(name="proof_of_purchase", item_type=ProofOfPurchase)
-    return proof_of_purchase
-```
+## The Method: `bundle.mthds`
 
-This is a great starting point for building more complex expense processing or accounting automation pipelines.
-
-## The Data Structure: `ProofOfPurchase` Model
-
-The pipeline is designed to extract a `ProofOfPurchase` object, which is a structured model that includes a list of `Products`.
-
-```python
-class Products(StructuredContent):
-    name: Optional[str] = None
-    quantity: Optional[int] = None
-    unit_price: Optional[float] = None
-    total_price: Optional[float] = None
-
-
-class ProofOfPurchase(StructuredContent):
-    date_of_purchase: Optional[datetime] = None
-    amount_paid: Optional[float] = None
-    currency: Optional[str] = None
-    payment_method: Optional[str] = None
-    purchase_number: Optional[str] = None
-    products: Optional[List[Products]] = None
-```
-This demonstrates how you can create nested data structures to accurately model your data.
-
-## The Pipeline Definition: `extract_proof_of_purchase.mthds`
-
-The pipeline uses a powerful `PipeLLM` to extract the structured data from the document. The prompt is carefully engineered to guide the LLM.
+### Concepts
 
 ```toml
-[pipe.write_markdown_from_page_content_proof_of_purchase]
-type = "PipeLLM"
-description = "Write markdown from page content"
-inputs = { "page_content.page_view" = "Image", page_content = "Page" }
-output = "ProofOfPurchase"
-model = "$vision"
-structuring_method = "preliminary_text"
-system_prompt = """You are a multimodal LLM, expert at converting images into perfect markdown."""
-prompt = """
-You are given an image of a proof of purchase: $page_content.page_view
-Your role is to convert the image into perfect markdown.
+[concept.Product]
+description = "A product in a proof of purchase"
 
-To help you do so, you are given the text extracted from the page by an OCR model.
-@page_content.text_and_images.text.text
+[concept.Product.structure]
+name        = { type = "text", description = "Name of the product" }
+quantity    = { type = "integer", description = "Quantity purchased" }
+unit_price  = { type = "number", description = "Unit price of the product" }
+total_price = { type = "number", description = "Total price for this product" }
 
-- Ensure you collect every title, number, and currency from the proof of purchase.
-- Pay attention to the text alignment, it might have been misaligned by the OCR.
-- The OCR extraction may be highly incomplete. It is your job to complete the text and add the missing information using the image.
-- Output only the markdown, nothing else. No need for "```markdown" or "```".
-- You can use HTML if it helps you.
-- You can use tables if it is relevant.
-"""
+[concept.ProofOfPurchase]
+description = "Elements from a proof of purchase"
+
+[concept.ProofOfPurchase.structure]
+date_of_purchase = { type = "date", description = "Date of the purchase" }
+amount_paid      = { type = "number", description = "Total amount paid" }
+currency         = { type = "text", description = "Currency used for the purchase" }
+payment_method   = { type = "text", description = "Method of payment used" }
+purchase_number  = { type = "text", description = "Purchase or receipt number" }
+products         = { type = "list", item_type = "concept",
+                     item_concept_ref = "extract_proof_of_purchase.Product",
+                     description = "List of products purchased" }
 ```
-The combination of a detailed prompt, the OCR text, and the document image allows the LLM to accurately extract the required information and structure it as a `ProofOfPurchase` object.
+
+### Pipeline
+
+```toml
+[pipe.power_extractor_proof_of_purchase]
+type = "PipeSequence"
+inputs = { document = "Document" }
+output = "ProofOfPurchase[]"
+steps = [
+  { pipe = "github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views",
+    result = "page_contents" },
+  { pipe = "write_markdown_from_page_content_proof_of_purchase",
+    batch_over = "page_contents", batch_as = "page_content",
+    result = "proof_of_purchase" },
+]
+```
+
+## How to run
+
+```bash
+pipelex run bundle examples/b_basics/document_extract/extract_proof_of_purchase/bundle.mthds \
+  -i examples/b_basics/document_extract/extract_proof_of_purchase/inputs.json
+```
 
 ## Related Documentation
 

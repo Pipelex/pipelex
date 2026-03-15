@@ -91,8 +91,10 @@ plugins:
         'home/4-cookbook-examples/extract-table.md': 'cookbook/extract-table.md'
         'home/4-cookbook-examples/hello-world.md': 'cookbook/hello-world.md'
         'home/4-cookbook-examples/index.md': 'cookbook/index.md'
-        'home/4-cookbook-examples/invoice-extractor.md': 'cookbook/invoice-extractor.md'
-        'home/4-cookbook-examples/simple-ocr.md': 'cookbook/simple-ocr.md'
+        'home/4-cookbook-examples/invoice-extractor.md': 'cookbook/extract-invoice.md'
+        'home/4-cookbook-examples/simple-ocr.md': 'cookbook/index.md'
+        'cookbook/simple-ocr.md': 'cookbook/index.md'
+        'cookbook/invoice-extractor.md': 'cookbook/extract-invoice.md'
         'home/4-cookbook-examples/write-tweet.md': 'cookbook/write-tweet.md'
         'home/5-setup/configure-ai-providers.md': 'setup/configure-ai-providers.md'
         'home/5-setup/gateway-models.md': 'setup/gateway-models.md'
@@ -205,18 +207,31 @@ nav:
       - Telemetry: setup/telemetry.md
     - Cookbook Examples:
       - Overview: cookbook/index.md
-      - Hello World: cookbook/hello-world.md
-      - Document Processing:
-        - Simple OCR: cookbook/simple-ocr.md
-        - Generic Document Extraction: cookbook/extract-generic.md
-        - Invoice Extractor: cookbook/invoice-extractor.md
-        - Proof of Purchase Extraction: cookbook/extract-proof-of-purchase.md
-      - Graphical Extraction:
-        - Gantt Chart Extraction: cookbook/extract-gantt.md
-        - Table Extraction from Image: cookbook/extract-table.md
-        - DPE Extraction: cookbook/extract-dpe.md
-      - Text Generation:
-        - Tweet Optimizer (wip): cookbook/write-tweet.md
+      - Quick Start:
+        - Hello World: cookbook/hello-world.md
+        - Summarize: cookbook/summarize.md
+      - Document Extraction:
+        - Generic Document: cookbook/extract-generic.md
+        - Invoice: cookbook/extract-invoice.md
+        - Proof of Purchase: cookbook/extract-proof-of-purchase.md
+        - DPE (Energy Diagnostic): cookbook/extract-dpe.md
+        - Table from Image: cookbook/extract-table.md
+        - Gantt Chart: cookbook/extract-gantt.md
+        - Markdown from Document: cookbook/extract-markdown.md
+        - Slides from Presentation: cookbook/extract-slides.md
+      - Visual Generation:
+        - Design Slides: cookbook/design-slides.md
+        - Generate Image: cookbook/generate-image.md
+      - Advanced:
+        - Synthetic Data: cookbook/gen-synthetic-data.md
+        - Expense Data with Receipts: cookbook/gen-expense-data.md
+        - Using Inference Plugins: cookbook/using-inference-plugins.md
+      - Work in Progress:
+        - Tweet Optimizer: cookbook/write-tweet.md
+        - Blog Article Generator: cookbook/blog-article-generator.md
+        - Advisory Board: cookbook/advisory-board.md
+        - Discord Newsletter: cookbook/discord-newsletter.md
+        - Expense Validation: cookbook/validate-expense-data.md
     - Viewpoint:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
