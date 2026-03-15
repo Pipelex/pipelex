@@ -15,6 +15,7 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
+    - navigation.indexes
     - navigation.top
     - content.code.copy
   palette:
@@ -194,11 +195,33 @@ extra_css:
   - stylesheets/general.css
 
 nav:
-  - Home:
+  - Get Started:
     - What is Pipelex?: index.md
     - Getting Started: get-started/write-methods-manually.md
+    - Setup:
+      - setup/index.md
+      - Configure AI Providers: setup/configure-ai-providers.md
+      - Project Organization: setup/project-organization.md
+      - Telemetry: setup/telemetry.md
+    - Cookbook Examples:
+      - cookbook/index.md
+      - Hello World: cookbook/hello-world.md
+      - Document Processing:
+        - Simple OCR: cookbook/simple-ocr.md
+        - Generic Document Extraction: cookbook/extract-generic.md
+        - Invoice Extractor: cookbook/invoice-extractor.md
+        - Proof of Purchase Extraction: cookbook/extract-proof-of-purchase.md
+      - Graphical Extraction:
+        - Gantt Chart Extraction: cookbook/extract-gantt.md
+        - Table Extraction from Image: cookbook/extract-table.md
+        - DPE Extraction: cookbook/extract-dpe.md
+      - Text Generation:
+        - Tweet Optimizer (wip): cookbook/write-tweet.md
+    - Viewpoint:
+      - The Know-How Graph: viewpoint/viewpoint.md
+  - Guide:
     - Features:
-      - Overview: features/index.md
+      - features/index.md
       - Declarative AI Methods:
         - MTHDS Language: features/mthds-language.md
         - Concepts & Structured Types: features/concepts.md
@@ -223,26 +246,6 @@ nav:
       - Configuration & Extensibility:
         - Configuration System: features/configuration.md
         - Advanced Customizations: features/advanced-customizations.md
-    - Cookbook Examples:
-      - Overview: cookbook/index.md
-      - Hello World: cookbook/hello-world.md
-      - Document Processing:
-        - Simple OCR: cookbook/simple-ocr.md
-        - Generic Document Extraction: cookbook/extract-generic.md
-        - Invoice Extractor: cookbook/invoice-extractor.md
-        - Proof of Purchase Extraction: cookbook/extract-proof-of-purchase.md
-      - Graphical Extraction:
-        - Gantt Chart Extraction: cookbook/extract-gantt.md
-        - Table Extraction from Image: cookbook/extract-table.md
-        - DPE Extraction: cookbook/extract-dpe.md
-      - Text Generation:
-        - Tweet Optimizer (wip): cookbook/write-tweet.md
-    - Setup (first run):
-      - Overview: setup/index.md
-      - Configure AI Providers: setup/configure-ai-providers.md
-      - Gateway Available Models: setup/gateway-models.md
-      - Project Organization: setup/project-organization.md
-      - Telemetry: setup/telemetry.md
     - Build Reliable AI Methods:
       - Kick off a Method Project: building-methods/kick-off-a-methods-project.md
       - Pipelex Bundle Specification: building-methods/pipelex-bundle-specification.md
@@ -254,7 +257,7 @@ nav:
         - Native Concepts: building-methods/concepts/native-concepts.md
         - Refining Concepts: building-methods/concepts/refining-concepts.md
       - Design and Run Methods:
-        - Overview: building-methods/pipes/index.md
+        - building-methods/pipes/index.md
         - Libraries: building-methods/libraries.md
         - Packages: building-methods/packages.md
         - Executing Pipelines: building-methods/pipes/executing-pipelines.md
@@ -263,7 +266,7 @@ nav:
         - Pipe Output: building-methods/pipes/pipe-output.md
         - Understanding Multiplicity: building-methods/pipes/understanding-multiplicity.md
         - Pipe Operators:
-          - Overview: building-methods/pipes/pipe-operators/index.md
+          - building-methods/pipes/pipe-operators/index.md
           - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md
           - PipeExtract: building-methods/pipes/pipe-operators/PipeExtract.md
           - PipeImgGen: building-methods/pipes/pipe-operators/PipeImgGen.md
@@ -271,7 +274,7 @@ nav:
           - PipeCompose: building-methods/pipes/pipe-operators/PipeCompose.md
           - PipeFunc: building-methods/pipes/pipe-operators/PipeFunc.md
         - Pipe Controllers:
-          - Overview: building-methods/pipes/pipe-controllers/index.md
+          - building-methods/pipes/pipe-controllers/index.md
           - PipeSequence: building-methods/pipes/pipe-controllers/PipeSequence.md
           - PipeParallel: building-methods/pipes/pipe-controllers/PipeParallel.md
           - PipeBatch: building-methods/pipes/pipe-controllers/PipeBatch.md
@@ -279,8 +282,23 @@ nav:
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
       - LLM Structured Generation: building-methods/llm-structured-generation-config.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+  - Reference:
+    - CLI Reference:
+      - tools/cli/index.md
+      - Init: tools/cli/init.md
+      - Validate: tools/cli/validate.md
+      - Run: tools/cli/run.md
+      - Show: tools/cli/show.md
+      - Pkg: tools/cli/pkg.md
+      - Build:
+        - tools/cli/build/index.md
+        - Runner: tools/cli/build/runner.md
+        - Structures: tools/cli/build/structures.md
+        - Inputs: tools/cli/build/inputs.md
+        - Output: tools/cli/build/output.md
+      - Agent CLI: tools/cli/agent-cli.md
     - Configuration (TOML reference):
-      - Overview: configuration/index.md
+      - configuration/index.md
       - Pipeline Validation Configuration:
         - Dry Run: configuration/config-pipeline-validation/dry-run-config.md
       - Practical Configuration:
@@ -294,51 +312,35 @@ nav:
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
         - Feature: configuration/config-advanced/feature-config.md
-    - Analytics:
-      - Observer Data Extraction: analytics/data-extraction.md
     - Tools:
-      - CLI:
-        - Overview: tools/cli/index.md
-        - Init: tools/cli/init.md
-        - Validate: tools/cli/validate.md
-        - Run: tools/cli/run.md
-        - Show: tools/cli/show.md
-        - Pkg: tools/cli/pkg.md
-        - Build:
-          - Overview: tools/cli/build/index.md
-          - Runner: tools/cli/build/runner.md
-          - Structures: tools/cli/build/structures.md
-          - Inputs: tools/cli/build/inputs.md
-          - Output: tools/cli/build/output.md
-        - Agent CLI: tools/cli/agent-cli.md
       - plxt (Formatter & Linter): tools/plxt.md
       - Logging: tools/logging.md
+    - Analytics:
+      - Observer Data Extraction: analytics/data-extraction.md
+    - Gateway Available Models: setup/gateway-models.md
+  - Advanced:
     - Advanced Customizations:
-      - Overview: advanced/index.md
+      - advanced/index.md
       - Secrets Provider: advanced/secrets-provider-injection.md
       - Reporting Delegate: advanced/reporting-delegate-injection.md
       - Storage Provider: advanced/storage-provider-injection.md
       - Observer: advanced/observer-provider-injection.md
       - Content Generator: advanced/content-generator-injection.md
       - Pipe Router: advanced/pipe-router-injection.md
-    - Viewpoint:
-      - The Know-How Graph: viewpoint/viewpoint.md
-  - Under the Hood:
-    - Overview: under-the-hood/index.md
-    - Architecture Overview: under-the-hood/architecture-overview.md
-    - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
-    - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
-    - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
-    - Reasoning Controls: under-the-hood/reasoning-controls.md
-    - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
-    - Test Profile Configuration: under-the-hood/test-profile-configuration.md
-    - Init CLI Flows: under-the-hood/init-cli-flows.md
-  - API: https://pipelex.github.io/pipelex-api/
-  - MCP: https://pipelex.github.io/pipelex-mcp/
-  - n8n: https://pipelex.github.io/n8n-nodes-pipelex/
-  - Contribute:
+    - Under the Hood:
+      - under-the-hood/index.md
+      - Architecture Overview: under-the-hood/architecture-overview.md
+      - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
+      - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
+      - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
+      - Reasoning Controls: under-the-hood/reasoning-controls.md
+      - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
+      - Test Profile Configuration: under-the-hood/test-profile-configuration.md
+      - Init CLI Flows: under-the-hood/init-cli-flows.md
+  - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
-  - Changelog: changelog.md
+    - Changelog: changelog.md
+  - API: https://pipelex.github.io/pipelex-api/
