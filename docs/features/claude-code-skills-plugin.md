@@ -30,9 +30,13 @@ Install from [mthds-ai/skills](https://github.com/mthds-ai/skills).
 
 ## Getting Started
 
-```text
-# Run these inside Claude Code:
+```
 /plugin marketplace add mthds-ai/skills
+```
+
+then:
+
+```
 /plugin install mthds@mthds-ai-skills
 ```
 

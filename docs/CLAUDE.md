@@ -62,8 +62,6 @@ To widen the sidebar you must override **two** things:
 1. `.md-sidebar { width: ... }` — the container itself
 2. `.md-sidebar .md-sidebar__inner { padding-right: 4px }` — the theme dynamically inflates `padding-right` on `.md-sidebar__inner` to absorb extra container width, keeping the nav at its original size. Pin this padding to prevent that.
 
-The `--md-sidebar-width` CSS variable is **not used** by Material for MkDocs internally — setting it alone has no effect.
-
 ## Common Mistakes to Avoid
 
 - Do NOT create `docs/404.md` — it poisons the sitemap with an indexable `/latest/404/` URL

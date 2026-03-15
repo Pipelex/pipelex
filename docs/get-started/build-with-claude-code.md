@@ -11,19 +11,23 @@ Install the `mthds` CLI:
 npm install -g mthds
 ```
 
-Install the MTHDS skills plugin in Claude Code:
-
-```bash
-claude
-```
+Launch Claude Code and tell it to install the MTHDS plugin:
 
 ```
 /plugin marketplace add mthds-ai/skills
+```
+
+```
 /plugin install mthds@mthds-ai-skills
+```
+
+then exit Claude Code and reopen it:
+
+```
 /exit
 ```
 
-Reopen Claude Code, then build your first method:
+Reopen Claude Code, and build your first method:
 
 ```
 /mthds-build A method to analyze a Job offer to build a scorecard, then batch process CVs to score them

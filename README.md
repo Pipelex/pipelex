@@ -61,17 +61,17 @@ claude
 ```
 
 Tell Claude to install the MTHDS skills marketplace:
-```bash
+```
 /plugin marketplace add mthds-ai/skills
 ```
 
 then install the MTHDS skills plugin:
-```bash
+```
 /plugin install mthds@mthds-ai-skills
 ```
 
 then you must exit Claude Code and reopen it.
-```bash
+```
 /exit
 ```
 
