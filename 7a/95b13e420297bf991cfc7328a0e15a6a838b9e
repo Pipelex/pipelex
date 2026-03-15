@@ -1,0 +1,62 @@
+mkdocs.yml
+  587260747c489419 204
+  b3c922a82226bda2 101-102,104-105
+docs/building-methods/concepts/python-classes.md
+  b3c922a82226bda2 262
+docs/index.md
+  587260747c489419 2,8
+  2e59daab82109b6a 3,10,14,18,20,38,42-43,45-46,52-55,57-68,70,72,74,76,78,80,82,84-97,101,103-111,113,115,117
+  b3c922a82226bda2 12-13,22,24,26,28,30,32,34,36-37,44,47-51
+docs/building-methods/concepts/native-concepts.md
+  b3c922a82226bda2 358
+docs/get-started/configure-ai-providers.md
+  b3c922a82226bda2 170
+docs/building-methods/concepts/inline-structures.md
+  b3c922a82226bda2 313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "7a95b13e420297bf991cfc7328a0e15a6a838b9e",
+  "prompts": {
+    "2e59daab82109b6a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ac1f480b-03de-4d37-a0ff-4b2a1da36444",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 94,
+      "total_deletions": 36,
+      "accepted_lines": 72,
+      "overriden_lines": 0
+    },
+    "587260747c489419": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "63f16bf2-a759-4381-a87d-2551da505557",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 3,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "b3c922a82226bda2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4c2291c7-7949-45dc-9b50-0a7fa88a2b33",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 42,
+      "accepted_lines": 26,
+      "overriden_lines": 0
+    }
+  }
+}
