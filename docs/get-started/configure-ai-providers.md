@@ -167,7 +167,7 @@ Learn more in our [Inference Backend Configuration](../configuration/config-tech
 
 Now that you have your backend configured:
 
-1. **Learn the concepts**: [Getting Started Tutorial](./index.md)
+1. **Learn the concepts**: [MTHDS Language Tutorial](./mthds-language-tutorial.md)
 2. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/main)
 3. **Deep dive**: [Build Reliable AI Methods](../building-methods/kick-off-a-methods-project.md)
 

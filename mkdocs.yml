@@ -98,11 +98,11 @@ plugins:
         'home/4-cookbook-examples/write-tweet.md': 'cookbook/write-tweet.md'
         'home/5-setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
         'home/5-setup/gateway-models.md': 'setup/gateway-models.md'
-        'home/5-setup/index.md': 'get-started/index.md'
-        'home/5-setup/project-organization.md': 'get-started/index.md'
+        'home/5-setup/index.md': 'get-started/build-with-claude-code.md'
+        'home/5-setup/project-organization.md': 'get-started/build-with-claude-code.md'
         'home/5-setup/telemetry.md': 'setup/telemetry.md'
-        'setup/index.md': 'get-started/index.md'
-        'setup/project-organization.md': 'get-started/index.md'
+        'setup/index.md': 'get-started/build-with-claude-code.md'
+        'setup/project-organization.md': 'get-started/build-with-claude-code.md'
         'setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
         'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md'
         'home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md': 'building-methods/concepts/define_your_concepts.md'
@@ -201,8 +201,7 @@ extra_css:
 
 nav:
   - Get Started:
-    - What is Pipelex?: index.md
-    - Getting Started: get-started/index.md
+    - Build & Run AI Methods: index.md
     - Build with Claude Code: get-started/build-with-claude-code.md
     - The MTHDS Language Tutorial: get-started/mthds-language-tutorial.md
     - Configure AI Providers: get-started/configure-ai-providers.md
