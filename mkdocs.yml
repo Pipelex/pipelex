@@ -15,7 +15,6 @@ theme:
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.sections
-    - navigation.indexes
     - navigation.top
     - content.code.copy
   palette:
@@ -199,12 +198,12 @@ nav:
     - What is Pipelex?: index.md
     - Getting Started: get-started/write-methods-manually.md
     - Setup:
-      - setup/index.md
+      - Overview: setup/index.md
       - Configure AI Providers: setup/configure-ai-providers.md
       - Project Organization: setup/project-organization.md
       - Telemetry: setup/telemetry.md
     - Cookbook Examples:
-      - cookbook/index.md
+      - Overview: cookbook/index.md
       - Hello World: cookbook/hello-world.md
       - Document Processing:
         - Simple OCR: cookbook/simple-ocr.md
@@ -221,7 +220,7 @@ nav:
       - The Know-How Graph: viewpoint/viewpoint.md
   - Guide:
     - Features:
-      - features/index.md
+      - Overview: features/index.md
       - Declarative AI Methods:
         - MTHDS Language: features/mthds-language.md
         - Concepts & Structured Types: features/concepts.md
@@ -257,7 +256,7 @@ nav:
         - Native Concepts: building-methods/concepts/native-concepts.md
         - Refining Concepts: building-methods/concepts/refining-concepts.md
       - Design and Run Methods:
-        - building-methods/pipes/index.md
+        - Overview: building-methods/pipes/index.md
         - Libraries: building-methods/libraries.md
         - Packages: building-methods/packages.md
         - Executing Pipelines: building-methods/pipes/executing-pipelines.md
@@ -266,7 +265,7 @@ nav:
         - Pipe Output: building-methods/pipes/pipe-output.md
         - Understanding Multiplicity: building-methods/pipes/understanding-multiplicity.md
         - Pipe Operators:
-          - building-methods/pipes/pipe-operators/index.md
+          - Overview: building-methods/pipes/pipe-operators/index.md
           - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md
           - PipeExtract: building-methods/pipes/pipe-operators/PipeExtract.md
           - PipeImgGen: building-methods/pipes/pipe-operators/PipeImgGen.md
@@ -274,7 +273,7 @@ nav:
           - PipeCompose: building-methods/pipes/pipe-operators/PipeCompose.md
           - PipeFunc: building-methods/pipes/pipe-operators/PipeFunc.md
         - Pipe Controllers:
-          - building-methods/pipes/pipe-controllers/index.md
+          - Overview: building-methods/pipes/pipe-controllers/index.md
           - PipeSequence: building-methods/pipes/pipe-controllers/PipeSequence.md
           - PipeParallel: building-methods/pipes/pipe-controllers/PipeParallel.md
           - PipeBatch: building-methods/pipes/pipe-controllers/PipeBatch.md
@@ -284,21 +283,21 @@ nav:
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
   - Reference:
     - CLI Reference:
-      - tools/cli/index.md
+      - Overview: tools/cli/index.md
       - Init: tools/cli/init.md
       - Validate: tools/cli/validate.md
       - Run: tools/cli/run.md
       - Show: tools/cli/show.md
       - Pkg: tools/cli/pkg.md
       - Build:
-        - tools/cli/build/index.md
+        - Overview: tools/cli/build/index.md
         - Runner: tools/cli/build/runner.md
         - Structures: tools/cli/build/structures.md
         - Inputs: tools/cli/build/inputs.md
         - Output: tools/cli/build/output.md
       - Agent CLI: tools/cli/agent-cli.md
     - Configuration (TOML reference):
-      - configuration/index.md
+      - Overview: configuration/index.md
       - Pipeline Validation Configuration:
         - Dry Run: configuration/config-pipeline-validation/dry-run-config.md
       - Practical Configuration:
@@ -320,7 +319,7 @@ nav:
     - Gateway Available Models: setup/gateway-models.md
   - Advanced:
     - Advanced Customizations:
-      - advanced/index.md
+      - Overview: advanced/index.md
       - Secrets Provider: advanced/secrets-provider-injection.md
       - Reporting Delegate: advanced/reporting-delegate-injection.md
       - Storage Provider: advanced/storage-provider-injection.md
@@ -328,7 +327,7 @@ nav:
       - Content Generator: advanced/content-generator-injection.md
       - Pipe Router: advanced/pipe-router-injection.md
     - Under the Hood:
-      - under-the-hood/index.md
+      - Overview: under-the-hood/index.md
       - Architecture Overview: under-the-hood/architecture-overview.md
       - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
       - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md

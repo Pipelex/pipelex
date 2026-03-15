@@ -14,6 +14,12 @@ pre code { white-space: pre-wrap !important; word-wrap: break-word; overflow-wra
 
 /* --- Sidebar nav --- */
 
+/* Hide the tab-name label that repeats the active tab above the sidebar tree
+   (e.g. "Get Started", "Guide") — these are top-level section labels in --lifted mode */
+.md-nav--primary.md-nav--lifted > .md-nav__list > .md-nav__item--section > label.md-nav__link {
+  display: none !important;
+}
+
 /* Ensure all link and label elements have no shadow */
 .md-nav__link,
 label.md-nav__link {
@@ -72,4 +78,16 @@ label.md-nav__link {
   color: #45BF9F !important;
   font-weight: 700 !important;
   background-color: rgba(69, 191, 159, 0.12) !important;
+}
+
+/* --- Top nav tabs: active tab stands out --- */
+.md-tabs__item--active .md-tabs__link {
+  font-weight: 700 !important;
+  opacity: 1 !important;
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+[data-md-color-scheme="default"] .md-tabs__item--active .md-tabs__link {
+  background-color: rgba(255, 255, 255, 0.25);
 }
