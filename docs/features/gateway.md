@@ -50,4 +50,4 @@ Run open-source models through dedicated providers:
 
 Routing profiles control which backend handles each model. Define pattern-based routes, defaults, and fallback orders in `routing_profiles.toml`. Switch a pipeline from one provider to another — or from Pipelex Gateway to your own keys — without changing the method definition.
 
-See [Configure AI Providers](../setup/configure-ai-providers.md) for setup details.
+See [Configure AI Providers](../get-started/configure-ai-providers.md) for setup details.

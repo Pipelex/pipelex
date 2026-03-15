@@ -22,7 +22,7 @@ To run methods with AI models, choose one of these options:
 - **Bring Your Own Keys** — use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc.
 - **Local AI** — run models locally with Ollama, vLLM, LM Studio, or llama.cpp — no API keys required.
 
-See [Configure AI Providers](../setup/configure-ai-providers.md) for full details.
+See [Configure AI Providers](./configure-ai-providers.md) for full details.
 
 !!! tip "VS Code Extension"
     We **highly** recommend installing the Pipelex extension for `.mthds` syntax highlighting and flowchart visualization:
@@ -61,6 +61,8 @@ Reopen Claude Code, then build your first method:
 ```
 /mthds-build A method to analyze a Job offer to build a scorecard, then batch process CVs to score them
 ```
+
+Running a method requires AI access. The quickest way is to grab a free Pipelex Gateway key at [app.pipelex.com](https://app.pipelex.com/) — see [Configure AI Providers](./configure-ai-providers.md) for all options.
 
 Run it:
 

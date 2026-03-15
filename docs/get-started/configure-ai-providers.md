@@ -32,12 +32,12 @@ Get **free credits** for testing and development with a single API key for LLMs,
 
 3. Run `pipelex init` and accept the Gateway terms of service when prompted.
 
-That's it! Your pipelines can now access any supported LLM. See [Gateway Available Models](./gateway-models.md) for the full list.
+That's it! Your pipelines can now access any supported LLM. See [Gateway Available Models](../setup/gateway-models.md) for the full list.
 
 !!! info "Terms of Service & Telemetry"
     When using Pipelex Gateway, you'll be prompted to accept our terms of service. By using the Gateway, identified telemetry is automatically enabled (tied to your hashed API key) to help us monitor service quality and enforce fair usage.
-    
-    **We collect only technical data** (model names, token counts, latency, error rates). We do **NOT** collect your prompts, completions, or business data. See [Telemetry](./telemetry.md) for details and trade-offs, and our [Privacy Policy](https://go.pipelex.com/privacy-policy) for more.
+
+    **We collect only technical data** (model names, token counts, latency, error rates). We do **NOT** collect your prompts, completions, or business data. See [Telemetry](../setup/telemetry.md) for details and trade-offs, and our [Privacy Policy](https://go.pipelex.com/privacy-policy) for more.
 
 ### Option 2: Bring Your Own API Keys
 
@@ -167,10 +167,9 @@ Learn more in our [Inference Backend Configuration](../configuration/config-tech
 
 Now that you have your backend configured:
 
-1. **Organize your project**: [Project Organization](./project-organization.md)
-2. **Learn the concepts**: [Getting Started Tutorial](../get-started/index.md)
-3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/main)
-4. **Deep dive**: [Build Reliable AI Methods](../building-methods/kick-off-a-methods-project.md)
+1. **Learn the concepts**: [Getting Started Tutorial](./index.md)
+2. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/main)
+3. **Deep dive**: [Build Reliable AI Methods](../building-methods/kick-off-a-methods-project.md)
 
 !!! tip "Advanced Configuration"
     For detailed backend configuration options, see [Inference Backend Configuration](../configuration/config-technical/inference-backend-config.md).

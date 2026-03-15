@@ -121,7 +121,7 @@ pipelex-agent init -g --config '{"backends": ["pipelex_gateway"], "accept_gatewa
 
 ## Related Configuration
 
-- [Configure AI Providers](../../setup/configure-ai-providers.md)
+- [Configure AI Providers](../../get-started/configure-ai-providers.md)
 - [Inference Backend Configuration](../../configuration/config-technical/inference-backend-config.md)
 - [Telemetry Configuration](../../configuration/config-practical/telemetry-config.md)
 

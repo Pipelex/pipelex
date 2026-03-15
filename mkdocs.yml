@@ -96,11 +96,14 @@ plugins:
         'cookbook/simple-ocr.md': 'cookbook/index.md'
         'cookbook/invoice-extractor.md': 'cookbook/extract-invoice.md'
         'home/4-cookbook-examples/write-tweet.md': 'cookbook/write-tweet.md'
-        'home/5-setup/configure-ai-providers.md': 'setup/configure-ai-providers.md'
+        'home/5-setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
         'home/5-setup/gateway-models.md': 'setup/gateway-models.md'
-        'home/5-setup/index.md': 'setup/index.md'
-        'home/5-setup/project-organization.md': 'setup/project-organization.md'
+        'home/5-setup/index.md': 'get-started/index.md'
+        'home/5-setup/project-organization.md': 'get-started/index.md'
         'home/5-setup/telemetry.md': 'setup/telemetry.md'
+        'setup/index.md': 'get-started/index.md'
+        'setup/project-organization.md': 'get-started/index.md'
+        'setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
         'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md'
         'home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md': 'building-methods/concepts/define_your_concepts.md'
         'home/6-build-reliable-ai-workflows/concepts/inline-structures.md': 'building-methods/concepts/inline-structures.md'
@@ -200,11 +203,7 @@ nav:
   - Get Started:
     - What is Pipelex?: index.md
     - Getting Started: get-started/index.md
-    - Setup:
-      - Overview: setup/index.md
-      - Configure AI Providers: setup/configure-ai-providers.md
-      - Project Organization: setup/project-organization.md
-      - Telemetry: setup/telemetry.md
+    - Configure AI Providers: get-started/configure-ai-providers.md
     - Cookbook Examples:
       - Overview: cookbook/index.md
       - Quick Start:
@@ -332,6 +331,7 @@ nav:
       - Logging: tools/logging.md
     - Analytics:
       - Observer Data Extraction: analytics/data-extraction.md
+    - Telemetry: setup/telemetry.md
     - Gateway Available Models: setup/gateway-models.md
   - Advanced:
     - Advanced Customizations:
