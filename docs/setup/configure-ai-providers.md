@@ -168,7 +168,7 @@ Learn more in our [Inference Backend Configuration](../configuration/config-tech
 Now that you have your backend configured:
 
 1. **Organize your project**: [Project Organization](./project-organization.md)
-2. **Learn the concepts**: [Writing Methods Tutorial](../get-started/write-methods-manually.md)
+2. **Learn the concepts**: [Getting Started Tutorial](../get-started/index.md)
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/main)
 4. **Deep dive**: [Build Reliable AI Methods](../building-methods/kick-off-a-methods-project.md)
 

@@ -57,8 +57,8 @@ Learn more in our [Project Structure documentation](../building-methods/kick-off
 
 Now that you understand project organization:
 
-1. **Start building**: [Get Started](../get-started/write-methods-manually.md)
-2. **Learn the concepts**: [Writing Methods Tutorial](../get-started/write-methods-manually.md)
+1. **Start building**: [Get Started](../get-started/index.md)
+2. **Learn the concepts**: [Getting Started Tutorial](../get-started/index.md)
 3. **Explore examples**: [Cookbook Repository](https://github.com/Pipelex/pipelex-cookbook/tree/main)
 4. **Deep dive**: [Build Reliable AI Methods](../building-methods/kick-off-a-methods-project.md)
 

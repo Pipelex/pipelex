@@ -81,7 +81,8 @@ plugins:
         'home/10-advanced-customizations/reporting-delegate-injection.md': 'advanced/reporting-delegate-injection.md'
         'home/10-advanced-customizations/secrets-provider-injection.md': 'advanced/secrets-provider-injection.md'
         'home/10-advanced-customizations/storage-provider-injection.md': 'advanced/storage-provider-injection.md'
-        'home/2-get-started/write-methods-manually.md': 'get-started/write-methods-manually.md'
+        'get-started/write-methods-manually.md': 'get-started/index.md'
+        'home/2-get-started/write-methods-manually.md': 'get-started/index.md'
         'home/3-understand-pipelex/viewpoint.md': 'viewpoint/viewpoint.md'
         'home/4-cookbook-examples/extract-dpe.md': 'cookbook/extract-dpe.md'
         'home/4-cookbook-examples/extract-gantt.md': 'cookbook/extract-gantt.md'
@@ -196,7 +197,7 @@ extra_css:
 nav:
   - Get Started:
     - What is Pipelex?: index.md
-    - Getting Started: get-started/write-methods-manually.md
+    - Getting Started: get-started/index.md
     - Setup:
       - Overview: setup/index.md
       - Configure AI Providers: setup/configure-ai-providers.md

@@ -56,7 +56,7 @@ Pipelex solves these problems by:
 
 Ready to get started?
 
-- [:material-rocket-launch: Get Started](./get-started/write-methods-manually.md){ .md-button .md-button--primary }
+- [:material-rocket-launch: Get Started](./get-started/index.md){ .md-button .md-button--primary }
 - [:material-shape-outline: Learn MTHDS](./features/mthds-language.md){ .md-button }
 - [:material-book-open: Read the Know-How Graph](./viewpoint/viewpoint.md){ .md-button }
 

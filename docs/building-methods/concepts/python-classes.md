@@ -259,6 +259,5 @@ Product = "A product in the catalog"
 
 - [Inline Structures](inline-structures.md) - Fast prototyping with TOML
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
-<!-- path verified: resolves to docs/get-started/write-methods-manually.md -->
-- [Writing Methods Tutorial](../../get-started/write-methods-manually.md) - Get started with structured outputs
+- [Getting Started Tutorial](../../get-started/index.md) - Get started with structured outputs
 
