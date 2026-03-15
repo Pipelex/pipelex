@@ -81,8 +81,8 @@ plugins:
         'home/10-advanced-customizations/reporting-delegate-injection.md': 'advanced/reporting-delegate-injection.md'
         'home/10-advanced-customizations/secrets-provider-injection.md': 'advanced/secrets-provider-injection.md'
         'home/10-advanced-customizations/storage-provider-injection.md': 'advanced/storage-provider-injection.md'
-        'get-started/write-methods-manually.md': 'get-started/index.md'
-        'home/2-get-started/write-methods-manually.md': 'get-started/index.md'
+        'get-started/write-methods-manually.md': 'get-started/mthds-language-tutorial.md'
+        'home/2-get-started/write-methods-manually.md': 'get-started/mthds-language-tutorial.md'
         'home/3-understand-pipelex/viewpoint.md': 'viewpoint/viewpoint.md'
         'home/4-cookbook-examples/extract-dpe.md': 'cookbook/extract-dpe.md'
         'home/4-cookbook-examples/extract-gantt.md': 'cookbook/extract-gantt.md'
@@ -203,6 +203,8 @@ nav:
   - Get Started:
     - What is Pipelex?: index.md
     - Getting Started: get-started/index.md
+    - Build with Claude Code: get-started/build-with-claude-code.md
+    - The MTHDS Language Tutorial: get-started/mthds-language-tutorial.md
     - Configure AI Providers: get-started/configure-ai-providers.md
     - Cookbook Examples:
       - Overview: cookbook/index.md

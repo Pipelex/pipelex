@@ -12,6 +12,10 @@
 .equal-width { width: 100%; max-width: 300px; display: inline-block; }
 pre code { white-space: pre-wrap !important; word-wrap: break-word; overflow-wrap: break-word; }
 
+/* --- Sidebar width — widen to fit longer nav labels without wrapping --- */
+.md-sidebar { width: 13rem; }
+.md-sidebar .md-sidebar__inner { padding-right: 4px; }
+
 /* --- Sidebar nav --- */
 
 /* Hide the tab-name label that repeats the active tab above the sidebar tree
