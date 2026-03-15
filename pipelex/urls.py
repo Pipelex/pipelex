@@ -8,11 +8,13 @@ class URLs:
     changelog = "https://docs.pipelex.com/latest/changelog/"
     discord = "https://go.pipelex.com/discord"
     privacy_policy = "https://go.pipelex.com/privacy-policy"
-    telemetry_docs = "https://docs.pipelex.com/latest/home/5-setup/telemetry/"
-    gateway_docs = "https://docs.pipelex.com/latest/home/5-setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-for-getting-started"
-    pipe_func_docs = "https://docs.pipelex.com/latest/home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc/"
-    backend_provider_docs = "https://docs.pipelex.com/latest/home/5-setup/configure-ai-providers/"
-    native_concepts_docs = "https://docs.pipelex.com/latest/home/6-build-reliable-ai-workflows/concepts/native-concepts/"
+    telemetry_docs = "https://docs.pipelex.com/latest/setup/telemetry/"
+    gateway_docs = (
+        "https://docs.pipelex.com/latest/setup/configure-ai-providers/#option-1-pipelex-gateway-easiest-and-most-powerful-for-getting-started"
+    )
+    pipe_func_docs = "https://docs.pipelex.com/latest/building-methods/pipes/pipe-operators/PipeFunc/"
+    backend_provider_docs = "https://docs.pipelex.com/latest/setup/configure-ai-providers/"
+    native_concepts_docs = "https://docs.pipelex.com/latest/building-methods/concepts/native-concepts/"
     app_cli_auth = "https://app.pipelex.com/auth/cli"
 
     jpg_example_1 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/jpg_example_1.jpg"

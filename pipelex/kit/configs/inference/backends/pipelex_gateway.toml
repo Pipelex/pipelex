@@ -30,7 +30,7 @@
 # with direct provider backends (openai, anthropic, etc.) instead.
 #
 # Documentation:
-# https://docs.pipelex.com/home/7-configuration/config-technical/inference-backend-config/
+# https://docs.pipelex.com/latest/configuration/config-technical/inference-backend-config/
 # Support: https://go.pipelex.com/discord
 #
 ################################################################################

@@ -1,8 +1,12 @@
+---
+description: "For contributors: how Pipelex merges configuration layers at runtime — shipped defaults, project overrides, and root override files."
+---
+
 # Configuration Internals (defaults and overrides)
 
 This page is for **contributors**: it explains where Pipelex defaults live, how configuration is merged at runtime, and where to change the behavior in code.
 
-For the user-facing configuration guide, see [Configuration Overview](../home/7-configuration/index.md).
+For the user-facing configuration guide, see [Configuration Overview](../configuration/index.md).
 
 ## Mental model (for contributors)
 

@@ -1,0 +1,13 @@
+{% extends "main.html" %}
+
+{% block extrahead %}
+{{ super() }}
+<meta name="robots" content="noindex, nofollow">
+<link rel="canonical" href="{{ config.site_url }}">
+{% endblock %}
+
+{% block content %}
+<h1>Page not found</h1>
+<p>The page you requested does not exist in this documentation version.</p>
+<p><a href="{{ config.site_url }}">Go to the latest docs</a></p>
+{% endblock %}

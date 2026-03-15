@@ -802,6 +802,9 @@ check-TODOs: env
 DOCS_VERSION := $(shell grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
 SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
 
+# Authoritative robots.txt for the domain root (docs.pipelex.com/robots.txt).
+# Deployed by docs-deploy-root. Note: docs/robots.txt is a no-op — it only
+# lands at /latest/robots.txt, which crawlers ignore per RFC 9309.
 define ROOT_ROBOTS_TXT
 User-agent: *
 Allow: /latest/
@@ -818,9 +821,22 @@ define ROOT_INDEX_HTML
     <title>Redirecting to latest documentation...</title>
     <meta http-equiv="refresh" content="0;url=/latest/">
     <link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #2e303e;
+            color: #ccc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        a { color: #45BF9F; text-decoration: none; }
+    </style>
 </head>
 <body>
-    <p>Redirecting to <a href="/latest/">latest documentation</a>...</p>
+    <p>Redirecting to <a href="/latest/">latest documentation</a>&#8230;</p>
 </body>
 </html>
 endef

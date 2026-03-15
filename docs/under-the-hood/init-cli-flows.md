@@ -1,5 +1,6 @@
 ---
 title: "Init CLI Flows"
+description: "Inside the pipelex init command — how focus-based dispatch sets up config files, backends, routing profiles, and telemetry independently."
 ---
 
 # Init CLI Flows

@@ -1,11 +1,12 @@
 site_name: Pipelex Documentation
-site_url: https://docs.pipelex.com/
-site_description: "Official documentation for Pipelex, an open-source library/CLI for building and running deterministic, repeatable AI methods."
+site_url: https://docs.pipelex.com/latest/
+site_description: "Official documentation for Pipelex, an open-source library/CLI for building and running executable AI methods."
 docs_dir: docs
 repo_url: "https://github.com/Pipelex/pipelex"
 repo_name: "Pipelex on GitHub"
 theme:
   name: material
+  language: en
   custom_dir: docs/overrides
   favicon: images/pipelex-favicon-32.png
   logo: https://pipelex-web.s3.amazonaws.com/logo/Pipelex-logo-wot-mono-560x176.png
@@ -28,7 +29,7 @@ theme:
       icon: material/weather-sunny
       name: Switch to light mode
 
-copyright: "© 2025 Evotis S.A.S. <br/>Pipelex is a trademark of Evotis S.A.S."
+copyright: "© 2025–2026 Evotis S.A.S. <br/>Pipelex is a trademark of Evotis S.A.S."
 
 extra:
   social:
@@ -49,7 +50,111 @@ extra:
     provider: mike
 
 plugins:
-  - search
+  - search:
+      separator: '[\s\-\.]+'
+  - redirects:
+      redirect_maps:
+        'home/1-features/advanced-customizations.md': 'features/advanced-customizations.md'
+        'home/1-features/claude-code-skills-plugin.md': 'features/claude-code-skills-plugin.md'
+        'home/1-features/cli.md': 'features/cli.md'
+        'home/1-features/cloud-storage.md': 'features/cloud-storage.md'
+        'home/1-features/concepts.md': 'features/concepts.md'
+        'home/1-features/configuration.md': 'features/configuration.md'
+        'home/1-features/cost-tracking.md': 'features/cost-tracking.md'
+        'home/1-features/document-extraction.md': 'features/document-extraction.md'
+        'home/1-features/execution-graph.md': 'features/execution-graph.md'
+        'home/1-features/gateway.md': 'features/gateway.md'
+        'home/1-features/image-generation.md': 'features/image-generation.md'
+        'home/1-features/index.md': 'features/index.md'
+        'home/1-features/llm-integration.md': 'features/llm-integration.md'
+        'home/1-features/mthds-language.md': 'features/mthds-language.md'
+        'home/1-features/pipe-operators.md': 'features/pipe-operators.md'
+        'home/1-features/pipeline-orchestration.md': 'features/pipeline-orchestration.md'
+        'home/1-features/plxt.md': 'features/plxt.md'
+        'home/1-features/telemetry.md': 'features/telemetry.md'
+        'home/1-features/validation-dry-run.md': 'features/validation-dry-run.md'
+        'home/1-features/web-search.md': 'features/web-search.md'
+        'home/10-advanced-customizations/content-generator-injection.md': 'advanced/content-generator-injection.md'
+        'home/10-advanced-customizations/index.md': 'advanced/index.md'
+        'home/10-advanced-customizations/observer-provider-injection.md': 'advanced/observer-provider-injection.md'
+        'home/10-advanced-customizations/pipe-router-injection.md': 'advanced/pipe-router-injection.md'
+        'home/10-advanced-customizations/reporting-delegate-injection.md': 'advanced/reporting-delegate-injection.md'
+        'home/10-advanced-customizations/secrets-provider-injection.md': 'advanced/secrets-provider-injection.md'
+        'home/10-advanced-customizations/storage-provider-injection.md': 'advanced/storage-provider-injection.md'
+        'home/2-get-started/write-methods-manually.md': 'get-started/write-methods-manually.md'
+        'home/3-understand-pipelex/viewpoint.md': 'viewpoint/viewpoint.md'
+        'home/4-cookbook-examples/extract-dpe.md': 'cookbook/extract-dpe.md'
+        'home/4-cookbook-examples/extract-gantt.md': 'cookbook/extract-gantt.md'
+        'home/4-cookbook-examples/extract-generic.md': 'cookbook/extract-generic.md'
+        'home/4-cookbook-examples/extract-proof-of-purchase.md': 'cookbook/extract-proof-of-purchase.md'
+        'home/4-cookbook-examples/extract-table.md': 'cookbook/extract-table.md'
+        'home/4-cookbook-examples/hello-world.md': 'cookbook/hello-world.md'
+        'home/4-cookbook-examples/index.md': 'cookbook/index.md'
+        'home/4-cookbook-examples/invoice-extractor.md': 'cookbook/invoice-extractor.md'
+        'home/4-cookbook-examples/simple-ocr.md': 'cookbook/simple-ocr.md'
+        'home/4-cookbook-examples/write-tweet.md': 'cookbook/write-tweet.md'
+        'home/5-setup/configure-ai-providers.md': 'setup/configure-ai-providers.md'
+        'home/5-setup/gateway-models.md': 'setup/gateway-models.md'
+        'home/5-setup/index.md': 'setup/index.md'
+        'home/5-setup/project-organization.md': 'setup/project-organization.md'
+        'home/5-setup/telemetry.md': 'setup/telemetry.md'
+        'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md'
+        'home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md': 'building-methods/concepts/define_your_concepts.md'
+        'home/6-build-reliable-ai-workflows/concepts/inline-structures.md': 'building-methods/concepts/inline-structures.md'
+        'home/6-build-reliable-ai-workflows/concepts/native-concepts.md': 'building-methods/concepts/native-concepts.md'
+        'home/6-build-reliable-ai-workflows/concepts/python-classes.md': 'building-methods/concepts/python-classes.md'
+        'home/6-build-reliable-ai-workflows/concepts/refining-concepts.md': 'building-methods/concepts/refining-concepts.md'
+        'home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-methods.md': 'building-methods/configure-ai-llm-to-optimize-methods.md'
+        'home/6-build-reliable-ai-workflows/domain.md': 'building-methods/domain.md'
+        'home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md': 'building-methods/kick-off-a-methods-project.md'
+        'home/6-build-reliable-ai-workflows/libraries.md': 'building-methods/libraries.md'
+        'home/6-build-reliable-ai-workflows/llm-structured-generation-config.md': 'building-methods/llm-structured-generation-config.md'
+        'home/6-build-reliable-ai-workflows/packages.md': 'building-methods/packages.md'
+        'home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md': 'building-methods/pipelex-bundle-specification.md'
+        'home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md': 'building-methods/pipes/executing-pipelines.md'
+        'home/6-build-reliable-ai-workflows/pipes/index.md': 'building-methods/pipes/index.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeBatch.md': 'building-methods/pipes/pipe-controllers/PipeBatch.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeCondition.md': 'building-methods/pipes/pipe-controllers/PipeCondition.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeParallel.md': 'building-methods/pipes/pipe-controllers/PipeParallel.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeSequence.md': 'building-methods/pipes/pipe-controllers/PipeSequence.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md': 'building-methods/pipes/pipe-controllers/index.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeCompose.md': 'building-methods/pipes/pipe-operators/PipeCompose.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeExtract.md': 'building-methods/pipes/pipe-operators/PipeExtract.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc.md': 'building-methods/pipes/pipe-operators/PipeFunc.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeImgGen.md': 'building-methods/pipes/pipe-operators/PipeImgGen.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md': 'building-methods/pipes/pipe-operators/PipeLLM.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeSearch.md': 'building-methods/pipes/pipe-operators/PipeSearch.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md': 'building-methods/pipes/pipe-operators/index.md'
+        'home/6-build-reliable-ai-workflows/pipes/pipe-output.md': 'building-methods/pipes/pipe-output.md'
+        'home/6-build-reliable-ai-workflows/pipes/provide-inputs.md': 'building-methods/pipes/provide-inputs.md'
+        'home/6-build-reliable-ai-workflows/pipes/understanding-multiplicity.md': 'building-methods/pipes/understanding-multiplicity.md'
+        'home/6-build-reliable-ai-workflows/pipes/working-memory.md': 'building-methods/pipes/working-memory.md'
+        'home/7-configuration/config-advanced/feature-config.md': 'configuration/config-advanced/feature-config.md'
+        'home/7-configuration/config-pipeline-validation/dry-run-config.md': 'configuration/config-pipeline-validation/dry-run-config.md'
+        'home/7-configuration/config-practical/logging-config.md': 'configuration/config-practical/logging-config.md'
+        'home/7-configuration/config-practical/pipe-run-config.md': 'configuration/config-practical/pipe-run-config.md'
+        'home/7-configuration/config-practical/reporting-config.md': 'configuration/config-practical/reporting-config.md'
+        'home/7-configuration/config-practical/telemetry-config.md': 'configuration/config-practical/telemetry-config.md'
+        'home/7-configuration/config-technical/aws-config.md': 'configuration/config-technical/aws-config.md'
+        'home/7-configuration/config-technical/cogt-config.md': 'configuration/config-technical/cogt-config.md'
+        'home/7-configuration/config-technical/inference-backend-config.md': 'configuration/config-technical/inference-backend-config.md'
+        'home/7-configuration/config-technical/library-config.md': 'configuration/config-technical/library-config.md'
+        'home/7-configuration/index.md': 'configuration/index.md'
+        'home/8-analytics/data-extraction.md': 'analytics/data-extraction.md'
+        'home/9-tools/cli/agent-cli.md': 'tools/cli/agent-cli.md'
+        'home/9-tools/cli/build/index.md': 'tools/cli/build/index.md'
+        'home/9-tools/cli/build/inputs.md': 'tools/cli/build/inputs.md'
+        'home/9-tools/cli/build/output.md': 'tools/cli/build/output.md'
+        'home/9-tools/cli/build/runner.md': 'tools/cli/build/runner.md'
+        'home/9-tools/cli/build/structures.md': 'tools/cli/build/structures.md'
+        'home/9-tools/cli/index.md': 'tools/cli/index.md'
+        'home/9-tools/cli/init.md': 'tools/cli/init.md'
+        'home/9-tools/cli/pkg.md': 'tools/cli/pkg.md'
+        'home/9-tools/cli/run.md': 'tools/cli/run.md'
+        'home/9-tools/cli/show.md': 'tools/cli/show.md'
+        'home/9-tools/cli/validate.md': 'tools/cli/validate.md'
+        'home/9-tools/logging.md': 'tools/logging.md'
+        'home/9-tools/plxt.md': 'tools/plxt.md'
   - meta-manager
   - glightbox:
       touchNavigation: true
@@ -91,133 +196,133 @@ extra_css:
 nav:
   - Home:
     - What is Pipelex?: index.md
-    - Getting Started: home/2-get-started/write-methods-manually.md
+    - Getting Started: get-started/write-methods-manually.md
     - Features:
-      - Overview: home/1-features/index.md
+      - Overview: features/index.md
       - Declarative AI Methods:
-        - MTHDS Language: home/1-features/mthds-language.md
-        - Concepts & Structured Types: home/1-features/concepts.md
-        - Pipe Operators: home/1-features/pipe-operators.md
-        - Pipeline Orchestration: home/1-features/pipeline-orchestration.md
+        - MTHDS Language: features/mthds-language.md
+        - Concepts & Structured Types: features/concepts.md
+        - Pipe Operators: features/pipe-operators.md
+        - Pipeline Orchestration: features/pipeline-orchestration.md
       - AI Capabilities:
-        - Pipelex Gateway & Model Access: home/1-features/gateway.md
-        - LLM Integration: home/1-features/llm-integration.md
-        - Document Extraction: home/1-features/document-extraction.md
-        - Image Generation: home/1-features/image-generation.md
-        - Web Search: home/1-features/web-search.md
+        - Pipelex Gateway & Model Access: features/gateway.md
+        - LLM Integration: features/llm-integration.md
+        - Document Extraction: features/document-extraction.md
+        - Image Generation: features/image-generation.md
+        - Web Search: features/web-search.md
       - Developer Tools:
-        - Claude Code Skills Plugin: home/1-features/claude-code-skills-plugin.md
-        - CLI: home/1-features/cli.md
-        - plxt Formatter & Linter: home/1-features/plxt.md
-        - Execution Graph Visualization: home/1-features/execution-graph.md
+        - Claude Code Skills Plugin: features/claude-code-skills-plugin.md
+        - CLI: features/cli.md
+        - plxt Formatter & Linter: features/plxt.md
+        - Execution Graph Visualization: features/execution-graph.md
       - Production & Operations:
-        - Validation & Dry Run: home/1-features/validation-dry-run.md
-        - Telemetry & Observability: home/1-features/telemetry.md
-        - Cloud Storage: home/1-features/cloud-storage.md
-        - Cost Tracking & Reporting: home/1-features/cost-tracking.md
+        - Validation & Dry Run: features/validation-dry-run.md
+        - Telemetry & Observability: features/telemetry.md
+        - Cloud Storage: features/cloud-storage.md
+        - Cost Tracking & Reporting: features/cost-tracking.md
       - Configuration & Extensibility:
-        - Configuration System: home/1-features/configuration.md
-        - Advanced Customizations: home/1-features/advanced-customizations.md
+        - Configuration System: features/configuration.md
+        - Advanced Customizations: features/advanced-customizations.md
     - Cookbook Examples:
-      - Overview: home/4-cookbook-examples/index.md
-      - Hello World: home/4-cookbook-examples/hello-world.md
+      - Overview: cookbook/index.md
+      - Hello World: cookbook/hello-world.md
       - Document Processing:
-        - Simple OCR: home/4-cookbook-examples/simple-ocr.md
-        - Generic Document Extraction: home/4-cookbook-examples/extract-generic.md
-        - Invoice Extractor: home/4-cookbook-examples/invoice-extractor.md
-        - Proof of Purchase Extraction: home/4-cookbook-examples/extract-proof-of-purchase.md
+        - Simple OCR: cookbook/simple-ocr.md
+        - Generic Document Extraction: cookbook/extract-generic.md
+        - Invoice Extractor: cookbook/invoice-extractor.md
+        - Proof of Purchase Extraction: cookbook/extract-proof-of-purchase.md
       - Graphical Extraction:
-        - Gantt Chart Extraction: home/4-cookbook-examples/extract-gantt.md
-        - Table Extraction from Image: home/4-cookbook-examples/extract-table.md
-        - DPE Extraction: home/4-cookbook-examples/extract-dpe.md
+        - Gantt Chart Extraction: cookbook/extract-gantt.md
+        - Table Extraction from Image: cookbook/extract-table.md
+        - DPE Extraction: cookbook/extract-dpe.md
       - Text Generation:
-        - Tweet Optimizer (wip): home/4-cookbook-examples/write-tweet.md
+        - Tweet Optimizer (wip): cookbook/write-tweet.md
     - Setup (first run):
-      - Overview: home/5-setup/index.md
-      - Configure AI Providers: home/5-setup/configure-ai-providers.md
-      - Gateway Available Models: home/5-setup/gateway-models.md
-      - Project Organization: home/5-setup/project-organization.md
-      - Telemetry: home/5-setup/telemetry.md
+      - Overview: setup/index.md
+      - Configure AI Providers: setup/configure-ai-providers.md
+      - Gateway Available Models: setup/gateway-models.md
+      - Project Organization: setup/project-organization.md
+      - Telemetry: setup/telemetry.md
     - Build Reliable AI Methods:
-      - Kick off a Method Project: home/6-build-reliable-ai-workflows/kick-off-a-methods-project.md
-      - Pipelex Bundle Specification: home/6-build-reliable-ai-workflows/pipelex-bundle-specification.md
-      - Domain: home/6-build-reliable-ai-workflows/domain.md
+      - Kick off a Method Project: building-methods/kick-off-a-methods-project.md
+      - Pipelex Bundle Specification: building-methods/pipelex-bundle-specification.md
+      - Domain: building-methods/domain.md
       - Concepts:
-        - Define Your Concepts: home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md
-        - Inline structures: home/6-build-reliable-ai-workflows/concepts/inline-structures.md
-        - Python classes: home/6-build-reliable-ai-workflows/concepts/python-classes.md
-        - Native Concepts: home/6-build-reliable-ai-workflows/concepts/native-concepts.md
-        - Refining Concepts: home/6-build-reliable-ai-workflows/concepts/refining-concepts.md
+        - Define Your Concepts: building-methods/concepts/define_your_concepts.md
+        - Inline structures: building-methods/concepts/inline-structures.md
+        - Python classes: building-methods/concepts/python-classes.md
+        - Native Concepts: building-methods/concepts/native-concepts.md
+        - Refining Concepts: building-methods/concepts/refining-concepts.md
       - Design and Run Methods:
-        - Overview: home/6-build-reliable-ai-workflows/pipes/index.md
-        - Libraries: home/6-build-reliable-ai-workflows/libraries.md
-        - Packages: home/6-build-reliable-ai-workflows/packages.md
-        - Executing Pipelines: home/6-build-reliable-ai-workflows/pipes/executing-pipelines.md
-        - Providing Inputs to Pipelines: home/6-build-reliable-ai-workflows/pipes/provide-inputs.md
-        - Working Memory: home/6-build-reliable-ai-workflows/pipes/working-memory.md
-        - Pipe Output: home/6-build-reliable-ai-workflows/pipes/pipe-output.md
-        - Understanding Multiplicity: home/6-build-reliable-ai-workflows/pipes/understanding-multiplicity.md
+        - Overview: building-methods/pipes/index.md
+        - Libraries: building-methods/libraries.md
+        - Packages: building-methods/packages.md
+        - Executing Pipelines: building-methods/pipes/executing-pipelines.md
+        - Providing Inputs to Pipelines: building-methods/pipes/provide-inputs.md
+        - Working Memory: building-methods/pipes/working-memory.md
+        - Pipe Output: building-methods/pipes/pipe-output.md
+        - Understanding Multiplicity: building-methods/pipes/understanding-multiplicity.md
         - Pipe Operators:
-          - Overview: home/6-build-reliable-ai-workflows/pipes/pipe-operators/index.md
-          - PipeLLM: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeLLM.md
-          - PipeExtract: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeExtract.md
-          - PipeImgGen: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeImgGen.md
-          - PipeSearch: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeSearch.md
-          - PipeCompose: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeCompose.md
-          - PipeFunc: home/6-build-reliable-ai-workflows/pipes/pipe-operators/PipeFunc.md
+          - Overview: building-methods/pipes/pipe-operators/index.md
+          - PipeLLM: building-methods/pipes/pipe-operators/PipeLLM.md
+          - PipeExtract: building-methods/pipes/pipe-operators/PipeExtract.md
+          - PipeImgGen: building-methods/pipes/pipe-operators/PipeImgGen.md
+          - PipeSearch: building-methods/pipes/pipe-operators/PipeSearch.md
+          - PipeCompose: building-methods/pipes/pipe-operators/PipeCompose.md
+          - PipeFunc: building-methods/pipes/pipe-operators/PipeFunc.md
         - Pipe Controllers:
-          - Overview: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/index.md
-          - PipeSequence: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeSequence.md
-          - PipeParallel: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeParallel.md
-          - PipeBatch: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeBatch.md
-          - PipeCondition: home/6-build-reliable-ai-workflows/pipes/pipe-controllers/PipeCondition.md
-      - Optimize Cost & Quality: home/6-build-reliable-ai-workflows/configure-ai-llm-to-optimize-methods.md
-      - LLM Structured Generation: home/6-build-reliable-ai-workflows/llm-structured-generation-config.md
-      - LLM Prompting Style: home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+          - Overview: building-methods/pipes/pipe-controllers/index.md
+          - PipeSequence: building-methods/pipes/pipe-controllers/PipeSequence.md
+          - PipeParallel: building-methods/pipes/pipe-controllers/PipeParallel.md
+          - PipeBatch: building-methods/pipes/pipe-controllers/PipeBatch.md
+          - PipeCondition: building-methods/pipes/pipe-controllers/PipeCondition.md
+      - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
+      - LLM Structured Generation: building-methods/llm-structured-generation-config.md
+      - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
     - Configuration (TOML reference):
-      - Overview: home/7-configuration/index.md
+      - Overview: configuration/index.md
       - Pipeline Validation Configuration:
-        - Dry Run: home/7-configuration/config-pipeline-validation/dry-run-config.md
+        - Dry Run: configuration/config-pipeline-validation/dry-run-config.md
       - Practical Configuration:
-        - Logging: home/7-configuration/config-practical/logging-config.md
-        - Pipe Run: home/7-configuration/config-practical/pipe-run-config.md
-        - Reporting: home/7-configuration/config-practical/reporting-config.md
-        - Telemetry: home/7-configuration/config-practical/telemetry-config.md
+        - Logging: configuration/config-practical/logging-config.md
+        - Pipe Run: configuration/config-practical/pipe-run-config.md
+        - Reporting: configuration/config-practical/reporting-config.md
+        - Telemetry: configuration/config-practical/telemetry-config.md
       - Technical Configuration:
-        - AWS: home/7-configuration/config-technical/aws-config.md
-        - Cogt: home/7-configuration/config-technical/cogt-config.md
-        - LLM Providers & Models: home/7-configuration/config-technical/inference-backend-config.md
-        - Library: home/7-configuration/config-technical/library-config.md
-        - Feature: home/7-configuration/config-advanced/feature-config.md
+        - AWS: configuration/config-technical/aws-config.md
+        - Cogt: configuration/config-technical/cogt-config.md
+        - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
+        - Library: configuration/config-technical/library-config.md
+        - Feature: configuration/config-advanced/feature-config.md
     - Analytics:
-      - Observer Data Extraction: home/8-analytics/data-extraction.md
+      - Observer Data Extraction: analytics/data-extraction.md
     - Tools:
       - CLI:
-        - Overview: home/9-tools/cli/index.md
-        - Init: home/9-tools/cli/init.md
-        - Validate: home/9-tools/cli/validate.md
-        - Run: home/9-tools/cli/run.md
-        - Show: home/9-tools/cli/show.md
-        - Pkg: home/9-tools/cli/pkg.md
+        - Overview: tools/cli/index.md
+        - Init: tools/cli/init.md
+        - Validate: tools/cli/validate.md
+        - Run: tools/cli/run.md
+        - Show: tools/cli/show.md
+        - Pkg: tools/cli/pkg.md
         - Build:
-          - Overview: home/9-tools/cli/build/index.md
-          - Runner: home/9-tools/cli/build/runner.md
-          - Structures: home/9-tools/cli/build/structures.md
-          - Inputs: home/9-tools/cli/build/inputs.md
-          - Output: home/9-tools/cli/build/output.md
-        - Agent CLI: home/9-tools/cli/agent-cli.md
-      - plxt (Formatter & Linter): home/9-tools/plxt.md
-      - Logging: home/9-tools/logging.md
+          - Overview: tools/cli/build/index.md
+          - Runner: tools/cli/build/runner.md
+          - Structures: tools/cli/build/structures.md
+          - Inputs: tools/cli/build/inputs.md
+          - Output: tools/cli/build/output.md
+        - Agent CLI: tools/cli/agent-cli.md
+      - plxt (Formatter & Linter): tools/plxt.md
+      - Logging: tools/logging.md
     - Advanced Customizations:
-      - Overview: home/10-advanced-customizations/index.md
-      - Secrets Provider: home/10-advanced-customizations/secrets-provider-injection.md
-      - Reporting Delegate: home/10-advanced-customizations/reporting-delegate-injection.md
-      - Storage Provider: home/10-advanced-customizations/storage-provider-injection.md
-      - Observer: home/10-advanced-customizations/observer-provider-injection.md
-      - Content Generator: home/10-advanced-customizations/content-generator-injection.md
-      - Pipe Router: home/10-advanced-customizations/pipe-router-injection.md
+      - Overview: advanced/index.md
+      - Secrets Provider: advanced/secrets-provider-injection.md
+      - Reporting Delegate: advanced/reporting-delegate-injection.md
+      - Storage Provider: advanced/storage-provider-injection.md
+      - Observer: advanced/observer-provider-injection.md
+      - Content Generator: advanced/content-generator-injection.md
+      - Pipe Router: advanced/pipe-router-injection.md
     - Viewpoint:
-      - The Know-How Graph: home/3-understand-pipelex/viewpoint.md
+      - The Know-How Graph: viewpoint/viewpoint.md
   - Under the Hood:
     - Overview: under-the-hood/index.md
     - Architecture Overview: under-the-hood/architecture-overview.md
