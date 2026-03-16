@@ -1,5 +1,5 @@
 site_name: Pipelex Documentation
-site_url: https://docs.pipelex.com/latest/
+site_url: https://docs.pipelex.com/
 site_description: "Official documentation for Pipelex, an open-source library/CLI for building and running executable AI methods."
 docs_dir: docs
 repo_url: "https://github.com/Pipelex/pipelex"

@@ -1,9 +1,43 @@
 {# overrides/main.html #}
 {% extends "base.html" %}
 
+{# Force canonical URL to /latest/ path regardless of deployed version.
+   site_url is https://docs.pipelex.com/ (bare domain) so that mike can
+   properly prefix version paths in sitemaps. We override canonical here
+   to always point crawlers at /latest/. #}
+
+{% block site_meta %}
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  {% if page.meta and page.meta.description %}
+    <meta name="description" content="{{ page.meta.description }}">
+  {% elif config.site_description %}
+    <meta name="description" content="{{ config.site_description }}">
+  {% endif %}
+  {% if page.meta and page.meta.author %}
+    <meta name="author" content="{{ page.meta.author }}">
+  {% elif config.site_author %}
+    <meta name="author" content="{{ config.site_author }}">
+  {% endif %}
+  {% set canonical_latest = "https://docs.pipelex.com/latest/" ~ page.url %}
+  <link rel="canonical" href="{{ canonical_latest }}">
+  {% if page.previous_page %}
+    <link rel="prev" href="{{ page.previous_page.url | url }}">
+  {% endif %}
+  {% if page.next_page %}
+    <link rel="next" href="{{ page.next_page.url | url }}">
+  {% endif %}
+  {% if config.extra.alternate is iterable %}
+    {% for alt in config.extra.alternate %}
+      <link rel="alternate" href="{{ alt.link | url }}" hreflang="{{ alt.lang }}">
+    {% endfor %}
+  {% endif %}
+{% endblock %}
+
 {% block extrahead %}
 {{ super() }}
 {% if page %}
+{% set canonical_latest = "https://docs.pipelex.com/latest/" ~ page.url %}
 {% set desc = page.meta.description if page.meta and page.meta.description else config.site_description %}
 {% set title = page.meta.title if page.meta and page.meta.title else page.title %}
 {% set img = page.meta.image if page.meta and page.meta.image else "https://d2cinlfp2qnig1.cloudfront.net/docs/pipelex_banner_1200x630.png?v=1" %}
@@ -16,7 +50,7 @@
 <meta property="og:image" content="{{ img }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
-<meta property="og:url" content="{{ page.canonical_url }}">
+<meta property="og:url" content="{{ canonical_latest }}">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="{{ title }}">
 <meta name="twitter:description" content="{{ desc }}">
@@ -27,7 +61,7 @@
   "@context": "https://schema.org",
   "@type": "WebSite",
   "name": "{{ config.site_name }}",
-  "url": "{{ config.site_url }}",
+  "url": "{{ canonical_latest }}",
   "description": "{{ config.site_description }}"
 }
 </script>
@@ -38,7 +72,7 @@
   "@type": "TechArticle",
   "headline": "{{ title }}",
   "description": "{{ desc }}",
-  "url": "{{ page.canonical_url }}",
+  "url": "{{ canonical_latest }}",
   "publisher": {
     "@type": "Organization",
     "name": "Pipelex",

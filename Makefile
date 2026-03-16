@@ -809,7 +809,7 @@ define ROOT_ROBOTS_TXT
 User-agent: *
 Allow: /latest/
 Disallow: /
-Sitemap: https://$(SITE_DOMAIN)/latest/sitemap.xml
+Sitemap: https://$(SITE_DOMAIN)/sitemap.xml
 endef
 export ROOT_ROBOTS_TXT
 
@@ -890,9 +890,10 @@ endif
 	cp docs/404.html "$$TMPDIR/404.html" && \
 	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
 	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
+	sed 's|/$(DOCS_VERSION)/|/latest/|g' "$$TMPDIR/$(DOCS_VERSION)/sitemap.xml" > "$$TMPDIR/sitemap.xml" && \
 	cd "$$TMPDIR" && \
-	git add 404.html robots.txt index.html && \
-	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html)") && \
+	git add 404.html robots.txt index.html sitemap.xml && \
+	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml)") && \
 	git push origin gh-pages
 
 docs-delete: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
