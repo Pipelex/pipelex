@@ -1,0 +1,29 @@
+pyproject.toml
+  b4c3e8e654e04f23 3
+Makefile
+  b4c3e8e654e04f23 808-813,817
+docs/CLAUDE.md
+  b4c3e8e654e04f23 41,88
+CHANGELOG.md
+  b4c3e8e654e04f23 3-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "42f2b960c6cc47b716b19e3ad6ee82986cf39cce",
+  "prompts": {
+    "b4c3e8e654e04f23": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4779de3b-e1b1-4e3d-8634-80fb7a9aa835",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 16,
+      "total_deletions": 2,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    }
+  }
+}
