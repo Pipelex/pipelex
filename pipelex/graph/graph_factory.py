@@ -127,9 +127,12 @@ async def generate_graph_outputs(
         if graph_config.data_inclusion.stuff_html_content:
             rf_stuff_data_html = collect_stuff_data_html(graph_spec)
 
+        effective_rf_config = graph_config.reactflow_config
+        if direction is not None:
+            effective_rf_config = effective_rf_config.model_copy(update={"layout_direction": direction})
         reactflow_html = await generate_reactflow_html_async(
             graph_spec,
-            graph_config.reactflow_config,
+            effective_rf_config,
             stuff_data_text=rf_stuff_data_text,
             stuff_data_html=rf_stuff_data_html,
             title=page_title,

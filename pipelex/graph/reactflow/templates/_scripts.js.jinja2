@@ -547,7 +547,7 @@ function buildOrchestrationGraph(graphspec) {
         const isFailed = node.status === 'failed';
         const isSucceeded = node.status === 'succeeded';
         const label = node.pipe_code || node.node_id.split(':').pop() || node.node_id;
-        const badge = node.timing?.duration ? node.timing.duration.toFixed(1) + 's' : '';
+        const badge = node.timing?.duration != null ? node.timing.duration.toFixed(1) + 's' : '';
         // Calculate width: ~8px per char (monospace 13px) + padding + status dot
         const nodeWidth = Math.max(160, (label.length || 10) * 8 + 50);
 
