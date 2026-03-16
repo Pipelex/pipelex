@@ -805,9 +805,16 @@ SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
 # Authoritative robots.txt for the domain root (docs.pipelex.com/robots.txt).
 # Deployed by docs-deploy-root. Note: docs/robots.txt is a no-op — it only
 # lands at /latest/robots.txt, which crawlers ignore per RFC 9309.
+#
+# IMPORTANT: `Disallow: /` blocks ALL root paths not explicitly `Allow`ed —
+# including root-level files like /sitemap.xml. The `Sitemap:` directive tells
+# crawlers *where* the sitemap is, but does NOT override Disallow rules —
+# crawlers still need permission to fetch the URL. Any root-level file that
+# crawlers must access needs its own `Allow:` line.
 define ROOT_ROBOTS_TXT
 User-agent: *
 Allow: /latest/
+Allow: /sitemap.xml
 Disallow: /
 Sitemap: https://$(SITE_DOMAIN)/sitemap.xml
 endef
