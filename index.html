@@ -1,12 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>Redirecting to latest documentation...</title>
-    <meta http-equiv="refresh" content="0;url=/latest/">
-    <link rel="canonical" href="https://docs.pipelex.com/latest/">
+  <meta charset="utf-8">
+  <title>Redirecting</title>
+  <noscript>
+    <meta http-equiv="refresh" content="1; url=latest/" />
+  </noscript>
+  <script>
+    window.location.replace(
+      "latest/" + window.location.search + window.location.hash
+    );
+  </script>
 </head>
 <body>
-    <p>Redirecting to <a href="/latest/">latest documentation</a>...</p>
+  Redirecting to <a href="latest/">latest/</a>...
 </body>
 </html>
