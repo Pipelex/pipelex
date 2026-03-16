@@ -74,3 +74,4 @@ derived/
 
 # Claude plans
 .claude/plans/
+.gstack/

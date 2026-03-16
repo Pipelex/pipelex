@@ -57,7 +57,7 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     @model_validator(mode="after")
     def validate_fields(self) -> Self:
         if self.image_stuff_name is None and self.document_stuff_name is None:
-            msg = "For PipeExtract you must provide either a document or an image or a concept that refines one of them"
+            msg = "For PipeExtract you must provide either a Document or an Image or a concept that refines one of them"
             raise ValueError(msg)
         return self
 

@@ -1,10 +1,11 @@
 ---
 title: "Architecture Overview"
+description: "Understand the two-layer architecture behind Pipelex — how declarative .mthds files become executable AI methods at runtime."
 ---
 
 # Architecture Overview
 
-Pipelex is a Python framework for building and running **repeatable AI methods** using a declarative language (`.mthds` files).
+Pipelex is a Python framework for building and running **executable AI methods** using a declarative language (`.mthds` files).
 
 ---
 

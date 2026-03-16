@@ -2,18 +2,50 @@
 {% extends "base.html" %}
 
 {% block extrahead %}
-{{ super() }} {# keep anything Material already outputs #}
-{% if page and page.title and page.meta %}
-<meta property="og:type" content="article">
-<meta property="og:title" content="{{ page.meta.title or page.title }}">
-<meta property="og:description" content="{{ page.meta.description }}">
-<meta property="og:image" content="{{ page.meta.image }}">
+{{ super() }}
+{% if page %}
+{% set desc = page.meta.description if page.meta and page.meta.description else config.site_description %}
+{% set title = page.meta.title if page.meta and page.meta.title else page.title %}
+{% set img = page.meta.image if page.meta and page.meta.image else "https://d2cinlfp2qnig1.cloudfront.net/docs/pipelex_banner_1200x630.png?v=1" %}
+{% set og_type = "website" if page.is_homepage or page.file.url in ('.', './', 'index.html') else "article" %}
+<meta property="og:type" content="{{ og_type }}">
+<meta property="og:site_name" content="{{ config.site_name }}">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="{{ title }}">
+<meta property="og:description" content="{{ desc }}">
+<meta property="og:image" content="{{ img }}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:url" content="{{ page.canonical_url }}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="{{ page.meta.title or page.title }}">
-<meta name="twitter:description" content="{{ page.meta.description }}">
-<meta name="twitter:image" content="{{ page.meta.image }}">
+<meta name="twitter:title" content="{{ title }}">
+<meta name="twitter:description" content="{{ desc }}">
+<meta name="twitter:image" content="{{ img }}">
+{% if page.is_homepage or page.file.url in ('.', './', 'index.html') %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  "name": "{{ config.site_name }}",
+  "url": "{{ config.site_url }}",
+  "description": "{{ config.site_description }}"
+}
+</script>
+{% else %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "TechArticle",
+  "headline": "{{ title }}",
+  "description": "{{ desc }}",
+  "url": "{{ page.canonical_url }}",
+  "publisher": {
+    "@type": "Organization",
+    "name": "Pipelex",
+    "url": "https://pipelex.com"
+  }
+}
+</script>
+{% endif %}
 {% endif %}
 {% endblock %}

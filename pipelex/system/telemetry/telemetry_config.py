@@ -141,8 +141,8 @@ class PipelexGatewayTelemetryConfig(BaseModel):
     provider backends (OpenAI, Anthropic, Azure, Bedrock, etc.) instead.
 
     See Also:
-        - docs/home/5-setup/telemetry.md: Overview of telemetry streams
-        - docs/home/7-configuration/config-practical/telemetry-config.md: Custom telemetry configuration
+        - docs/setup/telemetry.md: Overview of telemetry streams
+        - docs/configuration/config-practical/telemetry-config.md: Custom telemetry configuration
     """
 
     model_config = ConfigDict(extra="forbid")

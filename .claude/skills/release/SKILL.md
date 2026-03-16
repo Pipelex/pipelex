@@ -44,7 +44,19 @@ Run `make agent-check`. This is the gate — if it fails, stop and report the
 errors so they can be fixed before retrying. Do not proceed past this step on
 failure.
 
-### 4. Finalize the changelog
+### 4. Ensure we're on the right branch
+
+The release branch must be named `release/vX.Y.Z` where X.Y.Z is the **new**
+version. All file modifications (changelog, version bump, lock, badge) must
+happen on this branch.
+
+- If already on `release/vX.Y.Z` matching the new version, stay on it.
+- If on `dev`, `main`, or any other branch, create and switch to
+  `release/vX.Y.Z` from the current HEAD.
+- If on a `release/` branch for a **different** version, warn the user and ask
+  how to proceed.
+
+### 5. Finalize the changelog
 
 Add a new version entry at the top of the changelog for the release.
 
@@ -71,18 +83,18 @@ Add a new version entry at the top of the changelog for the release.
 ...
 ```
 
-### 5. Bump the version in pyproject.toml
+### 6. Bump the version in pyproject.toml
 
 Edit `pyproject.toml` line 3 to the new version string. Only change the version
 field — don't touch anything else.
 
-### 6. Lock dependencies
+### 7. Lock dependencies
 
 Run `make li` to regenerate `uv.lock` and reinstall. This ensures the lockfile
 reflects the new version in `pyproject.toml`. If this step fails, stop and
 report the error.
 
-### 7. Update the test count badge
+### 8. Update the test count badge
 
 Run `make test-count` to get the current number of tests. Then update
 `.badges/tests.json` — set the `"message"` field to the count returned by
@@ -90,17 +102,6 @@ Run `make test-count` to get the current number of tests. Then update
 
 After updating, run `make check-test-badge` to verify the badge matches. If it
 fails, re-check the count and fix the badge file.
-
-### 8. Ensure we're on the right branch
-
-The release branch must be named `release/vX.Y.Z` where X.Y.Z is the **new**
-version.
-
-- If already on `release/vX.Y.Z` matching the new version, stay on it.
-- If on `dev`, `main`, or any other branch, create and switch to
-  `release/vX.Y.Z` from the current HEAD.
-- If on a `release/` branch for a **different** version, warn the user and ask
-  how to proceed.
 
 ### 9. Commit and push
 

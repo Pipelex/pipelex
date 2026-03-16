@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.20.9] - 2026-03-16
+
+### Changed
+
+- Reorganize documentation site architecture and navigation.
+- Add SEO meta descriptions to all doc pages.
+- Redesign README: lead with value, collapse details.
+
 ## [v0.20.8] - 2026-03-13
 
 - Add `needs_model_specs=True` to agent CLI run and models commands.
@@ -186,7 +194,7 @@
 
     **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
 
-    See the [Build Commands documentation](https://docs.pipelex.com/home/9-tools/cli/#build-commands) for usage examples.
+    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
 
 - **New Backends & Models**:
     - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
@@ -209,7 +217,7 @@
 - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
 - **Image-to-Image Generation**: `PipeImgGen` now supports input images via `input_images` field, with `InputImagesTaxonomy` for provider-specific handling and variable reference detection (`{{ var }}`, `$var`, `@var`) in prompts.
 - **PipeCompose "Construct" Mode**: New `construct` mode for building structured objects (dictionaries/Pydantic models) directly from variables.
-- **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
+- **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/latest/building-methods/concepts/inline-structures).
 
 ### Breaking Changes
 
@@ -456,7 +464,7 @@
  - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
  - **Image-to-Image Generation**: `PipeImgGen` now supports input images via `input_images` field, with `InputImagesTaxonomy` for provider-specific handling and variable reference detection (`{{ var }}`, `$var`, `@var`) in prompts.
  - **PipeCompose "Construct" Mode**: New `construct` mode for building structured objects (dictionaries/Pydantic models) directly from variables.
- - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
+ - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/latest/building-methods/concepts/inline-structures).
 
 ### Added
  - **Builder Auto-Repair**: Self-healing capabilities including auto-generation of undeclared concepts, multiplicity mismatch fixes, and pruning of unreachable pipes/unused concepts.
@@ -558,7 +566,7 @@
 
     **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
 
-    See the [Build Commands documentation](https://docs.pipelex.com/home/9-tools/cli/#build-commands) for usage examples.
+    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
 
 - **New Backends & Models**:
     - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
@@ -1237,13 +1245,13 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 
 We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
 
-- **Get started in seconds** with [Pipelex Inference](home/7-configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
+- **Get started in seconds** with [Pipelex Inference](configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
 - **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, Amazon Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
-- **Smart model routing**: Automatically route models to the right backend using [routing profiles](home/7-configuration/config-technical/inference-backend-config.md#routing-profiles) with pattern matching
+- **Smart model routing**: Automatically route models to the right backend using [routing profiles](configuration/config-technical/inference-backend-config.md#routing-profiles) with pattern matching
 - **User-friendly aliases**: Define shortcuts like `best-claude` → `claude-4.1-opus` with optional fallback chains
 - **Cost-aware model specs**: Each model includes detailed pricing, capabilities, and constraints for better cost management
 
-For complete details, see the [Inference Backend Configuration](home/7-configuration/config-technical/inference-backend-config.md) documentation.
+For complete details, see the [Inference Backend Configuration](configuration/config-technical/inference-backend-config.md) documentation.
 
 ### Added
 
