@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Reporganize documentation site architecture and navigation.
+- Reorganize documentation site architecture and navigation.
 - Add SEO meta descriptions to all doc pages.
 - Redesign README: lead with value, collapse details.
 

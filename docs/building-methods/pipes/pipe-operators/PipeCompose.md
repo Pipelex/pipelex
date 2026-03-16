@@ -17,10 +17,10 @@ Template mode uses [Jinja2 templates](https://jinja.palletsprojects.com/) to dyn
 
 `PipeCompose` takes all the data currently in the `WorkingMemory` and uses it as the context for rendering a Jinja2 template. The resulting text is then saved back to the working memory as a new `Text` or `Html` output.
 
-<!-- target_format is a pipelex convenience field (PipeComposeSpec in pipe_compose_spec.py),
-     transformed to TemplateBlueprint at build time. The MTHDS standard uses category +
-     templating_style.text_format, but pipelex exposes target_format as a simpler authoring form. -->
-The public authoring form uses a top-level `template` field plus a required `target_format`.
+Template mode supports two syntax variants:
+
+- **Simple**: `template = "Hello $name"` — an inline string, defaults to `basic` category
+- **Rich**: A `[pipe.name.template]` section with `template`, `category`, and optionally `templating_style`
 
 ### Template Context
 
@@ -28,16 +28,21 @@ The Jinja2 template has access to all the "stuffs" currently in the working memo
 
 ### Template Mode Configuration
 
-| Parameter       | Type            | Description                                                                 | Required |
-| --------------- | --------------- | --------------------------------------------------------------------------- | -------- |
-| `type`          | string          | The type of the pipe: `PipeCompose`                                         | Yes      |
-| `description`   | string          | A description of the operation                                              | Yes      |
-| `inputs`        | table           | Input variables needed for the template                                     | Yes      |
-| `output`        | string          | The concept for the output                                                  | No       |
-| `template`      | string          | An inline Jinja2 template string                                            | Yes*     |
-| `target_format` | string          | Output rendering target, such as `plain`, `markdown`, `html`, `json`, or `mermaid` | Yes*     |
+| Parameter       | Type              | Description                                                                 | Required |
+| --------------- | ----------------- | --------------------------------------------------------------------------- | -------- |
+| `type`          | string            | The type of the pipe: `PipeCompose`                                         | Yes      |
+| `description`   | string            | A description of the operation                                              | Yes      |
+| `inputs`        | table             | Input variables needed for the template                                     | Yes      |
+| `output`        | string            | The concept for the output                                                  | No       |
+| `template`      | string or section | An inline template string, or a `[pipe.name.template]` section (see below)  | Yes*     |
 
-*Template mode requires both `template` and `target_format`.
+*Template mode requires `template`. When using the rich form (`[pipe.name.template]` section), the following sub-fields are available:
+
+| Sub-field          | Type   | Description                                                                      | Required |
+|--------------------|--------|----------------------------------------------------------------------------------|----------|
+| `template`         | string | The Jinja2 template string                                                       | Yes      |
+| `category`         | string | Template category: `basic`, `markdown`, `html`, `mermaid`                        | Yes      |
+| `templating_style` | table  | Style options: `{ tag_style = "...", text_format = "..." }`                      | No       |
 
 ### Template Mode Examples
 
@@ -49,11 +54,32 @@ type = "PipeCompose"
 description = "Compose a greeting message"
 inputs = { user = "User" }
 output = "Text"
-target_format = "plain"
 template = "Hello $user.name, welcome to our platform!"
 ```
 
-**HTML template:**
+**Markdown template with category:**
+
+```toml
+[pipe.compose_report]
+type = "PipeCompose"
+description = "Format data as a markdown report"
+inputs = { summary = "Text", items = "Item[]" }
+output = "Text"
+
+[pipe.compose_report.template]
+category = "markdown"
+template = """
+# Report
+
+$summary
+
+{% for item in items %}
+- {{ item.name }}: {{ item.value }}
+{% endfor %}
+"""
+```
+
+**HTML template with templating style:**
 
 ```toml
 [pipe.format_html_report]
@@ -61,7 +87,10 @@ type = "PipeCompose"
 description = "Format data as HTML"
 inputs = { summary = "Text", items = "Item[]" }
 output = "Html"
-target_format = "html"
+
+[pipe.format_html_report.template]
+category = "html"
+templating_style = { tag_style = "xml", text_format = "html" }
 template = """
 <h1>Report</h1>
 <p>{{ summary }}</p>

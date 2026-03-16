@@ -34,8 +34,7 @@ output = "presentation.MarkdownReport"
 steps = [
   { pipe = "classify_business_problem", result = "business_problem" },
   { pipe = "select_advisory_boards", result = "selected_advisory_boards" },
-  { pipe = "consult_board", batch_over = "selected_advisory_boards",
-    batch_as = "advisory_board", result = "board_consultations" },
+  { pipe = "consult_board", batch_over = "selected_advisory_boards", batch_as = "advisory_board", result = "board_consultations" },
   { pipe = "analyze_board_responses", result = "response_analysis" },
   { pipe = "generate_strategic_report", result = "strategic_report" },
   { pipe = "present_as_markdown", result = "strategic_report_markdown" },
