@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.20.11] - 2026-03-16
+
+### Fixed
+
+- Fix `docs-deploy-root` silently failing due to shell comments breaking the `\` continuation chain in the Makefile recipe — root `sitemap.xml` and updated `robots.txt` were never deployed in v0.20.10.
+
 ## [v0.20.10] - 2026-03-16
 
 ### Fixed
