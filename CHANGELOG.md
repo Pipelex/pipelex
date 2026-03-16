@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.20.9] - 2026-03-16
+
+### Changed
+
+- Reporganize documentation site architecture and navigation.
+- Add SEO meta descriptions to all doc pages.
+- Redesign README: lead with value, collapse details.
+
 ## [v0.20.8] - 2026-03-13
 
 - Add `needs_model_specs=True` to agent CLI run and models commands.
