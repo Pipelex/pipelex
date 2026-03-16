@@ -118,7 +118,7 @@ Run it:
 
 ## Configure AI Access
 
-- **Pipelex Gateway (Recommended)** — Free credits, single API key for LLMs, OCR / document extraction, and image generation across all major providers. [Get your key](https://app.pipelex.com/), add `PIPELEX_GATEWAY_API_KEY=your-key-here` to `.env`, run `pipelex init`.
+- **Pipelex Gateway (Recommended)** — Free credits, single API key for LLMs, OCR / document extraction, and image generation across all major providers. [Get your key](https://app.pipelex.com/), add `PIPELEX_GATEWAY_API_KEY=your-key-here` to `~/.pipelex/.env`, run `pipelex init`.
 - **Bring Your Own Keys** — Use existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
 - **Local AI** — Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
 
@@ -527,7 +527,7 @@ pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,
 
 ---
 
-**Privacy & Telemetry** — We only collect technical data (model names, token counts, latency) — never prompts or business data. Set `DO_NOT_TRACK=1` to disable. [Learn more](https://docs.pipelex.com/latest/setup/telemetry/)
+**Privacy & Telemetry** — Gateway telemetry (model names, token counts, latency) is automatic when using Pipelex Gateway — never prompts or business data. Set `DO_NOT_TRACK=1` to opt out of Gateway entirely. [Learn more](https://docs.pipelex.com/latest/setup/telemetry/)
 
 **Contributing** — We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md).
 

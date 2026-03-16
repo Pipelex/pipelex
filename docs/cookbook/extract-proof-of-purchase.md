@@ -41,9 +41,7 @@ amount_paid      = { type = "number", description = "Total amount paid" }
 currency         = { type = "text", description = "Currency used for the purchase" }
 payment_method   = { type = "text", description = "Method of payment used" }
 purchase_number  = { type = "text", description = "Purchase or receipt number" }
-products         = { type = "list", item_type = "concept",
-                     item_concept_ref = "extract_proof_of_purchase.Product",
-                     description = "List of products purchased" }
+products         = { type = "list", item_type = "concept", item_concept_ref = "extract_proof_of_purchase.Product", description = "List of products purchased" }
 ```
 
 ### Pipeline

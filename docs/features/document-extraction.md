@@ -40,4 +40,3 @@ Include PDFs directly in your prompts using `@variable` syntax. PipeLLM automati
 
 - [PipeExtract](../building-methods/pipes/pipe-operators/PipeExtract.md) - Operator reference and MTHDS fields
 - [Generic Document Extraction Example](../cookbook/extract-generic.md) - Extract markdown from complex PDFs using vision
-- [Generic Document Extraction](../cookbook/extract-generic.md) - Multi-step document method example
