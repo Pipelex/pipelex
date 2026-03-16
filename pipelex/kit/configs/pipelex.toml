@@ -48,7 +48,6 @@ error_stack_traces = true
 graphspec_json = true
 mermaidflow_mmd = true
 mermaidflow_html = true
-reactflow_viewspec = true
 reactflow_html = true
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config]

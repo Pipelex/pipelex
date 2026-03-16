@@ -84,7 +84,6 @@ graph_spec = await dry_run_pipe_with_graph(pipe)
 | `graphspec_json` | `_graphspec.json` | Canonical graph representation |
 | `mermaidflow_mmd` | `_mermaid.mmd` | Mermaid flowchart code |
 | `mermaidflow_html` | `_mermaid.html` | Standalone Mermaid viewer |
-| `reactflow_viewspec` | `_viewspec.json` | ViewSpec for ReactFlow |
 | `reactflow_html` | `_reactflow.html` | Interactive ReactFlow viewer |
 
 ---
@@ -132,11 +131,9 @@ flowchart TB
     subgraph RENDER["Renderers"]
         direction TB
         MF["MermaidflowFactory"]
-        RF["ViewSpec Transformer"]
-        HTML1["Mermaid HTML"]
-        HTML2["ReactFlow HTML"]
-        MF --> HTML1
-        RF --> HTML2
+        RF["ReactFlow HTML Generator"]
+        MF --> HTML1["Mermaid HTML"]
+        RF --> HTML2["ReactFlow HTML"]
     end
 
     JOB --> CTX
@@ -363,27 +360,9 @@ print(mermaidflow.mermaid_code)
 - Stuff nodes (data items) rendered as stadium shapes
 - DATA edges connect producers → stuff → consumers
 
-### ViewSpec (ReactFlow)
+### ReactFlow HTML
 
-Transforms GraphSpec into a viewer-oriented model:
-
-```python
-from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
-
-analysis = GraphAnalysis.from_graphspec(graph_spec)
-viewspec = graphspec_to_viewspec(
-    graph_spec,
-    analysis,
-    options={"show_data_edges": True},
-)
-```
-
-ViewSpec provides:
-
-- `ViewNode` with UI metadata (badges, classes, inspector data)
-- `ViewEdge` with ReactFlow properties (animated, hidden)
-- `ViewIndex` for fast client-side lookups
-- Layout configuration for Dagre
+ReactFlow HTML is generated directly from GraphSpec — no intermediate ViewSpec layer. The HTML generator embeds GraphSpec as JSON and the client-side JavaScript handles dataflow analysis, layout, and rendering.
 
 ---
 
@@ -405,7 +384,6 @@ error_stack_traces = true       # Include full stack traces
 graphspec_json = true           # Generate GraphSpec JSON
 mermaidflow_mmd = true          # Generate Mermaid code
 mermaidflow_html = true         # Generate Mermaid HTML
-reactflow_viewspec = true       # Generate ViewSpec JSON
 reactflow_html = true           # Generate ReactFlow HTML
 ```
 
@@ -480,7 +458,7 @@ validate_graphspec(graph_spec)
 | `GraphSpec.to_json()` | Serialize to JSON string |
 | `GraphAnalysis.from_graphspec(g)` | Pre-compute analysis |
 | `MermaidflowFactory.make_from_graphspec(...)` | Generate Mermaid |
-| `graphspec_to_viewspec(g, analysis)` | Generate ViewSpec |
+| `generate_reactflow_html(graphspec, config)` | Generate ReactFlow HTML |
 | `generate_graph_outputs(g, config, pipe_code)` | Generate all outputs |
 
 ---

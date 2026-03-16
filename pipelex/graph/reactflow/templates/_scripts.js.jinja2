@@ -47,13 +47,9 @@ document.getElementById('direction-toggle').addEventListener('click', () => {
     if (window.setLayoutDirection) window.setLayoutDirection(currentDirection);
 });
 
-// Parse embedded ViewSpec
-const viewspecElement = document.getElementById('pipelex-viewspec');
-const viewspec = JSON.parse(viewspecElement.textContent);
-
-// Parse GraphSpec if present
+// Parse embedded GraphSpec
 const graphspecElement = document.getElementById('pipelex-graphspec');
-const graphspec = graphspecElement ? JSON.parse(graphspecElement.textContent) : null;
+const graphspec = JSON.parse(graphspecElement.textContent);
 
 // Parse stuff data in alternate formats (for display toggle)
 const stuffDataTextElement = document.getElementById('pipelex-stuff-data-text');
@@ -149,10 +145,10 @@ const hasDataflow = dataflowAnalysis && Object.keys(dataflowAnalysis.stuffRegist
 const statsEl = document.getElementById('footer-stats');
 const pipeCount = hasDataflow
     ? graphspec.nodes.filter(n => !dataflowAnalysis.controllerNodeIds.has(n.node_id)).length
-    : viewspec.nodes.length;
+    : graphspec.nodes.length;
 const stuffCount = hasDataflow ? Object.keys(dataflowAnalysis.stuffRegistry).length : 0;
-const succeededCount = viewspec.nodes.filter(n => n.status === 'succeeded').length;
-const failedCount = viewspec.nodes.filter(n => n.status === 'failed').length;
+const succeededCount = graphspec.nodes.filter(n => n.status === 'succeeded').length;
+const failedCount = graphspec.nodes.filter(n => n.status === 'failed').length;
 
 statsEl.innerHTML = `
     <div class="stat-item">
@@ -543,19 +539,20 @@ function buildDataflowGraph(graphspec, analysis) {
 }
 
 // ====================================================================
-// FALLBACK: Build orchestration graph from ViewSpec (no dataflow)
+// FALLBACK: Build orchestration graph from GraphSpec (no dataflow)
 // ====================================================================
-function buildOrchestrationGraph(viewspec) {
-    const nodes = viewspec.nodes.map(node => {
+function buildOrchestrationGraph(graphspec) {
+    const nodes = graphspec.nodes.map(node => {
         const isController = node.kind === 'controller';
-        const isFailed = node.ui?.classes?.includes('failed');
-        const isSucceeded = node.ui?.classes?.includes('succeeded');
-        const badge = node.ui?.badges?.[0] || '';
+        const isFailed = node.status === 'failed';
+        const isSucceeded = node.status === 'succeeded';
+        const label = node.pipe_code || node.node_id.split(':').pop() || node.node_id;
+        const badge = node.timing?.duration ? node.timing.duration.toFixed(1) + 's' : '';
         // Calculate width: ~8px per char (monospace 13px) + padding + status dot
-        const nodeWidth = Math.max(160, (node.label?.length || 10) * 8 + 50);
+        const nodeWidth = Math.max(160, (label.length || 10) * 8 + 50);
 
         return {
-            id: node.id,
+            id: node.node_id,
             type: 'default',
             data: {
                 label: React.createElement('div', {
@@ -581,7 +578,7 @@ function buildOrchestrationGraph(viewspec) {
                                 fontWeight: 600,
                                 color: 'var(--color-pipe-text)',
                             }
-                        }, node.label),
+                        }, label),
                         isSucceeded && React.createElement('span', {
                             style: {
                                 width: '8px',
@@ -614,7 +611,7 @@ function buildOrchestrationGraph(viewspec) {
                                 fontSize: '11px',
                                 color: 'var(--color-text-dim)',
                             }
-                        }, isController ? 'Controller' : node.inspector?.pipe_type || 'Operator'),
+                        }, isController ? 'Controller' : node.pipe_type || 'Operator'),
                         badge && React.createElement('span', {
                             style: {
                                 fontSize: '10px',
@@ -631,7 +628,7 @@ function buildOrchestrationGraph(viewspec) {
                 isPipe: true,
                 isStuff: false,
             },
-            position: node.position || { x: 0, y: 0 },
+            position: { x: 0, y: 0 },
             style: {
                 background: isFailed ? 'var(--color-pipe-failed-bg)' : 'var(--color-pipe-bg)',
                 border: isFailed ? '2px solid var(--color-pipe-failed)' : '2px solid var(--color-pipe)',
@@ -643,12 +640,14 @@ function buildOrchestrationGraph(viewspec) {
         };
     });
 
-    const edges = viewspec.edges.map(edge => ({
-        id: edge.id,
+    // Filter edges: skip CONTAINS edges (handled via containment tree)
+    const visibleEdges = graphspec.edges.filter(edge => edge.kind !== 'contains');
+    const edges = visibleEdges.map((edge, index) => ({
+        id: edge.edge_id || 'edge_' + index,
         source: edge.source,
         target: edge.target,
         type: {{ edge_type | tojson }},
-        animated: edge.animated || false,
+        animated: edge.kind === 'data',
         label: edge.label,
         labelStyle: {
             fontSize: 11,
@@ -684,7 +683,7 @@ function GraphViewer() {
     if (hasDataflow) {
         initialData = buildDataflowGraph(graphspec, dataflowAnalysis);
     } else {
-        initialData = buildOrchestrationGraph(viewspec);
+        initialData = buildOrchestrationGraph(graphspec);
     }
 
     // Apply layout
