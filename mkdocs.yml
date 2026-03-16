@@ -1,5 +1,9 @@
 site_name: Pipelex Documentation
-site_url: https://docs.pipelex.com/latest/
+# IMPORTANT: site_url must be the bare domain, NOT https://docs.pipelex.com/latest/.
+# Mike inserts the version prefix into sitemap URLs during deployment. If site_url
+# already contains /latest/, mike produces broken double paths like /latest/0.20.9/page/.
+# Canonical URLs are forced to /latest/ via a template override in docs/overrides/main.html.
+site_url: https://docs.pipelex.com/
 site_description: "Official documentation for Pipelex, an open-source library/CLI for building and running executable AI methods."
 docs_dir: docs
 repo_url: "https://github.com/Pipelex/pipelex"
