@@ -878,6 +878,15 @@ docs-deploy-specific-version-pre-release: env
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
 	$(MAKE) docs-deploy-root
 
+# Deploy root assets (404.html, robots.txt, index.html, sitemap.xml) to gh-pages.
+# The root sitemap is generated from latest/sitemap.xml (not $(DOCS_VERSION)/) so
+# that pre-release deploys don't overwrite it with pages not served at /latest/.
+# Mike does NOT rewrite sitemap URLs for aliases — latest/sitemap.xml contains
+# versioned URLs like /0.20.9/page/, identical to the version directory. The sed
+# rewrites any semver path segment (including pre-release suffixes like -rc1) to /latest/.
+# WARNING: Do NOT insert comments inside the shell continuation chain below.
+# Lines starting with # after a \ continuation become shell comments that silently
+# truncate the command.
 docs-deploy-root:
 ifeq ($(SITE_DOMAIN),)
 	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
@@ -890,12 +899,6 @@ endif
 	cp docs/404.html "$$TMPDIR/404.html" && \
 	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
 	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
-# Generate root sitemap with /latest/ URLs.
-# Source from latest/ (not $(DOCS_VERSION)/) so that pre-release deploys don't
-# overwrite the root sitemap with pages that aren't served at /latest/.
-# Mike does NOT rewrite sitemap URLs for aliases — latest/sitemap.xml contains
-# versioned URLs like /0.20.9/page/, identical to the version directory. The sed
-# rewrites any semver path segment (including pre-release suffixes like -rc1) to /latest/.
 	sed 's|/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*[^/]*/|/latest/|g' "$$TMPDIR/latest/sitemap.xml" > "$$TMPDIR/sitemap.xml" && \
 	cd "$$TMPDIR" && \
 	git add 404.html robots.txt index.html sitemap.xml && \
