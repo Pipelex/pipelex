@@ -1,0 +1,42 @@
+pyproject.toml
+  6dbd7232498171f9 3
+.badges/tests.json
+  6dbd7232498171f9 4
+docs/under-the-hood/execution-graph-tracing.md
+  f33e8e8058485aea 135-136
+CHANGELOG.md
+  6dbd7232498171f9 3-8
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "90d36b2704091017be99ee80d40c95a282b89f6d",
+  "prompts": {
+    "6dbd7232498171f9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3ba1ac14-5083-4f45-8a2f-3988b35d1b1a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 2,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    },
+    "f33e8e8058485aea": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9f86380d-a89f-409a-979f-c500a9319dc4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 5,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
