@@ -1,0 +1,23 @@
+README.md
+  3c5e70289d88f291 7-9,40-58,75,81,87,93,101,122-123,126,128,130,132-144,146-147,149,277,279-280,373-375,439,442,444,446-448,450,452,454-459,461-469,482-483,499,528,530,532,534
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "d28ba2ce1e91ee3000b7a66960304948b9609ae5",
+  "prompts": {
+    "3c5e70289d88f291": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2338f2e2-02f6-4940-8913-7f2f5f448254",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 98,
+      "total_deletions": 117,
+      "accepted_lines": 87,
+      "overriden_lines": 1
+    }
+  }
+}
