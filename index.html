@@ -1,18 +1,25 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>Redirecting</title>
-  <noscript>
-    <meta http-equiv="refresh" content="1; url=latest/" />
-  </noscript>
-  <script>
-    window.location.replace(
-      "latest/" + window.location.search + window.location.hash
-    );
-  </script>
+    <meta charset="utf-8">
+    <title>Redirecting to latest documentation...</title>
+    <meta http-equiv="refresh" content="0;url=/latest/">
+    <link rel="canonical" href="https://docs.pipelex.com/latest/">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #2e303e;
+            color: #ccc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        a { color: #45BF9F; text-decoration: none; }
+    </style>
 </head>
 <body>
-  Redirecting to <a href="latest/">latest/</a>...
+    <p>Redirecting to <a href="/latest/">latest documentation</a>&#8230;</p>
 </body>
 </html>
