@@ -66,7 +66,7 @@ async def generate_graph_outputs(
         graph_config: Configuration controlling which outputs to generate and data inclusion.
         pipe_code: The pipe code, used to derive the HTML page title when title is not provided.
         title: Explicit HTML page title. When provided, overrides the auto-derived title from pipe_code.
-        direction: Flowchart direction for Mermaid diagrams. When None, uses graph_config.mermaid_config.direction.
+        direction: Flowchart direction override for both Mermaid and ReactFlow outputs. When None, each renderer uses its own config default.
         include_subgraphs: Whether to render controller hierarchy as subgraphs in Mermaid output.
 
     Returns:
