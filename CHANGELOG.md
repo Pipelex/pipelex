@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.20.12] - 2026-03-16
+
+### Fixed
+
+- Fix Google "Sitemap could not be read" error by adding `Allow: /sitemap.xml` to `ROOT_ROBOTS_TXT` — `Disallow: /` was blocking Googlebot from fetching the root sitemap even though `Sitemap:` pointed to it.
+
 ## [v0.20.11] - 2026-03-16
 
 ### Fixed
