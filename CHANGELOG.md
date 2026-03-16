@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.20.10] - 2026-03-16
+
+### Fixed
+
+- Fix sitemap double-path bug (`latest/0.20.9/page/`) caused by `site_url` including `/latest/` while mike also inserts the version prefix during deployment.
+- Override canonical URLs, `og:url`, and JSON-LD `url` to always point to `/latest/` via template override.
+- Add root-level `sitemap.xml` generation with `/latest/` URLs to `docs-deploy-root`.
+
 ## [v0.20.9] - 2026-03-16
 
 ### Changed
