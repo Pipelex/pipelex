@@ -1,60 +1,68 @@
 ---
 title: "Generic Document Extraction Example"
-description: "Extract content from complex PDF documents containing text and images. This Pipelex pipeline merges extracted content into a single coherent output."
+description: "Extract content from complex PDF documents containing text and images. This Pipelex pipeline converts each page to markdown using vision."
 ---
 
 # Example: Generic Document Extraction
 
-This example demonstrates a powerful and generic pipeline for extracting content from complex PDF documents. It can handle documents that contain both text and images, and it merges the extracted content into a single, coherent output.
+This example demonstrates a generic pipeline for extracting content from complex PDF documents. It extracts pages with views, then converts each page to markdown using a vision-capable LLM that combines OCR text with the page image.
 
 ## Get the code
 
-[**➡️ View on GitHub: examples/b_basics/document_extract/extract_generic/extract_generic.py**](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_generic/extract_generic.py)
+[![GitHub](https://img.shields.io/badge/View_on_GitHub-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/blob/main/examples/b_basics/document_extract/extract_generic/bundle.mthds)
 
-## The Pipeline Explained
+## What it demonstrates
 
-The `power_extractor` pipeline is at the heart of this example. After its execution, a custom function `merge_markdown_and_images` is used to combine the text (converted to Markdown) and the images from all pages.
+- Vision-based page-to-markdown conversion using `PipeLLM` with `$vision` model
+- Using shared method packages for page extraction
+- Batching over pages to process each one independently
+- Combining OCR text with page images for accurate extraction
 
-```python
-async def extract_generic(pdf_url: str) -> TextAndImagesContent:
-    pipe_output = await execute_pipeline(
-        pipe_code="power_extractor",
-        inputs={
-            "document": DocumentContent(url=pdf_url),
-        },
-    )
-    working_memory = pipe_output.working_memory
-    markdown_and_images: TextAndImagesContent = merge_markdown_and_images(working_memory)
-    return markdown_and_images
+## The Method: `bundle.mthds`
+
+```toml
+domain    = "extract_generic"
+main_pipe = "power_extractor"
+
+[pipe.power_extractor]
+type = "PipeSequence"
+description = "Update page content with markdown"
+inputs = { document = "Document" }
+output = "Text[]"
+steps = [
+  { pipe = "github.com/Pipelex/methods/documents->documents.extract_page_contents_and_views",
+    result = "page_contents" },
+  { pipe = "write_markdown_from_page_content",
+    batch_over = "page_contents", batch_as = "page_content",
+    result = "markdowns" },
+]
+
+[pipe.write_markdown_from_page_content]
+type = "PipeLLM"
+description = "Write markdown from page content"
+inputs = { "page_content.page_view" = "Image", page_content = "Page" }
+output = "Text"
+model = "$vision"
+system_prompt = "You are a multimodal LLM, expert at converting images into perfect markdown."
+prompt = """
+You are given an image which is a view of a document page: $page_content.page_view
+You are also given the text extracted from the page by an OCR model.
+Your task is to output the perfect markdown of the page.
+
+Here is the text extracted from the page:
+{{ page_content.text_and_images.text.text|tag("ocr_text") }}
+
+- Ensure you do not miss any information from the page.
+- Output only the markdown, nothing else.
+"""
 ```
 
-The `merge_markdown_and_images` function is a great example of how you can add your own Python code to a Pipelex method to perform custom processing.
+## How to run
 
-```python
-def merge_markdown_and_images(working_memory: WorkingMemory) -> TextAndImagesContent:
-    # Pages extracted from the PDF by PipeOCR
-    page_contents_list = working_memory.get_stuff_as_list(name="page_contents", item_type=PageContent)
-    # Markdown text extracted from the Pages by PipeLLM
-    page_markdown_list = working_memory.get_stuff_as_list(name="markdowns", item_type=TextContent)
-
-    # ... (check for length equality)
-
-    # Concatenate the markdown text
-    concatenated_markdown_text: str = "\n".join([page_markdown.text for page_markdown in page_markdown_list.items])
-
-    # Aggregate the images from the page contents
-    image_contents: List[ImageContent] = []
-    for page_content in page_contents_list.items:
-        if page_content.text_and_images.images:
-            image_contents.extend(page_content.text_and_images.images)
-
-    return TextAndImagesContent(
-        text=TextContent(text=concatenated_markdown_text),
-        images=image_contents,
-    )
+```bash
+pipelex run bundle examples/b_basics/document_extract/extract_generic/bundle.mthds \
+  -i examples/b_basics/document_extract/extract_generic/inputs.json
 ```
-
-This example shows the flexibility of Pipelex in handling complex, multi-modal documents and allowing for custom logic.
 
 ## Related Documentation
 

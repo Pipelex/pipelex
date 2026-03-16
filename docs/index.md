@@ -1,65 +1,118 @@
 ---
-title: "What is Pipelex?"
-description: "Pipelex is the open-source reference runtime for executable AI methods written in MTHDS. Build repeatable AI methods with typed concepts, focused pipes, and broad model support."
+title: "Build & Run AI Methods"
+description: "Methods are reusable, typed AI procedures written in MTHDS and executed by Pipelex. Build repeatable AI know-how with structured concepts, focused pipes, and 60+ models."
 ---
 
 ![Pipelex Banner](https://d2cinlfp2qnig1.cloudfront.net/banners/pipelex_banner_docs_v2.png)
 
-# What is Pipelex?
+# Build & Run AI Methods
 
-Pipelex is the open-source reference runtime for **executable AI methods** written in MTHDS. Instead of cramming everything into one complex prompt, you break tasks into focused steps, each pipe handling one clear transformation.
+A method is a reusable, typed AI procedure — declared in a `.mthds` file and executed by Pipelex. Each step is explicit, each output is structured, and every run is repeatable.
 
-Each pipe processes information using **Concepts** (typing with meaning) to keep method inputs and outputs explicit. MTHDS (`.mthds` files) is a human-readable format for defining those methods, and Pipelex validates and runs them.
-
-Each step can be structured and validated, so you get the reliability of software and the flexibility of AI.
-
----
-
-## Key Features
-
-### 🔄 Repeatable AI Methods
-Build methods that produce consistent, reliable results every time they run.
-
-### 🧩 Concept-Driven Design
-Use semantic typing (Concepts) to ensure each step of your pipeline makes sense and connects logically.
-
-### 📝 Human-Readable Language
-Write methods in `.mthds` files that are easy to read, edit, and maintain—even for non-developers.
-
-### 🤖 AI-Assisted Development
-Generate and iterate on methods using natural language with your favorite AI coding assistant.
-
-### 🔧 Production-Ready
-Validate, test, and deploy AI methods with the same confidence as traditional software.
+[:material-robot-outline: Claude Code](./get-started/build-with-claude-code.md){ .md-button .md-button--primary }
+[:material-school: MTHDS Tutorial](./get-started/mthds-language-tutorial.md){ .md-button }
+[:material-book-open-variant: Cookbook](./cookbook/index.md){ .md-button }
 
 ---
 
-## Why Pipelex?
+## Why Methods?
 
-Traditional AI applications often struggle with:
+<div class="grid cards" markdown>
 
-- **Complexity**: One massive prompt trying to do everything
-- **Unpredictability**: Different results each time
-- **Maintenance**: Hard to debug and improve
-- **Collaboration**: Difficult for teams to work together
+-   :material-file-document-check: **Declarative**
 
-Pipelex solves these problems by:
+    Express business logic at a high level of abstraction, in human-readable `.mthds` files that work across models.
 
-- **Breaking down complexity** into focused, manageable steps
-- **Ensuring consistency** through structured validation
-- **Enabling iteration** with clear, editable methods
-- **Facilitating collaboration** with human-readable syntax
+-   :material-shape-outline: **Typed**
+
+    Concepts are semantic types: AI understands what you mean, and every input and output connects with purpose.
+
+-   :material-refresh: **Repeatable**
+
+    Deterministic orchestration that leaves exactly the room you want for AI to express its intelligence and creativity.
+
+-   :material-puzzle: **Composable**
+
+    Chain pipes into sequences, nest methods inside methods, and share them with the community.
+
+</div>
 
 ---
 
-## Next Steps
+## What a Method Looks Like
 
-Ready to get started?
+A single pipe in MTHDS — five lines that call an LLM with typed inputs and output:
 
-- [:material-rocket-launch: Get Started](./get-started/write-methods-manually.md){ .md-button .md-button--primary }
-- [:material-shape-outline: Learn MTHDS](./features/mthds-language.md){ .md-button }
-- [:material-book-open: Read the Know-How Graph](./viewpoint/viewpoint.md){ .md-button }
+```toml
+[pipe.summarize_article]
+type    = "PipeLLM"
+inputs  = { article = "Text", audience = "Text" }
+output  = "Text"
+prompt  = "Summarize $article in three bullet points for $audience."
+```
 
-**Explore Examples:**
+From here, Pipelex handles model routing across 60+ models, structured output parsing, and pipeline orchestration.
 
-[![Cookbook](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/main)
+---
+
+## Capabilities
+
+<div class="grid cards" markdown>
+
+-   :material-shape-outline: **[Typed Concepts](./features/concepts.md)**
+
+    Semantic types that give meaning to every input and output — native, inline, or backed by Python classes.
+
+-   :material-pipe: **[Pipe Operators](./features/pipe-operators.md)**
+
+    Six operators that do the work: LLM calls, document extraction, image generation, web search, composition, and custom functions.
+
+-   :material-sitemap: **[Pipeline Orchestration](./features/pipeline-orchestration.md)**
+
+    Sequence, parallel, batch, and conditional controllers that wire pipes into full methods with shared working memory.
+
+-   :material-cloud-check: **[60+ AI Models](./features/llm-integration.md)**
+
+    One gateway key or bring-your-own: OpenAI, Anthropic, Mistral, Google, Deepseek, Hugging Face, and more.
+
+-   :material-check-decagram: **[Validation and Dry Run](./features/validation-dry-run.md)**
+
+    Validate pipelines before execution and dry-run with mocked responses — catch errors without spending tokens.
+
+-   :material-console: **[CLI and Tooling](./features/cli.md)**
+
+    Full CLI for init, build, validate, run, and graph visualization. Plus `plxt` for formatting and linting `.mthds` files.
+
+</div>
+
+---
+
+## The MTHDS Ecosystem
+
+MTHDS is the open standard behind Pipelex methods. It defines the language, the file format, and the ecosystem for sharing methods.
+
+!!! info "Explore the ecosystem"
+
+    - **[mthds.ai](https://mthds.ai)** — The MTHDS language specification
+    - **[mthds.sh](https://mthds.sh)** — The Methods Hub for discovering and sharing methods
+
+---
+
+## Get Started
+
+<div class="grid cards" markdown>
+
+-   :material-robot-outline: **[Build with Claude Code](./get-started/build-with-claude-code.md)**
+
+    Describe what you want in natural language — Claude writes, runs, and iterates on your method for you.
+
+-   :material-school: **[MTHDS Language Tutorial](./get-started/mthds-language-tutorial.md)**
+
+    Learn the declarative language step by step: concepts, pipes, sequences, inputs, and structured outputs.
+
+-   :material-book-open-variant: **[Cookbook Examples](./cookbook/index.md)**
+
+    Production-ready recipes — from Hello World to document extraction, synthetic data, and image generation.
+
+</div>
+

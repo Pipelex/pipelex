@@ -81,7 +81,8 @@ plugins:
         'home/10-advanced-customizations/reporting-delegate-injection.md': 'advanced/reporting-delegate-injection.md'
         'home/10-advanced-customizations/secrets-provider-injection.md': 'advanced/secrets-provider-injection.md'
         'home/10-advanced-customizations/storage-provider-injection.md': 'advanced/storage-provider-injection.md'
-        'home/2-get-started/write-methods-manually.md': 'get-started/write-methods-manually.md'
+        'get-started/write-methods-manually.md': 'get-started/mthds-language-tutorial.md'
+        'home/2-get-started/write-methods-manually.md': 'get-started/mthds-language-tutorial.md'
         'home/3-understand-pipelex/viewpoint.md': 'viewpoint/viewpoint.md'
         'home/4-cookbook-examples/extract-dpe.md': 'cookbook/extract-dpe.md'
         'home/4-cookbook-examples/extract-gantt.md': 'cookbook/extract-gantt.md'
@@ -90,14 +91,19 @@ plugins:
         'home/4-cookbook-examples/extract-table.md': 'cookbook/extract-table.md'
         'home/4-cookbook-examples/hello-world.md': 'cookbook/hello-world.md'
         'home/4-cookbook-examples/index.md': 'cookbook/index.md'
-        'home/4-cookbook-examples/invoice-extractor.md': 'cookbook/invoice-extractor.md'
-        'home/4-cookbook-examples/simple-ocr.md': 'cookbook/simple-ocr.md'
+        'home/4-cookbook-examples/invoice-extractor.md': 'cookbook/extract-invoice.md'
+        'home/4-cookbook-examples/simple-ocr.md': 'cookbook/index.md'
+        'cookbook/simple-ocr.md': 'cookbook/index.md'
+        'cookbook/invoice-extractor.md': 'cookbook/extract-invoice.md'
         'home/4-cookbook-examples/write-tweet.md': 'cookbook/write-tweet.md'
-        'home/5-setup/configure-ai-providers.md': 'setup/configure-ai-providers.md'
+        'home/5-setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
         'home/5-setup/gateway-models.md': 'setup/gateway-models.md'
-        'home/5-setup/index.md': 'setup/index.md'
-        'home/5-setup/project-organization.md': 'setup/project-organization.md'
+        'home/5-setup/index.md': 'get-started/build-with-claude-code.md'
+        'home/5-setup/project-organization.md': 'get-started/build-with-claude-code.md'
         'home/5-setup/telemetry.md': 'setup/telemetry.md'
+        'setup/index.md': 'get-started/build-with-claude-code.md'
+        'setup/project-organization.md': 'get-started/build-with-claude-code.md'
+        'setup/configure-ai-providers.md': 'get-started/configure-ai-providers.md'
         'home/6-build-reliable-ai-workflows/adapt-to-llm-prompting-style-openai-anthropic-mistral.md': 'building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md'
         'home/6-build-reliable-ai-workflows/concepts/define_your_concepts.md': 'building-methods/concepts/define_your_concepts.md'
         'home/6-build-reliable-ai-workflows/concepts/inline-structures.md': 'building-methods/concepts/inline-structures.md'
@@ -194,9 +200,41 @@ extra_css:
   - stylesheets/general.css
 
 nav:
-  - Home:
-    - What is Pipelex?: index.md
-    - Getting Started: get-started/write-methods-manually.md
+  - Get Started:
+    - Build & Run AI Methods: index.md
+    - Build with Claude Code: get-started/build-with-claude-code.md
+    - The MTHDS Language Tutorial: get-started/mthds-language-tutorial.md
+    - Configure AI Providers: get-started/configure-ai-providers.md
+    - Cookbook Examples:
+      - Overview: cookbook/index.md
+      - Quick Start:
+        - Hello World: cookbook/hello-world.md
+        - Summarize: cookbook/summarize.md
+      - Document Extraction:
+        - Generic Document: cookbook/extract-generic.md
+        - Invoice: cookbook/extract-invoice.md
+        - Proof of Purchase: cookbook/extract-proof-of-purchase.md
+        - DPE (Energy Diagnostic): cookbook/extract-dpe.md
+        - Table from Image: cookbook/extract-table.md
+        - Gantt Chart: cookbook/extract-gantt.md
+        - Markdown from Document: cookbook/extract-markdown.md
+        - Slides from Presentation: cookbook/extract-slides.md
+      - Visual Generation:
+        - Design Slides: cookbook/design-slides.md
+        - Generate Image: cookbook/generate-image.md
+      - Advanced:
+        - Synthetic Data: cookbook/gen-synthetic-data.md
+        - Expense Data with Receipts: cookbook/gen-expense-data.md
+        - Using Inference Plugins: cookbook/using-inference-plugins.md
+      - Work in Progress:
+        - Tweet Optimizer: cookbook/write-tweet.md
+        - Blog Article Generator: cookbook/blog-article-generator.md
+        - Advisory Board: cookbook/advisory-board.md
+        - Discord Newsletter: cookbook/discord-newsletter.md
+        - Expense Validation: cookbook/validate-expense-data.md
+    - Viewpoint:
+      - The Know-How Graph: viewpoint/viewpoint.md
+  - Guide:
     - Features:
       - Overview: features/index.md
       - Declarative AI Methods:
@@ -223,26 +261,6 @@ nav:
       - Configuration & Extensibility:
         - Configuration System: features/configuration.md
         - Advanced Customizations: features/advanced-customizations.md
-    - Cookbook Examples:
-      - Overview: cookbook/index.md
-      - Hello World: cookbook/hello-world.md
-      - Document Processing:
-        - Simple OCR: cookbook/simple-ocr.md
-        - Generic Document Extraction: cookbook/extract-generic.md
-        - Invoice Extractor: cookbook/invoice-extractor.md
-        - Proof of Purchase Extraction: cookbook/extract-proof-of-purchase.md
-      - Graphical Extraction:
-        - Gantt Chart Extraction: cookbook/extract-gantt.md
-        - Table Extraction from Image: cookbook/extract-table.md
-        - DPE Extraction: cookbook/extract-dpe.md
-      - Text Generation:
-        - Tweet Optimizer (wip): cookbook/write-tweet.md
-    - Setup (first run):
-      - Overview: setup/index.md
-      - Configure AI Providers: setup/configure-ai-providers.md
-      - Gateway Available Models: setup/gateway-models.md
-      - Project Organization: setup/project-organization.md
-      - Telemetry: setup/telemetry.md
     - Build Reliable AI Methods:
       - Kick off a Method Project: building-methods/kick-off-a-methods-project.md
       - Pipelex Bundle Specification: building-methods/pipelex-bundle-specification.md
@@ -279,6 +297,21 @@ nav:
       - Optimize Cost & Quality: building-methods/configure-ai-llm-to-optimize-methods.md
       - LLM Structured Generation: building-methods/llm-structured-generation-config.md
       - LLM Prompting Style: building-methods/adapt-to-llm-prompting-style-openai-anthropic-mistral.md
+  - Reference:
+    - CLI Reference:
+      - Overview: tools/cli/index.md
+      - Init: tools/cli/init.md
+      - Validate: tools/cli/validate.md
+      - Run: tools/cli/run.md
+      - Show: tools/cli/show.md
+      - Pkg: tools/cli/pkg.md
+      - Build:
+        - Overview: tools/cli/build/index.md
+        - Runner: tools/cli/build/runner.md
+        - Structures: tools/cli/build/structures.md
+        - Inputs: tools/cli/build/inputs.md
+        - Output: tools/cli/build/output.md
+      - Agent CLI: tools/cli/agent-cli.md
     - Configuration (TOML reference):
       - Overview: configuration/index.md
       - Pipeline Validation Configuration:
@@ -294,25 +327,14 @@ nav:
         - LLM Providers & Models: configuration/config-technical/inference-backend-config.md
         - Library: configuration/config-technical/library-config.md
         - Feature: configuration/config-advanced/feature-config.md
-    - Analytics:
-      - Observer Data Extraction: analytics/data-extraction.md
     - Tools:
-      - CLI:
-        - Overview: tools/cli/index.md
-        - Init: tools/cli/init.md
-        - Validate: tools/cli/validate.md
-        - Run: tools/cli/run.md
-        - Show: tools/cli/show.md
-        - Pkg: tools/cli/pkg.md
-        - Build:
-          - Overview: tools/cli/build/index.md
-          - Runner: tools/cli/build/runner.md
-          - Structures: tools/cli/build/structures.md
-          - Inputs: tools/cli/build/inputs.md
-          - Output: tools/cli/build/output.md
-        - Agent CLI: tools/cli/agent-cli.md
       - plxt (Formatter & Linter): tools/plxt.md
       - Logging: tools/logging.md
+    - Analytics:
+      - Observer Data Extraction: analytics/data-extraction.md
+    - Telemetry: setup/telemetry.md
+    - Gateway Available Models: setup/gateway-models.md
+  - Advanced:
     - Advanced Customizations:
       - Overview: advanced/index.md
       - Secrets Provider: advanced/secrets-provider-injection.md
@@ -321,24 +343,20 @@ nav:
       - Observer: advanced/observer-provider-injection.md
       - Content Generator: advanced/content-generator-injection.md
       - Pipe Router: advanced/pipe-router-injection.md
-    - Viewpoint:
-      - The Know-How Graph: viewpoint/viewpoint.md
-  - Under the Hood:
-    - Overview: under-the-hood/index.md
-    - Architecture Overview: under-the-hood/architecture-overview.md
-    - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
-    - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
-    - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
-    - Reasoning Controls: under-the-hood/reasoning-controls.md
-    - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
-    - Test Profile Configuration: under-the-hood/test-profile-configuration.md
-    - Init CLI Flows: under-the-hood/init-cli-flows.md
-  - API: https://pipelex.github.io/pipelex-api/
-  - MCP: https://pipelex.github.io/pipelex-mcp/
-  - n8n: https://pipelex.github.io/n8n-nodes-pipelex/
-  - Contribute:
+    - Under the Hood:
+      - Overview: under-the-hood/index.md
+      - Architecture Overview: under-the-hood/architecture-overview.md
+      - Dry Run Mock Generation: under-the-hood/dry-run-mock-generation.md
+      - Execution Graph Tracing: under-the-hood/execution-graph-tracing.md
+      - Image Handling in LLM Prompts: under-the-hood/image-handling-in-llm-prompts.md
+      - Reasoning Controls: under-the-hood/reasoning-controls.md
+      - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
+      - Test Profile Configuration: under-the-hood/test-profile-configuration.md
+      - Init CLI Flows: under-the-hood/init-cli-flows.md
+  - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md
     - Code of Conduct: CODE_OF_CONDUCT.md
     - License: license.md
-  - Changelog: changelog.md
+    - Changelog: changelog.md
+  - API: https://pipelex.github.io/pipelex-api/

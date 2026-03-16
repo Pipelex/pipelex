@@ -59,7 +59,7 @@ Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
 Documentation = "https://docs.pipelex.com/"
 Changelog = "https://docs.pipelex.com/changelog/"
-"MTHDS Standard" = "https://mthds.ai"
+"MTHDS Standard" = "https://mthds.ai/latest/"
 
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.78.0"]

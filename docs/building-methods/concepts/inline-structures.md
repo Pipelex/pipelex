@@ -310,5 +310,5 @@ See [Python StructuredContent Classes](python-classes.md) for advanced features.
 
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics and naming
 - [Python StructuredContent Classes](python-classes.md) - Advanced features with Python
-- [Writing Methods Tutorial](../../get-started/write-methods-manually.md) - Get started with structured outputs
+- [MTHDS Language Tutorial](../../get-started/mthds-language-tutorial.md) - Get started with structured outputs
 

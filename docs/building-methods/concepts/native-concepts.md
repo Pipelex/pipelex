@@ -355,5 +355,5 @@ prompt = "What is $topic?"
 - [Define Your Concepts](define_your_concepts.md) - Learn about concept semantics
 - [Inline Structures](inline-structures.md) - Add structure to refined concepts
 - [Python StructuredContent Classes](python-classes.md) - Advanced customization
-- [Writing Methods Tutorial](../../get-started/write-methods-manually.md) - Use native concepts in pipelines
+- [MTHDS Language Tutorial](../../get-started/mthds-language-tutorial.md) - Use native concepts in pipelines
 

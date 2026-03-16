@@ -52,7 +52,7 @@ Package manifest management currently lives in the `mthds` CLI:
 
 ## Related Documentation
 
-- [Configure AI Providers](../../setup/configure-ai-providers.md) - Set up LLM backends
+- [Configure AI Providers](../../get-started/configure-ai-providers.md) - Set up LLM backends
 - [Design and Run Pipelines](../../building-methods/pipes/index.md) - Pipeline development guide
 - [Packages](../../building-methods/packages.md) - `METHODS.toml` manifests and exports
 

@@ -54,6 +54,14 @@ The `docs-deploy-root` Makefile target deploys root assets (`404.html`, `robots.
 - `meta-manager` — applies `docs/.meta.yml` defaults to all pages
 - `glightbox` — image lightbox
 
+## Sidebar Width
+
+Material for MkDocs hard-codes `.md-sidebar { width: 12.1rem }`. The root font-size is **20px** (not 16), so `rem` values are larger than you'd expect (12.1rem = 242px). Custom overrides live in `docs/stylesheets/general.css`.
+
+To widen the sidebar you must override **two** things:
+1. `.md-sidebar { width: ... }` — the container itself
+2. `.md-sidebar .md-sidebar__inner { padding-right: 4px }` — the theme dynamically inflates `padding-right` on `.md-sidebar__inner` to absorb extra container width, keeping the nav at its original size. Pin this padding to prevent that.
+
 ## Common Mistakes to Avoid
 
 - Do NOT create `docs/404.md` — it poisons the sitemap with an indexable `/latest/404/` URL
