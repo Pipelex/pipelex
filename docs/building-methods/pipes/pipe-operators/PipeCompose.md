@@ -43,6 +43,7 @@ The Jinja2 template has access to all the "stuffs" currently in the working memo
 | `template`         | string | The Jinja2 template string                                                       | Yes      |
 | `category`         | string | Template category: `basic`, `markdown`, `html`, `mermaid`                        | Yes      |
 | `templating_style` | table  | Style options: `{ tag_style = "...", text_format = "..." }`                      | No       |
+| `extra_context`    | table  | Additional key-value pairs merged into the template rendering context             | No       |
 
 ### Template Mode Examples
 
