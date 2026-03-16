@@ -1,0 +1,31 @@
+docs/building-methods/pipes/pipe-operators/PipeCompose.md
+  67a01be8803075bb 20,22-23,32,37-39,41-45,60-79,82,90-93
+CLAUDE.md
+  67a01be8803075bb 262-268
+docs/CLAUDE.md
+  67a01be8803075bb 73-81
+CHANGELOG.md
+  67a01be8803075bb 7
+pipelex/builder/CLAUDE.md
+  67a01be8803075bb 63-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.12",
+  "base_commit_sha": "8f2f5189e8fae434b730611b4bb65f8d0f95dd14",
+  "prompts": {
+    "67a01be8803075bb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6dd25745-32ea-4279-a302-a74f557f22c8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 77,
+      "total_deletions": 22,
+      "accepted_lines": 69,
+      "overriden_lines": 0
+    }
+  }
+}
