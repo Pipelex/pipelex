@@ -890,7 +890,13 @@ endif
 	cp docs/404.html "$$TMPDIR/404.html" && \
 	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
 	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
-	sed 's|/$(DOCS_VERSION)/|/latest/|g' "$$TMPDIR/$(DOCS_VERSION)/sitemap.xml" > "$$TMPDIR/sitemap.xml" && \
+# Generate root sitemap with /latest/ URLs.
+# Source from latest/ (not $(DOCS_VERSION)/) so that pre-release deploys don't
+# overwrite the root sitemap with pages that aren't served at /latest/.
+# Mike does NOT rewrite sitemap URLs for aliases — latest/sitemap.xml contains
+# versioned URLs like /0.20.9/page/, identical to the version directory. The sed
+# rewrites any semver path segment (including pre-release suffixes like -rc1) to /latest/.
+	sed 's|/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*[^/]*/|/latest/|g' "$$TMPDIR/latest/sitemap.xml" > "$$TMPDIR/sitemap.xml" && \
 	cd "$$TMPDIR" && \
 	git add 404.html robots.txt index.html sitemap.xml && \
 	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml)") && \

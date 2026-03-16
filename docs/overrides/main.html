@@ -1,10 +1,16 @@
 {# overrides/main.html #}
 {% extends "base.html" %}
 
-{# Force canonical URL to /latest/ path regardless of deployed version.
-   site_url is https://docs.pipelex.com/ (bare domain) so that mike can
-   properly prefix version paths in sitemaps. We override canonical here
-   to always point crawlers at /latest/. #}
+{# We override the site_meta block (not just extrahead) because Material's base.html
+   emits <link rel="canonical"> inside site_meta. If we only added our canonical in
+   extrahead, every page would get TWO conflicting canonical tags.
+
+   Why this is needed: site_url is the bare domain (https://docs.pipelex.com/) so that
+   mike can properly prefix version paths in sitemaps without creating double paths.
+   But we want all canonical URLs to point to /latest/, so we hardcode that prefix here.
+
+   Note: docs/overrides/404.html also overrides this block to emit its own canonical
+   (pointing to /latest/ homepage) and suppress the page-specific one. #}
 
 {% block site_meta %}
   <meta charset="utf-8">
