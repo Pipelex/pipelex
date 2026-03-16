@@ -259,6 +259,13 @@ This document outlines the core coding standards, best practices, and quality co
 
 ## Standards related to developing the Pipelex codebase
 
+### Spec vs Blueprint Architecture
+
+- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/core/`) are the MTHDS language reference — what `.mthds` files parse into.
+- **Specs** (`pipelex/builder/pipe/`) are a convenience authoring format for AI agents. Each spec has `to_blueprint()` that transforms it into the corresponding blueprint. Spec-level fields may differ from blueprint-level fields.
+
+When adding validation or fields, decide which layer they belong to. Language rules go on blueprints; authoring convenience goes on specs. See `pipelex/builder/CLAUDE.md` for details.
+
 ### Main config
 
 - The main config model is defined using `ConfigModel` classes, derived from `pydantic BaseModel`

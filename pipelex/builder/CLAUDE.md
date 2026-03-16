@@ -60,6 +60,17 @@ All specs are Pydantic models (`StructuredContent` base). Two categories of pipe
 
 Each spec has `to_blueprint()` which converts it to the core framework's blueprint type. This separation keeps user-facing specs independent from internal execution types.
 
+## Critical: PipeSpecs and ConceptSpecs Are NOT the MTHDS Language
+
+PipeSpec and ConceptSpec subclasses in this directory are a **convenience authoring format** for AI agents and builders. They are NOT the ground truth of the MTHDS standard.
+
+The ground truth is the **blueprint** layer:
+
+- **Blueprints** (`pipelex/pipe_operators/`, `pipelex/pipe_controllers/`, `pipelex/core/`) define the actual MTHDS language. They are what `.mthds` files parse into via `PipelexInterpreter.make_pipelex_bundle_blueprint()`.
+- **Specs** are transformed into blueprints via `to_blueprint()` and then discarded. Spec-level fields (e.g., `PipeComposeSpec.target_format`) may not exist on the corresponding blueprint (e.g., `PipeComposeBlueprint` uses `TemplateBlueprint` with `category` + `templating_style` instead).
+
+When reviewing or modifying code: do not assume that a validation rule on a PipeSpec subclass reflects a rule of the MTHDS language. Check the corresponding blueprint class.
+
 `PipeSpecUnion` is a `Field(discriminator="type")` union of all pipe spec types.
 
 ## Multiplicity Notation

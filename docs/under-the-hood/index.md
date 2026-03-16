@@ -1,5 +1,6 @@
 ---
 title: "Under the Hood"
+description: "Technical deep-dives into Pipelex internals — architecture, execution tracing, image handling, reasoning controls, and more."
 ---
 
 # Under the Hood

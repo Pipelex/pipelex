@@ -1,5 +1,6 @@
 ---
 title: "Dry Run Mock Generation"
+description: "Learn how Pipelex generates format-compliant mock data for dry runs — validating pipeline structure without calling inference APIs."
 ---
 
 # Dry Run Mock Generation

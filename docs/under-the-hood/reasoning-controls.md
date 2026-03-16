@@ -1,5 +1,6 @@
 ---
 title: "Reasoning Controls"
+description: "Control LLM reasoning effort and budget across providers — a unified abstraction for chain-of-thought and extended thinking."
 ---
 
 # Reasoning Controls

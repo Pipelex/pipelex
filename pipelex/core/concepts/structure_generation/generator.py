@@ -90,7 +90,7 @@ class StructureGenerator:
             "If you want to customize this structure:\n"
             "  1. Copy this file to your own module\n"
             "  2. Remove the 'structure' or 'refines' declaration from the concept in the MTHDS file\n"
-            "     and declare it in inline mode (see https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/define_your_concepts/#basic-concept-definition)\n"
+            "     and declare it in inline mode (see https://docs.pipelex.com/latest/building-methods/concepts/define_your_concepts/#basic-concept-definition)\n"
             "  3. Make sure your custom class is importable and registered\n"
             "\n"
             "To regenerate: pipelex build structures <target_directory>\n"

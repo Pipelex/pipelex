@@ -27,7 +27,7 @@ def agent_models_cmd(
     that an agent needs to reference when building pipelines.
     """
     try:
-        make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False)
+        make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=backend is not None)
 
         result: dict[str, Any] = list_models(categories=model_type, backend=backend)
         result["success"] = True

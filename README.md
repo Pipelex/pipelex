@@ -4,12 +4,9 @@
   <br/>
   <br/>
   <br/>
-  <h2 align="center">Executable AI Methods</h2>
-  <p align="center">Pipelex is the reference Python runtime and Claude Code plugin for the <a href="https://mthds.ai">MTHDS</a> open standard.<br/>
-Readable by humans, executable by agents. No boilerplate, no lock-in.</p>
-  <br/>
-  <p align="center"><b>An AI method</b> is a multi-step workflow that chains LLMs, OCR, image generation, and more — each step typed and validated.<br/>
-<b>Executable</b> means each method becomes a new tool — agents and skills can call it, and it also runs standalone via CLI, Python, or REST API.</p>
+  <h2 align="center">Build & Run AI Methods</h2>
+  <p align="center">A method is a reusable, typed AI procedure — declared in a <code>.mthds</code> file and executed by Pipelex.<br/>
+Each step is explicit, each output is structured, and every run is repeatable.</p>
 
 
   <div>
@@ -40,6 +37,25 @@ Readable by humans, executable by agents. No boilerplate, no lock-in.</p>
 ![Claude Code + Pipelex + MTHDS](https://raw.githubusercontent.com/Pipelex/pipelex/main/.github/assets/Claude-Code-Pipelex-MTHDS-Cursor.png)
 
 
+## What a Method Looks Like
+
+```toml
+[pipe.summarize_article]
+type    = "PipeLLM"
+inputs  = { article = "Text", audience = "Text" }
+output  = "Text"
+prompt  = "Summarize $article in three bullet points for $audience."
+```
+
+From here, Pipelex handles model routing across 60+ models, structured output parsing, and pipeline orchestration.
+
+## Why Methods?
+
+| | |
+|---|---|
+| **Declarative** — Human-readable `.mthds` files that work across models | **Typed** — Semantic types: AI understands what you mean, every input/output connects with purpose |
+| **Repeatable** — Deterministic orchestration with controlled room for AI creativity | **Composable** — Chain pipes into sequences, nest methods inside methods, share with the community |
+
 # Quick Start
 
 ```bash
@@ -47,7 +63,7 @@ pip install pipelex
 pipelex init
 ```
 
-## Path A: With Claude Code (Recommended)
+## With Claude Code (Recommended)
 
 Install the `mthds` npm package:
 
@@ -56,29 +72,33 @@ npm install -g mthds
 ```
 
 Start Claude Code:
+
 ```bash
 claude
 ```
 
 Tell Claude to install the MTHDS skills marketplace:
-```bash
+
+```
 /plugin marketplace add mthds-ai/skills
 ```
 
 then install the MTHDS skills plugin:
-```bash
+
+```
 /plugin install mthds@mthds-ai-skills
 ```
 
 then you must exit Claude Code and reopen it.
-```bash
+
+```
 /exit
 ```
 
 Build your first method:
 
 ```
-/mthds-build A method to analyze a Job offer to build a scorecard, then batch process CVs to score them, if a CV fits, generate 5 questions for the interview, otherwise draft a rejection email
+/mthds-build A method to summarize articles with key takeaways for different audiences
 ```
 
 Run it:
@@ -87,7 +107,7 @@ Run it:
 /mthds-run
 ```
 
-## Path B: Without Claude Code
+## Without Claude Code
 
 1. Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting
 2. Browse methods on the [MTHDS Hub](https://mthds.sh) for inspiration
@@ -95,32 +115,39 @@ Run it:
 4. Validate with `pipelex validate bundle your_method.mthds`
 5. Run them with `pipelex run bundle your_method.mthds`
 6. View the flowchart in VS Code thanks to the extension
-7. Use the [`mthds` npm package](https://github.com/mthds-ai/mthds-js) to package and publish methods on the hub
 
 ## Configure AI Access
 
-To run methods with AI models, choose one of these options:
-
-### Option A: Pipelex Gateway (Recommended)
-
-Get **free credits** with a single API key for LLMs, document extraction, and image generation across all major providers (OpenAI, Anthropic, Google, Azure, and more).
-
-1. Get your API key at [app.pipelex.com](https://app.pipelex.com/)
-2. Add it to your `.env` file: `PIPELEX_GATEWAY_API_KEY=your-key-here`
-3. Run `pipelex init` and accept the Gateway terms of service
-
-### Option B: Bring Your Own Keys
-
-Use your existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/).
-
-### Option C: Local AI
-
-Run models locally with Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](https://docs.pipelex.com/home/5-setup/configure-ai-providers/).
+- **Pipelex Gateway (Recommended)** — Free credits, single API key for LLMs, OCR / document extraction, and image generation across all major providers. [Get your key](https://app.pipelex.com/), add `PIPELEX_GATEWAY_API_KEY=your-key-here` to `~/.pipelex/.env`, run `pipelex init`.
+- **Bring Your Own Keys** — Use existing API keys from OpenAI, Anthropic, Google, Mistral, etc. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
+- **Local AI** — Ollama, vLLM, LM Studio, or llama.cpp — no API keys required. See [Configure AI Providers](https://docs.pipelex.com/latest/setup/configure-ai-providers/).
 
 
-# Example: CV Batch Screening
+# Real-World Example: CV Batch Screening
+
+A production method that takes a stack of CVs and a job offer PDF, extracts and analyzes each, then scores how well each candidate matches the role.
 
 **cv_batch_screening.mthds**
+
+```toml
+[pipe.batch_analyze_cvs_for_job_offer]
+type = "PipeSequence"
+description = """
+Main orchestrator pipe that takes a bunch of CVs and a job offer in PDF format, and analyzes how they match.
+"""
+inputs = { cvs = "Document[]", job_offer_pdf = "Document" }
+output = "CandidateMatch[]"
+steps = [
+  { pipe = "prepare_job_offer", result = "job_requirements" },
+  { pipe = "process_cv", batch_over = "cvs", batch_as = "cv_pdf", result = "match_analyses" },
+]
+```
+
+<details>
+<summary><b>View concepts, supporting pipes, flowchart, and run commands</b></summary>
+
+**Concepts:**
+
 ```toml
 [concept.CandidateProfile]
 description = "A structured summary of a job candidate's professional background extracted from their CV."
@@ -148,18 +175,6 @@ match_score        = { type = "number", description = "Numerical score represent
 strengths          = { type = "text", description = "Areas where the candidate meets or exceeds requirements", required = true }
 gaps               = { type = "text", description = "Areas where the candidate falls short of requirements", required = true }
 overall_assessment = { type = "text", description = "Summary evaluation of the candidate's suitability", required = true }
-
-[pipe.batch_analyze_cvs_for_job_offer]
-type = "PipeSequence"
-description = """
-Main orchestrator pipe that takes a bunch of CVs and a job offer in PDF format, and analyzes how they match.
-"""
-inputs = { cvs = "Document[]", job_offer_pdf = "Document" }
-output = "CandidateMatch[]"
-steps = [
-  { pipe = "prepare_job_offer", result = "job_requirements" },
-  { pipe = "process_cv", batch_over = "cvs", batch_as = "cv_pdf", result = "match_analyses" },
-]
 ```
 
 <details>
@@ -258,10 +273,11 @@ Analyze how well the candidate matches the job requirements. Evaluate their fit 
 Provide a comprehensive match analysis including a numerical score, identified strengths, gaps, and an overall assessment.
 """
 ```
+
 </details>
 
-
-**View the pipeline flowchart:**
+<details>
+<summary><b>View the pipeline flowchart</b></summary>
 
 ```mermaid
 flowchart LR
@@ -354,7 +370,9 @@ flowchart LR
     style sg_n_f8d5afb7cd fill:#e6ffe6
 ```
 
-## Run Your Method
+</details>
+
+### Run Your Method
 
 **Via CLI:**
 
@@ -418,27 +436,37 @@ Pipelex.make()
 asyncio.run(run_pipeline())
 ```
 
-# What is Pipelex?
+</details>
 
-Pipelex is the reference Python runtime for executing AI methods defined in the [MTHDS](https://mthds.ai) open standard. It separates **what** a method does from **how** it runs — you declare intent, the runtime handles execution.
 
-MTHDS is a typed, declarative language built on two primitives:
+## See Pipelex in Action
 
-- **Concepts** — semantically typed data, named after real domain things (`ContractClause`, `CandidateProfile`, `Invoice`)
-- **Pipes** — typed transformations with explicit inputs and outputs (LLM calls, extraction, image generation, branching, batching)
+**Claude Code builds your AI Method**
 
-Methods are readable by domain experts, executable by agents, versionable in Git, and portable across runtimes. The `.mthds` format is TOML-based — no framework lock-in, no boilerplate.
+<a href="https://go.pipelex.com/demo">
+  <img src="https://go.pipelex.com/demo-thumbnail" alt="Pipelex Demo" width="500" style="max-width: 100%; height: auto;">
+</a>
 
-**The sweet spot between code and agent skills:**
+## IDE Extension
 
-| | Code | MTHDS | Agent Skills |
-|---|---|---|---|
-| **Control** | Total control, total effort | Structured freedom, open standard | Total freedom, no guarantees |
-| **Time to production** | Days, 80% boilerplate | Minutes, zero boilerplate | Minutes, different result every run |
-| **Validation** | Deterministic, testable | Typed schemas, validated before runtime | No validation, no audit trail |
-| **Audience** | Developers only | Engineers and domain experts | Anyone |
+We **highly** recommend installing our extension for `.mthds` syntax highlighting in your IDE:
 
-**Agent-first by design:** The Claude Code plugin lets agents write, edit, run, and compose methods. A domain expert who can describe what they need in plain language can have Claude author the method, which then runs consistently, is testable, and lives in version control.
+- **VS Code**: Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pipelex.pipelex)
+- **Cursor, Windsurf, and other VS Code forks**: Install from the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex), or search for "Pipelex" directly in your extensions tab
+
+Running `pipelex init` will also offer to install the extension automatically if it detects your IDE.
+
+## Run Anywhere
+
+The same `.mthds` file runs from multiple execution targets:
+
+| Target | How |
+|--------|-----|
+| **CLI** | `pipelex run bundle method.mthds --inputs inputs.json` |
+| **Python** | `PipelexRunner().execute_pipeline(...)` |
+| **REST API** | Self-hosted API server |
+| **MCP** | Model Context Protocol — agents call methods as tools |
+| **n8n** | Pipelex node for workflow automation |
 
 
 # The MTHDS Ecosystem
@@ -448,10 +476,11 @@ Methods are readable by domain experts, executable by agents, versionable in Git
 | **MTHDS Standard** | The open standard specification — language, package system, and typed concepts | [mthds.ai](https://mthds.ai) |
 | **MTHDS Hub** | Discover and share methods — browse packages, search by signature | [mthds.sh](https://mthds.sh) |
 | **Skills Plugin** | Claude Code plugin — 11 commands to build, run, edit, check, fix, and publish methods | [github.com/mthds-ai/skills](https://github.com/mthds-ai/skills) |
-| **Package System** | Versioned dependencies, lock files with SHA-256 integrity, cross-package references via `->` | [Packages docs](https://mthds.ai/packages/structure/) |
-| **Know-How Graph** | Typed discovery — "I have X, I need Y" — find methods or chains by typed signature | [Know-How Graph](https://mthds.ai/know-how-graph/) |
+| **Package System** | Versioned dependencies, lock files with SHA-256 integrity, cross-package references via `->` | [Packages docs](https://mthds.ai/latest/packages/structure/) |
+| **Know-How Graph** | Typed discovery — "I have X, I need Y" — find methods or chains by typed signature | [Know-How Graph](https://mthds.ai/latest/know-how-graph/) |
 
-### Skills Plugin Commands
+<details>
+<summary><b>View all 11 Skills Plugin commands</b></summary>
 
 | Command | Description |
 |---------|-------------|
@@ -467,31 +496,8 @@ Methods are readable by domain experts, executable by agents, versionable in Git
 | `/mthds-publish` | Publish methods to the hub |
 | `/mthds-share` | Share methods on social media |
 
+</details>
 
-<div>
-  <h2 align="center">See Pipelex in Action</h2>
-
-  <table align="center">
-    <tr>
-      <td align="center" width="50%">
-        <h3>Claude Code builds your AI Method</h3>
-        <a href="https://go.pipelex.com/demo">
-          <img src="https://go.pipelex.com/demo-thumbnail" alt="Pipelex Demo" width="100%" style="max-width: 500px; height: auto;">
-        </a>
-      </td>
-    </tr>
-  </table>
-
-</div>
-
-## IDE Extension
-
-We **highly** recommend installing our extension for `.mthds` syntax highlighting in your IDE:
-
-- **VS Code**: Install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=pipelex.pipelex)
-- **Cursor, Windsurf, and other VS Code forks**: Install from the [Open VSX Registry](https://open-vsx.org/extension/Pipelex/pipelex), or search for "Pipelex" directly in your extensions tab
-
-Running `pipelex init` will also offer to install the extension automatically if it detects your IDE.
 
 ## Examples & Cookbook
 
@@ -500,18 +506,6 @@ Explore real-world examples in our **Cookbook** repository:
 [![GitHub](https://img.shields.io/badge/Cookbook-5a0dad?logo=github&logoColor=white&style=flat)](https://github.com/Pipelex/pipelex-cookbook/tree/main)
 
 Clone it, fork it, and experiment with production-ready methods for various use cases.
-
-## Run Anywhere
-
-The same `.mthds` file runs from multiple execution targets:
-
-| Target | How |
-|--------|-----|
-| **CLI** | `pipelex run bundle method.mthds --inputs inputs.json` |
-| **Python** | `PipelexRunner().execute_pipeline(...)` |
-| **REST API** | Self-hosted API server |
-| **MCP** | Model Context Protocol — agents call methods as tools |
-| **n8n** | Pipelex node for workflow automation |
 
 ## Optional Features
 
@@ -531,36 +525,13 @@ Install all extras:
 pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
-## Privacy & Telemetry
+---
 
-Pipelex supports two independent telemetry streams:
+**Privacy & Telemetry** — Pipelex Gateway collects only technical data (model names, token counts, latency) — never prompts or business data. If you want to avoid Gateway telemetry, disable `pipelex_gateway` and use your own provider keys or local AI instead. [Learn more](https://docs.pipelex.com/latest/setup/telemetry/)
 
-- **Gateway Telemetry**: When using Pipelex Gateway, telemetry must be enabled (tied to your hashed API key) to monitor service quality and enforce fair usage. [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#gateway-telemetry-pipelex-controlled)
-- **Custom Telemetry**: User-controlled via `.pipelex/telemetry.toml` for your own observability systems (Langfuse, PostHog, OTLP). [Learn more](https://docs.pipelex.com/home/5-setup/telemetry/#custom-telemetry-user-controlled)
+**Contributing** — We welcome contributions! See our [Contributing Guidelines](CONTRIBUTING.md).
 
-**We only collect technical data** (model names, token counts, latency, error rates) — never your prompts, completions, or business data. Set `DO_NOT_TRACK=1` to disable all telemetry (note: Gateway requires telemetry to function).
-
-For more details, see the [Telemetry Documentation](https://docs.pipelex.com/home/5-setup/telemetry/) or read our [Privacy Policy](https://go.pipelex.com/privacy-policy).
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details on how to get started, including development setup and testing information.
-
-## Join the Community
-
-Join our vibrant Discord community to connect with other developers, share your experiences, and get help with your Pipelex projects!
-
-[![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://go.pipelex.com/discord)
-
-## Support
-
-- **GitHub Issues**: For bug reports and feature requests
-- **Discussions**: For questions and community discussions
-- [**Documentation**](https://docs.pipelex.com/)
-
-## Star Us!
-
-If you find Pipelex helpful, please consider giving us a star! It helps us reach more developers and continue improving the tool.
+**Community** — [![Discord](https://img.shields.io/badge/Discord-5865F2?logo=discord&logoColor=white)](https://go.pipelex.com/discord) [GitHub Issues](https://github.com/Pipelex/pipelex/issues) · [Discussions](https://github.com/Pipelex/pipelex/discussions) · [Documentation](https://docs.pipelex.com/)
 
 ## License
 
@@ -570,4 +541,4 @@ This project is licensed under the [MIT license](LICENSE). Runtime dependencies 
 
 "Pipelex" is a trademark of Evotis S.A.S.
 
-© 2026 Evotis S.A.S.
+© 2025-2026 Evotis S.A.S.

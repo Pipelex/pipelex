@@ -1,5 +1,6 @@
 ---
 title: "StuffArtefact & Image Rendering"
+description: "How StuffArtefact enables Jinja2 template access to Stuff objects and the ImageRenderable protocol extracts images from nested content."
 ---
 
 # StuffArtefact & Image Rendering

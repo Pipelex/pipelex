@@ -137,9 +137,9 @@ async def _execute_run(
         raise typer.Exit(1) from exc
 
     # Pretty print main_stuff unless disabled or in dry run mode
-    if not no_pretty_print and not dry_run:
+    if not no_pretty_print and not dry_run and (main_stuff := pipe_output.optional_main_stuff):
         title = f"Final output of pipe [red]{pipe_code}[/red]"
-        pipe_output.main_stuff.pretty_print_stuff(title=title)
+        main_stuff.pretty_print_stuff(title=title)
 
     # Determine if we need an output directory
     output_path: Path | None = None
