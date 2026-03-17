@@ -41,8 +41,8 @@ def validate_url_resource_exists(url: str) -> None:
 def _validate_http_url(url: str) -> None:
     user_agent = get_user_agent()
     try:
-        response = httpx.head(url, timeout=10, follow_redirects=True, headers={"User-Agent": user_agent})
-        response.raise_for_status()
+        with httpx.stream("GET", url, timeout=10, follow_redirects=True, headers={"User-Agent": user_agent}) as response:
+            response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         msg = f"URL '{url}' returned HTTP {exc.response.status_code}"
         raise ValueError(msg) from exc
