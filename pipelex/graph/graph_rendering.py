@@ -7,18 +7,14 @@ Used by both the regular CLI and the agent CLI.
 from pathlib import Path
 from typing import Any
 
-from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
-from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.viewspec import LayoutSpec
 from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
-from pipelex.pipe_run.pipe_run_mode import PipeRunMode
-from pipelex.pipeline.runner import PipelexRunner
+from pipelex.pipe_run.dry_run_pipeline import dry_run_pipeline
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.types import StrEnum
 
@@ -112,10 +108,10 @@ async def _dry_run_bundle(
     bundle_path: Path,
     library_dirs: list[str] | None = None,
 ) -> tuple[GraphSpec, str]:
-    """Perform a dry-run pipeline execution on a bundle to produce a GraphSpec.
+    """Dry-run a bundle file to produce a GraphSpec.
 
-    Reads the bundle, parses main_pipe, builds a runner, and executes a dry-run
-    with graph tracing enabled.
+    Reads the file, ensures its parent directory is in library_dirs,
+    then delegates to ``dry_run_pipeline``.
 
     Args:
         bundle_path: Path to the .mthds bundle file.
@@ -123,11 +119,6 @@ async def _dry_run_bundle(
 
     Returns:
         Tuple of (GraphSpec, pipe_code).
-
-    Raises:
-        PipelexInterpreterError: If bundle parsing fails or main_pipe is missing.
-        PipelexError: If pipeline execution does not produce a graph spec.
-        PipelineExecutionError: If dry-run execution fails.
     """
     mthds_content = bundle_path.read_text(encoding="utf-8")
 
@@ -142,83 +133,11 @@ async def _dry_run_bundle(
     else:
         effective_library_dirs = [bundle_parent_dir]
 
-    return await _dry_run_content(
+    return await dry_run_pipeline(
         mthds_content=mthds_content,
         bundle_uri=str(bundle_path),
         library_dirs=effective_library_dirs,
     )
-
-
-async def _dry_run_content(
-    mthds_content: str,
-    bundle_uri: str | None = None,
-    library_dirs: list[str] | None = None,
-) -> tuple[GraphSpec, str]:
-    """Perform a dry-run pipeline execution on MTHDS content to produce a GraphSpec.
-
-    Args:
-        mthds_content: MTHDS bundle content as a string.
-        bundle_uri: Optional URI for the bundle (used by runner for context).
-        library_dirs: Optional library directories for pipe resolution.
-
-    Returns:
-        Tuple of (GraphSpec, pipe_code).
-
-    Raises:
-        PipelexInterpreterError: If content parsing fails or main_pipe is missing.
-        PipelexError: If pipeline execution does not produce a graph spec.
-        PipelineExecutionError: If dry-run execution fails.
-    """
-    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
-    main_pipe_code = bundle_blueprint.main_pipe
-    if not main_pipe_code:
-        msg = "Bundle does not declare a main_pipe, cannot generate graph"
-        raise PipelexInterpreterError(msg)
-    pipe_code: str = main_pipe_code
-
-    execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
-        generate_graph=True,
-        mock_inputs=True,
-    )
-
-    runner = PipelexRunner(
-        bundle_uri=bundle_uri,
-        pipe_run_mode=PipeRunMode.DRY,
-        execution_config=execution_config,
-        library_dirs=library_dirs or [],
-    )
-    response = await runner.execute_pipeline(
-        pipe_code=pipe_code,
-        mthds_content=mthds_content,
-    )
-    pipe_output = response.pipe_output
-
-    if not pipe_output.graph_spec:
-        msg = "Pipeline execution did not produce a graph spec"
-        raise PipelexError(msg)
-
-    return pipe_output.graph_spec, pipe_code
-
-
-async def generate_graphspec_for_content(
-    mthds_content: str,
-    library_dirs: list[str] | None = None,
-) -> tuple[GraphSpec, str]:
-    """Generate a GraphSpec from MTHDS content via dry-run pipeline execution.
-
-    Args:
-        mthds_content: MTHDS bundle content as a string.
-        library_dirs: Optional library directories for pipe resolution.
-
-    Returns:
-        Tuple of (GraphSpec, pipe_code).
-
-    Raises:
-        PipelexInterpreterError: If content parsing fails or main_pipe is missing.
-        PipelexError: If pipeline execution does not produce a graph spec.
-        PipelineExecutionError: If dry-run execution fails.
-    """
-    return await _dry_run_content(mthds_content=mthds_content, library_dirs=library_dirs)
 
 
 async def generate_graph_for_bundle(
