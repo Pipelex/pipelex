@@ -10,7 +10,6 @@ import pytest
 
 from pipelex import log, pretty_print
 from pipelex.config import get_config
-from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.mermaidflow.mermaid_html import (
     render_mermaid_html_async,
@@ -19,7 +18,6 @@ from pipelex.graph.mermaidflow.mermaid_html import (
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
-from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, load_text_from_path
 from tests.conftest import TEST_OUTPUTS_DIR
@@ -62,7 +60,6 @@ class TestGraphRenderersFromJson:
 
         - mermaidflow.mmd + mermaidflow.html (Mermaid mermaidflow view)
         - reactflow.html (ReactFlow interactive view)
-        - viewspec.json (ViewSpec used by ReactFlow)
 
         All outputs are saved in the same folder for easy comparison.
         """
@@ -105,14 +102,6 @@ class TestGraphRenderersFromJson:
 
         # ==================== REACTFLOW OUTPUTS ====================
 
-        # Create ViewSpec and generate ReactFlow HTML
-        analysis = GraphAnalysis.from_graphspec(graph_spec)
-        viewspec = graphspec_to_viewspec(graph_spec, analysis)
-
-        # Save ViewSpec JSON
-        viewspec_path = output_dir / "viewspec.json"
-        viewspec_path.write_text(viewspec.model_dump_json(indent=2), encoding="utf-8")
-
         # Collect stuff data in alternate formats if configured
         rf_stuff_data_text: dict[str, str] | None = None
         rf_stuff_data_html: dict[str, str] | None = None
@@ -121,11 +110,10 @@ class TestGraphRenderersFromJson:
         if graph_config.data_inclusion.stuff_html_content:
             rf_stuff_data_html = collect_stuff_data_html(graph_spec)
 
-        # Generate ReactFlow HTML (with embedded GraphSpec for full data)
+        # Generate ReactFlow HTML directly from GraphSpec
         reactflow_html = await generate_reactflow_html_async(
-            viewspec,
+            graph_spec,
             graph_config.reactflow_config,
-            graphspec=graph_spec,
             stuff_data_text=rf_stuff_data_text,
             stuff_data_html=rf_stuff_data_html,
             title=f"ReactFlow: {topic}",
@@ -139,7 +127,6 @@ class TestGraphRenderersFromJson:
         expected_files = [
             "mermaidflow.mmd",
             "mermaidflow.html",
-            "viewspec.json",
             "reactflow.html",
         ]
         for filename in expected_files:
@@ -160,10 +147,10 @@ class TestGraphRenderersFromJson:
 
         # Summary
         log.info(
-            f"✅ All renderings generated for '{topic}':\n"
-            f"  📁 Output: {output_dir}\n"
-            f"  📊 Mermaid:\n"
+            f"All renderings generated for '{topic}':\n"
+            f"  Output: {output_dir}\n"
+            f"  Mermaid:\n"
             f"     - mermaidflow.html\n"
-            f"  🔷 ReactFlow:\n"
+            f"  ReactFlow:\n"
             f"     - reactflow.html"
         )

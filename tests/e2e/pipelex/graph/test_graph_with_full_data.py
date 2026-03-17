@@ -12,7 +12,6 @@ import pytest
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.stuffs.document_content import DocumentContent
-from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.mermaidflow.mermaid_html import (
     render_mermaid_html_async,
@@ -20,7 +19,6 @@ from pipelex.graph.mermaidflow.mermaid_html import (
 )
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
-from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexRunner
 from pipelex.tools.misc.chart_utils import FlowchartDirection
@@ -259,10 +257,8 @@ class TestGraphWithFullData:
         )
 
         # Generate ReactFlow HTML
-        analysis = GraphAnalysis.from_graphspec(graph_spec)
-        viewspec = graphspec_to_viewspec(graph_spec, analysis)
         rf_config = get_config().pipelex.pipeline_execution_config.graph_config.reactflow_config
-        reactflow_html = await generate_reactflow_html_async(viewspec, rf_config, graphspec=graph_spec, title="Graph: cv_job_matcher")
+        reactflow_html = await generate_reactflow_html_async(graph_spec, rf_config, title="Graph: cv_job_matcher")
         reactflow_path = output_dir / "reactflow.html"
         reactflow_path.write_text(reactflow_html, encoding="utf-8")
         log.info(f"Saved ReactFlow HTML to: {reactflow_path}")
@@ -271,11 +267,10 @@ class TestGraphWithFullData:
         assert reactflow_path.exists()
         assert reactflow_path.stat().st_size > 0
         html_content = reactflow_path.read_text(encoding="utf-8")
-        assert '<script type="application/json" id="pipelex-viewspec">' in html_content
         assert '<script type="application/json" id="pipelex-graphspec">' in html_content
         assert "ReactFlow" in html_content
         assert "getLayoutedElements" in html_content
-        assert f'"{graph_spec.graph_id}"' in html_content  # ViewSpec should contain graph_id
+        assert f'"{graph_spec.graph_id}"' in html_content  # GraphSpec should contain graph_id
 
         # Final summary
         log.info(
