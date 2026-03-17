@@ -49,7 +49,7 @@ def validate_bundle_cmd(
     ] = None,
     view: Annotated[
         bool,
-        typer.Option("--view", help="On successful bundle validation, include a ViewSpec (structured JSON for graph rendering) in the output"),
+        typer.Option("--view", help="On successful bundle validation, include a GraphSpec (structured JSON for graph rendering) in the output"),
     ] = False,
     library_dir: Annotated[
         list[str] | None,
@@ -147,7 +147,7 @@ def validate_bundle_cmd(
             except Exception as exc:
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
 
-        # Generate view (ViewSpec JSON) if requested and validation succeeded
+        # Generate view (GraphSpec JSON) if requested and validation succeeded
         if view:
             try:
                 view_result = asyncio.run(

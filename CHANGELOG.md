@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.20.13] - 2026-03-16
+
+### Removed
+
+- Remove unused `ViewSpec` class and related code from graph/reactflow — dead code that was no longer referenced.
+
 ## [v0.20.12] - 2026-03-16
 
 ### Fixed

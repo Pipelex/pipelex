@@ -78,12 +78,8 @@
     <div class="footer-stats" id="footer-stats"></div>
 </footer>
 
-<!-- Embedded ViewSpec -->
-<script type="application/json" id="pipelex-viewspec">{{ viewspec_json | escape_script_tag | safe }}</script>
-{% if graphspec_json %}
-<!-- Embedded GraphSpec (for dataflow extraction) -->
+<!-- Embedded GraphSpec -->
 <script type="application/json" id="pipelex-graphspec">{{ graphspec_json | escape_script_tag | safe }}</script>
-{% endif %}
 <!-- Embedded stuff data in multiple formats for display toggle -->
 <script type="application/json" id="pipelex-stuff-data-text">{{ stuff_data_text_json | escape_script_tag | safe }}</script>
 <script type="application/json" id="pipelex-stuff-data-html">{{ stuff_data_html_json | escape_script_tag | safe }}</script>
