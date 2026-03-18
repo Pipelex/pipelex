@@ -1,0 +1,25 @@
+.claude/skills/add-model/SKILL.md
+  2b80cbbec6873aaa 26-27,244,246-248,252,255,260-263,272,278,292,316
+.claude/skills/test-model/SKILL.md
+  2b80cbbec6873aaa 100,102-104,142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "e1a5f540dab40b1db23d90e6cd45592a19319109",
+  "prompts": {
+    "2b80cbbec6873aaa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "55eb935a-00a8-49e9-8282-966f33f01d8e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 23,
+      "total_deletions": 56,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    }
+  }
+}
