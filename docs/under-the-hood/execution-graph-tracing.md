@@ -1,5 +1,6 @@
 ---
 title: "Execution Graph Tracing"
+description: "Capture pipeline executions as directed graphs for visualization and debugging — render with Mermaid or ReactFlow backends."
 ---
 
 # Execution Graph Tracing
@@ -29,7 +30,7 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 
 | Scenario | CLI | API | Result |
 |----------|-----|-----|--------|
-| Generate execution graph | `pipelex run my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
+| Generate execution graph | `pipelex run pipe my_pipe --graph` | `PipelexRunner(execution_config=...).execute_pipeline(...)` | GraphSpec JSON + HTML viewers |
 | Force include full data | `--graph --graph-full-data` | `data_inclusion.stuff_json_content=True` | Data embedded in IOSpec |
 | Force exclude data | `--graph --graph-no-data` | All `data_inclusion.*=False` | Previews only |
 | Dry run with graph | `--dry-run --graph` | `dry_run_pipe_with_graph(pipe)` | Graph of mock execution |
@@ -45,16 +46,16 @@ Pipe Execution → GraphTracer → GraphSpec → Renderers → HTML/Mermaid
 
 ```bash
 # Run pipeline and generate graph
-pipelex run my_pipe --graph
+pipelex run pipe my_pipe --graph
 
 # Include full serialized data
-pipelex run my_pipe --graph --graph-full-data
+pipelex run pipe my_pipe --graph --graph-full-data
 
 # Exclude data (previews only)
-pipelex run my_pipe --graph --graph-no-data
+pipelex run pipe my_pipe --graph --graph-no-data
 
 # Dry run with graph tracing
-pipelex run my_pipe --dry-run --graph --mock-inputs
+pipelex run pipe my_pipe --dry-run --graph --mock-inputs
 ```
 
 ### API
@@ -83,7 +84,6 @@ graph_spec = await dry_run_pipe_with_graph(pipe)
 | `graphspec_json` | `_graphspec.json` | Canonical graph representation |
 | `mermaidflow_mmd` | `_mermaid.mmd` | Mermaid flowchart code |
 | `mermaidflow_html` | `_mermaid.html` | Standalone Mermaid viewer |
-| `reactflow_viewspec` | `_viewspec.json` | ViewSpec for ReactFlow |
 | `reactflow_html` | `_reactflow.html` | Interactive ReactFlow viewer |
 
 ---
@@ -131,11 +131,9 @@ flowchart TB
     subgraph RENDER["Renderers"]
         direction TB
         MF["MermaidflowFactory"]
-        RF["ViewSpec Transformer"]
-        HTML1["Mermaid HTML"]
-        HTML2["ReactFlow HTML"]
-        MF --> HTML1
-        RF --> HTML2
+        RF["ReactFlow HTML Generator"]
+        MF --> HTML1["Mermaid HTML"]
+        RF --> HTML2["ReactFlow HTML"]
     end
 
     JOB --> CTX
@@ -362,27 +360,9 @@ print(mermaidflow.mermaid_code)
 - Stuff nodes (data items) rendered as stadium shapes
 - DATA edges connect producers → stuff → consumers
 
-### ViewSpec (ReactFlow)
+### ReactFlow HTML
 
-Transforms GraphSpec into a viewer-oriented model:
-
-```python
-from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
-
-analysis = GraphAnalysis.from_graphspec(graph_spec)
-viewspec = graphspec_to_viewspec(
-    graph_spec,
-    analysis,
-    options={"show_data_edges": True},
-)
-```
-
-ViewSpec provides:
-
-- `ViewNode` with UI metadata (badges, classes, inspector data)
-- `ViewEdge` with ReactFlow properties (animated, hidden)
-- `ViewIndex` for fast client-side lookups
-- Layout configuration for Dagre
+ReactFlow HTML is generated directly from GraphSpec — no intermediate ViewSpec layer. The HTML generator embeds GraphSpec as JSON and the client-side JavaScript handles dataflow analysis, layout, and rendering.
 
 ---
 
@@ -404,7 +384,6 @@ error_stack_traces = true       # Include full stack traces
 graphspec_json = true           # Generate GraphSpec JSON
 mermaidflow_mmd = true          # Generate Mermaid code
 mermaidflow_html = true         # Generate Mermaid HTML
-reactflow_viewspec = true       # Generate ViewSpec JSON
 reactflow_html = true           # Generate ReactFlow HTML
 ```
 
@@ -479,7 +458,7 @@ validate_graphspec(graph_spec)
 | `GraphSpec.to_json()` | Serialize to JSON string |
 | `GraphAnalysis.from_graphspec(g)` | Pre-compute analysis |
 | `MermaidflowFactory.make_from_graphspec(...)` | Generate Mermaid |
-| `graphspec_to_viewspec(g, analysis)` | Generate ViewSpec |
+| `generate_reactflow_html(graphspec, config)` | Generate ReactFlow HTML |
 | `generate_graph_outputs(g, config, pipe_code)` | Generate all outputs |
 
 ---

@@ -49,7 +49,7 @@ def validate_bundle_cmd(
     ] = None,
     view: Annotated[
         bool,
-        typer.Option("--view", help="On successful bundle validation, include a ViewSpec (structured JSON for graph rendering) in the output"),
+        typer.Option("--view", help="On successful bundle validation, include a GraphSpec (structured JSON for graph rendering) in the output"),
     ] = False,
     library_dir: Annotated[
         list[str] | None,
@@ -109,7 +109,7 @@ def validate_bundle_cmd(
     # Convert library_dirs to list[str] for graph helper
     library_dir_strings = [str(lib_dir) for lib_dir in library_dirs] if library_dirs else None
 
-    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"], needs_inference=False)
+    make_pipelex_for_agent_cli(library_dirs=library_dirs, log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=True)
 
     try:
         if pipe:
@@ -147,7 +147,7 @@ def validate_bundle_cmd(
             except Exception as exc:
                 agent_error(f"Graph generation failed: {exc}", type(exc).__name__, cause=exc)
 
-        # Generate view (ViewSpec JSON) if requested and validation succeeded
+        # Generate view (GraphSpec JSON) if requested and validation succeeded
         if view:
             try:
                 view_result = asyncio.run(

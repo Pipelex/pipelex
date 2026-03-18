@@ -110,10 +110,3 @@ api_key = "${XAI_API_KEY}"
 
 [internal] # software-only backend, runs internally, without AI
 enabled = true
-
-# Deprecated
-[pipelex_inference]
-display_name = "🛑 Legacy Pipelex Inference"
-enabled = false
-endpoint = "https://inference.pipelex.com/v1"
-api_key = "${PIPELEX_INFERENCE_API_KEY}"

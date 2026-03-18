@@ -11,16 +11,26 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
-from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.graph_config import GraphConfig
 from pipelex.graph.graph_factory import GraphOutputs, generate_graph_outputs, save_graph_outputs_to_dir
 from pipelex.graph.graphspec import GraphSpec
-from pipelex.graph.reactflow.viewspec import LayoutSpec
-from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexRunner
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.types import StrEnum
+
+
+def _sanitize_graph_name(graph_name: str) -> str:
+    """Sanitize graph_name to prevent path traversal.
+
+    Args:
+        graph_name: The requested filename for the graph output.
+
+    Returns:
+        A safe filename with no directory components.
+    """
+    sanitized = Path(graph_name).name
+    return sanitized or "graph.html"
 
 
 class GraphFormat(StrEnum):
@@ -76,7 +86,6 @@ async def render_graph_from_spec(
                     "graphspec_json": False,
                     "mermaidflow_mmd": False,
                     "mermaidflow_html": include_mermaidflow,
-                    "reactflow_viewspec": False,
                     "reactflow_html": include_reactflow,
                 }
             ),
@@ -164,6 +173,7 @@ async def generate_graph_for_bundle(
     graph_format: GraphFormat,
     library_dirs: list[str] | None = None,
     direction: FlowchartDirection | None = None,
+    graph_name: str = "dry_run.html",
 ) -> dict[str, Any]:
     """Generate graph visualization for a bundle via dry-run pipeline execution.
 
@@ -175,6 +185,7 @@ async def generate_graph_for_bundle(
         graph_format: Which graph format(s) to generate.
         library_dirs: Optional library directories for pipe resolution.
         direction: Flowchart layout direction (default: None, uses TB).
+        graph_name: Filename for the generated HTML graph (default: "dry_run.html").
 
     Returns:
         Dictionary with graph_files, graph_output_dir, and direction.
@@ -215,6 +226,14 @@ async def generate_graph_for_bundle(
         direction=direction,
     )
 
+    # Rename reactflow.html to the requested filename
+    reactflow_path = saved_files.get("reactflow_html")
+    safe_name = _sanitize_graph_name(graph_name)
+    if reactflow_path and safe_name:
+        final_path = reactflow_path.parent / safe_name
+        reactflow_path.rename(final_path)
+        saved_files["reactflow_html"] = final_path
+
     return {
         "graph_files": {key: str(path) for key, path in saved_files.items()},
         "graph_output_dir": str(output_dir),
@@ -223,15 +242,14 @@ async def generate_graph_for_bundle(
     }
 
 
-# TODO: refactor to do only one dry run and generate both graph and ViewSpec
 async def generate_view_for_bundle(
     bundle_path: Path,
     library_dirs: list[str] | None = None,
     direction: FlowchartDirection | None = None,
 ) -> dict[str, Any]:
-    """Generate a ViewSpec for a bundle via dry-run pipeline execution.
+    """Generate a GraphSpec for a bundle via dry-run pipeline execution.
 
-    Returns structured JSON data (ViewSpec) suitable for client-side rendering,
+    Returns structured JSON data (GraphSpec) suitable for client-side rendering,
     without writing any files to disk.
 
     Args:
@@ -240,7 +258,7 @@ async def generate_view_for_bundle(
         direction: Flowchart layout direction (default: None, uses config default).
 
     Returns:
-        Dictionary with viewspec (JSON-serializable dict), pipe_code, and direction.
+        Dictionary with graphspec (JSON-serializable dict), pipe_code, and direction.
 
     Raises:
         PipelexInterpreterError: If bundle parsing fails or main_pipe is missing.
@@ -256,16 +274,7 @@ async def generate_view_for_bundle(
     rf_config = execution_config.graph_config.reactflow_config
     effective_direction = direction or rf_config.layout_direction
 
-    analysis = GraphAnalysis.from_graphspec(graph_spec)
-    layout = LayoutSpec(
-        direction=effective_direction,
-        nodesep=rf_config.nodesep,
-        ranksep=rf_config.ranksep,
-    )
-    viewspec = graphspec_to_viewspec(graph_spec, analysis, layout=layout)
-
     return {
-        "viewspec": viewspec.model_dump(mode="json"),
         "graphspec": graph_spec.model_dump(mode="json", by_alias=True),
         "pipe_code": pipe_code,
         "direction": str(effective_direction) if effective_direction else None,

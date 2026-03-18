@@ -18,7 +18,6 @@ class GraphsInclusionConfig(ConfigModel):
     graphspec_json: bool
     mermaidflow_mmd: bool
     mermaidflow_html: bool
-    reactflow_viewspec: bool
     reactflow_html: bool
 
 

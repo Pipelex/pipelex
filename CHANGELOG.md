@@ -1,12 +1,70 @@
 # Changelog
 
-## [Unreleased]
+## [v0.20.13] - 2026-03-16
+
+### Removed
+
+- Remove unused `ViewSpec` class and related code from graph/reactflow — dead code that was no longer referenced.
+
+## [v0.20.12] - 2026-03-16
+
+### Fixed
+
+- Fix Google "Sitemap could not be read" error by adding `Allow: /sitemap.xml` to `ROOT_ROBOTS_TXT` — `Disallow: /` was blocking Googlebot from fetching the root sitemap even though `Sitemap:` pointed to it.
+
+## [v0.20.11] - 2026-03-16
+
+### Fixed
+
+- Fix `docs-deploy-root` silently failing due to shell comments breaking the `\` continuation chain in the Makefile recipe — root `sitemap.xml` and updated `robots.txt` were never deployed in v0.20.10.
+
+## [v0.20.10] - 2026-03-16
+
+### Fixed
+
+- Fix sitemap double-path bug (`latest/0.20.9/page/`) caused by `site_url` including `/latest/` while mike also inserts the version prefix during deployment.
+- Override canonical URLs, `og:url`, and JSON-LD `url` to always point to `/latest/` via template override.
+- Add root-level `sitemap.xml` generation with `/latest/` URLs to `docs-deploy-root`.
+
+## [v0.20.9] - 2026-03-16
+
+### Changed
+
+- Reorganize documentation site architecture and navigation.
+- Add SEO meta descriptions to all doc pages.
+- Redesign README: lead with value, collapse details.
+
+## [v0.20.8] - 2026-03-13
+
+- Add `needs_model_specs=True` to agent CLI run and models commands.
+
+## [v0.20.7] - 2026-03-12
+
+- Bump `mthds` dependency to `>=0.1.1`.
+
+## [v0.20.6] - 2026-03-12
+
+### Added
+
+- **`needs_model_specs` parameter**: New option on `Pipelex.make()` and CLI factories to load real gateway model specs without enabling full inference. Validation commands (`pipelex validate`, `pipelex-agent validate`) now fetch live model specs, improving accuracy of pipe/method/bundle validation.
+
+### Removed
+
+- **Deprecated `pipelex_inference` backend**: Removed all traces of the legacy backend — config files, enum values, migration logic, deprecation warnings, and documentation admonitions. The transition to `pipelex_gateway` is complete.
+
+### Fixed
+
+- **`pipelex init inference --local`**: Fixed file filter to also copy `.md` files (e.g. Gateway model lists) to the backends directory, not just `.toml` files.
+- **Gateway terms persistence**: Hardened failure handling — when terms acceptance can't be persisted (e.g. unwritable global directory), gateway is now properly disabled in `backends.toml` as a fallback, preventing `GatewayTermsNotAcceptedError` at runtime.
+
+## [v0.20.5] - 2026-03-09
 
 ### Changed
 
 - **Config paths use `pathlib.Path`**: All `ConfigLoader` properties and methods now return `Path` instead of `str`. Consumer code across the config system (doctor, init, backends, routing, credentials, telemetry, agent CLI) updated accordingly.
 - **Layered config resolution for `pipelex doctor` and `pipelex init`**: Config files are now resolved with project-first, global-fallback layering per file. Fixed `replace_backend_file` using CWD-relative path that broke when run from another directory.
 - **Gateway terms are explicitly global**: `update_service_terms_acceptance` now targets `~/.pipelex/` by default, since gateway terms are a user-level agreement, not project-level.
+- Tweaks to the `pipelex-agent` CLI to play well with the Claude Code plugin and skills.
 
 ## [v0.20.4] - 2026-03-04
 
@@ -162,7 +220,7 @@
 
     **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
 
-    See the [Build Commands documentation](https://docs.pipelex.com/home/9-tools/cli/#build-commands) for usage examples.
+    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
 
 - **New Backends & Models**:
     - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
@@ -185,7 +243,7 @@
 - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
 - **Image-to-Image Generation**: `PipeImgGen` now supports input images via `input_images` field, with `InputImagesTaxonomy` for provider-specific handling and variable reference detection (`{{ var }}`, `$var`, `@var`) in prompts.
 - **PipeCompose "Construct" Mode**: New `construct` mode for building structured objects (dictionaries/Pydantic models) directly from variables.
-- **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
+- **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/latest/building-methods/concepts/inline-structures).
 
 ### Breaking Changes
 
@@ -432,7 +490,7 @@
  - **LLM Reasoning Controls**: Unified support for "Thinking" models (Chain of Thought) with `reasoning_effort`, `reasoning_budget`, and `thinking_mode` parameters. Supports Anthropic Extended Thinking, Google Gemini Thinking, OpenAI Reasoning (`o1`/`o3`), and Mistral/Magistral models. Includes new presets: `$deep-analysis` and `$quick-reasoning`.
  - **Image-to-Image Generation**: `PipeImgGen` now supports input images via `input_images` field, with `InputImagesTaxonomy` for provider-specific handling and variable reference detection (`{{ var }}`, `$var`, `@var`) in prompts.
  - **PipeCompose "Construct" Mode**: New `construct` mode for building structured objects (dictionaries/Pydantic models) directly from variables.
- - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/home/6-build-reliable-ai-workflows/concepts/inline-structures).
+ - **Nested concepts in inline structures**: You can now define nested structures for your concepts in your `.plx` files. Learn more here: [Nested Concepts in Inline Structures](https://docs.pipelex.com/latest/building-methods/concepts/inline-structures).
 
 ### Added
  - **Builder Auto-Repair**: Self-healing capabilities including auto-generation of undeclared concepts, multiplicity mismatch fixes, and pruning of unreachable pipes/unused concepts.
@@ -534,7 +592,7 @@
 
     **`pipelex build runner`** — Now automatically generates both the Python runner file AND the required Pydantic structures. When you run this command, it creates a complete, ready-to-execute Python script that imports the generated structures, so you can immediately use typed objects in your pipeline code.
 
-    See the [Build Commands documentation](https://docs.pipelex.com/home/9-tools/cli/#build-commands) for usage examples.
+    See the [Build Commands documentation](https://docs.pipelex.com/latest/tools/cli/build/) for usage examples.
 
 - **New Backends & Models**:
     - **Hugging Face Inference** — Support for Hugging Face Inference API, including `qwen-image` text-to-image model.
@@ -1213,13 +1271,13 @@ This is all in the spirit of making Pipelex a declarative language, where you ex
 
 We've completely redesigned how LLMs are configured and accessed in Pipelex, making it more flexible and easier to get started:
 
-- **Get started in seconds** with [Pipelex Inference](home/7-configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
+- **Get started in seconds** with [Pipelex Inference](configuration/config-technical/inference-backend-config.md): Use a single API key to access all major LLM providers (OpenAI, Anthropic, Google, Mistral, and more)
 - **Flexible backend configuration**: Configure multiple inference backends (Azure OpenAI, Amazon Bedrock, Vertex AI, etc.) through simple TOML files in `.pipelex/inference/`
-- **Smart model routing**: Automatically route models to the right backend using [routing profiles](home/7-configuration/config-technical/inference-backend-config.md#routing-profiles) with pattern matching
+- **Smart model routing**: Automatically route models to the right backend using [routing profiles](configuration/config-technical/inference-backend-config.md#routing-profiles) with pattern matching
 - **User-friendly aliases**: Define shortcuts like `best-claude` → `claude-4.1-opus` with optional fallback chains
 - **Cost-aware model specs**: Each model includes detailed pricing, capabilities, and constraints for better cost management
 
-For complete details, see the [Inference Backend Configuration](home/7-configuration/config-technical/inference-backend-config.md) documentation.
+For complete details, see the [Inference Backend Configuration](configuration/config-technical/inference-backend-config.md) documentation.
 
 ### Added
 

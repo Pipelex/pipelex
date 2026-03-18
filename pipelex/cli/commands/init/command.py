@@ -66,6 +66,7 @@ def _check_gateway_terms_if_needed(console: Console, backends_toml_path: str) ->
     # Gateway is enabled but terms not accepted - prompt user
     gateway_accepted = prompt_gateway_acceptance(console)
 
+    config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
     if gateway_accepted:
         display_gateway_accepted_message(console)
         update_service_terms_acceptance(accepted=True, config_dir=config_manager.global_config_dir)
@@ -238,7 +239,7 @@ def execute_initialization(
             target_backends_dir = target_inference_dir / "backends"
             target_backends_dir.mkdir(parents=True, exist_ok=True)
             for backend_file in os.listdir(template_backends_dir):
-                if backend_file.endswith(".toml"):
+                if backend_file.endswith((".toml", ".md")):
                     src_path = template_backends_dir / backend_file
                     dst_path = target_backends_dir / backend_file
                     shutil.copy2(src_path, dst_path)
@@ -283,6 +284,7 @@ def execute_initialization(
             effective_config_dir_for_routing = target_config_dir or config_manager.pipelex_config_dir
             routing_profiles_toml_path = str(effective_config_dir_for_routing / "inference" / "routing_profiles.toml")
             template_routing_path = Path(str(get_kit_configs_dir())) / "inference" / "routing_profiles.toml"
+            Path(routing_profiles_toml_path).parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(template_routing_path, routing_profiles_toml_path)
             console.print("✅ Reset routing_profiles.toml from template")
 

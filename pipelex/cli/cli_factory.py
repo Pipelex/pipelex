@@ -30,6 +30,7 @@ def make_pipelex_for_cli(
     library_dirs: list[str] | list[Path] | None = None,
     needs_inference: bool = True,
     temporal_enabled: bool | None = None,
+    needs_model_specs: bool | None = None,
 ) -> Pipelex:
     """Initialize Pipelex for CLI commands with proper error handling.
 
@@ -41,6 +42,7 @@ def make_pipelex_for_cli(
         library_dirs: The library directories to use for the Pipelex instance.
         needs_inference: When False, skip inference setup (credentials, gateway, telemetry).
         temporal_enabled: When provided, overrides the deep_flow.is_enabled config value.
+        needs_model_specs: When True, load real model specs even without inference.
 
     Returns:
         Initialized Pipelex instance.
@@ -50,7 +52,11 @@ def make_pipelex_for_cli(
     """
     try:
         return Pipelex.make(
-            integration_mode=IntegrationMode.CLI, library_dirs=library_dirs, needs_inference=needs_inference, temporal_enabled=temporal_enabled
+            integration_mode=IntegrationMode.CLI,
+            library_dirs=library_dirs,
+            needs_inference=needs_inference,
+            temporal_enabled=temporal_enabled,
+            needs_model_specs=needs_model_specs,
         )
     except TelemetryConfigValidationError as exc:
         handle_telemetry_config_validation_error(exc)

@@ -823,11 +823,21 @@ check-TODOs: env
 DOCS_VERSION := $(shell grep -m1 '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
 SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
 
+# Authoritative robots.txt for the domain root (docs.pipelex.com/robots.txt).
+# Deployed by docs-deploy-root. Note: docs/robots.txt is a no-op — it only
+# lands at /latest/robots.txt, which crawlers ignore per RFC 9309.
+#
+# IMPORTANT: `Disallow: /` blocks ALL root paths not explicitly `Allow`ed —
+# including root-level files like /sitemap.xml. The `Sitemap:` directive tells
+# crawlers *where* the sitemap is, but does NOT override Disallow rules —
+# crawlers still need permission to fetch the URL. Any root-level file that
+# crawlers must access needs its own `Allow:` line.
 define ROOT_ROBOTS_TXT
 User-agent: *
 Allow: /latest/
+Allow: /sitemap.xml
 Disallow: /
-Sitemap: https://$(SITE_DOMAIN)/latest/sitemap.xml
+Sitemap: https://$(SITE_DOMAIN)/sitemap.xml
 endef
 export ROOT_ROBOTS_TXT
 
@@ -839,9 +849,22 @@ define ROOT_INDEX_HTML
     <title>Redirecting to latest documentation...</title>
     <meta http-equiv="refresh" content="0;url=/latest/">
     <link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #2e303e;
+            color: #ccc;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        a { color: #45BF9F; text-decoration: none; }
+    </style>
 </head>
 <body>
-    <p>Redirecting to <a href="/latest/">latest documentation</a>...</p>
+    <p>Redirecting to <a href="/latest/">latest documentation</a>&#8230;</p>
 </body>
 </html>
 endef
@@ -883,6 +906,15 @@ docs-deploy-specific-version-pre-release: env
 	$(VENV_MIKE) deploy --push --update-aliases $(DOCS_VERSION) pre-release
 	$(MAKE) docs-deploy-root
 
+# Deploy root assets (404.html, robots.txt, index.html, sitemap.xml) to gh-pages.
+# The root sitemap is generated from latest/sitemap.xml (not $(DOCS_VERSION)/) so
+# that pre-release deploys don't overwrite it with pages not served at /latest/.
+# Mike does NOT rewrite sitemap URLs for aliases — latest/sitemap.xml contains
+# versioned URLs like /0.20.9/page/, identical to the version directory. The sed
+# rewrites any semver path segment (including pre-release suffixes like -rc1) to /latest/.
+# WARNING: Do NOT insert comments inside the shell continuation chain below.
+# Lines starting with # after a \ continuation become shell comments that silently
+# truncate the command.
 docs-deploy-root:
 ifeq ($(SITE_DOMAIN),)
 	$(error SITE_DOMAIN is empty — docs/CNAME is missing or blank. Cannot generate root assets with valid URLs)
@@ -895,9 +927,10 @@ endif
 	cp docs/404.html "$$TMPDIR/404.html" && \
 	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
 	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
+	sed 's|/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*[^/]*/|/latest/|g' "$$TMPDIR/latest/sitemap.xml" > "$$TMPDIR/sitemap.xml" && \
 	cd "$$TMPDIR" && \
-	git add 404.html robots.txt index.html && \
-	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html)") && \
+	git add 404.html robots.txt index.html sitemap.xml && \
+	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml)") && \
 	git push origin gh-pages
 
 docs-delete: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)

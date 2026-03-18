@@ -11,13 +11,10 @@ from typing import TYPE_CHECKING
 from pydantic import BaseModel
 
 from pipelex import log
-from pipelex.graph.graph_analysis import GraphAnalysis
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
 from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
-from pipelex.graph.reactflow.viewspec import LayoutSpec
-from pipelex.graph.reactflow.viewspec_transformer import graphspec_to_viewspec
 from pipelex.tools.misc.string_utils import snake_to_title_case
 
 if TYPE_CHECKING:
@@ -37,14 +34,12 @@ class GraphOutputs(BaseModel):
         graphspec_json: The GraphSpec serialized as JSON.
         mermaidflow_mmd: Mermaidflow view as Mermaid flowchart code.
         mermaidflow_html: Mermaidflow view as standalone HTML page.
-        reactflow_viewspec: The ViewSpec serialized as JSON for ReactFlow rendering.
         reactflow_html: ReactFlow interactive graph as standalone HTML page.
     """
 
     graphspec_json: str | None = None
     mermaidflow_mmd: str | None = None
     mermaidflow_html: str | None = None
-    reactflow_viewspec: str | None = None
     reactflow_html: str | None = None
 
 
@@ -64,7 +59,6 @@ async def generate_graph_outputs(
     This can generate:
     - GraphSpec JSON: The canonical graph representation
     - Mermaidflow view: Data flow with controller subgraphs (Mermaid)
-    - ReactFlow ViewSpec: JSON for ReactFlow rendering
     - ReactFlow HTML: Interactive graph viewer
 
     Args:
@@ -72,7 +66,7 @@ async def generate_graph_outputs(
         graph_config: Configuration controlling which outputs to generate and data inclusion.
         pipe_code: The pipe code, used to derive the HTML page title when title is not provided.
         title: Explicit HTML page title. When provided, overrides the auto-derived title from pipe_code.
-        direction: Flowchart direction for Mermaid diagrams. When None, uses graph_config.mermaid_config.direction.
+        direction: Flowchart direction override for both Mermaid and ReactFlow outputs. When None, each renderer uses its own config default.
         include_subgraphs: Whether to render controller hierarchy as subgraphs in Mermaid output.
 
     Returns:
@@ -84,7 +78,6 @@ async def generate_graph_outputs(
     graphspec_json: str | None = None
     mermaidflow_mmd: str | None = None
     mermaidflow_html: str | None = None
-    reactflow_viewspec: str | None = None
     reactflow_html: str | None = None
 
     # Generate GraphSpec JSON
@@ -121,47 +114,34 @@ async def generate_graph_outputs(
             else:
                 mermaidflow_html = await render_mermaid_html_async(mermaidflow.mermaid_code, title=page_title, theme=mermaid_theme)
 
-    # Generate ReactFlow outputs
-    if inclusion.reactflow_viewspec or inclusion.reactflow_html:
-        analysis = GraphAnalysis.from_graphspec(graph_spec)
-        rf_config = graph_config.reactflow_config
-        effective_rf_direction = direction or rf_config.layout_direction
-        layout = LayoutSpec(
-            direction=effective_rf_direction,
-            nodesep=rf_config.nodesep,
-            ranksep=rf_config.ranksep,
+    # Generate ReactFlow HTML
+    if inclusion.reactflow_html:
+        # Collect stuff data in alternate formats if configured
+        rf_stuff_data_text: dict[str, str] | None = None
+        rf_stuff_data_html: dict[str, str] | None = None
+        if graph_config.data_inclusion.stuff_text_content:
+            log.verbose("Collecting stuff data text for graph_spec")
+            rf_stuff_data_text = collect_stuff_data_text(graph_spec)
+        else:
+            log.verbose("No stuff data text to collect for graph_spec")
+        if graph_config.data_inclusion.stuff_html_content:
+            rf_stuff_data_html = collect_stuff_data_html(graph_spec)
+
+        effective_rf_config = graph_config.reactflow_config
+        if direction is not None:
+            effective_rf_config = effective_rf_config.model_copy(update={"layout_direction": direction})
+        reactflow_html = await generate_reactflow_html_async(
+            graph_spec,
+            effective_rf_config,
+            stuff_data_text=rf_stuff_data_text,
+            stuff_data_html=rf_stuff_data_html,
+            title=page_title,
         )
-        viewspec = graphspec_to_viewspec(graph_spec, analysis, layout=layout)
-
-        if inclusion.reactflow_viewspec:
-            reactflow_viewspec = viewspec.model_dump_json(indent=2)
-
-        if inclusion.reactflow_html:
-            # Collect stuff data in alternate formats if configured
-            rf_stuff_data_text: dict[str, str] | None = None
-            rf_stuff_data_html: dict[str, str] | None = None
-            if graph_config.data_inclusion.stuff_text_content:
-                log.verbose("Collecting stuff data text for graph_spec")
-                rf_stuff_data_text = collect_stuff_data_text(graph_spec)
-            else:
-                log.verbose("No stuff data text to collect for graph_spec")
-            if graph_config.data_inclusion.stuff_html_content:
-                rf_stuff_data_html = collect_stuff_data_html(graph_spec)
-
-            reactflow_html = await generate_reactflow_html_async(
-                viewspec,
-                graph_config.reactflow_config,
-                graphspec=graph_spec,
-                stuff_data_text=rf_stuff_data_text,
-                stuff_data_html=rf_stuff_data_html,
-                title=page_title,
-            )
 
     return GraphOutputs(
         graphspec_json=graphspec_json,
         mermaidflow_mmd=mermaidflow_mmd,
         mermaidflow_html=mermaidflow_html,
-        reactflow_viewspec=reactflow_viewspec,
         reactflow_html=reactflow_html,
     )
 
@@ -204,12 +184,6 @@ def save_graph_outputs_to_dir(
         file_path.write_text(graph_outputs.mermaidflow_html, encoding="utf-8")
         saved_files["mermaidflow_html"] = file_path
         log.verbose(f"Mermaidflow HTML saved to: {file_path}")
-
-    if graph_outputs.reactflow_viewspec is not None:
-        file_path = output_dir / "viewspec.json"
-        file_path.write_text(graph_outputs.reactflow_viewspec, encoding="utf-8")
-        saved_files["reactflow_viewspec"] = file_path
-        log.verbose(f"ReactFlow ViewSpec saved to: {file_path}")
 
     if graph_outputs.reactflow_html is not None:
         file_path = output_dir / "reactflow.html"

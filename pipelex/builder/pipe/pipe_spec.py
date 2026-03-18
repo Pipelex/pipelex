@@ -1,7 +1,7 @@
 import re
 from typing import Any
 
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from rich.console import Group
 from rich.table import Table
 from rich.text import Text
@@ -35,6 +35,8 @@ class PipeSpec(StructuredContent):
         output = "Article[]"  # produces a list of articles
         output = "Image[5]"  # produces exactly 5 images
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     pipe_code: str = Field(description="Unique pipe identifier. Must be snake_case.", json_schema_extra={"mock_format": MockFormat.SNAKE_CASE})
     type: Any = Field(
