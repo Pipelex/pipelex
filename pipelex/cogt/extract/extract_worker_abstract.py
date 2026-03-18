@@ -39,8 +39,8 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         return self.inference_model.is_pdf_supported_for_extract
 
     @property
-    def is_web_supported(self) -> bool:
-        return self.inference_model.is_web_supported_for_extract
+    def is_web_page_supported(self) -> bool:
+        return self.inference_model.is_web_page_supported_for_extract
 
     @property
     def is_image_supported(self) -> bool:
@@ -58,7 +58,7 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
                 msg = f"Extract engine '{self.inference_model.tag}' does not support image extraction."
                 raise ExtractCapabilityError(msg)
         elif extract_input.document_uri:
-            if not (self.inference_model.is_pdf_supported_for_extract or self.inference_model.is_web_supported_for_extract):
+            if not (self.inference_model.is_pdf_supported_for_extract or self.inference_model.is_web_page_supported_for_extract):
                 msg = f"Extract engine '{self.inference_model.tag}' does not support document extraction."
                 raise ExtractCapabilityError(msg)
         if extract_job.job_params.should_caption_images:

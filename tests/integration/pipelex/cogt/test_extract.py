@@ -133,7 +133,7 @@ class TestExtract:
     ):
         """Test web page extraction using Linkup fetch API."""
         extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
-        if not extract_worker.is_web_supported:
+        if not extract_worker.is_web_page_supported:
             msg = f"Web extraction is not supported for this extract worker: '{extract_worker.desc}'"
             pytest.skip(msg)
         extract_job_params = ExtractJobParams(
