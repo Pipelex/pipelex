@@ -85,6 +85,7 @@ If `"tools"` is in `supported_parameters`, the model supports structured output
 
 ## Filtering for a specific model
 
-The API returns all models at once. Filter client-side by matching on `id` or
-`name`. The `id` field is provider-scoped (e.g., `openai/gpt-5.4`,
+The API returns all models at once. Filter client-side by matching on `id` (LLM
+models) or `slug` (image-generation models), or `name` for either. Both `id` and
+`slug` are provider-scoped (e.g., `openai/gpt-5.4`,
 `anthropic/claude-4.6-opus`).
