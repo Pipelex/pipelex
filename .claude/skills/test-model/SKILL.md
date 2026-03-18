@@ -97,12 +97,13 @@ Set the appropriate model list based on model type:
 The override file may already contain profiles from previous testing sessions.
 Don't remove existing profiles — just add or update the one you need.
 
-## Step 3: Regenerate fixtures and run tests
+## Step 3: Run tests
 
-Regenerate fixtures for the new profile, then run the appropriate test class.
+Run the appropriate test class. **No need to call `make rtm` separately** — all
+inference test targets automatically regenerate fixtures when `PROF=` is passed
+on the command line.
 
 ```bash
-make rtm PROF=<profile_name>
 make test-inference-with-prints PROF=<profile_name> TEST=<TestClass>
 ```
 
@@ -138,18 +139,7 @@ deeper coverage (only if the user wants thorough testing):
   - Capability errors (e.g., vision not supported) → expected skips, not failures
   - Timeout / rate limit → transient, suggest retrying
 
-## Step 5: Restore default fixtures
-
-After testing, regenerate fixtures back to the default dev profile:
-
-```bash
-make rtm
-```
-
-This is important — if you leave the fixtures pointing at the temporary profile,
-other tests will fail.
-
-## Step 6: Clean up (optional)
+## Step 5: Clean up (optional)
 
 Ask the user if they want the temporary profile removed from
 `test_profiles_override.toml`. If yes, remove it. If no, leave it — the file is
