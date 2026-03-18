@@ -170,6 +170,7 @@ class GeneratedContentFactory:
                     text_and_images=TextAndImagesContent(
                         text=TextContent(text=page.text) if page.text else None,
                         images=page_images,
+                        raw_html=page.raw_html,
                     ),
                 )
             )

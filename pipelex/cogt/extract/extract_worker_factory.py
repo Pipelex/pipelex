@@ -93,6 +93,14 @@ class ExtractWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case "linkup_fetch":
+                from pipelex.plugins.linkup.linkup_extract_worker import LinkupExtractWorker  # noqa: PLC0415
+
+                extract_worker = LinkupExtractWorker(
+                    extra_config=backend.extra_config,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
             case _:
                 msg = f"Plugin '{plugin}' is not supported"
                 raise NotImplementedError(msg)

@@ -61,6 +61,10 @@ class InferenceModelSpec(ConfigModel):
         return "image" in self.inputs
 
     @property
+    def is_web_supported_for_extract(self) -> bool:
+        return "web" in self.inputs
+
+    @property
     def is_caption_supported_for_extract(self) -> bool:
         return "captions" in self.outputs
 

@@ -42,6 +42,8 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
     max_page_images: int | None
     should_include_page_views: bool
     page_views_dpi: int | None
+    render_js: bool | None = None
+    include_raw_html: bool | None = None
 
     image_stuff_name: str | None = None
     document_stuff_name: str | None = None
@@ -146,6 +148,8 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             page_views_dpi=self.page_views_dpi,
             max_nb_images=max_nb_images,
             image_min_size=extract_setting.image_min_size,
+            render_js=self.render_js,
+            include_raw_html=self.include_raw_html,
         )
         extract_input = ExtractInput(
             image_uri=image_uri,

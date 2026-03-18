@@ -54,8 +54,8 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
                 msg = f"Extract engine '{self.inference_model.tag}' does not support image extraction."
                 raise ExtractCapabilityError(msg)
         elif extract_input.document_uri:
-            if not self.inference_model.is_pdf_supported_for_extract:
-                msg = f"Extract engine '{self.inference_model.tag}' does not support PDF extraction."
+            if not (self.inference_model.is_pdf_supported_for_extract or self.inference_model.is_web_supported_for_extract):
+                msg = f"Extract engine '{self.inference_model.tag}' does not support document extraction."
                 raise ExtractCapabilityError(msg)
         if extract_job.job_params.should_caption_images:
             if not self.inference_model.is_caption_supported_for_extract:
