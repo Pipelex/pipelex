@@ -16,7 +16,7 @@ from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 
-class LinkupWorker(SearchWorkerAbstract):
+class LinkupSearchWorker(SearchWorkerAbstract):
     def __init__(
         self,
         inference_model: InferenceModelSpec,

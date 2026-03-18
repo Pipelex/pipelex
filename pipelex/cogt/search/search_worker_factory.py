@@ -26,9 +26,9 @@ class SearchWorkerFactory:
         search_worker: SearchWorkerAbstract
         match plugin.sdk:
             case "linkup":
-                from pipelex.plugins.linkup.linkup_worker import LinkupWorker  # noqa: PLC0415
+                from pipelex.plugins.linkup.linkup_search_worker import LinkupSearchWorker  # noqa: PLC0415
 
-                search_worker = LinkupWorker(inference_model=inference_model, reporting_delegate=get_report_delegate())
+                search_worker = LinkupSearchWorker(inference_model=inference_model, reporting_delegate=get_report_delegate())
             case "gateway_search":
                 from pipelex.plugins.gateway.gateway_factory import GatewayFactory  # noqa: PLC0415
                 from pipelex.plugins.gateway.gateway_search_worker import GatewaySearchWorker  # noqa: PLC0415
