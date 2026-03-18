@@ -31,7 +31,7 @@ default-extract-document = "azure-document-intelligence"
 default-extract-image = "azure-document-intelligence"
 default-text-from-pdf = "pypdfium2-extract-pdf"
 default-no-inference = "pypdfium2-extract-pdf"
-default-extract-web = "linkup-fetch"
+default-extract-web-page = "linkup-fetch"
 
 ####################################################################################################
 # Extract Presets
