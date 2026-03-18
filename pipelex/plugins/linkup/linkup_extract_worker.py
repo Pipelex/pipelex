@@ -11,23 +11,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.hub import get_secrets_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.tools.misc.image_utils import ImageFormat
-
-_EXTENSION_TO_MIME: dict[str, str] = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-}
-
-
-def _mime_type_from_url(url: str) -> str | None:
-    """Infer MIME type from URL extension; returns None for unsupported formats."""
-    path = urlparse(url).path.lower()
-    for extension, mime in _EXTENSION_TO_MIME.items():
-        if path.endswith(extension):
-            return mime
-    return None
 
 
 def _is_valid_image_url(url: str) -> bool:
@@ -91,14 +74,11 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
                     break
                 if not _is_valid_image_url(image.url):
                     continue
-                mime_type = _mime_type_from_url(image.url)
-                if mime_type is None or not ImageFormat.is_supported_mime_type(mime_type):
-                    continue
                 extracted_images.append(
                     ExtractedImageFromPage(
                         size=None,
                         actual_url=image.url,
-                        mime_type=mime_type,
+                        mime_type=None,
                         caption=image.alt or None,
                     )
                 )
