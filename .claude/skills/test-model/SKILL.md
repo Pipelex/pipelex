@@ -103,20 +103,20 @@ Regenerate fixtures for the new profile, then run the appropriate test class.
 
 ```bash
 make rtm PROF=<profile_name>
-make ti PROF=<profile_name> TEST=<TestClass>
+make test-inference-with-prints PROF=<profile_name> TEST=<TestClass>
 ```
 
 Map model type to test class:
 
 | Model type | Test class | Make shortcut |
 |------------|-----------|---------------|
-| LLM | `TestLLMInference` | `make ti` |
-| Image gen | `TestImageGeneration` | `make ti` |
-| Extract | `TestExtract` | `make ti` |
-| Search | `TestSearch` | `make ti` |
+| LLM | `TestLLMInference` | `make test-inference-with-prints` |
+| Image gen | `TestImageGeneration` | `make test-inference-with-prints` |
+| Extract | `TestExtract` | `make test-inference-with-prints` |
+| Search | `TestSearch` | `make test-inference-with-prints` |
 
-All use `make ti` (test-inference) since all these test classes are marked with
-the `inference` pytest marker.
+All use `make test-inference-with-prints` since all these test classes are marked
+with the `inference` pytest marker.
 
 For LLM models specifically, there are additional test classes you can run for
 deeper coverage (only if the user wants thorough testing):

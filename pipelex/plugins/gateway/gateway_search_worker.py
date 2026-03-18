@@ -12,18 +12,16 @@ from pipelex.cogt.exceptions import SdkTypeError
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
-from pipelex.cogt.search.search_job_factory import SearchJobFactory
-from pipelex.cogt.search.search_setting import SearchSetting
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.core.stuffs.search_result_content import SearchResultContent, SearchSourceContent
-from pipelex.pipeline.job_metadata import JobMetadata, UnitJobId
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_search_schemas import GatewaySearchRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
 class GatewaySearchWorker(SearchWorkerAbstract):
@@ -35,14 +33,13 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         inference_model: InferenceModelSpec,
         reporting_delegate: ReportingProtocol | None = None,
     ):
-        super().__init__(reporting_delegate=reporting_delegate)
+        super().__init__(inference_model=inference_model, reporting_delegate=reporting_delegate)
 
         if not isinstance(sdk_instance, AsyncPortkey):
             msg = f"Provided sdk_instance for {self.__class__.__name__} is not of type AsyncPortkey: it's a '{type(sdk_instance)}'"
             raise SdkTypeError(msg)
 
         self.portkey_client: AsyncPortkey = sdk_instance
-        self.inference_model = inference_model
         self._tenacity_config = get_config().cogt.tenacity_config
 
     def _make_retryer(self) -> AsyncRetrying:
@@ -60,30 +57,23 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         )
 
     @override
-    async def search_sourced_answer(
+    async def _search_sourced_answer(
         self,
-        query: str,
-        search_setting: SearchSetting,
-        job_metadata: JobMetadata,
-        include_domains: list[str] | None = None,
-        exclude_domains: list[str] | None = None,
-        from_date: str | None = None,
-        to_date: str | None = None,
+        search_job: SearchJob,
     ) -> SearchResultContent:
-        job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
-        search_job = SearchJobFactory.make_search_job(job_metadata=job_metadata)
-        search_job.search_job_before_start(inference_model=self.inference_model)
+        job_params = search_job.job_params
+        search_setting = job_params.search_setting
 
         params = GatewaySearchRequestParams(
-            query=query,
+            query=search_job.query,
             depth=SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1]),
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
             max_results=search_setting.max_results,
-            include_domains=include_domains,
-            exclude_domains=exclude_domains,
-            from_date=from_date,
-            to_date=to_date,
+            include_domains=job_params.include_domains,
+            exclude_domains=job_params.exclude_domains,
+            from_date=job_params.from_date,
+            to_date=job_params.to_date,
         )
 
         response = await self._call_relay(
@@ -92,9 +82,6 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         )
 
         self._extract_usage(response=response, search_job=search_job)
-        search_job.search_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=search_job)
 
         content_str = self._extract_content(response)
         result_dict: dict[str, Any] = json.loads(content_str)
@@ -114,39 +101,27 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         )
 
     @override
-    async def search_structured(
+    async def _search_structured(
         self,
-        query: str,
-        search_setting: SearchSetting,
-        output_schema: type,
-        job_metadata: JobMetadata,
-        include_domains: list[str] | None = None,
-        exclude_domains: list[str] | None = None,
-        from_date: str | None = None,
-        to_date: str | None = None,
+        search_job: SearchJob,
+        schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
-        job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
-        search_job = SearchJobFactory.make_search_job(job_metadata=job_metadata)
-        search_job.search_job_before_start(inference_model=self.inference_model)
+        job_params = search_job.job_params
+        search_setting = job_params.search_setting
 
         # Convert Pydantic model class to JSON Schema dict for the relay
-        schema_dict: dict[str, Any]
-        if hasattr(output_schema, "model_json_schema"):
-            schema_dict = cast("dict[str, Any]", output_schema.model_json_schema())  # pyright: ignore[reportUnknownMemberType]
-        else:
-            msg = f"output_schema must be a Pydantic model class with model_json_schema(), got {output_schema}"
-            raise SdkTypeError(msg)
+        schema_dict: dict[str, Any] = schema.model_json_schema()
 
         params = GatewaySearchRequestParams(
-            query=query,
+            query=search_job.query,
             depth=SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1]),
             include_images=search_setting.include_images,
             include_inline_citations=search_setting.include_inline_citations,
             max_results=search_setting.max_results,
-            include_domains=include_domains,
-            exclude_domains=exclude_domains,
-            from_date=from_date,
-            to_date=to_date,
+            include_domains=job_params.include_domains,
+            exclude_domains=job_params.exclude_domains,
+            from_date=job_params.from_date,
+            to_date=job_params.to_date,
             output_schema=schema_dict,
         )
 
@@ -156,9 +131,6 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         )
 
         self._extract_usage(response=response, search_job=search_job)
-        search_job.search_job_after_complete()
-        if self.reporting_delegate:
-            self.reporting_delegate.report_inference_job(inference_job=search_job)
 
         content_str = self._extract_content(response)
         result: dict[str, Any] = json.loads(content_str)
