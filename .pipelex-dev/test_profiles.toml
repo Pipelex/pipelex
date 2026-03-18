@@ -117,6 +117,8 @@ mistralai = [
   "pixtral-large",
   "mistral-small-2506",
   "mistral-small-3.2",
+  "mistral-small-2603",
+  "mistral-small-4",
   "mistral-small",
   "mistral-medium-2508",
   "mistral-medium-3.1",
