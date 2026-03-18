@@ -14,11 +14,14 @@ from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.inference_constants import InferenceOutputType
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.config import get_config
 from pipelex.hub import get_storage_provider
 from pipelex.plugins.gateway.gateway_completions_factory import GatewayCompletionsFactory
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
+from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
+from pipelex.plugins.gateway.gateway_search_schemas import GatewayFetchRequestParams
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.uri.uri_resolver import make_base64_url_from_any_uri
 
@@ -67,6 +70,17 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         self,
         extract_job: ExtractJob,
     ) -> ExtractOutput:
+        extract_protocol = GatewayExtractProtocol.make_from_model_handle(model_handle=self.inference_model.name)
+        match extract_protocol:
+            case GatewayExtractProtocol.LINKUP_FETCH:
+                return await self._extract_web_fetch(extract_job=extract_job)
+            case GatewayExtractProtocol.MISTRAL_DOC_AI | GatewayExtractProtocol.AZURE_DOC_INTEL | GatewayExtractProtocol.DEEPSEEK_OCR:
+                return await self._extract_document(extract_job=extract_job)
+
+    async def _extract_document(
+        self,
+        extract_job: ExtractJob,
+    ) -> ExtractOutput:
         # max_nb_images: None=unlimited, 0=no images, N=limit to N images
         max_nb_images = extract_job.job_params.max_nb_images
         should_include_images = max_nb_images is None or max_nb_images > 0
@@ -95,6 +109,73 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
         else:
             msg = "No image nor document URI provided in ExtractJob"
             raise ExtractInputError(msg)
+        return extract_output
+
+    async def _extract_web_fetch(
+        self,
+        extract_job: ExtractJob,
+    ) -> ExtractOutput:
+        """Extract content from a web page via the gateway's linkup-fetch endpoint."""
+        document_uri = extract_job.extract_input.document_uri
+        if not document_uri:
+            msg = "GatewayExtractWorker (linkup-fetch) requires a document_uri (web URL) in ExtractInput"
+            raise ExtractInputError(msg)
+
+        job_params = extract_job.job_params
+        max_nb_images = job_params.max_nb_images
+        extract_images = max_nb_images is None or max_nb_images != 0
+
+        fetch_params = GatewayFetchRequestParams(
+            url=document_uri,
+            render_js=job_params.render_js,
+            include_raw_html=job_params.include_raw_html,
+            extract_images=extract_images,
+        )
+
+        config_id = GatewayDeck.get_config_id(headers=self.inference_model.extra_headers or {})
+        log.dev(f"Web fetch via gateway config '{config_id}' for URL: {document_uri}")
+
+        messages: list[dict[str, str]] = [{"role": "user", "content": fetch_params.model_dump_json()}]
+
+        attempt_number = 0
+        response: GenericResponse | None = None
+        retryer = self._make_retryer()
+        try:
+            async for attempt in retryer:
+                with attempt:
+                    attempt_number += 1
+                    response = await self.portkey_client.with_options(config=config_id).post(  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+                        "/chat/completions",
+                        model=self.inference_model.model_id,
+                        messages=messages,
+                    )
+        except portkey_exceptions.APIError as exc:
+            error_summary = GatewayFactory.make_error_summary_from_portkey_error(exc)
+            msg = f"Web fetch service error for model '{self.inference_model.tag}' after {attempt_number} attempt(s): {error_summary}"
+            raise ExtractJobFailureError(msg) from exc
+
+        if response is None:
+            msg = f"Could not get a response for model '{self.inference_model.tag}' via Portkey after {attempt_number} attempts"
+            raise ExtractJobFailureError(msg)
+
+        if not isinstance(response, GenericResponse):
+            msg = "Response is not of type GenericResponse"
+            raise TypeError(msg)
+
+        extract_output = GatewayCompletionsFactory.make_extract_output_from_response(inference_model=self.inference_model, response=response)
+
+        # Apply image limit (factory just parses, worker applies limits)
+        if max_nb_images is not None and extract_output.pages:
+            for page in extract_output.pages.values():
+                page.extracted_images = page.extracted_images[:max_nb_images]
+
+        # Per-request cost model: costs are defined per million, so 1 request = 1_000_000
+        if extract_tokens_usage := extract_job.job_report.extract_tokens_usage:
+            extract_tokens_usage.nb_tokens_by_category = {
+                TokenCategory.INPUT: 1_000_000,
+                TokenCategory.OUTPUT: 1_000_000,
+            }
+
         return extract_output
 
     async def _extract_base64_url(

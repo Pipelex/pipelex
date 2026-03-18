@@ -90,6 +90,8 @@ class GatewayFactory:
                 case GatewayExtractProtocol.DEEPSEEK_OCR:
                     messages_deepseek: list[dict[str, str]] = [{"role": "user", "content": "Convert the document to markdown."}]
                     extra_body["messages"] = messages_deepseek
+                case GatewayExtractProtocol.LINKUP_FETCH:
+                    pass  # Fetch params are built directly in GatewayExtractWorker._extract_web_fetch
         elif isinstance(inference_job, LLMJob) and inference_model.model_id.lower().startswith("mistral-") and inference_job.job_params.seed is None:
             # Mistral models really want non-null seed
             extra_body["seed"] = random.randint(0, 1000000)
