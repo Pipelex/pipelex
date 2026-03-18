@@ -291,7 +291,9 @@ profile:
 make rtm
 ```
 
-And clean up the temporary profiles from `test_profiles_override.toml`.
+Ask the user if they want the temporary profiles removed from
+`test_profiles_override.toml`. If they do, clean them up. If not, leave them
+in place — the file is gitignored so it won't affect anyone else.
 
 ## Step 7: Gateway (manual — user action required)
 
