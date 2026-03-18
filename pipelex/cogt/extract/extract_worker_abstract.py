@@ -39,6 +39,10 @@ class ExtractWorkerAbstract(InferenceWorkerAbstract):
         return self.inference_model.is_pdf_supported_for_extract
 
     @property
+    def is_web_supported(self) -> bool:
+        return self.inference_model.is_web_supported_for_extract
+
+    @property
     def is_image_supported(self) -> bool:
         return self.inference_model.is_image_supported_for_extract
 

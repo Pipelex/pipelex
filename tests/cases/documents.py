@@ -38,3 +38,10 @@ class DocumentTestCases:
         PDF_FILE_URL_1,
         PDF_FILE_URL_2,
     ]
+
+    # Web URLs
+    WEB_URL_1 = "https://en.wikipedia.org/wiki/Python_(programming_language)"
+
+    WEB_URLS: ClassVar[list[str]] = [
+        WEB_URL_1,
+    ]

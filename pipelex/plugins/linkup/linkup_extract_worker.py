@@ -1,4 +1,5 @@
 from typing import Any
+from urllib.parse import urlparse
 
 from linkup import LinkupClient, LinkupFetchResponse
 from typing_extensions import override
@@ -10,6 +11,33 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.hub import get_secrets_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.misc.image_utils import ImageFormat
+
+_EXTENSION_TO_MIME: dict[str, str] = {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+}
+
+
+def _mime_type_from_url(url: str) -> str | None:
+    """Infer MIME type from URL extension; returns None for unsupported formats."""
+    path = urlparse(url).path.lower()
+    for extension, mime in _EXTENSION_TO_MIME.items():
+        if path.endswith(extension):
+            return mime
+    return None
+
+
+def _is_valid_image_url(url: str) -> bool:
+    """Check if a URL is a well-formed absolute HTTP(S) URL."""
+    parsed = urlparse(url)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return False
+    # Detect malformed URLs where a protocol-relative path was appended to a base domain
+    # e.g. "https://example.com//cdn.other.com/image.png"
+    return not parsed.path.startswith("//")
 
 
 class LinkupExtractWorker(ExtractWorkerAbstract):
@@ -55,13 +83,22 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
                 TokenCategory.OUTPUT: 1_000_000,
             }
 
+        max_images = job_params.max_nb_images
         extracted_images: list[ExtractedImageFromPage] = []
         if response.images:
             for image in response.images:
+                if max_images is not None and len(extracted_images) >= max_images:
+                    break
+                if not _is_valid_image_url(image.url):
+                    continue
+                mime_type = _mime_type_from_url(image.url)
+                if mime_type is None or not ImageFormat.is_supported_mime_type(mime_type):
+                    continue
                 extracted_images.append(
                     ExtractedImageFromPage(
                         size=None,
                         actual_url=image.url,
+                        mime_type=mime_type,
                         caption=image.alt or None,
                     )
                 )
