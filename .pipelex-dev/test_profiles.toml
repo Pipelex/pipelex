@@ -117,6 +117,8 @@ mistralai = [
   "pixtral-large",
   "mistral-small-2506",
   "mistral-small-3.2",
+  "mistral-small-2603",
+  "mistral-small-4",
   "mistral-small",
   "mistral-medium-2508",
   "mistral-medium-3.1",
@@ -158,6 +160,10 @@ openai = [
   "gpt-5.2-chat",
   "gpt-5.2-codex",
   "gpt-5.3-codex",
+  "gpt-5.4",
+  "gpt-5.4-pro",
+  "gpt-5.4-mini",
+  "gpt-5.4-nano",
 ]
 
 # --- OpenAI OSS Models ---
