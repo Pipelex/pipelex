@@ -61,9 +61,6 @@ reference, but here's the quick version:
    OpenRouter `file` -> our `pdf`. If `"tools"` is in `supported_parameters`,
    add `"structured"` to outputs.
 
-Present the looked-up values to the user for confirmation before writing them into
-the TOML files — OpenRouter prices may differ from the provider's direct pricing.
-
 ### Determining which backends
 
 Each provider typically maps to specific backends:
@@ -228,17 +225,28 @@ Once the model is registered and fixtures are regenerated, help the user run the
 integration tests to verify the model actually works end-to-end with real API
 calls.
 
-### Create a targeted test profile
+### Create targeted test profiles — one per backend
 
-The easiest way to test a single new model is to create a temporary profile in
+**IMPORTANT**: You must test the model on **every backend** it was added to, not
+just one. Create a separate temporary profile for each backend in
 `.pipelex-dev/test_profiles_override.toml` (this file is gitignored so it won't
-pollute the shared config):
+pollute the shared config).
+
+For example, if the model was added to both `openai` and `azure_openai`:
 
 ```toml
-[profiles.new_model]
-description = "Test the newly added model"
-backends = ["openai"]  # whichever backend(s) to test against
-llm_models = ["gpt-5.4"]  # the new model name
+[profiles.new_model_openai]
+description = "Test the newly added model on OpenAI"
+backends = ["openai"]
+llm_models = ["gpt-5.4"]
+img_gen_models = []
+extract_models = []
+search_models = []
+
+[profiles.new_model_azure]
+description = "Test the newly added model on Azure OpenAI"
+backends = ["azure_openai"]
+llm_models = ["gpt-5.4"]
 img_gen_models = []
 extract_models = []
 search_models = []
@@ -247,21 +255,25 @@ search_models = []
 Adjust the `backends` and model list fields based on what type the model is
 (`llm_models`, `img_gen_models`, `extract_models`, or `search_models`).
 
-### Regenerate fixtures with the new profile and run tests
+### Regenerate fixtures and run tests for EACH backend
+
+For each backend profile, regenerate fixtures and run the inference tests:
 
 ```bash
-make rtm PROF=new_model
+# Test on first backend
+make rtm PROF=new_model_openai
+make ti PROF=new_model_openai TEST=TestLLMInference
+
+# Test on second backend
+make rtm PROF=new_model_azure
+make ti PROF=new_model_azure TEST=TestLLMInference
 ```
 
-This regenerates `tests/integration/pipelex/fixtures/_generated_model_sets.py`
-with only the new model selected. Then run the inference tests:
+Use the appropriate test class for the model type:
 
-Then run the inference tests for the specific model type using `make ti` with the
-profile and test class:
-
-- **LLM models**: `make ti PROF=new_model TEST=TestLLMInference`
-- **Image gen models**: `make ti PROF=new_model TEST=TestImgGen`
-- **Extract models**: `make ti PROF=new_model TEST=TestExtract`
+- **LLM models**: `make ti PROF=<profile> TEST=TestLLMInference`
+- **Image gen models**: `make ti PROF=<profile> TEST=TestImgGen`
+- **Extract models**: `make ti PROF=<profile> TEST=TestExtract`
 
 The `PROF` parameter selects the test profile (which controls which models are
 tested), and `TEST` selects the test class or method to run.
@@ -272,13 +284,14 @@ model_id, missing capabilities) or in the API key / network setup.
 
 ### Restore the default profile after testing
 
-Once satisfied, regenerate fixtures back to the standard dev profile:
+Once all backends have been tested, regenerate fixtures back to the standard dev
+profile:
 
 ```bash
 make rtm
 ```
 
-And optionally clean up the temporary profile from `test_profiles_override.toml`.
+And clean up the temporary profiles from `test_profiles_override.toml`.
 
 ## Step 7: Gateway (manual — user action required)
 
@@ -319,7 +332,7 @@ Present this checklist to the user at the end so they can confirm everything:
 - [ ] Kit configs synced (`make ukc` + `make ccs`)
 - [ ] Model added to collections in `.pipelex-dev/test_profiles.toml`
 - [ ] Test fixtures regenerated (`make rtm`)
-- [ ] Inference tests pass against the new model (`make rtm PROF=new_model` + `make ti`)
+- [ ] Inference tests pass on **every backend** the model was added to (one `make rtm PROF=...` + `make ti` per backend)
 - [ ] Default fixtures restored (`make rtm`)
 - [ ] Boot test passes (`make tb`)
 - [ ] Quality checks pass (`make agent-check`)
