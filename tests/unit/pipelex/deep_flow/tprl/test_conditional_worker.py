@@ -8,9 +8,9 @@ import pytest
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
-from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
-from pipelex.deep_flow.tprl.conditional_worker import with_conditional_worker
-from pipelex.deep_flow.tprl.workflow_caller import WorkflowExecutor
+from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
+from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
+from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor
 
 
 @pytest.mark.asyncio(loop_scope="class")
@@ -37,7 +37,7 @@ class TestConditionalWorker:
         mock_worker_ctx.__aexit__ = AsyncMock(return_value=False)
         mock_task_manager.make_worker.return_value = mock_worker_ctx
         mocker.patch(
-            "pipelex.deep_flow.tprl.conditional_worker.get_task_manager",
+            "pipelex.temporal.tprl.conditional_worker.get_task_manager",
             return_value=mock_task_manager,
         )
 
@@ -69,7 +69,7 @@ class TestConditionalWorker:
         mock_worker_ctx.__aexit__ = AsyncMock(return_value=False)
         mock_task_manager.make_worker.return_value = mock_worker_ctx
         mocker.patch(
-            "pipelex.deep_flow.tprl.conditional_worker.get_task_manager",
+            "pipelex.temporal.tprl.conditional_worker.get_task_manager",
             return_value=mock_task_manager,
         )
 

@@ -1,10 +1,10 @@
 import pytest
 from pytest import Parser
 
-from pipelex.deep_flow.deep_flow_hub import deep_flow_hub
-from pipelex.deep_flow.deep_flow_manager import DeepFlowManager
-from pipelex.deep_flow.tasks import Tasks
-from pipelex.deep_flow.temporal_manager import TemporalWorkerEnvironment
+from pipelex.temporal.deep_flow_hub import deep_flow_hub
+from pipelex.temporal.deep_flow_manager import DeepFlowManager
+from pipelex.temporal.tasks import Tasks
+from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 
 
 def pytest_addoption(parser: Parser):

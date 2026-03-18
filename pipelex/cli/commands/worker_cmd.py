@@ -8,8 +8,8 @@ import typer
 from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
-from pipelex.deep_flow.deep_flow_hub import get_task_manager
 from pipelex.pipelex import Pipelex
+from pipelex.temporal.deep_flow_hub import get_task_manager
 
 
 def worker_cmd(

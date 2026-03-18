@@ -7,8 +7,8 @@ from pytest import FixtureRequest, Parser
 from temporalio.client import Client
 from temporalio.testing import WorkflowEnvironment
 
-from pipelex.deep_flow.temporal_data_converter import data_converter
 from pipelex.hub import get_report_delegate
+from pipelex.temporal.temporal_data_converter import data_converter
 
 
 def pytest_addoption(parser: Parser):

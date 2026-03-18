@@ -4,7 +4,7 @@ import pytest
 from pydantic import RootModel
 
 from pipelex import pretty_print
-from pipelex.deep_flow.temporal_data_converter import BaseModelPayloadConverter
+from pipelex.temporal.temporal_data_converter import BaseModelPayloadConverter
 
 
 class MyRootModel(RootModel[dict[str, Any]]):

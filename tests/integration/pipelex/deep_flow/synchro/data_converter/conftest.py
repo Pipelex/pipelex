@@ -1,6 +1,6 @@
 import pytest
 
-from pipelex.deep_flow.temporal_data_converter import BaseModelPayloadConverter
+from pipelex.temporal.temporal_data_converter import BaseModelPayloadConverter
 
 
 @pytest.fixture

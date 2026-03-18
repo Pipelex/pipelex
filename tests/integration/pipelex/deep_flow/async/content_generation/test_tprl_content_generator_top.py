@@ -11,10 +11,10 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.deep_flow.test_extras.deep_flow_registry_test_models import Person
-from pipelex.deep_flow.tprl_content_generation.content_generator_top import ContentGeneratorTop
 from pipelex.hub import get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.temporal.test_extras.deep_flow_registry_test_models import Person
+from pipelex.temporal.tprl_content_generation.content_generator_top import ContentGeneratorTop
 from tests.integration.pipelex.deep_flow.test_data import PipeTestCases
 
 USER_TEXT_FOR_BASE = """

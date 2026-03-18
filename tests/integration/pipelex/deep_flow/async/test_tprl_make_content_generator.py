@@ -1,8 +1,8 @@
 import pytest
 
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
-from pipelex.deep_flow.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
-from pipelex.deep_flow.tprl_content_generation.content_generator_top_factory import ContentGeneratorTopFactory
+from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
+from pipelex.temporal.tprl_content_generation.content_generator_top_factory import ContentGeneratorTopFactory
 
 
 @pytest.mark.temporal

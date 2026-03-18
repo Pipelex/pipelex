@@ -367,9 +367,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         # --- Deep Flow (Temporal) --------------------------------------------------------------
 
         if get_config().deep_flow.is_enabled:
-            from pipelex.deep_flow.deep_flow_hub import deep_flow_hub  # noqa: PLC0415
-            from pipelex.deep_flow.deep_flow_manager import DeepFlowManager  # noqa: PLC0415
-            from pipelex.deep_flow.tasks import Tasks  # noqa: PLC0415
+            from pipelex.temporal.deep_flow_hub import deep_flow_hub  # noqa: PLC0415
+            from pipelex.temporal.deep_flow_manager import DeepFlowManager  # noqa: PLC0415
+            from pipelex.temporal.tasks import Tasks  # noqa: PLC0415
 
             deep_flow_manager = DeepFlowManager()
             deep_flow_hub.set_task_manager(deep_flow_manager)
@@ -387,7 +387,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if pipe_router:
             effective_pipe_router = pipe_router
         elif get_config().deep_flow.is_enabled:
-            from pipelex.deep_flow.tprl_pipe.pipe_router_top import make_tprl_pipe_router_top  # noqa: PLC0415
+            from pipelex.temporal.tprl_pipe.pipe_router_top import make_tprl_pipe_router_top  # noqa: PLC0415
 
             effective_pipe_router = make_tprl_pipe_router_top()
         else:
@@ -399,8 +399,8 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
     def teardown(self):
         # deep flow
         if self._deep_flow_manager is not None:
-            from pipelex.deep_flow.deep_flow_hub import deep_flow_hub  # noqa: PLC0415
-            from pipelex.deep_flow.deep_flow_manager import DeepFlowManager  # noqa: PLC0415
+            from pipelex.temporal.deep_flow_hub import deep_flow_hub  # noqa: PLC0415
+            from pipelex.temporal.deep_flow_manager import DeepFlowManager  # noqa: PLC0415
 
             if isinstance(self._deep_flow_manager, DeepFlowManager):
                 self._deep_flow_manager.teardown()

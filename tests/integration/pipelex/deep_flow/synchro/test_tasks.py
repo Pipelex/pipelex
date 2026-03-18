@@ -2,7 +2,7 @@ import pytest
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.deep_flow.deep_flow_hub import get_task_manager
+from pipelex.temporal.deep_flow_hub import get_task_manager
 
 
 # TODO: improve and check system for all projects using temporal tasks
