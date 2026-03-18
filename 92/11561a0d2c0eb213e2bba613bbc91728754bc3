@@ -1,0 +1,25 @@
+.claude/skills/add-model/SKILL.md
+  33e36c0b35b616b1 1-327
+.claude/skills/add-model/references/openrouter-price-lookup.md
+  33e36c0b35b616b1 1-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "9211561a0d2c0eb213e2bba613bbc91728754bc3",
+  "prompts": {
+    "33e36c0b35b616b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9d1e7815-efe6-487e-a799-7bfa94c6e04f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 420,
+      "total_deletions": 3,
+      "accepted_lines": 417,
+      "overriden_lines": 0
+    }
+  }
+}
