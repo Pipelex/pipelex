@@ -272,8 +272,9 @@ make ti PROF=new_model_azure TEST=TestLLMInference
 Use the appropriate test class for the model type:
 
 - **LLM models**: `make ti PROF=<profile> TEST=TestLLMInference`
-- **Image gen models**: `make ti PROF=<profile> TEST=TestImgGen`
+- **Image gen models**: `make ti PROF=<profile> TEST=TestImageGeneration`
 - **Extract models**: `make ti PROF=<profile> TEST=TestExtract`
+- **Search models**: `make ti PROF=<profile> TEST=TestSearch`
 
 The `PROF` parameter selects the test profile (which controls which models are
 tested), and `TEST` selects the test class or method to run.
