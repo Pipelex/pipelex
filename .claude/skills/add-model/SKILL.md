@@ -256,16 +256,15 @@ make rtm PROF=new_model
 This regenerates `tests/integration/pipelex/fixtures/_generated_model_sets.py`
 with only the new model selected. Then run the inference tests:
 
-```bash
-make ti
-```
+Then run the inference tests for the specific model type using `make ti` with the
+profile and test class:
 
-This runs all integration tests marked with `@pytest.mark.inference`. For a more
-targeted run:
+- **LLM models**: `make ti PROF=new_model TEST=TestLLMInference`
+- **Image gen models**: `make ti PROF=new_model TEST=TestImgGen`
+- **Extract models**: `make ti PROF=new_model TEST=TestExtract`
 
-- `make tl` — LLM tests only (`@pytest.mark.llm`)
-- `make tg` — image generation tests only (`@pytest.mark.img_gen`)
-- `make te` — text extraction tests only (`@pytest.mark.extract`)
+The `PROF` parameter selects the test profile (which controls which models are
+tested), and `TEST` selects the test class or method to run.
 
 These are live API calls, so they require valid API keys for the backend being
 tested. If tests fail, check whether the issue is in the model config (wrong
