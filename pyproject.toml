@@ -36,7 +36,7 @@ dependencies = [
   "opentelemetry-semantic-conventions",
   "opentelemetry-sdk",
   "pillow>=11.2.1",
-  "pipelex-tools>=0.2.3",                               # plxt CLI for MTHDS/TOML/PLX formatting & linting, needed by client projects too
+  "pipelex-tools>=0.3.1",                               # plxt CLI for MTHDS/TOML/PLX formatting & linting, needed by client projects too
   "polyfactory>=2.21.0",
   "portkey-ai>=2.1.0",
   "posthog>=6.7.0",

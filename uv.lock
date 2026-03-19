@@ -3597,7 +3597,7 @@ requires-dist = [
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "pillow", specifier = ">=11.2.1" },
-    { name = "pipelex-tools", specifier = ">=0.2.3" },
+    { name = "pipelex-tools", specifier = ">=0.3.1" },
     { name = "polyfactory", specifier = ">=2.21.0" },
     { name = "portkey-ai", specifier = ">=2.1.0" },
     { name = "posthog", specifier = ">=6.7.0" },

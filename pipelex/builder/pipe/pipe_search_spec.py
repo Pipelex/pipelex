@@ -1,7 +1,7 @@
 import re
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 from rich.console import Group
 from rich.panel import Panel
 from rich.text import Text
@@ -24,13 +24,19 @@ class PipeSearchSpec(PipeSpec):
     Supports static and dynamic prompts with configurable search parameters.
     """
 
+    model_config = ConfigDict(populate_by_name=True)
+
     type: Literal["PipeSearch"] = "PipeSearch"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
     search_talent: SearchTalent | str = Field(
+        default=SearchTalent.WEB_SEARCH,
         description="Select the most adequate search talent according to the task to be performed.",
         examples=list(SearchTalent),
     )
-    prompt: str = Field(description="A finalized search prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).")
+    prompt: str = Field(
+        validation_alias="query",
+        description="A finalized search prompt or prompt template: use `$` prefix for inline variables (e.g., `$topic`).",
+    )
     from_date: str | None = Field(
         default=None,
         description="Start date filter in ISO 8601 format (YYYY-MM-DD). Only return results from this date onwards.",
@@ -43,6 +49,21 @@ class PipeSearchSpec(PipeSpec):
     )
     include_domains: list[str] | None = Field(default=None, description="Restrict search to these domains only (e.g., ['reuters.com', 'bbc.com']).")
     exclude_domains: list[str] | None = Field(default=None, description="Exclude results from these domains.")
+    max_results: int | None = Field(
+        default=None, description="Maximum number of search results to return. If not set, the search provider's default is used."
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_prompt_field(cls, values: dict[str, Any]) -> dict[str, Any]:
+        """Accept both 'prompt' and 'query' as input field names.
+
+        The LLM may generate 'query' instead of 'prompt', so we normalize 'prompt' to 'query'
+        which is the validation_alias that Pydantic expects.
+        """
+        if "prompt" in values and "query" not in values:
+            values["query"] = values.pop("prompt")
+        return values
 
     @field_validator("from_date", "to_date", mode="before")
     @classmethod
@@ -96,6 +117,8 @@ class PipeSearchSpec(PipeSpec):
             filter_lines.append(f"Include domains: {', '.join(self.include_domains)}")
         if self.exclude_domains is not None:
             filter_lines.append(f"Exclude domains: {', '.join(self.exclude_domains)}")
+        if self.max_results is not None:
+            filter_lines.append(f"Max results: {self.max_results}")
         if filter_lines:
             search_group.renderables.append(Text())  # Blank line
             for filter_line in filter_lines:
@@ -119,7 +142,7 @@ class PipeSearchSpec(PipeSpec):
             prompt=self.prompt,
             model=search_choice,
             include_images=None,
-            max_results=None,
+            max_results=self.max_results,
             from_date=self.from_date,
             to_date=self.to_date,
             include_domains=self.include_domains,
