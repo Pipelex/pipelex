@@ -1,0 +1,29 @@
+Makefile
+  b5c492585de5e35a 809-811,816-821,828,832-838,842-844,846-848,850-853,857-896,960-961,964-966
+pyproject.toml
+  b5c492585de5e35a 83
+mkdocs.yml
+  b5c492585de5e35a 180-309
+.github/workflows/doc-check.yml
+  b5c492585de5e35a 37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "0e0be353753f1910b6dda429ef317a6a9b7f8871",
+  "prompts": {
+    "b5c492585de5e35a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c5f3df06-cdac-4e28-9095-f353608e5568",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 212,
+      "total_deletions": 27,
+      "accepted_lines": 204,
+      "overriden_lines": 0
+    }
+  }
+}
