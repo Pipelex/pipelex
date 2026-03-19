@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.20.14] - 2026-03-19
+
+### Changed
+
+- **`mthds_content` → `mthds_contents`** — Unified singular `mthds_content: str | None` into `mthds_contents: list[str] | None` across `PipelexRunner`, `pipeline_run_setup`, `validate_bundle`, CLI commands, and builder operations. Callers now pass a list of bundle content strings.
+- **`bundle_uri` → `bundle_uris`** — Renamed `bundle_uri: str | None` to `bundle_uris: list[str] | None` across `PipelexRunner.__init__`, `pipeline_run_setup`, `dry_run_pipeline`, and all CLI call sites. Multiple bundles can now be loaded simultaneously.
+- **Bump `mthds` dependency** to `>=0.2.0` (from `>=0.1.1`) to match the updated `RunnerProtocol` interface.
+
 ## [v0.20.13] - 2026-03-16
 
 ### Removed
