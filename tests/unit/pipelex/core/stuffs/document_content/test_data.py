@@ -15,6 +15,8 @@ class TestData:
         "mime_type": None,
         "public_url": None,
         "filename": None,
+        "title": None,
+        "snippet": None,
     }
 
     # Expected outputs for smart_dump (with optional fields)
@@ -23,6 +25,8 @@ class TestData:
         "mime_type": "application/pdf",
         "public_url": "Report.pdf",
         "filename": None,
+        "title": None,
+        "snippet": None,
     }
 
     # Expected outputs for render methods

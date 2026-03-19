@@ -10,7 +10,7 @@ from pipelex.core.stuffs.json_content import JSONContent
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.number_content import NumberContent
 from pipelex.core.stuffs.page_content import PageContent
-from pipelex.core.stuffs.search_result_content import SearchResultContent, SearchSourceContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -88,7 +88,6 @@ class CoreRegistryModels(RegistryModels):
         PageContent,
         JSONContent,
         SearchResultContent,
-        SearchSourceContent,
     ]
 
     EXPERIMENTAL: ClassVar[list[ModelType]] = [

@@ -27,7 +27,7 @@ Here are all the native concepts you can use out of the box:
 |-----------------|-------------|---------------------|
 | `Text` | A text | `TextContent` |
 | `Image` | An image | `ImageContent` |
-| `Document` | A document (PDF, DOCX, PPTX) | `DocumentContent` |
+| `Document` | A document (PDF, DOCX, PPTX, web page) | `DocumentContent` |
 | `TextAndImages` | Text with its associated images | `TextAndImagesContent` |
 | `Number` | A number | `NumberContent` |
 | `Page` | A document page with text, images, and optional page view | `PageContent` |
@@ -80,15 +80,23 @@ Represents a document (PDF, DOCX, PPTX, etc.):
 ```python
 class DocumentContent(StuffContent):
     url: str
+    public_url: str | None = None
     mime_type: str | None = None
+    filename: str | None = None
+    title: str | None = None
+    snippet: str | None = None
 ```
 
 **Fields:**
 
-- `url`: Location of the document file (file path or URL)
+- `url`: Location of the document file, storage URL, or web page URL
+- `public_url`: Optional public-facing URL (when `url` is a private/internal reference)
 - `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+- `filename`: Optional filename of the document
+- `title`: Optional title of the document or source
+- `snippet`: Optional text snippet or excerpt from the document
 
-**Use for:** Contracts, invoices, reports, presentations, any document file.
+**Use for:** Contracts, invoices, reports, presentations, web pages, search source citations, any document file.
 
 ### NumberContent
 
@@ -188,16 +196,13 @@ Represents the result of a web search query. Produced by `PipeSearch`:
 ```python
 class SearchResultContent(StuffContent):
     answer: str
-    sources: list[SearchSourceContent] = []
+    sources: list[DocumentContent] = []
 ```
 
 **Fields:**
 
 - `answer`: The synthesized answer text from the search
-- `sources`: A list of source citations, each containing:
-    - `name` (str): Source name/title
-    - `url` (str): Source URL
-    - `snippet` (str | None): Relevant excerpt from the source
+- `sources`: A list of `DocumentContent` source citations (each with `url`, `title`, and `snippet`)
 
 **Use for:** Web search results, research findings, information retrieval with citations.
 

@@ -15,7 +15,8 @@ from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
-from pipelex.core.stuffs.search_result_content import SearchResultContent, SearchSourceContent
+from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.plugins.gateway.gateway_deck import GatewayDeck
 from pipelex.plugins.gateway.gateway_exceptions import GatewaySearchResponseError
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
@@ -87,10 +88,12 @@ class GatewaySearchWorker(SearchWorkerAbstract):
         result_dict: dict[str, Any] = json.loads(content_str)
 
         sources = [
-            SearchSourceContent(
-                name=source["name"],
+            DocumentContent(
+                title=source["name"],
                 url=source["url"],
+                public_url=source["url"],
                 snippet=source["snippet"],
+                mime_type="text/html",
             )
             for source in result_dict.get("sources", [])
         ]
