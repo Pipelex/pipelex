@@ -23,9 +23,8 @@ and must be done in order to keep everything consistent.
 2. **Add to backend TOML(s)** — the model spec in each relevant backend config
 3. **Sync kit configs** — propagate `.pipelex/` changes into `pipelex/kit/configs/`
 4. **Add to test profile collections** — so the model is available for test selection
-5. **Regenerate test fixtures** — refresh the generated model sets
-6. **Run inference tests** — verify the model works end-to-end with real API calls
-7. **Gateway (manual)** — the user handles this separately since it's remote config
+5. **Run inference tests** — verify the model works end-to-end with real API calls (fixtures are auto-regenerated when `PROF=` is passed)
+6. **Gateway (manual)** — the user handles this separately since it's remote config
 
 ## Step 1: Gather model information
 
@@ -206,20 +205,7 @@ If the model should be part of a named test profile (like `dev` or `coverage`),
 add it there too. But usually the collections are enough — profiles reference
 collections via `@collection_name` or glob patterns like `gpt-*`.
 
-## Step 5: Regenerate test fixtures
-
-Run the fixture regeneration to update the generated model sets:
-
-```bash
-make rtm
-```
-
-This runs `pipelex-dev preprocess-test-models --generate-fixtures --profile dev`
-and updates `tests/integration/pipelex/fixtures/_generated_model_sets.py`.
-
-Verify the generated file includes the new model if the active profile selects it.
-
-## Step 6: Run inference tests against the new model
+## Step 5: Run inference tests against the new model
 
 Once the model is registered and fixtures are regenerated, help the user run the
 integration tests to verify the model actually works end-to-end with real API
@@ -255,26 +241,26 @@ search_models = []
 Adjust the `backends` and model list fields based on what type the model is
 (`llm_models`, `img_gen_models`, `extract_models`, or `search_models`).
 
-### Regenerate fixtures and run tests for EACH backend
+### Run tests for EACH backend
 
-For each backend profile, regenerate fixtures and run the inference tests:
+For each backend profile, run the inference tests. **No need to call `make rtm`
+separately** — all inference test targets (`ti`, `tip`, `tl`, `te`, etc.)
+automatically regenerate fixtures when `PROF=` is passed on the command line.
 
 ```bash
 # Test on first backend
-make rtm PROF=new_model_openai
-make ti PROF=new_model_openai TEST=TestLLMInference
+make test-inference-fast PROF=new_model_openai TEST=TestLLMInference
 
 # Test on second backend
-make rtm PROF=new_model_azure
-make ti PROF=new_model_azure TEST=TestLLMInference
+make test-inference-fast PROF=new_model_azure TEST=TestLLMInference
 ```
 
 Use the appropriate test class for the model type:
 
-- **LLM models**: `make ti PROF=<profile> TEST=TestLLMInference`
-- **Image gen models**: `make ti PROF=<profile> TEST=TestImageGeneration`
-- **Extract models**: `make ti PROF=<profile> TEST=TestExtract`
-- **Search models**: `make ti PROF=<profile> TEST=TestSearch`
+- **LLM models**: `make test-inference-fast PROF=<profile> TEST=TestLLMInference`
+- **Image gen models**: `make test-inference-fast PROF=<profile> TEST=TestImageGeneration`
+- **Extract models**: `make test-inference-fast PROF=<profile> TEST=TestExtract`
+- **Search models**: `make test-inference-fast PROF=<profile> TEST=TestSearch`
 
 The `PROF` parameter selects the test profile (which controls which models are
 tested), and `TEST` selects the test class or method to run.
@@ -283,20 +269,13 @@ These are live API calls, so they require valid API keys for the backend being
 tested. If tests fail, check whether the issue is in the model config (wrong
 model_id, missing capabilities) or in the API key / network setup.
 
-### Restore the default profile after testing
-
-Once all backends have been tested, regenerate fixtures back to the standard dev
-profile:
-
-```bash
-make rtm
-```
+### Clean up after testing
 
 Ask the user if they want the temporary profiles removed from
 `test_profiles_override.toml`. If they do, clean them up. If not, leave them
 in place — the file is gitignored so it won't affect anyone else.
 
-## Step 7: Gateway (manual — user action required)
+## Step 6: Gateway (manual — user action required)
 
 Remind the user:
 
@@ -310,7 +289,7 @@ The local file `.pipelex/inference/backends/pipelex_gateway.toml` only allows
 overriding `sdk` and `structure_method` per model — you cannot define new models
 in it.
 
-## Step 8: Verify everything works
+## Step 7: Verify everything works
 
 Run the boot sequence test to make sure config loading succeeds:
 
@@ -334,9 +313,7 @@ Present this checklist to the user at the end so they can confirm everything:
 - [ ] Model entry added to `<backend>.toml` in `.pipelex/inference/backends/`
 - [ ] Kit configs synced (`make ukc` + `make ccs`)
 - [ ] Model added to collections in `.pipelex-dev/test_profiles.toml`
-- [ ] Test fixtures regenerated (`make rtm`)
-- [ ] Inference tests pass on **every backend** the model was added to (one `make rtm PROF=...` + `make ti` per backend)
-- [ ] Default fixtures restored (`make rtm`)
+- [ ] Inference tests pass on **every backend** the model was added to (`make test-inference-fast PROF=... TEST=...` per backend — fixtures are auto-regenerated)
 - [ ] Boot test passes (`make tb`)
 - [ ] Quality checks pass (`make agent-check`)
 - [ ] Gateway: user will add the model to the remote gateway config separately

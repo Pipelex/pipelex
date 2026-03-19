@@ -234,14 +234,6 @@ class SerDeTestLLMCases:
     ]
 
 
-class FetchTestCases:
-    """Test cases for fetch integration tests."""
-
-    FETCH_URLS: ClassVar[list[tuple[str, str]]] = [  # topic, url
-        ("Wikipedia Python", "https://en.wikipedia.org/wiki/Python_(programming_language)"),
-    ]
-
-
 class SearchTestCases:
     """Test cases for search integration tests."""
 

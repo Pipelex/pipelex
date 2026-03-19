@@ -11,6 +11,7 @@ class ExtractedImageFromPage(GeneratedImageRawDetails):
 
 class Page(CustomBaseModel):
     text: str | None = None
+    raw_html: str | None = None
     extracted_images: list[ExtractedImageFromPage] = Field(default_factory=empty_list_factory_of(ExtractedImageFromPage))
 
 

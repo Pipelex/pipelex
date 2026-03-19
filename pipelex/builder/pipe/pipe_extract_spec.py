@@ -47,6 +47,8 @@ class PipeExtractSpec(PipeSpec):
     )
     page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
+    render_js: bool | None = Field(default=None, description="Whether to render JavaScript before fetching (web extraction only).")
+    include_raw_html: bool | None = Field(default=None, description="Whether to include raw HTML in the response (web extraction only).")
 
     @override
     @field_validator("output", mode="before")
@@ -116,4 +118,6 @@ class PipeExtractSpec(PipeSpec):
             page_image_captions=self.page_image_captions,
             page_views=self.page_views,
             page_views_dpi=None,
+            render_js=self.render_js,
+            include_raw_html=self.include_raw_html,
         )

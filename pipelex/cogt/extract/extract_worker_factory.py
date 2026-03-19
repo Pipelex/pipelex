@@ -93,6 +93,24 @@ class ExtractWorkerFactory:
                     inference_model=inference_model,
                     reporting_delegate=reporting_delegate,
                 )
+            case "linkup_fetch":
+                if importlib.util.find_spec("linkup") is None:
+                    lib_name = "linkup"
+                    lib_extra_name = "linkup"
+                    msg = "The linkup SDK is required in order to use Linkup Fetch extraction models."
+                    raise MissingDependencyError(
+                        lib_name,
+                        lib_extra_name,
+                        msg,
+                    )
+
+                from pipelex.plugins.linkup.linkup_extract_worker import LinkupExtractWorker  # noqa: PLC0415
+
+                extract_worker = LinkupExtractWorker(
+                    extra_config=backend.extra_config,
+                    inference_model=inference_model,
+                    reporting_delegate=reporting_delegate,
+                )
             case _:
                 msg = f"Plugin '{plugin}' is not supported"
                 raise NotImplementedError(msg)

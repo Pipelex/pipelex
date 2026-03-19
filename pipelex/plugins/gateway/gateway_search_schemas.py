@@ -26,3 +26,18 @@ class GatewayFetchRequestParams(BaseModel):
     render_js: bool | None = Field(default=None, description="Whether to render JavaScript before fetching")
     extract_images: bool | None = Field(default=None, description="Whether to extract images from the page")
     timeout: float | None = Field(default=None, description="Request timeout in seconds")
+
+
+class GatewayFetchImageResponse(BaseModel):
+    """An image extracted from a fetched page."""
+
+    url: str = Field(description="URL of the image")
+    alt: str | None = Field(default=None, description="Alt text of the image")
+
+
+class GatewayFetchResultResponse(BaseModel):
+    """Response from a web page fetch."""
+
+    markdown: str | None = Field(default=None, description="Page content as markdown")
+    images: list[GatewayFetchImageResponse] | None = Field(default=None, description="Extracted images")
+    raw_html: str | None = Field(default=None, description="Raw HTML of the page")

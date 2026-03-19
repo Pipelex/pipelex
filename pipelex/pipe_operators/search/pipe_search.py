@@ -7,6 +7,7 @@ from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck_check import check_search_choice_with_deck
+from pipelex.cogt.search.search_job_factory import SearchJobFactory
 from pipelex.cogt.search.search_setting import SearchModelChoice, SearchSetting
 from pipelex.cogt.search.search_worker_factory import SearchWorkerFactory
 from pipelex.cogt.templating.template_blueprint import TemplateBlueprint
@@ -111,33 +112,27 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
         # 5. Get search worker from factory
         worker = SearchWorkerFactory.make_search_worker(inference_model=inference_model)
 
-        # 6. Execute search based on output type
+        # 6. Create search job
+        search_job = SearchJobFactory.make_search_job(
+            query=query_text,
+            search_setting=search_setting,
+            job_metadata=job_metadata,
+            include_domains=self.include_domains,
+            exclude_domains=self.exclude_domains,
+            from_date=self.from_date,
+            to_date=self.to_date,
+        )
+
+        # 7. Execute search based on output type
         content: StuffContent
         if not self.is_structured_output:
-            content = await worker.search_sourced_answer(
-                query=query_text,
-                search_setting=search_setting,
-                job_metadata=job_metadata,
-                include_domains=self.include_domains,
-                exclude_domains=self.exclude_domains,
-                from_date=self.from_date,
-                to_date=self.to_date,
-            )
+            content = await worker.search_sourced_answer(search_job=search_job)
         else:
             output_structure_class = self.output.concept.get_structure_class()
-            result_dict = await worker.search_structured(
-                query=query_text,
-                search_setting=search_setting,
-                output_schema=output_structure_class,
-                job_metadata=job_metadata,
-                include_domains=self.include_domains,
-                exclude_domains=self.exclude_domains,
-                from_date=self.from_date,
-                to_date=self.to_date,
-            )
+            result_dict = await worker.search_structured(search_job=search_job, schema=output_structure_class)
             content = output_structure_class.model_validate(result_dict)
 
-        # 7. Create Stuff, set in working memory, and return output
+        # 8. Create Stuff, set in working memory, and return output
         output_stuff = StuffFactory.make_stuff(
             name=output_name,
             concept=self.output.concept,

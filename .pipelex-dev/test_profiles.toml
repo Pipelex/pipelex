@@ -47,6 +47,7 @@ all = [
   "scaleway",
   "vertexai",
   "xai",
+  "linkup",
   "internal",
 ]
 
@@ -217,6 +218,9 @@ qwen = ["qwen-image"]
 linkup = ["linkup-standard", "linkup-deep"]
 
 [collections.extract]
+# --- Web Extraction Models ---
+from_web = ["linkup-fetch"]
+
 # --- PDF Extraction Models ---
 from_pdf = [
   "pypdfium2-extract-pdf",
