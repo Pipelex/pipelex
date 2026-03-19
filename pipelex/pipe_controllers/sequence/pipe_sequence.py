@@ -147,10 +147,11 @@ class PipeSequence(PipeController):
                             f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs.format_for_display()}"
                         )
                         raise PipeSequenceValueError(msg) from exc
+                    is_dotted_path = "." in sequential_sub_pipe.batch_params.input_list_stuff_name
                     needed_inputs.add_stuff_spec(
                         variable_name=input_list_root,
                         concept=stuff_spec.concept,
-                        multiplicity=True,
+                        multiplicity=True if not is_dotted_path else None,
                     )
                     for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                         if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:

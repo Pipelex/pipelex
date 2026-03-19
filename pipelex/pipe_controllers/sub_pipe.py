@@ -84,7 +84,33 @@ class SubPipe(BaseModel):
 
                 # Inject resolved list under a synthetic flat name and update batch_params
                 synthetic_flat_name = input_list_stuff_name.replace(".", "__")
-                item_stuff_spec = sub_pipe.inputs.get_required_stuff_spec(variable_name=batch_params.input_item_stuff_name)
+                if working_memory.is_stuff_exists(name=synthetic_flat_name):
+                    msg = (
+                        f"Cannot use synthetic name '{synthetic_flat_name}' for dotted-path batch resolution "
+                        f"in sub_pipe '{self.pipe_code}' of pipe '{calling_pipe_code}': "
+                        f"a stuff with that name already exists in working memory"
+                    )
+                    raise PipeRunInputsError(
+                        message=msg,
+                        run_mode=sub_pipe_run_params.run_mode,
+                        pipe_code=self.pipe_code,
+                        variable_name=synthetic_flat_name,
+                        concept_code=None,
+                    )
+                try:
+                    item_stuff_spec = sub_pipe.inputs.get_required_stuff_spec(variable_name=batch_params.input_item_stuff_name)
+                except InputStuffSpecNotFoundError as exc:
+                    msg = (
+                        f"Batch input item named '{batch_params.input_item_stuff_name}' from '{calling_pipe_code}' is not "
+                        f"in SubPipe '{self.pipe_code}' input stuff specs: {sub_pipe.inputs}"
+                    )
+                    raise PipeRunInputsError(
+                        message=msg,
+                        run_mode=sub_pipe_run_params.run_mode,
+                        pipe_code=self.pipe_code,
+                        variable_name=batch_params.input_item_stuff_name,
+                        concept_code=None,
+                    ) from exc
                 synthetic_stuff = StuffFactory.make_stuff(
                     concept=item_stuff_spec.concept,
                     content=list_content,
