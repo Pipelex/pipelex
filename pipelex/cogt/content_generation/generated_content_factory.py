@@ -131,7 +131,7 @@ class GeneratedContentFactory:
             try:
                 actual_bytes = await self._fetch_remote_content(url=url)
             except (httpx.HTTPStatusError, httpx.RequestError) as exc:
-                log.warning(f"Failed to fetch remote image at '{url}': {exc}")
+                log.warning(f"Failed to fetch a remote image: {exc}")
                 public_url = url
             else:
                 storage_key = self._build_storage_key(
