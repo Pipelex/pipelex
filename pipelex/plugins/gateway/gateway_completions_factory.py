@@ -30,6 +30,7 @@ from pipelex.plugins.gateway.gateway_exceptions import GatewayExtractResponseErr
 from pipelex.plugins.gateway.gateway_factory import GatewayFactory
 from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_schemas import GatewayExtractPageAzure, GatewayExtractPageDeepseek, GatewayExtractPageMistral
+from pipelex.plugins.gateway.gateway_search_schemas import GatewayFetchResultResponse
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
@@ -133,6 +134,8 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
                 return cls._make_extract_output_from_response_azure(response=response)
             case GatewayExtractProtocol.DEEPSEEK_OCR:
                 return cls._make_extract_output_from_response_deepseek(response=response)
+            case GatewayExtractProtocol.LINKUP_FETCH:
+                return cls._make_extract_output_from_response_linkup_fetch(response=response)
 
     @classmethod
     def _extract_pages_from_choices_content(
@@ -288,6 +291,64 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         except (TypeError, ValidationError) as exc:
             msg = f"Error parsing Gateway extract response from pages using Deepseek schema: {exc}"
             raise GatewayExtractResponseError(msg) from exc
+
+    @classmethod
+    def _make_extract_output_from_response_linkup_fetch(
+        cls,
+        response: GenericResponse,
+    ) -> ExtractOutput:
+        content_str = cls._extract_content_string_from_response(response=response)
+        if content_str is None:
+            msg = "Gateway fetch response does not contain content in choices[0].message.content"
+            raise GatewayExtractResponseError(msg)
+        try:
+            fetch_result = GatewayFetchResultResponse.model_validate_json(content_str)
+        except (ValidationError, ValueError) as exc:
+            msg = f"Error parsing Gateway fetch response as GatewayFetchResultResponse: {exc}"
+            raise GatewayExtractResponseError(msg) from exc
+
+        extracted_images: list[ExtractedImageFromPage] = []
+        if fetch_result.images:
+            for image in fetch_result.images:
+                extracted_images.append(
+                    ExtractedImageFromPage(
+                        size=None,
+                        actual_url=image.url,
+                        mime_type=None,
+                        caption=image.alt or None,
+                    )
+                )
+
+        page = Page(
+            text=fetch_result.markdown,
+            raw_html=fetch_result.raw_html,
+            extracted_images=extracted_images,
+        )
+        return ExtractOutput(pages={0: page})
+
+    @classmethod
+    def _extract_content_string_from_response(
+        cls,
+        response: GenericResponse,
+    ) -> str | None:
+        """Extract the string content from choices[0].message.content."""
+        try:
+            response_dict: dict[str, Any] = response.model_dump(serialize_as_any=True)
+            choices = response_dict.get("choices")
+            if not choices or not isinstance(choices, list) or len(choices) == 0:  # pyright: ignore[reportUnknownArgumentType]
+                return None
+            first_choice = cast("dict[str, Any]", choices[0])
+            message_raw: Any = first_choice.get("message")
+            if not message_raw or not isinstance(message_raw, dict):
+                return None
+            message_dict = cast("dict[str, Any]", message_raw)
+            content: Any = message_dict.get("content")
+            if not content or not isinstance(content, str):
+                return None
+            content_str: str = content
+            return content_str
+        except (KeyError, IndexError, TypeError, AttributeError):
+            return None
 
     @override
     def make_extras(

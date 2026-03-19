@@ -22,6 +22,7 @@ from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 from pipelex.types import Self
 
 if TYPE_CHECKING:
@@ -86,8 +87,9 @@ class PipeParallel(PipeController):
                         f"in this Parallel Pipe '{self.code}' input requirements: {pipe_needed_inputs}"
                     )
                     raise PipeValidationError(message=msg) from exc
+                input_list_root = get_root_from_dotted_path(sub_pipe.batch_params.input_list_stuff_name)
                 needed_inputs.add_stuff_spec(
-                    variable_name=sub_pipe.batch_params.input_list_stuff_name,
+                    variable_name=input_list_root,
                     concept=stuff_spec.concept,
                     multiplicity=True,
                 )

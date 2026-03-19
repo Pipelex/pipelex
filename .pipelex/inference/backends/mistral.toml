@@ -100,12 +100,29 @@ inputs = ["text"]
 outputs = ["text", "structured"]
 costs = { input = 0.1, output = 0.3 }
 
+[mistral-small-2603]
+model_id = "mistral-small-2603"
+max_tokens = 256000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.60 }
+thinking_mode = "manual"
+
+["mistral-small-4"]
+model_id = "mistral-small-2603"
+max_tokens = 256000
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.15, output = 0.60 }
+thinking_mode = "manual"
+
 [mistral-small]
 model_id = "mistral-small-latest"
-max_tokens = 128000
-inputs = ["text"]
+max_tokens = 256000
+inputs = ["text", "images"]
 outputs = ["text", "structured"]
-costs = { input = 0.1, output = 0.3 }
+costs = { input = 0.15, output = 0.60 }
+thinking_mode = "manual"
 
 # --- Mistral Medium Series ----------------------------------------------------
 [mistral-medium-2508]

@@ -103,6 +103,18 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gpt-5.3-codex**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **gpt-5.4**
+  - inputs: text, images
+  - outputs: text, structured
+- **gpt-5.4-mini**
+  - inputs: text, images
+  - outputs: text, structured
+- **gpt-5.4-nano**
+  - inputs: text, images
+  - outputs: text, structured
+- **gpt-5.4-pro**
+  - inputs: text, images
+  - outputs: text, structured
 - **gpt-oss-120b**
   - inputs: text
   - outputs: text, structured
@@ -163,6 +175,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **deepseek-ocr**
   - inputs: image
   - outputs: pages
+- **linkup-fetch**
+  - inputs: web_page
+  - outputs: pages
 
 
 **About extracted pages:** Each page contains Markdown text (based on AI-interpreted layout) and optional extracted images. A single image input is treated as one page. Pipelex also wraps the `pypdfium2` library for raw text (without any AI interpretation) and images extraction and page views rendering. All these elements can be used as inputs into downstream pipes, including LLM prompts.
@@ -193,6 +208,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-14T15:45:06Z
+> Last updated: 2026-03-19T01:52:02Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

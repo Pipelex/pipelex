@@ -196,12 +196,45 @@ costs = { input = 1.75, output = 14.0 }
 valued_constraints = { fixed_temperature = 1 }
 thinking_mode = "manual"
 
+["gpt-5.2-codex"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
 # --- GPT-5.3 Series -------------------------------------------------------------
 ["gpt-5.3-codex"]
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
 costs = { input = 1.75, output = 14.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+# --- GPT-5.4 Series -----------------------------------------------------------
+["gpt-5.4"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 15.0 }
+thinking_mode = "manual"
+
+["gpt-5.4-pro"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 30.0, output = 180.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+["gpt-5.4-mini"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.75, output = 4.5 }
+thinking_mode = "manual"
+
+["gpt-5.4-nano"]
+inputs = ["text", "images", "pdf"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 1.25 }
 thinking_mode = "manual"
 
 ################################################################################

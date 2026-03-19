@@ -14,6 +14,8 @@ class PipeExtractBlueprint(PipeBlueprint):
     page_image_captions: bool | None = None
     page_views: bool | None = None
     page_views_dpi: int | None = None
+    render_js: bool | None = None
+    include_raw_html: bool | None = None
 
     @override
     def validate_inputs(self):

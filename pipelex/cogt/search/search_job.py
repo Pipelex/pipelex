@@ -6,6 +6,15 @@ from typing_extensions import override
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_report import SearchTokensUsage
+from pipelex.cogt.search.search_setting import SearchSetting
+
+
+class SearchJobParams(BaseModel):
+    search_setting: SearchSetting
+    include_domains: list[str] | None = None
+    exclude_domains: list[str] | None = None
+    from_date: str | None = None
+    to_date: str | None = None
 
 
 class SearchJobReport(BaseModel):
@@ -13,6 +22,8 @@ class SearchJobReport(BaseModel):
 
 
 class SearchJob(InferenceJobAbstract):
+    query: str
+    job_params: SearchJobParams
     job_report: SearchJobReport = SearchJobReport()
 
     @override

@@ -38,7 +38,7 @@ class GeneratedImageRawDetails(CustomBaseModel):
             return None
 
     @model_validator(mode="after")
-    def validate_mime_type_or_image_format(self) -> Self:
+    def validate_mime_type_or_image_format_or_actual_url(self) -> Self:
         if self.mime_type:
             ImageFormat.raise_if_unsupported_mime_type(self.mime_type)
         elif self.actual_url_or_prefixed_base64 and (
@@ -48,6 +48,10 @@ class GeneratedImageRawDetails(CustomBaseModel):
             ImageFormat.raise_if_unsupported_mime_type(base64_extracted_mime_type)
             self.mime_type = base64_extracted_mime_type
             self.base64_str = base64_str
+        elif self.actual_url:
+            # When only a URL is provided (e.g. from web extraction), the mime type
+            # will be determined when the image is actually downloaded.
+            pass
         elif self.image_format is None:
             msg = "Either mime_type or image_format must be provided"
             raise ValueError(msg)
