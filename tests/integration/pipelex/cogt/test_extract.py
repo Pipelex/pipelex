@@ -152,7 +152,7 @@ class TestExtract:
         )
         extract_output = await extract_worker.extract_pages(extract_job=extract_job)
         assert extract_output.pages
-        page = extract_output.pages[0]
+        page = next(iter(extract_output.pages.values()))
         assert page.text, "Web extraction should return markdown text"
         pretty_print(page.text, title="Extracted markdown")
         if page.raw_html:
