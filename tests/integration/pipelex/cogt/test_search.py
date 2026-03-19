@@ -45,7 +45,7 @@ class TestSearch:
         assert result.answer, "Expected a non-empty answer"
         assert len(result.sources) > 0, "Expected at least one source"
         for source in result.sources:
-            assert source.name, "Expected source to have a name"
+            assert source.title, "Expected source to have a title"
             assert source.url, "Expected source to have a URL"
         get_report_delegate().generate_report()
 

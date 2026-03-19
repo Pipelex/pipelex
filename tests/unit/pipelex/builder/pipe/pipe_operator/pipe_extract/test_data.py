@@ -42,7 +42,7 @@ class PipeExtractTestCases:
             output="Page[]",
             model="@default-text-from-pdf",
             max_page_images=None,
-            page_image_captions=True,
+            page_image_captions=None,
             page_views=True,
             page_views_dpi=None,
         ),

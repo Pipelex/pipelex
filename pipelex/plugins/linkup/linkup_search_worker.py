@@ -9,7 +9,8 @@ from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_worker_abstract import SearchWorkerAbstract
 from pipelex.cogt.usage.token_category import TokenCategory
-from pipelex.core.stuffs.search_result_content import SearchResultContent, SearchSourceContent
+from pipelex.core.stuffs.document_content import DocumentContent
+from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.hub import get_secrets_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
@@ -56,13 +57,15 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         if search_tokens_usage := search_job.job_report.search_tokens_usage:
             search_tokens_usage.nb_tokens_by_category = {TokenCategory.INPUT: 1_000_000, TokenCategory.OUTPUT: 1_000_000}
 
-        sources: list[SearchSourceContent] = []
+        sources: list[DocumentContent] = []
         for source in response.sources:
             sources.append(
-                SearchSourceContent(
-                    name=source.name,
+                DocumentContent(
+                    title=source.name,
                     url=source.url,
+                    public_url=source.url,
                     snippet=source.snippet,
+                    mime_type="text/html",
                 )
             )
 

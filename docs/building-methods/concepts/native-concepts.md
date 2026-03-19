@@ -81,14 +81,18 @@ Represents a document (PDF, DOCX, PPTX, etc.):
 class DocumentContent(StuffContent):
     url: str
     mime_type: str | None = None
+    title: str | None = None
+    snippet: str | None = None
 ```
 
 **Fields:**
 
 - `url`: Location of the document file (file path or URL)
 - `mime_type`: Optional MIME type of the document (e.g., "application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+- `title`: Optional title of the document or source
+- `snippet`: Optional text snippet or excerpt from the document
 
-**Use for:** Contracts, invoices, reports, presentations, any document file.
+**Use for:** Contracts, invoices, reports, presentations, search source citations, any document file.
 
 ### NumberContent
 
@@ -188,16 +192,13 @@ Represents the result of a web search query. Produced by `PipeSearch`:
 ```python
 class SearchResultContent(StuffContent):
     answer: str
-    sources: list[SearchSourceContent] = []
+    sources: list[DocumentContent] = []
 ```
 
 **Fields:**
 
 - `answer`: The synthesized answer text from the search
-- `sources`: A list of source citations, each containing:
-    - `name` (str): Source name/title
-    - `url` (str): Source URL
-    - `snippet` (str | None): Relevant excerpt from the source
+- `sources`: A list of `DocumentContent` source citations (each with `url`, `title`, and `snippet`)
 
 **Use for:** Web search results, research findings, information retrieval with citations.
 
