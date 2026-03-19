@@ -1,0 +1,27 @@
+pipelex/cogt/content_generation/generated_content_factory.py
+  d95096f83cb02ce7 6,131,133-136
+tests/cases/documents.py
+  d95096f83cb02ce7 43
+pipelex/plugins/gateway/gateway_completions_factory.py
+  d95096f83cb02ce7 317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "7447771a6a75319dcd5576421b16cda45375cb66",
+  "prompts": {
+    "d95096f83cb02ce7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9ec63885-946e-4228-b99e-82e177acfaab",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 21,
+      "total_deletions": 56,
+      "accepted_lines": 8,
+      "overriden_lines": 0
+    }
+  }
+}
