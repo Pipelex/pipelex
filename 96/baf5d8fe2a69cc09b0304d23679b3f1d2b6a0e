@@ -1,0 +1,27 @@
+pyproject.toml
+  e8612d7028e3241b 3
+CHANGELOG.md
+  e8612d7028e3241b 3-27
+.claude/skills/release/SKILL.md
+  e8612d7028e3241b 9-11,72-78,80
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "96baf5d8fe2a69cc09b0304d23679b3f1d2b6a0e",
+  "prompts": {
+    "e8612d7028e3241b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a91a9bfe-607f-4c98-8954-0995a6697c35",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 41,
+      "total_deletions": 8,
+      "accepted_lines": 37,
+      "overriden_lines": 0
+    }
+  }
+}
