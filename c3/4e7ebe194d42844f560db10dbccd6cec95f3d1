@@ -1,0 +1,23 @@
+pipelex/cli/agent_cli/commands/pipe_cmd.py
+  34da637d28d65012 57
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "c34e7ebe194d42844f560db10dbccd6cec95f3d1",
+  "prompts": {
+    "34da637d28d65012": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "eb96bc7a-8ff6-4046-a614-ce50fdd04e36",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
