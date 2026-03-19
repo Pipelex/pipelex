@@ -38,7 +38,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         job_params = search_job.job_params
         search_setting = job_params.search_setting
 
-        depth_value = SearchDepth(self.inference_model.model_id)
+        depth_value = SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1])
         response: LinkupSourcedAnswer = await self._linkup_client.async_search(
             query=search_job.query,
             depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
@@ -80,7 +80,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         job_params = search_job.job_params
         search_setting = job_params.search_setting
 
-        depth_value = SearchDepth(self.inference_model.model_id)
+        depth_value = SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1])
         response = await self._linkup_client.async_search(
             query=search_job.query,
             depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]

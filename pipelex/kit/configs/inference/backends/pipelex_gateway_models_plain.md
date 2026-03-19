@@ -101,7 +101,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-5.3-codex**
-  - inputs: text, images
+  - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-5.4**
   - inputs: text, images
@@ -175,8 +175,8 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **deepseek-ocr**
   - inputs: image
   - outputs: pages
-- **mistral-document-ai-2505**
-  - inputs: image, pdf
+- **linkup-fetch**
+  - inputs: web_page
   - outputs: pages
 
 
@@ -199,12 +199,15 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **nano-banana**
   - inputs: text, images
   - outputs: image
+- **nano-banana-2**
+  - inputs: text, images
+  - outputs: image
 - **nano-banana-pro**
   - inputs: text, images
   - outputs: image
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-18T17:53:18Z
+> Last updated: 2026-03-19T01:52:02Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

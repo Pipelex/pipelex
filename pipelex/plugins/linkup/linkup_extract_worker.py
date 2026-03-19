@@ -39,7 +39,7 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
             raise ValueError(msg)
 
         job_params = extract_job.job_params
-        extract_images = (job_params.max_nb_images or 0) != 0
+        extract_images = job_params.max_nb_images is None or job_params.max_nb_images > 0
 
         response: LinkupFetchResponse = await self._linkup_client.async_fetch(
             url=document_uri,

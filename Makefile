@@ -806,48 +806,22 @@ SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
 # Deployed by docs-deploy-root. Note: docs/robots.txt is a no-op — it only
 # lands at /latest/robots.txt, which crawlers ignore per RFC 9309.
 #
-# IMPORTANT: `Disallow: /` blocks ALL root paths not explicitly `Allow`ed —
-# including root-level files like /sitemap.xml. The `Sitemap:` directive tells
-# crawlers *where* the sitemap is, but does NOT override Disallow rules —
-# crawlers still need permission to fetch the URL. Any root-level file that
-# crawlers must access needs its own `Allow:` line.
+# Targeted Disallow: block versioned paths and non-content pages, allow
+# everything else (root-level files like /sitemap.xml, /llms.txt are
+# implicitly allowed).
 define ROOT_ROBOTS_TXT
 User-agent: *
 Allow: /latest/
 Allow: /sitemap.xml
-Disallow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /0.
+Disallow: /pre-release/
+Disallow: /404.html
+
 Sitemap: https://$(SITE_DOMAIN)/sitemap.xml
 endef
 export ROOT_ROBOTS_TXT
-
-define ROOT_INDEX_HTML
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Redirecting to latest documentation...</title>
-    <meta http-equiv="refresh" content="0;url=/latest/">
-    <link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
-    <style>
-        body {
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #2e303e;
-            color: #ccc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        a { color: #45BF9F; text-decoration: none; }
-    </style>
-</head>
-<body>
-    <p>Redirecting to <a href="/latest/">latest documentation</a>&#8230;</p>
-</body>
-</html>
-endef
-export ROOT_INDEX_HTML
 
 docs: env
 	$(call PRINT_TITLE,"Serving documentation with mkdocs")
@@ -905,11 +879,15 @@ endif
 	git worktree add "$$TMPDIR" gh-pages && \
 	cp docs/404.html "$$TMPDIR/404.html" && \
 	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
-	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
+	sed 's/__SITE_DOMAIN__/$(SITE_DOMAIN)/g' docs/root-index.html > "$$TMPDIR/index.html" && \
 	sed 's|/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*[^/]*/|/latest/|g' "$$TMPDIR/latest/sitemap.xml" > "$$TMPDIR/sitemap.xml" && \
+	if [ -f "$$TMPDIR/latest/llms.txt" ]; then cp "$$TMPDIR/latest/llms.txt" "$$TMPDIR/llms.txt"; fi && \
+	if [ -f "$$TMPDIR/latest/llms-full.txt" ]; then cp "$$TMPDIR/latest/llms-full.txt" "$$TMPDIR/llms-full.txt"; fi && \
 	cd "$$TMPDIR" && \
 	git add 404.html robots.txt index.html sitemap.xml && \
-	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml)") && \
+	if [ -f llms.txt ]; then git add llms.txt; fi && \
+	if [ -f llms-full.txt ]; then git add llms-full.txt; fi && \
+	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml, llms.txt)") && \
 	git push origin gh-pages
 
 docs-delete: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
