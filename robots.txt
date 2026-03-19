@@ -1,5 +1,10 @@
 User-agent: *
 Allow: /latest/
 Allow: /sitemap.xml
-Disallow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /0.
+Disallow: /pre-release/
+Disallow: /404.html
+
 Sitemap: https://docs.pipelex.com/sitemap.xml
