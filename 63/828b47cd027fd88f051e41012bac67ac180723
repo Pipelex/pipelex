@@ -1,0 +1,25 @@
+pipelex/pipe_controllers/sequence/pipe_sequence.py
+  56e2a23dd54f871d 150,154
+pipelex/pipe_controllers/sub_pipe.py
+  56e2a23dd54f871d 87-113
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "63828b47cd027fd88f051e41012bac67ac180723",
+  "prompts": {
+    "56e2a23dd54f871d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "60d71703-9390-43b4-b1d6-f131fba8bce8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 29,
+      "total_deletions": 2,
+      "accepted_lines": 29,
+      "overriden_lines": 0
+    }
+  }
+}
