@@ -45,10 +45,7 @@ class PipeExtractSpec(PipeSpec):
     max_page_images: int | None = Field(
         default=None, description="Max number of images to extract from pages: None=unlimited, 0=no images, N=limit to N images."
     )
-    page_image_captions: bool | None = Field(default=None, description="Whether to generate captions for detected images using AI.")
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
-    render_js: bool | None = Field(default=None, description="Whether to render JavaScript before fetching (web extraction only).")
-    include_raw_html: bool | None = Field(default=None, description="Whether to include raw HTML in the response (web extraction only).")
 
     @override
     @field_validator("output", mode="before")
@@ -93,8 +90,6 @@ class PipeExtractSpec(PipeSpec):
         # Add optional extraction settings if they are set
         if self.max_page_images is not None:
             extract_group.renderables.append(Text.from_markup(f"Max Page Images: [bold magenta]{self.max_page_images}[/bold magenta]"))
-        if self.page_image_captions is not None:
-            extract_group.renderables.append(Text.from_markup(f"Generate Image Captions: [bold magenta]{self.page_image_captions}[/bold magenta]"))
         if self.page_views is not None:
             extract_group.renderables.append(Text.from_markup(f"Include Page Views: [bold magenta]{self.page_views}[/bold magenta]"))
 
@@ -115,9 +110,9 @@ class PipeExtractSpec(PipeSpec):
             output=base_blueprint.output,
             model=extract_model_choice,
             max_page_images=self.max_page_images,
-            page_image_captions=self.page_image_captions,
+            page_image_captions=None,
             page_views=self.page_views,
             page_views_dpi=None,
-            render_js=self.render_js,
-            include_raw_html=self.include_raw_html,
+            render_js=None,
+            include_raw_html=None,
         )
