@@ -1,0 +1,53 @@
+tests/unit/pipelex/pipe_controllers/sequence/data.py
+  546f94e5b6c9bc08 82-100,107
+pipelex/pipe_operators/search/pipe_search.py
+  5829e4858956dd14 18,161-164,167-168
+tests/e2e/pipelex/pipes/pipe_controller/pipe_batch/article_briefing.mthds
+  5829e4858956dd14 53,61
+tests/integration/pipelex/pipes/controller/pipe_batch_dotted_path/dotted_batch.mthds
+  5829e4858956dd14 1-11
+tests/integration/pipelex/pipes/controller/pipe_batch_dotted_path/test_dotted_batch.py
+  5829e4858956dd14 1-14,16-105
+pipelex/pipe_controllers/sub_pipe.py
+  546f94e5b6c9bc08 1-2,13-14,45-99,155,157
+  5829e4858956dd14 147,154,156
+tests/e2e/pipelex/pipes/pipe_controller/pipe_batch/test_pipe_batch_graph.py
+  5829e4858956dd14 29,304-336
+pipelex/pipe_controllers/sequence/pipe_sequence.py
+  546f94e5b6c9bc08 138-139,151
+pipelex/pipe_controllers/parallel/pipe_parallel.py
+  546f94e5b6c9bc08 90,92
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "9550ac90abbea83bc88b1f7fce89023b0e4011c2",
+  "prompts": {
+    "546f94e5b6c9bc08": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1860af0e-1ae4-4642-b371-229e4a25b9ca",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 99,
+      "total_deletions": 13,
+      "accepted_lines": 86,
+      "overriden_lines": 0
+    },
+    "5829e4858956dd14": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8ae10890-4b8a-45ae-b5a3-e80809658fb4",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 250,
+      "total_deletions": 96,
+      "accepted_lines": 161,
+      "overriden_lines": 0
+    }
+  }
+}
