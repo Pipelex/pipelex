@@ -753,7 +753,7 @@ class StuffViewerTestData:
         css_class="test-class",
     )
     IMAGE_CONTENT: ClassVar[ImageContent] = ImageContent(url=URLs.png_example_1, mime_type="image/png")
-    PDF_CONTENT: ClassVar[DocumentContent] = DocumentContent(url=URLs.pdf_example_1)
+    PDF_CONTENT: ClassVar[DocumentContent] = DocumentContent(url=URLs.pdf_example_1, mime_type="application/pdf")
     MERMAID_CONTENT: ClassVar[MermaidContent] = MermaidContent(
         mermaid_code="graph TD; A-->B",
         mermaid_url="https://mermaid.live/view#abc",
