@@ -15,6 +15,7 @@ from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.pipe_output import PipeOutput
+from pipelex.core.stuffs.document_content import DocumentContent
 from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.hub import get_model_deck
@@ -157,14 +158,14 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
     ) -> PipeSearchOutput:
         content: StuffContent
         if not self.is_structured_output:
-            content = SearchResultContent(
-                answer="[DRY RUN] Mock search result",
-                sources=[],
-            )
+            doc_factory = DryRunFactory.make_dry_run_factory(DocumentContent)
+            mock_sources = [doc_factory.build() for _ in range(3)]
+            search_result_factory = DryRunFactory.make_dry_run_factory(SearchResultContent)
+            content = search_result_factory.build(sources=mock_sources)
         else:
             output_structure_class = self.output.concept.get_structure_class()
-            object_factory = DryRunFactory.make_dry_run_factory(output_structure_class)
-            content = object_factory.build()
+            structured_factory = DryRunFactory.make_dry_run_factory(output_structure_class)
+            content = structured_factory.build()
 
         output_stuff = StuffFactory.make_stuff(
             name=output_name,

@@ -79,12 +79,32 @@ class PipeSequenceInputTestCases:
         ),
     )
 
+    VALID_WITH_BATCH_DOTTED_PATH: ClassVar[tuple[str, PipeSequenceBlueprint]] = (
+        "valid_with_batch_dotted_path",
+        PipeSequenceBlueprint(
+            description="Test case: valid_with_batch_dotted_path",
+            inputs={"query": "native.Text"},
+            output="native.Text",
+            steps=[
+                SubPipeBlueprint(pipe="search_step", result="search_result"),
+                SubPipeBlueprint(
+                    pipe="process_source",
+                    batch_over="search_result.sources",
+                    batch_as="source",
+                    result="processed_sources",
+                ),
+                SubPipeBlueprint(pipe="summarize_results", result="summary"),
+            ],
+        ),
+    )
+
     VALID_CASES: ClassVar[list[tuple[str, PipeSequenceBlueprint]]] = [
         VALID_SIMPLE_SEQUENCE,
         VALID_THREE_STEPS,
         VALID_SINGLE_STEP,
         VALID_MULTIPLE_INPUTS,
         VALID_WITH_BATCH,
+        VALID_WITH_BATCH_DOTTED_PATH,
     ]
 
     # Error test cases: (test_id, blueprint_dict, expected_error_message_fragment)
