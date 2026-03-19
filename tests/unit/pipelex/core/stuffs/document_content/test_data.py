@@ -6,7 +6,7 @@ from pipelex.urls import URLs
 class TestData:
     # Input content
     SAMPLE_URL = URLs.pdf_example_1
-    SAMPLE_PUBLIC_URL = "Report.pdf"
+    SAMPLE_PUBLIC_URL = "https://cdn.example.com/docs/Report.pdf"
     SAMPLE_MIME_TYPE = "application/pdf"
 
     # Expected outputs for smart_dump (minimal)
@@ -23,7 +23,7 @@ class TestData:
     EXPECTED_SMART_DUMP_FULL: ClassVar[dict[str, Any]] = {
         "url": URLs.pdf_example_1,
         "mime_type": "application/pdf",
-        "public_url": "Report.pdf",
+        "public_url": "https://cdn.example.com/docs/Report.pdf",
         "filename": None,
         "title": None,
         "snippet": None,
@@ -32,8 +32,8 @@ class TestData:
     # Expected outputs for render methods
     EXPECTED_RENDERED_PLAIN = URLs.pdf_example_1
     EXPECTED_RENDERED_MARKDOWN = f"[{URLs.pdf_example_1}]({URLs.pdf_example_1})"
-    EXPECTED_RENDERED_MARKDOWN_WITH_DISPLAY_LINK = "[Report.pdf](Report.pdf)"
+    EXPECTED_RENDERED_MARKDOWN_WITH_DISPLAY_LINK = f"[{SAMPLE_PUBLIC_URL}]({SAMPLE_PUBLIC_URL})"
     EXPECTED_RENDERED_HTML = f'<a href="{URLs.pdf_example_1}" class="msg-document">{URLs.pdf_example_1}</a>'
-    EXPECTED_RENDERED_HTML_WITH_PUBLIC_URL = '<a href="Report.pdf" class="msg-document">Report.pdf</a>'
+    EXPECTED_RENDERED_HTML_WITH_PUBLIC_URL = f'<a href="{SAMPLE_PUBLIC_URL}" class="msg-document">{SAMPLE_PUBLIC_URL}</a>'
     # rendered_for_prompt returns just the URL for documents
     EXPECTED_RENDERED_FOR_PROMPT = URLs.pdf_example_1
