@@ -33,7 +33,6 @@ class PipeExtractTestCases:
             output="Page[]",
             extract_talent=ExtractTalent.PDF_BASIC_TEXT_EXTRACTOR,
             max_page_images=None,
-            page_image_captions=True,
             page_views=True,
         ),
         PipeExtractBlueprint(
