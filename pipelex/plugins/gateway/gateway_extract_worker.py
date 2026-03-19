@@ -123,7 +123,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
 
         job_params = extract_job.job_params
         max_nb_images = job_params.max_nb_images
-        extract_images = max_nb_images is None or max_nb_images != 0
+        extract_images = max_nb_images is None or max_nb_images > 0
 
         fetch_params = GatewayFetchRequestParams(
             url=document_uri,

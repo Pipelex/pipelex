@@ -77,7 +77,7 @@ class DocumentContent(StuffContent):
     @override
     def rendered_markdown(self, level: int = 1, is_pretty: bool = False) -> str:
         display_text = self.title or self.public_url or self.url
-        result = f"[{display_text}]({self.url})"
+        result = f"[{display_text}]({self.public_url or self.url})"
         if self.snippet:
             result += f"\n  {self.snippet}"
         return result

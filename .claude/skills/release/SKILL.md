@@ -70,10 +70,11 @@ Add a new version entry at the top of the changelog for the release.
 3. **Never add an `[Unreleased]` heading.** The changelog should only contain
    concrete version entries.
 4. If the user provided changelog content when invoking the skill (e.g.
-   `/release Added new extract backend`), use that content as the changelog
-   entry for this version. Format it properly under the appropriate heading
-   (e.g. `### Added`, `### Changed`, `### Fixed`), inferring the heading from
-   the content when possible.
+   `/release Added new extract backend`), **merge** that content with any
+   existing `[Unreleased]` content (do not discard either source). Format the
+   combined content properly under the appropriate headings (e.g. `### Added`,
+   `### Changed`, `### Fixed`), inferring headings from the content when
+   possible.
 5. If the release has no changelog content yet (neither from an `[Unreleased]`
    section nor from inline user input), ask the user what to include before
    proceeding.

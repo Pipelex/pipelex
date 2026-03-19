@@ -196,7 +196,7 @@ Represents the result of a web search query. Produced by `PipeSearch`:
 ```python
 class SearchResultContent(StuffContent):
     answer: str
-    sources: list[DocumentContent] = []
+    sources: list[DocumentContent] = Field(default_factory=empty_list_factory_of(DocumentContent))
 ```
 
 **Fields:**

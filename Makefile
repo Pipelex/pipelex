@@ -885,8 +885,7 @@ endif
 	if [ -f "$$TMPDIR/latest/llms-full.txt" ]; then cp "$$TMPDIR/latest/llms-full.txt" "$$TMPDIR/llms-full.txt"; fi && \
 	cd "$$TMPDIR" && \
 	git add 404.html robots.txt index.html sitemap.xml && \
-	if [ -f llms.txt ]; then git add llms.txt; fi && \
-	if [ -f llms-full.txt ]; then git add llms-full.txt; fi && \
+	git add -A llms.txt llms-full.txt 2>/dev/null; \
 	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml, llms.txt)") && \
 	git push origin gh-pages
 
