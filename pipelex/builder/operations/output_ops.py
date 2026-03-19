@@ -29,7 +29,7 @@ async def build_output_for_pipe(
     Raises:
         ValidateBundleError: If bundle validation fails.
     """
-    validate_bundle_result = await validate_bundle(mthds_content=mthds_content)
+    validate_bundle_result = await validate_bundle(mthds_contents=[mthds_content])
     blueprint = validate_bundle_result.blueprints[0]
 
     library_manager = get_library_manager()

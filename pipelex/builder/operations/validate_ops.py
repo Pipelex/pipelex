@@ -100,7 +100,7 @@ async def validate_bundle_content(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    validate_bundle_result = await validate_bundle(mthds_content=mthds_content)
+    validate_bundle_result = await validate_bundle(mthds_contents=[mthds_content])
     blueprint = validate_bundle_result.blueprints[0]
 
     validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in validate_bundle_result.pipes]

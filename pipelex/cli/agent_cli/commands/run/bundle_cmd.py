@@ -156,7 +156,7 @@ def run_bundle_cmd(
                 result = asyncio.run(
                     run_pipeline_core_api(
                         pipe_code=pipe_code,  # type: ignore[arg-type]
-                        mthds_content=mthds_content,
+                        mthds_contents=[mthds_content] if mthds_content else None,
                         inputs=pipeline_inputs,
                         with_memory=with_memory,
                     )
@@ -179,8 +179,8 @@ def run_bundle_cmd(
                 result = asyncio.run(
                     run_pipeline_core(
                         pipe_code=pipe_code,  # type: ignore[arg-type]
-                        mthds_content=mthds_content,
-                        bundle_uri=bundle_path,
+                        mthds_contents=[mthds_content] if mthds_content else None,
+                        bundle_uris=[bundle_path] if bundle_path else None,
                         inputs=pipeline_inputs,
                         dry_run=dry_run,
                         mock_inputs=mock_inputs,

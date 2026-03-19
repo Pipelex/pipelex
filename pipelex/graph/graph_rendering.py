@@ -130,8 +130,8 @@ async def _dry_run_bundle(
         effective_library_dirs = [bundle_parent_dir]
 
     return await dry_run_pipeline(
-        mthds_content=mthds_content,
-        bundle_uri=str(bundle_path),
+        mthds_contents=[mthds_content],
+        bundle_uris=[str(bundle_path)],
         library_dirs=effective_library_dirs,
     )
 

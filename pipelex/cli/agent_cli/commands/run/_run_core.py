@@ -16,8 +16,8 @@ from pipelex.tools.misc.json_utils import clean_json_dumps
 
 async def run_pipeline_core(
     pipe_code: str,
-    mthds_content: str | None = None,
-    bundle_uri: str | None = None,
+    mthds_contents: list[str] | None = None,
+    bundle_uris: list[str] | None = None,
     inputs: dict[str, Any] | None = None,
     dry_run: bool = False,
     mock_inputs: bool = False,
@@ -29,8 +29,8 @@ async def run_pipeline_core(
 
     Args:
         pipe_code: The pipe code to run.
-        mthds_content: MTHDS content string (optional).
-        bundle_uri: Bundle file path (optional).
+        mthds_contents: List of MTHDS content strings (optional).
+        bundle_uris: List of bundle file paths (optional).
         inputs: Input dictionary for the pipeline.
         dry_run: Whether to run in dry mode (no actual inference calls).
         mock_inputs: Whether to generate mock data for missing inputs.
@@ -53,14 +53,14 @@ async def run_pipeline_core(
     )
 
     runner = PipelexRunner(
-        bundle_uri=bundle_uri,
+        bundle_uris=bundle_uris,
         pipe_run_mode=pipe_run_mode,
         execution_config=execution_config,
         library_dirs=library_dirs,
     )
     response = await runner.execute_pipeline(
         pipe_code=pipe_code,
-        mthds_content=mthds_content,
+        mthds_contents=mthds_contents,
         inputs=inputs,
     )
     pipe_output = response.pipe_output
@@ -87,8 +87,8 @@ async def run_pipeline_core(
 
     # Determine output directory: next to the bundle, or mthds-wip/ fallback
     output_dir: Path
-    if bundle_uri:
-        output_dir = Path(bundle_uri).parent
+    if bundle_uris:
+        output_dir = Path(bundle_uris[0]).parent
     else:
         output_dir = Path("mthds-wip")
     output_dir.mkdir(parents=True, exist_ok=True)

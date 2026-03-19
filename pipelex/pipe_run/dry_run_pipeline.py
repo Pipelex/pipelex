@@ -14,8 +14,8 @@ from pipelex.pipeline.runner import PipelexRunner
 
 
 async def dry_run_pipeline(
-    mthds_content: str,
-    bundle_uri: str | None = None,
+    mthds_contents: list[str] | None = None,
+    bundle_uris: list[str] | None = None,
     library_dirs: list[str] | None = None,
 ) -> tuple[GraphSpec, str]:
     """Dry-run a full pipeline from MTHDS content, producing a GraphSpec.
@@ -23,9 +23,12 @@ async def dry_run_pipeline(
     Parses the content, identifies the main pipe, and executes the pipeline
     in dry-run mode with graph tracing enabled and mock inputs.
 
+    All contents are parsed into blueprints and loaded together; the main_pipe
+    is found from the first blueprint that declares one.
+
     Args:
-        mthds_content: MTHDS bundle content as a string.
-        bundle_uri: Optional URI for the bundle (used by runner for context).
+        mthds_contents: List of MTHDS bundle contents as strings.
+        bundle_uris: Optional list of URIs for the bundles (used by runner for dedup).
         library_dirs: Optional library directories for pipe resolution.
 
     Returns:
@@ -36,11 +39,22 @@ async def dry_run_pipeline(
         PipelexError: If pipeline execution does not produce a graph spec.
         PipelineExecutionError: If dry-run execution fails.
     """
-    bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
-    main_pipe_code = bundle_blueprint.main_pipe
+    if not mthds_contents:
+        msg = "mthds_contents must be provided"
+        raise ValueError(msg)
+
+    # Determine main_pipe_code from the content(s)
+    main_pipe_code: str | None = None
+
+    for content in mthds_contents:
+        bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content)
+        if bundle_blueprint.main_pipe and main_pipe_code is None:
+            main_pipe_code = bundle_blueprint.main_pipe
+
     if not main_pipe_code:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"
         raise PipelexInterpreterError(msg)
+
     pipe_code: str = main_pipe_code
 
     execution_config = get_config().pipelex.pipeline_execution_config.with_graph_config_overrides(
@@ -49,14 +63,14 @@ async def dry_run_pipeline(
     )
 
     runner = PipelexRunner(
-        bundle_uri=bundle_uri,
+        bundle_uris=bundle_uris,
         pipe_run_mode=PipeRunMode.DRY,
         execution_config=execution_config,
         library_dirs=library_dirs or [],
     )
     response = await runner.execute_pipeline(
         pipe_code=pipe_code,
-        mthds_content=mthds_content,
+        mthds_contents=mthds_contents,  # multi-file support
     )
     pipe_output = response.pipe_output
 

@@ -42,7 +42,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     ),
     # API runner errors
     "ClientAuthenticationError": "Run 'pipelex-agent doctor' to check credentials, or set the PIPELEX_API_KEY environment variable",
-    "PipelineRequestError": "Check that pipe_code or mthds_content is provided",
+    "PipelineRequestError": "Check that pipe_code or mthds_contents is provided",
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
     # Builder/assembler errors

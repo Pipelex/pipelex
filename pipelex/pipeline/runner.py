@@ -51,7 +51,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         self,
         library_id: str | None = None,
         library_dirs: list[str] | None = None,
-        bundle_uri: str | None = None,
+        bundle_uris: list[str] | None = None,
         pipe_run_mode: PipeRunMode | None = None,
         search_domain_codes: list[str] | None = None,
         user_id: str | None = None,
@@ -59,7 +59,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
-        self.bundle_uri = bundle_uri
+        self.bundle_uris = bundle_uris
         self.pipe_run_mode = pipe_run_mode
         self.search_domain_codes = search_domain_codes
         self.user_id = user_id
@@ -70,7 +70,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
     async def execute_pipeline(
         self,
         pipe_code: str | None = None,
-        mthds_content: str | None = None,
+        mthds_contents: list[str] | None = None,
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
@@ -87,14 +87,15 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         Parameters
         ----------
         pipe_code:
-            Code identifying the pipe to execute. Required when ``mthds_content`` is not
-            provided. When both ``mthds_content`` and ``pipe_code`` are provided, the
-            specified pipe from the PLX content will be executed (overriding any
-            ``main_pipe`` defined in the content).
-        mthds_content:
-            Complete PLX file content as a string. The pipe to execute is determined by
-            ``pipe_code`` (if provided) or the ``main_pipe`` property in the PLX content.
-            Can be combined with ``library_dirs`` to load additional definitions.
+            Code identifying the pipe to execute. Required when ``mthds_contents`` is not
+            provided. When both ``mthds_contents`` and ``pipe_code`` are provided, the
+            specified pipe from the MTHDS contents will be executed (overriding any
+            ``main_pipe`` defined in the contents).
+        mthds_contents:
+            List of MTHDS file contents as strings. The pipe to execute is determined by
+            ``pipe_code`` (if provided) or the ``main_pipe`` property in the first content
+            that declares one. Can be combined with ``library_dirs`` to load additional
+            definitions.
         inputs:
             Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
             or a ``WorkingMemory`` instance.
@@ -134,8 +135,8 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 library_id=self.library_id,
                 library_dirs=self.library_dirs,
                 pipe_code=pipe_code,
-                mthds_content=mthds_content,
-                bundle_uri=self.bundle_uri,
+                mthds_contents=mthds_contents,
+                bundle_uris=self.bundle_uris,
                 inputs=pipelex_inputs,
                 output_name=output_name,
                 output_multiplicity=output_multiplicity,
@@ -223,7 +224,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
     async def start_pipeline(
         self,
         pipe_code: str | None = None,
-        mthds_content: str | None = None,
+        mthds_contents: list[str] | None = None,
         inputs: PipelineInputs | WorkingMemoryAbstract[Any] | None = None,
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,

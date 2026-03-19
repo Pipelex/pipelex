@@ -43,7 +43,7 @@ async def build_inputs_for_pipe(
         ValueError: If no pipe code can be determined.
     """
     if mthds_content:
-        validate_bundle_result = await validate_bundle(mthds_content=mthds_content)
+        validate_bundle_result = await validate_bundle(mthds_contents=[mthds_content])
         blueprint = validate_bundle_result.blueprints[0]
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()
