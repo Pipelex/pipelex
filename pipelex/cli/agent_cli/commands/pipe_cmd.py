@@ -54,6 +54,7 @@ EXTRACT_TALENT_TO_MODEL: dict[str, str] = {
     "pdf-basic-text-extractor": "@default-text-from-pdf",
     "image-text-extractor": "@default-extract-image",
     "full-document-extractor": "@default-extract-document",
+    "web-page-extractor": "@default-extract-web-page",
 }
 
 # Reverse mappings: preset name → talent name (for fuzzy resolution)
