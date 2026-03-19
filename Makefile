@@ -806,44 +806,94 @@ SITE_DOMAIN := $(shell cat docs/CNAME 2>/dev/null | tr -d '[:space:]')
 # Deployed by docs-deploy-root. Note: docs/robots.txt is a no-op — it only
 # lands at /latest/robots.txt, which crawlers ignore per RFC 9309.
 #
-# IMPORTANT: `Disallow: /` blocks ALL root paths not explicitly `Allow`ed —
-# including root-level files like /sitemap.xml. The `Sitemap:` directive tells
-# crawlers *where* the sitemap is, but does NOT override Disallow rules —
-# crawlers still need permission to fetch the URL. Any root-level file that
-# crawlers must access needs its own `Allow:` line.
+# Targeted Disallow: block versioned paths and non-content pages, allow
+# everything else (root-level files like /sitemap.xml, /llms.txt are
+# implicitly allowed).
 define ROOT_ROBOTS_TXT
 User-agent: *
 Allow: /latest/
 Allow: /sitemap.xml
-Disallow: /
+Allow: /llms.txt
+Allow: /llms-full.txt
+Disallow: /0.
+Disallow: /pre-release/
+Disallow: /404.html
+
 Sitemap: https://$(SITE_DOMAIN)/sitemap.xml
 endef
 export ROOT_ROBOTS_TXT
 
 define ROOT_INDEX_HTML
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Redirecting to latest documentation...</title>
-    <meta http-equiv="refresh" content="0;url=/latest/">
-    <link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
-    <style>
-        body {
-            margin: 0;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #2e303e;
-            color: #ccc;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-        a { color: #45BF9F; text-decoration: none; }
-    </style>
+<meta charset="utf-8">
+<meta http-equiv="refresh" content="0;url=/latest/">
+<link rel="canonical" href="https://$(SITE_DOMAIN)/latest/">
+<title>Pipelex — Build & Run AI Methods</title>
+<meta name="description" content="Pipelex is an open-source library and CLI for building and running executable AI methods. Methods are reusable, typed AI procedures declared in MTHDS and executed across 60+ models.">
+<meta property="og:title" content="Pipelex — Build & Run AI Methods">
+<meta property="og:description" content="Pipelex is an open-source library and CLI for building and running executable AI methods. Methods are reusable, typed AI procedures declared in MTHDS and executed across 60+ models.">
+<meta property="og:url" content="https://$(SITE_DOMAIN)/latest/">
+<meta property="og:type" content="website">
+<style>
+    body {
+        margin: 0;
+        padding: 2rem;
+        background: #1a1a1a;
+        color: #d4d4d4;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        line-height: 1.6;
+        max-width: 720px;
+        margin: 0 auto;
+    }
+    a { color: #45BF9F; }
+    h1 { color: #e5e5e5; }
+    ul { padding-left: 1.2rem; }
+    .redirect-notice { color: #888; font-size: 0.85rem; margin-top: 2rem; }
+</style>
 </head>
 <body>
-    <p>Redirecting to <a href="/latest/">latest documentation</a>&#8230;</p>
+<h1>Pipelex: Build & Run AI Methods</h1>
+<p>A method is a reusable, typed AI procedure declared in a .mthds file and executed by Pipelex. Each step is explicit, each output is structured, and every run is repeatable.</p>
+<h2>What a Method Looks Like</h2>
+<pre><code>[pipe.summarize_article]
+type    = "PipeLLM"
+inputs  = { article = "Text", audience = "Text" }
+output  = "Text"
+prompt  = "Summarize $$article in three bullet points for $$audience."
+</code></pre>
+<p>From here, Pipelex handles model routing across 60+ models, structured output parsing, and pipeline orchestration.</p>
+<h2>Why Methods?</h2>
+<ul>
+<li><strong>Declarative</strong> — Express business logic in human-readable .mthds files that work across models.</li>
+<li><strong>Typed</strong> — Concepts are semantic types: AI understands what you mean, and every input and output connects with purpose.</li>
+<li><strong>Repeatable</strong> — Deterministic orchestration that leaves exactly the room you want for AI to express its intelligence.</li>
+<li><strong>Composable</strong> — Chain pipes into sequences, nest methods inside methods, and share them with the community.</li>
+</ul>
+<h2>Capabilities</h2>
+<ul>
+<li><a href="/latest/features/concepts/">Typed Concepts</a> — Semantic types that give meaning to every input and output.</li>
+<li><a href="/latest/features/pipe-operators/">Pipe Operators</a> — LLM calls, document extraction, image generation, web search, composition, and custom functions.</li>
+<li><a href="/latest/features/pipeline-orchestration/">Pipeline Orchestration</a> — Sequence, parallel, batch, and conditional controllers.</li>
+<li><a href="/latest/features/llm-integration/">60+ AI Models</a> — OpenAI, Anthropic, Mistral, Google, Deepseek, Hugging Face, and more.</li>
+<li><a href="/latest/features/validation-dry-run/">Validation and Dry Run</a> — Catch errors without spending tokens.</li>
+<li><a href="/latest/features/cli/">CLI and Tooling</a> — Init, build, validate, run, and graph visualization.</li>
+</ul>
+<h2>Get Started</h2>
+<ul>
+<li><a href="/latest/get-started/build-with-claude-code/">Build with Claude Code</a> — Describe what you want in natural language.</li>
+<li><a href="/latest/get-started/mthds-language-tutorial/">MTHDS Language Tutorial</a> — Learn concepts, pipes, sequences, and structured outputs.</li>
+<li><a href="/latest/cookbook/">Cookbook Examples</a> — From Hello World to document extraction and image generation.</li>
+</ul>
+<h2>The MTHDS Ecosystem</h2>
+<ul>
+<li><a href="https://mthds.ai">mthds.ai</a> — The MTHDS language specification</li>
+<li><a href="https://mthds.sh">mthds.sh</a> — The Methods Hub for discovering and sharing methods</li>
+<li><a href="https://github.com/Pipelex/pipelex">GitHub</a> — Pipelex source code</li>
+</ul>
+<p>For AI agents: see <a href="/llms.txt">/llms.txt</a> for a machine-readable index of this documentation.</p>
+<p class="redirect-notice">Redirecting to <a href="/latest/">Pipelex Documentation</a>&#8230;</p>
 </body>
 </html>
 endef
@@ -907,9 +957,13 @@ endif
 	echo "$$ROOT_ROBOTS_TXT" > "$$TMPDIR/robots.txt" && \
 	echo "$$ROOT_INDEX_HTML" > "$$TMPDIR/index.html" && \
 	sed 's|/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*[^/]*/|/latest/|g' "$$TMPDIR/latest/sitemap.xml" > "$$TMPDIR/sitemap.xml" && \
+	if [ -f "$$TMPDIR/latest/llms.txt" ]; then cp "$$TMPDIR/latest/llms.txt" "$$TMPDIR/llms.txt"; fi && \
+	if [ -f "$$TMPDIR/latest/llms-full.txt" ]; then cp "$$TMPDIR/latest/llms-full.txt" "$$TMPDIR/llms-full.txt"; fi && \
 	cd "$$TMPDIR" && \
 	git add 404.html robots.txt index.html sitemap.xml && \
-	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml)") && \
+	if [ -f llms.txt ]; then git add llms.txt; fi && \
+	if [ -f llms-full.txt ]; then git add llms-full.txt; fi && \
+	(git diff --cached --quiet || git commit -m "Update root assets (404.html, robots.txt, index.html, sitemap.xml, llms.txt)") && \
 	git push origin gh-pages
 
 docs-delete: export PATH := $(VIRTUAL_ENV)/bin:$(PATH)
