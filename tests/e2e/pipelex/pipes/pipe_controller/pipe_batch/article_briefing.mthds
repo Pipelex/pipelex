@@ -1,0 +1,62 @@
+domain      = "article_briefing"
+description = "Search for articles on a topic, fetch and review each one with a comment and interest rating, then write a concise synthesis"
+main_pipe   = "article_briefing"
+
+[concept.ArticleReview]
+description = "A review of a single article with a short comment and interest rating"
+
+[concept.ArticleReview.structure]
+title = { type = "text", description = "Title of the article", required = true }
+url = { type = "text", description = "URL of the article", required = true }
+comment = { type = "text", description = "A short comment about the article content and value", required = true }
+rating = { type = "integer", description = "Interest rating from 1 (low) to 5 (high)", required = true, choices = [
+  "1",
+  "2",
+  "3",
+  "4",
+  "5",
+] }
+
+[pipe.article_briefing]
+type = "PipeSequence"
+description = "Search for articles on a topic, fetch and review each one, then synthesize"
+inputs = { topic = "Text" }
+output = "Text"
+steps = [
+  { pipe = "search_articles", result = "search_result" },
+  { pipe = "fetch_article", result = "fetched_pages", batch_over = "search_result.sources", batch_as = "document" },
+  { pipe = "review_article", result = "reviews", batch_over = "fetched_pages", batch_as = "pages" },
+  { pipe = "synthesize_reviews", result = "synthesis" },
+]
+
+[pipe.search_articles]
+type        = "PipeSearch"
+description = "Search the web for articles on the given topic"
+inputs      = { topic = "Text" }
+output      = "SearchResult"
+model       = "$standard"
+prompt      = "Find articles about $topic"
+max_results = 5
+
+[pipe.fetch_article]
+type        = "PipeExtract"
+description = "Fetch full page content from a source URL"
+inputs      = { document = "Document" }
+output      = "Page[]"
+model       = "@default-extract-web-page"
+
+[pipe.review_article]
+type        = "PipeLLM"
+description = "Write a short comment and rate an article from 1 to 5 in terms of interest"
+inputs      = { pages = "Page[]" }
+output      = "ArticleReview"
+model       = "$testing-text"
+prompt      = "You are reviewing an article that was fetched from the web.\n\nHere is the article content:\n\n@pages\n\nWrite a short comment about this article (2-3 sentences covering what it is about and its value), and rate it from 1 to 5 in terms of interest (1 = not interesting, 5 = very interesting).\n\nAlso extract the article title and URL from the content."
+
+[pipe.synthesize_reviews]
+type        = "PipeLLM"
+description = "Write a concise synthesis of all reviewed articles"
+inputs      = { reviews = "ArticleReview[]" }
+output      = "Text"
+model       = "$testing-text"
+prompt      = "You have reviewed a selection of articles on a given topic. Here are the reviews:\n\n@reviews\n\nWrite a concise synthesis (1-2 paragraphs) of this selection of articles. Highlight the key themes, most interesting findings, and overall quality of the selection."

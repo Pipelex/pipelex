@@ -18,6 +18,7 @@ from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class PipeSequence(PipeController):
@@ -134,7 +135,8 @@ class PipeSequence(PipeController):
                         generated_outputs.add(sub_parallel_pipe.output_name)
 
             if sequential_sub_pipe.batch_params:
-                if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
+                input_list_root = get_root_from_dotted_path(sequential_sub_pipe.batch_params.input_list_stuff_name)
+                if input_list_root not in generated_outputs:
                     try:
                         stuff_spec = sub_pipe_needed_inputs.get_required_stuff_spec(
                             variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
@@ -146,7 +148,7 @@ class PipeSequence(PipeController):
                         )
                         raise PipeSequenceValueError(msg) from exc
                     needed_inputs.add_stuff_spec(
-                        variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
+                        variable_name=input_list_root,
                         concept=stuff_spec.concept,
                         multiplicity=True,
                     )
