@@ -1,0 +1,23 @@
+docs/building-methods/pipes/pipe-operators/PipeExtract.md
+  85a0a450bb7be3b8 56,58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "f974eb8a31a46f32a2fc556909cef307bfc154dc",
+  "prompts": {
+    "85a0a450bb7be3b8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a8649d9-e7ff-4af4-8b76-6f6034e87ca9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
