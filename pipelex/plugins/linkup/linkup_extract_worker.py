@@ -1,5 +1,4 @@
 from typing import Any
-from urllib.parse import urlparse
 
 from linkup import LinkupClient, LinkupFetchResponse
 from typing_extensions import override
@@ -11,16 +10,6 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.hub import get_secrets_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-
-
-def _is_valid_image_url(url: str) -> bool:
-    """Check if a URL is a well-formed absolute HTTP(S) URL."""
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return False
-    # Detect malformed URLs where a protocol-relative path was appended to a base domain
-    # e.g. "https://example.com//cdn.other.com/image.png"
-    return not parsed.path.startswith("//")
 
 
 class LinkupExtractWorker(ExtractWorkerAbstract):
@@ -72,8 +61,6 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
             for image in response.images:
                 if max_images is not None and len(extracted_images) >= max_images:
                     break
-                if not _is_valid_image_url(image.url):
-                    continue
                 extracted_images.append(
                     ExtractedImageFromPage(
                         size=None,

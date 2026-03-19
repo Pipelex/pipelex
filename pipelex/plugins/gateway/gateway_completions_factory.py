@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, Any, cast
-from urllib.parse import urlparse
 
 import openai
 from openai.types.chat import (
@@ -33,33 +32,7 @@ from pipelex.plugins.gateway.gateway_protocols import GatewayExtractProtocol
 from pipelex.plugins.gateway.gateway_schemas import GatewayExtractPageAzure, GatewayExtractPageDeepseek, GatewayExtractPageMistral
 from pipelex.plugins.gateway.gateway_search_schemas import GatewayFetchResultResponse
 from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsFactory
-from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
-
-_EXTENSION_TO_MIME: dict[str, str] = {
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".png": "image/png",
-    ".webp": "image/webp",
-}
-
-
-def _mime_type_from_url(url: str) -> str | None:
-    """Infer MIME type from URL extension; returns None for unsupported formats."""
-    path = urlparse(url).path.lower()
-    for extension, mime in _EXTENSION_TO_MIME.items():
-        if path.endswith(extension):
-            return mime
-    return None
-
-
-def _is_valid_image_url(url: str) -> bool:
-    """Check if a URL is a well-formed absolute HTTP(S) URL."""
-    parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-        return False
-    return not parsed.path.startswith("//")
-
 
 if TYPE_CHECKING:
     from portkey_ai.api_resources.utils import GenericResponse
@@ -337,16 +310,11 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         extracted_images: list[ExtractedImageFromPage] = []
         if fetch_result.images:
             for image in fetch_result.images:
-                if not _is_valid_image_url(image.url):
-                    continue
-                mime_type = _mime_type_from_url(image.url)
-                if mime_type is None or not ImageFormat.is_supported_mime_type(mime_type):
-                    continue
                 extracted_images.append(
                     ExtractedImageFromPage(
                         size=None,
                         actual_url=image.url,
-                        mime_type=mime_type,
+                        mime_type=None,
                         caption=image.alt or None,
                     )
                 )

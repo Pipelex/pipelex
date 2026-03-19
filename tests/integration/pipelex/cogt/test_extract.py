@@ -142,7 +142,7 @@ class TestExtract:
             should_include_page_views=False,
             page_views_dpi=None,
             image_min_size=None,
-            render_js=False,
+            render_js=True,
             include_raw_html=True,
         )
         extract_job = ExtractJobFactory.make_extract_job(

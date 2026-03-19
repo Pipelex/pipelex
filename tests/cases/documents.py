@@ -40,8 +40,10 @@ class DocumentTestCases:
     ]
 
     # Web URLs
-    WEB_URL_1 = "https://en.wikipedia.org/wiki/Python_(programming_language)"
+    WEB_URL_1 = "https://books.toscrape.com/catalogue/cravings-recipes-for-what-you-want-to-eat_589/index.html"
+    WEB_URL_2 = "https://www.scrapethissite.com/pages/"
 
     WEB_URLS: ClassVar[list[str]] = [
         WEB_URL_1,
+        WEB_URL_2,
     ]
