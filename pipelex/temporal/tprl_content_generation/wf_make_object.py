@@ -32,7 +32,7 @@ class WfMakeObject(WorkflowClass[ObjectAssignment, BaseModel]):
         workflow_arg: ObjectAssignment,
     ) -> BaseModel:
         workflow_log.debug("Workflow start")
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         try:
             obj = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_object,
@@ -58,7 +58,7 @@ class WfMakeObjectList(WorkflowClass[ObjectAssignment, list[BaseModel]]):
         workflow_arg: ObjectAssignment,
     ) -> list[BaseModel]:
         workflow_log.debug("Workflow start")
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         try:
             obj_list: list[BaseModel] = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_object_list,
@@ -84,7 +84,7 @@ class WfMakeTextThenObject(WorkflowClass[TextThenObjectAssignment, BaseModel]):
         workflow_arg: TextThenObjectAssignment,
     ) -> BaseModel:
         workflow_log.debug("Workflow start")
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         try:
             preliminary_text = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_text,
@@ -130,7 +130,7 @@ class WfMakeTextThenObjectList(WorkflowClass[TextThenObjectAssignment, list[Base
         workflow_arg: TextThenObjectAssignment,
     ) -> list[BaseModel]:
         workflow_log.debug("Workflow start")
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         try:
             preliminary_text = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_text,

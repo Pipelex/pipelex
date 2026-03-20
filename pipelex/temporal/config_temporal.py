@@ -163,8 +163,8 @@ class WorkerConfig(ConfigModel):
         return self.retry_policy_config.make_retry_policy()
 
 
-class DeepFlow(ConfigModel):
-    """Main configuration model for DeepFlow."""
+class Temporal(ConfigModel):
+    """Main configuration model for Temporal."""
 
     is_enabled: bool
     temporal_config: TemporalConfig

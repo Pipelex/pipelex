@@ -56,7 +56,7 @@ class PipeRouterChild(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol)
 
 
 def make_tprl_pipe_router_child() -> PipeRouterChild:
-    worker_config = get_config().deep_flow.worker_config
+    worker_config = get_config().temporal.worker_config
     return PipeRouterChild(
         workflow_execution_timeout=worker_config.workflow_execution_timeout,
         retry_policy=worker_config.retry_policy,

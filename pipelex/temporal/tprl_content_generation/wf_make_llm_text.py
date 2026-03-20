@@ -23,7 +23,7 @@ class WfMakeLLMText(WorkflowClass[LLMAssignment, str]):
         workflow_arg: LLMAssignment,
     ) -> str:
         workflow_log.debug("Workflow start")
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         try:
             crafted_text = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_text,

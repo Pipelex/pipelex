@@ -4,7 +4,7 @@ from typing import Any, Awaitable, Callable, TypeVar, cast
 import shortuuid
 
 from pipelex import log
-from pipelex.temporal.deep_flow_hub import get_task_manager
+from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor, WorkflowInput, WorkflowOutput
 

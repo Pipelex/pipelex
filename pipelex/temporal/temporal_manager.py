@@ -7,7 +7,7 @@ from temporalio.exceptions import TemporalError
 
 from pipelex import log
 from pipelex.system.runtime import RunMode, runtime_manager
-from pipelex.temporal.config_deep_flow import TemporalServerConfig
+from pipelex.temporal.config_temporal import TemporalServerConfig
 from pipelex.temporal.temporal_connect import connect_to_temporal, connect_to_temporal_selected_server, connect_to_temporal_server
 from pipelex.types import StrEnum
 
@@ -53,12 +53,12 @@ class TemporalManager:
     ) -> TemporalClient:
         """One remark first: this method is async only because Temporal's Client.connect() method is async.
 
-        This method is only passing your settings or using defaults from pipelex.deep_flow's config.
+        This method is only passing your settings or using defaults from pipelex.temporal's config.
         To init the temporal client, it will use one of the provided arguments if available, in the following order:
         - temporal_client
         - temporal_server_config
         - temporal_selected_server
-        ... otherwise it will use the default connection set by deep_flow's config.
+        ... otherwise it will use the default connection set by temporal's config.
         """
         # select temporal client based on the available arguments
         the_temporal_client: TemporalClient

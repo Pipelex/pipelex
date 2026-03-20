@@ -14,12 +14,12 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_class_registry
 from pipelex.system.runtime import WorkerMode, runtime_manager
-from pipelex.temporal.deep_flow_registry_models import DeepFlowRegistryModels
 from pipelex.temporal.log_temporal import configure_temporal_logs
 from pipelex.temporal.sandbox_manager import sandbox_manager
 from pipelex.temporal.task_manager import TaskManager
 from pipelex.temporal.temporal_connect import connect_to_temporal
 from pipelex.temporal.temporal_manager import TemporalManager
+from pipelex.temporal.temporal_registry_models import TemporalRegistryModels
 from pipelex.temporal.temporal_tasks import TaskPack, TemporalTasks
 from pipelex.temporal.temporal_types import (
     ActivityList,
@@ -27,7 +27,7 @@ from pipelex.temporal.temporal_types import (
     WorkflowList,
     WorkflowType,
 )
-from pipelex.temporal.test_extras.deep_flow_registry_test_models import DeepFlowTestModels
+from pipelex.temporal.test_extras.temporal_registry_test_models import TemporalTestModels
 
 
 def is_in_temporal_sandbox() -> bool:
@@ -39,7 +39,7 @@ def is_in_temporal_sandbox() -> bool:
     return workflow.unsafe.in_sandbox()
 
 
-class DeepFlowManager(TaskManager):
+class TemporalTaskManager(TaskManager):
     def __init__(self):
         self.temporal_tasks = self.__class__.create_temporal_tasks()
 
@@ -48,19 +48,19 @@ class DeepFlowManager(TaskManager):
         return TemporalTasks()
 
     def setup(self):
-        get_class_registry().register_classes(DeepFlowRegistryModels.get_all_models())
+        get_class_registry().register_classes(TemporalRegistryModels.get_all_models())
         if runtime_manager.is_unit_testing:
             log.debug("Registering test models for unit testing")
-            get_class_registry().register_classes(DeepFlowTestModels.get_all_models())
+            get_class_registry().register_classes(TemporalTestModels.get_all_models())
         configure_temporal_logs()
         # TODO: use direct tweaking of settings in Pipelex to apply the sandbox restrictions to loggers etc.
         sandbox_manager.set_sandbox_callable(sandbox_callable=is_in_temporal_sandbox)
         TemporalManager.setup(session_id=get_config().session_id)
-        log.info("DeepFlowManager setup done")
+        log.info("TemporalTaskManager setup done")
 
     def teardown(self):
         TemporalManager.teardown()
-        log.info("DeepFlowManager teardown done")
+        log.info("TemporalTaskManager teardown done")
 
     @override
     def complement_catalog(
@@ -157,7 +157,7 @@ class DeepFlowManager(TaskManager):
                 log.debug(f"is_unit_testing={is_unit_testing} Setting worker mode to NORMAL")
                 runtime_manager.set_worker_mode(worker_mode=WorkerMode.NORMAL)
             temporal_client = await connect_to_temporal()
-            worker_config = get_config().deep_flow.worker_config
+            worker_config = get_config().temporal.worker_config
             task_queue = task_queue or worker_config.task_queue
             async with self.make_worker(
                 temporal_client=temporal_client,

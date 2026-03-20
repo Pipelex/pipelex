@@ -1,25 +1,25 @@
 from pipelex.base_exceptions import PipelexError
 
 
-class DeepFlowError(PipelexError):
+class TemporalFlowError(PipelexError):
     pass
 
 
-class WorkflowInputError(DeepFlowError):
+class WorkflowInputError(TemporalFlowError):
     pass
 
 
-class WorkflowExecutionError(DeepFlowError):
+class WorkflowExecutionError(TemporalFlowError):
     pass
 
 
-class ContentGenerationError(DeepFlowError):
+class ContentGenerationError(TemporalFlowError):
     pass
 
 
-class TemporalConfigError(ValueError, DeepFlowError):
+class TemporalConfigError(ValueError, TemporalFlowError):
     pass
 
 
-class TemporalServerError(DeepFlowError):
+class TemporalServerError(TemporalFlowError):
     pass

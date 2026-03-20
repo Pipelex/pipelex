@@ -40,10 +40,10 @@ from temporalio.converter import (
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.temporal.exceptions import DeepFlowError
+from pipelex.temporal.exceptions import TemporalFlowError
 
 
-class BaseModelPayloadConverterError(DeepFlowError):
+class BaseModelPayloadConverterError(TemporalFlowError):
     pass
 
 

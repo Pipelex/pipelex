@@ -23,7 +23,7 @@ class WfMakeExtract(WorkflowClass[ExtractAssignment, ExtractOutput]):
         workflow_arg: ExtractAssignment,
     ) -> ExtractOutput:
         workflow_log.debug("Workflow start")
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         try:
             extract_output = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_extract_gen_extract_pages,

@@ -179,13 +179,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = f"The base setup method does not support any additional arguments: {kwargs}"
             raise PipelexSetupError(msg)
 
-        # Override deep_flow.is_enabled if temporal_enabled is explicitly provided
+        # Override temporal.is_enabled if temporal_enabled is explicitly provided
         if temporal_enabled is not None:
             config = get_config()
-            updated_deep_flow = config.deep_flow.model_copy(update={"is_enabled": temporal_enabled})
-            config.deep_flow = updated_deep_flow
+            updated_temporal = config.temporal.model_copy(update={"is_enabled": temporal_enabled})
+            config.temporal = updated_temporal
 
-        self._deep_flow_manager: object | None = None
+        self._temporal_task_manager: object | None = None
 
         # Initialize secrets provider early - needed for gateway check
         secrets_provider = secrets_provider or EnvSecretsProvider()
@@ -364,29 +364,29 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         multi_observer = MultiObserver(observers=observers)
         self.pipelex_hub.set_observer(observer=multi_observer)
 
-        # --- Deep Flow (Temporal) --------------------------------------------------------------
+        # --- Temporal --------------------------------------------------------------------------
 
-        if get_config().deep_flow.is_enabled:
-            from pipelex.temporal.deep_flow_hub import deep_flow_hub  # noqa: PLC0415
-            from pipelex.temporal.deep_flow_manager import DeepFlowManager  # noqa: PLC0415
+        if get_config().temporal.is_enabled:
             from pipelex.temporal.tasks import Tasks  # noqa: PLC0415
+            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
+            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
 
-            deep_flow_manager = DeepFlowManager()
-            deep_flow_hub.set_task_manager(deep_flow_manager)
-            deep_flow_manager.complement_catalog(
+            temporal_task_manager = TemporalTaskManager()
+            temporal_hub.set_task_manager(temporal_task_manager)
+            temporal_task_manager.complement_catalog(
                 extra_catalog=Tasks.TASK_PACKS,
                 extra_workflows=[],
                 extra_activities=[],
             )
-            deep_flow_manager.setup()
-            self._deep_flow_manager = deep_flow_manager
+            temporal_task_manager.setup()
+            self._temporal_task_manager = temporal_task_manager
 
         # --- Pipe Router -----------------------------------------------------------------------
 
         effective_pipe_router: PipeRouterProtocol
         if pipe_router:
             effective_pipe_router = pipe_router
-        elif get_config().deep_flow.is_enabled:
+        elif get_config().temporal.is_enabled:
             from pipelex.temporal.tprl_pipe.pipe_router_top import make_tprl_pipe_router_top  # noqa: PLC0415
 
             effective_pipe_router = make_tprl_pipe_router_top()
@@ -397,14 +397,14 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 
     def teardown(self):
-        # deep flow
-        if self._deep_flow_manager is not None:
-            from pipelex.temporal.deep_flow_hub import deep_flow_hub  # noqa: PLC0415
-            from pipelex.temporal.deep_flow_manager import DeepFlowManager  # noqa: PLC0415
+        # temporal
+        if self._temporal_task_manager is not None:
+            from pipelex.temporal.temporal_hub import temporal_hub  # noqa: PLC0415
+            from pipelex.temporal.temporal_task_manager import TemporalTaskManager  # noqa: PLC0415
 
-            if isinstance(self._deep_flow_manager, DeepFlowManager):
-                self._deep_flow_manager.teardown()
-            deep_flow_hub.reset()
+            if isinstance(self._temporal_task_manager, TemporalTaskManager):
+                self._temporal_task_manager.teardown()
+            temporal_hub.reset()
 
         # pipelex
         self.pipeline_manager.teardown()
@@ -471,7 +471,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 content generator and loading backends leniently (skipping those with missing
                 credentials). This skips gateway terms check and model deck validation.
                 Useful for commands like validate/show that don't call inference APIs.
-            temporal_enabled: When provided, overrides the deep_flow.is_enabled config value.
+            temporal_enabled: When provided, overrides the temporal.is_enabled config value.
                 True forces Temporal workflow execution, False forces direct execution.
             needs_model_specs: When True, load real model specs even if needs_inference
                 is False. When None (default), follows needs_inference. Useful for validate

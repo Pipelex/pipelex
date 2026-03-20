@@ -13,9 +13,9 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.temporal.test_extras.deep_flow_registry_test_models import Person
+from pipelex.temporal.test_extras.temporal_registry_test_models import Person
 from pipelex.temporal.tprl_content_generation.content_generator_top import ContentGeneratorTop
-from tests.integration.pipelex.deep_flow.test_data import PipeTestCases
+from tests.integration.pipelex.temporal.test_data import PipeTestCases
 
 USER_TEXT_FOR_BASE = """
 Write a detailed description of a woman's clothing in the style of a 19th-century novel.

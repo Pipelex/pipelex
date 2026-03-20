@@ -1,8 +1,7 @@
-"""python -m deep_flow.worker_cli
-python -m deep_flow.worker_cli deep_flow
-python -m deep_flow.worker_cli --is-unit-testing
-python -m deep_flow.worker_cli --is-not-sandboxed
-python -m deep_flow.worker_cli --task-queue my_task_queue
+"""python -m pipelex.temporal.worker_cli
+python -m pipelex.temporal.worker_cli --is-unit-testing
+python -m pipelex.temporal.worker_cli --is-not-sandboxed
+python -m pipelex.temporal.worker_cli --task-queue my_task_queue
 """
 
 import asyncio
@@ -13,7 +12,7 @@ import typer
 
 from pipelex import log
 from pipelex.system.runtime import RunMode, runtime_manager
-from pipelex.temporal.deep_flow_hub import get_task_manager
+from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.tools.misc.string_utils import snake_to_pascal_case
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
@@ -59,10 +58,10 @@ def configure(
     # Force-enable Temporal when running as a worker, regardless of config
     from pipelex.config import get_config  # noqa: PLC0415
 
-    if not get_config().deep_flow.is_enabled:
-        log.warning("deep_flow.is_enabled is false in config, but forcing it on for worker mode")
-        updated_deep_flow = get_config().deep_flow.model_copy(update={"is_enabled": True})
-        get_config().deep_flow = updated_deep_flow
+    if not get_config().temporal.is_enabled:
+        log.warning("temporal.is_enabled is false in config, but forcing it on for worker mode")
+        updated_temporal = get_config().temporal.model_copy(update={"is_enabled": True})
+        get_config().temporal = updated_temporal
 
     asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue))
 

@@ -3,7 +3,7 @@ import uuid
 import pytest
 from temporalio.client import Client as TemporalClient
 
-from pipelex.temporal.deep_flow_hub import get_task_manager
+from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.test_extras.temporal_test_tasks import TEMPORAL_TEST_ACTIVITIES, TEMPORAL_TEST_WORKFLOWS
 from pipelex.temporal.test_extras.wf_test_content_generator_child import WfTestContentGeneratorChild
 

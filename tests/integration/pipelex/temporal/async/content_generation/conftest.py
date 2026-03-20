@@ -10,13 +10,13 @@ from pipelex.hub import get_class_registry, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.temporal_connect import connect_to_temporal
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
-from pipelex.temporal.test_extras.deep_flow_registry_test_models import Person
-from pipelex.temporal.test_helpers.deep_flow_pytest_plugins import DeepFlowPytestOption
+from pipelex.temporal.test_extras.temporal_registry_test_models import Person
+from pipelex.temporal.test_helpers.temporal_pytest_plugins import TemporalPytestOption
 from pipelex.temporal.tprl_content_generation.content_generator_child import ContentGeneratorChild
 from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
 from pipelex.temporal.tprl_content_generation.content_generator_top import ContentGeneratorTop
 from pipelex.temporal.tprl_content_generation.content_generator_top_factory import ContentGeneratorTopFactory
-from tests.integration.pipelex.deep_flow.test_utils import rprint
+from tests.integration.pipelex.temporal.test_utils import rprint
 
 
 @pytest.fixture(autouse=True)
@@ -34,7 +34,7 @@ def register_test_temporal_models():
 async def top_crafter(request: FixtureRequest, generated_content_factory: GeneratedContentFactory) -> AsyncGenerator[ContentGeneratorTop, None]:  # noqa: RUF029
     # Code to run before each test
     rprint("\n[magenta]TopCrafter setup[/magenta]")
-    worker_environment = TemporalWorkerEnvironment(request.config.getoption(DeepFlowPytestOption.WORKER_ENVIRONMENT))
+    worker_environment = TemporalWorkerEnvironment(request.config.getoption(TemporalPytestOption.WORKER_ENVIRONMENT))
     crafter = ContentGeneratorTopFactory.make_content_generator_top(
         generated_content_factory=generated_content_factory,
         worker_environment=worker_environment,

@@ -27,7 +27,7 @@ class WfMakeImages(WorkflowClass[ImgGenAssignment, list[GeneratedImageRawDetails
         workflow_arg: ImgGenAssignment,
     ) -> list[GeneratedImageRawDetails]:
         workflow_log.debug("Workflow start")
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         try:
             generated_image_list = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_img_gen_images,

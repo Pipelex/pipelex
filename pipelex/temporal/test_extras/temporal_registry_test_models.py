@@ -13,5 +13,5 @@ class Person(BaseModel):
     job: str
 
 
-class DeepFlowTestModels(RegistryModels):
+class TemporalTestModels(RegistryModels):
     TEST_MODELS: ClassVar[list[ModelType]] = [Person]

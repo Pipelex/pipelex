@@ -1,8 +1,8 @@
 from pipelex.temporal.task_manager import TaskManager
 
 
-class DeepFlowHub:
-    """DeepFlowHub serves as a central dependency manager to break cyclic imports between components.
+class TemporalHub:
+    """TemporalHub serves as a central dependency manager to break cyclic imports between components.
     It provides access to core providers and factories through a singleton instance,
     allowing components to retrieve dependencies based on protocols without direct imports that could create cycles.
     """
@@ -27,10 +27,10 @@ class DeepFlowHub:
         return self._task_manager
 
 
-deep_flow_hub = DeepFlowHub()
+temporal_hub = TemporalHub()
 
 # root convenience functions
 
 
 def get_task_manager() -> TaskManager:
-    return deep_flow_hub.get_required_task_manager()
+    return temporal_hub.get_required_task_manager()
