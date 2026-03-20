@@ -12,8 +12,6 @@ from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
-from pipelex.cogt.search.fetch_job import FetchJob
-from pipelex.cogt.search.fetch_report import FetchTokensUsage
 from pipelex.cogt.search.search_job import SearchJob
 from pipelex.cogt.search.search_report import SearchTokensUsage
 from pipelex.cogt.usage.cost_registry import CostRegistry
@@ -26,7 +24,7 @@ from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 if TYPE_CHECKING:
     from pathlib import Path
 
-TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage | FetchTokensUsage
+TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage
 UsageRegistryRoot = list[TokensUsage]
 
 
@@ -124,20 +122,6 @@ class ReportingManager(ReportingProtocol):
             search_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=search_tokens_usage)
             log.verbose(search_token_cost_report, title="Token Cost report")
 
-    def _report_fetch_job(self, fetch_job: FetchJob):
-        fetch_tokens_usage = fetch_job.job_report.fetch_tokens_usage
-
-        if not fetch_tokens_usage:
-            log.warning("Fetch job has no fetch_tokens_usage")
-            return
-
-        pipeline_run_id = fetch_job.job_metadata.pipeline_run_id
-        self._get_registry(pipeline_run_id).add_tokens_usage(fetch_tokens_usage)
-
-        if self._reporting_config.is_log_costs_to_console:
-            fetch_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=fetch_tokens_usage)
-            log.verbose(fetch_token_cost_report, title="Token Cost report")
-
     ############################################################
     # ReportingProtocol
     ############################################################
@@ -160,8 +144,6 @@ class ReportingManager(ReportingProtocol):
             self._report_extract_job(extract_job=inference_job)
         elif isinstance(inference_job, SearchJob):
             self._report_search_job(search_job=inference_job)
-        elif isinstance(inference_job, FetchJob):
-            self._report_fetch_job(fetch_job=inference_job)
         else:
             log.warning(f"ReportingManager does not support reporting for inference job type: {type(inference_job).__name__}")
 

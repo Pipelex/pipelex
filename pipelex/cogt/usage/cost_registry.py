@@ -12,7 +12,6 @@ from pipelex.cogt.exceptions import CostRegistryError
 from pipelex.cogt.extract.extract_report import ExtractTokenCostReport, ExtractTokenCostReportField, ExtractTokensUsage
 from pipelex.cogt.img_gen.img_gen_report import ImgGenTokenCostReport, ImgGenTokenCostReportField, ImgGenTokensUsage
 from pipelex.cogt.llm.llm_report import LLMTokenCostReport, LLMTokenCostReportField, LLMTokensUsage
-from pipelex.cogt.search.fetch_report import FetchTokenCostReport, FetchTokenCostReportField, FetchTokensUsage
 from pipelex.cogt.search.search_report import SearchTokenCostReport, SearchTokenCostReportField, SearchTokensUsage
 from pipelex.cogt.usage.cost_category import CostCategory, CostsByCategoryDict
 from pipelex.cogt.usage.costs_per_token import model_cost_per_token
@@ -20,8 +19,8 @@ from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.hub import get_console
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 
-TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage | FetchTokensUsage
-TokenCostReport = LLMTokenCostReport | ImgGenTokenCostReport | ExtractTokenCostReport | SearchTokenCostReport | FetchTokenCostReport
+TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage
+TokenCostReport = LLMTokenCostReport | ImgGenTokenCostReport | ExtractTokenCostReport | SearchTokenCostReport
 CostRegistryRoot = list[TokenCostReport]
 
 
@@ -83,8 +82,7 @@ class CostRegistry(RootModel[CostRegistryRoot]):
                 record.get(report_field.LLM_NAME)
                 or record.get(ImgGenTokenCostReportField.IMG_GEN_NAME)
                 or record.get(ExtractTokenCostReportField.EXTRACT_NAME)
-                or record.get(SearchTokenCostReportField.SEARCH_NAME)
-                or record.get(FetchTokenCostReportField.FETCH_NAME, "unknown")
+                or record.get(SearchTokenCostReportField.SEARCH_NAME, "unknown")
             )
             model_type = record.get(report_field.MODEL_TYPE, "llm")
             model_types[model_name] = model_type
@@ -237,15 +235,6 @@ class CostRegistry(RootModel[CostRegistryRoot]):
             )
         if isinstance(tokens_usage, SearchTokensUsage):
             return SearchTokenCostReport(
-                model_type=tokens_usage.model_type,
-                job_metadata=tokens_usage.job_metadata,
-                inference_model_name=tokens_usage.inference_model_name,
-                platform_model_id=tokens_usage.inference_model_id,
-                nb_tokens_by_category=tokens_usage.nb_tokens_by_category,
-                costs_by_token_category=costs_by_token_category,
-            )
-        if isinstance(tokens_usage, FetchTokensUsage):
-            return FetchTokenCostReport(
                 model_type=tokens_usage.model_type,
                 job_metadata=tokens_usage.job_metadata,
                 inference_model_name=tokens_usage.inference_model_name,

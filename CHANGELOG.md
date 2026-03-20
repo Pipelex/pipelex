@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.21.0] - 2026-03-19
+
+### Added
+
+- **Web Page Extraction:** `PipeExtract` now supports extracting content from web pages via the new `linkup-fetch` model, with `render_js` and `include_raw_html` parameters. Added `@default-extract-web-page` alias to the extraction model deck.
+- **New AI Models:** OpenAI / Azure: `gpt-5.4`, `gpt-5.4-pro`, `gpt-5.4-mini`, `gpt-5.4-nano`, `gpt-5.2-codex`; Mistral: `mistral-small-4`
+- **DocumentContent Enhancements:** Added `public_url`, `filename`, `title`, and `snippet` fields to support web pages and search citations.
+- **AI Agent Documentation:** Integrated `mkdocs-llmstxt-md` plugin to generate `/llms.txt` and `/llms-full.txt` for AI agents.
+- **Claude Code Skills:** Added internal `.claude/skills` (`add-model`, `test-model`) for registering and testing new inference models.
+
+### Changed
+
+- **Web Fetching → Extract Domain:** Moved web fetching from the Search domain into the Extract domain. Replaced `FetchJob`, `FetchWorkerAbstract`, and related classes with native handling in `PipeExtract` and a new `GatewayExtractWorker`. Split `LinkupWorker` into dedicated `LinkupSearchWorker` and `LinkupExtractWorker`.
+- **Search Results Unification:** `SearchResultContent` now uses `DocumentContent` instead of the removed `SearchSourceContent`.
+- **Search Job Refactoring:** Encapsulated `SearchJob` parameters into a new `SearchJobParams` object; updated `SearchWorkerAbstract` signatures accordingly.
+- **Documentation Build:** Replaced inline HTML generation with a `docs/root-index.html` template. Updated `robots.txt` to allow AI crawler access to `llms.txt`.
+
+### Fixed
+
+- **Remote Image Fetching:** Added error handling (`httpx.HTTPStatusError`, `httpx.RequestError`) in `GeneratedContentFactory` when downloading remote images, with graceful fallback to using the original URL as `public_url`.
+
+### Removed
+
+- **`page_image_captions` parameter:** Removed from `PipeExtractSpec` and `ExtractJobParams`.
+
 ## [v0.20.13] - 2026-03-16
 
 ### Removed

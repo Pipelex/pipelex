@@ -123,6 +123,50 @@ class TestExtract:
         pretty_print(extract_output, title="Extract Output")
         assert extract_output.pages
 
+    @pytest.mark.parametrize("url", DocumentTestCases.WEB_URLS)
+    async def test_extract_web_url(
+        self,
+        generated_content_factory: GeneratedContentFactory,
+        job_metadata: JobMetadata,
+        extract_combo: ModelCombo,
+        url: str,
+    ):
+        """Test web page extraction using Linkup fetch API."""
+        extract_worker = get_extract_worker(extract_handle=extract_combo.handle)
+        if not extract_worker.is_web_page_supported:
+            msg = f"Web extraction is not supported for this extract worker: '{extract_worker.desc}'"
+            pytest.skip(msg)
+        extract_job_params = ExtractJobParams(
+            max_nb_images=5,
+            should_caption_images=False,
+            should_include_page_views=False,
+            page_views_dpi=None,
+            image_min_size=None,
+            render_js=False,
+            include_raw_html=True,
+        )
+        extract_job = ExtractJobFactory.make_extract_job(
+            extract_input=ExtractInput(document_uri=url),
+            extract_job_params=extract_job_params,
+            job_metadata=job_metadata,
+        )
+        extract_output = await extract_worker.extract_pages(extract_job=extract_job)
+        assert extract_output.pages
+        page = next(iter(extract_output.pages.values()))
+        assert page.text, "Web extraction should return markdown text"
+        pretty_print(page.text, title="Extracted markdown")
+        if page.raw_html:
+            pretty_print(page.raw_html[:500], title="Raw HTML (first 500 chars)")
+        page_contents = await generated_content_factory.make_page_contents(
+            primary_id=job_metadata.user_id,
+            secondary_id=job_metadata.pipeline_run_id,
+            extract_output=extract_output,
+        )
+        assert page_contents
+        for page_index, page_content in enumerate(page_contents):
+            pretty_print(page_content, title=f"Page {page_index}")
+        get_report_delegate().generate_report()
+
     @pytest.mark.parametrize("file_path", DocumentTestCases.DOCUMENT_FILE_PATHS)
     async def test_extract_image_save(
         self,

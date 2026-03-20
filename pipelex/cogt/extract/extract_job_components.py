@@ -23,6 +23,8 @@ class ExtractJobParams(BaseModel):
     should_caption_images: bool
     should_include_page_views: bool
     page_views_dpi: int | None
+    render_js: bool | None = None
+    include_raw_html: bool | None = None
 
     @classmethod
     def make_default_extract_job_params(cls) -> "ExtractJobParams":
@@ -32,6 +34,8 @@ class ExtractJobParams(BaseModel):
             image_min_size=None,
             should_include_page_views=False,
             page_views_dpi=None,
+            render_js=None,
+            include_raw_html=None,
         )
 
 

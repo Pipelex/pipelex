@@ -170,6 +170,14 @@ costs = { input = 1.25, output = 10.0 }
 valued_constraints = { fixed_temperature = 1 }
 thinking_mode = "manual"
 
+["gpt-5.2-codex"]
+model_id = "gpt-5.2-codex-2026-01-14"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 1.75, output = 14.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
 # --- GPT-5.3 Series -------------------------------------------------------------
 ["gpt-5.3-codex"]
 model_id = "gpt-5.3-codex-2026-02-24"
@@ -177,6 +185,36 @@ inputs = ["text", "images"]
 outputs = ["text", "structured"]
 costs = { input = 1.75, output = 14.0 }
 valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+# --- GPT-5.4 Series -----------------------------------------------------------
+["gpt-5.4"]
+model_id = "gpt-5.4-2026-03-05"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 2.5, output = 15.0 }
+thinking_mode = "manual"
+
+["gpt-5.4-pro"]
+model_id = "gpt-5.4-pro-2026-03-05"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 30.0, output = 180.0 }
+valued_constraints = { fixed_temperature = 1 }
+thinking_mode = "manual"
+
+["gpt-5.4-mini"]
+model_id = "gpt-5.4-mini-2026-03-17"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.75, output = 4.5 }
+thinking_mode = "manual"
+
+["gpt-5.4-nano"]
+model_id = "gpt-5.4-nano-2026-03-17"
+inputs = ["text", "images"]
+outputs = ["text", "structured"]
+costs = { input = 0.2, output = 1.25 }
 thinking_mode = "manual"
 
 ################################################################################

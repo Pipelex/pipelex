@@ -67,4 +67,6 @@ class PipeExtractFactory(PipeFactoryProtocol[PipeExtractBlueprint, PipeExtract])
             should_caption_images=blueprint.page_image_captions or False,
             should_include_page_views=blueprint.page_views or False,
             page_views_dpi=blueprint.page_views_dpi,
+            render_js=blueprint.render_js,
+            include_raw_html=blueprint.include_raw_html,
         )

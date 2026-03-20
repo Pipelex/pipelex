@@ -72,6 +72,7 @@ gen-image-high-quality = "$gen-image-high-quality"
 pdf-basic-text-extractor = "@default-text-from-pdf"
 image-text-extractor = "@default-extract-image"
 full-document-extractor = "@default-extract-document"
+web-page-extractor = "@default-extract-web-page"
 
 [pipelex.builder_config.talent_preset_mappings.search]
 web-search = "$standard"
