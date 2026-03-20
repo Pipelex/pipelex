@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Temporal Workflow Orchestration:** Pipelex now integrates with [Temporal](https://temporal.io/) for distributed workflow orchestration, enabling reliable and scalable execution of pipes across workers with retry policies, sandboxing, and configurable task queues.
+
 ## [v0.21.0] - 2026-03-19
 
 ### Added
