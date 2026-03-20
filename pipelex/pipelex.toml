@@ -460,7 +460,6 @@ preferred_agent_target = "claude"
 
 [migration.migration_maps.telemetry]
 
-
 ####################################################################################################
 # Temporal Config
 ####################################################################################################
@@ -489,9 +488,6 @@ non_retryable_error_types = [
   "ModelNotFoundError",
   "ValidationError",
 ]
-
-[temporal.temporal_config]
-selected_server = "local"
 
 [temporal.temporal_config.temporal_server_configs.local]
 description = "default localhost"

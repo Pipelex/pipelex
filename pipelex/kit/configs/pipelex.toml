@@ -192,3 +192,66 @@ is_dump_response_text_enabled = false
 is_dump_kwargs_enabled = false
 is_dump_response_enabled = false
 is_dump_error_enabled = false
+
+####################################################################################################
+# Temporal Config
+####################################################################################################
+
+[temporal]
+is_enabled = false
+
+[temporal.worker_config]
+task_queue = "temporal_task_queue"
+workflow_execution_timeout = "1:00:00"
+run_timeout = "1:00:00"
+task_timeout = "0:00:10"
+start_delay = "0:00:00"
+rpc_timeout = "1:00:00"
+
+[temporal.worker_config.retry_policy_config]
+initial_interval = "0:00:03"
+backoff_coefficient = 2.0
+maximum_interval = "unlimited"
+maximum_attempts = 3
+non_retryable_error_types = [
+  "ExtractHandleNotFoundError",
+  "FileNotFoundError",
+  "ImgGenHandleNotFoundError",
+  "LLMHandleNotFoundError",
+  "ModelNotFoundError",
+  "ValidationError",
+]
+
+[temporal.temporal_config.temporal_server_configs.local]
+description = "default localhost"
+target_host = "localhost:7233"
+namespace = "default"
+api_key_method = "none"
+api_key_id = ""
+
+[temporal.temporal_config.temporal_server_configs.testing]
+description = "Temporal server for testing"
+target_host = "${TESTING_TEMPORAL_TARGET_HOST}"
+namespace = "${TESTING_TEMPORAL_NAMESPACE}"
+api_key_method = "secret_provider"
+api_key_id = "${TESTING_TEMPORAL_MAIN_API_KEY}"
+
+[temporal.temporal_config.temporal_log_config]
+is_workflow_info_on_message = false
+is_workflow_info_on_extra = true
+is_full_workflow_info_on_extra = false
+is_activity_info_on_message = false
+is_activity_info_on_extra = true
+is_full_activity_info_on_extra = false
+is_formatter_enabled = true
+is_prefix_enabled = true
+managed_loggers = [
+  "temporalio.activity",
+  "temporalio.workflow",
+  "temporalio.worker._activity",
+]
+
+[temporal.temporal_config.temporal_tasks_config]
+required_tasks_packs = ["crafting"]
+required_workflows = []
+required_activities = []
