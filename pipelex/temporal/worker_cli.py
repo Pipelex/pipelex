@@ -11,9 +11,10 @@ from typing import Annotated
 import typer
 
 from pipelex import log
+from pipelex.config import get_config
+from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import RunMode, runtime_manager
 from pipelex.temporal.temporal_hub import get_task_manager
-from pipelex.tools.misc.string_utils import snake_to_pascal_case
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 app = typer.Typer()
@@ -47,16 +48,8 @@ def configure(
         if not project:
             msg = "Project name not found in pyproject.toml"
             raise ValueError(msg)
-    from importlib import import_module  # noqa: PLC0415
 
-    project_name_pascal_case = snake_to_pascal_case(project)
-    project_class_name = f"{project_name_pascal_case}System"
-    project_module = import_module(f"{project}.system")
-    project_class = getattr(project_module, project_class_name)
-    project_class.make()
-
-    # Force-enable Temporal when running as a worker, regardless of config
-    from pipelex.config import get_config  # noqa: PLC0415
+    Pipelex.make(temporal_enabled=True)
 
     if not get_config().temporal.is_enabled:
         log.warning("temporal.is_enabled is false in config, but forcing it on for worker mode")
