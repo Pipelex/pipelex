@@ -1,0 +1,25 @@
+.pipelex/inference/backends/minimax.toml
+  f8cf8d1b4a165162 40,46,52,59,65,72,78
+pipelex/kit/configs/inference/backends/minimax.toml
+  f8cf8d1b4a165162 40,46,52,59,65,72,78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "b2b21f04333634fa8206782eb979251e880653ad",
+  "prompts": {
+    "f8cf8d1b4a165162": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8c1501d8-0a18-4ee8-a85b-78277c9ecd6c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 14,
+      "total_deletions": 14,
+      "accepted_lines": 14,
+      "overriden_lines": 0
+    }
+  }
+}
