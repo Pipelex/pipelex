@@ -64,6 +64,10 @@ default = "huggingface"
 description = "Use Linkup backend for all its supported models"
 default = "linkup"
 
+[profiles.all_minimax]
+description = "Use MiniMax backend for all its supported models"
+default = "minimax"
+
 [profiles.all_mistral]
 description = "Use Mistral backend for all its supported models"
 default = "mistral"

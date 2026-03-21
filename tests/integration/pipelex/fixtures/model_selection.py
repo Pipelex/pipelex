@@ -9,6 +9,8 @@ from __future__ import annotations
 from functools import cache
 from pathlib import Path
 
+import pytest
+
 from tests.integration.pipelex.fixtures.model_combo import ModelCombo  # noqa: TC001
 
 # Path to generated fixtures file
@@ -19,6 +21,13 @@ MISSING_FIXTURES_ERROR_MSG = (
     "This file is required for model-based tests to run.\n"
     "Please run 'make regenerate-test-models' or 'make install' to generate it."
 )
+
+
+def _or_skip(combos: list[ModelCombo], label: str) -> list[ModelCombo]:
+    """Return combos as-is, or a single skip-marked param if the list is empty."""
+    if combos:
+        return combos
+    return [pytest.param(None, marks=pytest.mark.skip(reason=f"No {label} combos in test profile"))]  # type: ignore[list-item]
 
 
 def _ensure_generated_fixtures_exist() -> None:
@@ -46,7 +55,7 @@ def get_llm_combos() -> list[ModelCombo]:
         LLM_COMBOS,  # noqa: PLC2701
     )
 
-    return list(LLM_COMBOS)
+    return _or_skip(list(LLM_COMBOS), "LLM")
 
 
 @cache
@@ -64,7 +73,7 @@ def get_img_gen_combos() -> list[ModelCombo]:
         IMG_GEN_COMBOS,  # noqa: PLC2701
     )
 
-    return list(IMG_GEN_COMBOS)
+    return _or_skip(list(IMG_GEN_COMBOS), "image generation")
 
 
 @cache
@@ -82,7 +91,7 @@ def get_extract_combos() -> list[ModelCombo]:
         EXTRACT_COMBOS,  # noqa: PLC2701
     )
 
-    return list(EXTRACT_COMBOS)
+    return _or_skip(list(EXTRACT_COMBOS), "extraction")
 
 
 @cache
@@ -100,4 +109,4 @@ def get_search_combos() -> list[ModelCombo]:
         SEARCH_COMBOS,  # noqa: PLC2701
     )
 
-    return list(SEARCH_COMBOS)
+    return _or_skip(list(SEARCH_COMBOS), "search")
