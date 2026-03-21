@@ -37,42 +37,42 @@ max_tokens = 16384
 model_id = "MiniMax-M2"
 inputs = ["text"]
 outputs = ["text", "structured"]
-costs = { input = 0.27, output = 1.15 }
+costs = { input = 0.3, output = 1.2 }
 
 ["minimax-m2.1"]
 model_id = "MiniMax-M2.1"
 inputs = ["text"]
 outputs = ["text", "structured"]
-costs = { input = 0.27, output = 1.15 }
+costs = { input = 0.3, output = 1.2 }
 
 ["minimax-m2.1-highspeed"]
 model_id = "MiniMax-M2.1-highspeed"
 inputs = ["text"]
 outputs = ["text", "structured"]
-costs = { input = 0.27, output = 1.15 }
+costs = { input = 0.6, output = 2.4 }
 
 # --- MiniMax M2.5 Series ------------------------------------------------------
 ["minimax-m2.5"]
 model_id = "MiniMax-M2.5"
 inputs = ["text"]
 outputs = ["text", "structured"]
-costs = { input = 0.27, output = 1.15 }
+costs = { input = 0.3, output = 1.2 }
 
 ["minimax-m2.5-highspeed"]
 model_id = "MiniMax-M2.5-highspeed"
 inputs = ["text"]
 outputs = ["text", "structured"]
-costs = { input = 0.27, output = 1.15 }
+costs = { input = 0.6, output = 2.4 }
 
 # --- MiniMax M2.7 Series ------------------------------------------------------
 ["minimax-m2.7"]
 model_id = "MiniMax-M2.7"
 inputs = ["text"]
 outputs = ["text", "structured"]
-costs = { input = 0.27, output = 1.15 }
+costs = { input = 0.3, output = 1.2 }
 
 ["minimax-m2.7-highspeed"]
 model_id = "MiniMax-M2.7-highspeed"
 inputs = ["text"]
 outputs = ["text", "structured"]
-costs = { input = 0.27, output = 1.15 }
+costs = { input = 0.6, output = 2.4 }
