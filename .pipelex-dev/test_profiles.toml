@@ -40,6 +40,7 @@ all = [
   "google",
   "groq",
   "huggingface",
+  "minimax",
   "mistral",
   "ollama",
   "openai",
@@ -105,6 +106,17 @@ meta = [
 
 # --- Microsoft Models ---
 microsoft = ["phi-4", "phi-4-multimodal"]
+
+# --- MiniMax Models ---
+minimax = [
+  "minimax-m2",
+  "minimax-m2.1",
+  "minimax-m2.1-highspeed",
+  "minimax-m2.5",
+  "minimax-m2.5-highspeed",
+  "minimax-m2.7",
+  "minimax-m2.7-highspeed",
+]
 
 # --- Mistral Models ---
 mistralai = [
