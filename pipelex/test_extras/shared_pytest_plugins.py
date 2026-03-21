@@ -102,7 +102,7 @@ def pytest_configure(config: Config) -> None:
     if not is_pipelex_gateway_enabled():
         return
 
-    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.pipelex_config_dir)
+    pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
 
     if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
         console = Console()
