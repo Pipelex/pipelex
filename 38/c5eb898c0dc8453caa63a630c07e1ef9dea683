@@ -1,0 +1,25 @@
+.pipelex/inference/backends/minimax.toml
+  bec085d5774e9acc 28
+pipelex/kit/configs/inference/backends/minimax.toml
+  bec085d5774e9acc 28
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "38c5eb898c0dc8453caa63a630c07e1ef9dea683",
+  "prompts": {
+    "bec085d5774e9acc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6fc9c7f8-ada1-4dd5-98fd-22fb6c5121d1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
