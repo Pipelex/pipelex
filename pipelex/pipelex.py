@@ -383,16 +383,16 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
 
         # --- Pipe Router -----------------------------------------------------------------------
 
-        effective_pipe_router: PipeRouterProtocol
         if pipe_router:
-            effective_pipe_router = pipe_router
+            self.pipelex_hub.set_pipe_router(pipe_router)
         elif get_config().temporal.is_enabled:
+            from pipelex.temporal.tprl_pipe.pipe_router_child import make_tprl_pipe_router_child  # noqa: PLC0415
             from pipelex.temporal.tprl_pipe.pipe_router_top import make_tprl_pipe_router_top  # noqa: PLC0415
 
-            effective_pipe_router = make_tprl_pipe_router_top()
+            self.pipelex_hub.set_pipe_router_top(make_tprl_pipe_router_top())
+            self.pipelex_hub.set_pipe_router(make_tprl_pipe_router_child())
         else:
-            effective_pipe_router = PipeRouter(observer=multi_observer)
-        self.pipelex_hub.set_pipe_router(effective_pipe_router)
+            self.pipelex_hub.set_pipe_router(PipeRouter(observer=multi_observer))
 
         log.verbose(f"{PACKAGE_NAME} version {PACKAGE_VERSION} setup done")
 

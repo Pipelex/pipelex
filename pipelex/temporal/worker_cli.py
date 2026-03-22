@@ -51,6 +51,21 @@ def configure(
 
     Pipelex.make(temporal_enabled=True)
 
+    # Load base library from PIPELEXPATH at worker startup.
+    # This generates dynamic concept classes and registers them with Kajson (fixing deserialization)
+    # and populates the pipe library (fixing get_required_pipe() for controllers).
+    from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library  # noqa: PLC0415
+
+    library_manager = get_library_manager()
+    library_manager.open_library(library_id="worker_base")
+    set_current_library(library_id="worker_base")
+    effective_dirs, source_label = resolve_library_dirs(library_dirs=None)
+    if effective_dirs:
+        log.info(f"Worker loading base library from {len(effective_dirs)} directory(ies) ({source_label})")
+        library_manager.load_libraries(library_id="worker_base", library_dirs=effective_dirs)
+    else:
+        log.info("No library directories configured for worker (PIPELEXPATH not set)")
+
     if not get_config().temporal.is_enabled:
         log.warning("temporal.is_enabled is false in config, but forcing it on for worker mode")
         updated_temporal = get_config().temporal.model_copy(update={"is_enabled": True})

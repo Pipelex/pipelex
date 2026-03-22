@@ -208,6 +208,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-19T01:52:02Z
+> Last updated: 2026-03-22T11:04:09Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

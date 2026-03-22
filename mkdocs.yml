@@ -487,6 +487,7 @@ nav:
       - StuffArtefact & Image Rendering: under-the-hood/stuffartefact-and-image-rendering.md
       - Test Profile Configuration: under-the-hood/test-profile-configuration.md
       - Init CLI Flows: under-the-hood/init-cli-flows.md
+      - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
   - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md

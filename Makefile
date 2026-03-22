@@ -142,6 +142,12 @@ make view-graph               - Start server and open ReactFlow graph in browser
 
 make temporal-server          - Start a local Temporal dev server (requires 'temporal' CLI)
 make ts                       - Shorthand -> temporal-server
+make temporal-worker          - Start a Temporal worker (separate process)
+make tw                       - Shorthand -> temporal-worker
+make temporal-run             - Run a pipe through Temporal (real LLM calls)
+make trun                     - Shorthand -> temporal-run
+make temporal-run-dry         - Run a pipe through Temporal (dry run, no LLM)
+make trund                    - Shorthand -> temporal-run-dry
 
 make check                    - Shorthand -> format lint mypy
 make c                        - Shorthand -> check
@@ -180,7 +186,7 @@ export HELP
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
-	temporal-server ts \
+	temporal-server ts temporal-worker tw temporal-run trun temporal-run-dry trund \
 	docs-deploy-root
 
 all help:
@@ -970,6 +976,30 @@ temporal-server:
 	temporal server start-dev
 
 ts: temporal-server
+
+TEMPORAL_BUNDLE ?= tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds
+TEMPORAL_PIPE ?= simple_text_sequence
+TEMPORAL_LIB ?=
+
+temporal-worker:
+	$(call PRINT_TITLE,"Starting Temporal worker")
+	$(if $(TEMPORAL_LIB),PIPELEXPATH=$(TEMPORAL_LIB),) $(VENV_PYTHON) -m pipelex.temporal.worker_cli --is-not-sandboxed
+
+tw: temporal-worker
+
+temporal-run:
+	$(call PRINT_TITLE,"Running pipe through Temporal")
+	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --mock-inputs --no-logo \
+		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
+
+trun: temporal-run
+
+temporal-run-dry:
+	$(call PRINT_TITLE,"Running pipe through Temporal - dry run")
+	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --dry-run --mock-inputs --no-logo \
+		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
+
+trund: temporal-run-dry
 
 ##########################################################################################
 ### SHORTHANDS

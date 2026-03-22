@@ -1,10 +1,13 @@
-from typing import Protocol
+from __future__ import annotations
 
-from temporalio.client import Client as TemporalClient
-from temporalio.worker import Worker
+from typing import TYPE_CHECKING, Protocol
 
-from pipelex.temporal.temporal_tasks import TaskPack
-from pipelex.temporal.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
+if TYPE_CHECKING:
+    from temporalio.client import Client as TemporalClient
+    from temporalio.worker import Worker
+
+    from pipelex.temporal.temporal_tasks import TaskPack
+    from pipelex.temporal.temporal_types import ActivityList, ActivityType, WorkflowList, WorkflowType
 
 
 class TaskManager(Protocol):

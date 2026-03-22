@@ -1,4 +1,9 @@
-from pipelex.temporal.task_manager import TaskManager
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pipelex.temporal.task_manager import TaskManager
 
 
 class TemporalHub:

@@ -35,3 +35,4 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-test-tube: Test Profile Configuration](./test-profile-configuration.md){ .md-button }
 - [:material-flask-outline: Dry Run Mock Generation](./dry-run-mock-generation.md){ .md-button }
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
+- [:material-pipe: Pipe Routing & Execution](./pipe-routing-and-execution.md){ .md-button }

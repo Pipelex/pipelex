@@ -1,9 +1,7 @@
 from typing import ClassVar, Optional
 
 import shortuuid
-from temporalio import workflow
 from temporalio.client import Client as TemporalClient
-from temporalio.exceptions import TemporalError
 
 from pipelex import log
 from pipelex.system.runtime import RunMode, runtime_manager
@@ -116,12 +114,3 @@ def get_temporal_manager() -> TemporalManager:
 
 async def get_temporal_client(should_auto_connect: bool) -> TemporalClient:
     return await get_temporal_manager().get_temporal_client(should_auto_connect=should_auto_connect)
-
-
-def is_in_temporal_workflow() -> bool:
-    try:
-        # This will raise an error if not inside a workflow
-        workflow.info()
-        return True
-    except (TemporalError, RuntimeError):
-        return False
