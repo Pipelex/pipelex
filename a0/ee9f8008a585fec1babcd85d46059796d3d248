@@ -1,0 +1,94 @@
+Makefile
+  7780463f2c24fa3d 145-150,189,980,983-985,987-991,993-998,1000-1003
+  90fb43cefd1db85b 982,986
+.claude/skills/temporal-diagnose/references/temporal-worker-problem.md
+  7780463f2c24fa3d 1-4,6-14,17-19,24-26,32-37,42,44-53,66-73,89-94,101-103
+  659138a068dfdae2 5,15-16,20-23,27-31,38-41,43,54-65,74-88,95-100
+pipelex/cli/commands/worker_cmd.py
+  1c7b0ce98caa80a1 40-41
+pipelex/pipe_controllers/sub_pipe.py
+  90fb43cefd1db85b 15,175-177,181-182,190-192,196-197,223-225,229-230
+pipelex/temporal/task_manager.py
+  1c7b0ce98caa80a1 1,3,5-10
+pipelex/pipe_controllers/batch/pipe_batch.py
+  90fb43cefd1db85b 12,160-162,164-165,167
+.claude/skills/temporal-diagnose/SKILL.md
+  90fb43cefd1db85b 42,76,122,194,277
+  7780463f2c24fa3d 1-41,43,47-75,77-121,123-124,127,129,131-133,138-161,176-180,183-193,195-276,278-282
+  659138a068dfdae2 44-46,125-126,128,130,134-137,162-175,181-182
+pipelex/temporal/temporal_workflow_utils.py
+  90fb43cefd1db85b 1-15
+pipelex/temporal/worker_cli.py
+  90fb43cefd1db85b 54-68
+mkdocs.yml
+  90fb43cefd1db85b 490
+docs/under-the-hood/index.md
+  90fb43cefd1db85b 38
+docs/under-the-hood/pipe-routing-and-execution.md
+  90fb43cefd1db85b 1-321
+pipelex/hub.py
+  90fb43cefd1db85b 77,184-186,299-309
+pipelex/temporal/temporal_hub.py
+  1c7b0ce98caa80a1 1-6
+pipelex/pipelex.py
+  90fb43cefd1db85b 387,389,392-393,395
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "a0ee9f8008a585fec1babcd85d46059796d3d248",
+  "prompts": {
+    "1c7b0ce98caa80a1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d69b764c-fe3c-45ec-b519-973e722af7a9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 17,
+      "total_deletions": 8,
+      "accepted_lines": 16,
+      "overriden_lines": 0
+    },
+    "659138a068dfdae2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0600c62e-8ae6-4a9c-bf9e-89d9afe3d733",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 85,
+      "total_deletions": 19,
+      "accepted_lines": 77,
+      "overriden_lines": 0
+    },
+    "7780463f2c24fa3d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "593adde0-5215-4057-b969-f63edd3f7502",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 558,
+      "total_deletions": 210,
+      "accepted_lines": 329,
+      "overriden_lines": 3
+    },
+    "90fb43cefd1db85b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8249b8a7-bef0-4a6d-804e-d99633aec7cb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 456,
+      "total_deletions": 82,
+      "accepted_lines": 416,
+      "overriden_lines": 0
+    }
+  }
+}
