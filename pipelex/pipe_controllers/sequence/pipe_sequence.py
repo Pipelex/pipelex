@@ -109,11 +109,11 @@ class PipeSequence(PipeController):
             visited_pipes = set()
 
         # If we've already visited this pipe, stop recursion
-        if self.code in visited_pipes:
+        if self.pipe_ref in visited_pipes:
             return InputStuffSpecsFactory.make_empty()
 
         # Add this pipe to visited set for recursive calls
-        visited_pipes_with_current = visited_pipes | {self.code}
+        visited_pipes_with_current = visited_pipes | {self.pipe_ref}
 
         needed_inputs = InputStuffSpecsFactory.make_empty()
         generated_outputs: set[str] = set()

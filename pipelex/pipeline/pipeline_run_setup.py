@@ -176,7 +176,9 @@ async def pipeline_run_setup(
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
         elif blueprint.main_pipe:
-            pipe = get_required_pipe(pipe_code=blueprint.main_pipe)
+            # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with the same code
+            qualified_main_pipe = f"{blueprint.domain}.{blueprint.main_pipe}"
+            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
         else:
             msg = "No pipe code or main pipe in the MTHDS content provided to the pipeline API."
             raise PipeExecutionError(message=msg)

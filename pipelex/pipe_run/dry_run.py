@@ -110,7 +110,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
     allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
     for pipe in pipes:
-        results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
+        results[pipe.pipe_ref] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
 
     successful_pipes: list[str] = []
     failed_pipes: list[str] = []
@@ -124,7 +124,8 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
             case DryRunStatus.SKIPPED:
                 skipped_pipes.append(pipe_code)
 
-    unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
+    # Compare using bare pipe_code from DryRunOutput since allowed_to_fail_pipes uses bare codes
+    unexpected_failures = {pipe_ref: results[pipe_ref] for pipe_ref in failed_pipes if results[pipe_ref].pipe_code not in allowed_to_fail_pipes}
 
     log.verbose(
         f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, "
