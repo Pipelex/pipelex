@@ -52,9 +52,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "PipelineRequestError": "Check that pipe_code or mthds_content is provided",
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
-    # Builder errors
-    "ConceptLoadError": "Check TOML syntax in the concept source file or inline string",
-    "PipeLoadError": "Check TOML syntax in the pipe source file or inline string",
     # Input/type errors
     "JsonTypeError": "Input file must be a JSON object {...}, not an array or scalar value",
     "BundleError": "Bundle must declare a 'main_pipe' or use the --pipe flag to specify which pipe to run",
@@ -86,8 +83,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "BundleError": "input",
     "PipelineRequestError": "input",
     "GraphSpecParseError": "input",
-    "ConceptLoadError": "input",
-    "PipeLoadError": "input",
     "UnknownCommandError": "input",
     # config = environment/config changes needed
     "ClientAuthenticationError": "config",
