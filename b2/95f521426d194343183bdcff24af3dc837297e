@@ -1,0 +1,54 @@
+docs/under-the-hood/pipe-routing-and-execution.md
+  5d9a03f6c8b8110a 227-228
+.claude/skills/temporal-diagnose/SKILL.md
+  a4157a1ed4a4eb95 76,122,199,282
+  0266e325b9ec1535 137-139,141-144,149-152,155-156
+mkdocs.yml
+  5d9a03f6c8b8110a 306
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "b295f521426d194343183bdcff24af3dc837297e",
+  "prompts": {
+    "0266e325b9ec1535": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ce920dda-fcdb-4b65-8cc9-7e7520328c01",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 8,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    },
+    "5d9a03f6c8b8110a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "84103c36-b3d7-4b97-baf4-bb819dc1e36d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 2,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    },
+    "a4157a1ed4a4eb95": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "cb934c29-11a1-47d4-8d1f-ff65ad8b1720",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 7,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    }
+  }
+}
