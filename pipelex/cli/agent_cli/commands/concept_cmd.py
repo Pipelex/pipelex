@@ -1,4 +1,4 @@
-"""Agent CLI concept command - structure concepts from JSON specs with JSON/TOML output."""
+"""Agent CLI concept command - structure concepts from JSON specs with raw TOML output."""
 
 # pyright: reportUnknownMemberType=false
 
@@ -10,7 +10,7 @@ import typer
 from pydantic import ValidationError
 
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
 
 
@@ -145,7 +145,7 @@ def concept_cmd(
     Takes a concept specification in JSON format and converts it to valid Pipelex
     TOML format. Validates the spec before conversion.
 
-    Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
+    Outputs raw TOML to stdout on success, JSON to stderr on error with exit code 1.
 
     JSON spec format:
     {
@@ -191,13 +191,7 @@ def concept_cmd(
         concept_spec = _parse_concept_spec_from_json(spec_data)
         toml_content = _concept_spec_to_toml(concept_spec)
 
-        agent_success(
-            {
-                "success": True,
-                "concept_code": concept_spec.the_concept_code,
-                "toml": toml_content,
-            }
-        )
+        print(toml_content, end="" if toml_content.endswith("\n") else "\n")
 
     except ValidationError as exc:
         message, details = format_pydantic_validation_error_for_agent(exc)

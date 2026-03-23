@@ -45,7 +45,7 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "PipelineRequestError": "Check that pipe_code or mthds_content is provided",
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
-    # Builder/assembler errors
+    # Builder errors
     "ConceptLoadError": "Check TOML syntax in the concept source file or inline string",
     "PipeLoadError": "Check TOML syntax in the pipe source file or inline string",
     # Input/type errors
