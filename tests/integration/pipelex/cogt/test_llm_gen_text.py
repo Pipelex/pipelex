@@ -41,7 +41,12 @@ def get_worker_and_job(llm_preset_id: str, user_text: str, job_metadata: JobMeta
 class TestLLMGenText:
     @pytest.mark.parametrize(("topic", "prompt_text"), LLMTestCases.SINGLE_TEXT)
     async def test_gen_text_using_handle(
-        self, job_metadata: JobMetadata, llm_job_params: LLMJobParams, llm_combo: ModelCombo, topic: str, prompt_text: str
+        self,
+        job_metadata: JobMetadata,
+        llm_job_params: LLMJobParams,
+        llm_combo: ModelCombo,
+        topic: str,
+        prompt_text: str,
     ):
         pretty_print(prompt_text, title=f"Generating text about '{topic}' using '{llm_combo.handle}'")
         llm_worker = get_llm_worker(llm_handle=llm_combo.handle)

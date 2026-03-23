@@ -1,0 +1,78 @@
+################################################################################
+# MiniMax Backend Configuration
+################################################################################
+#
+# This file defines the model specifications for MiniMax models.
+# It contains model definitions for MiniMax language models
+# accessible through the MiniMax Anthropic-compatible API.
+#
+# Configuration structure:
+# - Each model is defined in its own section with the model name as the header
+# - Headers with dots must be quoted (e.g., ["minimax-m2.1"])
+# - Model costs are in USD per million tokens (input/output)
+#
+# Documentation: https://docs.pipelex.com
+# Support: https://go.pipelex.com/discord
+#
+################################################################################
+
+################################################################################
+# MODEL DEFAULTS
+################################################################################
+
+[defaults]
+model_type = "llm"
+sdk = "anthropic"
+prompting_target = "anthropic"
+structure_method = "instructor/anthropic_tools"
+thinking_mode = "manual"
+max_tokens = 16384
+
+################################################################################
+# LANGUAGE MODELS
+################################################################################
+
+# --- MiniMax M2 Series --------------------------------------------------------
+[minimax-m2]
+model_id = "MiniMax-M2"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 1.2 }
+
+["minimax-m2.1"]
+model_id = "MiniMax-M2.1"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 1.2 }
+
+["minimax-m2.1-highspeed"]
+model_id = "MiniMax-M2.1-highspeed"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.6, output = 2.4 }
+
+# --- MiniMax M2.5 Series ------------------------------------------------------
+["minimax-m2.5"]
+model_id = "MiniMax-M2.5"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 1.2 }
+
+["minimax-m2.5-highspeed"]
+model_id = "MiniMax-M2.5-highspeed"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.6, output = 2.4 }
+
+# --- MiniMax M2.7 Series ------------------------------------------------------
+["minimax-m2.7"]
+model_id = "MiniMax-M2.7"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.3, output = 1.2 }
+
+["minimax-m2.7-highspeed"]
+model_id = "MiniMax-M2.7-highspeed"
+inputs = ["text"]
+outputs = ["text", "structured"]
+costs = { input = 0.6, output = 2.4 }
