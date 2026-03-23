@@ -7,7 +7,7 @@ from typing_extensions import override
 
 from pipelex import pretty_print
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.core.qualified_ref import QualifiedRef, QualifiedRefError
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.types import Self
@@ -37,15 +37,15 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def add_new_pipe(self, pipe: PipeAbstract):
-        if pipe.code in self.root:
+        if pipe.pipe_ref in self.root:
             msg = (
-                f"Pipe '{pipe.code}' already exists in the library. "
+                f"Pipe '{pipe.pipe_ref}' already exists in the library. "
                 "It is likely declared in two different bundle files loaded into the same library. "
                 "Check your library configuration: PIPELEXPATH environment variable, "
                 "library_dirs passed to Pipelex.make(), or the --library-dir / -L CLI option."
             )
             raise PipeLibraryError(msg)
-        self.root[pipe.code] = pipe
+        self.root[pipe.pipe_ref] = pipe
 
     @override
     def add_pipes(self, pipes: list[PipeAbstract]):
@@ -54,31 +54,41 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
 
     @override
     def get_optional_pipe(self, pipe_code: str) -> PipeAbstract | None:
-        # Direct lookup first (bare code or exact match)
+        # 1. Direct lookup — handles pipe_ref keys (domain.code) and cross-package keys (alias->domain.code)
         pipe = self.root.get(pipe_code)
         if pipe is not None:
             return pipe
-        # Cross-package: "alias->domain.pipe_code" -> lookup "alias->pipe_code"
+
+        # 2. Cross-package refs
         if QualifiedRef.has_cross_package_prefix(pipe_code):
             alias, remainder = QualifiedRef.split_cross_package_ref(pipe_code)
-            try:
-                ref = QualifiedRef.parse(remainder)
-            except QualifiedRefError:
-                return None
-            pipe = self.root.get(f"{alias}->{ref.local_code}")
-            if pipe is not None and ref.is_qualified and pipe.domain_code != ref.domain_path:
-                return None
-            return pipe
-        # If it's a domain-qualified ref (e.g. "scoring.compute_score"), try the local code
-        if "." in pipe_code:
-            try:
-                ref = QualifiedRef.parse(pipe_code)
-            except QualifiedRefError:
-                return None
-            pipe = self.root.get(ref.local_code)
-            if pipe is not None and ref.is_qualified and pipe.domain_code != ref.domain_path:
-                return None
-            return pipe
+            # Try domain-qualified remainder as direct key
+            aliased_key = f"{alias}->{remainder}"
+            pipe = self.root.get(aliased_key)
+            if pipe is not None:
+                return pipe
+            # Bare code remainder — search aliased entries matching the bare code
+            if "." not in remainder:
+                matches = [val for key, val in self.root.items() if key.startswith(f"{alias}->") and val.code == remainder]
+                if len(matches) == 1:
+                    return matches[0]
+                if len(matches) > 1:
+                    domains = [match.domain_code for match in matches]
+                    msg = f"Ambiguous cross-package pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
+                    raise PipeLibraryError(msg)
+            return None
+
+        # 3. Bare code fallback — search across domains (excluding cross-package entries)
+        if "." not in pipe_code:
+            matches = [val for key, val in self.root.items() if not QualifiedRef.has_cross_package_prefix(key) and val.code == pipe_code]
+            if len(matches) == 1:
+                return matches[0]
+            if len(matches) > 1:
+                domains = [match.domain_code for match in matches]
+                msg = f"Ambiguous pipe code '{pipe_code}' found in domains: {domains}. Use domain-qualified ref."
+                raise PipeLibraryError(msg)
+            return None
+
         return None
 
     def add_dependency_pipe(self, alias: str, pipe: PipeAbstract) -> None:
@@ -88,7 +98,7 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             alias: The dependency alias
             pipe: The pipe to add
         """
-        key = f"{alias}->{pipe.code}"
+        key = f"{alias}->{pipe.pipe_ref}"
         if key in self.root:
             msg = f"Dependency pipe '{key}' already exists in the library"
             raise PipeLibraryError(msg)
@@ -111,13 +121,13 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
         return self.root
 
     @override
-    def remove_pipes_by_codes(self, pipe_codes: list[str]) -> None:
+    def remove_pipes_by_refs(self, pipe_refs: list[str]) -> None:
         # TODO: We should create a separate library, that copies the original one, and then removes the pipes from it
         # Then run the dry run + validation to see if removing those pipe has not broken any other pipe.
         # If validated, it should update the real library.
-        for pipe_code in pipe_codes:
-            if pipe_code in self.root:
-                del self.root[pipe_code]
+        for pipe_ref in pipe_refs:
+            if pipe_ref in self.root:
+                del self.root[pipe_ref]
 
     @override
     def pretty_list_pipes(self) -> None:

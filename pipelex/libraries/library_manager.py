@@ -28,6 +28,7 @@ from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
 from pipelex.hub import get_current_library
+from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.exceptions import (
     LibraryError,
     LibraryLoadingError,
@@ -91,7 +92,7 @@ class LibraryManager(LibraryManagerAbstract):
     def __init__(self):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
-        self._pipe_source_map: dict[str, Path] = {}  # pipe_code -> source .mthds file
+        self._pipe_source_map: dict[str, Path] = {}  # pipe_ref (domain.pipe_code) -> source .mthds file
 
     ############################################################
     # Manager lifecycle
@@ -111,8 +112,8 @@ class LibraryManager(LibraryManagerAbstract):
                 raise LibraryError(msg)
             library = self._libraries[library_id]
             # Remove source map entries for pipes in this library
-            for pipe_code in library.pipe_library.root:
-                self._pipe_source_map.pop(pipe_code, None)
+            for pipe_ref in library.pipe_library.root:
+                self._pipe_source_map.pop(pipe_ref, None)
             library.teardown()
             del self._libraries[library_id]
             return
@@ -164,12 +165,22 @@ class LibraryManager(LibraryManagerAbstract):
         """Get the source file path for a pipe.
 
         Args:
-            pipe_code: The pipe code to look up.
+            pipe_code: The pipe code or pipe_ref (domain.code) to look up.
 
         Returns:
             Path to the .mthds file the pipe was loaded from, or None if unknown.
         """
-        return self._pipe_source_map.get(pipe_code)
+        # Direct lookup by pipe_ref
+        result = self._pipe_source_map.get(pipe_code)
+        if result is not None:
+            return result
+        # Bare code fallback: search for a key ending with .pipe_code
+        if "." not in pipe_code:
+            suffix = f".{pipe_code}"
+            matches = [path for key, path in self._pipe_source_map.items() if key.endswith(suffix)]
+            if len(matches) == 1:
+                return matches[0]
+        return None
 
     ############################################################
     # Private methods
@@ -374,22 +385,23 @@ class LibraryManager(LibraryManagerAbstract):
             new_source = Path(blueprint.source) if blueprint.source else None
             if blueprint.pipe is not None:
                 for pipe_code, pipe_blueprint in blueprint.pipe.items():
+                    pipe_ref = f"{blueprint.domain}.{pipe_code}"
                     # Detect duplicate pipe declarations across different bundles in the same library
-                    if pipe_code in pipe_source_in_this_load:
-                        existing_source = pipe_source_in_this_load[pipe_code]
+                    if pipe_ref in pipe_source_in_this_load:
+                        existing_source = pipe_source_in_this_load[pipe_ref]
                         if existing_source == new_source:
                             msg = (
-                                f"Pipe '{pipe_code}' is declared twice in the same bundle file: '{existing_source}'. "
+                                f"Pipe '{pipe_ref}' is declared twice in the same bundle file: '{existing_source}'. "
                                 "Please remove the duplicate declaration."
                             )
                         else:
                             msg = (
-                                f"Pipe '{pipe_code}' is declared in two different bundle files: "
+                                f"Pipe '{pipe_ref}' is declared in two different bundle files: "
                                 f"'{existing_source}' and '{new_source}'. "
                                 "Please remove one of the declarations or rename one of the pipes."
                             )
                         raise PipeLibraryError(msg)
-                    pipe_source_in_this_load[pipe_code] = new_source
+                    pipe_source_in_this_load[pipe_ref] = new_source
                     pipe = PipeFactory[PipeAbstract].make_from_blueprint(
                         domain_code=blueprint.domain,
                         pipe_code=pipe_code,
@@ -399,7 +411,7 @@ class LibraryManager(LibraryManagerAbstract):
                     pipes.append(pipe)
                     # Track source file for this pipe (used by get_pipe_source)
                     if new_source:
-                        self._pipe_source_map[pipe_code] = new_source
+                        self._pipe_source_map[pipe_ref] = new_source
             all_pipes.extend(pipes)
 
         library.pipe_library.add_pipes(pipes=all_pipes)
@@ -474,16 +486,34 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of loaded concepts
         """
-        # Step 1: Collect all concept entries with metadata
+        # Step 1: Collect all concept entries with metadata, detecting duplicates
+        concept_source_in_this_load: dict[str, Path | None] = {}
         ref_to_entry: dict[str, tuple[str, str, ConceptBlueprint | str]] = {}
 
         for blueprint in blueprints:
             if blueprint.concept is not None:
+                new_source = Path(blueprint.source) if blueprint.source else None
                 for concept_code, concept_blueprint in blueprint.concept.items():
                     concept_ref = ConceptFactory.make_concept_ref_with_domain(
                         domain_code=blueprint.domain,
                         concept_code=concept_code,
                     )
+                    # Detect duplicate concept declarations across different bundles in the same library
+                    if concept_ref in concept_source_in_this_load:
+                        existing_source = concept_source_in_this_load[concept_ref]
+                        if existing_source == new_source:
+                            msg = (
+                                f"Concept '{concept_ref}' is declared twice in the same bundle file: '{existing_source}'. "
+                                "Please remove the duplicate declaration."
+                            )
+                        else:
+                            msg = (
+                                f"Concept '{concept_ref}' is declared in two different bundle files: "
+                                f"'{existing_source}' and '{new_source}'. "
+                                "Please remove one of the declarations or rename one of the concepts."
+                            )
+                        raise ConceptLibraryError(msg)
+                    concept_source_in_this_load[concept_ref] = new_source
                     ref_to_entry[concept_ref] = (
                         blueprint.domain,
                         concept_code,
@@ -967,7 +997,8 @@ class LibraryManager(LibraryManagerAbstract):
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()
         if blueprint.pipe is not None:
-            library.pipe_library.remove_pipes_by_codes(pipe_codes=list(blueprint.pipe.keys()))
+            pipe_refs_to_remove = [f"{blueprint.domain}.{pipe_code}" for pipe_code in blueprint.pipe]
+            library.pipe_library.remove_pipes_by_refs(pipe_refs=pipe_refs_to_remove)
 
     def _remove_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()

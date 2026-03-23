@@ -32,8 +32,7 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
     def add_domain(self, domain: Domain):
         domain_code = domain.code
         if domain_code in self.root:
-            msg = f"Trying to add domain '{domain_code}' to domain library but it already exists"
-            raise DomainLibraryError(msg)
+            return  # Idempotent: same domain from another bundle
         self.root[domain_code] = domain
 
     def add_domains(self, domains: list[Domain]):
