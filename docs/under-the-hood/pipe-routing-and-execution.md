@@ -224,8 +224,8 @@ Concrete pipe operators (PipeLLM, PipeCompose, PipeExtract, PipeImgGen) use dedi
 | `wf_make_llm_text` | `act_llm_gen_text` | LLM text generation |
 | `wf_make_object` | `act_llm_gen_object` | LLM structured output |
 | `wf_make_jinja2_text` | `act_jinja2_gen_text` | Jinja2 template rendering |
-| `wf_make_extract` | `act_extract_generate` | Document extraction |
-| `wf_make_images` | `act_img_gen_images` | Image generation |
+| `wf_make_extract` | `act_extract_gen_extract_pages` | Document extraction |
+| `wf_make_image` | `act_img_gen_images` | Image generation |
 
 ### Worker Environment
 

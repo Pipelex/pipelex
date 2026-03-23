@@ -303,6 +303,7 @@ plugins:
         - under-the-hood/stuffartefact-and-image-rendering.md: "StuffArtefact & Image Rendering"
         - under-the-hood/test-profile-configuration.md: "Test Profile Configuration"
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
+        - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
         Project:
         - contributing.md: "Contributing"
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"

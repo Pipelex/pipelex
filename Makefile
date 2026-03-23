@@ -981,20 +981,20 @@ TEMPORAL_BUNDLE ?= tests/integration/pipelex/pipes/controller/pipe_sequence/pipe
 TEMPORAL_PIPE ?= simple_text_sequence
 TEMPORAL_LIB ?=
 
-temporal-worker:
+temporal-worker: env
 	$(call PRINT_TITLE,"Starting Temporal worker")
 	$(if $(TEMPORAL_LIB),PIPELEXPATH=$(TEMPORAL_LIB),) $(VENV_PYTHON) -m pipelex.temporal.worker_cli --is-not-sandboxed
 
 tw: temporal-worker
 
-temporal-run:
+temporal-run: env
 	$(call PRINT_TITLE,"Running pipe through Temporal")
 	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --mock-inputs --no-logo \
 		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
 
 trun: temporal-run
 
-temporal-run-dry:
+temporal-run-dry: env
 	$(call PRINT_TITLE,"Running pipe through Temporal - dry run")
 	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --dry-run --mock-inputs --no-logo \
 		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)

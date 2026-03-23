@@ -73,7 +73,7 @@ tmux capture-pane -t temporal-worker -p -S -100
 **Kill and restart** (e.g., to pick up code changes):
 ```bash
 tmux kill-session -t temporal-worker
-tmux new-session -d -s temporal-worker 'cd /Users/lchoquel/repos/Pipelex/pipelex && PIPELEXPATH=tests/integration/pipelex/pipes/controller/pipe_sequence .venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
+tmux new-session -d -c "$PWD" -s temporal-worker 'PIPELEXPATH=tests/integration/pipelex/pipes/controller/pipe_sequence .venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
 ```
 
 If tmux is not installed, fall back to asking the user to run the server and
@@ -119,7 +119,7 @@ calls will fail.
 ```bash
 tmux has-session -t temporal-worker 2>/dev/null || \
   tmux new-session -d -s temporal-worker \
-  'cd /Users/lchoquel/repos/Pipelex/pipelex && PIPELEXPATH=tests/integration/pipelex/pipes/controller/pipe_sequence .venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
+  'cd $PWD && PIPELEXPATH=tests/integration/pipelex/pipes/controller/pipe_sequence .venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
 ```
 
 The worker is also long-running and never exits. Sleep **4 seconds** (no more),
@@ -134,21 +134,26 @@ Look for `Temporal Worker started for 'temporal_task_queue'`.
 Run the job submitter. It connects to Temporal, submits the workflow, and **waits
 for the result**. If the worker fails to process the job (e.g., deserialization
 error), the submitter may hang for a long time waiting for a response that never
-comes. Run it in the background so you can check worker output while it's waiting:
+comes. Run it in the background so you can check worker output while it's waiting.
+
+Dry run (no real LLM calls):
 ```bash
-make trund
+TEMPORAL_BUNDLE="tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds"
+tmux has-session -t temporal-submitter 2>/dev/null || \
+  tmux new-session -d -s temporal-submitter \
+  "cd $PWD && .venv/bin/pipelex run bundle $TEMPORAL_BUNDLE --temporal --dry-run --mock-inputs --no-logo"
 ```
 
 Or for real LLM execution:
 ```bash
-make trun
+TEMPORAL_BUNDLE="tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds"
+tmux has-session -t temporal-submitter 2>/dev/null || \
+  tmux new-session -d -s temporal-submitter \
+  "cd $PWD && .venv/bin/pipelex run bundle $TEMPORAL_BUNDLE --temporal --mock-inputs --no-logo"
 ```
 
-Both default to `pipe_sequence_1.mthds` (2-step PipeSequence). Override with:
-```bash
-make trund TEMPORAL_BUNDLE=path/to/other.mthds
-make trund TEMPORAL_PIPE=specific_pipe_code
-```
+Both default to `pipe_sequence_1.mthds`. To target a specific pipe, add `--pipe <pipe_code>`.
+Override the bundle by changing `TEMPORAL_BUNDLE`.
 
 ### Step 4: Diagnose the output
 
@@ -191,7 +196,7 @@ for Layer 1 failures).
 1. Kill and restart the worker (to pick up code changes):
    ```bash
    tmux kill-session -t temporal-worker
-   tmux new-session -d -s temporal-worker 'cd /Users/lchoquel/repos/Pipelex/pipelex && PIPELEXPATH=tests/integration/pipelex/pipes/controller/pipe_sequence .venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
+   tmux new-session -d -c "$PWD" -s temporal-worker 'PIPELEXPATH=tests/integration/pipelex/pipes/controller/pipe_sequence .venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
    sleep 5
    ```
 2. Make code changes
@@ -274,7 +279,7 @@ Only then shift to making code changes. Use the diagnose loop to verify each cha
 2. Restart the worker:
    ```bash
    tmux kill-session -t temporal-worker
-   tmux new-session -d -s temporal-worker 'cd /Users/lchoquel/repos/Pipelex/pipelex && PIPELEXPATH=tests/integration/pipelex/pipes/controller/pipe_sequence .venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
+   tmux new-session -d -c "$PWD" -s temporal-worker 'PIPELEXPATH=tests/integration/pipelex/pipes/controller/pipe_sequence .venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
    sleep 5
    ```
 3. Run `make trund` via Bash and read the output
