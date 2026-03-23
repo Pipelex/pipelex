@@ -1,0 +1,23 @@
+tests/unit/pipelex/language/test_toml_string_utils.py
+  63df80deb3515053 13-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "8a3cd45593358a1f59c5467a81b766e94eb991d5",
+  "prompts": {
+    "63df80deb3515053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68727665-9150-47b3-a1b6-3f6f0ed7770b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
