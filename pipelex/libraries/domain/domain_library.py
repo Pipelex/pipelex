@@ -1,6 +1,7 @@
 from pydantic import RootModel
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.core.domains.domain import Domain
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
 from pipelex.libraries.domain.exceptions import DomainLibraryError
@@ -30,9 +31,22 @@ class DomainLibrary(RootModel[DomainLibraryRoot], DomainLibraryAbstract):
         return self.root.get(domain_code)
 
     def add_domain(self, domain: Domain):
+        # TODO: resolve domain metadata conflicts properly — currently first-write-wins with a warning.
+        # The system_prompt field is used as a PipeLLM fallback; it should be inlined at pipe factory time
+        # before LibraryCrate construction so domain-level system_prompt becomes unnecessary.
         domain_code = domain.code
         if domain_code in self.root:
-            return  # Idempotent: same domain from another bundle
+            existing = self.root[domain_code]
+            if existing.description != domain.description:
+                log.warning(
+                    f"Domain '{domain_code}' declared with different descriptions: "
+                    f"'{existing.description}' vs '{domain.description}'. Keeping the first.",
+                )
+            if existing.system_prompt != domain.system_prompt:
+                log.warning(
+                    f"Domain '{domain_code}' declared with different system_prompts. Keeping the first.",
+                )
+            return
         self.root[domain_code] = domain
 
     def add_domains(self, domains: list[Domain]):
