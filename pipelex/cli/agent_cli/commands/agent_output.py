@@ -8,6 +8,13 @@ import typer
 
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.tools.misc.json_utils import clean_json_dumps
+from pipelex.types import StrEnum
+
+
+class CliOutputFormat(StrEnum):
+    JSON = "json"
+    MARKDOWN = "markdown"
+
 
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors

@@ -5,7 +5,7 @@ from typing import Annotated, Any
 import typer
 
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
@@ -223,6 +223,66 @@ def _build_talent_mappings_for_category(
     return _filter_talent_mappings_by_backend(mappings, presets_dict, model_deck, model_type, backend)
 
 
+CATEGORY_DISPLAY_NAMES: dict[str, str] = {
+    "llm": "LLM",
+    "img_gen": "Image Generation",
+    "extract": "Extract",
+    "search": "Search",
+}
+
+
+def _format_models_markdown(result: dict[str, Any]) -> str:
+    """Format the models result dict as markdown with bullet points."""
+    lines: list[str] = ["# Available Models"]
+
+    presets: dict[str, list[dict[str, Any]]] = result["presets"]
+    aliases: dict[str, dict[str, str]] = result["aliases"]
+    waterfalls: dict[str, dict[str, list[str]]] = result["waterfalls"]
+    talent_mappings: dict[str, dict[str, str]] = result["talent_mappings"]
+
+    for category_key, display_name in CATEGORY_DISPLAY_NAMES.items():
+        cat_presets = presets.get(category_key, [])
+        cat_aliases = aliases.get(category_key, {})
+        cat_waterfalls = waterfalls.get(category_key, {})
+        cat_talents = talent_mappings.get(category_key, {})
+
+        if not cat_presets and not cat_aliases and not cat_waterfalls and not cat_talents:
+            continue
+
+        lines.append(f"\n## {display_name}")
+
+        if cat_presets:
+            lines.append("\n### Presets\n")
+            for preset in cat_presets:
+                description = preset.get("description", "")
+                if description:
+                    lines.append(f"- **{preset['name']}**: {description}")
+                else:
+                    lines.append(f"- **{preset['name']}**")
+
+        if cat_aliases:
+            lines.append("\n### Aliases\n")
+            for alias_name, alias_target in cat_aliases.items():
+                lines.append(f"- **{alias_name}** \u2192 {alias_target}")
+
+        if cat_waterfalls:
+            lines.append("\n### Waterfalls\n")
+            for waterfall_name, fallback_list in cat_waterfalls.items():
+                chain = " \u2192 ".join(fallback_list)
+                lines.append(f"- **{waterfall_name}**: {chain}")
+
+        if cat_talents:
+            lines.append("\n### Talent Mappings\n")
+            for talent_name, preset_name in cat_talents.items():
+                lines.append(f"- **{talent_name}** \u2192 {preset_name}")
+
+    hint = result.get("talent_mappings_usage_hint")
+    if hint:
+        lines.append(f"\n---\n\n{hint}")
+
+    return "\n".join(lines)
+
+
 def agent_models_cmd(
     ctx: typer.Context,
     model_type: Annotated[
@@ -233,11 +293,15 @@ def agent_models_cmd(
         str | None,
         typer.Option("--backend", "-b", help="Filter by backend name"),
     ] = None,
+    output_format: Annotated[
+        CliOutputFormat,
+        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+    ] = CliOutputFormat.MARKDOWN,
 ) -> None:
     """List available model presets, aliases, waterfalls, and talent mappings.
 
-    Outputs structured JSON to stdout with all model configuration
-    that an agent needs to reference when building pipelines.
+    Outputs model configuration that an agent needs to reference when building pipelines.
+    Default output is markdown; use --format json for structured JSON.
     """
     try:
         make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=backend is not None)
@@ -287,7 +351,11 @@ def agent_models_cmd(
             ),
         }
 
-        agent_success(result)
+        match output_format:
+            case CliOutputFormat.JSON:
+                agent_success(result)
+            case CliOutputFormat.MARKDOWN:
+                print(_format_models_markdown(result))
     except SystemExit:
         # agent_error already handled and called sys.exit
         raise

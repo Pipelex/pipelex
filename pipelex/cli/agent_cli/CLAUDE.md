@@ -64,12 +64,12 @@ commands/
 | `inputs` | Generates example input JSON for a pipe/bundle/method (pipe\|bundle\|method subcommands) |
 | `concept` | Converts a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Converts a JSON pipe spec (typed) into raw TOML (stdout) |
-| `models` | Lists available model presets, aliases, waterfalls, and talent mappings |
-| `doctor` | Checks config, credentials, models health. Use `--global`/`-g` to check `~/.pipelex/` instead of auto-detected config dir. |
+| `models` | Lists available model presets, aliases, waterfalls, and talent mappings. `--format markdown\|json` (default: markdown) |
+| `doctor` | Checks config, credentials, models health. `--global`/`-g` for global dir. `--format markdown\|json` (default: markdown) |
 
 ## Key Patterns
 
-- **Output contract**: Every command returns via `agent_success(dict)` or `agent_error(message, error_type, cause)`. Never print outside these. Exceptions: `fmt` and `lint` are raw passthrough to `plxt`; `concept` and `pipe` print raw TOML to stdout (errors still go via `agent_error()`).
+- **Output contract**: Most commands return via `agent_success(dict)` or `agent_error(message, error_type, cause)`. Exceptions that print directly to stdout: `fmt`/`lint` (plxt passthrough), `concept`/`pipe` (raw TOML), `models`/`doctor` in markdown mode. Errors always go via `agent_error()` regardless of format.
 - **Error classification**: Each error type maps to a domain (`input`, `config`, `runtime`), a hint string, and a `retryable` flag. See `AGENT_ERROR_HINTS` dict in `agent_output.py`.
 - **Init**: All commands that need Pipelex use `make_pipelex_for_agent_cli(library_dirs)`. It catches init errors and routes them through `agent_error()`.
 - **Async core**: Run and validate are async — commands use `asyncio.run()`.
