@@ -115,14 +115,14 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
     successful_pipes: list[str] = []
     failed_pipes: list[str] = []
     skipped_pipes: list[str] = []
-    for pipe_code, dry_run_output in results.items():
+    for pipe_ref, dry_run_output in results.items():
         match dry_run_output.status:
             case DryRunStatus.SUCCESS:
-                successful_pipes.append(pipe_code)
+                successful_pipes.append(pipe_ref)
             case DryRunStatus.FAILURE:
-                failed_pipes.append(pipe_code)
+                failed_pipes.append(pipe_ref)
             case DryRunStatus.SKIPPED:
-                skipped_pipes.append(pipe_code)
+                skipped_pipes.append(pipe_ref)
 
     # Compare using bare pipe_code from DryRunOutput since allowed_to_fail_pipes uses bare codes
     unexpected_failures = {pipe_ref: results[pipe_ref] for pipe_ref in failed_pipes if results[pipe_ref].pipe_code not in allowed_to_fail_pipes}
@@ -132,7 +132,7 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
         f"{len(skipped_pipes)} skipped, {len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
     )
     if unexpected_failures:
-        unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
+        unexpected_failures_details = "\n".join([f"'{pipe_ref}': {results[pipe_ref]}" for pipe_ref in unexpected_failures])
         if raise_on_failure:
             msg = f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}"
             raise DryRunError(msg)
