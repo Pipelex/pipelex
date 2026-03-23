@@ -79,6 +79,9 @@ class PipeLibrary(RootModel[PipeLibraryRoot], PipeLibraryAbstract):
             return None
 
         # 3. Bare code fallback — search across domains (excluding cross-package entries)
+        # TODO: add domain_hint parameter so controllers can prefer their own domain when bare code is ambiguous.
+        # Currently, controllers resolve sub-pipes by bare code; if two domains share a pipe code the lookup
+        # raises PipeLibraryError instead of preferring the caller's domain. See PR #779 review.
         if "." not in pipe_code:
             matches = [val for key, val in self.root.items() if not QualifiedRef.has_cross_package_prefix(key) and val.code == pipe_code]
             if len(matches) == 1:
