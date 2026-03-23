@@ -11,6 +11,7 @@ from pydantic import ValidationError
 
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
+from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
 
 
@@ -30,7 +31,7 @@ def _concept_spec_to_toml(concept_spec: ConceptSpec) -> str:
     concept_item_table = tomlkit.table()
 
     # Add description
-    concept_item_table.add("description", concept_spec.description)
+    concept_item_table.add("description", format_toml_string(concept_spec.description))
 
     # Add refines if present
     if concept_spec.refines:
@@ -43,7 +44,7 @@ def _concept_spec_to_toml(concept_spec: ConceptSpec) -> str:
             field_dict = _structure_field_to_dict(field_spec)
             # If only description is present, use simple string format
             if len(field_dict) == 1 and "description" in field_dict:
-                structure_table.add(field_name, field_dict["description"])
+                structure_table.add(field_name, format_toml_string(field_dict["description"]))
             else:
                 inline_table = tomlkit.inline_table()
                 for key, value in field_dict.items():
