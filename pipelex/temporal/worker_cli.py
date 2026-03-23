@@ -1,8 +1,7 @@
-"""python -m deep_flow.worker_cli
-python -m deep_flow.worker_cli deep_flow
-python -m deep_flow.worker_cli --is-unit-testing
-python -m deep_flow.worker_cli --is-not-sandboxed
-python -m deep_flow.worker_cli --task-queue my_task_queue
+"""python -m pipelex.temporal.worker_cli
+python -m pipelex.temporal.worker_cli --is-unit-testing
+python -m pipelex.temporal.worker_cli --is-not-sandboxed
+python -m pipelex.temporal.worker_cli --task-queue my_task_queue
 """
 
 import asyncio
@@ -12,9 +11,10 @@ from typing import Annotated
 import typer
 
 from pipelex import log
+from pipelex.config import get_config
+from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import RunMode, runtime_manager
-from pipelex.temporal.deep_flow_hub import get_task_manager
-from pipelex.tools.misc.string_utils import snake_to_pascal_case
+from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 app = typer.Typer()
@@ -48,21 +48,28 @@ def configure(
         if not project:
             msg = "Project name not found in pyproject.toml"
             raise ValueError(msg)
-    from importlib import import_module  # noqa: PLC0415
 
-    project_name_pascal_case = snake_to_pascal_case(project)
-    project_class_name = f"{project_name_pascal_case}System"
-    project_module = import_module(f"{project}.system")
-    project_class = getattr(project_module, project_class_name)
-    project_class.make()
+    Pipelex.make(temporal_enabled=True)
 
-    # Force-enable Temporal when running as a worker, regardless of config
-    from pipelex.config import get_config  # noqa: PLC0415
+    # Load base library from PIPELEXPATH at worker startup.
+    # This generates dynamic concept classes and registers them with Kajson (fixing deserialization)
+    # and populates the pipe library (fixing get_required_pipe() for controllers).
+    from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library  # noqa: PLC0415
 
-    if not get_config().deep_flow.is_enabled:
-        log.warning("deep_flow.is_enabled is false in config, but forcing it on for worker mode")
-        updated_deep_flow = get_config().deep_flow.model_copy(update={"is_enabled": True})
-        get_config().deep_flow = updated_deep_flow
+    library_manager = get_library_manager()
+    library_manager.open_library(library_id="worker_base")
+    set_current_library(library_id="worker_base")
+    effective_dirs, source_label = resolve_library_dirs(library_dirs=None)
+    if effective_dirs:
+        log.info(f"Worker loading base library from {len(effective_dirs)} directory(ies) ({source_label})")
+        library_manager.load_libraries(library_id="worker_base", library_dirs=effective_dirs)
+    else:
+        log.info("No library directories configured for worker (PIPELEXPATH not set)")
+
+    if not get_config().temporal.is_enabled:
+        log.warning("temporal.is_enabled is false in config, but forcing it on for worker mode")
+        updated_temporal = get_config().temporal.model_copy(update={"is_enabled": True})
+        get_config().temporal = updated_temporal
 
     asyncio.run(run_worker(project, is_not_sandboxed, is_unit_testing, task_queue))
 

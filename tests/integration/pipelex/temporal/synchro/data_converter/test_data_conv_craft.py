@@ -6,7 +6,7 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.hub import get_model_deck
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.temporal_data_converter import BaseModelPayloadConverter
-from pipelex.temporal.test_extras.deep_flow_registry_test_models import Person
+from pipelex.temporal.test_extras.temporal_registry_test_models import Person
 
 from .conftest import CraftingTestCases
 

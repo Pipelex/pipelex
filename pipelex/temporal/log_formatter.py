@@ -8,10 +8,10 @@ from pipelex.tools.log.log_formatter import LevelAndEmojiLogFormatter, log_level
 from pipelex.tools.misc.terminal_utils import RESET_FONT, TerminalColor
 
 
-class DeepFlowTemporalLogFormatter(LevelAndEmojiLogFormatter):
+class TemporalLogFormatter(LevelAndEmojiLogFormatter):
     @override
     def format(self, record: logging.LogRecord):
-        temporal_log_config = get_config().deep_flow.temporal_config.temporal_log_config
+        temporal_log_config = get_config().temporal.temporal_config.temporal_log_config
         if record.name not in temporal_log_config.managed_loggers:
             return super().format(record)
 

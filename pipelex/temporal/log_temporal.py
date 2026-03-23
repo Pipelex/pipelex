@@ -5,7 +5,7 @@ from temporalio import activity, workflow
 
 from pipelex import log
 from pipelex.config import get_config
-from pipelex.temporal.log_formatter import DeepFlowTemporalLogFormatter
+from pipelex.temporal.log_formatter import TemporalLogFormatter
 from pipelex.tools.log.log_levels import LOGGING_LEVEL_DEV, LOGGING_LEVEL_VERBOSE
 
 
@@ -15,8 +15,8 @@ def configure_temporal_logs():
     This function sets up the log formatter, safety callable, and various logging options
     for both workflow and activity loggers.
     """
-    temporal_log_config = get_config().deep_flow.temporal_config.temporal_log_config
-    log.set_poor_log_formatter(DeepFlowTemporalLogFormatter())
+    temporal_log_config = get_config().temporal.temporal_config.temporal_log_config
+    log.set_poor_log_formatter(TemporalLogFormatter())
 
     workflow.logger.workflow_info_on_message = temporal_log_config.is_workflow_info_on_message
     workflow.logger.workflow_info_on_extra = temporal_log_config.is_workflow_info_on_extra

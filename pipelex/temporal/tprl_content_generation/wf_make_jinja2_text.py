@@ -27,7 +27,7 @@ class WfMakeJinja2Text(WorkflowClass[TemplatingAssignment, str]):
         workflow_arg: TemplatingAssignment,
     ) -> str:
         workflow_log.debug("Workflow start")
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         try:
             jinja2_text: str = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_jinja2_gen_text,

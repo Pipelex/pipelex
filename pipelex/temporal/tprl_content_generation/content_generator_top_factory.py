@@ -18,10 +18,10 @@ class ContentGeneratorTopFactory:
         task_queue: str | None = None,
         worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
     ) -> ContentGeneratorTop:
-        """This factory is only passing your settings or using defaults from pipelex.deep_flow's config.
+        """This factory is only passing your settings or using defaults from pipelex.temporal's config.
         Don't hesitate to create your own factory or your own TopCrafter according to your needs and context.
         """
-        worker_config = get_config().deep_flow.worker_config
+        worker_config = get_config().temporal.worker_config
         return ContentGeneratorTop(
             generated_content_factory=generated_content_factory,
             task_queue=task_queue or worker_config.task_queue,

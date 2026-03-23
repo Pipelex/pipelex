@@ -20,7 +20,7 @@ class ContentGeneratorChildFactory:
         start_delay: timedelta | None = None,
         rpc_timeout: timedelta | None = None,
     ) -> ContentGeneratorChild:
-        config = get_config().deep_flow.worker_config
+        config = get_config().temporal.worker_config
 
         return ContentGeneratorChild(
             generated_content_factory=generated_content_factory,

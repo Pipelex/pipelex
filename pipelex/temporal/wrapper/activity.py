@@ -15,7 +15,7 @@ def start_tprl_activity(
     activity: Callable[[B], Awaitable[T]],
     workflow_arg: B,
 ) -> Awaitable[T]:
-    worker_config = get_config().deep_flow.worker_config
+    worker_config = get_config().temporal.worker_config
     max_timeout = timedelta(hours=24)
 
     return workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]

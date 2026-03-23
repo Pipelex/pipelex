@@ -9,7 +9,6 @@ from pipelex import log
 from pipelex.cli.cli_factory import make_pipelex_for_cli
 from pipelex.cli.error_handlers import ErrorContext
 from pipelex.pipelex import Pipelex
-from pipelex.temporal.deep_flow_hub import get_task_manager
 
 
 def worker_cmd(
@@ -37,6 +36,8 @@ def worker_cmd(
         pipelex worker --task-queue my_queue
     """
     make_pipelex_for_cli(context=ErrorContext.VALIDATION_BEFORE_PIPE_RUN, temporal_enabled=True)
+
+    from pipelex.temporal.temporal_hub import get_task_manager  # noqa: PLC0415
 
     try:
         log.info("Starting Temporal worker...")

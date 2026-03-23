@@ -41,7 +41,7 @@ def make_pipelex_for_cli(
         context: The CLI context for error messages.
         library_dirs: The library directories to use for the Pipelex instance.
         needs_inference: When False, skip inference setup (credentials, gateway, telemetry).
-        temporal_enabled: When provided, overrides the deep_flow.is_enabled config value.
+        temporal_enabled: When provided, overrides the temporal.is_enabled config value.
         needs_model_specs: When True, load real model specs even without inference.
 
     Returns:

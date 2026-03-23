@@ -84,8 +84,8 @@ def make_tprl_pipe_router_top(
     should_auto_connect_temporal: bool = True,
     worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
 ) -> PipeRouterTop:
-    """This factory is only passing your settings or using defaults from pipelex.deep_flow's config."""
-    worker_config = get_config().deep_flow.worker_config
+    """This factory is only passing your settings or using defaults from pipelex.temporal's config."""
+    worker_config = get_config().temporal.worker_config
     return PipeRouterTop(
         task_queue=task_queue or worker_config.task_queue,
         workflow_execution_timeout=workflow_execution_timeout or worker_config.workflow_execution_timeout,

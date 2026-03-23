@@ -74,6 +74,7 @@ class PipelexHub:
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
+        self._pipe_router_top: PipeRouterProtocol | None = None
 
         # pipeline
         self._pipeline_manager: PipelineManagerAbstract | None = None
@@ -179,6 +180,9 @@ class PipelexHub:
 
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
+
+    def set_pipe_router_top(self, pipe_router_top: PipeRouterProtocol):
+        self._pipe_router_top = pipe_router_top
 
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
@@ -292,6 +296,17 @@ class PipelexHub:
         return self._pipe_library
 
     def get_required_pipe_router(self) -> PipeRouterProtocol:
+        # When Temporal is enabled, auto-switch between top (outside workflow) and child (inside workflow)
+        if self._pipe_router_top is not None:
+            from pipelex.temporal.temporal_workflow_utils import is_in_temporal_workflow  # noqa: PLC0415
+
+            if is_in_temporal_workflow():
+                if self._pipe_router is None:
+                    msg = "PipeRouterChild is not initialized"
+                    raise RuntimeError(msg)
+                return self._pipe_router
+            return self._pipe_router_top
+        # Direct mode: return the single router
         if self._pipe_router is None:
             msg = "PipeRouter is not initialized"
             raise RuntimeError(msg)

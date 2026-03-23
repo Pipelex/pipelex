@@ -6,7 +6,7 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_secret
 from pipelex.system.environment import get_required_env
-from pipelex.temporal.config_deep_flow import SecretMethod, TemporalConfigError, TemporalServerConfig
+from pipelex.temporal.config_temporal import SecretMethod, TemporalConfigError, TemporalServerConfig
 from pipelex.temporal.exceptions import TemporalServerError
 from pipelex.temporal.temporal_data_converter import data_converter
 
@@ -70,7 +70,7 @@ async def connect_to_temporal_selected_server(
     selected_server_config: str,
 ) -> TemporalClient:
     """Connect to Temporal using the server selected by argument."""
-    temporal_config = get_config().deep_flow.temporal_config
+    temporal_config = get_config().temporal.temporal_config
     log.dev(f"Using Temporal server config named: '{selected_server_config}'")
     server_config = temporal_config.temporal_server_configs.get(selected_server_config)
     if not server_config:
@@ -83,7 +83,7 @@ async def connect_to_temporal_selected_server(
 
 async def connect_to_temporal() -> TemporalClient:
     """Connect to Temporal using the server selected from the config."""
-    temporal_config = get_config().deep_flow.temporal_config
+    temporal_config = get_config().temporal.temporal_config
     return await connect_to_temporal_selected_server(
         selected_server_config=temporal_config.selected_server,
     )

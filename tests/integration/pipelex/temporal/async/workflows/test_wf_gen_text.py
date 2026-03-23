@@ -9,9 +9,9 @@
 # from temporalio import activity
 # from temporalio.client import Client as TemporalClient
 
-# from deep_flow.deep_flow_hub import get_task_manager
-# from deep_flow.tprl_content_generation.act_llm_generate import act_llm_gen_text
-# from deep_flow.tprl_content_generation.wf_make_llm_text import WfMakeLLMText
+# from pipelex.temporal.temporal_hub import get_task_manager
+# from pipelex.temporal.tprl_content_generation.act_llm_generate import act_llm_gen_text
+# from pipelex.temporal.tprl_content_generation.wf_make_llm_text import WfMakeLLMText
 
 # USER_TEXT_FOR_BASE = """
 # Write a detailed description of a woman's clothing in the style of a 19th-century novel.

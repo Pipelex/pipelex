@@ -5,8 +5,8 @@
 # from pipelex.cogt.content_generation.assignment_models import Jinja2Assignment
 # from temporalio.client import Client as TemporalClient
 
-# from deep_flow.deep_flow_hub import get_task_manager
-# from deep_flow.tprl_content_generation.wf_make_jinja2_text import WfMakeJinja2Text
+# from pipelex.temporal.temporal_hub import get_task_manager
+# from pipelex.temporal.tprl_content_generation.wf_make_jinja2_text import WfMakeJinja2Text
 
 # TODO: fix and restore this test
 

@@ -12,10 +12,11 @@ from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
-from pipelex.hub import get_required_pipe
+from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.batch.pipe_batch import PipeBatch
 from pipelex.pipe_controllers.batch.pipe_batch_blueprint import PipeBatchBlueprint
 from pipelex.pipe_controllers.condition.pipe_condition import PipeCondition
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
@@ -171,11 +172,14 @@ class SubPipe(BaseModel):
                 concept_codes_from_the_same_domain=[concept.code for concept in sub_pipe.concept_dependencies],
             )
             try:
-                pipe_output = await pipe_batch.run_pipe(
-                    job_metadata=job_metadata,
-                    working_memory=working_memory,
-                    pipe_run_params=sub_pipe_run_params,
-                    output_name=self.output_name,
+                pipe_output = await get_pipe_router().run(
+                    pipe_job=PipeJobFactory.make_pipe_job(
+                        pipe=pipe_batch,
+                        job_metadata=job_metadata,
+                        working_memory=working_memory,
+                        pipe_run_params=sub_pipe_run_params,
+                        output_name=self.output_name,
+                    ),
                 )
             finally:
                 # Clean up synthetic stuff injected for dotted-path resolution
@@ -183,11 +187,14 @@ class SubPipe(BaseModel):
                     working_memory.remove_stuff(name=synthetic_flat_name)
         # Case 2: Condition processing
         elif isinstance(sub_pipe, PipeCondition):
-            pipe_output = await sub_pipe.run_pipe(
-                job_metadata=job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=sub_pipe_run_params,
-                output_name=self.output_name,
+            pipe_output = await get_pipe_router().run(
+                pipe_job=PipeJobFactory.make_pipe_job(
+                    pipe=sub_pipe,
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=sub_pipe_run_params,
+                    output_name=self.output_name,
+                ),
             )
         else:
             # Case 3: Normal processing
@@ -213,11 +220,14 @@ class SubPipe(BaseModel):
                     concept_code=None,
                 ) from exc
             log.verbose(required_stuffs, title=f"Required stuffs for {self.pipe_code}")
-            pipe_output = await sub_pipe.run_pipe(
-                job_metadata=job_metadata,
-                working_memory=working_memory,
-                pipe_run_params=sub_pipe_run_params,
-                output_name=self.output_name,
+            pipe_output = await get_pipe_router().run(
+                pipe_job=PipeJobFactory.make_pipe_job(
+                    pipe=sub_pipe,
+                    job_metadata=job_metadata,
+                    working_memory=working_memory,
+                    pipe_run_params=sub_pipe_run_params,
+                    output_name=self.output_name,
+                ),
             )
 
         return pipe_output

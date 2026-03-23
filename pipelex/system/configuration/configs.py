@@ -9,7 +9,7 @@ from pipelex.graph.graph_config import GraphConfig
 from pipelex.language.mthds_config import MthdsConfig
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.system.configuration.config_root import ConfigRoot
-from pipelex.temporal.config_deep_flow import DeepFlow
+from pipelex.temporal.config_temporal import Temporal
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
 from pipelex.tools.storage.storage_config import StorageConfig
@@ -202,6 +202,6 @@ class MigrationConfig(ConfigModel):
 class PipelexConfig(ConfigRoot):
     session_id: str = shortuuid.uuid()
     cogt: Cogt
-    deep_flow: DeepFlow
+    temporal: Temporal
     pipelex: Pipelex
     migration: MigrationConfig

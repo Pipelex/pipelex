@@ -68,8 +68,8 @@ class WorkflowExecutor(WorkflowCaller, Generic[WorkflowInput, WorkflowOutput]):
 
     async def temporal_client(self) -> TemporalClient:
         """Get the temporal client, raising an error if not set."""
-        if not get_config().deep_flow.is_enabled:
-            msg = "Temporal is not enabled. Set deep_flow.is_enabled = true in pipelex.toml or use --temporal CLI flag."
+        if not get_config().temporal.is_enabled:
+            msg = "Temporal is not enabled. Set temporal.is_enabled = true in pipelex.toml or use --temporal CLI flag."
             raise WorkflowExecutionError(msg)
         if self._temporal_client is None:
             if self.should_auto_connect_temporal:
@@ -227,8 +227,8 @@ class WorkflowExecutorFactory(Generic[WorkflowInput, WorkflowOutput]):
         should_auto_connect_temporal: bool = False,
         worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
     ) -> WorkflowExecutor[WorkflowInput, WorkflowOutput]:
-        """Creates a WorkflowExecutor with configuration from pipelex.deep_flow's config if not provided."""
-        config = get_config().deep_flow.worker_config
+        """Creates a WorkflowExecutor with configuration from pipelex.temporal's config if not provided."""
+        config = get_config().temporal.worker_config
 
         return WorkflowExecutor[WorkflowInput, WorkflowOutput](
             task_queue=task_queue or config.task_queue,

@@ -9,9 +9,10 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
-from pipelex.hub import get_required_pipe
+from pipelex.hub import get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.exceptions import PipeRunError
+from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
 from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -156,11 +157,14 @@ class PipeBatch(PipeController):
                 },
             )
             branch_pipe_run_params.run_mode = pipe_run_params.run_mode
-            task = sub_pipe.run_pipe(
-                job_metadata=job_metadata,
-                working_memory=branch_memory,
-                output_name=None,
-                pipe_run_params=branch_pipe_run_params,
+            task = get_pipe_router().run(
+                pipe_job=PipeJobFactory.make_pipe_job(
+                    pipe=sub_pipe,
+                    job_metadata=job_metadata,
+                    working_memory=branch_memory,
+                    pipe_run_params=branch_pipe_run_params,
+                    output_name=None,
+                ),
             )
             tasks.append(task)
 

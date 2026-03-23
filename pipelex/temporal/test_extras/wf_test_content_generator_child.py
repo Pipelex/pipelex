@@ -9,10 +9,10 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.hub import get_model_deck
     from pipelex.pipeline.job_metadata import JobMetadata
     from pipelex.temporal.log_temporal import workflow_log
-    from pipelex.temporal.test_extras.deep_flow_registry_test_models import Person
+    from pipelex.temporal.test_extras.temporal_registry_test_models import Person
     from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
     from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
-    from tests.integration.pipelex.deep_flow.test_data import PipeTestCases
+    from tests.integration.pipelex.temporal.test_data import PipeTestCases
 
 
 USER_TEXT_FOR_BASE = """

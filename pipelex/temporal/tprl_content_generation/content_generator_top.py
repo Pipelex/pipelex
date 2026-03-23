@@ -79,7 +79,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             workflow=WfMakeLLMText.run,
             arg=llm_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
@@ -113,7 +113,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             workflow=WfMakeObject.run,
             arg=object_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
@@ -157,7 +157,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             workflow=WfMakeTextThenObject.run,
             arg=tto_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
@@ -191,7 +191,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             workflow=WfMakeObjectList.run,
             arg=object_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
@@ -236,7 +236,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             workflow=WfMakeTextThenObjectList.run,
             arg=tto_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
@@ -300,7 +300,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             workflow=WfMakeImages.run,
             arg=img_gen_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
@@ -343,7 +343,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             workflow=WfMakeImages.run,
             arg=img_gen_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
@@ -379,7 +379,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             WfMakeJinja2Text.run,
             arg=templating_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
@@ -441,7 +441,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             workflow=WfMakeExtract.run,
             arg=extract_assignment,
             id=workflow_id,
-            task_queue=self.task_queue or get_config().deep_flow.worker_config.task_queue,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
