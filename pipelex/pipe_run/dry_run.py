@@ -124,7 +124,8 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
             case DryRunStatus.SKIPPED:
                 skipped_pipes.append(pipe_ref)
 
-    # Compare using bare pipe_code from DryRunOutput since allowed_to_fail_pipes uses bare codes
+    # TODO: allowed_to_fail_pipes uses bare codes, so one allowed code can silently match pipes from multiple domains.
+    #  Consider supporting namespaced pipe_refs (e.g. "domain.pipe_code") in the config to allow precise targeting.
     unexpected_failures = {pipe_ref: results[pipe_ref] for pipe_ref in failed_pipes if results[pipe_ref].pipe_code not in allowed_to_fail_pipes}
 
     log.verbose(
