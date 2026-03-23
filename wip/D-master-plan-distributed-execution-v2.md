@@ -91,7 +91,7 @@ async def act_library_setup(library_context: LibraryContext) -> None:
     # 4. Cache fingerprint
 ```
 
-- Replay-safe (activities re-execute cleanly on replay)
+- Retry-safe (activities may re-execute due to retries/failures)
 - Idempotent (same fingerprint = no-op via in-process cache)
 - Uses `library_manager.load_from_blueprints()` (already exists)
 

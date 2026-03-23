@@ -138,9 +138,9 @@ For workflows with additional library content beyond the base, a `LibraryContext
 ```python
 class LibraryContext(BaseModel):
     """Describes library content that must be loaded on the worker before execution."""
-    bundles: dict[str, str]           # filename -> mthds content (multiple files)
+    bundles: list[BundleContent]                             # One or more .mthds files
     manifest_content: str | None      # METHODS.toml content, if present
-    dependency_metadata: list[ResolvedDependencyRef] | None  # pre-resolved dep refs
+    resolved_dependencies: list[ResolvedDependencyRef] | None  # pre-resolved dep refs
     fingerprint: str                  # SHA256 hash for caching
 ```
 

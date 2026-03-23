@@ -2,7 +2,7 @@
 
 > **Status**: Draft — braindump cleanup
 > **Date**: 2026-03-23
-> **Related**: [temporal-library-fix-proposals-v2.md](temporal-library-fix-proposals-v2.md)
+> **Related**: [A-temporal-library-fix-proposals-v2.md](A-temporal-library-fix-proposals-v2.md)
 
 ---
 

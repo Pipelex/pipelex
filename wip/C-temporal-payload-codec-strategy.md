@@ -2,7 +2,7 @@
 
 > **Status**: Draft
 > **Date**: 2026-03-23
-> **Related**: [temporal-library-fix-proposals-v2.md](temporal-library-fix-proposals-v2.md), [library-as-execution-context.md](library-as-execution-context.md)
+> **Related**: [A-temporal-library-fix-proposals-v2.md](A-temporal-library-fix-proposals-v2.md), [B-library-as-execution-context.md](B-library-as-execution-context.md)
 
 ---
 
@@ -149,7 +149,7 @@ The same `data_converter` (with the same codec) must be used on both the client 
 
 ## 5. How This Simplifies the v2 Architecture
 
-The v2 proposals ([temporal-library-fix-proposals-v2.md](temporal-library-fix-proposals-v2.md)) identified several concerns around payload size. Here's how the codec approach resolves them:
+The v2 proposals ([A-temporal-library-fix-proposals-v2.md](A-temporal-library-fix-proposals-v2.md)) identified several concerns around payload size. Here's how the codec approach resolves them:
 
 | v2 concern | Without codec | With codec |
 |---|---|---|
