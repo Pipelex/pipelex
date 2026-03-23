@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, Any, Mapping, cast
 
 import tomlkit
 from tomlkit import array, document, inline_table, table
-from tomlkit import string as tomlkit_string
 
 from pipelex import log
 from pipelex.config import get_config
+from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.misc.json_utils import remove_none_values_from_dict
 from pipelex.types import StrEnum
 
@@ -35,23 +35,18 @@ class MthdsFactory:
     @classmethod
     def format_tomlkit_string(cls, text: str) -> Any:  # Can't type this because of tomlkit
         r"""Build a tomlkit string node.
-        - If `force_multiline` or the text contains '\\n', we emit a triple-quoted multiline string.
-        - When multiline, `ensure_trailing_newline` puts the closing quotes on their own line.
-        - When multiline, `ensure_leading_blank_line` inserts a real blank line at the start of the string.
+
+        Delegates to the shared `format_toml_string` utility, passing config values.
         """
         strings_config = cls._mthds_config().strings
-
-        needs_multiline = strings_config.force_multiline or ("\n" in text) or len(text) > strings_config.length_limit_to_multiline
-        normalized = text
-
-        if needs_multiline:
-            if strings_config.ensure_leading_blank_line and not normalized.startswith("\n"):
-                normalized = "\n" + normalized
-            if strings_config.ensure_trailing_newline and not normalized.endswith("\n"):
-                normalized += "\n"
-
-        use_literal = strings_config.prefer_literal and ("'''" not in normalized)
-        return tomlkit_string(normalized, multiline=needs_multiline, literal=use_literal)
+        return format_toml_string(
+            text,
+            force_multiline=strings_config.force_multiline,
+            length_limit_to_multiline=strings_config.length_limit_to_multiline,
+            ensure_trailing_newline=strings_config.ensure_trailing_newline,
+            ensure_leading_blank_line=strings_config.ensure_leading_blank_line,
+            prefer_literal=strings_config.prefer_literal,
+        )
 
     @classmethod
     def convert_dicts_to_inline_tables(cls, value: Any, field_ordering: list[str] | None = None) -> Any:  # Can't type this because of tomlkit
