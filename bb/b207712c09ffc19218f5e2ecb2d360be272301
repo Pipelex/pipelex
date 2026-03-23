@@ -1,0 +1,31 @@
+tests/unit/pipelex/language/test_toml_string_utils.py
+  63df80deb3515053 1-75
+pipelex/language/toml_string_utils.py
+  63df80deb3515053 1-43
+pipelex/language/mthds_factory.py
+  63df80deb3515053 10,38-39,42-48
+pipelex/cli/agent_cli/commands/concept_cmd.py
+  63df80deb3515053 14,34,47
+pipelex/cli/agent_cli/commands/pipe_cmd.py
+  63df80deb3515053 103,137,139,160,209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "bbb207712c09ffc19218f5e2ecb2d360be272301",
+  "prompts": {
+    "63df80deb3515053": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "68727665-9150-47b3-a1b6-3f6f0ed7770b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 147,
+      "total_deletions": 40,
+      "accepted_lines": 136,
+      "overriden_lines": 0
+    }
+  }
+}
