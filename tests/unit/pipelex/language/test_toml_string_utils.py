@@ -10,6 +10,12 @@ from pipelex.language.toml_string_utils import format_toml_string
 class TestFormatTomlString:
     """Verify format_toml_string produces correct tomlkit string nodes."""
 
+    def test_empty_string_stays_basic(self) -> None:
+        """An empty string should remain a single-line basic string."""
+        result = format_toml_string("")
+        rendered = result.as_string()
+        assert rendered == '""'
+
     def test_short_string_stays_basic(self) -> None:
         """A short string without newlines should remain a single-line basic string."""
         result = format_toml_string("hello world")
