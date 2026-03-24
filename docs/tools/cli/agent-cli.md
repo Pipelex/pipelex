@@ -1,12 +1,12 @@
 ---
-description: "Use the pipelex-agent CLI for machine-oriented JSON output — designed for AI agents, IDE extensions, and automation toolchains."
+description: "Use the pipelex-agent CLI for machine-oriented output — designed for AI agents, IDE extensions, and automation toolchains."
 ---
 
 # Agent CLI (`pipelex-agent`)
 
-The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. All output is structured JSON written to stdout (success) or stderr (error), with no Rich formatting or interactive prompts.
+The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — JSON, raw TOML, or markdown — with no Rich formatting or interactive prompts. Errors always go to stderr as JSON.
 
-Its structured JSON output makes it well-suited for piping into other tools (e.g., `jq`), scripting, and integration into larger workflows. It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
+It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
 ## Global Options
 
