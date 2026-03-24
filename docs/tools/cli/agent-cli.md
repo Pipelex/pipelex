@@ -1,12 +1,12 @@
 ---
-description: "Use the pipelex-agent CLI for machine-oriented JSON output — designed for AI agents, IDE extensions, and automation toolchains."
+description: "Use the pipelex-agent CLI for machine-oriented output — designed for AI agents, IDE extensions, and automation toolchains."
 ---
 
 # Agent CLI (`pipelex-agent`)
 
-The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. All output is structured JSON written to stdout (success) or stderr (error), with no Rich formatting or interactive prompts.
+The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — JSON, raw TOML, or markdown — with no Rich formatting or interactive prompts. Errors always go to stderr as JSON.
 
-Its structured JSON output makes it well-suited for piping into other tools (e.g., `jq`), scripting, and integration into larger workflows. It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
+It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
 ## Global Options
 
@@ -87,17 +87,21 @@ These commands do not have subcommands:
 |---------|-------------|
 | `fmt` | Format a `.mthds`/`.toml`/`.plx` file in-place (delegates to `plxt`) |
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
-| `concept` | Convert a JSON concept spec into TOML |
-| `pipe` | Convert a JSON pipe spec into TOML |
-| `assemble` | Merge concept and pipe TOML sections into a complete `.mthds` file |
-| `models` | List available model presets, aliases, waterfalls, and talent mappings |
-| `doctor` | Check config, credentials, and model health |
+| `concept` | Convert a JSON concept spec into raw TOML (stdout) |
+| `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
+| `models` | List available model presets, aliases, waterfalls, and talent mappings (`--format markdown\|json`, default: markdown) |
+| `doctor` | Check config, credentials, and model health (`--format markdown\|json`, default: markdown) |
 
 ## Output Contract
 
-Every command (except `fmt` and `lint`) returns structured JSON.
+Commands use different stdout formats depending on their purpose:
 
-**Success** — written to stdout:
+- **JSON**: `run`, `validate`, `inputs`, `init` — structured JSON via `agent_success()`
+- **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
+- **Markdown or JSON**: `models`, `doctor` — markdown by default, JSON with `--format json`
+- **Passthrough**: `fmt`, `lint` — raw `plxt` output
+
+**JSON success** — written to stdout:
 
 ```json
 {
@@ -107,7 +111,7 @@ Every command (except `fmt` and `lint`) returns structured JSON.
 }
 ```
 
-Successful commands return the result object directly. They are not wrapped in a `status` or `data` envelope.
+JSON commands return the result object directly. They are not wrapped in a `status` or `data` envelope.
 
 **Error** — written to stderr:
 

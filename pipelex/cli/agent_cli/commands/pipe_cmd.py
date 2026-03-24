@@ -1,4 +1,4 @@
-"""Agent CLI pipe command - structure pipes from JSON specs with JSON/TOML output."""
+"""Agent CLI pipe command - structure pipes from JSON specs with raw TOML output."""
 
 # pyright: reportUnknownMemberType=false
 # pyright: reportArgumentType=false
@@ -27,8 +27,9 @@ from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.talents.extract_talent import ExtractTalent
 from pipelex.builder.talents.img_gen_talent import ImgGenTalent
 from pipelex.builder.talents.llm_talent import LLMTalent
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.core.pipes.pipe_blueprint import PipeType
+from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
 
 # Static talent-to-model preset mappings (from pipelex.toml defaults)
@@ -99,7 +100,7 @@ def _pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
     pipe_item_table.add("type", pipe_spec.type)
 
     # Add description
-    pipe_item_table.add("description", pipe_spec.description)
+    pipe_item_table.add("description", format_toml_string(pipe_spec.description))
 
     # Add inputs as inline table
     if pipe_spec.inputs:
@@ -133,9 +134,9 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         model_preset = LLM_TALENT_TO_MODEL.get(pipe_spec.llm_talent, "$writing-creative")
         pipe_table.add("model", model_preset)
         if pipe_spec.system_prompt:
-            pipe_table.add("system_prompt", pipe_spec.system_prompt)
+            pipe_table.add("system_prompt", format_toml_string(pipe_spec.system_prompt))
         if pipe_spec.prompt:
-            pipe_table.add("prompt", pipe_spec.prompt)
+            pipe_table.add("prompt", format_toml_string(pipe_spec.prompt))
 
     elif isinstance(pipe_spec, PipeComposeSpec):
         if pipe_spec.construct_spec is not None:
@@ -156,7 +157,7 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
             if pipe_spec.target_format is not None:
                 pipe_table.add("target_format", str(pipe_spec.target_format))
             if pipe_spec.template is not None:
-                pipe_table.add("template", pipe_spec.template)
+                pipe_table.add("template", format_toml_string(pipe_spec.template))
 
     elif isinstance(pipe_spec, PipeSequenceSpec):
         steps_array = tomlkit.array()
@@ -205,7 +206,7 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         # Convert img_gen_talent to model preset using static mappings
         model_preset = IMG_GEN_TALENT_TO_MODEL.get(pipe_spec.img_gen_talent, "$gen-image")
         pipe_table.add("model", model_preset)
-        pipe_table.add("prompt", pipe_spec.prompt)
+        pipe_table.add("prompt", format_toml_string(pipe_spec.prompt))
 
     elif isinstance(pipe_spec, PipeFuncSpec):
         pipe_table.add("function_name", pipe_spec.function_name)
@@ -336,7 +337,7 @@ def pipe_cmd(
     Takes a pipe specification in JSON format and converts it to valid Pipelex
     TOML format. Validates the spec before conversion.
 
-    Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
+    Outputs raw TOML to stdout on success, JSON to stderr on error with exit code 1.
 
     JSON spec format (varies by pipe type):
 
@@ -406,14 +407,7 @@ def pipe_cmd(
         pipe_spec = _parse_pipe_spec_from_json(resolved_pipe_type, spec_data)
         toml_content = _pipe_spec_to_toml(pipe_spec)
 
-        agent_success(
-            {
-                "success": True,
-                "pipe_code": pipe_spec.pipe_code,
-                "pipe_type": resolved_pipe_type,
-                "toml": toml_content,
-            }
-        )
+        print(toml_content, end="" if toml_content.endswith("\n") else "\n")
 
     except ValidationError as exc:
         message, details = format_pydantic_validation_error_for_agent(exc)
