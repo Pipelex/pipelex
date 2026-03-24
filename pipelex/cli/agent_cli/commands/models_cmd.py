@@ -1,4 +1,4 @@
-"""Agent CLI models command -- list available model presets, aliases, and talent mappings."""
+"""Agent CLI models command -- list available model presets, aliases, and waterfalls."""
 
 from typing import Annotated, Any
 
@@ -9,7 +9,6 @@ from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_e
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.models.model_deck import ModelDeck
-from pipelex.config import get_config
 from pipelex.hub import get_model_deck
 from pipelex.pipelex import Pipelex
 from pipelex.types import StrEnum
@@ -100,25 +99,6 @@ def _filter_waterfalls_by_backend(
     return filtered
 
 
-def _filter_talent_mappings_by_backend(
-    mappings: dict[str, str],
-    presets_dict: dict[str, Any],
-    model_deck: ModelDeck,
-    model_type: ModelType,
-    backend: str,
-) -> dict[str, str]:
-    """Filter talent mappings to only include those whose preset resolves to the given backend."""
-    filtered: dict[str, str] = {}
-    for talent_name, preset_name in mappings.items():
-        setting = presets_dict.get(preset_name)
-        if setting is None:
-            continue
-        spec = _resolve_preset_backend(model_deck, setting.model, model_type)
-        if spec is not None and spec.backend_name == backend:
-            filtered[talent_name] = preset_name
-    return filtered
-
-
 def _build_presets_for_category(
     model_deck: ModelDeck,
     category: ModelCategory,
@@ -198,31 +178,6 @@ def _build_waterfalls_for_category(
     return waterfalls
 
 
-def _build_talent_mappings_for_category(
-    model_deck: ModelDeck,
-    category: ModelCategory,
-    mappings: dict[str, str],
-    backend: str | None,
-) -> dict[str, str]:
-    """Build the talent mappings dict for a given category, optionally filtered by backend."""
-    if backend is None:
-        return mappings
-
-    model_type = CATEGORY_TO_MODEL_TYPE[category]
-    presets_dict: dict[str, Any]
-    match category:
-        case ModelCategory.LLM:
-            presets_dict = model_deck.llm_presets
-        case ModelCategory.EXTRACT:
-            presets_dict = model_deck.extract_presets
-        case ModelCategory.IMG_GEN:
-            presets_dict = model_deck.img_gen_presets
-        case ModelCategory.SEARCH:
-            presets_dict = model_deck.search_presets
-
-    return _filter_talent_mappings_by_backend(mappings, presets_dict, model_deck, model_type, backend)
-
-
 CATEGORY_DISPLAY_NAMES: dict[str, str] = {
     "llm": "LLM",
     "img_gen": "Image Generation",
@@ -238,47 +193,41 @@ def _format_models_markdown(result: dict[str, Any]) -> str:
     presets: dict[str, list[dict[str, Any]]] = result["presets"]
     aliases: dict[str, dict[str, str]] = result["aliases"]
     waterfalls: dict[str, dict[str, list[str]]] = result["waterfalls"]
-    talent_mappings: dict[str, dict[str, str]] = result["talent_mappings"]
 
     for category_key, display_name in CATEGORY_DISPLAY_NAMES.items():
         cat_presets = presets.get(category_key, [])
         cat_aliases = aliases.get(category_key, {})
         cat_waterfalls = waterfalls.get(category_key, {})
-        cat_talents = talent_mappings.get(category_key, {})
 
-        if not cat_presets and not cat_aliases and not cat_waterfalls and not cat_talents:
+        if not cat_presets and not cat_aliases and not cat_waterfalls:
             continue
 
         lines.append(f"\n## {display_name}")
 
         if cat_presets:
-            lines.append("\n### Presets\n")
+            lines.append("\n### Presets")
+            lines.append("\nPresets are the preferred way to specify models — each preset bundles a model with relevant settings.\n")
             for preset in cat_presets:
                 description = preset.get("description", "")
                 if description:
-                    lines.append(f"- **{preset['name']}**: {description}")
+                    lines.append(f"- ${preset['name']}: {description}")
                 else:
-                    lines.append(f"- **{preset['name']}**")
+                    lines.append(f"- ${preset['name']}")
 
         if cat_aliases:
-            lines.append("\n### Aliases\n")
+            lines.append("\n### Aliases")
+            lines.append(
+                "\nAliases provide stable names that can be retargeted when new models come out, so pipelines stay up to date without edits.\n"
+            )
             for alias_name, alias_target in cat_aliases.items():
-                lines.append(f"- **{alias_name}** \u2192 {alias_target}")
+                lines.append(f"- @{alias_name} \u2192 {alias_target}")
 
         if cat_waterfalls:
-            lines.append("\n### Waterfalls\n")
+            lines.append("\n### Waterfalls")
+            lines.append("\nWaterfalls define ordered fallback chains — if the first model is unavailable, the next one is tried automatically.\n")
             for waterfall_name, fallback_list in cat_waterfalls.items():
                 chain = " \u2192 ".join(fallback_list)
-                lines.append(f"- **{waterfall_name}**: {chain}")
-
-        if cat_talents:
-            lines.append("\n### Talent Mappings\n")
-            for talent_name, preset_name in cat_talents.items():
-                lines.append(f"- **{talent_name}** \u2192 {preset_name}")
-
-    hint = result.get("talent_mappings_usage_hint")
-    if hint:
-        lines.append(f"\n---\n\n{hint}")
+                lines.append(f"- ~{waterfall_name}: {chain}")
 
     return "\n".join(lines)
 
@@ -298,7 +247,7 @@ def agent_models_cmd(
         typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
     ] = CliOutputFormat.MARKDOWN,
 ) -> None:
-    """List available model presets, aliases, waterfalls, and talent mappings.
+    """List available model presets, aliases, and waterfalls.
 
     Outputs model configuration that an agent needs to reference when building pipelines.
     Default output is markdown; use --format json for structured JSON.
@@ -307,50 +256,36 @@ def agent_models_cmd(
         make_pipelex_for_agent_cli(log_level=ctx.obj["log_level"], needs_inference=False, needs_model_specs=backend is not None)
 
         model_deck = get_model_deck()
-        builder_config = get_config().pipelex.builder_config
-        talent_mappings = builder_config.talent_preset_mappings
 
         presets: dict[str, list[dict[str, Any]]] = {}
         aliases: dict[str, dict[str, str]] = {}
         waterfalls: dict[str, dict[str, list[str]]] = {}
-        talent: dict[str, dict[str, str]] = {}
 
         if _should_include(ModelCategory.LLM, model_type):
             presets["llm"] = _build_presets_for_category(model_deck, ModelCategory.LLM, backend)
             aliases["llm"] = _build_aliases_for_category(model_deck, ModelCategory.LLM, backend)
             waterfalls["llm"] = _build_waterfalls_for_category(model_deck, ModelCategory.LLM, backend)
-            talent["llm"] = _build_talent_mappings_for_category(model_deck, ModelCategory.LLM, talent_mappings.llm, backend)
 
         if _should_include(ModelCategory.IMG_GEN, model_type):
             presets["img_gen"] = _build_presets_for_category(model_deck, ModelCategory.IMG_GEN, backend)
             aliases["img_gen"] = _build_aliases_for_category(model_deck, ModelCategory.IMG_GEN, backend)
             waterfalls["img_gen"] = _build_waterfalls_for_category(model_deck, ModelCategory.IMG_GEN, backend)
-            talent["img_gen"] = _build_talent_mappings_for_category(model_deck, ModelCategory.IMG_GEN, talent_mappings.img_gen, backend)
 
         if _should_include(ModelCategory.EXTRACT, model_type):
             presets["extract"] = _build_presets_for_category(model_deck, ModelCategory.EXTRACT, backend)
             aliases["extract"] = _build_aliases_for_category(model_deck, ModelCategory.EXTRACT, backend)
             waterfalls["extract"] = _build_waterfalls_for_category(model_deck, ModelCategory.EXTRACT, backend)
-            talent["extract"] = _build_talent_mappings_for_category(model_deck, ModelCategory.EXTRACT, talent_mappings.extract, backend)
 
         if _should_include(ModelCategory.SEARCH, model_type):
             presets["search"] = _build_presets_for_category(model_deck, ModelCategory.SEARCH, backend)
             aliases["search"] = _build_aliases_for_category(model_deck, ModelCategory.SEARCH, backend)
             waterfalls["search"] = _build_waterfalls_for_category(model_deck, ModelCategory.SEARCH, backend)
-            talent["search"] = _build_talent_mappings_for_category(model_deck, ModelCategory.SEARCH, talent_mappings.search, backend)
 
         result: dict[str, Any] = {
             "success": True,
             "presets": presets,
             "aliases": aliases,
             "waterfalls": waterfalls,
-            "talent_mappings": talent,
-            "talent_mappings_usage_hint": (
-                "Talent mappings show which model preset corresponds to each talent."
-                " When building pipes, use the model preset name directly as the 'model' field"
-                " in pipe specs passed to 'pipelex-agent pipe --spec'."
-                " Example: model = '$writing-creative'"
-            ),
         }
 
         match output_format:
