@@ -1,0 +1,23 @@
+pipelex/pipe_run/dry_run.py
+  21ebfafdd2c6aa66 127-128
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "37df6364bafe5d8fbd56bb1d23948eaa5475627a",
+  "prompts": {
+    "21ebfafdd2c6aa66": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b967e374-d88f-4fd2-a118-743fa2304bf2",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 1,
+      "accepted_lines": 2,
+      "overriden_lines": 0
+    }
+  }
+}
