@@ -1,10 +1,10 @@
-"""Agent CLI doctor command -- JSON health report with no interactive prompts."""
+"""Agent CLI doctor command -- health report with no interactive prompts."""
 
 from typing import Annotated, Any
 
 import typer
 
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success
 from pipelex.cli.commands.doctor_cmd import (
     ConfigLocationInfo,
     check_backend_credentials,
@@ -16,6 +16,77 @@ from pipelex.cli.commands.doctor_cmd import (
 from pipelex.system.configuration.config_loader import config_manager
 
 
+def _status_icon(healthy: bool) -> str:
+    """Return a status emoji: checkmark for healthy, warning for unhealthy."""
+    return "\u2705" if healthy else "\u26a0\ufe0f"
+
+
+def _format_doctor_markdown(result: dict[str, Any]) -> str:
+    """Format the doctor result dict as markdown with bullet points."""
+    all_healthy: bool = result["all_healthy"]
+    config_location: dict[str, Any] = result["config_location"]
+    checks: dict[str, Any] = result["checks"]
+
+    status_text = f"All healthy {_status_icon(True)}" if all_healthy else f"Issues found {_status_icon(False)}"
+    location_type = "project-local" if config_location.get("is_project_local") else "global"
+
+    lines: list[str] = [
+        "# Pipelex Health Check",
+        "",
+        f"**Status:** {status_text}",
+        f"**Config location:** {config_location['config_dir']} ({location_type})",
+    ]
+
+    # Config Files
+    config_check = checks["config_files"]
+    lines.append(f"\n## Config Files \u2014 {_status_icon(config_check['healthy'])}\n")
+    lines.append(config_check["message"])
+
+    # Telemetry
+    telemetry_check = checks["telemetry"]
+    lines.append(f"\n## Telemetry \u2014 {_status_icon(telemetry_check['healthy'])}\n")
+    lines.append(telemetry_check["message"])
+
+    # Backend Credentials
+    creds_check = checks["backend_credentials"]
+    lines.append(f"\n## Backend Credentials \u2014 {_status_icon(creds_check['healthy'])}\n")
+    lines.append(creds_check["message"])
+    for backend_entry in creds_check.get("backends", []):
+        name = backend_entry["backend_name"]
+        if backend_entry["all_credentials_valid"]:
+            lines.append(f"- **{name}**: All credentials valid")
+        else:
+            issues: list[str] = []
+            missing = backend_entry.get("missing_vars")
+            if missing:
+                issues.append(f"missing: {', '.join(missing)}")
+            placeholder = backend_entry.get("placeholder_vars")
+            if placeholder:
+                issues.append(f"placeholder: {', '.join(placeholder)}")
+            lines.append(f"- **{name}**: {'; '.join(issues) or 'credentials invalid'}")
+
+    # Models
+    models_check = checks["models"]
+    lines.append(f"\n## Models \u2014 {_status_icon(models_check['healthy'])}\n")
+    lines.append(models_check["message"])
+    for file_entry in models_check.get("backend_files", []):
+        name = file_entry["backend_name"]
+        if file_entry["is_valid"]:
+            lines.append(f"- **{name}** (`{file_entry['file_path']}`): Valid")
+        else:
+            error_msg = file_entry.get("error_message", "unknown error")
+            lines.append(f"- **{name}** (`{file_entry['file_path']}`): Invalid \u2014 {error_msg}")
+
+    # Recommended Actions
+    recommended = result.get("recommended_actions", [])
+    if recommended:
+        lines.append("\n## Recommended Actions\n")
+        for index, action in enumerate(recommended, 1):
+            lines.append(f"{index}. {action}")
+
+    return "\n".join(lines)
+
+
 def agent_doctor_cmd(
     global_: Annotated[
         bool,
@@ -25,13 +96,18 @@ def agent_doctor_cmd(
             help="Force checking the global ~/.pipelex/ directory.",
         ),
     ] = False,
+    output_format: Annotated[
+        CliOutputFormat,
+        typer.Option("--format", help="Output format: markdown (default) or json (structured)"),
+    ] = CliOutputFormat.MARKDOWN,
 ) -> None:
-    """Check Pipelex configuration health and output a JSON report.
+    """Check Pipelex configuration health and output a diagnostic report.
 
     Unlike the human CLI doctor, this command:
-    - Outputs structured JSON to stdout (never Rich panels or colors)
     - Does not offer interactive fixes (diagnostic-only)
     - Includes ``recommended_actions`` for programmatic remediation
+
+    Default output is markdown; use --format json for structured JSON.
 
     Target directory: auto-detects project .pipelex/ if present, else ~/.pipelex/.
     Use --global/-g to force checking the global ~/.pipelex/ directory.
@@ -143,4 +219,8 @@ def agent_doctor_cmd(
     if recommended_actions:
         result["recommended_actions"] = recommended_actions
 
-    agent_success(result)
+    match output_format:
+        case CliOutputFormat.JSON:
+            agent_success(result)
+        case CliOutputFormat.MARKDOWN:
+            print(_format_doctor_markdown(result))
