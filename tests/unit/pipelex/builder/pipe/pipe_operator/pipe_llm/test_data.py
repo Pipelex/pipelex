@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
-from pipelex.builder.talents.llm_talent import LLMTalent
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 
 
@@ -13,7 +12,7 @@ class PipeLLMTestCases:
             description="Generate text",
             inputs={"topic": "Text"},
             output="Text",
-            llm_talent=LLMTalent.CREATIVE_WRITER,
+            model="$writing-creative",
             prompt="Write about $topic",
         ),
         PipeLLMBlueprint(
@@ -34,7 +33,7 @@ class PipeLLMTestCases:
             description="Generate without inputs",
             inputs={},
             output="Text",
-            llm_talent=LLMTalent.CREATIVE_WRITER,
+            model="$writing-creative",
             prompt="Generate something interesting",
         ),
         PipeLLMBlueprint(
@@ -55,7 +54,7 @@ class PipeLLMTestCases:
             inputs={"image": "Image"},
             output="Text",
             prompt="Analyze the image: $image",
-            llm_talent=LLMTalent.VISION_LANGUAGE_MODEL,
+            model="$vision",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -76,7 +75,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm_talent=LLMTalent.CREATIVE_WRITER,
+            model="$writing-creative",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -96,7 +95,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Text",
             prompt="Generate text",
-            llm_talent=LLMTalent.DATA_RETRIEVAL,
+            model="$retrieval",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -117,7 +116,7 @@ class PipeLLMTestCases:
             output="Analysis",
             system_prompt="You are a data analyst",
             prompt="Analyze: @data",
-            llm_talent=LLMTalent.DATA_RETRIEVAL,
+            model="$retrieval",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -139,7 +138,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[]",
             prompt="Generate items",
-            llm_talent=LLMTalent.CREATIVE_WRITER,
+            model="$writing-creative",
         ),
         PipeLLMBlueprint(
             source=None,
@@ -159,7 +158,7 @@ class PipeLLMTestCases:
             inputs={},
             output="Item[5]",
             prompt="Generate items",
-            llm_talent=LLMTalent.CREATIVE_WRITER,
+            model="$writing-creative",
         ),
         PipeLLMBlueprint(
             source=None,

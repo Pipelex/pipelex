@@ -41,7 +41,7 @@ class TestFormatModelsMarkdown:
             "extract": {},
             "search": {},
         },
-        "talent_mappings_usage_hint": "Use the talent name as the value for llm_talent",
+        "talent_mappings_usage_hint": "Talent mappings show which model preset corresponds to each talent.",
     }
 
     def test_output_starts_with_heading(self) -> None:
@@ -82,7 +82,7 @@ class TestFormatModelsMarkdown:
     def test_hint_present(self) -> None:
         """Usage hint should appear at the bottom."""
         output = _format_models_markdown(self._FULL_RESULT)
-        assert "Use the talent name as the value for llm_talent" in output
+        assert "Talent mappings show which model preset corresponds to each talent." in output
 
     def test_empty_categories_omitted(self) -> None:
         """Categories with no data should not appear in output."""
