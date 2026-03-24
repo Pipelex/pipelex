@@ -40,6 +40,8 @@ Introduce the LibraryCrate as the universal intermediate representation for libr
 
 ## Phase 0: Pipe Namespace Fix (`pipe_ref`)
 
+> **Status**: Complete — PR #780 (628e414d)
+
 **Goal**: Pipes are indexed by domain-qualified `pipe_ref` (`domain.pipe_code`), symmetric with how concepts use `concept_ref` (`domain.ConceptCode`). Multiple bundles can contribute to the same domain.
 
 **Why first**: The LibraryCrate organizes content by domain. If pipes can collide across domains, the crate can't reliably merge content. This fix is also valuable independently — it eliminates a latent bug.
@@ -70,14 +72,14 @@ See [E-pipe-namespace-fix.md](E-pipe-namespace-fix.md) for the full technical sp
 
 ### Done when
 
-- [ ] All existing tests pass with `pipe_ref`-based indexing
-- [ ] New unit test: two pipes with same code in different domains coexist in one `PipeLibrary`
-- [ ] New unit test: domain-qualified lookup returns correct pipe when same code exists in multiple domains
-- [ ] New unit test: bare-code lookup still works when unambiguous (single domain)
-- [ ] New unit test: bare-code lookup raises when ambiguous (same code in multiple domains)
-- [ ] New unit test: multiple bundles for the same domain can be loaded (domain merging)
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+- [x] All existing tests pass with `pipe_ref`-based indexing
+- [x] New unit test: two pipes with same code in different domains coexist in one `PipeLibrary`
+- [x] New unit test: domain-qualified lookup returns correct pipe when same code exists in multiple domains
+- [x] New unit test: bare-code lookup still works when unambiguous (single domain)
+- [x] New unit test: bare-code lookup raises when ambiguous (same code in multiple domains)
+- [x] New unit test: multiple bundles for the same domain can be loaded (domain merging)
+- [x] `make agent-check` passes
+- [x] `make agent-test` passes
 
 ---
 
