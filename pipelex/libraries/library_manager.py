@@ -17,7 +17,6 @@ from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
-from pipelex.core.domains.domain import Domain
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.core.domains.domain_factory import DomainFactory
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
@@ -34,6 +33,7 @@ from pipelex.libraries.exceptions import (
     LibraryLoadingError,
 )
 from pipelex.libraries.library import Library
+from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.library_utils import (
@@ -49,6 +49,7 @@ if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
     from pipelex.core.domains.domain import Domain
+    from pipelex.libraries.library_crate import LibraryCrate
 
 MTHDS_METHODS_DIRNAME = ".mthds/methods"
 
@@ -335,8 +336,72 @@ class LibraryManager(LibraryManagerAbstract):
         return all_concepts
 
     @override
+    def load_from_crate(self, library_id: str, crate: "LibraryCrate") -> list[PipeAbstract]:
+        """Load a LibraryCrate into a live Library.
+
+        Args:
+            library_id: The library to load into
+            crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
+
+        Returns:
+            List of all pipes that were loaded
+        """
+        library = self.get_library(library_id=library_id)
+
+        # Load domains from crate metadata
+        all_domains: list[Domain] = []
+        for domain_blueprint in crate.domains.values():
+            domain = DomainFactory.make_from_blueprint(blueprint=domain_blueprint)
+            all_domains.append(domain)
+        library.domain_library.add_domains(domains=all_domains)
+
+        # Load concepts in topological order
+        all_concepts = self._load_concepts_from_crate(crate.concepts)
+        library.concept_library.add_concepts(concepts=all_concepts)
+
+        # Resolve forward references in dynamically generated structure classes
+        self._rebuild_models_with_forward_refs(all_concepts)
+
+        # Detect cycles in concept references (A -> B -> A is forbidden)
+        self._detect_concept_cycles(all_concepts)
+
+        # Load pipes with domain-filtered concept codes
+        all_pipes: list[PipeAbstract] = []
+        for pipe_ref, pipe_blueprint in crate.pipes.items():
+            parsed = QualifiedRef.parse_pipe_ref(raw=pipe_ref)
+            if parsed.domain_path is None:
+                msg = f"Crate pipe_ref '{pipe_ref}' must be domain-qualified"
+                raise PipeLibraryError(msg)
+            domain_code = parsed.domain_path
+            pipe_code = parsed.local_code
+
+            # Filter concept codes to only those in the same domain
+            domain_prefix = f"{domain_code}."
+            concept_codes_for_domain = [QualifiedRef.parse_concept_ref(ref).local_code for ref in crate.concepts if ref.startswith(domain_prefix)]
+
+            pipe = PipeFactory[PipeAbstract].make_from_blueprint(
+                domain_code=domain_code,
+                pipe_code=pipe_code,
+                blueprint=pipe_blueprint,
+                concept_codes_from_the_same_domain=concept_codes_for_domain,
+            )
+            all_pipes.append(pipe)
+
+            # Track source file for this pipe (used by get_pipe_source)
+            source = crate.source_map.get(pipe_ref)
+            if source:
+                self._pipe_source_map[pipe_ref] = Path(source)
+
+        library.pipe_library.add_pipes(pipes=all_pipes)
+
+        library.validate_library()
+        return all_pipes
+
+    @override
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:
         """Load domains, concepts, and pipes from a list of blueprints.
+
+        Delegates through LibraryCrate: builds a crate from blueprints, then loads from the crate.
 
         Args:
             library_id: The ID of the library to load into
@@ -351,73 +416,11 @@ class LibraryManager(LibraryManagerAbstract):
             blueprints=blueprints,
         )
 
-        library = self.get_library(library_id=library_id)
-        all_pipes: list[PipeAbstract] = []
+        # Build the crate (merges, qualifies, detects duplicates)
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
 
-        # Load all domains first
-        all_domains: list[Domain] = []
-        for blueprint in blueprints:
-            domain = DomainFactory.make_from_blueprint(
-                blueprint=DomainBlueprint(
-                    source=blueprint.source,
-                    code=blueprint.domain,
-                    description=blueprint.description or "",
-                    system_prompt=blueprint.system_prompt,
-                ),
-            )
-            all_domains.append(domain)
-        library.domain_library.add_domains(domains=all_domains)
-
-        # Load concepts (forward references resolved after all are loaded)
-        all_concepts = self._load_concepts_from_blueprints(blueprints)
-        library.concept_library.add_concepts(concepts=all_concepts)
-
-        # Resolve forward references in dynamically generated structure classes
-        self._rebuild_models_with_forward_refs(all_concepts)
-
-        # Detect cycles in concept references (A -> B -> A is forbidden)
-        self._detect_concept_cycles(all_concepts)
-
-        # Load all pipes, detecting duplicate declarations across bundles in this library
-        pipe_source_in_this_load: dict[str, Path | None] = {}
-        for blueprint in blueprints:
-            pipes: list[PipeAbstract] = []
-            new_source = Path(blueprint.source) if blueprint.source else None
-            if blueprint.pipe is not None:
-                for pipe_code, pipe_blueprint in blueprint.pipe.items():
-                    pipe_ref = f"{blueprint.domain}.{pipe_code}"
-                    # Detect duplicate pipe declarations across different bundles in the same library
-                    if pipe_ref in pipe_source_in_this_load:
-                        existing_source = pipe_source_in_this_load[pipe_ref]
-                        if existing_source == new_source:
-                            msg = (
-                                f"Pipe '{pipe_ref}' is declared twice in the same bundle file: '{existing_source}'. "
-                                "Please remove the duplicate declaration."
-                            )
-                        else:
-                            msg = (
-                                f"Pipe '{pipe_ref}' is declared in two different bundle files: "
-                                f"'{existing_source}' and '{new_source}'. "
-                                "Please remove one of the declarations or rename one of the pipes."
-                            )
-                        raise PipeLibraryError(msg)
-                    pipe_source_in_this_load[pipe_ref] = new_source
-                    pipe = PipeFactory[PipeAbstract].make_from_blueprint(
-                        domain_code=blueprint.domain,
-                        pipe_code=pipe_code,
-                        blueprint=pipe_blueprint,
-                        concept_codes_from_the_same_domain=[the_concept.code for the_concept in all_concepts],
-                    )
-                    pipes.append(pipe)
-                    # Track source file for this pipe (used by get_pipe_source)
-                    if new_source:
-                        self._pipe_source_map[pipe_ref] = new_source
-            all_pipes.extend(pipes)
-
-        library.pipe_library.add_pipes(pipes=all_pipes)
-
-        library.validate_library()
-        return all_pipes
+        # Load from crate (domains, concepts, pipes, validation)
+        return self.load_from_crate(library_id=library_id, crate=crate)
 
     @override
     def load_concepts_only_from_blueprints(
@@ -531,6 +534,83 @@ class LibraryManager(LibraryManagerAbstract):
             dependencies: set[str] = set()
 
             if not isinstance(concept_blueprint, str) and concept_blueprint.refines:
+                refines = concept_blueprint.refines
+                # Skip native concepts (always available)
+                if not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=refines):
+                    # Resolve to full concept ref
+                    if "." in refines:
+                        refined_ref = refines
+                    else:
+                        refined_ref = ConceptFactory.make_concept_ref_with_domain(
+                            domain_code=domain_code,
+                            concept_code=refines,
+                        )
+                    # Only add dependency if it's a concept we're loading
+                    if refined_ref in ref_to_entry:
+                        dependencies.add(refined_ref)
+
+            sorter.add(concept_ref, *dependencies)
+
+        # Step 3: Get sorted order (raises CycleError if cycles detected)
+        try:
+            sorted_refs = list(sorter.static_order())
+        except CycleError as exc:
+            msg = f"Cycle detected in concept refines dependencies: {exc.args[1]}"
+            raise LibraryLoadingError(msg) from exc
+
+        # Step 4: Load concepts in topological order
+        all_concepts: list[Concept] = []
+        for concept_ref in sorted_refs:
+            domain_code, concept_code, concept_blueprint = ref_to_entry[concept_ref]
+            concept = ConceptFactory.make_from_blueprint(
+                domain_code=domain_code,
+                concept_code=concept_code,
+                blueprint_or_string_description=concept_blueprint,
+            )
+            all_concepts.append(concept)
+
+        return all_concepts
+
+    def _load_concepts_from_crate(
+        self,
+        concepts: dict[str, "ConceptBlueprint"],
+    ) -> list["Concept"]:
+        """Load concepts from a crate's flat concept dict in topological order.
+
+        Similar to _load_concepts_from_blueprints but works with the crate's flat
+        dict[concept_ref, ConceptBlueprint] instead of a list of PipelexBundleBlueprint.
+        Duplicate detection is already done by LibraryCrateFactory.
+
+        Args:
+            concepts: Flat dict mapping concept_ref to ConceptBlueprint
+
+        Returns:
+            List of loaded concepts in topological order
+        """
+        # Step 1: Build entry map (concept_ref -> (domain_code, concept_code, blueprint))
+        ref_to_entry: dict[str, tuple[str, str, ConceptBlueprint]] = {}
+        for concept_ref, concept_blueprint in concepts.items():
+            parsed = QualifiedRef.parse_concept_ref(raw=concept_ref)
+            if parsed.domain_path is None:
+                msg = f"Crate concept_ref '{concept_ref}' must be domain-qualified"
+                raise ConceptLibraryError(msg)
+            ref_to_entry[concept_ref] = (
+                parsed.domain_path,
+                parsed.local_code,
+                concept_blueprint,
+            )
+
+        # Step 2: Build dependency graph and topologically sort using graphlib
+        sorter: TopologicalSorter[str] = TopologicalSorter()
+
+        for concept_ref, (
+            domain_code,
+            _concept_code,
+            concept_blueprint,
+        ) in ref_to_entry.items():
+            dependencies: set[str] = set()
+
+            if concept_blueprint.refines:
                 refines = concept_blueprint.refines
                 # Skip native concepts (always available)
                 if not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=refines):

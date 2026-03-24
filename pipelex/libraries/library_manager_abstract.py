@@ -8,6 +8,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
     from pipelex.libraries.library import Library
+    from pipelex.libraries.library_crate import LibraryCrate
 
 
 class LibraryManagerAbstract(ABC):
@@ -45,6 +46,15 @@ class LibraryManagerAbstract(ABC):
             Path to the .mthds file the pipe was loaded from, or None if unknown.
         """
         return None
+
+    @abstractmethod
+    def load_from_crate(self, library_id: str, crate: "LibraryCrate") -> list[PipeAbstract]:
+        """Load a LibraryCrate into a live Library.
+
+        Args:
+            library_id: The library to load into
+            crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
+        """
 
     @abstractmethod
     def load_from_blueprints(self, library_id: str, blueprints: list[PipelexBundleBlueprint]) -> list[PipeAbstract]:

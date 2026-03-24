@@ -30,7 +30,9 @@
 
 ### Running Tests
 
-   After you're finished making code changes, you must always run tests using `make agent-test`.
+   `make agent-test` runs the full test suite and is **critical at the end of a coding session** to verify everything is good before wrapping up.
+
+   At intermediate steps during development, it's OK to run only the tests relevant to your changes — either by calling pytest directly from the `.venv` (e.g. `.venv/bin/pytest -x -q tests/unit/path/to/test_module.py`) or using `make t TEST=TestClassName`.
 
    ```bash
    make agent-test
