@@ -51,6 +51,9 @@ class LibraryManagerAbstract(ABC):
     def load_from_crate(self, library_id: str, crate: "LibraryCrate") -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
+        Note: This method does NOT resolve cross-package address-based dependencies.
+        Callers must handle dependency loading before calling this method.
+
         Args:
             library_id: The library to load into
             crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info

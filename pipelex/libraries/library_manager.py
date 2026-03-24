@@ -339,6 +339,11 @@ class LibraryManager(LibraryManagerAbstract):
     def load_from_crate(self, library_id: str, crate: "LibraryCrate") -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
+        Note: This method does NOT resolve cross-package address-based dependencies.
+        Callers must handle dependency loading before calling this method (e.g. via
+        _load_address_based_dependencies). The load_from_blueprints method does this
+        automatically before delegating here.
+
         Args:
             library_id: The library to load into
             crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
@@ -365,6 +370,13 @@ class LibraryManager(LibraryManagerAbstract):
         # Detect cycles in concept references (A -> B -> A is forbidden)
         self._detect_concept_cycles(all_concepts)
 
+        # Precompute domain -> concept local codes mapping (avoids O(N*M) re-parsing per pipe)
+        domain_concept_codes: dict[str, list[str]] = {}
+        for concept_ref in crate.concepts:
+            parsed_concept = QualifiedRef.parse_concept_ref(raw=concept_ref)
+            if parsed_concept.domain_path is not None:
+                domain_concept_codes.setdefault(parsed_concept.domain_path, []).append(parsed_concept.local_code)
+
         # Load pipes with domain-filtered concept codes
         all_pipes: list[PipeAbstract] = []
         for pipe_ref, pipe_blueprint in crate.pipes.items():
@@ -375,9 +387,7 @@ class LibraryManager(LibraryManagerAbstract):
             domain_code = parsed.domain_path
             pipe_code = parsed.local_code
 
-            # Filter concept codes to only those in the same domain
-            domain_prefix = f"{domain_code}."
-            concept_codes_for_domain = [QualifiedRef.parse_concept_ref(ref).local_code for ref in crate.concepts if ref.startswith(domain_prefix)]
+            concept_codes_for_domain = domain_concept_codes.get(domain_code, [])
 
             pipe = PipeFactory[PipeAbstract].make_from_blueprint(
                 domain_code=domain_code,

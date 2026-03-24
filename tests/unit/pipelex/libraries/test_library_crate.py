@@ -58,18 +58,32 @@ class TestLibraryCrate:
         assert isinstance(concept, ConceptBlueprint)
         assert concept.description == "A simple concept described as a string"
 
-    def test_concept_collision_raises(self):
-        """Two bundles declaring the same concept_ref raise ConceptLibraryError."""
-        with pytest.raises(ConceptLibraryError, match=r"scoring\.WeightedScore"):
+    def test_concept_collision_cross_file_raises(self):
+        """Two bundles from different files declaring the same concept_ref raise ConceptLibraryError."""
+        with pytest.raises(ConceptLibraryError, match=r"two different bundle files"):
             LibraryCrateFactory.make_from_blueprints(
                 blueprints=[BlueprintSamples.SCORING_BUNDLE, BlueprintSamples.SCORING_DUPLICATE_CONCEPT_BUNDLE],
             )
 
-    def test_pipe_collision_raises(self):
-        """Two bundles declaring the same pipe_ref raise PipeLibraryError."""
-        with pytest.raises(PipeLibraryError, match=r"scoring\.compute_score"):
+    def test_concept_collision_same_file_raises(self):
+        """Two bundles from the same file declaring the same concept_ref raise ConceptLibraryError."""
+        with pytest.raises(ConceptLibraryError, match=r"declared twice in the same bundle file"):
+            LibraryCrateFactory.make_from_blueprints(
+                blueprints=[BlueprintSamples.SCORING_BUNDLE, BlueprintSamples.SCORING_SAME_FILE_DUPLICATE_CONCEPT_BUNDLE],
+            )
+
+    def test_pipe_collision_cross_file_raises(self):
+        """Two bundles from different files declaring the same pipe_ref raise PipeLibraryError."""
+        with pytest.raises(PipeLibraryError, match=r"two different bundle files"):
             LibraryCrateFactory.make_from_blueprints(
                 blueprints=[BlueprintSamples.SCORING_BUNDLE, BlueprintSamples.SCORING_DUPLICATE_PIPE_BUNDLE],
+            )
+
+    def test_pipe_collision_same_file_raises(self):
+        """Two bundles from the same file declaring the same pipe_ref raise PipeLibraryError."""
+        with pytest.raises(PipeLibraryError, match=r"declared twice in the same bundle file"):
+            LibraryCrateFactory.make_from_blueprints(
+                blueprints=[BlueprintSamples.SCORING_BUNDLE, BlueprintSamples.SCORING_SAME_FILE_DUPLICATE_PIPE_BUNDLE],
             )
 
     def test_fingerprint_determinism(self):

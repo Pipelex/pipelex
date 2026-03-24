@@ -95,3 +95,27 @@ class BlueprintSamples:
             ),
         },
     )
+
+    # For same-file collision tests: same source as SCORING_BUNDLE + same concept
+    SCORING_SAME_FILE_DUPLICATE_CONCEPT_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/scoring.mthds",
+        domain="scoring",
+        description="Scoring domain same-file duplicate",
+        concept={
+            "WeightedScore": ConceptBlueprint(description="Same-file duplicate weighted score"),
+        },
+    )
+
+    # For same-file collision tests: same source as SCORING_BUNDLE + same pipe
+    SCORING_SAME_FILE_DUPLICATE_PIPE_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source="/fake/scoring.mthds",
+        domain="scoring",
+        description="Scoring domain same-file duplicate",
+        pipe={
+            "compute_score": PipeLLMBlueprint(
+                description="Same-file duplicate compute score",
+                output="Text",
+                prompt="Same-file duplicate.",
+            ),
+        },
+    )

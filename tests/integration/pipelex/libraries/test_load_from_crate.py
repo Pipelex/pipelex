@@ -10,6 +10,7 @@ SCORING_MTHDS = """\
 domain = "scoring"
 description = "Scoring domain"
 system_prompt = "You are a scoring assistant."
+main_pipe = "compute_score"
 
 [concept]
 ScoreResult = "A scoring result"
@@ -90,3 +91,17 @@ class TestLoadFromCrate:
             assert concept_refs_a == concept_refs_b, f"Concept refs differ: {concept_refs_a} vs {concept_refs_b}"
             assert pipe_refs_a == pipe_refs_b, f"Pipe refs differ: {pipe_refs_a} vs {pipe_refs_b}"
             assert domain_codes_a == domain_codes_b, f"Domain codes differ: {domain_codes_a} vs {domain_codes_b}"
+
+    def test_crate_preserves_main_pipe(self):
+        """LibraryCrate preserves main_pipe from bundle domain metadata."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            scoring_path = Path(tmp_dir) / "scoring.mthds"
+            scoring_path.write_text(SCORING_MTHDS, encoding="utf-8")
+
+            blueprints = [
+                PipelexInterpreter.make_pipelex_bundle_blueprint(bundle_path=scoring_path),
+            ]
+
+            crate = LibraryCrateFactory.make_from_blueprints(blueprints=blueprints)
+            assert "scoring" in crate.domains
+            assert crate.domains["scoring"].main_pipe == "compute_score"
