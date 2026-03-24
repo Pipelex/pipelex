@@ -1,6 +1,5 @@
 import pytest
 
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
@@ -49,14 +48,14 @@ class TestLibraryCrate:
         assert "scoring" in crate.domains
         assert "analytics" in crate.domains
 
-    def test_string_concept_normalization(self):
-        """String-described concepts are normalized to ConceptBlueprint."""
+    def test_string_concept_preserved(self):
+        """String-described concepts are preserved as strings (not converted to ConceptBlueprint)."""
         crate = LibraryCrateFactory.make_from_blueprints(
             blueprints=[BlueprintSamples.STRING_CONCEPT_BUNDLE],
         )
         concept = crate.concepts["simple.MyConcept"]
-        assert isinstance(concept, ConceptBlueprint)
-        assert concept.description == "A simple concept described as a string"
+        assert isinstance(concept, str)
+        assert concept == "A simple concept described as a string"
 
     def test_concept_collision_cross_file_raises(self):
         """Two bundles from different files declaring the same concept_ref raise ConceptLibraryError."""

@@ -15,6 +15,7 @@ from pipelex import log
 from pipelex.builder import builder
 from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
+from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
@@ -46,8 +47,9 @@ from pipelex.system.registries.func_registry_utils import FuncRegistryUtils
 from pipelex.tools.misc.semver import SemVerError, parse_constraint, parse_version, version_satisfies
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from pipelex.core.concepts.concept import Concept
-    from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
     from pipelex.core.domains.domain import Domain
     from pipelex.libraries.library_crate import LibraryCrate
 
@@ -533,7 +535,53 @@ class LibraryManager(LibraryManagerAbstract):
                         concept_blueprint,
                     )
 
-        # Step 2: Build dependency graph and topologically sort using graphlib
+        return self._topological_load_concepts(ref_to_entry)
+
+    def _load_concepts_from_crate(
+        self,
+        concepts: dict[str, ConceptBlueprint | str],
+    ) -> list["Concept"]:
+        """Load concepts from a crate's flat concept dict in topological order.
+
+        Builds the entry map from the crate's flat dict, then delegates to
+        _topological_load_concepts for sorting and instantiation.
+        Duplicate detection is already done by LibraryCrateFactory.
+
+        Args:
+            concepts: Flat dict mapping concept_ref to ConceptBlueprint or string description
+
+        Returns:
+            List of loaded concepts in topological order
+        """
+        ref_to_entry: dict[str, tuple[str, str, ConceptBlueprint | str]] = {}
+        for concept_ref, concept_blueprint in concepts.items():
+            parsed = QualifiedRef.parse_concept_ref(raw=concept_ref)
+            if parsed.domain_path is None:
+                msg = f"Crate concept_ref '{concept_ref}' must be domain-qualified"
+                raise ConceptLibraryError(msg)
+            ref_to_entry[concept_ref] = (
+                parsed.domain_path,
+                parsed.local_code,
+                concept_blueprint,
+            )
+
+        return self._topological_load_concepts(ref_to_entry)
+
+    def _topological_load_concepts(
+        self,
+        ref_to_entry: "Mapping[str, tuple[str, str, ConceptBlueprint | str]]",
+    ) -> list["Concept"]:
+        """Sort concepts by refines dependencies and instantiate them.
+
+        Shared helper used by both _load_concepts_from_blueprints (blueprint path)
+        and _load_concepts_from_crate (crate path).
+
+        Args:
+            ref_to_entry: Mapping of concept_ref to (domain_code, concept_code, blueprint_or_string)
+
+        Returns:
+            List of loaded concepts in topological order
+        """
         sorter: TopologicalSorter[str] = TopologicalSorter()
 
         for concept_ref, (
@@ -561,91 +609,12 @@ class LibraryManager(LibraryManagerAbstract):
 
             sorter.add(concept_ref, *dependencies)
 
-        # Step 3: Get sorted order (raises CycleError if cycles detected)
         try:
             sorted_refs = list(sorter.static_order())
         except CycleError as exc:
             msg = f"Cycle detected in concept refines dependencies: {exc.args[1]}"
             raise LibraryLoadingError(msg) from exc
 
-        # Step 4: Load concepts in topological order
-        all_concepts: list[Concept] = []
-        for concept_ref in sorted_refs:
-            domain_code, concept_code, concept_blueprint = ref_to_entry[concept_ref]
-            concept = ConceptFactory.make_from_blueprint(
-                domain_code=domain_code,
-                concept_code=concept_code,
-                blueprint_or_string_description=concept_blueprint,
-            )
-            all_concepts.append(concept)
-
-        return all_concepts
-
-    def _load_concepts_from_crate(
-        self,
-        concepts: dict[str, "ConceptBlueprint"],
-    ) -> list["Concept"]:
-        """Load concepts from a crate's flat concept dict in topological order.
-
-        Similar to _load_concepts_from_blueprints but works with the crate's flat
-        dict[concept_ref, ConceptBlueprint] instead of a list of PipelexBundleBlueprint.
-        Duplicate detection is already done by LibraryCrateFactory.
-
-        Args:
-            concepts: Flat dict mapping concept_ref to ConceptBlueprint
-
-        Returns:
-            List of loaded concepts in topological order
-        """
-        # Step 1: Build entry map (concept_ref -> (domain_code, concept_code, blueprint))
-        ref_to_entry: dict[str, tuple[str, str, ConceptBlueprint]] = {}
-        for concept_ref, concept_blueprint in concepts.items():
-            parsed = QualifiedRef.parse_concept_ref(raw=concept_ref)
-            if parsed.domain_path is None:
-                msg = f"Crate concept_ref '{concept_ref}' must be domain-qualified"
-                raise ConceptLibraryError(msg)
-            ref_to_entry[concept_ref] = (
-                parsed.domain_path,
-                parsed.local_code,
-                concept_blueprint,
-            )
-
-        # Step 2: Build dependency graph and topologically sort using graphlib
-        sorter: TopologicalSorter[str] = TopologicalSorter()
-
-        for concept_ref, (
-            domain_code,
-            _concept_code,
-            concept_blueprint,
-        ) in ref_to_entry.items():
-            dependencies: set[str] = set()
-
-            if concept_blueprint.refines:
-                refines = concept_blueprint.refines
-                # Skip native concepts (always available)
-                if not NativeConceptCode.is_native_concept_ref_or_code(concept_ref_or_code=refines):
-                    # Resolve to full concept ref
-                    if "." in refines:
-                        refined_ref = refines
-                    else:
-                        refined_ref = ConceptFactory.make_concept_ref_with_domain(
-                            domain_code=domain_code,
-                            concept_code=refines,
-                        )
-                    # Only add dependency if it's a concept we're loading
-                    if refined_ref in ref_to_entry:
-                        dependencies.add(refined_ref)
-
-            sorter.add(concept_ref, *dependencies)
-
-        # Step 3: Get sorted order (raises CycleError if cycles detected)
-        try:
-            sorted_refs = list(sorter.static_order())
-        except CycleError as exc:
-            msg = f"Cycle detected in concept refines dependencies: {exc.args[1]}"
-            raise LibraryLoadingError(msg) from exc
-
-        # Step 4: Load concepts in topological order
         all_concepts: list[Concept] = []
         for concept_ref in sorted_refs:
             domain_code, concept_code, concept_blueprint = ref_to_entry[concept_ref]

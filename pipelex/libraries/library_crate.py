@@ -18,8 +18,8 @@ class LibraryCrate(BaseModel):
     Includes source information so that validation errors can trace back to origin files.
     """
 
-    concepts: dict[str, ConceptBlueprint] = Field(default_factory=dict)
-    """concept_ref (domain.ConceptCode) -> ConceptBlueprint"""
+    concepts: dict[str, ConceptBlueprint | str] = Field(default_factory=dict)
+    """concept_ref (domain.ConceptCode) -> ConceptBlueprint or string description"""
 
     pipes: dict[str, PipeBlueprintUnion] = Field(default_factory=dict)
     """pipe_ref (domain.pipe_code) -> PipeBlueprintUnion"""
@@ -39,7 +39,9 @@ class LibraryCrate(BaseModel):
         Uses deterministic JSON serialization of concepts and pipes only
         (excludes domains, source_map, and fingerprint itself).
         """
-        concepts_json = {ref: blueprint.model_dump(mode="json") for ref, blueprint in sorted(self.concepts.items())}
+        concepts_json: dict[str, object] = {}
+        for ref, value in sorted(self.concepts.items()):
+            concepts_json[ref] = value if isinstance(value, str) else value.model_dump(mode="json")
         pipes_json = {ref: blueprint.model_dump(mode="json") for ref, blueprint in sorted(self.pipes.items())}
         payload = {"concepts": concepts_json, "pipes": pipes_json}
         serialized = json.dumps(payload, sort_keys=True, ensure_ascii=True)

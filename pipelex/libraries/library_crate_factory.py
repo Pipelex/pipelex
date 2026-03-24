@@ -1,9 +1,13 @@
+from typing import TYPE_CHECKING
+
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
-from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
+
+if TYPE_CHECKING:
+    from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
 
 
 class LibraryCrateFactory:
@@ -19,7 +23,7 @@ class LibraryCrateFactory:
         For each bundle:
         1. Qualify concept codes with the bundle's domain -> concept_ref keys
         2. Qualify pipe codes with the bundle's domain -> pipe_ref keys
-        3. Normalize string-described concepts to ConceptBlueprint
+        3. Preserve string-described concepts as-is (no normalization to ConceptBlueprint)
         4. Collect domain metadata (first-write-wins per domain code)
         5. Track source file for each concept_ref and pipe_ref
         6. Detect duplicate refs across bundles (raise ConceptLibraryError / PipeLibraryError)
@@ -31,7 +35,7 @@ class LibraryCrateFactory:
         Returns:
             A LibraryCrate with all content merged and fingerprinted
         """
-        concepts: dict[str, ConceptBlueprint] = {}
+        concepts: dict[str, ConceptBlueprint | str] = {}
         pipes: dict[str, PipeBlueprintUnion] = {}
         domains: dict[str, DomainBlueprint] = {}
         source_map: dict[str, str] = {}
@@ -68,10 +72,7 @@ class LibraryCrateFactory:
                                 "Please remove one of the declarations or rename one of the concepts."
                             )
                         raise ConceptLibraryError(msg)
-                    if isinstance(value, str):
-                        concepts[concept_ref] = ConceptBlueprint(description=value)
-                    else:
-                        concepts[concept_ref] = value
+                    concepts[concept_ref] = value
                     if source:
                         source_map[concept_ref] = source
 
