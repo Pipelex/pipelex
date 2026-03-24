@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from rich.console import Group
 from rich.panel import Panel
@@ -52,6 +52,14 @@ Example: `Only analyze the colors from $image_1 and the shapes from $image_2.
 So, don't have to write a bullet-list of all the attributes definitions yourself.
 """,
     )
+
+    @field_validator("model", mode="before")
+    @classmethod
+    def reject_empty_model(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            msg = "Model cannot be an empty string; omit the field to use defaults"
+            raise ValueError(msg)
+        return value
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:

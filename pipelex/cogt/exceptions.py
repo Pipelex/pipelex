@@ -47,14 +47,28 @@ class ModelChoiceNotFoundError(CogtError):
         model_choice: str,
         reference_kind: ModelReferenceKind | None = None,
         available_options: list[str] | None = None,
+        suggestions: list[str] | None = None,
+        wrong_sigil_hints: list[str] | None = None,
+        cross_collection_suggestions: list[str] | None = None,
     ):
         self.model_type = model_type
         self.model_choice = model_choice
         self.reference_kind = reference_kind
         self.available_options = available_options or []
+        self.suggestions = suggestions or []
+        self.wrong_sigil_hints = wrong_sigil_hints or []
+        self.cross_collection_suggestions = cross_collection_suggestions or []
 
         full_message = message
-        if self.available_options:
+
+        all_suggestions = self.suggestions + self.cross_collection_suggestions
+        if all_suggestions:
+            full_message += "\n\nDid you mean: " + ", ".join(all_suggestions)
+
+        for hint in self.wrong_sigil_hints:
+            full_message += f"\nNote: {hint}"
+
+        if not all_suggestions and not self.wrong_sigil_hints and self.available_options:
             options_str = ", ".join(sorted(self.available_options)[:10])
             if len(self.available_options) > 10:
                 options_str += f" ... and {len(self.available_options) - 10} more"

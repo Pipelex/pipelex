@@ -47,6 +47,14 @@ class PipeSearchSpec(PipeSpec):
         default=None, description="Maximum number of search results to return. If not set, the search provider's default is used."
     )
 
+    @field_validator("model", mode="before")
+    @classmethod
+    def reject_empty_model(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            msg = "Model cannot be an empty string; omit the field to use defaults"
+            raise ValueError(msg)
+        return value
+
     @model_validator(mode="before")
     @classmethod
     def normalize_prompt_field(cls, values: dict[str, Any]) -> dict[str, Any]:

@@ -1,6 +1,5 @@
 """Agent CLI check-model command -- validate a model reference and suggest alternatives."""
 
-import difflib
 from typing import Annotated, Any
 
 import typer
@@ -8,103 +7,14 @@ import typer
 from pipelex.cli.agent_cli.commands.agent_cli_factory import make_pipelex_for_agent_cli
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat, agent_error, agent_success
 from pipelex.cli.agent_cli.commands.models_cmd import CATEGORY_TO_MODEL_TYPE, ModelCategory
-from pipelex.cogt.models.model_deck import ModelDeck
-from pipelex.cogt.models.model_reference import (
-    SIGIL_ALIAS,
-    SIGIL_PRESET,
-    SIGIL_WATERFALL,
-    ModelReference,
-    ModelReferenceKind,
+from pipelex.cogt.models.model_reference import ModelReference, ModelReferenceParseError
+from pipelex.cogt.models.model_suggestion import (
+    KIND_LABELS,
+    get_collection_keys,
+    suggest_model_alternatives,
 )
 from pipelex.hub import get_model_deck
 from pipelex.pipelex import Pipelex
-
-# Maps reference kind to its sigil prefix for display
-KIND_SIGILS: dict[ModelReferenceKind, str] = {
-    ModelReferenceKind.PRESET: SIGIL_PRESET,
-    ModelReferenceKind.ALIAS: SIGIL_ALIAS,
-    ModelReferenceKind.WATERFALL: SIGIL_WATERFALL,
-    ModelReferenceKind.HANDLE: "",
-}
-
-# Human-readable labels for reference kinds
-KIND_LABELS: dict[ModelReferenceKind, str] = {
-    ModelReferenceKind.PRESET: "preset",
-    ModelReferenceKind.ALIAS: "alias",
-    ModelReferenceKind.WATERFALL: "waterfall",
-    ModelReferenceKind.HANDLE: "handle",
-}
-
-
-def _get_collection_keys(
-    model_deck: ModelDeck,
-    category: ModelCategory,
-    kind: ModelReferenceKind,
-) -> list[str]:
-    """Return the list of known names for a given reference kind and category."""
-    match kind:
-        case ModelReferenceKind.PRESET:
-            match category:
-                case ModelCategory.LLM:
-                    return list(model_deck.llm_presets.keys())
-                case ModelCategory.EXTRACT:
-                    return list(model_deck.extract_presets.keys())
-                case ModelCategory.IMG_GEN:
-                    return list(model_deck.img_gen_presets.keys())
-                case ModelCategory.SEARCH:
-                    return list(model_deck.search_presets.keys())
-        case ModelReferenceKind.ALIAS:
-            match category:
-                case ModelCategory.LLM:
-                    return list(model_deck.llm_aliases.keys())
-                case ModelCategory.EXTRACT:
-                    return list(model_deck.extract_aliases.keys())
-                case ModelCategory.IMG_GEN:
-                    return list(model_deck.img_gen_aliases.keys())
-                case ModelCategory.SEARCH:
-                    return list(model_deck.search_aliases.keys())
-        case ModelReferenceKind.WATERFALL:
-            match category:
-                case ModelCategory.LLM:
-                    return list(model_deck.llm_waterfalls.keys())
-                case ModelCategory.EXTRACT:
-                    return list(model_deck.extract_waterfalls.keys())
-                case ModelCategory.IMG_GEN:
-                    return list(model_deck.img_gen_waterfalls.keys())
-                case ModelCategory.SEARCH:
-                    return list(model_deck.search_waterfalls.keys())
-        case ModelReferenceKind.HANDLE:
-            target_model_type = CATEGORY_TO_MODEL_TYPE[category]
-            return sorted(handle for handle, spec in model_deck.inference_models.items() if spec.model_type == target_model_type)
-
-
-def _check_other_collections(
-    model_deck: ModelDeck,
-    category: ModelCategory,
-    name: str,
-    exclude_kind: ModelReferenceKind,
-) -> tuple[list[str], list[str]]:
-    """Check other collections for exact matches (wrong-sigil) and fuzzy matches.
-
-    Returns:
-        A tuple of (wrong_sigil_hints, cross_collection_suggestions).
-        wrong_sigil_hints: e.g. ["best-claude exists as @best-claude (alias)"]
-        cross_collection_suggestions: e.g. ["$writing-creative"]
-    """
-    wrong_sigil_hints: list[str] = []
-    cross_suggestions: list[str] = []
-    other_kinds = [kind for kind in ModelReferenceKind if kind != exclude_kind]
-    for kind in other_kinds:
-        candidates = _get_collection_keys(model_deck, category, kind)
-        sigil = KIND_SIGILS[kind]
-        label = KIND_LABELS[kind]
-        if name in candidates:
-            wrong_sigil_hints.append(f"{name} exists as {sigil}{name} ({label})")
-        else:
-            fuzzy = difflib.get_close_matches(name, candidates, n=3, cutoff=0.7)
-            for match in fuzzy:
-                cross_suggestions.append(f"{sigil}{match} ({label})")
-    return wrong_sigil_hints, cross_suggestions
 
 
 def _format_check_markdown(result: dict[str, Any]) -> str:
@@ -163,8 +73,9 @@ def agent_check_model_cmd(
 
         model_deck = get_model_deck()
         ref = ModelReference.parse(name)
+        resolved_model_type = CATEGORY_TO_MODEL_TYPE[model_type]
 
-        candidates = _get_collection_keys(model_deck, model_type, ref.kind)
+        candidates = get_collection_keys(model_deck, resolved_model_type, ref.kind)
         is_valid = ref.name in candidates
 
         result: dict[str, Any] = {
@@ -176,10 +87,8 @@ def agent_check_model_cmd(
         }
 
         if not is_valid:
-            sigil = KIND_SIGILS[ref.kind]
-            fuzzy_matches = difflib.get_close_matches(ref.name, candidates, n=5, cutoff=0.5)
-            result["suggestions"] = [f"{sigil}{match}" for match in fuzzy_matches]
-            wrong_sigil_hints, cross_suggestions = _check_other_collections(model_deck, model_type, ref.name, ref.kind)
+            suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(model_deck, resolved_model_type, ref.name, ref.kind)
+            result["suggestions"] = suggestions
             result["wrong_sigil_hints"] = wrong_sigil_hints
             result["cross_collection_suggestions"] = cross_suggestions
 
@@ -190,6 +99,8 @@ def agent_check_model_cmd(
                 print(_format_check_markdown(result))
     except SystemExit:
         raise
+    except ModelReferenceParseError as exc:
+        agent_error(f"Invalid model reference: {exc}", "ArgumentError", cause=exc)
     except Exception as exc:
         agent_error(f"Failed to check model: {exc}", type(exc).__name__, cause=exc)
     finally:

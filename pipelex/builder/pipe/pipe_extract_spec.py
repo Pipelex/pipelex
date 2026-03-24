@@ -42,6 +42,14 @@ class PipeExtractSpec(PipeSpec):
     )
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
 
+    @field_validator("model", mode="before")
+    @classmethod
+    def reject_empty_model(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            msg = "Model cannot be an empty string; omit the field to use defaults"
+            raise ValueError(msg)
+        return value
+
     @override
     @field_validator("output", mode="before")
     @classmethod
