@@ -1,5 +1,7 @@
 """Model choice validation against the model deck with fuzzy suggestions."""
 
+from typing import NoReturn
+
 from pipelex.cogt.exceptions import ModelChoiceNotFoundError
 from pipelex.cogt.extract.extract_setting import ExtractModelChoice, ExtractSetting
 from pipelex.cogt.img_gen.img_gen_setting import ImgGenModelChoice, ImgGenSetting
@@ -20,7 +22,7 @@ def _raise_model_choice_not_found(
     name: str,
     reference_kind: ModelReferenceKind,
     available_options: list[str],
-) -> None:
+) -> NoReturn:
     """Compute fuzzy suggestions and raise ModelChoiceNotFoundError."""
     suggestions, wrong_sigil_hints, cross_suggestions = suggest_model_alternatives(model_deck, model_type, name, reference_kind)
     raise ModelChoiceNotFoundError(
