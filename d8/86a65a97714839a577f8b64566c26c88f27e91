@@ -1,0 +1,45 @@
+tests/unit/pipelex/builder/test_builder_loop_prune.py
+  a11380534acc5f06 75,109,143,176,217,256,318,354
+tests/unit/pipelex/builder/test_builder_loop_namespace_stripping.py
+  a11380534acc5f06 62,86,110,135,159,196,235,245,287,297,339,349,359,401,443,485,555
+pipelex/builder/CLAUDE.md
+  a11380534acc5f06 103
+tests/integration/pipelex/test_data.py
+  a11380534acc5f06 443
+tests/unit/pipelex/cli/test_pipe_cmd.py
+  a11380534acc5f06 25,81,205,230,235,240,246,251-252,256,264,270,278,314-327,331,336,338-339,343,349,352-353,357
+tests/unit/pipelex/builder/pipe/pipe_operator/pipe_llm/test_data.py
+  a11380534acc5f06 15,36,57,78,98,119,141,161
+pipelex/cli/agent_cli/commands/models_cmd.py
+  a11380534acc5f06 349-352
+tests/unit/pipelex/builder/test_builder_loop_multiplicity_fix.py
+  a11380534acc5f06 304
+pipelex/cli/agent_cli/commands/pipe_cmd.py
+  a11380534acc5f06 79-80,146-147,150-151,251,315
+tests/unit/pipelex/builder/pipe/pipe_operator/pipe_img_gen/test_data.py
+  a11380534acc5f06 15,40
+tests/unit/pipelex/builder/pipe/pipe_operator/pipe_extract/test_data.py
+  a11380534acc5f06 15,33
+tests/unit/pipelex/cli/test_format_models_markdown.py
+  a11380534acc5f06 44,85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "d886a65a97714839a577f8b64566c26c88f27e91",
+  "prompts": {
+    "a11380534acc5f06": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "53568369-369c-4aeb-bdc3-1c16c08a8e74",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 209,
+      "total_deletions": 408,
+      "accepted_lines": 207,
+      "overriden_lines": 0
+    }
+  }
+}
