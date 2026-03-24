@@ -12,14 +12,14 @@ from pipelex.pipeline.validate_bundle import validate_bundle
 
 
 async def build_output_for_pipe(
-    mthds_content: str,
+    mthds_contents: list[str],
     pipe_code: str,
     output_format: ConceptRepresentationFormat = ConceptRepresentationFormat.SCHEMA,
 ) -> dict[str, Any]:
     """Generate output JSON representation for a pipe.
 
     Args:
-        mthds_content: Raw .mthds content to parse and load.
+        mthds_contents: List of raw .mthds contents to parse and load.
         pipe_code: The pipe code to generate output for.
         output_format: Format to generate output in.
 
@@ -29,7 +29,7 @@ async def build_output_for_pipe(
     Raises:
         ValidateBundleError: If bundle validation fails.
     """
-    validate_bundle_result = await validate_bundle(mthds_contents=[mthds_content])
+    validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents)
     blueprint = validate_bundle_result.blueprints[0]
 
     library_manager = get_library_manager()

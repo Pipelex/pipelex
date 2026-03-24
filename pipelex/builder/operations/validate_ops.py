@@ -87,12 +87,12 @@ async def validate_bundle_file(
 
 
 async def validate_bundle_content(
-    mthds_content: str,
+    mthds_contents: list[str],
 ) -> dict[str, Any]:
-    """Validate bundle content provided as a string.
+    """Validate bundle content provided as strings.
 
     Args:
-        mthds_content: Raw .mthds content to validate.
+        mthds_contents: List of raw .mthds contents to validate.
 
     Returns:
         Dictionary with validation results including the blueprint.
@@ -100,14 +100,14 @@ async def validate_bundle_content(
     Raises:
         ValidateBundleError: If validation fails.
     """
-    validate_bundle_result = await validate_bundle(mthds_contents=[mthds_content])
+    validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents)
     blueprint = validate_bundle_result.blueprints[0]
 
     validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in validate_bundle_result.pipes]
 
     return {
         "success": True,
-        "mthds_content": mthds_content,
+        "mthds_contents": mthds_contents,
         "pipelex_bundle_blueprint": blueprint,
         "validated_pipes": validated_pipes,
         "total_pipes": len(validate_bundle_result.pipes),

@@ -54,9 +54,6 @@ dependencies = [
   "typing-extensions>=4.13.2",
 ]
 
-[tool.uv.sources]
-mthds = { git = "https://github.com/mthds-ai/mthds-python.git", branch = "feature/runner-multiple-mthds" }
-
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"

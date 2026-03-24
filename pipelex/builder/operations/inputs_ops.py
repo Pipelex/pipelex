@@ -20,18 +20,18 @@ if TYPE_CHECKING:
 
 async def build_inputs_for_pipe(
     pipe_code: str | None = None,
-    mthds_content: str | None = None,
+    mthds_contents: list[str] | None = None,
     bundle_path: Path | None = None,
     library_dirs: list[Path] | None = None,
 ) -> dict[str, Any]:
     """Generate example input JSON for a pipe.
 
-    Supports loading from either mthds content string, a bundle file path,
+    Supports loading from either mthds contents, a bundle file path,
     or from already-loaded libraries.
 
     Args:
         pipe_code: The pipe code to generate inputs for.
-        mthds_content: Raw .mthds content to parse and load.
+        mthds_contents: List of raw .mthds contents to parse and load.
         bundle_path: Path to the bundle file (.mthds).
         library_dirs: List of library directories to search for pipe definitions.
 
@@ -42,8 +42,8 @@ async def build_inputs_for_pipe(
         ValidateBundleError: If bundle validation fails.
         ValueError: If no pipe code can be determined.
     """
-    if mthds_content:
-        validate_bundle_result = await validate_bundle(mthds_contents=[mthds_content])
+    if mthds_contents:
+        validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents)
         blueprint = validate_bundle_result.blueprints[0]
         library_manager = get_library_manager()
         library_id, _ = library_manager.open_library()

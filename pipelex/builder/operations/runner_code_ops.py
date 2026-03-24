@@ -9,16 +9,16 @@ from pipelex.pipe_run.dry_run import dry_run_pipes
 
 
 async def build_runner_code_for_pipe(
-    mthds_content: str,
+    mthds_contents: list[str],
     pipe_code: str,
 ) -> str:
-    """Generate Python runner code for a pipe from .mthds content.
+    """Generate Python runner code for a pipe from .mthds contents.
 
-    Parses and validates the content, loads pipes, dry-runs them,
+    Parses and validates the contents, loads pipes, dry-runs them,
     then generates runner code for the specified pipe.
 
     Args:
-        mthds_content: Raw .mthds content to parse and load.
+        mthds_contents: List of raw .mthds contents to parse and load.
         pipe_code: The pipe code to generate runner code for.
 
     Returns:
@@ -31,12 +31,12 @@ async def build_runner_code_for_pipe(
     library_id, _ = library_manager.open_library()
     set_current_library(library_id)
 
-    # Parse PLX content into a bundle blueprint
+    # Parse PLX contents into bundle blueprints
     converter = PipelexInterpreter()
-    blueprint = converter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
+    blueprints = [converter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
-    # Load pipes from the blueprint
-    pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+    # Load pipes from the blueprints
+    pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
     # Validate all pipes
     for pipe in pipes:
