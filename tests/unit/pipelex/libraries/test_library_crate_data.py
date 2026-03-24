@@ -119,3 +119,30 @@ class BlueprintSamples:
             ),
         },
     )
+
+    # For source=None edge case tests
+    NONE_SOURCE_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source=None,
+        domain="nosource",
+        description="Domain with no source file",
+        concept={
+            "Item": ConceptBlueprint(description="An item"),
+        },
+        pipe={
+            "process_item": PipeLLMBlueprint(
+                description="Process an item",
+                output="Item",
+                prompt="Process the item.",
+            ),
+        },
+    )
+
+    # For source=None collision tests: same domain + concept as NONE_SOURCE_BUNDLE
+    NONE_SOURCE_DUPLICATE_CONCEPT_BUNDLE: ClassVar[PipelexBundleBlueprint] = PipelexBundleBlueprint(
+        source=None,
+        domain="nosource",
+        description="Domain with no source file (duplicate)",
+        concept={
+            "Item": ConceptBlueprint(description="Duplicate item"),
+        },
+    )

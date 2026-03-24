@@ -118,3 +118,20 @@ class TestLibraryCrate:
         )
         assert crate.source_map["scoring.WeightedScore"] == "/fake/scoring.mthds"
         assert crate.source_map["scoring.compute_score"] == "/fake/scoring.mthds"
+
+    def test_none_source_excluded_from_source_map(self):
+        """Bundles with source=None produce valid crates but no source_map entries."""
+        crate = LibraryCrateFactory.make_from_blueprints(
+            blueprints=[BlueprintSamples.NONE_SOURCE_BUNDLE],
+        )
+        assert "nosource.Item" in crate.concepts
+        assert "nosource.process_item" in crate.pipes
+        assert "nosource.Item" not in crate.source_map
+        assert "nosource.process_item" not in crate.source_map
+
+    def test_concept_collision_none_source_raises(self):
+        """Two bundles with source=None declaring the same concept_ref raise ConceptLibraryError."""
+        with pytest.raises(ConceptLibraryError, match=r"two different bundle files"):
+            LibraryCrateFactory.make_from_blueprints(
+                blueprints=[BlueprintSamples.NONE_SOURCE_BUNDLE, BlueprintSamples.NONE_SOURCE_DUPLICATE_CONCEPT_BUNDLE],
+            )

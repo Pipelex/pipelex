@@ -1,7 +1,7 @@
 import hashlib
 import json
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -17,6 +17,8 @@ class LibraryCrate(BaseModel):
 
     Includes source information so that validation errors can trace back to origin files.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     concepts: dict[str, ConceptBlueprint | str] = Field(default_factory=dict)
     """concept_ref (domain.ConceptCode) -> ConceptBlueprint or string description"""
