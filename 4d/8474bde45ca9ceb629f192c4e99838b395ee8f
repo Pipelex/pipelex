@@ -1,0 +1,37 @@
+pipelex/libraries/pipe/pipe_library.py
+  2abc788b86cfddef 40,42,48,57,61-62,65-91,101,124,128-130
+pipelex/libraries/pipe/pipe_library_abstract.py
+  2abc788b86cfddef 36
+pipelex/core/pipes/pipe_abstract.py
+  2abc788b86cfddef 57-60
+pipelex/libraries/domain/domain_library.py
+  2abc788b86cfddef 35
+pipelex/libraries/library_manager.py
+  2abc788b86cfddef 95,115-116,168,173-183,388,390-391,394,399,404,414,489-490,495,501-516,1000-1001
+tests/integration/pipelex/libraries/test_pipe_namespace.py
+  2abc788b86cfddef 1-235
+tests/unit/pipelex/libraries/test_domain_library.py
+  2abc788b86cfddef 1-26
+tests/unit/pipelex/libraries/test_pipe_library_lookup.py
+  2abc788b86cfddef 6,11,15,20,22,24-25,28,32-33,36,40-63,65-86,88-94,102,109-117,147-148,150,159,162-197
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.17",
+  "base_commit_sha": "4d8474bde45ca9ceb629f192c4e99838b395ee8f",
+  "prompts": {
+    "2abc788b86cfddef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "538d0d2b-94f8-477b-9e87-818d453138fb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 513,
+      "total_deletions": 108,
+      "accepted_lines": 466,
+      "overriden_lines": 0
+    }
+  }
+}
