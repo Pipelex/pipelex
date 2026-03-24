@@ -51,11 +51,10 @@ The `pipelex-agent` CLI is a machine-first interface designed for automated envi
 | `fmt` | Format `.mthds`, `.toml`, or `.plx` files in-place |
 | `lint` | Lint files for errors |
 | `inputs` | Generate example input JSON for a pipe |
-| `concept` | Convert a JSON concept spec into TOML |
-| `pipe` | Convert a JSON pipe spec into TOML |
-| `assemble` | Combine TOML parts into a complete `.mthds` file |
-| `models` | List available model presets, aliases, and talent mappings |
-| `doctor` | Check configuration health and auto-fix issues |
+| `concept` | Convert a JSON concept spec into raw TOML (stdout) |
+| `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
+| `models` | List available model presets, aliases, and talent mappings (`--format markdown\|json`, default: markdown) |
+| `doctor` | Check configuration health (`--format markdown\|json`, default: markdown) |
 
 For detailed CLI documentation, see the [CLI reference](../tools/cli/index.md).
 

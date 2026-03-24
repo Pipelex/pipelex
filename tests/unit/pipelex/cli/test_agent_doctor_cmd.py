@@ -11,6 +11,7 @@ import typer
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
 
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport
 
@@ -37,7 +38,7 @@ class TestAgentDoctorCmd:
             return_value=(True, "Models valid", {}),
         )
 
-        agent_doctor_cmd()
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
@@ -63,7 +64,7 @@ class TestAgentDoctorCmd:
             return_value=(True, "Models valid", {}),
         )
 
-        agent_doctor_cmd()
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["all_healthy"] is False
@@ -101,7 +102,7 @@ class TestAgentDoctorCmd:
             return_value=(True, "Models valid", {}),
         )
 
-        agent_doctor_cmd()
+        agent_doctor_cmd(output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["all_healthy"] is False

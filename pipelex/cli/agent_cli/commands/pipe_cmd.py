@@ -1,4 +1,4 @@
-"""Agent CLI pipe command - structure pipes from JSON specs with JSON/TOML output."""
+"""Agent CLI pipe command - structure pipes from JSON specs with raw TOML output."""
 
 # pyright: reportUnknownMemberType=false
 # pyright: reportArgumentType=false
@@ -27,7 +27,7 @@ from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.builder.talents.extract_talent import ExtractTalent
 from pipelex.builder.talents.img_gen_talent import ImgGenTalent
 from pipelex.builder.talents.llm_talent import LLMTalent
-from pipelex.cli.agent_cli.commands.agent_output import agent_error, agent_success
+from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
@@ -337,7 +337,7 @@ def pipe_cmd(
     Takes a pipe specification in JSON format and converts it to valid Pipelex
     TOML format. Validates the spec before conversion.
 
-    Outputs JSON to stdout on success, JSON to stderr on error with exit code 1.
+    Outputs raw TOML to stdout on success, JSON to stderr on error with exit code 1.
 
     JSON spec format (varies by pipe type):
 
@@ -407,14 +407,7 @@ def pipe_cmd(
         pipe_spec = _parse_pipe_spec_from_json(resolved_pipe_type, spec_data)
         toml_content = _pipe_spec_to_toml(pipe_spec)
 
-        agent_success(
-            {
-                "success": True,
-                "pipe_code": pipe_spec.pipe_code,
-                "pipe_type": resolved_pipe_type,
-                "toml": toml_content,
-            }
-        )
+        print(toml_content, end="" if toml_content.endswith("\n") else "\n")
 
     except ValidationError as exc:
         message, details = format_pydantic_validation_error_for_agent(exc)
