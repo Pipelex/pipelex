@@ -47,9 +47,9 @@ async def validate_all_core(
 
     validated_pipes: list[dict[str, str]] = []
     for the_pipe in pipes:
-        dry_run_output = dry_run_results.get(the_pipe.code)
+        dry_run_output = dry_run_results.get(the_pipe.pipe_ref)
         status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
-        validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
+        validated_pipes.append({"pipe_code": the_pipe.pipe_ref, "status": status})
 
     return {
         "success": True,
@@ -76,7 +76,7 @@ async def validate_bundle_core(
     """
     result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
 
-    validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in result.pipes]
+    validated_pipes = [{"pipe_code": the_pipe.pipe_ref, "status": "SUCCESS"} for the_pipe in result.pipes]
 
     return {
         "success": True,

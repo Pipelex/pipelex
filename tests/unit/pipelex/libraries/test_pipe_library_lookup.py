@@ -3,47 +3,95 @@ from typing import Any
 import pytest
 from pytest_mock import MockerFixture
 
-from pipelex.libraries.pipe.exceptions import PipeNotFoundError
+from pipelex.libraries.pipe.exceptions import PipeLibraryError, PipeNotFoundError
 from pipelex.libraries.pipe.pipe_library import PipeLibrary
 
 
 def _make_stub_pipe(mocker: MockerFixture, code: str, domain_code: str) -> Any:
-    """Create a minimal mock pipe with code and domain_code."""
+    """Create a minimal mock pipe with code, domain_code, and pipe_ref."""
     mock_pipe = mocker.MagicMock()
     mock_pipe.code = code
     mock_pipe.domain_code = domain_code
+    mock_pipe.pipe_ref = f"{domain_code}.{code}"
     return mock_pipe
 
 
 class TestPipeLibraryLookup:
-    """Tests for PipeLibrary.get_optional_pipe domain enforcement and malformed-ref safety."""
+    """Tests for PipeLibrary lookup with pipe_ref-based indexing."""
 
-    def test_bare_code_lookup(self, mocker: MockerFixture):
-        """Bare code lookup still works."""
+    # ── Direct pipe_ref lookup ──────────────────────────────────────
+
+    def test_pipe_ref_lookup(self, mocker: MockerFixture):
+        """Domain-qualified pipe_ref lookup works as primary path."""
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
-        library.root["compute_score"] = mock_pipe
-        result = library.get_optional_pipe("compute_score")
-        assert result is mock_pipe
-
-    def test_domain_qualified_ref_correct_domain(self, mocker: MockerFixture):
-        """Domain-qualified ref resolves when pipe domain matches."""
-        library = PipeLibrary.make_empty()
-        mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
-        library.root["compute_score"] = mock_pipe
+        library.root["scoring.compute_score"] = mock_pipe
         result = library.get_optional_pipe("scoring.compute_score")
         assert result is mock_pipe
 
-    def test_domain_qualified_ref_wrong_domain(self, mocker: MockerFixture):
-        """Domain-qualified ref returns None when pipe domain does not match."""
+    def test_pipe_ref_wrong_domain_returns_none(self, mocker: MockerFixture):
+        """Domain-qualified ref returns None when domain does not exist."""
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
-        library.root["compute_score"] = mock_pipe
+        library.root["scoring.compute_score"] = mock_pipe
         result = library.get_optional_pipe("wrong_domain.compute_score")
         assert result is None
 
-    def test_cross_package_ref_correct_domain(self, mocker: MockerFixture):
-        """Cross-package ref resolves when pipe domain matches."""
+    # ── Bare code fallback ──────────────────────────────────────────
+
+    def test_bare_code_unambiguous(self, mocker: MockerFixture):
+        """Bare code lookup works when only one pipe has that code."""
+        library = PipeLibrary.make_empty()
+        mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.root["scoring.compute_score"] = mock_pipe
+        result = library.get_optional_pipe("compute_score")
+        assert result is mock_pipe
+
+    def test_bare_code_ambiguous_raises(self, mocker: MockerFixture):
+        """Bare code lookup raises PipeLibraryError when multiple domains have the same code."""
+        library = PipeLibrary.make_empty()
+        pipe_scoring = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        pipe_analytics = _make_stub_pipe(mocker, code="compute_score", domain_code="analytics")
+        library.root["scoring.compute_score"] = pipe_scoring
+        library.root["analytics.compute_score"] = pipe_analytics
+        with pytest.raises(PipeLibraryError, match="Ambiguous pipe code"):
+            library.get_optional_pipe("compute_score")
+
+    def test_bare_code_no_match_returns_none(self):
+        """Bare code lookup returns None when no pipe has that code."""
+        library = PipeLibrary.make_empty()
+        result = library.get_optional_pipe("nonexistent")
+        assert result is None
+
+    # ── Multi-domain coexistence ────────────────────────────────────
+
+    def test_multi_domain_coexistence(self, mocker: MockerFixture):
+        """Two pipes with the same code in different domains coexist and are individually retrievable."""
+        library = PipeLibrary.make_empty()
+        pipe_scoring = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        pipe_analytics = _make_stub_pipe(mocker, code="compute_score", domain_code="analytics")
+        library.root["scoring.compute_score"] = pipe_scoring
+        library.root["analytics.compute_score"] = pipe_analytics
+
+        assert library.get_optional_pipe("scoring.compute_score") is pipe_scoring
+        assert library.get_optional_pipe("analytics.compute_score") is pipe_analytics
+        assert len(library.root) == 2
+
+    def test_add_new_pipe_multi_domain(self, mocker: MockerFixture):
+        """add_new_pipe stores by pipe_ref so same code in different domains works."""
+        library = PipeLibrary.make_empty()
+        pipe_scoring = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        pipe_analytics = _make_stub_pipe(mocker, code="compute_score", domain_code="analytics")
+        library.add_new_pipe(pipe=pipe_scoring)
+        library.add_new_pipe(pipe=pipe_analytics)
+
+        assert "scoring.compute_score" in library.root
+        assert "analytics.compute_score" in library.root
+
+    # ── Cross-package refs ──────────────────────────────────────────
+
+    def test_cross_package_ref_with_pipe_ref(self, mocker: MockerFixture):
+        """Cross-package ref with domain-qualified remainder resolves correctly."""
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         library.add_dependency_pipe(alias="lib", pipe=mock_pipe)
@@ -51,12 +99,22 @@ class TestPipeLibraryLookup:
         assert result is mock_pipe
 
     def test_cross_package_ref_wrong_domain(self, mocker: MockerFixture):
-        """Cross-package ref returns None when pipe domain does not match."""
+        """Cross-package ref with wrong domain returns None."""
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
         library.add_dependency_pipe(alias="lib", pipe=mock_pipe)
         result = library.get_optional_pipe("lib->wrong_domain.compute_score")
         assert result is None
+
+    def test_cross_package_ref_bare_code_unambiguous(self, mocker: MockerFixture):
+        """Cross-package ref with bare code resolves when unambiguous."""
+        library = PipeLibrary.make_empty()
+        mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.add_dependency_pipe(alias="lib", pipe=mock_pipe)
+        result = library.get_optional_pipe("lib->compute_score")
+        assert result is mock_pipe
+
+    # ── Malformed refs ──────────────────────────────────────────────
 
     @pytest.mark.parametrize(
         "malformed_ref",
@@ -86,8 +144,10 @@ class TestPipeLibraryLookup:
         result = library.get_optional_pipe(malformed_ref)
         assert result is None
 
+    # ── get_required_pipe error cases ───────────────────────────────
+
     def test_get_required_pipe_malformed_raises_not_found(self):
-        """Malformed ref through get_required_pipe raises PipeNotFoundError, not QualifiedRefError."""
+        """Malformed ref through get_required_pipe raises PipeNotFoundError."""
         library = PipeLibrary.make_empty()
         with pytest.raises(PipeNotFoundError):
             library.get_required_pipe("foo..bar")
@@ -96,6 +156,42 @@ class TestPipeLibraryLookup:
         """Domain mismatch through get_required_pipe raises PipeNotFoundError."""
         library = PipeLibrary.make_empty()
         mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
-        library.root["compute_score"] = mock_pipe
+        library.root["scoring.compute_score"] = mock_pipe
         with pytest.raises(PipeNotFoundError):
             library.get_required_pipe("wrong_domain.compute_score")
+
+    # ── Collision tests ───────────────────────────────────────────────
+
+    def test_same_code_different_domains_no_collision(self, mocker: MockerFixture):
+        """Same bare code in different domains does NOT collide — this would have failed under old bare-code indexing."""
+        library = PipeLibrary.make_empty()
+        pipe_scoring = _make_stub_pipe(mocker, code="process", domain_code="scoring")
+        pipe_analytics = _make_stub_pipe(mocker, code="process", domain_code="analytics")
+
+        # Both add_new_pipe calls succeed — no collision
+        library.add_new_pipe(pipe=pipe_scoring)
+        library.add_new_pipe(pipe=pipe_analytics)
+
+        # Both retrievable by pipe_ref
+        assert library.get_optional_pipe("scoring.process") is pipe_scoring
+        assert library.get_optional_pipe("analytics.process") is pipe_analytics
+
+    def test_same_pipe_ref_collision_raises(self, mocker: MockerFixture):
+        """Same pipe_ref (same domain + same code) from separate add calls raises PipeLibraryError."""
+        library = PipeLibrary.make_empty()
+        pipe_first = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        pipe_duplicate = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+
+        library.add_new_pipe(pipe=pipe_first)
+        with pytest.raises(PipeLibraryError, match="already exists"):
+            library.add_new_pipe(pipe=pipe_duplicate)
+
+    # ── remove_pipes_by_refs ────────────────────────────────────────
+
+    def test_remove_pipes_by_refs(self, mocker: MockerFixture):
+        """remove_pipes_by_refs removes pipes by their pipe_ref keys."""
+        library = PipeLibrary.make_empty()
+        mock_pipe = _make_stub_pipe(mocker, code="compute_score", domain_code="scoring")
+        library.root["scoring.compute_score"] = mock_pipe
+        library.remove_pipes_by_refs(pipe_refs=["scoring.compute_score"])
+        assert "scoring.compute_score" not in library.root
