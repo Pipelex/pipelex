@@ -1,7 +1,6 @@
 from typing import ClassVar
 
 from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
-from pipelex.builder.talents.img_gen_talent import ImgGenTalent
 from pipelex.pipe_operators.img_gen.pipe_img_gen_blueprint import PipeImgGenBlueprint
 
 
@@ -13,7 +12,7 @@ class PipeImgGenTestCases:
             description="Generate an image",
             inputs={"my_prompt": "Text"},
             output="native.Image",
-            img_gen_talent=ImgGenTalent.GEN_IMAGE,
+            model="$gen-image",
             prompt="@my_prompt",
         ),
         PipeImgGenBlueprint(
@@ -38,7 +37,7 @@ class PipeImgGenTestCases:
             inputs={"description": "Text"},
             output="Image[3]",
             prompt="@description",
-            img_gen_talent=ImgGenTalent.GEN_IMAGE_FAST,
+            model="$gen-image-fast",
         ),
         PipeImgGenBlueprint(
             description="Generate image with options",

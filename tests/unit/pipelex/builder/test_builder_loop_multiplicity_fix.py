@@ -301,7 +301,7 @@ class TestBuilderLoopMultiplicityFix:
                     description="An LLM pipe",
                     inputs={"input_text": "Text"},
                     output="Text",
-                    llm_talent="data-retrieval",
+                    model="$retrieval",
                     prompt="Do something with @input_text",
                 ),
             },
