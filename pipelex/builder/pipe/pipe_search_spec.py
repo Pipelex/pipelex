@@ -3,6 +3,7 @@ from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from rich.console import Group
+from rich.markup import escape
 from rich.panel import Panel
 from rich.text import Text
 from typing_extensions import override
@@ -88,7 +89,7 @@ class PipeSearchSpec(PipeSpec):
 
         # Add search specific information
         search_group.renderables.append(Text())  # Blank line
-        search_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{self.model or '(default)'}[/bold yellow]"))
+        search_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{escape(self.model or '(default)')}[/bold yellow]"))
         prompt_panel = Panel(
             self.prompt,
             title="Search Prompt",

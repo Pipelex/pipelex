@@ -38,6 +38,8 @@ def _format_check_markdown(result: dict[str, Any]) -> str:
     if cross_suggestions:
         if not suggestions:
             lines.append("\nDid you mean:")
+        else:
+            lines.append("\nOr from a different collection:")
         for suggestion in cross_suggestions:
             lines.append(f"- {suggestion}")
 
