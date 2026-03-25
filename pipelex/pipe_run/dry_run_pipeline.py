@@ -8,6 +8,7 @@ from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.core.interpreter.exceptions import PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.runner import PipelexRunner
@@ -53,7 +54,7 @@ async def dry_run_pipeline(
         bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content)
         if bundle_blueprint.main_pipe and main_pipe_code is None:
             # Domain-qualify to avoid ambiguity across multiple domains
-            main_pipe_code = f"{bundle_blueprint.domain}.{bundle_blueprint.main_pipe}"
+            main_pipe_code = PipeFactory.make_pipe_ref_with_domain(domain_code=bundle_blueprint.domain, pipe_code=bundle_blueprint.main_pipe)
 
     if not main_pipe_code:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"

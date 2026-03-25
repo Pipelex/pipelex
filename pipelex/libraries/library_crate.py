@@ -35,16 +35,24 @@ class LibraryCrate(BaseModel):
     fingerprint: str = ""
     """SHA-256 hex digest of the serialized concepts + pipes content."""
 
-    def compute_fingerprint(self) -> str:
+    @staticmethod
+    def compute_fingerprint_from_content(
+        concepts: dict[str, "ConceptBlueprint | str"],
+        pipes: dict[str, PipeBlueprintUnion],
+    ) -> str:
         """Compute SHA-256 fingerprint from concepts and pipes content.
 
         Uses deterministic JSON serialization of concepts and pipes only
         (excludes domains, source_map, and fingerprint itself).
         """
         concepts_json: dict[str, object] = {}
-        for ref, value in sorted(self.concepts.items()):
+        for ref, value in sorted(concepts.items()):
             concepts_json[ref] = value if isinstance(value, str) else value.model_dump(mode="json")
-        pipes_json = {ref: blueprint.model_dump(mode="json") for ref, blueprint in sorted(self.pipes.items())}
+        pipes_json = {ref: blueprint.model_dump(mode="json") for ref, blueprint in sorted(pipes.items())}
         payload = {"concepts": concepts_json, "pipes": pipes_json}
         serialized = json.dumps(payload, sort_keys=True, ensure_ascii=True)
         return hashlib.sha256(serialized.encode()).hexdigest()
+
+    def compute_fingerprint(self) -> str:
+        """Compute SHA-256 fingerprint from this crate's concepts and pipes."""
+        return self.compute_fingerprint_from_content(concepts=self.concepts, pipes=self.pipes)

@@ -7,6 +7,7 @@ from pipelex import log
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
@@ -185,7 +186,7 @@ async def pipeline_run_setup(
             qualified_main_pipe: str | None = None
             for blueprint in all_blueprints:
                 if blueprint.main_pipe:
-                    qualified_main_pipe = f"{blueprint.domain}.{blueprint.main_pipe}"
+                    qualified_main_pipe = PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=blueprint.main_pipe)
                     break
             if not qualified_main_pipe:
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
