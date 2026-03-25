@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from rich.console import Group
+from rich.markup import escape
 from rich.text import Text
 from typing_extensions import override
 
@@ -78,7 +79,7 @@ class PipeExtractSpec(PipeSpec):
 
         # Add extract specific information
         extract_group.renderables.append(Text())  # Blank line
-        extract_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{self.model or '(default)'}[/bold yellow]"))
+        extract_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{escape(self.model or '(default)')}[/bold yellow]"))
 
         # Add optional extraction settings if they are set
         if self.max_page_images is not None:

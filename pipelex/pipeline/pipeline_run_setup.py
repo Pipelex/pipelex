@@ -176,7 +176,9 @@ async def pipeline_run_setup(
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
         elif blueprint.main_pipe:
-            # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with the same code
+            # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with the same code.
+            # Note: main_pipe is validated as snake_case (no dots allowed), so it is always a bare code — never
+            # already domain-qualified. See PipelexBundleBlueprint.validate_main_pipe_syntax.
             qualified_main_pipe = f"{blueprint.domain}.{blueprint.main_pipe}"
             pipe = get_required_pipe(pipe_code=qualified_main_pipe)
         else:

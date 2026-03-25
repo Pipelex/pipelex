@@ -4,7 +4,7 @@ description: "Use the pipelex-agent CLI for machine-oriented output — designed
 
 # Agent CLI (`pipelex-agent`)
 
-The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — JSON, raw TOML, or markdown — with no Rich formatting or interactive prompts. Errors always go to stderr as JSON.
+The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — JSON, raw TOML, or markdown — with no Rich formatting or interactive prompts. Structured commands emit JSON errors to stderr; `fmt` and `lint` pass through native `plxt` output.
 
 It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
@@ -89,7 +89,7 @@ These commands do not have subcommands:
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
 | `concept` | Convert a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
-| `models` | List available model presets, aliases, waterfalls, and talent mappings (`--format markdown\|json`, default: markdown) |
+| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json`, default: markdown) |
 | `doctor` | Check config, credentials, and model health (`--format markdown\|json`, default: markdown) |
 
 ## Output Contract

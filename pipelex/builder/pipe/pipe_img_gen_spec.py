@@ -2,6 +2,7 @@ from typing import Literal
 
 from pydantic import Field, field_validator
 from rich.console import Group
+from rich.markup import escape
 from rich.text import Text
 from typing_extensions import override
 
@@ -50,7 +51,7 @@ class PipeImgGenSpec(PipeSpec):
 
         # Add image generation specific information
         img_gen_group.renderables.append(Text())  # Blank line
-        img_gen_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{self.model or '(default)'}[/bold yellow]"))
+        img_gen_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{escape(self.model or '(default)')}[/bold yellow]"))
 
         return img_gen_group
 

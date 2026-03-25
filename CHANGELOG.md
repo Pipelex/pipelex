@@ -1,10 +1,30 @@
 # Changelog
 
-## [Unreleased]
+## [v0.22.0] - 2026-03-25
 
 ### Added
 
-- **Temporal Workflow Orchestration:** Pipelex now integrates with [Temporal](https://temporal.io/) for distributed workflow orchestration, enabling reliable and scalable execution of pipes across workers with retry policies, sandboxing, and configurable task queues.
+- **MiniMax Backend Support**: Added integration for MiniMax models (M2, M2.1, M2.5, M2.7 series including high-speed variants) with an `all_minimax` routing profile.
+- **`check-model` Agent CLI Command**: Introduced `pipelex-agent check-model` to validate model references. Provides fuzzy matching suggestions, cross-collection suggestions, and wrong-sigil hints when an invalid model is provided.
+- **Domain-Qualified Pipe References (`pipe_ref`)**: Added a `pipe_ref` property (`domain.code`) as the primary pipe index, allowing pipes with the same code to coexist across different domains. Bare code lookups remain supported as a fallback when unambiguous.
+- **Duplicate Concept Detection**: Added validation to warn about duplicate concept declarations across different bundles within the same library.
+- **Shared TOML Formatter**: Extracted a shared `format_toml_string` utility for consistent multi-line string formatting across the MTHDS factory and Agent CLI.
+
+### Changed
+
+- **Agent CLI Output Formats**: Overhauled `pipelex-agent` CLI output for LLM agents: `concept` and `pipe` commands now output raw TOML to stdout; `models` and `doctor` commands output Markdown by default (JSON still available via `--format json`).
+- **Unified `model` Field in Pipe Specs**: Replaced type-specific talent fields (`llm_talent`, `extract_talent`, `img_gen_talent`, `search_talent`) with a single `model` field accepting model presets directly. Talent mappings removed from `pipelex-agent models` output accordingly.
+- **Initialization Checks**: `check_is_initialized` now additionally verifies the presence of `plxt.toml`.
+- **Documentation & Handoffs**: Updated Claude Code skills plugin docs, CLI references.
+
+### Fixed
+
+- **Domain Metadata Conflicts**: Loading multiple bundles declaring the same domain with differing descriptions or system prompts now emits a warning and keeps the first declaration instead of throwing an error.
+- **Cross-Domain Execution Tracking**: Pipe controllers and the dry-run engine now track visited pipes using `pipe_ref` instead of bare codes, preventing false-positive loop detections when crossing domains.
+
+### Removed
+
+- **`assemble` Agent CLI Command**: Removed the `pipelex-agent assemble` command.
 
 ## [v0.21.0] - 2026-03-19
 
