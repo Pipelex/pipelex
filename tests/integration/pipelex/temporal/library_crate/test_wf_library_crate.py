@@ -9,6 +9,7 @@ import uuid
 
 import pytest
 from temporalio.client import Client as TemporalClient
+from temporalio.client import WorkflowFailureError
 
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_job import PipeJob
@@ -26,6 +27,9 @@ class TestWfLibraryCrate:
         assert crate is not None, "library_crate should be set on PipeJob"
         assert crate.fingerprint, "fingerprint should be non-empty"
 
+        assert len(crate.pipes) == len(LibraryCrateTestData.EXPECTED_PIPE_REFS), (
+            f"Expected {len(LibraryCrateTestData.EXPECTED_PIPE_REFS)} pipes, got {len(crate.pipes)}"
+        )
         for pipe_ref in LibraryCrateTestData.EXPECTED_PIPE_REFS:
             assert pipe_ref in crate.pipes, f"Expected pipe_ref '{pipe_ref}' not found in crate"
 
@@ -52,7 +56,13 @@ class TestWfLibraryCrate:
             )
 
         assert isinstance(pipe_output, PipeOutput)
-        assert pipe_output.working_memory is not None
+        working_memory = pipe_output.working_memory
+        assert working_memory is not None
+
+        for stuff_name in LibraryCrateTestData.EXPECTED_STUFF_NAMES:
+            assert working_memory.is_stuff_exists(stuff_name), f"Expected stuff '{stuff_name}' missing from output"
+            stuff = working_memory.get_stuff(stuff_name)
+            assert stuff.content is not None, f"Stuff '{stuff_name}' has no content"
 
     async def test_crate_structure_from_dirs(self, pipe_job_from_library_dirs: PipeJob):
         self._assert_crate_structure(pipe_job_from_library_dirs)
@@ -75,3 +85,27 @@ class TestWfLibraryCrate:
     ):
         """Same as above but the crate was built from an inline mthds_content string."""
         await self._execute_workflow_and_assert(pipe_job_from_mthds_content, temporal_client)
+
+    async def test_missing_crate_fails_pipe_resolution(
+        self,
+        pipe_job_from_mthds_content: PipeJob,
+        temporal_client: TemporalClient,
+    ):
+        """A PipeJob without a crate should fail: child pipes can't resolve on worker."""
+        pipe_job_without_crate = pipe_job_from_mthds_content.model_copy(update={"library_crate": None})
+
+        task_queue = str(uuid.uuid4())
+        workflow_id = str(uuid.uuid4())
+
+        async with get_task_manager().make_worker(
+            temporal_client,
+            task_queue=task_queue,
+            is_not_sandboxed=True,
+        ):
+            with pytest.raises(WorkflowFailureError):
+                await temporal_client.execute_workflow(
+                    workflow=WfPipeRouter.run,
+                    arg=pipe_job_without_crate,
+                    id=workflow_id,
+                    task_queue=task_queue,
+                )

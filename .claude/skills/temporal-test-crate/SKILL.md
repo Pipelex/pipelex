@@ -20,7 +20,7 @@ Run the Phase 2 integration tests that verify LibraryCrate propagation through T
 # Verify venv and temporalio
 .venv/bin/python -c "import temporalio; print(f'temporalio {temporalio.__version__}')"
 # Verify test bundle exists
-ls tests/integration/pipelex/temporal/async/library_crate/native_text_sequence.mthds
+ls tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds
 ```
 
 ## Run the tests
@@ -47,6 +47,6 @@ For tmux-based 3-terminal debugging (server + worker + submitter), use the `/tem
 
 | File | Purpose |
 |------|---------|
-| `tests/integration/pipelex/temporal/async/library_crate/test_wf_library_crate.py` | 4 integration tests |
+| `tests/integration/pipelex/temporal/library_crate/test_wf_library_crate.py` | 4 integration tests |
 | `tests/integration/pipelex/temporal/async/library_crate/conftest.py` | PipeJob fixtures with LibraryCrate |
 | `tests/integration/pipelex/temporal/test_data.py` | Test constants (`LibraryCrateTestData`) |

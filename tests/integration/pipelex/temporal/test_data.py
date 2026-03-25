@@ -98,8 +98,8 @@ class LibraryCrateTestData:
     tests Layer 2 (pipe resolution via get_required_pipe on the worker).
     """
 
-    BUNDLE_DIR: ClassVar[str] = "tests/integration/pipelex/temporal/async/library_crate"
-    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/temporal/async/library_crate/native_text_sequence.mthds"
+    BUNDLE_DIR: ClassVar[str] = "tests/integration/pipelex/temporal/library_crate"
+    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds"
     PIPE_CODE: ClassVar[str] = "native_text_sequence"
     DOMAIN: ClassVar[str] = "native_text_test"
 
@@ -107,6 +107,11 @@ class LibraryCrateTestData:
         "native_text_test.native_text_sequence",
         "native_text_test.step_one",
         "native_text_test.step_two",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "step_one_result",
+        "step_two_result",
     ]
 
 
