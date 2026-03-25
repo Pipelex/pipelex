@@ -1,5 +1,21 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Builder Operations module** (`pipelex/builder/operations/`): New standalone operation functions for the build agent — `concept_ops`, `inputs_ops`, `models_ops`, `output_ops`, `pipe_ops`, `runner_code_ops`, `validate_ops`. These decouple build logic from CLI commands so it can be reused by agents and the API.
+- **`dry_run_pipeline`** (`pipelex/pipe_run/dry_run_pipeline.py`): New shared entrypoint to dry-run a pipeline from MTHDS contents and produce a `GraphSpec`. Used by both CLI graph commands and the API.
+
+### Changed
+
+- **`mthds_content` → `mthds_contents`**: Unified singular `mthds_content: str | None` into `mthds_contents: list[str] | None` across `PipelexRunner`, `pipeline_run_setup`, `validate_bundle`, CLI commands, and builder operations. Callers now pass a list of bundle content strings.
+- **`bundle_uri` → `bundle_uris`**: Renamed `bundle_uri: str | None` to `bundle_uris: list[str] | None` across `PipelexRunner.__init__`, `pipeline_run_setup`, `dry_run_pipeline`, and all CLI call sites. Multiple bundles can now be loaded simultaneously.
+- **Bump `mthds` dependency** to `>=0.2.0` (from `>=0.1.1`) to match the updated `RunnerProtocol` interface.
+- **Graph rendering refactor**: Extracted dry-run logic from `graph_rendering._dry_run_bundle` into the new shared `dry_run_pipeline` function.
+- **Agent CLI inputs**: Refactored `_inputs_core` to delegate to `builder.operations.inputs_ops.build_inputs_for_pipe` instead of duplicating bundle validation and input rendering logic.
+- **Agent CLI run**: Added graph generation support with ReactFlow HTML output and side-effect metadata tracking in `_run_core`.
+
 ## [v0.22.0] - 2026-03-25
 
 ### Added

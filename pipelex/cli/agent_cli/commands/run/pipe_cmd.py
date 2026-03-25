@@ -111,7 +111,6 @@ def run_pipe_cmd(
                 result = asyncio.run(
                     run_pipeline_core_api(
                         pipe_code=pipe_code,
-                        mthds_content=None,
                         inputs=pipeline_inputs,
                         with_memory=with_memory,
                     )
@@ -134,8 +133,6 @@ def run_pipe_cmd(
                 result = asyncio.run(
                     run_pipeline_core(
                         pipe_code=pipe_code,
-                        mthds_content=None,
-                        bundle_uri=None,
                         inputs=pipeline_inputs,
                         dry_run=dry_run,
                         mock_inputs=mock_inputs,
