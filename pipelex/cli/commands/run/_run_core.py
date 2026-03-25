@@ -118,14 +118,14 @@ async def _execute_run(
 
     try:
         runner = PipelexRunner(
-            bundle_uri=bundle_path,
+            bundle_uris=[bundle_path] if bundle_path else None,
             pipe_run_mode=pipe_run_mode,
             execution_config=execution_config,
             library_dirs=library_dir,
         )
         response = await runner.execute_pipeline(
             pipe_code=pipe_code,
-            mthds_content=mthds_content,
+            mthds_contents=[mthds_content] if mthds_content else None,
             inputs=pipeline_inputs,
         )
         pipe_output = response.pipe_output

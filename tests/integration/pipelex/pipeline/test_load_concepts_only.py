@@ -252,7 +252,7 @@ description = "An item"
 name = { type = "text", description = "Item name" }
 """
 
-        result = load_concepts_only(mthds_content=mthds_content)
+        result = load_concepts_only(mthds_contents=[mthds_content])
 
         assert len(result.blueprints) == 1
         assert len(result.concepts) == 1
