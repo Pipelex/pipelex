@@ -1,16 +1,14 @@
 """Core operations for pipe spec parsing and TOML generation."""
 
+# tomlkit lacks type stubs; pydantic `model` field clashes with BaseModel namespace
 # pyright: reportUnknownMemberType=false
-# pyright: reportArgumentType=false
 # pyright: reportUnknownVariableType=false
-# pyright: reportUnusedExcept=false
 # pyright: reportAttributeAccessIssue=false
-# pyright: reportUnknownArgumentType=false
-# mypy: disable-error-code="arg-type,no-any-return,attr-defined"
 
 from typing import Any
 
 import tomlkit
+from tomlkit.items import Table
 
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
@@ -20,6 +18,7 @@ from pipelex.builder.pipe.pipe_func_spec import PipeFuncSpec
 from pipelex.builder.pipe.pipe_img_gen_spec import PipeImgGenSpec
 from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
+from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
@@ -89,7 +88,7 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     return spec_class.model_validate(spec_data)
 
 
-def add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocument | tomlkit.items.Table) -> None:  # type: ignore[name-defined]
+def add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: Table) -> None:
     """Add type-specific fields to the pipe TOML table.
 
     Args:
@@ -166,6 +165,25 @@ def add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocume
     elif isinstance(pipe_spec, PipeExtractSpec):
         if pipe_spec.model:
             pipe_table.add("model", pipe_spec.model)
+        if pipe_spec.max_page_images is not None:
+            pipe_table.add("max_page_images", pipe_spec.max_page_images)
+        if pipe_spec.page_views is not None:
+            pipe_table.add("page_views", pipe_spec.page_views)
+
+    elif isinstance(pipe_spec, PipeSearchSpec):
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
+        pipe_table.add("prompt", pipe_spec.prompt)
+        if pipe_spec.from_date is not None:
+            pipe_table.add("from_date", pipe_spec.from_date)
+        if pipe_spec.to_date is not None:
+            pipe_table.add("to_date", pipe_spec.to_date)
+        if pipe_spec.include_domains is not None:
+            pipe_table.add("include_domains", pipe_spec.include_domains)
+        if pipe_spec.exclude_domains is not None:
+            pipe_table.add("exclude_domains", pipe_spec.exclude_domains)
+        if pipe_spec.max_results is not None:
+            pipe_table.add("max_results", pipe_spec.max_results)
 
     elif isinstance(pipe_spec, PipeImgGenSpec):
         if pipe_spec.model:

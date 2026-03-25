@@ -22,7 +22,7 @@ def validate_url_resource_exists(url: str) -> None:
     By the time a URL reaches DocumentContent/ImageContent, it should already
     be resolved (absolute path or fully qualified URL).
 
-    For HTTP/HTTPS URLs: performs a HEAD request to check reachability.
+    For HTTP/HTTPS URLs: performs a streaming GET request to check reachability.
     For local file paths: checks that the file exists on disk.
     Skips validation for internal URIs (base64 data URLs, pipelex-storage://).
 

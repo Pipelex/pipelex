@@ -47,10 +47,14 @@ def _load_toml_content(source: str) -> tomlkit.TOMLDocument:
     Returns:
         Parsed TOML document that preserves formatting.
     """
-    source_path = Path(source)
-    if source_path.exists() and source_path.is_file():
-        with open(source_path, encoding="utf-8") as the_file:
-            return tomlkit.load(the_file)
+    try:
+        source_path = Path(source)
+        if source_path.exists() and source_path.is_file():
+            with open(source_path, encoding="utf-8") as the_file:
+                return tomlkit.load(the_file)
+    except OSError:
+        # Inline TOML content may contain characters invalid for file paths
+        pass
     return tomlkit.parse(source)
 
 

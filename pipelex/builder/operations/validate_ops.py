@@ -76,7 +76,11 @@ async def validate_bundle_file(
     """
     result = await validate_bundle(mthds_file_path=bundle_path, library_dirs=library_dirs)
 
-    validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in result.pipes]
+    validated_pipes: list[dict[str, str]] = []
+    for the_pipe in result.pipes:
+        dry_run_output = result.dry_run_result.get(the_pipe.code)
+        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
+        validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
 
     return {
         "success": True,
@@ -101,14 +105,18 @@ async def validate_bundle_content(
         ValidateBundleError: If validation fails.
     """
     validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents)
-    blueprint = validate_bundle_result.blueprints[0]
+    blueprints = validate_bundle_result.blueprints
 
-    validated_pipes = [{"pipe_code": the_pipe.code, "status": "SUCCESS"} for the_pipe in validate_bundle_result.pipes]
+    validated_pipes: list[dict[str, str]] = []
+    for the_pipe in validate_bundle_result.pipes:
+        dry_run_output = validate_bundle_result.dry_run_result.get(the_pipe.code)
+        status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
+        validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
 
     return {
         "success": True,
         "mthds_contents": mthds_contents,
-        "pipelex_bundle_blueprint": blueprint,
+        "pipelex_bundle_blueprint": blueprints[0] if len(blueprints) == 1 else blueprints,
         "validated_pipes": validated_pipes,
         "total_pipes": len(validate_bundle_result.pipes),
     }
