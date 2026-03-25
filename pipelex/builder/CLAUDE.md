@@ -100,4 +100,4 @@ After fixing, `_prune_unreachable_specs()` removes pipes unreachable from `main_
 
 ## Talent System
 
-Talents are abstract capability labels mapped to concrete model presets. Each talent enum (in `talents/`) maps to a `$preset` code used in MTHDS files. When modifying talents, update both the enum and its preset mapping dict.
+Talents are abstract capability labels mapped to concrete model presets. They remain in `talents/` and are used by the `pipelex-agent models` CLI to help agents choose appropriate presets. PipeSpec subclasses accept model presets directly via a `model: str | None` field, bypassing talent resolution. When modifying talent enums, update both the enum and its preset mapping dict in `pipelex.toml`.

@@ -41,7 +41,7 @@ Package manifest management is currently exposed through the lowercase `mthds` C
 
 ## Agent CLI
 
-The `pipelex-agent` CLI is a machine-first interface designed for automated environments like Claude Code skills. All output is structured JSON to stdout, with no interactive prompts or Rich formatting.
+The `pipelex-agent` CLI is a machine-first interface designed for automated environments like Claude Code skills. Output format varies by command — JSON, raw TOML, or markdown — with no interactive prompts or Rich formatting. Structured commands emit JSON errors to stderr; `fmt` and `lint` pass through native `plxt` output.
 
 | Command | Description |
 |---------|-------------|
@@ -51,16 +51,15 @@ The `pipelex-agent` CLI is a machine-first interface designed for automated envi
 | `fmt` | Format `.mthds`, `.toml`, or `.plx` files in-place |
 | `lint` | Lint files for errors |
 | `inputs` | Generate example input JSON for a pipe |
-| `concept` | Convert a JSON concept spec into TOML |
-| `pipe` | Convert a JSON pipe spec into TOML |
-| `assemble` | Combine TOML parts into a complete `.mthds` file |
-| `models` | List available model presets, aliases, and talent mappings |
-| `doctor` | Check configuration health and auto-fix issues |
+| `concept` | Convert a JSON concept spec into raw TOML (stdout) |
+| `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
+| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json`, default: markdown) |
+| `doctor` | Check configuration health (`--format markdown\|json`, default: markdown) |
 
 For detailed CLI documentation, see the [CLI reference](../tools/cli/index.md).
 
 ## Related Documentation
 
 - [CLI Reference](../tools/cli/index.md) - Runtime CLI commands
-- [Agent CLI](../tools/cli/agent-cli.md) - Machine-oriented JSON interface
+- [Agent CLI](../tools/cli/agent-cli.md) - Machine-oriented interface for AI agents
 - [Package Commands](../tools/cli/pkg.md) - Current `mthds package` manifest commands

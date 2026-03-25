@@ -1,20 +1,16 @@
 import re
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, field_validator, model_validator
 from rich.console import Group
+from rich.markup import escape
 from rich.panel import Panel
 from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.builder.talents.search_talent import SearchTalent
-from pipelex.config import get_config
 from pipelex.pipe_operators.search.pipe_search_blueprint import PipeSearchBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-
-if TYPE_CHECKING:
-    from pipelex.cogt.search.search_setting import SearchModelChoice
 
 
 class PipeSearchSpec(PipeSpec):
@@ -28,10 +24,9 @@ class PipeSearchSpec(PipeSpec):
 
     type: Literal["PipeSearch"] = "PipeSearch"
     pipe_category: Literal["PipeOperator"] = "PipeOperator"
-    search_talent: SearchTalent | str = Field(
-        default=SearchTalent.WEB_SEARCH,
-        description="Select the most adequate search talent according to the task to be performed.",
-        examples=list(SearchTalent),
+    model: str | None = Field(
+        default=None,
+        description="Model preset, alias, waterfall, or direct model handle. Use presets from 'pipelex-agent models'.",
     )
     prompt: str = Field(
         validation_alias="query",
@@ -52,6 +47,14 @@ class PipeSearchSpec(PipeSpec):
     max_results: int | None = Field(
         default=None, description="Maximum number of search results to return. If not set, the search provider's default is used."
     )
+
+    @field_validator("model", mode="before")
+    @classmethod
+    def reject_empty_model(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            msg = "Model cannot be an empty string; omit the field to use defaults"
+            raise ValueError(msg)
+        return value
 
     @model_validator(mode="before")
     @classmethod
@@ -75,16 +78,6 @@ class PipeSearchSpec(PipeSpec):
             raise ValueError(msg)
         return date_value
 
-    @field_validator("search_talent", mode="before")
-    @classmethod
-    def validate_search_talent(cls, search_talent_value: str) -> SearchTalent:
-        try:
-            return SearchTalent(search_talent_value)
-        except ValueError:
-            valid = list(SearchTalent)
-            msg = f"'{search_talent_value}' is not a valid SearchTalent. Valid values: {valid}"
-            raise ValueError(msg) from None
-
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
         # Get base pipe information from parent
@@ -96,7 +89,7 @@ class PipeSearchSpec(PipeSpec):
 
         # Add search specific information
         search_group.renderables.append(Text())  # Blank line
-        search_group.renderables.append(Text.from_markup(f"Search Talent: [bold yellow]{self.search_talent}[/bold yellow]"))
+        search_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{escape(self.model or '(default)')}[/bold yellow]"))
         prompt_panel = Panel(
             self.prompt,
             title="Search Prompt",
@@ -131,16 +124,12 @@ class PipeSearchSpec(PipeSpec):
         """Convert this PipeSearchSpec to the core PipeSearchBlueprint."""
         base_blueprint = super().to_blueprint()
 
-        # Get search choice from config-based mapping
-        mappings = get_config().pipelex.builder_config.talent_preset_mappings.search
-        search_choice: SearchModelChoice = mappings[self.search_talent]
-
         return PipeSearchBlueprint(
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             prompt=self.prompt,
-            model=search_choice,
+            model=self.model,
             include_images=None,
             max_results=self.max_results,
             from_date=self.from_date,

@@ -1,20 +1,19 @@
 from rich.panel import Panel
 
-from pipelex.cli.commands.init.config_files import init_config
 from pipelex.hub import get_console
-from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.configuration.config_loader import CONFIG_NAME, config_manager
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.urls import URLs
 
+# Config files that must be resolvable (in project or global dir) for pipelex to be initialized.
+PLXT_CONFIG_NAME = "plxt.toml"
+
 
 def check_is_initialized(print_warning_if_not: bool = True) -> bool:
-    backends_toml_path = config_manager.backends_file_path
-    routing_profiles_toml_path = config_manager.routing_profiles_file_path
-
-    # Check critical files
-    config_exists = init_config(reset=False, dry_run=True) == 0
-    backends_exists = path_exists(backends_toml_path)
-    routing_exists = path_exists(routing_profiles_toml_path)
+    # Use resolve_config_file for all checks — consistent with how backends and routing are resolved
+    config_exists = path_exists(config_manager.resolve_config_file(CONFIG_NAME)) and path_exists(config_manager.resolve_config_file(PLXT_CONFIG_NAME))
+    backends_exists = path_exists(config_manager.backends_file_path)
+    routing_exists = path_exists(config_manager.routing_profiles_file_path)
 
     is_initialized = config_exists and backends_exists and routing_exists
 

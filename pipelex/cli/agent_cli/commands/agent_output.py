@@ -8,9 +8,20 @@ import typer
 
 from pipelex.pipeline.validate_bundle import ValidateBundleError
 from pipelex.tools.misc.json_utils import clean_json_dumps
+from pipelex.types import StrEnum
+
+
+class CliOutputFormat(StrEnum):
+    JSON = "json"
+    MARKDOWN = "markdown"
+
 
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
+    "ModelChoiceNotFoundError": (
+        "Check model name for typos. Use 'pipelex-agent check-model <name> -t <type>' "
+        "to validate or 'pipelex-agent models -t <type>' to list available models."
+    ),
     "PipeOperatorModelChoiceError": "Run 'pipelex-agent doctor' to check available models and routing configuration",
     "PipeOperatorModelAvailabilityError": "Run 'pipelex-agent doctor' to check available models and verify API keys",
     "ModelDeckPresetValidatonError": (
@@ -45,9 +56,6 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "PipelineRequestError": "Check that pipe_code or mthds_content is provided",
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
-    # Builder/assembler errors
-    "ConceptLoadError": "Check TOML syntax in the concept source file or inline string",
-    "PipeLoadError": "Check TOML syntax in the pipe source file or inline string",
     # Input/type errors
     "JsonTypeError": "Input file must be a JSON object {...}, not an array or scalar value",
     "BundleError": "Bundle must declare a 'main_pipe' or use the --pipe flag to specify which pipe to run",
@@ -66,6 +74,7 @@ RETRYABLE_ERROR_TYPES: set[str] = {
 
 AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
+    "ModelChoiceNotFoundError": "input",
     "ValidateBundleError": "input",
     "PipeValidationError": "input",
     "FileNotFoundError": "input",
@@ -79,8 +88,6 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "BundleError": "input",
     "PipelineRequestError": "input",
     "GraphSpecParseError": "input",
-    "ConceptLoadError": "input",
-    "PipeLoadError": "input",
     "UnknownCommandError": "input",
     # config = environment/config changes needed
     "ClientAuthenticationError": "config",

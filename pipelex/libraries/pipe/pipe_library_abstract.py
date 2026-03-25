@@ -33,7 +33,7 @@ class PipeLibraryAbstract(ABC):
     def get_pipes_dict(self) -> dict[str, PipeAbstract]:
         pass
 
-    def remove_pipes_by_codes(self, pipe_codes: list[str]) -> None:
+    def remove_pipes_by_refs(self, pipe_refs: list[str]) -> None:
         pass
 
     @abstractmethod
