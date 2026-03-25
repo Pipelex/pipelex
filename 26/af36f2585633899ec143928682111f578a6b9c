@@ -1,0 +1,23 @@
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  165e45defbe250c0 38-43
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "26af36f2585633899ec143928682111f578a6b9c",
+  "prompts": {
+    "165e45defbe250c0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7586e315-5bf7-4a57-8f4c-4cade56b655d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 7,
+      "total_deletions": 7,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
