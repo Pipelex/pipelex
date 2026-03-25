@@ -47,7 +47,8 @@ commands/
   plxt_passthrough.py          # Shared helper for plxt subprocess delegation
   concept_cmd.py               # concept — JSON spec → raw TOML to stdout
   pipe_cmd.py                  # pipe — JSON spec → raw TOML to stdout
-  models_cmd.py                # models — list presets, aliases, talent mappings
+  models_cmd.py                # models — list presets, aliases, waterfalls
+  check_model_cmd.py           # check-model — validate model reference with fuzzy suggestions
   init_cmd.py                  # init — non-interactive config setup (--global/-g, --config/-c)
   doctor_cmd.py                # doctor — config health check (--global/-g)
 ```
@@ -64,7 +65,8 @@ commands/
 | `inputs` | Generates example input JSON for a pipe/bundle/method (pipe\|bundle\|method subcommands) |
 | `concept` | Converts a JSON concept spec into raw TOML (stdout) |
 | `pipe` | Converts a JSON pipe spec (typed) into raw TOML (stdout) |
-| `models` | Lists available model presets, aliases, waterfalls, and talent mappings. `--format markdown\|json` (default: markdown) |
+| `models` | Lists available model presets, aliases, and waterfalls. `--format markdown\|json` (default: markdown) |
+| `check-model` | Validates a model reference and suggests alternatives if invalid. `--type`/`-t` for model category, `--format markdown\|json` (default: markdown) |
 | `doctor` | Checks config, credentials, models health. `--global`/`-g` for global dir. `--format markdown\|json` (default: markdown) |
 
 ## Key Patterns

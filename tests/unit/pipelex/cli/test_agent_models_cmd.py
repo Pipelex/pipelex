@@ -24,31 +24,6 @@ class _FakeSetting:
         self.description = description
 
 
-class _FakeTalentMappings:
-    """Minimal stand-in for TalentPresetMappings."""
-
-    def __init__(self, llm: dict[str, str], img_gen: dict[str, str], extract: dict[str, str], search: dict[str, str] | None = None):
-        self.llm = llm
-        self.img_gen = img_gen
-        self.extract = extract
-        self.search = search or {}
-
-
-class _FakeBuilderConfig:
-    def __init__(self, talent_preset_mappings: _FakeTalentMappings):
-        self.talent_preset_mappings = talent_preset_mappings
-
-
-class _FakePipelexConfig:
-    def __init__(self, builder_config: _FakeBuilderConfig):
-        self.builder_config = builder_config
-
-
-class _FakeConfig:
-    def __init__(self, pipelex: _FakePipelexConfig):
-        self.pipelex = pipelex
-
-
 class _FakeInferenceModelSpec:
     """Minimal stand-in for InferenceModelSpec."""
 
@@ -79,11 +54,6 @@ class TestData:
     EXTRACT_WATERFALLS: ClassVar[dict[str, list[str]]] = {"extract-wf": ["textract-model"]}
     IMG_GEN_WATERFALLS: ClassVar[dict[str, list[str]]] = {"img-wf": ["dall-e-3"]}
 
-    TALENT_LLM: ClassVar[dict[str, str]] = {"text_gen": "fast"}
-    TALENT_IMG_GEN: ClassVar[dict[str, str]] = {"image_gen": "hd-image"}
-    TALENT_EXTRACT: ClassVar[dict[str, str]] = {"extraction": "doc-extract"}
-
-    # Backend resolution map: model_handle -> (backend_name, model_type)
     INFERENCE_MAP: ClassVar[dict[str, tuple[str, ModelType]]] = {
         "gpt-4o-mini": ("openai", ModelType.LLM),
         "claude-sonnet": ("anthropic", ModelType.LLM),
@@ -123,25 +93,10 @@ def _make_fake_model_deck() -> Any:
     return FakeModelDeck()
 
 
-def _make_fake_config() -> _FakeConfig:
-    """Create a fake config with talent mappings."""
-    talent_mappings = _FakeTalentMappings(
-        llm=TestData.TALENT_LLM,
-        img_gen=TestData.TALENT_IMG_GEN,
-        extract=TestData.TALENT_EXTRACT,
-    )
-    return _FakeConfig(
-        pipelex=_FakePipelexConfig(
-            builder_config=_FakeBuilderConfig(talent_preset_mappings=talent_mappings),
-        ),
-    )
-
-
 def _setup_mocks(mocker: MockerFixture) -> None:
     """Patch the common dependencies for agent_models_cmd."""
     mocker.patch(f"{MODULE_PATH}.make_pipelex_for_agent_cli")
     mocker.patch(f"{MODULE_PATH}.get_model_deck", return_value=_make_fake_model_deck())
-    mocker.patch(f"{MODULE_PATH}.get_config", return_value=_make_fake_config())
     mocker.patch(f"{MODULE_PATH}.Pipelex")
 
 
@@ -149,17 +104,27 @@ class TestAgentModelsCmd:
     """Tests for agent_models_cmd JSON output with --type and --backend filters."""
 
     def test_no_filters_returns_all_categories(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """No filters should return all 3 categories in every section."""
+        """No filters should return all categories in every section."""
         _setup_mocks(mocker)
 
         agent_models_cmd(ctx=agent_ctx, output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
-        for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
+        for section in ("presets", "aliases", "waterfalls"):
             assert "llm" in parsed[section], f"llm missing from {section}"
             assert "img_gen" in parsed[section], f"img_gen missing from {section}"
             assert "extract" in parsed[section], f"extract missing from {section}"
+
+    def test_no_talent_mappings_in_output(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+        """Output should not contain talent_mappings or usage hint."""
+        _setup_mocks(mocker)
+
+        agent_models_cmd(ctx=agent_ctx, output_format=CliOutputFormat.JSON)
+
+        parsed = json.loads(capsys.readouterr().out)
+        assert "talent_mappings" not in parsed
+        assert "talent_mappings_usage_hint" not in parsed
 
     def test_no_filters_preset_content(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
         """No filters should include all preset entries with correct data."""
@@ -171,7 +136,6 @@ class TestAgentModelsCmd:
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
         assert "fast" in llm_preset_names
         assert "smart" in llm_preset_names
-        # Check description is included
         fast_preset = next(preset for preset in parsed["presets"]["llm"] if preset["name"] == "fast")
         assert fast_preset["description"] == "Fast LLM"
 
@@ -182,7 +146,7 @@ class TestAgentModelsCmd:
         agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
-        for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
+        for section in ("presets", "aliases", "waterfalls"):
             assert "llm" in parsed[section], f"llm missing from {section}"
             assert "img_gen" not in parsed[section], f"img_gen should not be in {section}"
             assert "extract" not in parsed[section], f"extract should not be in {section}"
@@ -194,7 +158,7 @@ class TestAgentModelsCmd:
         agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.EXTRACT], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
-        for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
+        for section in ("presets", "aliases", "waterfalls"):
             assert "extract" in parsed[section], f"extract missing from {section}"
             assert "llm" not in parsed[section], f"llm should not be in {section}"
             assert "img_gen" not in parsed[section], f"img_gen should not be in {section}"
@@ -206,7 +170,7 @@ class TestAgentModelsCmd:
         agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.IMG_GEN], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
-        for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
+        for section in ("presets", "aliases", "waterfalls"):
             assert "img_gen" in parsed[section], f"img_gen missing from {section}"
             assert "llm" not in parsed[section], f"llm should not be in {section}"
             assert "extract" not in parsed[section], f"extract should not be in {section}"
@@ -218,7 +182,7 @@ class TestAgentModelsCmd:
         agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM, ModelCategory.IMG_GEN], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
-        for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
+        for section in ("presets", "aliases", "waterfalls"):
             assert "llm" in parsed[section], f"llm missing from {section}"
             assert "img_gen" in parsed[section], f"img_gen missing from {section}"
             assert "extract" not in parsed[section], f"extract should not be in {section}"
@@ -230,16 +194,12 @@ class TestAgentModelsCmd:
         agent_models_cmd(ctx=agent_ctx, backend="openai", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
-        # LLM: only 'fast' preset (gpt-4o-mini on openai), not 'smart' (claude-sonnet on anthropic)
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
         assert "fast" in llm_preset_names
         assert "smart" not in llm_preset_names
-        # LLM aliases: best-llm -> claude-sonnet (anthropic), should be excluded
         assert len(parsed["aliases"]["llm"]) == 0
-        # IMG_GEN: dall-e-3 is on openai, should be included
         img_gen_preset_names = [preset["name"] for preset in parsed["presets"]["img_gen"]]
         assert "hd-image" in img_gen_preset_names
-        # Extract: textract-model is on aws, should be excluded
         assert len(parsed["presets"]["extract"]) == 0
 
     def test_backend_filter_anthropic(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
@@ -252,7 +212,6 @@ class TestAgentModelsCmd:
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
         assert "smart" in llm_preset_names
         assert "fast" not in llm_preset_names
-        # Alias best-llm -> claude-sonnet (anthropic) should be included
         assert "best-llm" in parsed["aliases"]["llm"]
 
     def test_type_and_backend_combined(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
@@ -262,24 +221,22 @@ class TestAgentModelsCmd:
         agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM], backend="openai", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
-        # Only llm category
         assert "llm" in parsed["presets"]
         assert "img_gen" not in parsed["presets"]
         assert "extract" not in parsed["presets"]
-        # Only openai-backed LLM presets
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
         assert "fast" in llm_preset_names
         assert "smart" not in llm_preset_names
 
     def test_backend_nonexistent(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """--backend nonexistent should produce empty presets/aliases/waterfalls/talent_mappings."""
+        """--backend nonexistent should produce empty presets/aliases/waterfalls."""
         _setup_mocks(mocker)
 
         agent_models_cmd(ctx=agent_ctx, backend="nonexistent", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
-        for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
+        for section in ("presets", "aliases", "waterfalls"):
             for category in ("llm", "img_gen", "extract"):
                 assert len(parsed[section][category]) == 0, f"{section}.{category} should be empty"
 
@@ -293,14 +250,3 @@ class TestAgentModelsCmd:
         assert "llm-wf" in parsed["waterfalls"]["llm"]
         assert len(parsed["waterfalls"]["img_gen"]) == 0
         assert len(parsed["waterfalls"]["extract"]) == 0
-
-    def test_talent_mappings_backend_filter(self, agent_ctx: Any, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-        """--backend openai should include LLM talent_mapping (fast->gpt-4o-mini) and img_gen, but not extract."""
-        _setup_mocks(mocker)
-
-        agent_models_cmd(ctx=agent_ctx, backend="openai", output_format=CliOutputFormat.JSON)
-
-        parsed = json.loads(capsys.readouterr().out)
-        assert "text_gen" in parsed["talent_mappings"]["llm"]
-        assert "image_gen" in parsed["talent_mappings"]["img_gen"]
-        assert len(parsed["talent_mappings"]["extract"]) == 0

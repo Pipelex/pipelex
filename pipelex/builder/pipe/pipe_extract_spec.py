@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -7,14 +7,9 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.builder.talents.extract_talent import ExtractTalent
 from pipelex.cogt.content_generation.dry_run_factory import MockFormat
-from pipelex.config import get_config
 from pipelex.pipe_operators.extract.pipe_extract_blueprint import PipeExtractBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-
-if TYPE_CHECKING:
-    from pipelex.cogt.extract.extract_setting import ExtractModelChoice
 
 
 class PipeExtractSpec(PipeSpec):
@@ -38,30 +33,28 @@ class PipeExtractSpec(PipeSpec):
         ),
         json_schema_extra={"mock_format": MockFormat.DICT_SINGLE_EXTRACT_INPUT},
     )
-    extract_talent: ExtractTalent | str = Field(
-        description="Select the most adequate extraction model talent according to the task to be performed.",
-        examples=list(ExtractTalent),
+    model: str | None = Field(
+        default=None,
+        description="Model preset, alias, waterfall, or direct model handle. Use presets from 'pipelex-agent models'.",
     )
     max_page_images: int | None = Field(
         default=None, description="Max number of images to extract from pages: None=unlimited, 0=no images, N=limit to N images."
     )
     page_views: bool | None = Field(default=None, description="Whether to include rendered page views in the output.")
 
+    @field_validator("model", mode="before")
+    @classmethod
+    def reject_empty_model(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            msg = "Model cannot be an empty string; omit the field to use defaults"
+            raise ValueError(msg)
+        return value
+
     @override
     @field_validator("output", mode="before")
     @classmethod
     def validate_output(cls, output: str) -> str:
         return "Page[]"
-
-    @field_validator("extract_talent", mode="before")
-    @classmethod
-    def validate_extract_talent(cls, extract_talent_value: str) -> ExtractTalent:
-        try:
-            return ExtractTalent(extract_talent_value)
-        except ValueError:
-            valid = [talent.value for talent in ExtractTalent]
-            msg = f"'{extract_talent_value}' is not a valid ExtractTalent. Valid values: {valid}"
-            raise ValueError(msg) from None
 
     @field_validator("inputs", mode="before")
     @classmethod
@@ -85,7 +78,7 @@ class PipeExtractSpec(PipeSpec):
 
         # Add extract specific information
         extract_group.renderables.append(Text())  # Blank line
-        extract_group.renderables.append(Text.from_markup(f"Extract Talent: [bold yellow]{self.extract_talent}[/bold yellow]"))
+        extract_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{self.model or '(default)'}[/bold yellow]"))
 
         # Add optional extraction settings if they are set
         if self.max_page_images is not None:
@@ -99,16 +92,12 @@ class PipeExtractSpec(PipeSpec):
     def to_blueprint(self) -> PipeExtractBlueprint:
         base_blueprint = super().to_blueprint()
 
-        # Get extract choice from config-based mapping
-        mappings = get_config().pipelex.builder_config.talent_preset_mappings.extract
-        extract_model_choice: ExtractModelChoice = mappings[self.extract_talent]
-
         return PipeExtractBlueprint(
             source=None,
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
-            model=extract_model_choice,
+            model=self.model,
             max_page_images=self.max_page_images,
             page_image_captions=None,
             page_views=self.page_views,
