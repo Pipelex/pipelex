@@ -48,8 +48,8 @@ async def pipeline_run_setup(
     library_id: str | None = None,
     library_dirs: list[str] | None = None,
     pipe_code: str | None = None,
-    mthds_content: str | None = None,
-    bundle_uri: str | None = None,
+    mthds_contents: list[str] | None = None,
+    bundle_uris: list[str] | None = None,
     inputs: PipelineInputs | WorkingMemory | None = None,
     output_name: str | None = None,
     output_multiplicity: VariableMultiplicity | None = None,
@@ -76,22 +76,23 @@ async def pipeline_run_setup(
     library_dirs:
         List of directory paths to load pipe definitions from. Combined with directories
         from the ``PIPELEXPATH`` environment variable (PIPELEXPATH directories are searched
-        first). When provided alongside ``mthds_content``, definitions from both sources
+        first). When provided alongside ``mthds_contents``, definitions from both sources
         are loaded into the library.
     pipe_code:
-        Code identifying the pipe to execute. Required when ``mthds_content`` is not
-        provided. When both ``mthds_content`` and ``pipe_code`` are provided, the
-        specified pipe from the MTHDS content will be executed (overriding any
-        ``main_pipe`` defined in the content).
-    mthds_content:
-        Complete MTHDS file content as a string. The pipe to execute is determined by
-        ``pipe_code`` (if provided) or the ``main_pipe`` property in the MTHDS content.
-        Can be combined with ``library_dirs`` to load additional definitions.
-    bundle_uri:
-        URI identifying the bundle. Used to detect if the bundle was already loaded
-        from library directories (e.g., via PIPELEXPATH) to avoid duplicate domain
-        registration. If provided and the resolved absolute path is already in the
-        loaded MTHDS paths, the ``mthds_content`` loading will be skipped.
+        Code identifying the pipe to execute. Required when ``mthds_contents`` is not
+        provided. When both ``mthds_contents`` and ``pipe_code`` are provided, the
+        specified pipe from the MTHDS contents will be executed (overriding any
+        ``main_pipe`` defined in the contents).
+    mthds_contents:
+        List of MTHDS file contents as strings. The pipe to execute is determined by
+        ``pipe_code`` (if provided) or the ``main_pipe`` property in the first content
+        that declares one. Can be combined with ``library_dirs`` to load additional
+        definitions.
+    bundle_uris:
+        List of URIs identifying the bundles. Used to detect if bundles were already
+        loaded from library directories (e.g., via PIPELEXPATH) to avoid duplicate
+        domain registration. If all resolved absolute paths are already in the loaded
+        MTHDS paths, the ``mthds_contents`` loading will be skipped.
     inputs:
         Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
         or a ``WorkingMemory`` instance.
@@ -119,8 +120,8 @@ async def pipeline_run_setup(
 
     """
     user_id = user_id or OTelConstants.DEFAULT_USER_ID
-    if not mthds_content and not pipe_code:
-        msg = "Either pipe_code or mthds_content must be provided to the pipeline API."
+    if not mthds_contents and not pipe_code:
+        msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
 
     pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code)
@@ -149,45 +150,52 @@ async def pipeline_run_setup(
     else:
         log.verbose(f"No library directories to load ({source_label})")
 
-    # Then handle MTHDS content or pipe_code
-    if mthds_content:
-        blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
-        blueprints_to_load = [blueprint]
+    # Then handle MTHDS content(s) or pipe_code
+    if mthds_contents:
+        all_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
-        # Check if this bundle was already loaded from library directories
+        # Check if all bundles were already loaded from library directories
         bundle_already_loaded = False
-        if bundle_uri:
-            try:
-                resolved_bundle_uri = Path(bundle_uri).resolve()
-            except (OSError, RuntimeError):
-                # Use str(Path(...)) to normalize the path (e.g., "./file.mthds" -> "file.mthds")
-                # to match the normalization done in library_manager._load_mthds_files_into_library
-                resolved_bundle_uri = Path(bundle_uri)
+        if bundle_uris:
             current_library = library_manager.get_library(library_id=library_id)
-            bundle_already_loaded = resolved_bundle_uri in current_library.loaded_mthds_paths
+            all_loaded = True
+            for uri in bundle_uris:
+                try:
+                    resolved_uri = Path(uri).resolve()
+                except (OSError, RuntimeError):
+                    resolved_uri = Path(uri)
+                if resolved_uri not in current_library.loaded_mthds_paths:
+                    all_loaded = False
+                    break
+            bundle_already_loaded = all_loaded
             if bundle_already_loaded:
-                log.verbose(f"Bundle '{bundle_uri}' already loaded from library directories, skipping duplicate load")
+                log.verbose(f"All {len(bundle_uris)} bundle(s) already loaded from library directories, skipping duplicate load")
 
         if not bundle_already_loaded:
-            library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=all_blueprints)
 
-        # For now, we only support one blueprint when given MTHDS content. So blueprints is of length 1.
-        # blueprint is already set from make_pipelex_bundle_blueprint above
+        # Find the pipe to execute
         if pipe_code:
             pipe = get_required_pipe(pipe_code=pipe_code)
-        elif blueprint.main_pipe:
+        else:
+            # Find main_pipe from the first blueprint that declares one
             # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with the same code.
             # Note: main_pipe is validated as snake_case (no dots allowed), so it is always a bare code — never
             # already domain-qualified. See PipelexBundleBlueprint.validate_main_pipe_syntax.
-            qualified_main_pipe = f"{blueprint.domain}.{blueprint.main_pipe}"
+            qualified_main_pipe: str | None = None
+            for blueprint in all_blueprints:
+                if blueprint.main_pipe:
+                    qualified_main_pipe = f"{blueprint.domain}.{blueprint.main_pipe}"
+                    break
+            if not qualified_main_pipe:
+                msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
+                raise PipeExecutionError(message=msg)
             pipe = get_required_pipe(pipe_code=qualified_main_pipe)
-        else:
-            msg = "No pipe code or main pipe in the MTHDS content provided to the pipeline API."
-            raise PipeExecutionError(message=msg)
+
     elif pipe_code:
         pipe = get_required_pipe(pipe_code=pipe_code)
     else:
-        msg = "Either provide pipe_code or mthds_content to the pipeline API. 'pipe_code' must be provided when 'mthds_content' is None"
+        msg = "Either provide pipe_code or mthds_contents to the pipeline API."
         raise PipeExecutionError(message=msg)
 
     pipe_code = pipe.code

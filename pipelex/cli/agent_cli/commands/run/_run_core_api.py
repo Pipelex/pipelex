@@ -1,5 +1,9 @@
 """Core logic for running a pipeline via the remote MTHDS API in the agent CLI."""
 
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownVariableType=false
+# pyright: reportUnknownArgumentType=false
+
 from __future__ import annotations
 
 from typing import Any, cast
@@ -12,7 +16,7 @@ from pipelex.cli.agent_cli.commands.run._output_helpers import build_run_output
 
 async def run_pipeline_core_api(
     pipe_code: str,
-    mthds_content: str | None = None,
+    mthds_contents: list[str] | None = None,
     inputs: dict[str, Any] | None = None,
     with_memory: bool = False,
 ) -> dict[str, Any]:
@@ -20,7 +24,7 @@ async def run_pipeline_core_api(
 
     Args:
         pipe_code: The pipe code to run.
-        mthds_content: MTHDS content string (optional).
+        mthds_contents: List of MTHDS content strings (optional).
         inputs: Input dictionary for the pipeline.
         with_memory: Whether to include full working memory in output (True) or
             return compact concept JSON only (False, default).
@@ -35,7 +39,7 @@ async def run_pipeline_core_api(
     runner = ApiRunner()
     response = await runner.execute_pipeline(
         pipe_code=pipe_code,
-        mthds_content=mthds_content,
+        mthds_contents=mthds_contents,
         inputs=inputs,
     )
 

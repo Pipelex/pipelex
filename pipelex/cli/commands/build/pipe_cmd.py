@@ -305,7 +305,7 @@ def build_pipe_cmd(
                             library_dirs=[],
                         )
                         built_pipe_response = await built_runner.execute_pipeline(
-                            mthds_content=mthds_content,
+                            mthds_contents=[mthds_content],
                         )
                         built_pipe_output = built_pipe_response.pipe_output
                         if built_pipe_output.graph_spec:
