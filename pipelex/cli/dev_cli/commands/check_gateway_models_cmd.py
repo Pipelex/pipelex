@@ -13,6 +13,7 @@ from pipelex.cli.dev_cli.commands.gateway_models_generator import (
     fetch_gateway_model_specs,
     generate_reference_markdown,
     generate_reference_pure_markdown,
+    normalize_for_comparison,
 )
 from pipelex.cli.dev_cli.commands.update_gateway_models_cmd import (
     GATEWAY_MODELS_PLAIN_REFERENCE_PATH,
@@ -23,12 +24,6 @@ from pipelex.system.pipelex_service.exceptions import RemoteConfigFetchError, Re
 
 if TYPE_CHECKING:
     from rich.console import Console
-
-
-def _normalize_for_comparison(content: str) -> str:
-    """Remove timestamp line for comparison since it changes every generation."""
-    lines = content.split("\n")
-    return "\n".join(line for line in lines if not line.startswith("> Last updated:"))
 
 
 def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> None:
@@ -127,8 +122,8 @@ def check_gateway_models_cmd(show_diff: bool = True, quiet: bool = False) -> Non
         sys.exit(1)
 
     # Compare content (ignoring timestamp line for comparison)
-    html_matches = _normalize_for_comparison(existing_html_content) == _normalize_for_comparison(expected_html_content)
-    plain_matches = _normalize_for_comparison(existing_plain_content) == _normalize_for_comparison(expected_plain_content)
+    html_matches = normalize_for_comparison(existing_html_content) == normalize_for_comparison(expected_html_content)
+    plain_matches = normalize_for_comparison(existing_plain_content) == normalize_for_comparison(expected_plain_content)
 
     if html_matches and plain_matches:
         # No differences found in either file

@@ -27,6 +27,12 @@ PREFERRED_INPUT_ORDER = ["text", "images", "image", "pdf"]
 PREFERRED_OUTPUT_ORDER = ["text", "structured", "image", "pages"]
 
 
+def normalize_for_comparison(content: str) -> str:
+    """Remove timestamp line for comparison since it changes every generation."""
+    lines = content.split("\n")
+    return "\n".join(line for line in lines if not line.startswith("> Last updated:"))
+
+
 def fetch_gateway_model_specs() -> BackendModelSpecs:
     """Fetch model specifications from Pipelex Gateway remote config.
 
