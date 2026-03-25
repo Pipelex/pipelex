@@ -1,5 +1,9 @@
 """Core logic for running a pipeline via the remote MTHDS API in the agent CLI."""
 
+# pyright: reportUnknownMemberType=false
+# pyright: reportUnknownVariableType=false
+# pyright: reportUnknownArgumentType=false
+
 from __future__ import annotations
 
 from typing import Any, cast

@@ -92,10 +92,9 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             specified pipe from the MTHDS contents will be executed (overriding any
             ``main_pipe`` defined in the contents).
         mthds_contents:
-            List of MTHDS file contents as strings. The pipe to execute is determined by
-            ``pipe_code`` (if provided) or the ``main_pipe`` property in the first content
-            that declares one. Can be combined with ``library_dirs`` to load additional
-            definitions.
+            List of MTHDS bundle contents as strings. The pipe to execute is determined by
+            ``pipe_code`` (if provided) or the ``main_pipe`` property in the content.
+            Can be combined with ``library_dirs`` to load additional definitions.
         inputs:
             Inputs passed to the pipeline. Can be either a ``PipelineInputs`` dictionary
             or a ``WorkingMemory`` instance.

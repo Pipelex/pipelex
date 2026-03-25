@@ -70,7 +70,7 @@ async def dry_run_pipeline(
     )
     response = await runner.execute_pipeline(
         pipe_code=pipe_code,
-        mthds_contents=mthds_contents,  # multi-file support
+        mthds_contents=mthds_contents,
     )
     pipe_output = response.pipe_output
 
