@@ -140,11 +140,9 @@ See [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationa
 
 ### Design
 
-The `LibraryCrate` lives on `PipeJob` and is threaded through the signature chain so that child workflows — which can land on different workers — receive it.
+The `LibraryCrate` lives on `PipeJob` and propagates through the signature chain so that every child workflow receives it — each child workflow is an independent Temporal workflow that can land on any worker, so the crate must travel in the serialized `PipeJob`.
 
-**Key decisions:**
-- **No `act_library_setup` activity** — crate loading is pure in-memory work (Pydantic models → library dicts), not I/O. Activities add scheduling overhead for no benefit. Loading happens inline in `WfPipeRouter.run()`, idempotent via fingerprint.
-- **Crate propagates through signatures** — Temporal child workflows are independent workflows that can run on any worker. The only data channel between parent and child is the serialized `PipeJob`. ContextVars, singletons, and in-process state do not cross workflow boundaries.
+Each `WfPipeRouter` loads the crate inline via `load_from_crate()`, idempotent via fingerprint.
 
 ### Propagation chain
 
@@ -167,7 +165,7 @@ WfPipeRouter.run(pipe_job)
 
 - Add `library_crate: LibraryCrate | None` field to `PipeJob`
 - In `PipeRouterTop`: after `pipeline_run_setup()` loads the library, build the flat crate from the blueprints that were loaded beyond PIPELEXPATH base. Attach to `PipeJob`.
-- In `WfPipeRouter.run()`: load the crate inline via `load_from_crate()` (no activity), pass to `pipe.run_pipe()`
+- In `WfPipeRouter.run()`: load the crate inline via `load_from_crate()`, pass to `pipe.run_pipe()`
 - Thread `library_crate` through the signature chain: `PipeAbstract.run_pipe()` → `_live_run_pipe()` → `PipeController._live_run_controller_pipe()` → `SubPipe.run_pipe()` → `PipeJobFactory.make_pipe_job()`
 - `PipeOperator._live_run_pipe()`: accept param, ignore it (no child pipes)
 
@@ -204,7 +202,7 @@ WfPipeRouter.run(pipe_job)
 
 **Goal**: Handle Layer 1 — when `mthds_content` introduces dynamic concept classes that the worker doesn't know about at deserialization time.
 
-**The problem**: Temporal auto-deserializes PipeJob via the Kajson data converter. If WorkingMemory contains Stuff objects with dynamic content classes (e.g., `RawText`), Kajson fails because those classes aren't registered on the worker yet. The `act_library_setup` activity can't run until the workflow starts, but the workflow input must be deserialized first.
+**The problem**: Temporal auto-deserializes PipeJob via the Kajson data converter. If WorkingMemory contains Stuff objects with dynamic content classes (e.g., `RawText`), Kajson fails because those classes aren't registered on the worker yet. The crate loading can't happen until the workflow starts, but the workflow input must be deserialized first.
 
 **The solution**: WorkingMemory travels as a raw JSON dict when it contains dynamic concepts. After library setup registers the classes, the dict is hydrated into a typed `WorkingMemory`.
 
@@ -321,12 +319,12 @@ Phase 1 (LibraryCrate, direct mode)
 Phase 2 (LibraryCrate on Temporal)
     │
     ▼
-Phase 3 (Deferred WM Hydration)        ← requires Phase 2's library_crate and activity
+Phase 3 (Deferred WM Hydration)        ← requires Phase 2's library_crate on PipeJob
 
 Phase 4 (StoragePayloadCodec)           ← independent, can parallel with Phase 3
 ```
 
-Phase 0 is a prerequisite for Phase 1 (domain-qualified indexing). Phase 1 is a prerequisite for Phase 2 (crate must exist to ship it). Phase 3 builds on Phase 2's activity. Phase 4 is independently useful.
+Phase 0 is a prerequisite for Phase 1 (domain-qualified indexing). Phase 1 is a prerequisite for Phase 2 (crate must exist to ship it). Phase 3 builds on Phase 2's crate propagation. Phase 4 is independently useful.
 
 ---
 
