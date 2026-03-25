@@ -33,14 +33,14 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         # Set up per-workflow library if a library crate is present
         library_crate = workflow_arg.library_crate
         wf_library_id: str | None = None
-        if library_crate is not None:
-            wf_library_id = f"wf_{workflow.info().workflow_id}"
-            library_manager = get_library_manager()
-            library_manager.open_library(library_id=wf_library_id)
-            set_current_library(library_id=wf_library_id)
-            library_manager.load_from_crate(library_id=wf_library_id, crate=library_crate)
 
         try:
+            if library_crate is not None:
+                library_manager = get_library_manager()
+                wf_library_id = f"wf_{workflow.info().workflow_id}"
+                library_manager.open_library(library_id=wf_library_id)
+                set_current_library(library_id=wf_library_id)
+                library_manager.load_from_crate(library_id=wf_library_id, crate=library_crate)
             pipe_output = await pipe.run_pipe(
                 job_metadata=workflow_arg.job_metadata,
                 working_memory=working_memory,
