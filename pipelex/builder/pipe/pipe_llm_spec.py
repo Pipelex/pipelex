@@ -3,6 +3,7 @@ from typing import Literal
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
 from rich.console import Group
+from rich.markup import escape
 from rich.panel import Panel
 from rich.text import Text
 from typing_extensions import override
@@ -72,7 +73,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 
         # Add LLM-specific information
         llm_group.renderables.append(Text())  # Blank line
-        llm_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{self.model or '(default)'}[/bold yellow]"))
+        llm_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{escape(self.model or '(default)')}[/bold yellow]"))
 
         # Add system prompt if present
         if self.system_prompt:
