@@ -35,13 +35,6 @@ class TestFormatModelsMarkdown:
             "extract": {},
             "search": {},
         },
-        "talent_mappings": {
-            "llm": {"creative-writer": "writing-creative"},
-            "img_gen": {},
-            "extract": {},
-            "search": {},
-        },
-        "talent_mappings_usage_hint": "Use the talent name as the value for llm_talent",
     }
 
     def test_output_starts_with_heading(self) -> None:
@@ -54,35 +47,30 @@ class TestFormatModelsMarkdown:
         output = _format_models_markdown(self._FULL_RESULT)
         assert "## LLM" in output
 
-    def test_preset_with_description(self) -> None:
-        """Preset with description should show name and description."""
+    def test_preset_with_description_uses_sigil(self) -> None:
+        """Preset with description should show $-prefixed name and description."""
         output = _format_models_markdown(self._FULL_RESULT)
-        assert "- **writing-creative**: Creative writing" in output
+        assert "- $writing-creative: Creative writing" in output
 
-    def test_preset_without_description(self) -> None:
-        """Preset without description should show only the name."""
+    def test_preset_without_description_uses_sigil(self) -> None:
+        """Preset without description should show only the $-prefixed name."""
         output = _format_models_markdown(self._FULL_RESULT)
-        assert "- **engineering-code**" in output
+        assert "- $engineering-code" in output
 
-    def test_aliases_use_arrow(self) -> None:
-        """Aliases should use arrow notation."""
+    def test_aliases_use_sigil_and_arrow(self) -> None:
+        """Aliases should use @-prefix and arrow notation."""
         output = _format_models_markdown(self._FULL_RESULT)
-        assert "- **fast** \u2192 gpt4o-mini" in output
+        assert "- @fast \u2192 gpt4o-mini" in output
 
-    def test_waterfalls_show_chain(self) -> None:
-        """Waterfalls should show the full fallback chain with arrows."""
+    def test_waterfalls_use_sigil_and_chain(self) -> None:
+        """Waterfalls should use ~-prefix and show the full fallback chain."""
         output = _format_models_markdown(self._FULL_RESULT)
-        assert "gpt4o \u2192 claude-sonnet \u2192 gemini" in output
+        assert "- ~robust: gpt4o \u2192 claude-sonnet \u2192 gemini" in output
 
-    def test_talent_mappings_present(self) -> None:
-        """Talent mappings should use arrow notation."""
+    def test_no_bold_markers(self) -> None:
+        """Output should not contain bold markdown markers."""
         output = _format_models_markdown(self._FULL_RESULT)
-        assert "- **creative-writer** \u2192 writing-creative" in output
-
-    def test_hint_present(self) -> None:
-        """Usage hint should appear at the bottom."""
-        output = _format_models_markdown(self._FULL_RESULT)
-        assert "Use the talent name as the value for llm_talent" in output
+        assert "**" not in output
 
     def test_empty_categories_omitted(self) -> None:
         """Categories with no data should not appear in output."""
@@ -91,24 +79,21 @@ class TestFormatModelsMarkdown:
         assert "## Search" not in output
 
     def test_img_gen_category_present(self) -> None:
-        """Image Generation category with presets should appear."""
+        """Image Generation category with presets should appear with sigil."""
         output = _format_models_markdown(self._FULL_RESULT)
         assert "## Image Generation" in output
-        assert "- **gen-image**: Image generation" in output
+        assert "- $gen-image: Image generation" in output
 
     def test_all_empty_produces_heading_only(self) -> None:
-        """Result with all empty sections should produce only the heading and hint."""
+        """Result with all empty sections should produce only the heading."""
         empty_result: dict[str, Any] = {
             "presets": {"llm": [], "img_gen": [], "extract": [], "search": []},
             "aliases": {"llm": {}, "img_gen": {}, "extract": {}, "search": {}},
             "waterfalls": {"llm": {}, "img_gen": {}, "extract": {}, "search": {}},
-            "talent_mappings": {"llm": {}, "img_gen": {}, "extract": {}, "search": {}},
-            "talent_mappings_usage_hint": "hint text",
         }
         output = _format_models_markdown(empty_result)
         assert "# Available Models" in output
         assert "## LLM" not in output
-        assert "hint text" in output
 
     def test_empty_subsections_omitted_within_category(self) -> None:
         """Within a category, subsections with no data should be omitted."""
@@ -116,10 +101,18 @@ class TestFormatModelsMarkdown:
             "presets": {"llm": [{"name": "only-preset"}]},
             "aliases": {"llm": {}},
             "waterfalls": {"llm": {}},
-            "talent_mappings": {"llm": {}},
         }
         output = _format_models_markdown(result)
         assert "### Presets" in output
         assert "### Aliases" not in output
         assert "### Waterfalls" not in output
-        assert "### Talent Mappings" not in output
+
+    def test_presets_description_line(self) -> None:
+        """Presets section should include the one-liner description."""
+        output = _format_models_markdown(self._FULL_RESULT)
+        assert "Presets are the preferred way to specify models" in output
+
+    def test_aliases_description_line(self) -> None:
+        """Aliases section should include the one-liner description."""
+        output = _format_models_markdown(self._FULL_RESULT)
+        assert "Aliases provide stable names" in output

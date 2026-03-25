@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import Literal
 
 from pydantic import Field, field_validator
 from pydantic.json_schema import SkipJsonSchema
@@ -8,13 +8,8 @@ from rich.text import Text
 from typing_extensions import override
 
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.builder.talents.llm_talent import LLMTalent
-from pipelex.config import get_config
 from pipelex.pipe_operators.llm.pipe_llm_blueprint import PipeLLMBlueprint
 from pipelex.tools.misc.pretty import PrettyPrintable
-
-if TYPE_CHECKING:
-    from pipelex.cogt.llm.llm_setting import LLMModelChoice
 
 
 class PipeLLMSpec(PipeSpec):
@@ -33,9 +28,9 @@ class PipeLLMSpec(PipeSpec):
 
     type: SkipJsonSchema[Literal["PipeLLM"]] = "PipeLLM"
     pipe_category: SkipJsonSchema[Literal["PipeOperator"]] = "PipeOperator"
-    llm_talent: LLMTalent | str = Field(
-        description="Select the simplest LLM talent corresponding to the task to be performed.",
-        examples=list(LLMTalent),
+    model: str | None = Field(
+        default=None,
+        description="Model preset, alias, waterfall, or direct model handle. Use presets from 'pipelex-agent models'.",
     )
     system_prompt: str | None = Field(default=None, description="A system prompt to guide the LLM's behavior, style and skills. Can be a template.")
     prompt: str | None = Field(
@@ -58,15 +53,13 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 """,
     )
 
-    @field_validator("llm_talent", mode="before")
+    @field_validator("model", mode="before")
     @classmethod
-    def validate_llm_talent(cls, llm_value: str) -> LLMTalent:
-        try:
-            return LLMTalent(llm_value)
-        except ValueError:
-            valid = [talent.value for talent in LLMTalent]
-            msg = f"'{llm_value}' is not a valid LLMTalent. Valid values: {valid}"
-            raise ValueError(msg) from None
+    def reject_empty_model(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            msg = "Model cannot be an empty string; omit the field to use defaults"
+            raise ValueError(msg)
+        return value
 
     @override
     def rendered_pretty(self, title: str | None = None, depth: int = 0) -> PrettyPrintable:
@@ -79,7 +72,7 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
 
         # Add LLM-specific information
         llm_group.renderables.append(Text())  # Blank line
-        llm_group.renderables.append(Text.from_markup(f"LLM Talent: [bold yellow]{self.llm_talent}[/bold yellow]"))
+        llm_group.renderables.append(Text.from_markup(f"Model: [bold yellow]{self.model or '(default)'}[/bold yellow]"))
 
         # Add system prompt if present
         if self.system_prompt:
@@ -111,15 +104,11 @@ So, don't have to write a bullet-list of all the attributes definitions yourself
     def to_blueprint(self) -> PipeLLMBlueprint:
         base_blueprint = super().to_blueprint()
 
-        # Get llm choice from config-based mapping
-        mappings = get_config().pipelex.builder_config.talent_preset_mappings.llm
-        llm_choice: LLMModelChoice = mappings[self.llm_talent]
-
         return PipeLLMBlueprint(
             description=base_blueprint.description,
             inputs=base_blueprint.inputs,
             output=base_blueprint.output,
             system_prompt=self.system_prompt,
             prompt=self.prompt,
-            model=llm_choice,
+            model=self.model,
         )

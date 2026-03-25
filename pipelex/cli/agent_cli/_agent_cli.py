@@ -8,6 +8,7 @@ from mthds.runners.types import RunnerType
 from typer.core import TyperGroup
 from typing_extensions import override
 
+from pipelex.cli.agent_cli.commands.check_model_cmd import agent_check_model_cmd
 from pipelex.cli.agent_cli.commands.concept_cmd import concept_cmd
 from pipelex.cli.agent_cli.commands.doctor_cmd import agent_doctor_cmd
 from pipelex.cli.agent_cli.commands.fmt_cmd import fmt_cmd
@@ -37,6 +38,7 @@ class PipelexAgentCLI(TyperGroup):
             "concept",
             "pipe",
             "models",
+            "check-model",
             "doctor",
         ]
 
@@ -126,5 +128,6 @@ app.command(name="lint", help="Lint a .mthds, .toml, or .plx file")(lint_cmd)
 app.add_typer(inputs_app, name="inputs", help="Generate example input JSON for a pipe")
 app.command(name="concept", help="Structure a concept from JSON spec and output TOML")(concept_cmd)
 app.command(name="pipe", help="Structure a pipe from JSON spec and output TOML")(pipe_cmd)
-app.command(name="models", help="List available model presets, aliases, and talent mappings")(agent_models_cmd)
+app.command(name="models", help="List available model presets, aliases, and waterfalls")(agent_models_cmd)
+app.command(name="check-model", help="Check if a model reference is valid and suggest alternatives")(agent_check_model_cmd)
 app.command(name="doctor", help="Check Pipelex configuration health and auto-fix issues")(agent_doctor_cmd)
