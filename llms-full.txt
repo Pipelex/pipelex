@@ -2293,7 +2293,7 @@ Build, run, validate, and edit AI methods directly from Claude Code.
 
 ## Overview
 
-The **MTHDS skills plugin** for Claude Code brings the full Pipelex workflow into your AI coding assistant. Build methods from natural language, validate them, run them, and iterate through conversational slash commands. The plugin leverages the `pipelex-agent` CLI under the hood for structured JSON communication.
+The **MTHDS skills plugin** for Claude Code brings the full Pipelex workflow into your AI coding assistant. Build methods from natural language, validate them, run them, and iterate through conversational slash commands. The plugin leverages the `pipelex-agent` CLI under the hood.
 
 Install from [mthds-ai/skills](https://github.com/mthds-ai/skills).
 
@@ -2373,7 +2373,7 @@ Package manifest management is currently exposed through the lowercase `mthds` C
 
 ## Agent CLI
 
-The `pipelex-agent` CLI is a machine-first interface designed for automated environments like Claude Code skills. All output is structured JSON to stdout, with no interactive prompts or Rich formatting.
+The `pipelex-agent` CLI is a machine-first interface designed for automated environments like Claude Code skills. Output format varies by command — JSON, raw TOML, or markdown — with no interactive prompts or Rich formatting. Structured commands emit JSON errors to stderr; `fmt` and `lint` pass through native `plxt` output.
 
 | Command | Description |
 |---------|-------------|
@@ -2383,18 +2383,17 @@ The `pipelex-agent` CLI is a machine-first interface designed for automated envi
 | `fmt` | Format `.mthds`, `.toml`, or `.plx` files in-place |
 | `lint` | Lint files for errors |
 | `inputs` | Generate example input JSON for a pipe |
-| `concept` | Convert a JSON concept spec into TOML |
-| `pipe` | Convert a JSON pipe spec into TOML |
-| `assemble` | Combine TOML parts into a complete `.mthds` file |
-| `models` | List available model presets, aliases, and talent mappings |
-| `doctor` | Check configuration health and auto-fix issues |
+| `concept` | Convert a JSON concept spec into raw TOML (stdout) |
+| `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
+| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json`, default: markdown) |
+| `doctor` | Check configuration health (`--format markdown\|json`, default: markdown) |
 
 For detailed CLI documentation, see the [CLI reference](../tools/cli/index.md).
 
 ## Related Documentation
 
 - [CLI Reference](../tools/cli/index.md) - Runtime CLI commands
-- [Agent CLI](../tools/cli/agent-cli.md) - Machine-oriented JSON interface
+- [Agent CLI](../tools/cli/agent-cli.md) - Machine-oriented interface for AI agents
 - [Package Commands](../tools/cli/pkg.md) - Current `mthds package` manifest commands
 
 
@@ -10102,9 +10101,9 @@ This helps you understand all possible output structures that the pipe could ret
 
 # Agent CLI (`pipelex-agent`)
 
-The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. All output is structured JSON written to stdout (success) or stderr (error), with no Rich formatting or interactive prompts.
+The `pipelex-agent` CLI is a machine-oriented companion to the main `pipelex` CLI. It is designed for programmatic consumption by AI agents, IDE extensions, and other automation tools. Output format varies by command — JSON, raw TOML, or markdown — with no Rich formatting or interactive prompts. Structured commands emit JSON errors to stderr; `fmt` and `lint` pass through native `plxt` output.
 
-Its structured JSON output makes it well-suited for piping into other tools (e.g., `jq`), scripting, and integration into larger workflows. It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
+It is consumed by the `mthds-agent` CLI (from the `mthds` npm package) which itself is used by Claude Code skills, the VS Code extension, and can be called directly from the command line.
 
 ## Global Options
 
@@ -10185,17 +10184,21 @@ These commands do not have subcommands:
 |---------|-------------|
 | `fmt` | Format a `.mthds`/`.toml`/`.plx` file in-place (delegates to `plxt`) |
 | `lint` | Lint a `.mthds`/`.toml`/`.plx` file for errors (delegates to `plxt`) |
-| `concept` | Convert a JSON concept spec into TOML |
-| `pipe` | Convert a JSON pipe spec into TOML |
-| `assemble` | Merge concept and pipe TOML sections into a complete `.mthds` file |
-| `models` | List available model presets, aliases, waterfalls, and talent mappings |
-| `doctor` | Check config, credentials, and model health |
+| `concept` | Convert a JSON concept spec into raw TOML (stdout) |
+| `pipe` | Convert a JSON pipe spec into raw TOML (stdout) |
+| `models` | List available model presets, aliases, and waterfalls (`--format markdown\|json`, default: markdown) |
+| `doctor` | Check config, credentials, and model health (`--format markdown\|json`, default: markdown) |
 
 ## Output Contract
 
-Every command (except `fmt` and `lint`) returns structured JSON.
+Commands use different stdout formats depending on their purpose:
 
-**Success** — written to stdout:
+- **JSON**: `run`, `validate`, `inputs`, `init` — structured JSON via `agent_success()`
+- **Raw TOML**: `concept`, `pipe` — TOML text printed directly to stdout
+- **Markdown or JSON**: `models`, `doctor` — markdown by default, JSON with `--format json`
+- **Passthrough**: `fmt`, `lint` — raw `plxt` output
+
+**JSON success** — written to stdout:
 
 ```json
 {
@@ -10205,7 +10208,7 @@ Every command (except `fmt` and `lint`) returns structured JSON.
 }
 ```
 
-Successful commands return the result object directly. They are not wrapped in a `status` or `data` envelope.
+JSON commands return the result object directly. They are not wrapped in a `status` or `data` envelope.
 
 **Error** — written to stderr:
 
