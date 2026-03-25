@@ -90,6 +90,26 @@ class PipeTestCases:
     ]
 
 
+class LibraryCrateTestData:
+    """Test constants for LibraryCrate integration tests.
+
+    Uses a PipeSequence bundle with only native Text concepts (no dynamic classes)
+    to avoid the Layer 1 Kajson deserialization issue (Phase 3). This still fully
+    tests Layer 2 (pipe resolution via get_required_pipe on the worker).
+    """
+
+    BUNDLE_DIR: ClassVar[str] = "tests/integration/pipelex/temporal/async/library_crate"
+    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/temporal/async/library_crate/native_text_sequence.mthds"
+    PIPE_CODE: ClassVar[str] = "native_text_sequence"
+    DOMAIN: ClassVar[str] = "native_text_test"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "native_text_test.native_text_sequence",
+        "native_text_test.step_one",
+        "native_text_test.step_two",
+    ]
+
+
 class PipeOcrTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
         # LOCAL
