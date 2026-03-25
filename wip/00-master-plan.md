@@ -2,7 +2,7 @@
 
 > **Status**: Master plan for phased implementation
 > **Date**: 2026-03-23
-> **Related**: [B-library-as-execution-context.md](B-library-as-execution-context.md), [E-pipe-namespace-fix.md](E-pipe-namespace-fix.md), [C-temporal-payload-codec-strategy.md](C-temporal-payload-codec-strategy.md), [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationale.md)
+> **Related**: [archive/early-library-as-execution-context.md](archive/early-library-as-execution-context.md), [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md), [phase4-payload-codec-strategy.md](phase4-payload-codec-strategy.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md)
 
 ---
 
@@ -46,7 +46,7 @@ Introduce the LibraryCrate as the universal intermediate representation for libr
 
 **Why first**: The LibraryCrate organizes content by domain. If pipes can collide across domains, the crate can't reliably merge content. This fix is also valuable independently — it eliminates a latent bug.
 
-See [E-pipe-namespace-fix.md](E-pipe-namespace-fix.md) for the full technical spec.
+See [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md) for the full technical spec.
 
 ### Changes
 
@@ -136,7 +136,7 @@ Flat structure. Domain is implicit in the keys — `scoring.WeightedScore`, `sco
 
 **What it does NOT solve yet**: Layer 1 (dynamic class deserialization) for concepts introduced by `mthds_content` that aren't in PIPELEXPATH. That's Phase 3.
 
-See [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationale.md) for the design rationale and rejected alternatives.
+See [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md) for the design rationale and rejected alternatives.
 
 ### Design
 
@@ -287,13 +287,13 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 
 ## Future Phases (Out of Scope)
 
-These are documented for roadmap visibility but not planned for implementation now. See [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md) for the full architectural direction and incremental path.
+These are documented for roadmap visibility but not planned for implementation now. See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the full architectural direction and incremental path.
 
 ### Crate-First Architecture
 
 The long-term direction is to invert the current loading-driven architecture into a crate-driven one with three cleanly separated phases: **Collect** (resolve deps, fetch remote, gather all blueprints) **Build** (construct one crate, optionally strip to transitive closure) **Load** (same `load_from_crate()` on submitter and worker). This enables the two major capabilities below and makes the crate the central concept in library management.
 
-Phase 2's design decision (blueprint accumulation instead of crate merge) is the first step on this path. See [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md) for the decision rationale.
+Phase 2's design decision (blueprint accumulation instead of crate merge) is the first step on this path. See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the decision rationale.
 
 ### Crate Stripping (Transitive Closure)
 

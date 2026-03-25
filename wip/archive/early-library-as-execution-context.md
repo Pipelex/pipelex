@@ -2,7 +2,7 @@
 
 > **Status**: Architecture vision
 > **Date**: 2026-03-23
-> **Related**: [D-master-plan-distributed-execution-v2.md](D-master-plan-distributed-execution-v2.md), [E-pipe-namespace-fix.md](E-pipe-namespace-fix.md)
+> **Related**: [00-master-plan.md](00-master-plan.md), [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md)
 
 ---
 
@@ -123,7 +123,7 @@ This must be fixed by introducing `pipe_ref` = `domain.pipe_code` on `PipeAbstra
 
 Once `pipe_ref` is in place, the flat LibraryCrate keying becomes natural — both concepts and pipes use fully-qualified refs as dict keys, and the domain is just the prefix before the dot.
 
-See [E-pipe-namespace-fix.md](E-pipe-namespace-fix.md) for the detailed technical spec.
+See [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md) for the detailed technical spec.
 
 ---
 

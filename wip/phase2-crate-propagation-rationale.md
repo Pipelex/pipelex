@@ -2,7 +2,7 @@
 
 > **Status**: Decided
 > **Date**: 2026-03-25
-> **Related**: [D-master-plan-distributed-execution-v2.md](D-master-plan-distributed-execution-v2.md)
+> **Related**: [00-master-plan.md](00-master-plan.md)
 
 ---
 

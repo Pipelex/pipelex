@@ -2,7 +2,7 @@
 
 > **Status**: Technical spec — Phase 0 of the master plan
 > **Date**: 2026-03-23
-> **Related**: [D-master-plan-distributed-execution-v2.md](D-master-plan-distributed-execution-v2.md), [B-library-as-execution-context.md](B-library-as-execution-context.md)
+> **Related**: [00-master-plan.md](00-master-plan.md), [archive/early-library-as-execution-context.md](archive/early-library-as-execution-context.md)
 
 ---
 

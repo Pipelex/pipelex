@@ -2,7 +2,7 @@
 
 > **Status**: Vision / future direction
 > **Date**: 2026-03-25
-> **Related**: [D-master-plan-distributed-execution-v2.md](D-master-plan-distributed-execution-v2.md), [H-phase2-implementation-plan.md](H-phase2-implementation-plan.md)
+> **Related**: [00-master-plan.md](00-master-plan.md), [phase2-implementation-plan.md](phase2-implementation-plan.md)
 
 ---
 

@@ -2,7 +2,7 @@
 
 > **Status**: Reviewed, ready to implement (updated after feature/LibraryCrate merge — 5477e16a, then crate design review — Option A chosen)
 > **Date**: 2026-03-25
-> **Related**: [D-master-plan-distributed-execution-v2.md](D-master-plan-distributed-execution-v2.md), [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationale.md), [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md)
+> **Related**: [00-master-plan.md](00-master-plan.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md), [future-crate-first-architecture.md](future-crate-first-architecture.md)
 > **Review**: Eng review passed (0 critical gaps). Codex outside voice: 7 findings, all addressed. Crate design review: Option A (blueprint accumulation) chosen over Option B (crate merge).
 
 ---
@@ -19,11 +19,11 @@ Phase 0 (pipe_ref fix) and Phase 1 (LibraryCrate in direct mode) are complete. T
 
 ## Key Architecture Decisions
 
-1. **Crate on PipeJob** — `library_crate: LibraryCrate | None = None` field on `PipeJob`. Threaded through the signature chain as an optional parameter. (Rationale: [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationale.md))
+1. **Crate on PipeJob** — `library_crate: LibraryCrate | None = None` field on `PipeJob`. Threaded through the signature chain as an optional parameter. (Rationale: [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md))
 
 2. **Self-contained crate** — The crate carries ALL blueprints (PIPELEXPATH + mthds_content + extra library_dirs). Workers don't assume anything is pre-loaded.
 
-3. **Blueprint accumulation on LibraryManager** — `_blueprints: dict[str, list[PipelexBundleBlueprint]]` tracks all blueprints loaded per `library_id`. Each `load_from_blueprints()` call appends to the list. `get_crate(library_id)` builds one crate from all accumulated blueprints via `LibraryCrateFactory.make_from_blueprints()`. No merge logic, no crate accumulation — blueprints are the unit of accumulation. See [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md) for the rationale.
+3. **Blueprint accumulation on LibraryManager** — `_blueprints: dict[str, list[PipelexBundleBlueprint]]` tracks all blueprints loaded per `library_id`. Each `load_from_blueprints()` call appends to the list. `get_crate(library_id)` builds one crate from all accumulated blueprints via `LibraryCrateFactory.make_from_blueprints()`. No merge logic, no crate accumulation — blueprints are the unit of accumulation. See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the rationale.
 
 4. **Per-workflow library on workers** — Each `WfPipeRouter` opens its own library using a unique ID derived from `workflow.info().workflow_id` (e.g., `f"wf_{workflow_id}"`). Full isolation — parent and child workflows from PipeParallel/PipeBatch get different IDs. Teardown after execution.
 
@@ -267,7 +267,7 @@ No critical gaps — all failure modes have either test coverage, error handling
 
 **Note on fingerprint scope**: `compute_fingerprint()` hashes concepts + pipes only (not domains/source_map). This is intentional — domains carry metadata (description, system_prompt) that doesn't affect pipe resolution. If domain metadata changes become significant, fingerprint scope can be expanded later.
 
-**Note on crate design**: Option A (blueprint accumulation) was chosen over Option B (crate merge). See [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md) for the full rationale. In short: accumulating blueprints is simpler (no merge logic, no crate accumulation dict, no fingerprint recomputation) and directionally correct toward the future crate-first architecture.
+**Note on crate design**: Option A (blueprint accumulation) was chosen over Option B (crate merge). See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the full rationale. In short: accumulating blueprints is simpler (no merge logic, no crate accumulation dict, no fingerprint recomputation) and directionally correct toward the future crate-first architecture.
 
 ---
 
