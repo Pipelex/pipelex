@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from typing import Any
 
@@ -87,7 +88,7 @@ async def run_pipeline_core(
 
     # Determine output directory: next to the bundle, or mthds-wip/ fallback
     output_dir: Path
-    if bundle_uris:
+    if bundle_uris and not bundle_uris[0].startswith(("http://", "https://")):
         output_dir = Path(bundle_uris[0]).parent
     else:
         output_dir = Path("mthds-wip")
@@ -134,7 +135,7 @@ async def run_pipeline_core(
         reactflow_path = saved_files.get("reactflow_html")
         if reactflow_path:
             final_path = reactflow_path.parent / graph_filename
-            reactflow_path.rename(final_path)
+            shutil.move(str(reactflow_path), str(final_path))
             side_effects["graph_files"] = {"graph_html": str(final_path)}
 
     # Save output JSON (includes side-effect paths for on-disk reference)

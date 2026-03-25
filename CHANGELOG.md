@@ -4,7 +4,7 @@
 
 ### Added
 
-- **Builder Operations module** (`pipelex/builder/operations/`): New standalone operation functions for the build agent — `assemble_ops`, `concept_ops`, `inputs_ops`, `models_ops`, `output_ops`, `pipe_ops`, `runner_code_ops`, `validate_ops`. These decouple build logic from CLI commands so it can be reused by agents and the API.
+- **Builder Operations module** (`pipelex/builder/operations/`): New standalone operation functions for the build agent — `concept_ops`, `inputs_ops`, `models_ops`, `output_ops`, `pipe_ops`, `runner_code_ops`, `validate_ops`. These decouple build logic from CLI commands so it can be reused by agents and the API.
 - **`dry_run_pipeline`** (`pipelex/pipe_run/dry_run_pipeline.py`): New shared entrypoint to dry-run a pipeline from MTHDS contents and produce a `GraphSpec`. Used by both CLI graph commands and the API.
 
 ### Changed

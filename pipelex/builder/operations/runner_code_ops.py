@@ -32,16 +32,15 @@ async def build_runner_code_for_pipe(
     set_current_library(library_id)
 
     # Parse PLX contents into bundle blueprints
-    converter = PipelexInterpreter()
-    blueprints = [converter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+    blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
     # Load pipes from the blueprints
     pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
 
-    # Validate all pipes
+    # Validate all pipes then dry-run in a single batch
     for pipe in pipes:
         pipe.validate_with_libraries()
-        await dry_run_pipes(pipes=[pipe], raise_on_failure=True)
+    await dry_run_pipes(pipes=pipes, raise_on_failure=True)
 
     # Get the required pipe and generate runner code
     pipe = get_required_pipe(pipe_code)

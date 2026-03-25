@@ -64,7 +64,7 @@ class TestPipeComposeToToml:
             _TomlTestCases.TEMPLATE_MODE,
         ],
     )
-    def testpipe_spec_to_toml_does_not_crash(
+    def test_pipe_spec_to_toml_does_not_crash(
         self,
         _test_name: str,
         spec_data: dict[str, Any],

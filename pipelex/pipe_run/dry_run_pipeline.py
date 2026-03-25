@@ -43,13 +43,17 @@ async def dry_run_pipeline(
         msg = "mthds_contents must be provided"
         raise ValueError(msg)
 
-    # Determine main_pipe_code from the content(s)
+    # Pre-parse contents to extract main_pipe_code.
+    # Note: pipeline_run_setup will re-parse these contents. The double-parse is
+    # accepted because the runner interface requires pipe_code upfront and does not
+    # expose the internally-resolved pipe code in its response.
     main_pipe_code: str | None = None
 
     for content in mthds_contents:
         bundle_blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content)
         if bundle_blueprint.main_pipe and main_pipe_code is None:
-            main_pipe_code = bundle_blueprint.main_pipe
+            # Domain-qualify to avoid ambiguity across multiple domains
+            main_pipe_code = f"{bundle_blueprint.domain}.{bundle_blueprint.main_pipe}"
 
     if not main_pipe_code:
         msg = "Bundle does not declare a main_pipe, cannot generate graph"

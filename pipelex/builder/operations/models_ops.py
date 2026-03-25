@@ -95,6 +95,13 @@ def _filter_waterfalls_by_backend(
     return filtered
 
 
+def _strip_sigil(value: str) -> str:
+    """Strip sigil prefix ($, @, ~) from a model reference to get the bare name."""
+    if value and value[0] in {"$", "@", "~"}:
+        return value[1:]
+    return value
+
+
 def _filter_talent_mappings_by_backend(
     mappings: dict[str, str],
     presets_dict: dict[str, Any],
@@ -105,7 +112,8 @@ def _filter_talent_mappings_by_backend(
     """Filter talent mappings to only include those whose preset resolves to the given backend."""
     filtered: dict[str, str] = {}
     for talent_name, preset_name in mappings.items():
-        setting = presets_dict.get(preset_name)
+        bare_name = _strip_sigil(preset_name)
+        setting = presets_dict.get(bare_name)
         if setting is None:
             continue
         spec = _resolve_preset_backend(model_deck, setting.model, model_type)

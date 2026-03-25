@@ -23,6 +23,9 @@ def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
     Raises:
         ValidationError: If validation fails.
     """
+    # Work on a copy to avoid mutating the caller's dict
+    spec_data = dict(spec_data)
+
     # Accept common aliases for "the_concept_code"
     for alias in ("concept_code", "code", "name", "concept_name"):
         if alias in spec_data:
@@ -44,7 +47,8 @@ def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
                     "type": "text",
                 }
             else:
-                # Full field spec
+                # Full field spec — copy to avoid mutating nested caller data
+                field_data = dict(field_data)
                 field_data["the_field_name"] = field_name
                 converted_structure[field_name] = field_data
         spec_data["structure"] = converted_structure

@@ -43,18 +43,15 @@ async def build_inputs_for_pipe(
         ValueError: If no pipe code can be determined.
     """
     if mthds_contents:
+        # validate_bundle opens a library, loads blueprints, and sets it as current
         validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents)
         blueprints = validate_bundle_result.blueprints
-        library_manager = get_library_manager()
-        library_id, _ = library_manager.open_library()
-        set_current_library(library_id)
-        library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
         if not pipe_code:
-            # Find the first blueprint that declares a main_pipe
+            # Find the first blueprint that declares a main_pipe, domain-qualified
             main_pipe_code: str | None = None
             for blueprint in blueprints:
                 if blueprint.main_pipe:
-                    main_pipe_code = blueprint.main_pipe
+                    main_pipe_code = f"{blueprint.domain}.{blueprint.main_pipe}"
                     break
             if not main_pipe_code:
                 msg = "Bundle does not declare a main_pipe. Specify a pipe code."
@@ -68,7 +65,7 @@ async def build_inputs_for_pipe(
             if not main_pipe_code:
                 msg = f"Bundle '{bundle_path}' does not declare a main_pipe. Specify a pipe code."
                 raise ValueError(msg)
-            pipe_code = main_pipe_code
+            pipe_code = f"{bundle_blueprint.domain}.{main_pipe_code}"
     else:
         # No bundle - initialize the library manually
         library_manager = get_library_manager()

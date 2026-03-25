@@ -156,7 +156,7 @@ async def pipeline_run_setup(
 
         # Check if all bundles were already loaded from library directories
         bundle_already_loaded = False
-        if bundle_uris and len(bundle_uris) == len(all_blueprints):
+        if bundle_uris:
             current_library = library_manager.get_library(library_id=library_id)
             all_loaded = True
             for uri in bundle_uris:

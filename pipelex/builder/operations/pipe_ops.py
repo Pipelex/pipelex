@@ -45,6 +45,9 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
 
     spec_class = pipe_type_to_spec_class[pipe_type]
 
+    # Work on a copy to avoid mutating the caller's dict
+    spec_data = dict(spec_data)
+
     # Add type to spec_data if not present
     spec_data["type"] = pipe_type
 
@@ -57,9 +60,11 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
                 spec_data.pop(alias)
 
     # Handle steps/branches conversion - need to convert pipe to pipe_code
+    # Deep-copy nested dicts to avoid mutating caller's nested structures
     if "steps" in spec_data:
         converted_steps = []
         for step in spec_data["steps"]:
+            step = dict(step)
             if "pipe" in step and "pipe_code" not in step:
                 step["pipe_code"] = step.pop("pipe")
             converted_steps.append(step)
@@ -68,6 +73,7 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     if "branches" in spec_data:
         converted_branches = []
         for branch in spec_data["branches"]:
+            branch = dict(branch)
             if "pipe" in branch and "pipe_code" not in branch:
                 branch["pipe_code"] = branch.pop("pipe")
             converted_branches.append(branch)

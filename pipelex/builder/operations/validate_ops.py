@@ -47,7 +47,7 @@ async def validate_all(
 
     validated_pipes: list[dict[str, str]] = []
     for the_pipe in pipes:
-        dry_run_output = dry_run_results.get(the_pipe.code)
+        dry_run_output = dry_run_results.get(the_pipe.pipe_ref)
         status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
         validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
 
@@ -78,7 +78,7 @@ async def validate_bundle_file(
 
     validated_pipes: list[dict[str, str]] = []
     for the_pipe in result.pipes:
-        dry_run_output = result.dry_run_result.get(the_pipe.code)
+        dry_run_output = result.dry_run_result.get(the_pipe.pipe_ref)
         status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
         validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
 
@@ -109,14 +109,16 @@ async def validate_bundle_content(
 
     validated_pipes: list[dict[str, str]] = []
     for the_pipe in validate_bundle_result.pipes:
-        dry_run_output = validate_bundle_result.dry_run_result.get(the_pipe.code)
+        dry_run_output = validate_bundle_result.dry_run_result.get(the_pipe.pipe_ref)
         status: str = dry_run_output.status if dry_run_output else DryRunStatus.SUCCESS
         validated_pipes.append({"pipe_code": the_pipe.code, "status": status})
 
     return {
         "success": True,
         "mthds_contents": mthds_contents,
-        "pipelex_bundle_blueprint": blueprints[0] if len(blueprints) == 1 else blueprints,
+        "pipelex_bundle_blueprint": blueprints[0].model_dump(mode="json")
+        if len(blueprints) == 1
+        else [b.model_dump(mode="json") for b in blueprints],
         "validated_pipes": validated_pipes,
         "total_pipes": len(validate_bundle_result.pipes),
     }

@@ -7,7 +7,7 @@ from typing import Any
 
 from pipelex.core.concepts.concept_representation_generator import ConceptRepresentationFormat
 from pipelex.core.pipes.output.output_renderer import render_output
-from pipelex.hub import get_library_manager, get_required_pipe, set_current_library
+from pipelex.hub import get_required_pipe
 from pipelex.pipeline.validate_bundle import validate_bundle
 
 
@@ -29,15 +29,14 @@ async def build_output_for_pipe(
     Raises:
         ValidateBundleError: If bundle validation fails.
     """
-    validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents)
-    blueprints = validate_bundle_result.blueprints
-
-    library_manager = get_library_manager()
-    library_id, _ = library_manager.open_library()
-    set_current_library(library_id)
-    library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints)
+    # validate_bundle opens a library, loads blueprints, and sets it as current
+    await validate_bundle(mthds_contents=mthds_contents)
 
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    output_json_str = render_output(the_pipe, output_format=output_format)
+    output_str = render_output(the_pipe, output_format=output_format)
 
-    return json.loads(output_json_str)  # type: ignore[no-any-return]
+    match output_format:
+        case ConceptRepresentationFormat.PYTHON:
+            return {"output": output_str}
+        case ConceptRepresentationFormat.SCHEMA | ConceptRepresentationFormat.JSON:
+            return json.loads(output_str)  # type: ignore[no-any-return]
