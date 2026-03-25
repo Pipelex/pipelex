@@ -287,15 +287,21 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 
 ## Future Phases (Out of Scope)
 
-These are documented for roadmap visibility but not planned for implementation now.
+These are documented for roadmap visibility but not planned for implementation now. See [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md) for the full architectural direction and incremental path.
 
-### Crate Stripping (Static Dependency Tree)
+### Crate-First Architecture
 
-From the entry pipe, walk the transitive closure of `pipe_dependencies()` + `concept_dependencies` to determine the minimal subset of the library needed. Strip the crate to only those domains/concepts/pipes. Reduces payload size and clarifies execution context.
+The long-term direction is to invert the current loading-driven architecture into a crate-driven one with three cleanly separated phases: **Collect** (resolve deps, fetch remote, gather all blueprints) **Build** (construct one crate, optionally strip to transitive closure) **Load** (same `load_from_crate()` on submitter and worker). This enables the two major capabilities below and makes the crate the central concept in library management.
+
+Phase 2's design decision (blueprint accumulation instead of crate merge) is the first step on this path. See [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md) for the decision rationale.
+
+### Crate Stripping (Transitive Closure)
+
+From the entry pipe, walk the transitive closure of pipe and concept dependencies to determine the minimal subset needed. Strip the crate to only those concepts, pipes, and domains. Requires decoupling dependency resolution from library loading so that dependency blueprints are accumulated alongside the main package's blueprints.
 
 ### Remote Dependency Resolution
 
-Resolve dependencies from GitHub method package addresses (e.g., `github:org/repo`). Clone to a temp directory, parse bundles, merge into the crate. Enables running pipelines whose dependencies aren't pre-installed.
+Resolve dependencies from remote package addresses (e.g., `github.com/org/repo/package`). Fetch the package, parse its bundles, include in the crate. Requires extracting a blueprint collector from `_load_single_dependency` so that remote fetch is a new resolution strategy alongside local lookup.
 
 ### Library Fingerprint Validation
 
@@ -303,7 +309,7 @@ Verify that the worker's base library (PIPELEXPATH) matches the API's expectatio
 
 ### Cross-Worker Cache via Shared Storage
 
-Cache loaded libraries in shared storage (Redis, S3) so multiple workers don't redundantly load the same crate. Keyed by fingerprint.
+Cache loaded crates in shared storage (Redis, S3) so multiple workers don't redundantly load the same crate. Keyed by fingerprint. Complementary to crate stripping (smaller crates = faster cache).
 
 ---
 

@@ -1,9 +1,9 @@
 # Phase 2 Implementation Plan: LibraryCrate on Temporal
 
-> **Status**: Reviewed, ready to implement
+> **Status**: Reviewed, ready to implement (updated after feature/LibraryCrate merge — 5477e16a, then crate design review — Option A chosen)
 > **Date**: 2026-03-25
-> **Related**: [D-master-plan-distributed-execution-v2.md](D-master-plan-distributed-execution-v2.md), [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationale.md)
-> **Review**: Eng review passed (0 critical gaps). Codex outside voice: 7 findings, all addressed.
+> **Related**: [D-master-plan-distributed-execution-v2.md](D-master-plan-distributed-execution-v2.md), [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationale.md), [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md)
+> **Review**: Eng review passed (0 critical gaps). Codex outside voice: 7 findings, all addressed. Crate design review: Option A (blueprint accumulation) chosen over Option B (crate merge).
 
 ---
 
@@ -23,7 +23,7 @@ Phase 0 (pipe_ref fix) and Phase 1 (LibraryCrate in direct mode) are complete. T
 
 2. **Self-contained crate** — The crate carries ALL blueprints (PIPELEXPATH + mthds_content + extra library_dirs). Workers don't assume anything is pre-loaded.
 
-3. **Crate accumulation on LibraryManager** — `_crates: dict[str, LibraryCrate]` tracks accumulated crate per `library_id`. Each `load_from_crate()` call merges into the dict. No return type changes to existing methods. `pipeline_run_setup()` reads `library_manager.get_crate(library_id)`.
+3. **Blueprint accumulation on LibraryManager** — `_blueprints: dict[str, list[PipelexBundleBlueprint]]` tracks all blueprints loaded per `library_id`. Each `load_from_blueprints()` call appends to the list. `get_crate(library_id)` builds one crate from all accumulated blueprints via `LibraryCrateFactory.make_from_blueprints()`. No merge logic, no crate accumulation — blueprints are the unit of accumulation. See [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md) for the rationale.
 
 4. **Per-workflow library on workers** — Each `WfPipeRouter` opens its own library using a unique ID derived from `workflow.info().workflow_id` (e.g., `f"wf_{workflow_id}"`). Full isolation — parent and child workflows from PipeParallel/PipeBatch get different IDs. Teardown after execution.
 
@@ -39,16 +39,18 @@ Phase 0 (pipe_ref fix) and Phase 1 (LibraryCrate in direct mode) are complete. T
 SUBMITTER (pipeline_run_setup)
 ════════════════════════════════════════════════════════
   load_libraries(library_id, dirs)          ─┐
-    → load_from_blueprints(blueprints)       │  Each call goes through
-      → LibraryCrateFactory → crate          │  load_from_crate() which
-      → load_from_crate(library_id, crate)   │  accumulates into
-        → _crates[library_id] = merge(...)  ─┘  _crates[library_id]
+    → load_from_blueprints(blueprints)       │  Each call appends blueprints
+      → _blueprints[library_id] += blueprints│  to the accumulation list,
+      → LibraryCrateFactory → crate          │  then loads from crate
+      → load_from_crate(library_id, crate)  ─┘  as today
 
   [if mthds_content]
   load_from_blueprints(library_id, mthds_blueprints)
-    → same path → crate merged into _crates[library_id]
+    → same path → blueprints appended to _blueprints[library_id]
 
   library_crate = library_manager.get_crate(library_id)
+    → LibraryCrateFactory.make_from_blueprints(_blueprints[library_id])
+    → one crate from ALL accumulated blueprints
   pipe_job = PipeJobFactory.make_pipe_job(..., library_crate=library_crate)
 
 
@@ -80,33 +82,31 @@ WORKER (WfPipeRouter.run)
 
 ## Implementation Steps
 
-### Step 1: LibraryCrate merge + crate accumulation + fingerprint idempotency
+### Step 1: Blueprint accumulation + get_crate + fingerprint idempotency
 
-**Tests first** (`tests/unit/pipelex/libraries/test_library_crate_merge.py`):
-- `merge()` combines two non-overlapping crates correctly
-- `merge()` raises on concept key collision
-- `merge()` raises on pipe key collision
-- `merge()` handles empty crate + non-empty crate
-- `load_from_crate()` returns `[]` on second call with same fingerprint
-- `get_crate(library_id)` returns accumulated crate
+**Tests first** (`tests/unit/pipelex/libraries/test_library_crate_accumulation.py`):
+- `get_crate(library_id)` builds crate from all accumulated blueprints
 - `get_crate(library_id)` returns `None` for unknown library_id
-- `teardown()` clears crate for that library_id
+- `get_crate(library_id)` returns `None` when no blueprints were loaded
+- Blueprints from multiple `load_from_blueprints()` calls are all included in the crate
+- `load_from_crate()` returns `[]` on second call with same fingerprint (idempotency)
+- `teardown()` clears blueprints for that library_id
 
 **Then implement:**
 
-**File**: `pipelex/libraries/library_crate.py`
-- Add `merge()` classmethod: combines concepts, pipes, domains, source_map dicts. Raises on key collision (reuse error patterns from `LibraryCrateFactory`). Recomputes fingerprint.
-
 **File**: `pipelex/libraries/library_manager.py`
-- Add `_crates: dict[str, LibraryCrate]` field alongside `_libraries`
+- Add `_blueprints: dict[str, list[PipelexBundleBlueprint]]` field alongside `_libraries`
+- In `load_from_blueprints()`:
+  - Append `blueprints` to `_blueprints[library_id]` (before or after the existing crate build + load)
 - In `load_from_crate()`:
   - Check fingerprint idempotency (skip if already seen for this library_id)
-  - After successful load: merge crate into `_crates[library_id]`
-- Add `get_crate(library_id) -> LibraryCrate | None`
-- Clear in `teardown(library_id)` and `reset()`
+- Add `get_crate(library_id) -> LibraryCrate | None`: if `_blueprints[library_id]` exists and is non-empty, call `LibraryCrateFactory.make_from_blueprints()` with the full accumulated list; otherwise return `None`
+- Clear `_blueprints[library_id]` in `teardown(library_id)` and `reset()`
 
 **File**: `pipelex/libraries/library_manager_abstract.py`
 - Add abstract `get_crate(library_id) -> LibraryCrate | None`
+
+**No changes to `pipelex/libraries/library_crate.py`** — no `merge()` method needed.
 
 ---
 
@@ -197,6 +197,8 @@ In `run()`:
 
 **File**: `pipelex/pipeline/pipeline_run_setup.py`
 
+**Note**: After the feature/LibraryCrate merge, `mthds_content` is now `mthds_contents: list[str] | None` and `bundle_uri` is now `bundle_uris: list[str] | None`. The crate accumulation approach is unaffected — both `load_libraries()` and `load_from_blueprints()` go through `load_from_crate()` which accumulates into `_crates[library_id]`.
+
 After all library loading (load_libraries + load_from_blueprints), before creating PipeJob:
 
 ```python
@@ -238,10 +240,13 @@ No manual crate building or merging needed — `get_crate()` returns the accumul
 
 | What | Where | Reuse |
 |------|-------|-------|
-| `LibraryCrate` model | `pipelex/libraries/library_crate.py` | Phase 1 — add `merge()` |
+| `LibraryCrate` model | `pipelex/libraries/library_crate.py` | Reuse as-is (no merge needed) |
 | `LibraryCrateFactory.make_from_blueprints()` | `pipelex/libraries/library_crate_factory.py` | Reuse as-is |
-| `LibraryManager.load_from_crate()` | `pipelex/libraries/library_manager.py` | Phase 1 — add fingerprint check + accumulation |
-| `load_from_blueprints()` → crate path | `library_manager.py:432` | Already builds crate internally, calls load_from_crate |
+| `LibraryManager.load_from_crate()` | `pipelex/libraries/library_manager.py` | Phase 1 — add fingerprint check |
+| `load_from_blueprints()` → crate path | `library_manager.py:432` | Already builds crate internally, calls `load_from_crate` |
+| `PipeFactory.make_pipe_ref_with_domain()` | `core/pipes/pipe_factory.py:41` | New helper — not needed in `merge()` (keys already qualified) |
+| `ConceptFactory.make_concept_ref_with_domain()` | `core/concepts/concept_factory.py:213` | New helper — not needed in `merge()` (keys already qualified) |
+| `LibraryCrate.compute_fingerprint_from_content()` | `libraries/library_crate.py` | Static method — used by `LibraryCrateFactory` |
 | Worker base library loading | `temporal/worker_cli.py:65` | Exists — worker_base library |
 | Kajson data converter | `temporal/temporal_data_converter.py` | Handles PipeJob serialization |
 | `PipeRouterProtocol.run()` | `pipe_run/pipe_router_protocol.py` | Unchanged — PipeJob carries crate |
@@ -256,11 +261,13 @@ No manual crate building or merging needed — `get_crate()` returns the accumul
 | Fingerprint collision | Two different crates with same SHA256 | Astronomically unlikely | Second load skipped silently | Wrong pipes loaded — very unlikely |
 | Worker library teardown | Exception during pipe execution skips teardown | Needs try/finally | Add finally block in WfPipeRouter | Memory leak on worker |
 | Concurrent crate loading | Two workflows load same crate simultaneously | Thread-safe via GIL | No issue in Python | None |
-| Direct mode crate cleanup | `runner.py` calls `library.teardown()` directly, not `library_manager.teardown()` | Audit runner.py | Ensure `_crates` cleanup happens via manager | Stale crate state in direct mode |
+| Direct mode crate cleanup | `runner.py:199` calls `library.teardown()` directly, not `library_manager.teardown()` | Fix in Step 1 | Change `runner.py` to call `library_manager.teardown(library_id)` instead | Stale `_crates` state in direct mode if not fixed |
 
 No critical gaps — all failure modes have either test coverage, error handling, or are handled by existing infrastructure.
 
 **Note on fingerprint scope**: `compute_fingerprint()` hashes concepts + pipes only (not domains/source_map). This is intentional — domains carry metadata (description, system_prompt) that doesn't affect pipe resolution. If domain metadata changes become significant, fingerprint scope can be expanded later.
+
+**Note on crate design**: Option A (blueprint accumulation) was chosen over Option B (crate merge). See [I-crate-first-architecture-vision.md](I-crate-first-architecture-vision.md) for the full rationale. In short: accumulating blueprints is simpler (no merge logic, no crate accumulation dict, no fingerprint recomputation) and directionally correct toward the future crate-first architecture.
 
 ---
 
@@ -284,8 +291,8 @@ No critical gaps — all failure modes have either test coverage, error handling
 
 | File | Change |
 |------|--------|
-| `pipelex/libraries/library_crate.py` | Add `merge()` classmethod |
-| `pipelex/libraries/library_manager.py` | Add `_crates` dict, fingerprint idempotency, `get_crate()`, accumulate in `load_from_crate()` |
+| `pipelex/libraries/library_crate.py` | No changes needed |
+| `pipelex/libraries/library_manager.py` | Add `_blueprints` dict, accumulate in `load_from_blueprints()`, fingerprint idempotency in `load_from_crate()`, `get_crate()` builds crate from accumulated blueprints |
 | `pipelex/libraries/library_manager_abstract.py` | Add abstract `get_crate()` |
 | `pipelex/pipe_run/pipe_job.py` | Add `library_crate` field |
 | `pipelex/pipe_run/pipe_job_factory.py` | Add `library_crate` param |
@@ -300,4 +307,5 @@ No critical gaps — all failure modes have either test coverage, error handling
 | `pipelex/pipe_run/pipe_router.py` | Pass `library_crate` from PipeJob to `run_pipe()` |
 | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` | Per-workflow library lifecycle + load crate + pass to `run_pipe()` |
 | `pipelex/pipeline/pipeline_run_setup.py` | Read crate via `get_crate()`, attach to PipeJob |
-| `tests/unit/pipelex/libraries/test_library_crate_merge.py` | New: merge, idempotency, get_crate tests |
+| `pipelex/pipeline/runner.py` | Fix teardown: call `library_manager.teardown(library_id)` instead of `library.teardown()` |
+| `tests/unit/pipelex/libraries/test_library_crate_accumulation.py` | New: blueprint accumulation, idempotency, get_crate tests |

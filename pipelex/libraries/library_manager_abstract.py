@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING
 
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.libraries.library_crate import LibraryCrate
 
 if TYPE_CHECKING:
     from pipelex.core.concepts.concept import Concept
     from pipelex.libraries.library import Library
-    from pipelex.libraries.library_crate import LibraryCrate
 
 
 class LibraryManagerAbstract(ABC):
@@ -48,7 +48,7 @@ class LibraryManagerAbstract(ABC):
         return None
 
     @abstractmethod
-    def load_from_crate(self, library_id: str, crate: "LibraryCrate") -> list[PipeAbstract]:
+    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Note: This method does NOT resolve cross-package address-based dependencies.

@@ -34,6 +34,7 @@ from pipelex.libraries.exceptions import (
     LibraryLoadingError,
 )
 from pipelex.libraries.library import Library
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_crate_factory import LibraryCrateFactory
 from pipelex.libraries.library_factory import LibraryFactory
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -51,7 +52,6 @@ if TYPE_CHECKING:
 
     from pipelex.core.concepts.concept import Concept
     from pipelex.core.domains.domain import Domain
-    from pipelex.libraries.library_crate import LibraryCrate
 
 MTHDS_METHODS_DIRNAME = ".mthds/methods"
 
@@ -338,7 +338,7 @@ class LibraryManager(LibraryManagerAbstract):
         return all_concepts
 
     @override
-    def load_from_crate(self, library_id: str, crate: "LibraryCrate") -> list[PipeAbstract]:
+    def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
         Note: This method does NOT resolve cross-package address-based dependencies.
