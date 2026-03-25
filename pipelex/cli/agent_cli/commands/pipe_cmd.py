@@ -24,64 +24,10 @@ from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
-from pipelex.builder.talents.extract_talent import ExtractTalent
-from pipelex.builder.talents.img_gen_talent import ImgGenTalent
-from pipelex.builder.talents.llm_talent import LLMTalent
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
-
-# Static talent-to-model preset mappings (from pipelex.toml defaults)
-LLM_TALENT_TO_MODEL: dict[str, str] = {
-    "data-retrieval": "$retrieval",
-    "hr-expert": "$writing-factual",
-    "accounting-expert": "$writing-factual",
-    "creative-writer": "$writing-creative",
-    "engineer": "$engineering-structured",
-    "coder": "$engineering-code",
-    "code-analyzer": "$engineering-codebase-analysis",
-    "vision-language-model": "$vision",
-    "visual-designer": "$img-gen-prompting",
-}
-
-IMG_GEN_TALENT_TO_MODEL: dict[str, str] = {
-    "gen-image": "$gen-image",
-    "gen-image-fast": "$gen-image-fast",
-    "gen-image-high-quality": "$gen-image-high-quality",
-}
-
-EXTRACT_TALENT_TO_MODEL: dict[str, str] = {
-    "pdf-basic-text-extractor": "@default-text-from-pdf",
-    "image-text-extractor": "@default-extract-image",
-    "full-document-extractor": "@default-extract-document",
-    "web-page-extractor": "@default-extract-web-page",
-}
-
-# Reverse mappings: preset name → talent name (for fuzzy resolution)
-_MODEL_TO_LLM_TALENT: dict[str, str] = {}
-for _talent, _preset in LLM_TALENT_TO_MODEL.items():
-    _MODEL_TO_LLM_TALENT[_preset] = _talent
-    _MODEL_TO_LLM_TALENT[_preset.lstrip("$@")] = _talent
-
-_MODEL_TO_IMG_GEN_TALENT: dict[str, str] = {}
-for _talent, _preset in IMG_GEN_TALENT_TO_MODEL.items():
-    _MODEL_TO_IMG_GEN_TALENT[_preset] = _talent
-    _MODEL_TO_IMG_GEN_TALENT[_preset.lstrip("$@")] = _talent
-
-_MODEL_TO_EXTRACT_TALENT: dict[str, str] = {}
-for _talent, _preset in EXTRACT_TALENT_TO_MODEL.items():
-    _MODEL_TO_EXTRACT_TALENT[_preset] = _talent
-    _MODEL_TO_EXTRACT_TALENT[_preset.lstrip("$@")] = _talent
-
-# Maps pipe types to their talent field names and valid values.
-# Used to enrich validation errors with field_hints so the agent knows
-# what values are valid when a talent field is missing or wrong.
-PIPE_TYPE_TALENT_HINTS: dict[str, dict[str, list[str]]] = {
-    "PipeLLM": {"llm_talent": [talent.value for talent in LLMTalent]},
-    "PipeExtract": {"extract_talent": [talent.value for talent in ExtractTalent]},
-    "PipeImgGen": {"img_gen_talent": [talent.value for talent in ImgGenTalent]},
-}
 
 
 def _pipe_spec_to_toml(pipe_spec: PipeSpec) -> str:
@@ -130,9 +76,8 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         pipe_table: The TOML table to add fields to.
     """
     if isinstance(pipe_spec, PipeLLMSpec):
-        # Convert llm_talent to model preset using static mappings
-        model_preset = LLM_TALENT_TO_MODEL.get(pipe_spec.llm_talent, "$writing-creative")
-        pipe_table.add("model", model_preset)
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
         if pipe_spec.system_prompt:
             pipe_table.add("system_prompt", format_toml_string(pipe_spec.system_prompt))
         if pipe_spec.prompt:
@@ -198,38 +143,16 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         pipe_table.add("input_item_name", pipe_spec.input_item_name)
 
     elif isinstance(pipe_spec, PipeExtractSpec):
-        # Convert extract_talent to model preset using static mappings
-        model_preset = EXTRACT_TALENT_TO_MODEL.get(pipe_spec.extract_talent, "@default-extract-document")
-        pipe_table.add("model", model_preset)
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
 
     elif isinstance(pipe_spec, PipeImgGenSpec):
-        # Convert img_gen_talent to model preset using static mappings
-        model_preset = IMG_GEN_TALENT_TO_MODEL.get(pipe_spec.img_gen_talent, "$gen-image")
-        pipe_table.add("model", model_preset)
+        if pipe_spec.model:
+            pipe_table.add("model", pipe_spec.model)
         pipe_table.add("prompt", format_toml_string(pipe_spec.prompt))
 
     elif isinstance(pipe_spec, PipeFuncSpec):
         pipe_table.add("function_name", pipe_spec.function_name)
-
-
-def _resolve_talent_value(pipe_type: str, raw_value: Any) -> Any:
-    """Attempt to resolve a talent value, accepting preset names as aliases."""
-    if not isinstance(raw_value, str):
-        return raw_value
-    reverse_maps: dict[str, dict[str, str]] = {
-        "PipeLLM": _MODEL_TO_LLM_TALENT,
-        "PipeImgGen": _MODEL_TO_IMG_GEN_TALENT,
-        "PipeExtract": _MODEL_TO_EXTRACT_TALENT,
-    }
-    reverse_map = reverse_maps.get(pipe_type)
-    if not reverse_map:
-        return raw_value
-    # If it's already a valid talent, return as-is
-    # Otherwise try reverse-mapping from preset
-    resolved = reverse_map.get(raw_value)
-    if resolved:
-        return resolved
-    return raw_value  # Let Pydantic validation handle the error
 
 
 def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
@@ -264,23 +187,6 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
             else:
                 spec_data.pop(alias)
 
-    # Accept generic talent aliases and map to the type-specific field
-    talent_aliases = ("talent_name", "talent")
-    pipe_type_to_talent_field: dict[str, str] = {
-        "PipeLLM": "llm_talent",
-        "PipeExtract": "extract_talent",
-        "PipeImgGen": "img_gen_talent",
-        "PipeSearch": "search_talent",
-    }
-    talent_field = pipe_type_to_talent_field.get(pipe_type)
-    if talent_field:
-        for alias in talent_aliases:
-            if alias in spec_data:
-                if talent_field not in spec_data:
-                    spec_data[talent_field] = spec_data.pop(alias)
-                else:
-                    spec_data.pop(alias)
-
     # Handle steps/branches conversion - need to convert pipe to pipe_code
     if "steps" in spec_data:
         converted_steps = []
@@ -304,11 +210,6 @@ def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> Pip
             spec_data["jinja2_expression_template"] = spec_data.pop("expression")
         else:
             spec_data.pop("expression")
-
-    # Resolve preset names to talent names (tolerance for agent mistakes)
-    talent_field = pipe_type_to_talent_field.get(pipe_type)
-    if talent_field and talent_field in spec_data:
-        spec_data[talent_field] = _resolve_talent_value(pipe_type, spec_data[talent_field])
 
     # Accept output as dict with "type" key → extract the type string
     if "output" in spec_data and isinstance(spec_data["output"], dict):
@@ -347,7 +248,7 @@ def pipe_cmd(
         "description": "What the pipe does",
         "inputs": {"input_name": "ConceptName"},
         "output": "OutputConcept",
-        "llm_talent": "creative-writer",
+        "model": "$writing-creative",
         "prompt": "Your prompt with @block and $inline vars"
     }
 
@@ -411,8 +312,7 @@ def pipe_cmd(
 
     except ValidationError as exc:
         message, details = format_pydantic_validation_error_for_agent(exc)
-        field_hints = PIPE_TYPE_TALENT_HINTS.get(resolved_pipe_type, {})
-        agent_error(message, "ValidationError", cause=exc, validation_details=details, field_hints=field_hints)
+        agent_error(message, "ValidationError", cause=exc, validation_details=details)
 
     except ValueError as exc:
         agent_error(str(exc), "ValueError", cause=exc)
