@@ -96,6 +96,9 @@ class LibraryManager(LibraryManagerAbstract):
         # UNTITLED library is the fallback library for all others
         self._libraries: dict[str, Library] = {}
         self._pipe_source_map: dict[str, Path] = {}  # pipe_ref (domain.pipe_code) -> source .mthds file
+        self._blueprints: dict[str, list[PipelexBundleBlueprint]] = {}  # library_id -> accumulated blueprints
+        self._crate_cache: dict[str, LibraryCrate] = {}  # library_id -> cached crate from get_crate()
+        self._loaded_fingerprints: dict[str, set[str]] = {}  # library_id -> set of loaded crate fingerprints
 
     ############################################################
     # Manager lifecycle
@@ -119,12 +122,18 @@ class LibraryManager(LibraryManagerAbstract):
                 self._pipe_source_map.pop(pipe_ref, None)
             library.teardown()
             del self._libraries[library_id]
+            self._blueprints.pop(library_id, None)
+            self._crate_cache.pop(library_id, None)
+            self._loaded_fingerprints.pop(library_id, None)
             return
 
         for library in self._libraries.values():
             library.teardown()
         self._libraries = {}
         self._pipe_source_map = {}
+        self._blueprints = {}
+        self._crate_cache = {}
+        self._loaded_fingerprints = {}
 
     @override
     def reset(self) -> None:
@@ -184,6 +193,18 @@ class LibraryManager(LibraryManagerAbstract):
             if len(matches) == 1:
                 return matches[0]
         return None
+
+    @override
+    def get_crate(self, library_id: str) -> LibraryCrate | None:
+        cached = self._crate_cache.get(library_id)
+        if cached is not None:
+            return cached
+        accumulated = self._blueprints.get(library_id)
+        if not accumulated:
+            return None
+        crate = LibraryCrateFactory.make_from_blueprints(blueprints=accumulated)
+        self._crate_cache[library_id] = crate
+        return crate
 
     ############################################################
     # Private methods
@@ -341,6 +362,9 @@ class LibraryManager(LibraryManagerAbstract):
     def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 
+        Fingerprint idempotency: if a crate with the same fingerprint was already loaded
+        into this library_id, the load is skipped and an empty list is returned.
+
         Note: This method does NOT resolve cross-package address-based dependencies.
         Callers must handle dependency loading before calling this method (e.g. via
         _load_address_based_dependencies). The load_from_blueprints method does this
@@ -351,8 +375,16 @@ class LibraryManager(LibraryManagerAbstract):
             crate: The LibraryCrate containing qualified blueprints, domain metadata, and source info
 
         Returns:
-            List of all pipes that were loaded
+            List of all pipes that were loaded, or empty list if already loaded
         """
+        # Fingerprint idempotency: skip if this crate was already loaded into this library
+        fingerprint = crate.fingerprint
+        loaded_set = self._loaded_fingerprints.setdefault(library_id, set())
+        if fingerprint in loaded_set:
+            log.verbose(f"Crate with fingerprint {fingerprint[:12]}... already loaded into '{library_id}', skipping")
+            return []
+        loaded_set.add(fingerprint)
+
         library = self.get_library(library_id=library_id)
 
         # Load domains from crate metadata
@@ -414,6 +446,7 @@ class LibraryManager(LibraryManagerAbstract):
         """Load domains, concepts, and pipes from a list of blueprints.
 
         Delegates through LibraryCrate: builds a crate from blueprints, then loads from the crate.
+        Also accumulates blueprints for later crate retrieval via get_crate().
 
         Args:
             library_id: The ID of the library to load into
@@ -422,6 +455,10 @@ class LibraryManager(LibraryManagerAbstract):
         Returns:
             List of all pipes that were loaded
         """
+        # Accumulate blueprints for later crate construction via get_crate()
+        self._blueprints.setdefault(library_id, []).extend(blueprints)
+        self._crate_cache.pop(library_id, None)
+
         # Discover and load address-based cross-package dependencies before loading pipes
         self._load_address_based_dependencies(
             library_id=library_id,

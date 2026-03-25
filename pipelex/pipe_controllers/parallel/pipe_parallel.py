@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
     from pipelex.core.stuffs.stuff import Stuff
     from pipelex.core.stuffs.stuff_content import StuffContent
+    from pipelex.libraries.library_crate import LibraryCrate
 
 
 class PipeParallel(PipeController):
@@ -137,6 +138,7 @@ class PipeParallel(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         if pipe_run_params.final_stuff_code:
             log.verbose(f"PipeBatch.run_pipe() final_stuff_code: {pipe_run_params.final_stuff_code}")
@@ -151,6 +153,7 @@ class PipeParallel(PipeController):
                     job_metadata=job_metadata,
                     working_memory=working_memory.make_deep_copy(),
                     sub_pipe_run_params=pipe_run_params.make_deep_copy(),
+                    library_crate=library_crate,
                 ),
             )
 
@@ -220,6 +223,7 @@ class PipeParallel(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         # 1. Validate that all sub-pipes exist
         for sub_pipe in self.parallel_sub_pipes:
@@ -239,6 +243,7 @@ class PipeParallel(PipeController):
                     job_metadata=job_metadata,
                     working_memory=working_memory.make_deep_copy(),
                     sub_pipe_run_params=pipe_run_params.make_deep_copy(),
+                    library_crate=library_crate,
                 ),
             )
 

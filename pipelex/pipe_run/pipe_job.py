@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 
@@ -12,6 +13,7 @@ class PipeJob(BaseModel):
     pipe_run_params: PipeRunParams
     job_metadata: JobMetadata
     output_name: str | None = None
+    library_crate: LibraryCrate | None = None
 
     @property
     def pipe_type(self) -> str:

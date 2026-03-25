@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from typing_extensions import override
 
@@ -20,6 +20,9 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.jinja2.jinja2_errors import Jinja2DetectVariablesError
 from pipelex.tools.jinja2.jinja2_required_variables import detect_jinja2_required_variables
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+
+if TYPE_CHECKING:
+    from pipelex.libraries.library_crate import LibraryCrate
 
 ConditionOutcomeMap = dict[str, str | SpecialOutcome]
 
@@ -224,6 +227,7 @@ class PipeCondition(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         evaluated_expression = await self._evaluate_expression(working_memory=working_memory)
         # Select the outcome based on the evaluated expression
@@ -261,6 +265,7 @@ class PipeCondition(PipeController):
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
+                library_crate=library_crate,
             ),
         )
 
@@ -271,6 +276,7 @@ class PipeCondition(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         # Validate that the expression template is valid
         try:
@@ -310,5 +316,6 @@ class PipeCondition(PipeController):
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
+                library_crate=library_crate,
             )
         return PipeOutput(working_memory=working_memory)

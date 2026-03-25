@@ -21,4 +21,5 @@ class PipeRouter(PipeRouterProtocol):
             working_memory=pipe_job.working_memory,
             output_name=pipe_job.output_name,
             pipe_run_params=pipe_job.pipe_run_params,
+            library_crate=pipe_job.library_crate,
         )

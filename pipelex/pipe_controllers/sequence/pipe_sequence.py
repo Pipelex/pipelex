@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from pydantic import field_validator
 from typing_extensions import override
@@ -19,6 +19,9 @@ from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
+
+if TYPE_CHECKING:
+    from pipelex.libraries.library_crate import LibraryCrate
 
 
 class PipeSequence(PipeController):
@@ -178,6 +181,7 @@ class PipeSequence(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         evolving_memory = working_memory
 
@@ -192,6 +196,7 @@ class PipeSequence(PipeController):
                 working_memory=evolving_memory,
                 job_metadata=job_metadata,
                 sub_pipe_run_params=sub_pipe_run_params,
+                library_crate=library_crate,
             )
             evolving_memory = pipe_output.working_memory
         return PipeOutput(
@@ -206,12 +211,14 @@ class PipeSequence(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         return await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
+            library_crate=library_crate,
         )
 
     @override
