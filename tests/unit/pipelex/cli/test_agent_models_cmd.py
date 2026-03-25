@@ -9,12 +9,11 @@ if TYPE_CHECKING:
     import pytest
     from pytest_mock import MockerFixture
 
-from pipelex.builder.operations.models_ops import ModelCategory
-from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
+from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
+from pipelex.cli.agent_cli.commands.models_cmd import ModelCategory, agent_models_cmd
 from pipelex.cogt.model_backends.model_type import ModelType
 
-CMD_MODULE_PATH = "pipelex.cli.agent_cli.commands.models_cmd"
-OPS_MODULE_PATH = "pipelex.builder.operations.models_ops"
+MODULE_PATH = "pipelex.cli.agent_cli.commands.models_cmd"
 
 
 class _FakeSetting:
@@ -140,10 +139,10 @@ def _make_fake_config() -> _FakeConfig:
 
 def _setup_mocks(mocker: MockerFixture) -> None:
     """Patch the common dependencies for agent_models_cmd."""
-    mocker.patch(f"{CMD_MODULE_PATH}.make_pipelex_for_agent_cli")
-    mocker.patch(f"{OPS_MODULE_PATH}.get_model_deck", return_value=_make_fake_model_deck())
-    mocker.patch(f"{OPS_MODULE_PATH}.get_config", return_value=_make_fake_config())
-    mocker.patch(f"{CMD_MODULE_PATH}.Pipelex")
+    mocker.patch(f"{MODULE_PATH}.make_pipelex_for_agent_cli")
+    mocker.patch(f"{MODULE_PATH}.get_model_deck", return_value=_make_fake_model_deck())
+    mocker.patch(f"{MODULE_PATH}.get_config", return_value=_make_fake_config())
+    mocker.patch(f"{MODULE_PATH}.Pipelex")
 
 
 class TestAgentModelsCmd:
@@ -153,7 +152,7 @@ class TestAgentModelsCmd:
         """No filters should return all 3 categories in every section."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx)
+        agent_models_cmd(ctx=agent_ctx, output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
@@ -166,7 +165,7 @@ class TestAgentModelsCmd:
         """No filters should include all preset entries with correct data."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx)
+        agent_models_cmd(ctx=agent_ctx, output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
@@ -180,7 +179,7 @@ class TestAgentModelsCmd:
         """--type llm should return only llm keys in all sections."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM])
+        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
@@ -192,7 +191,7 @@ class TestAgentModelsCmd:
         """--type extract should return only extract keys in all sections."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.EXTRACT])
+        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.EXTRACT], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
@@ -204,7 +203,7 @@ class TestAgentModelsCmd:
         """--type img_gen should return only img_gen keys in all sections."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.IMG_GEN])
+        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.IMG_GEN], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
@@ -216,7 +215,7 @@ class TestAgentModelsCmd:
         """--type llm --type img_gen should return both llm and img_gen, but not extract."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM, ModelCategory.IMG_GEN])
+        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM, ModelCategory.IMG_GEN], output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         for section in ("presets", "aliases", "waterfalls", "talent_mappings"):
@@ -228,7 +227,7 @@ class TestAgentModelsCmd:
         """--backend openai should filter presets/aliases/waterfalls to only openai-backed models."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="openai")
+        agent_models_cmd(ctx=agent_ctx, backend="openai", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         # LLM: only 'fast' preset (gpt-4o-mini on openai), not 'smart' (claude-sonnet on anthropic)
@@ -247,7 +246,7 @@ class TestAgentModelsCmd:
         """--backend anthropic should include only anthropic-backed models."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="anthropic")
+        agent_models_cmd(ctx=agent_ctx, backend="anthropic", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         llm_preset_names = [preset["name"] for preset in parsed["presets"]["llm"]]
@@ -260,7 +259,7 @@ class TestAgentModelsCmd:
         """--type llm --backend openai should combine both filters."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM], backend="openai")
+        agent_models_cmd(ctx=agent_ctx, model_type=[ModelCategory.LLM], backend="openai", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         # Only llm category
@@ -276,7 +275,7 @@ class TestAgentModelsCmd:
         """--backend nonexistent should produce empty presets/aliases/waterfalls/talent_mappings."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="nonexistent")
+        agent_models_cmd(ctx=agent_ctx, backend="nonexistent", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert parsed["success"] is True
@@ -288,7 +287,7 @@ class TestAgentModelsCmd:
         """--backend anthropic should include llm waterfall (has claude-sonnet) but not img waterfall."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="anthropic")
+        agent_models_cmd(ctx=agent_ctx, backend="anthropic", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert "llm-wf" in parsed["waterfalls"]["llm"]
@@ -299,7 +298,7 @@ class TestAgentModelsCmd:
         """--backend openai should include LLM talent_mapping (fast->gpt-4o-mini) and img_gen, but not extract."""
         _setup_mocks(mocker)
 
-        agent_models_cmd(ctx=agent_ctx, backend="openai")
+        agent_models_cmd(ctx=agent_ctx, backend="openai", output_format=CliOutputFormat.JSON)
 
         parsed = json.loads(capsys.readouterr().out)
         assert "text_gen" in parsed["talent_mappings"]["llm"]

@@ -18,6 +18,7 @@ from pipelex.pipe_controllers.sequence.exceptions import PipeSequenceValueError
 from pipelex.pipe_controllers.sub_pipe import SubPipe
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
 
 class PipeSequence(PipeController):
@@ -108,11 +109,11 @@ class PipeSequence(PipeController):
             visited_pipes = set()
 
         # If we've already visited this pipe, stop recursion
-        if self.code in visited_pipes:
+        if self.pipe_ref in visited_pipes:
             return InputStuffSpecsFactory.make_empty()
 
         # Add this pipe to visited set for recursive calls
-        visited_pipes_with_current = visited_pipes | {self.code}
+        visited_pipes_with_current = visited_pipes | {self.pipe_ref}
 
         needed_inputs = InputStuffSpecsFactory.make_empty()
         generated_outputs: set[str] = set()
@@ -134,7 +135,8 @@ class PipeSequence(PipeController):
                         generated_outputs.add(sub_parallel_pipe.output_name)
 
             if sequential_sub_pipe.batch_params:
-                if sequential_sub_pipe.batch_params.input_list_stuff_name not in generated_outputs:
+                input_list_root = get_root_from_dotted_path(sequential_sub_pipe.batch_params.input_list_stuff_name)
+                if input_list_root not in generated_outputs:
                     try:
                         stuff_spec = sub_pipe_needed_inputs.get_required_stuff_spec(
                             variable_name=sequential_sub_pipe.batch_params.input_item_stuff_name
@@ -145,10 +147,11 @@ class PipeSequence(PipeController):
                             f"in this PipeSequence '{self.code}' input requirements: {sub_pipe_needed_inputs.format_for_display()}"
                         )
                         raise PipeSequenceValueError(msg) from exc
+                    is_dotted_path = "." in sequential_sub_pipe.batch_params.input_list_stuff_name
                     needed_inputs.add_stuff_spec(
-                        variable_name=sequential_sub_pipe.batch_params.input_list_stuff_name,
+                        variable_name=input_list_root,
                         concept=stuff_spec.concept,
-                        multiplicity=True,
+                        multiplicity=True if not is_dotted_path else None,
                     )
                     for input_name, stuff_spec in sub_pipe_needed_inputs.items:
                         if input_name != sequential_sub_pipe.batch_params.input_item_stuff_name and input_name not in generated_outputs:

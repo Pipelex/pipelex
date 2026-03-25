@@ -6,7 +6,9 @@ description: >
   release/vX.Y.Z branch, commits, pushes, and opens a PR to main. Use when user
   says "release", "cut a release", "bump version", "prepare a release", "make a
   release", "ship it", "create release branch", or any variation of shipping a
-  new version of pipelex.
+  new version of pipelex. The user can optionally provide changelog content
+  inline when invoking the skill (e.g. "/release Added new extract backend"),
+  which will be used as the changelog entry for this version.
 ---
 
 # Pipelex Release Workflow
@@ -67,9 +69,16 @@ Add a new version entry at the top of the changelog for the release.
    directly after the `# Changelog` title.
 3. **Never add an `[Unreleased]` heading.** The changelog should only contain
    concrete version entries.
-4. If the release has no changelog content yet, ask the user what to include
-   before proceeding.
-5. The result should look like:
+4. If the user provided changelog content when invoking the skill (e.g.
+   `/release Added new extract backend`), **merge** that content with any
+   existing `[Unreleased]` content (do not discard either source). Format the
+   combined content properly under the appropriate headings (e.g. `### Added`,
+   `### Changed`, `### Fixed`), inferring headings from the content when
+   possible.
+5. If the release has no changelog content yet (neither from an `[Unreleased]`
+   section nor from inline user input), ask the user what to include before
+   proceeding.
+6. The result should look like:
 
 ```markdown
 # Changelog

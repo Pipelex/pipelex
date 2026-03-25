@@ -1,6 +1,9 @@
 import base64
 import hashlib
 
+import httpx
+
+from pipelex import log
 from pipelex.cogt.content_generation.exceptions import NeitherUrlNorDataError
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
@@ -125,16 +128,21 @@ class GeneratedContentFactory:
 
         public_url: str | None
         if is_remote_url and get_config().pipelex.storage_config.is_fetch_remote_content_enabled:
-            actual_bytes = await self._fetch_remote_content(url=url)
-            storage_key = self._build_storage_key(
-                primary_id=primary_id,
-                secondary_id=secondary_id,
-                data=actual_bytes,
-                mime_type=mime_type,
-                image_format=image_format,
-            )
-            url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
-            public_url = await self.storage_provider.public_url(uri=url)
+            try:
+                actual_bytes = await self._fetch_remote_content(url=url)
+            except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+                log.warning(f"Failed to fetch a remote image: {exc}")
+                public_url = url
+            else:
+                storage_key = self._build_storage_key(
+                    primary_id=primary_id,
+                    secondary_id=secondary_id,
+                    data=actual_bytes,
+                    mime_type=mime_type,
+                    image_format=image_format,
+                )
+                url = await self.storage_provider.store(data=actual_bytes, key=storage_key)
+                public_url = await self.storage_provider.public_url(uri=url)
         elif not is_remote_url:
             public_url = await self.storage_provider.public_url(uri=url)
         else:
@@ -170,6 +178,7 @@ class GeneratedContentFactory:
                     text_and_images=TextAndImagesContent(
                         text=TextContent(text=page.text) if page.text else None,
                         images=page_images,
+                        raw_html=page.raw_html,
                     ),
                 )
             )

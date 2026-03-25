@@ -35,3 +35,15 @@ model_id = "deep"
 inputs = ["text"]
 outputs = ["sourced-answers", "structured"]
 costs = { input = 0.05, output = 0 }
+
+################################################################################
+# FETCH / EXTRACT MODELS
+################################################################################
+
+["linkup-fetch"]
+model_type = "text_extractor"
+sdk = "linkup_fetch"
+model_id = "fetch"
+inputs = ["web_page"]
+outputs = ["pages"]
+costs = { input = 0.005, output = 0 }

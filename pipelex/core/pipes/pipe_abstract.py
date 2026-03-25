@@ -54,6 +54,11 @@ class PipeAbstract(ABC, BaseModel):
     output: StuffSpec
 
     @property
+    def pipe_ref(self) -> str:
+        """Domain-qualified pipe reference, e.g. 'scoring.compute_score'."""
+        return f"{self.domain_code}.{self.code}"
+
+    @property
     def pipe_type(self) -> str:
         return self.__class__.__name__
 

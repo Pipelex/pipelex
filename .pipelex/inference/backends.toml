@@ -63,6 +63,12 @@ display_name = "Linkup"
 enabled = true
 api_key = "${LINKUP_API_KEY}"
 
+[minimax]
+display_name = "MiniMax"
+enabled = true
+endpoint = "https://api.minimax.io/anthropic"
+api_key = "${MINIMAX_API_KEY}"
+
 [mistral]
 display_name = "Mistral AI"
 enabled = true

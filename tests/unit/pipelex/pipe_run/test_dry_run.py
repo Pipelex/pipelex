@@ -38,12 +38,14 @@ class TestDryRun:
         """Skipped pipes must not inflate the success count in dry_run_pipes."""
         mock_successful_pipe = mocker.MagicMock()
         mock_successful_pipe.code = "successful_pipe"
+        mock_successful_pipe.pipe_ref = "test_domain.successful_pipe"
         mock_successful_pipe.needed_inputs.return_value = mocker.MagicMock(named_stuff_specs=[])
         mock_successful_pipe.validate_with_libraries.return_value = None
         mock_successful_pipe.run_pipe = mocker.AsyncMock(return_value=None)
 
         mock_skipped_pipe = mocker.MagicMock()
         mock_skipped_pipe.code = "skipped_pipe"
+        mock_skipped_pipe.pipe_ref = "test_domain.skipped_pipe"
         mock_skipped_pipe.needed_inputs.side_effect = PipeNotFoundError("dep->domain.pipe not found")
 
         results = await dry_run_pipes(
@@ -51,8 +53,8 @@ class TestDryRun:
             raise_on_failure=False,
         )
 
-        assert results["successful_pipe"].status == DryRunStatus.SUCCESS
-        assert results["skipped_pipe"].status == DryRunStatus.SKIPPED
+        assert results["test_domain.successful_pipe"].status == DryRunStatus.SUCCESS
+        assert results["test_domain.skipped_pipe"].status == DryRunStatus.SKIPPED
 
     @pytest.mark.asyncio
     async def test_dry_run_pipe_skipped_is_not_failure(self, mocker: MockerFixture) -> None:

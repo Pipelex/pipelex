@@ -1,14 +1,14 @@
 ---
-description: "PipeExtract performs OCR on images and PDFs to extract text and embedded visuals. Turn documents into structured data for your AI methods."
+description: "PipeExtract extracts structured content from documents (PDF, images, web pages). Turn documents into structured data for your AI methods."
 ---
 
 # PipeExtract
 
-The `PipeExtract` operator performs Optical Character Recognition (OCR) on images and PDF documents. It extracts text, embedded images, and provides full-page renderings.
+The `PipeExtract` operator extracts structured content from documents. For PDFs and images, it performs OCR to extract text, embedded images, and full-page renderings. For web pages, it fetches and extracts page content.
 
 ## How it works
 
-`PipeExtract` takes a single input, which must be a `Document` or an `Image` (or a concept that refines one of them). It processes the input and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from one page.
+`PipeExtract` takes a single input, which must be a `Document` or an `Image` (or a concept that refines one of them). The document URL can be a file path, a storage URL, or a web page URL. It processes the input and produces a list of `PageContent` objects. Each `PageContent` object encapsulates all the information extracted from one page.
 
 The output is always a list. If the input is a single image, the output still contains one `Page` item.
 
@@ -25,30 +25,37 @@ The `PageContent` object has the following structure:
 
 `PipeExtract` is configured in your pipeline's `.mthds` file.
 
-### OCR Models and Backend System
+### Extraction Models and Backend System
 
-PipeExtract uses the unified inference backend system to manage OCR models. This means you can:
+PipeExtract uses the unified inference backend system to manage extraction models. This means you can:
 
-- Use different OCR providers (Mistral OCR, local PDF extraction via internal backend, etc.)
-- Configure OCR models through the same backend system as LLMs and image generation models
-- Use OCR presets for consistent configurations across your pipelines
-- Route OCR requests to different backends based on your routing profile
+- Use different extraction providers (Mistral OCR, Linkup Fetch, local PDF extraction via internal backend, etc.)
+- Configure extraction models through the same backend system as LLMs and image generation models
+- Use extraction presets for consistent configurations across your pipelines
+- Route extraction requests to different backends based on your routing profile
 
-Common OCR model handles:
+Common extraction model handles:
 
 - `mistral-ocr`: Mistral's OCR model for high-quality text and image extraction
 - `pypdfium2-extract-pdf`: Local PDF text extraction (no API calls required)
+- `linkup-fetch`: Web page content extraction from URLs
 
-OCR presets are defined in your model deck configuration and can include parameters like `max_nb_images` and `image_min_size`.
+Common model aliases:
+
+- `@default-extract-web-page`: Default for web page extraction (Linkup Fetch)
+- `@default-extract-document`: Default for document extraction (Azure Document Intelligence)
+- `@default-text-from-pdf`: Fast local PDF text extraction (pypdfium2)
+
+Extraction presets are defined in your model deck configuration and can include parameters like `max_nb_images` and `image_min_size`.
 
 ### MTHDS Parameters
 
 | Parameter                   | Type    | Description                                                                                                                              | Required |
 | --------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | `type`                      | string  | The type of the pipe: `PipeExtract`                                                                          | Yes      |
-| `description`               | string  | A description of the OCR operation.                                                                   | Yes      |
-| `inputs`                    | Fixed  | The value must be of concept `Document` or `Image` (or a concept that refines one of them).                                                     | Yes       |
-| `output`                    | string  | The output concept produced by the OCR operation. Use `Page[]`.                                  | Yes      |
+| `description`               | string  | A description of the extraction operation.                                                                   | Yes      |
+| `inputs`                    | Fixed  | The value must be of concept `Document` or `Image` (or a concept that refines one of them). For web page extraction, the Document holds a web URL.                                                     | Yes       |
+| `output`                    | string  | The output concept produced by the extraction operation. Use `Page[]`.                                  | Yes      |
 | `max_page_images`           | integer or null | Maximum number of images to extract from pages: `null` (or omit) for unlimited, `0` for no images, or a positive integer to limit. Defaults to the value in your Extract model preset. | No       |
 | `page_views`                | boolean | If `true`, a high-fidelity image of each page will be included in the `page_view` field. Defaults to `false`.                              | No       |
 | `page_views_dpi`            | integer | The resolution (in Dots Per Inch) for the generated page views when processing a PDF. Defaults to `150`.                                 | No       |
@@ -79,6 +86,21 @@ page_views_dpi = 200
 The output of `PipeExtract` must be `Page[]`.
 
 To use this pipe, first load a PDF into the `ScannedDocument` concept. After the pipe runs, the output contains a list of `PageContent` objects, where each object has the extracted text and a 200 DPI image of the corresponding page.
+
+### Example: Extracting a Web Page
+
+This example defines a pipe that extracts content from a web page URL.
+
+```toml
+[pipe.extract_web_article]
+type        = "PipeExtract"
+description = "Extract content from a web page"
+inputs      = { article_url = "Document" }
+output      = "Page[]"
+model       = "@default-extract-web-page"
+```
+
+Pass a web URL as the `document_uri` when running the pipe. PipeExtract fetches the page and extracts its content into `Page` objects, following the same pattern as document extraction.
 
 ## Related Documentation
 

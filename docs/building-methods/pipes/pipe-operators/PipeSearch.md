@@ -13,7 +13,7 @@ The `PipeSearch` operator searches the web using a configurable search provider 
 The output is a `SearchResult` (or a concept that refines it), which contains:
 
 -   `answer`: The synthesized answer text from the search
--   `sources`: A list of sources, each with a `name`, `url`, and optional `snippet`
+-   `sources`: A list of sources, each with a `title`, `url`, and optional `snippet`
 
 ## Configuration
 
@@ -106,7 +106,7 @@ from_date = "2026-01-01"
 include_domains = ["reuters.com", "apnews.com", "bbc.com"]
 ```
 
-When the output concept is compatible with `SearchResult`, the output contains the synthesized `answer` and a list of `sources` with their names, URLs, and snippets. PipeSearch can also feed a structured output concept when your method needs a more specialized downstream shape.
+When the output concept is compatible with `SearchResult`, the output contains the synthesized `answer` and a list of `sources` with their titles, URLs, and snippets. PipeSearch can also feed a structured output concept when your method needs a more specialized downstream shape.
 
 ## Related Documentation
 

@@ -1,0 +1,11 @@
+domain      = "dotted_batch_test"
+description = "Branch pipe for dotted-path batch_over integration test"
+main_pipe   = "process_document"
+
+[pipe.process_document]
+type        = "PipeLLM"
+description = "Summarize a single document"
+inputs      = { document = "Document" }
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Summarize this document: $document"

@@ -1,66 +1,80 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing import Any
 
-from pipelex.cogt.search.search_setting import SearchSetting
+from typing_extensions import override
+
+from pipelex import log
+from pipelex.cogt.inference.inference_worker_abstract import InferenceWorkerAbstract
+from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
+from pipelex.cogt.search.search_job import SearchJob
 from pipelex.core.stuffs.search_result_content import SearchResultContent
-from pipelex.pipeline.job_metadata import JobMetadata
+from pipelex.pipeline.job_metadata import UnitJobId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
-class SearchWorkerAbstract(ABC):
-    def __init__(self, reporting_delegate: ReportingProtocol | None = None):
-        self.reporting_delegate = reporting_delegate
+class SearchWorkerAbstract(InferenceWorkerAbstract):
+    def __init__(
+        self,
+        inference_model: InferenceModelSpec,
+        reporting_delegate: ReportingProtocol | None = None,
+    ):
+        InferenceWorkerAbstract.__init__(self, reporting_delegate=reporting_delegate)
+        self.inference_model = inference_model
 
-    @abstractmethod
+    @property
+    @override
+    def desc(self) -> str:
+        return f"Search using {self.inference_model.desc}"
+
     async def search_sourced_answer(
         self,
-        query: str,
-        search_setting: SearchSetting,
-        job_metadata: JobMetadata,
-        include_domains: list[str] | None = None,
-        exclude_domains: list[str] | None = None,
-        from_date: str | None = None,
-        to_date: str | None = None,
+        search_job: SearchJob,
     ) -> SearchResultContent:
-        """Execute a search query and return a sourced answer with sources.
+        """Execute a search query and return a sourced answer with sources."""
+        log.dev(f"✨ {self.desc} ✨")
+        search_job.validate_before_execution()
+        search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_SOURCED_ANSWER
+        search_job.search_job_before_start(inference_model=self.inference_model)
 
-        Args:
-            query: The search query text
-            search_setting: Search configuration including model, depth, etc.
-            job_metadata: Job metadata for cost reporting
-            include_domains: Optional list of domains to restrict search to
-            exclude_domains: Optional list of domains to exclude from search
-            from_date: Optional start date filter (YYYY-MM-DD)
-            to_date: Optional end date filter (YYYY-MM-DD)
+        result = await self._search_sourced_answer(search_job=search_job)
 
-        Returns:
-            SearchResultContent with answer and sources
-        """
+        search_job.search_job_after_complete()
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=search_job)
 
-    @abstractmethod
+        return result
+
     async def search_structured(
         self,
-        query: str,
-        search_setting: SearchSetting,
-        output_schema: type,
-        job_metadata: JobMetadata,
-        include_domains: list[str] | None = None,
-        exclude_domains: list[str] | None = None,
-        from_date: str | None = None,
-        to_date: str | None = None,
+        search_job: SearchJob,
+        schema: type[BaseModelTypeVar],
     ) -> dict[str, Any]:
-        """Execute a search query and return structured data matching the schema.
+        """Execute a search query and return structured data matching the schema."""
+        log.dev(f"✨ {self.desc} ✨")
+        search_job.validate_before_execution()
+        search_job.job_metadata.unit_job_id = UnitJobId.SEARCH_STRUCTURED
+        search_job.search_job_before_start(inference_model=self.inference_model)
 
-        Args:
-            query: The search query text
-            search_setting: Search configuration including model, depth, etc.
-            output_schema: Pydantic model class defining the expected output structure
-            job_metadata: Job metadata for cost reporting
-            include_domains: Optional list of domains to restrict search to
-            exclude_domains: Optional list of domains to exclude from search
-            from_date: Optional start date filter (YYYY-MM-DD)
-            to_date: Optional end date filter (YYYY-MM-DD)
+        result = await self._search_structured(search_job=search_job, schema=schema)
 
-        Returns:
-            Dictionary matching the output_schema structure
-        """
+        search_job.search_job_after_complete()
+        if self.reporting_delegate:
+            self.reporting_delegate.report_inference_job(inference_job=search_job)
+
+        return result
+
+    @abstractmethod
+    async def _search_sourced_answer(
+        self,
+        search_job: SearchJob,
+    ) -> SearchResultContent:
+        pass
+
+    @abstractmethod
+    async def _search_structured(
+        self,
+        search_job: SearchJob,
+        schema: type[BaseModelTypeVar],
+    ) -> dict[str, Any]:
+        pass

@@ -40,6 +40,7 @@ all = [
   "google",
   "groq",
   "huggingface",
+  "minimax",
   "mistral",
   "ollama",
   "openai",
@@ -47,6 +48,7 @@ all = [
   "scaleway",
   "vertexai",
   "xai",
+  "linkup",
   "internal",
 ]
 
@@ -105,6 +107,17 @@ meta = [
 # --- Microsoft Models ---
 microsoft = ["phi-4", "phi-4-multimodal"]
 
+# --- MiniMax Models ---
+minimax = [
+  "minimax-m2",
+  "minimax-m2.1",
+  "minimax-m2.1-highspeed",
+  "minimax-m2.5",
+  "minimax-m2.5-highspeed",
+  "minimax-m2.7",
+  "minimax-m2.7-highspeed",
+]
+
 # --- Mistral Models ---
 mistralai = [
   "bedrock-mistral-large",
@@ -117,6 +130,8 @@ mistralai = [
   "pixtral-large",
   "mistral-small-2506",
   "mistral-small-3.2",
+  "mistral-small-2603",
+  "mistral-small-4",
   "mistral-small",
   "mistral-medium-2508",
   "mistral-medium-3.1",
@@ -158,6 +173,10 @@ openai = [
   "gpt-5.2-chat",
   "gpt-5.2-codex",
   "gpt-5.3-codex",
+  "gpt-5.4",
+  "gpt-5.4-pro",
+  "gpt-5.4-mini",
+  "gpt-5.4-nano",
 ]
 
 # --- OpenAI OSS Models ---
@@ -211,6 +230,9 @@ qwen = ["qwen-image"]
 linkup = ["linkup-standard", "linkup-deep"]
 
 [collections.extract]
+# --- Web Extraction Models ---
+from_web = ["linkup-fetch"]
+
 # --- PDF Extraction Models ---
 from_pdf = [
   "pypdfium2-extract-pdf",

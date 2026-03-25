@@ -110,28 +110,30 @@ async def dry_run_pipes(pipes: list[PipeAbstract], raise_on_failure: bool = True
     allowed_to_fail_pipes = get_config().pipelex.dry_run_config.allowed_to_fail_pipes
 
     for pipe in pipes:
-        results[pipe.code] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
+        results[pipe.pipe_ref] = await dry_run_pipe(pipe, raise_on_failure=raise_on_failure)
 
     successful_pipes: list[str] = []
     failed_pipes: list[str] = []
     skipped_pipes: list[str] = []
-    for pipe_code, dry_run_output in results.items():
+    for pipe_ref, dry_run_output in results.items():
         match dry_run_output.status:
             case DryRunStatus.SUCCESS:
-                successful_pipes.append(pipe_code)
+                successful_pipes.append(pipe_ref)
             case DryRunStatus.FAILURE:
-                failed_pipes.append(pipe_code)
+                failed_pipes.append(pipe_ref)
             case DryRunStatus.SKIPPED:
-                skipped_pipes.append(pipe_code)
+                skipped_pipes.append(pipe_ref)
 
-    unexpected_failures = {pipe_code: results[pipe_code] for pipe_code in failed_pipes if pipe_code not in allowed_to_fail_pipes}
+    # TODO: allowed_to_fail_pipes uses bare codes, so one allowed code can silently match pipes from multiple domains.
+    #  Consider supporting namespaced pipe_refs (e.g. "domain.pipe_code") in the config to allow precise targeting.
+    unexpected_failures = {pipe_ref: results[pipe_ref] for pipe_ref in failed_pipes if results[pipe_ref].pipe_code not in allowed_to_fail_pipes}
 
     log.verbose(
         f"Dry run completed: {len(successful_pipes)} successful, {len(failed_pipes)} failed, "
         f"{len(skipped_pipes)} skipped, {len(allowed_to_fail_pipes)} allowed to fail, in {time.time() - start_time:.2f} seconds",
     )
     if unexpected_failures:
-        unexpected_failures_details = "\n".join([f"'{pipe_code}': {results[pipe_code]}" for pipe_code in unexpected_failures])
+        unexpected_failures_details = "\n".join([f"'{pipe_ref}': {results[pipe_ref]}" for pipe_ref in unexpected_failures])
         if raise_on_failure:
             msg = f"Dry run failed with '{len(unexpected_failures)}' unexpected pipe failures:\n{unexpected_failures_details}"
             raise DryRunError(msg)
