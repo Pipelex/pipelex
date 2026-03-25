@@ -2,7 +2,7 @@
 
 > **Status**: Master plan for phased implementation
 > **Date**: 2026-03-23
-> **Related**: [B-library-as-execution-context.md](B-library-as-execution-context.md), [E-pipe-namespace-fix.md](E-pipe-namespace-fix.md), [C-temporal-payload-codec-strategy.md](C-temporal-payload-codec-strategy.md)
+> **Related**: [B-library-as-execution-context.md](B-library-as-execution-context.md), [E-pipe-namespace-fix.md](E-pipe-namespace-fix.md), [C-temporal-payload-codec-strategy.md](C-temporal-payload-codec-strategy.md), [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationale.md)
 
 ---
 
@@ -136,39 +136,63 @@ Flat structure. Domain is implicit in the keys — `scoring.WeightedScore`, `sco
 
 **What it does NOT solve yet**: Layer 1 (dynamic class deserialization) for concepts introduced by `mthds_content` that aren't in PIPELEXPATH. That's Phase 3.
 
+See [G-phase2-crate-propagation-rationale.md](G-phase2-crate-propagation-rationale.md) for the design rationale and rejected alternatives.
+
+### Design
+
+The `LibraryCrate` lives on `PipeJob` and is threaded through the signature chain so that child workflows — which can land on different workers — receive it.
+
+**Key decisions:**
+- **No `act_library_setup` activity** — crate loading is pure in-memory work (Pydantic models → library dicts), not I/O. Activities add scheduling overhead for no benefit. Loading happens inline in `WfPipeRouter.run()`, idempotent via fingerprint.
+- **Crate propagates through signatures** — Temporal child workflows are independent workflows that can run on any worker. The only data channel between parent and child is the serialized `PipeJob`. ContextVars, singletons, and in-process state do not cross workflow boundaries.
+
+### Propagation chain
+
+```
+WfPipeRouter.run(pipe_job)
+  # 1. Load crate into this worker's library (idempotent via fingerprint)
+  # 2. Pass crate through the signature chain:
+  → pipe.run_pipe(..., library_crate=pipe_job.library_crate)
+    → _live_run_pipe(..., library_crate)
+      → [PipeController] _live_run_controller_pipe(..., library_crate)
+        → SubPipe.run_pipe(..., library_crate)
+          → PipeJobFactory.make_pipe_job(..., library_crate)
+            → PipeRouterChild → new WfPipeRouter(child_pipe_job)
+              # child_pipe_job.library_crate is set → cycle repeats
+```
+
+`library_crate` is an optional parameter (default `None`) at each level. Pipe operators receive it but ignore it — they have no child pipes.
+
 ### Changes
 
 - Add `library_crate: LibraryCrate | None` field to `PipeJob`
 - In `PipeRouterTop`: after `pipeline_run_setup()` loads the library, build the flat crate from the blueprints that were loaded beyond PIPELEXPATH base. Attach to `PipeJob`.
-- New `act_library_setup` activity: receives a `LibraryCrate`, calls `load_from_crate()`. Idempotent via fingerprint caching.
-- Update `WfPipeRouter`: call `act_library_setup` before pipe execution if `library_crate` is present.
-
-```python
-@workflow.run
-async def run(self, pipe_job: PipeJob) -> PipeOutput:
-    if pipe_job.library_crate is not None:
-        await workflow.execute_activity(
-            act_library_setup,
-            pipe_job.library_crate,
-            start_to_close_timeout=timedelta(seconds=30),
-        )
-    return await pipe_job.pipe.run_pipe(...)
-```
+- In `WfPipeRouter.run()`: load the crate inline via `load_from_crate()` (no activity), pass to `pipe.run_pipe()`
+- Thread `library_crate` through the signature chain: `PipeAbstract.run_pipe()` → `_live_run_pipe()` → `PipeController._live_run_controller_pipe()` → `SubPipe.run_pipe()` → `PipeJobFactory.make_pipe_job()`
+- `PipeOperator._live_run_pipe()`: accept param, ignore it (no child pipes)
 
 ### Key files
 
 | File | Change |
 |------|--------|
 | `pipelex/pipe_run/pipe_job.py` | Add `library_crate: LibraryCrate | None` field |
-| `pipelex/temporal/tprl_pipe/act_library_setup.py` | **New** — library setup activity |
-| `pipelex/temporal/tprl_pipe/wf_pipe_router.py` | Call `act_library_setup` before pipe execution |
+| `pipelex/pipe_run/pipe_job_factory.py` | Accept and forward `library_crate` |
+| `pipelex/core/pipes/pipe_abstract.py` | Add optional `library_crate` param to `run_pipe()`, `_live_run_pipe()` |
+| `pipelex/pipe_operators/pipe_operator.py` | Add param to `_live_run_pipe()` (ignored) |
+| `pipelex/pipe_controllers/pipe_controller.py` | Add param to `_live_run_pipe()`, `_live_run_controller_pipe()` |
+| `pipelex/pipe_controllers/sequence/pipe_sequence.py` | Forward `library_crate` to `SubPipe.run_pipe()` |
+| `pipelex/pipe_controllers/batch/pipe_batch.py` | Forward `library_crate` to child pipe execution |
+| `pipelex/pipe_controllers/condition/pipe_condition.py` | Forward `library_crate` to child pipe execution |
+| `pipelex/pipe_controllers/parallel/pipe_parallel.py` | Forward `library_crate` to `SubPipe.run_pipe()` |
+| `pipelex/pipe_controllers/sub_pipe.py` | Add param, set on child `PipeJob` via factory |
+| `pipelex/pipe_run/pipe_router.py` | Pass `library_crate` from `PipeJob` to `run_pipe()` |
+| `pipelex/temporal/tprl_pipe/wf_pipe_router.py` | Load crate inline, pass `library_crate` to `run_pipe()` |
 | `pipelex/temporal/tprl_pipe/pipe_router_top.py` | Build `LibraryCrate` when dispatching |
-| `pipelex/temporal/temporal_tasks.py` | Register `act_library_setup` |
 
 ### Done when
 
 - [ ] Integration test: PipeSequence through Temporal with PIPELEXPATH-based library only (no crate needed)
-- [ ] Integration test: PipeSequence with `mthds_content` containing additional pipes (crate shipped, loaded via activity)
+- [ ] Integration test: PipeSequence with `mthds_content` containing additional pipes (crate shipped, loaded on worker)
 - [ ] `get_required_pipe()` works on worker for child pipes
 - [ ] Crate is visible as structured JSON in Temporal dashboard
 - [ ] `make agent-check` passes
