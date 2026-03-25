@@ -77,26 +77,30 @@ def update_gateway_models_cmd(quiet: bool = False) -> None:
 
     # Skip writing if the only change is the timestamp (avoids noisy diffs in PRs)
     if GATEWAY_MODELS_REFERENCE_PATH.exists() and GATEWAY_MODELS_PLAIN_REFERENCE_PATH.exists():
-        existing_html = GATEWAY_MODELS_REFERENCE_PATH.read_text(encoding="utf-8")
-        existing_plain = GATEWAY_MODELS_PLAIN_REFERENCE_PATH.read_text(encoding="utf-8")
-        html_unchanged = normalize_for_comparison(existing_html) == normalize_for_comparison(markdown_content)
-        plain_unchanged = normalize_for_comparison(existing_plain) == normalize_for_comparison(plain_markdown_content)
-        if html_unchanged and plain_unchanged:
-            if quiet:
-                console.print(f"[green]✓ Gateway models update: UP-TO-DATE[/green] ({model_count} models, no changes)")
-            else:
-                up_to_date_panel = Panel(
-                    f"[green]✓[/green] Reference files are already up-to-date (skipped write)\n\n"
-                    f"[dim]HTML-styled: {GATEWAY_MODELS_REFERENCE_PATH}[/dim]\n"
-                    f"[dim]Plain text:  {GATEWAY_MODELS_PLAIN_REFERENCE_PATH}[/dim]\n"
-                    f"[dim]Models: {model_count}[/dim]",
-                    title="[bold green]Gateway Models Update: UP-TO-DATE[/bold green]",
-                    border_style="green",
-                    padding=(1, 2),
-                )
-                console.print(up_to_date_panel)
-                console.print()
-            return
+        try:
+            existing_html = GATEWAY_MODELS_REFERENCE_PATH.read_text(encoding="utf-8")
+            existing_plain = GATEWAY_MODELS_PLAIN_REFERENCE_PATH.read_text(encoding="utf-8")
+        except OSError:
+            pass  # File disappeared or is unreadable — fall through and rewrite
+        else:
+            html_unchanged = normalize_for_comparison(existing_html) == normalize_for_comparison(markdown_content)
+            plain_unchanged = normalize_for_comparison(existing_plain) == normalize_for_comparison(plain_markdown_content)
+            if html_unchanged and plain_unchanged:
+                if quiet:
+                    console.print(f"[green]✓ Gateway models update: UP-TO-DATE[/green] ({model_count} models, no changes)")
+                else:
+                    up_to_date_panel = Panel(
+                        f"[green]✓[/green] Reference files are already up-to-date (skipped write)\n\n"
+                        f"[dim]HTML-styled: {GATEWAY_MODELS_REFERENCE_PATH}[/dim]\n"
+                        f"[dim]Plain text:  {GATEWAY_MODELS_PLAIN_REFERENCE_PATH}[/dim]\n"
+                        f"[dim]Models: {model_count}[/dim]",
+                        title="[bold green]Gateway Models Update: UP-TO-DATE[/bold green]",
+                        border_style="green",
+                        padding=(1, 2),
+                    )
+                    console.print(up_to_date_panel)
+                    console.print()
+                return
 
     # Ensure parent directory exists
     GATEWAY_MODELS_REFERENCE_PATH.parent.mkdir(parents=True, exist_ok=True)
