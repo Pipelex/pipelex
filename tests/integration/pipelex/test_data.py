@@ -440,7 +440,7 @@ class AssemblePipelexBundleSpecTestCases:
             description="Generate a plan from a user brief.",
             inputs={"brief": "UserBrief"},
             output="PlanDraft",
-            llm_talent="engineer",
+            model="$engineering-structured",
             prompt="Generate a plan for: @brief",
         ),
     ]

@@ -18,6 +18,10 @@ class CliOutputFormat(StrEnum):
 
 AGENT_ERROR_HINTS: dict[str, str] = {
     # Model/routing errors
+    "ModelChoiceNotFoundError": (
+        "Check model name for typos. Use 'pipelex-agent check-model <name> -t <type>' "
+        "to validate or 'pipelex-agent models -t <type>' to list available models."
+    ),
     "PipeOperatorModelChoiceError": "Run 'pipelex-agent doctor' to check available models and routing configuration",
     "PipeOperatorModelAvailabilityError": "Run 'pipelex-agent doctor' to check available models and verify API keys",
     "ModelDeckPresetValidatonError": (
@@ -70,6 +74,7 @@ RETRYABLE_ERROR_TYPES: set[str] = {
 
 AGENT_ERROR_DOMAINS: dict[str, str] = {
     # input = agent can fix (bad .mthds, wrong args, bad JSON)
+    "ModelChoiceNotFoundError": "input",
     "ValidateBundleError": "input",
     "PipeValidationError": "input",
     "FileNotFoundError": "input",
