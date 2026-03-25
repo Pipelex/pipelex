@@ -85,6 +85,8 @@ See [E-pipe-namespace-fix.md](E-pipe-namespace-fix.md) for the full technical sp
 
 ## Phase 1: LibraryCrate (Direct Mode)
 
+> **Status**: Complete
+
 **Goal**: All library loading goes through `LibraryCrate` as an intermediate. The three-stage pipeline (`bundles → crate → library`) is the only path. Works in direct execution mode.
 
 ### LibraryCrate model
@@ -118,13 +120,13 @@ Flat structure. Domain is implicit in the keys — `scoring.WeightedScore`, `sco
 
 ### Done when
 
-- [ ] `LibraryCrate` model serializes and deserializes correctly (unit test: JSON round-trip)
-- [ ] `make_from_blueprints()` merges correctly (unit test: two blueprints for same domain → both pipes/concepts in flat crate with qualified refs)
-- [ ] `make_from_blueprints()` raises on concept/pipe code collision within a domain (unit test)
-- [ ] `load_from_crate()` produces a valid library equivalent to `load_from_blueprints()` (integration test)
-- [ ] All existing pipeline tests pass through the new `bundles → crate → library` path
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+- [x] `LibraryCrate` model serializes and deserializes correctly (unit test: JSON round-trip)
+- [x] `make_from_blueprints()` merges correctly (unit test: two blueprints for same domain → both pipes/concepts in flat crate with qualified refs)
+- [x] `make_from_blueprints()` raises on concept/pipe code collision within a domain (unit test)
+- [x] `load_from_crate()` produces a valid library equivalent to `load_from_blueprints()` (integration test)
+- [x] All existing pipeline tests pass through the new `bundles → crate → library` path
+- [x] `make agent-check` passes
+- [x] `make agent-test` passes
 
 ---
 
