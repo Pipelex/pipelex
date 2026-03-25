@@ -1057,7 +1057,9 @@ class LibraryManager(LibraryManagerAbstract):
     def _remove_pipes_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:
         library = self.get_current_library()
         if blueprint.pipe is not None:
-            pipe_refs_to_remove = [f"{blueprint.domain}.{pipe_code}" for pipe_code in blueprint.pipe]
+            pipe_refs_to_remove = [
+                PipeFactory.make_pipe_ref_with_domain(domain_code=blueprint.domain, pipe_code=pipe_code) for pipe_code in blueprint.pipe
+            ]
             library.pipe_library.remove_pipes_by_refs(pipe_refs=pipe_refs_to_remove)
 
     def _remove_concepts_from_blueprint(self, blueprint: PipelexBundleBlueprint) -> None:

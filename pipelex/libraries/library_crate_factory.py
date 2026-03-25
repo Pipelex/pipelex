@@ -1,7 +1,10 @@
 from typing import TYPE_CHECKING
 
+from pipelex import log
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipeBlueprintUnion, PipelexBundleBlueprint
+from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.domains.domain_blueprint import DomainBlueprint
+from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.pipe.exceptions import PipeLibraryError
@@ -53,14 +56,26 @@ class LibraryCrateFactory:
                     system_prompt=blueprint.system_prompt,
                     main_pipe=blueprint.main_pipe,
                 )
+            else:
+                existing = domains[domain_code]
+                new_description = blueprint.description or ""
+                if existing.description != new_description:
+                    log.warning(
+                        f"Domain '{domain_code}' declared with different descriptions: "
+                        f"'{existing.description}' vs '{new_description}'. Keeping the first.",
+                    )
+                if existing.system_prompt != blueprint.system_prompt:
+                    log.warning(
+                        f"Domain '{domain_code}' declared with different system_prompts. Keeping the first.",
+                    )
 
             # Concepts
             if blueprint.concept is not None:
                 for concept_code, value in blueprint.concept.items():
-                    concept_ref = f"{domain_code}.{concept_code}"
+                    concept_ref = ConceptFactory.make_concept_ref_with_domain(domain_code=domain_code, concept_code=concept_code)
                     if concept_ref in concepts:
-                        existing_source = source_map.get(concept_ref, "unknown")
-                        if existing_source == source:
+                        existing_source = source_map.get(concept_ref)
+                        if existing_source is not None and existing_source == source:
                             msg = (
                                 f"Concept '{concept_ref}' is declared twice in the same bundle file: '{existing_source}'. "
                                 "Please remove the duplicate declaration."
@@ -68,7 +83,7 @@ class LibraryCrateFactory:
                         else:
                             msg = (
                                 f"Concept '{concept_ref}' is declared in two different bundle files: "
-                                f"'{existing_source}' and '{source}'. "
+                                f"'{existing_source or 'unknown'}' and '{source or 'unknown'}'. "
                                 "Please remove one of the declarations or rename one of the concepts."
                             )
                         raise ConceptLibraryError(msg)
@@ -79,10 +94,10 @@ class LibraryCrateFactory:
             # Pipes
             if blueprint.pipe is not None:
                 for pipe_code, pipe_blueprint in blueprint.pipe.items():
-                    pipe_ref = f"{domain_code}.{pipe_code}"
+                    pipe_ref = PipeFactory.make_pipe_ref_with_domain(domain_code=domain_code, pipe_code=pipe_code)
                     if pipe_ref in pipes:
-                        existing_source = source_map.get(pipe_ref, "unknown")
-                        if existing_source == source:
+                        existing_source = source_map.get(pipe_ref)
+                        if existing_source is not None and existing_source == source:
                             msg = (
                                 f"Pipe '{pipe_ref}' is declared twice in the same bundle file: '{existing_source}'. "
                                 "Please remove the duplicate declaration."
@@ -90,7 +105,7 @@ class LibraryCrateFactory:
                         else:
                             msg = (
                                 f"Pipe '{pipe_ref}' is declared in two different bundle files: "
-                                f"'{existing_source}' and '{source}'. "
+                                f"'{existing_source or 'unknown'}' and '{source or 'unknown'}'. "
                                 "Please remove one of the declarations or rename one of the pipes."
                             )
                         raise PipeLibraryError(msg)
@@ -98,11 +113,11 @@ class LibraryCrateFactory:
                     if source:
                         source_map[pipe_ref] = source
 
-        crate = LibraryCrate(
+        fingerprint = LibraryCrate.compute_fingerprint_from_content(concepts=concepts, pipes=pipes)
+        return LibraryCrate(
             concepts=concepts,
             pipes=pipes,
             domains=domains,
             source_map=source_map,
+            fingerprint=fingerprint,
         )
-        crate.fingerprint = crate.compute_fingerprint()
-        return crate

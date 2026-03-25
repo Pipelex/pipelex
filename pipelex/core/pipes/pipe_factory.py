@@ -38,6 +38,10 @@ class PipeFactoryProtocol(Protocol[PipeBlueprintType, PipeAbstractType]):
 
 class PipeFactory(Generic[PipeAbstractType]):
     @classmethod
+    def make_pipe_ref_with_domain(cls, domain_code: str, pipe_code: str) -> str:
+        return f"{domain_code}.{pipe_code}"
+
+    @classmethod
     def make_from_blueprint(
         cls,
         domain_code: str,
