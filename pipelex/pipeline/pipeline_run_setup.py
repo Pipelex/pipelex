@@ -179,15 +179,18 @@ async def pipeline_run_setup(
             pipe = get_required_pipe(pipe_code=pipe_code)
         else:
             # Find main_pipe from the first blueprint that declares one
-            main_pipe_code: str | None = None
+            # Qualify main_pipe with domain to avoid ambiguity when multiple domains define pipes with the same code.
+            # Note: main_pipe is validated as snake_case (no dots allowed), so it is always a bare code — never
+            # already domain-qualified. See PipelexBundleBlueprint.validate_main_pipe_syntax.
+            qualified_main_pipe: str | None = None
             for blueprint in all_blueprints:
                 if blueprint.main_pipe:
-                    main_pipe_code = blueprint.main_pipe
+                    qualified_main_pipe = f"{blueprint.domain}.{blueprint.main_pipe}"
                     break
-            if not main_pipe_code:
+            if not qualified_main_pipe:
                 msg = "No pipe_code provided and no main_pipe found in any of the MTHDS contents."
                 raise PipeExecutionError(message=msg)
-            pipe = get_required_pipe(pipe_code=main_pipe_code)
+            pipe = get_required_pipe(pipe_code=qualified_main_pipe)
 
     elif pipe_code:
         pipe = get_required_pipe(pipe_code=pipe_code)
