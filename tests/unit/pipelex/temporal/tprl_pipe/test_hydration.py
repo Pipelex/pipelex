@@ -1,0 +1,74 @@
+import pytest
+from kajson.kajson_manager import KajsonManager
+
+from pipelex.core.concepts.concept import Concept
+from pipelex.core.domains.domain import SpecialDomain
+from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.stuff import Stuff
+from pipelex.core.stuffs.text_content import TextContent
+from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
+
+
+def _make_text_concept() -> Concept:
+    """Build a native Text concept for testing."""
+    return Concept(
+        code="Text",
+        domain_code=SpecialDomain.NATIVE,
+        description="Plain text",
+        structure_class_name="TextContent",
+    )
+
+
+def _make_text_stuff(name: str, text: str) -> Stuff:
+    """Build a simple text Stuff."""
+    return Stuff(
+        stuff_code="test",
+        stuff_name=name,
+        concept=_make_text_concept(),
+        content=TextContent(text=text),
+    )
+
+
+class TestHydrateWorkingMemory:
+    @pytest.fixture(autouse=True)
+    def _register_text_content(self) -> None:
+        """Ensure TextContent is registered in the ClassRegistry for hydration tests."""
+        registry = KajsonManager.get_class_registry()
+        if not registry.has_class(name="TextContent"):
+            registry.register_class(TextContent)
+
+    def test_hydrate_with_native_text(self) -> None:
+        """A raw dict containing TextContent stuff hydrates to typed TextContent."""
+        working_memory = WorkingMemory()
+        working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello, world!")
+
+        raw = working_memory.smart_dump()
+        hydrated = hydrate_working_memory(raw)
+
+        assert "greeting" in hydrated.root
+        stuff = hydrated.root["greeting"]
+        assert isinstance(stuff.content, TextContent)
+        assert stuff.content.text == "Hello, world!"
+        assert stuff.stuff_name == "greeting"
+
+    def test_hydrate_empty(self) -> None:
+        """An empty WorkingMemory raw dict hydrates to empty WorkingMemory."""
+        working_memory = WorkingMemory()
+        raw = working_memory.smart_dump()
+
+        hydrated = hydrate_working_memory(raw)
+
+        assert len(hydrated.root) == 0
+        assert len(hydrated.aliases) == 0
+
+    def test_hydrate_preserves_aliases(self) -> None:
+        """Aliases survive the dump/hydrate round-trip."""
+        working_memory = WorkingMemory()
+        working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
+        working_memory.aliases["main_stuff"] = "greeting"
+
+        raw = working_memory.smart_dump()
+        hydrated = hydrate_working_memory(raw)
+
+        assert hydrated.aliases == {"main_stuff": "greeting"}
+        assert "greeting" in hydrated.root

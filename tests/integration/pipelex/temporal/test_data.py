@@ -115,6 +115,30 @@ class LibraryCrateTestData:
     ]
 
 
+class DeferredHydrationTestData:
+    """Test constants for Phase 3 deferred hydration integration tests.
+
+    Uses a PipeSequence bundle with a custom concept (Greeting) that has an inline
+    structure — this triggers dynamic class generation and exercises the full
+    deferred hydration + scoped ClassRegistry path.
+    """
+
+    BUNDLE_FILE: ClassVar[str] = "tests/integration/pipelex/temporal/library_crate/dynamic_concept_sequence.mthds"
+    PIPE_CODE: ClassVar[str] = "dynamic_greeting_sequence"
+    DOMAIN: ClassVar[str] = "dynamic_concept_test"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "dynamic_concept_test.dynamic_greeting_sequence",
+        "dynamic_concept_test.generate_greeting",
+        "dynamic_concept_test.summarize_greeting",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "greeting_result",
+        "summary_result",
+    ]
+
+
 class PipeOcrTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
         # LOCAL
