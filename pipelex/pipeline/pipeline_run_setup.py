@@ -290,12 +290,16 @@ async def pipeline_run_setup(
             pipe_run_mode=pipe_run_mode,
         )
 
+        # Build the library crate from all accumulated blueprints for Temporal dispatch
+        library_crate = library_manager.get_crate(library_id=library_id)
+
         pipe_job = PipeJobFactory.make_pipe_job(
             pipe=pipe,
             pipe_run_params=pipe_run_params,
             job_metadata=job_metadata,
             working_memory=working_memory,
             output_name=output_name,
+            library_crate=library_crate,
         )
 
         properties = {

@@ -1,4 +1,4 @@
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from pydantic import BaseModel
 
@@ -21,6 +21,9 @@ from pipelex.pipe_run.pipe_run_params import BatchParams, PipeRunParams
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.string_utils import get_root_from_dotted_path
 
+if TYPE_CHECKING:
+    from pipelex.libraries.library_crate import LibraryCrate
+
 
 class SubPipe(BaseModel):
     pipe_code: str
@@ -34,6 +37,7 @@ class SubPipe(BaseModel):
         working_memory: WorkingMemory,
         job_metadata: JobMetadata,
         sub_pipe_run_params: PipeRunParams,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         if self.output_multiplicity:
             sub_pipe_run_params.output_multiplicity = self.output_multiplicity
@@ -179,6 +183,7 @@ class SubPipe(BaseModel):
                         working_memory=working_memory,
                         pipe_run_params=sub_pipe_run_params,
                         output_name=self.output_name,
+                        library_crate=library_crate,
                     ),
                 )
             finally:
@@ -194,6 +199,7 @@ class SubPipe(BaseModel):
                     working_memory=working_memory,
                     pipe_run_params=sub_pipe_run_params,
                     output_name=self.output_name,
+                    library_crate=library_crate,
                 ),
             )
         else:
@@ -227,6 +233,7 @@ class SubPipe(BaseModel):
                     working_memory=working_memory,
                     pipe_run_params=sub_pipe_run_params,
                     output_name=self.output_name,
+                    library_crate=library_crate,
                 ),
             )
 

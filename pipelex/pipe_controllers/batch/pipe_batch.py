@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Coroutine
 
     from pipelex.core.stuffs.stuff_content import StuffContent
+    from pipelex.libraries.library_crate import LibraryCrate
 
 
 class PipeBatch(PipeController):
@@ -99,6 +100,7 @@ class PipeBatch(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         batch_params = pipe_run_params.batch_params or self.batch_params or BatchParams.make_default()
         input_item_stuff_name = batch_params.input_item_stuff_name
@@ -164,6 +166,7 @@ class PipeBatch(PipeController):
                     working_memory=branch_memory,
                     pipe_run_params=branch_pipe_run_params,
                     output_name=None,
+                    library_crate=library_crate,
                 ),
             )
             tasks.append(task)
@@ -219,12 +222,14 @@ class PipeBatch(PipeController):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         pipe_output = await self._live_run_controller_pipe(
             job_metadata=job_metadata,
             working_memory=working_memory,
             pipe_run_params=pipe_run_params,
             output_name=output_name,
+            library_crate=library_crate,
         )
         # For dry run coordination: set the first item's pipe_code to "mock_main"
         # to match the BundleHeaderSpec.main_pipe examples=["mock_main"]

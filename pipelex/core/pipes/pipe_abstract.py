@@ -38,6 +38,7 @@ from pipelex.types import Self
 
 if TYPE_CHECKING:
     from pipelex.graph.graph_context import GraphContext
+    from pipelex.libraries.library_crate import LibraryCrate
 
 PipeAbstractType = type["PipeAbstract"]
 
@@ -380,6 +381,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         pipe_run_params.push_pipe_to_stack(pipe_code=self.code)
 
@@ -436,6 +438,7 @@ class PipeAbstract(ABC, BaseModel):
                         working_memory=working_memory,
                         pipe_run_params=pipe_run_params,
                         output_name=output_name,
+                        library_crate=library_crate,
                     )
                 case PipeRunMode.DRY:
                     pipe_output = await self.dry_run_pipe(
@@ -443,6 +446,7 @@ class PipeAbstract(ABC, BaseModel):
                         working_memory=working_memory,
                         pipe_run_params=pipe_run_params,
                         output_name=output_name,
+                        library_crate=library_crate,
                     )
             await self.validate_after_run(
                 job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
@@ -497,6 +501,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         log.info(self._format_pipe_run_info(pipe_run_params=pipe_run_params))
 
@@ -543,7 +548,11 @@ class PipeAbstract(ABC, BaseModel):
 
         try:
             pipe_output = await self._live_run_pipe(
-                job_metadata=child_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+                job_metadata=child_metadata,
+                working_memory=working_memory,
+                pipe_run_params=pipe_run_params,
+                output_name=output_name,
+                library_crate=library_crate,
             )
         except Exception as exc:
             self._end_pipe_span_error(span, error=exc, is_root_span=is_root_span)
@@ -562,11 +571,16 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         log.verbose(f"Dry run of {self.type}: '{self.code}'")
         assert pipe_run_params.run_mode.is_dry, f"Dry run of {self.type} '{self.code}' called with run_mode = {pipe_run_params.run_mode}"
         return await self._dry_run_pipe(
-            job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name
+            job_metadata=job_metadata,
+            working_memory=working_memory,
+            pipe_run_params=pipe_run_params,
+            output_name=output_name,
+            library_crate=library_crate,
         )
 
     @abstractmethod
@@ -576,6 +590,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         pass
 
@@ -586,6 +601,7 @@ class PipeAbstract(ABC, BaseModel):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         pass
 

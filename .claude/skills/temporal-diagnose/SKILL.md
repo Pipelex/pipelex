@@ -136,24 +136,28 @@ for the result**. If the worker fails to process the job (e.g., deserialization
 error), the submitter may hang for a long time waiting for a response that never
 comes. Run it in the background so you can check worker output while it's waiting.
 
+**Important**: The test bundles we use do not declare `main_pipe`, so you **must** pass `--pipe <pipe_code>`.
+See the test bundles table below for the correct pipe code per bundle.
+
 Dry run (no real LLM calls):
 ```bash
 TEMPORAL_BUNDLE="tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds"
+TEMPORAL_PIPE="simple_text_sequence"
 tmux has-session -t temporal-submitter 2>/dev/null || \
   tmux new-session -d -s temporal-submitter \
-  "cd $PWD && .venv/bin/pipelex run bundle $TEMPORAL_BUNDLE --temporal --dry-run --mock-inputs --no-logo"
+  "cd $PWD && .venv/bin/pipelex run bundle $TEMPORAL_BUNDLE --pipe $TEMPORAL_PIPE --temporal --dry-run --mock-inputs --no-logo"
 ```
 
 Or for real LLM execution:
 ```bash
 TEMPORAL_BUNDLE="tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds"
+TEMPORAL_PIPE="simple_text_sequence"
 tmux has-session -t temporal-submitter 2>/dev/null || \
   tmux new-session -d -s temporal-submitter \
-  "cd $PWD && .venv/bin/pipelex run bundle $TEMPORAL_BUNDLE --temporal --mock-inputs --no-logo"
+  "cd $PWD && .venv/bin/pipelex run bundle $TEMPORAL_BUNDLE --pipe $TEMPORAL_PIPE --temporal --mock-inputs --no-logo"
 ```
 
-Both default to `pipe_sequence_1.mthds`. To target a specific pipe, add `--pipe <pipe_code>`.
-Override the bundle by changing `TEMPORAL_BUNDLE`.
+Override the bundle and pipe by changing `TEMPORAL_BUNDLE` and `TEMPORAL_PIPE`.
 
 ### Step 4: Diagnose the output
 
@@ -216,12 +220,12 @@ tmux kill-session -t temporal-server 2>/dev/null
 
 ### Test bundles for different pipe controllers
 
-| Controller | Bundle path |
-|------------|-------------|
-| PipeSequence | `tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds` |
-| PipeCondition | `tests/integration/pipelex/pipes/controller/pipe_condition/pipe_condition_1.mthds` |
-| PipeBatch | `tests/integration/pipelex/pipes/controller/pipe_batch/uppercase_transformer.mthds` |
-| PipeParallel | `tests/integration/pipelex/pipes/controller/pipe_parallel/pipe_parallel_1.mthds` |
+| Controller | Bundle path | `--pipe` code |
+|------------|-------------|---------------|
+| PipeSequence | `tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds` | `simple_text_sequence` |
+| PipeCondition | `tests/integration/pipelex/pipes/controller/pipe_condition/pipe_condition_1.mthds` | `basic_condition_by_category` |
+| PipeBatch | `tests/integration/pipelex/pipes/controller/pipe_batch/uppercase_transformer.mthds` | `uppercase_transformer` |
+| PipeParallel | `tests/integration/pipelex/pipes/controller/pipe_parallel/pipe_parallel_1.mthds` | `parallel_document_analysis` |
 
 ---
 

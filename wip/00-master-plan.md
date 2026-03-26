@@ -132,6 +132,8 @@ Flat structure. Domain is implicit in the keys — `scoring.WeightedScore`, `sco
 
 ## Phase 2: LibraryCrate on Temporal
 
+> **Status**: Complete
+
 **Goal**: Temporal workers receive and load a LibraryCrate. Pipe controllers (PipeSequence, PipeCondition, PipeBatch, PipeParallel) work on workers. This solves Layer 2 (pipe resolution).
 
 **What it does NOT solve yet**: Layer 1 (dynamic class deserialization) for concepts introduced by `mthds_content` that aren't in PIPELEXPATH. That's Phase 3.
@@ -189,12 +191,12 @@ WfPipeRouter.run(pipe_job)
 
 ### Done when
 
-- [ ] Integration test: PipeSequence through Temporal with PIPELEXPATH-based library only (no crate needed)
-- [ ] Integration test: PipeSequence with `mthds_content` containing additional pipes (crate shipped, loaded on worker)
-- [ ] `get_required_pipe()` works on worker for child pipes
-- [ ] Crate is visible as structured JSON in Temporal dashboard
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+- [x] Integration test: PipeSequence through Temporal with PIPELEXPATH-based library only (no crate needed)
+- [x] Integration test: PipeSequence with `mthds_content` containing additional pipes (crate shipped, loaded on worker)
+- [x] `get_required_pipe()` works on worker for child pipes
+- [x] Crate is visible as structured JSON in Temporal dashboard
+- [x] `make agent-check` passes
+- [x] `make agent-test` passes
 
 ---
 

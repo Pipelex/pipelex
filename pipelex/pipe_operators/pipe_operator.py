@@ -14,6 +14,7 @@ from pipelex.pipeline.job_metadata import JobMetadata
 if TYPE_CHECKING:
     from pipelex.core.stuffs.list_content import ListContent
     from pipelex.core.stuffs.stuff_content import StuffContent
+    from pipelex.libraries.library_crate import LibraryCrate
 
 PipeOperatorOutputType = TypeVar("PipeOperatorOutputType", bound=PipeOutput)
 
@@ -33,6 +34,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         try:
             pipe_output = await self._live_run_operator_pipe(
@@ -77,7 +79,12 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
     @final
     @override
     async def _dry_run_pipe(
-        self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
+        self,
+        job_metadata: JobMetadata,
+        working_memory: WorkingMemory,
+        pipe_run_params: PipeRunParams,
+        output_name: str | None = None,
+        library_crate: "LibraryCrate | None" = None,
     ) -> PipeOutput:
         return await self._dry_run_operator_pipe(
             job_metadata=job_metadata, working_memory=working_memory, pipe_run_params=pipe_run_params, output_name=output_name

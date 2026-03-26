@@ -195,8 +195,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
 
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:
-                library = get_library_manager().get_library(library_id=library_id_resolved)
-                library.teardown()
+                get_library_manager().teardown(library_id=library_id_resolved)
                 teardown_current_library()
 
         # Assign graph spec to output (only reached on success, when pipe_output is bound)

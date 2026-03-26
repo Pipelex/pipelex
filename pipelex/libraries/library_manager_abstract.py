@@ -48,6 +48,19 @@ class LibraryManagerAbstract(ABC):
         return None
 
     @abstractmethod
+    def get_crate(self, library_id: str) -> LibraryCrate | None:
+        """Build a LibraryCrate from all accumulated blueprints for a given library_id.
+
+        Returns None if the library_id is unknown or no blueprints were loaded.
+
+        Args:
+            library_id: The library to get the crate for
+
+        Returns:
+            A LibraryCrate built from all accumulated blueprints, or None
+        """
+
+    @abstractmethod
     def load_from_crate(self, library_id: str, crate: LibraryCrate) -> list[PipeAbstract]:
         """Load a LibraryCrate into a live Library.
 

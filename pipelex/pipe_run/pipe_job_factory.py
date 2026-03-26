@@ -1,6 +1,7 @@
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
 from pipelex.pipe_run.pipe_run_params_factory import PipeRunParamsFactory
@@ -16,6 +17,7 @@ class PipeJobFactory:
         pipe_run_params: PipeRunParams | None = None,
         working_memory: WorkingMemory | None = None,
         output_name: str | None = None,
+        library_crate: LibraryCrate | None = None,
     ) -> PipeJob:
         working_memory = working_memory or WorkingMemoryFactory.make_empty()
         if not pipe_run_params:
@@ -26,4 +28,5 @@ class PipeJobFactory:
             pipe_run_params=pipe_run_params,
             pipe=pipe,
             output_name=output_name,
+            library_crate=library_crate,
         )
