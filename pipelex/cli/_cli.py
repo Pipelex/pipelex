@@ -86,7 +86,7 @@ def _warn_if_update_available() -> None:
         current_version = get_package_version()
         console = get_console()
         console.print()
-        console.print(f"[bold yellow]A new version of Pipelex is available: {latest_version} (current: {current_version})[/bold yellow]")
+        console.print(f"A new version of Pipelex is available: {latest_version} (current: {current_version})", style="bold yellow")
         console.print("[dim]You can update by running:[/dim] [cyan]pip install --upgrade pipelex[/cyan]")
         console.print()
 
@@ -173,7 +173,7 @@ def init_command(
 
       config       Reset configuration files and prompt for missing API keys
 
-      credentials  Set API keys for enabled backends (prompts for all; use --missing to skip already set ones)
+      credentials  Set API keys for enabled backends (always saved to ~/.pipelex/.env; use --missing to skip already set ones)
 
       inference    Reset inference backends selection and prompt for missing API keys
 
