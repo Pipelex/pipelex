@@ -165,10 +165,10 @@ def prompt_credentials(console: Console, backends_toml_path: str, missing_only: 
         else:
             current_value = os.getenv(var_name) or entries.get(var_name)
             if current_value:
-                status = f"[green]current: {escape(_mask_value(current_value))}[/green]"
+                status = f"[green]\\[current: {escape(_mask_value(current_value))}][/green]"
             else:
-                status = "[red]not set[/red]"
-            prompt_text = f"  [bold]{escape(var_name)}[/bold] [dim](required by {escape(backends_str)})[/dim] [{status}]"
+                status = "[red]\\[not set][/red]"
+            prompt_text = f"  [bold]{escape(var_name)}[/bold] [dim](required by {escape(backends_str)})[/dim] {status}"
 
         value = Prompt.ask(prompt_text, default="", console=console, password=True)
         if value == "done":

@@ -1,5 +1,6 @@
 """Main entry point for the agent CLI."""
 
+import sys
 from typing import Annotated
 
 import typer
@@ -69,8 +70,6 @@ app = typer.Typer(
 
 def _warn_if_update_available_stderr() -> None:
     """Print a version warning to stderr so it doesn't break JSON output."""
-    import sys  # noqa: PLC0415
-
     latest_version = check_for_update()
     if latest_version is not None:
         current_version = get_package_version()

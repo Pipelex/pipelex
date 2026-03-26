@@ -157,7 +157,12 @@ def init_command(
         bool, typer.Option("--local", "-l", help="Create project-level .pipelex/ at the detected project root instead of global ~/.pipelex/")
     ] = False,
     missing_only: Annotated[
-        bool, typer.Option("--missing", "-m", help="Only prompt for credentials that are not yet set (skip already configured ones)")
+        bool,
+        typer.Option(
+            "--missing",
+            "-m",
+            help="Only prompt for credentials that are not yet set (skip already configured ones). Only applies to 'credentials' focus.",
+        ),
     ] = False,
 ) -> None:
     """Initialize Pipelex configuration in ~/.pipelex (global) or project .pipelex (--local).
