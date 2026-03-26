@@ -34,17 +34,17 @@ def _pipe_job_from_library(load_fn: Callable[[str], None]) -> Generator[PipeJob,
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
+    try:
+        load_fn(library_id)
 
-    load_fn(library_id)
+        pipe = get_required_pipe(pipe_code=LibraryCrateTestData.PIPE_CODE)
+        library_crate = library_manager.get_crate(library_id=library_id)
+        pipe_job = _build_pipe_job(pipe=pipe, library_crate=library_crate)
 
-    pipe = get_required_pipe(pipe_code=LibraryCrateTestData.PIPE_CODE)
-    library_crate = library_manager.get_crate(library_id=library_id)
-    pipe_job = _build_pipe_job(pipe=pipe, library_crate=library_crate)
-
-    yield pipe_job
-
-    library_manager.teardown(library_id=library_id)
-    teardown_current_library()
+        yield pipe_job
+    finally:
+        library_manager.teardown(library_id=library_id)
+        teardown_current_library()
 
 
 @pytest.fixture(scope="class")
