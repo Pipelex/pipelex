@@ -42,7 +42,7 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
         wfid: str | None = None,
     ) -> PipeOutput:
         log.debug(f"PipeRouterTop _run_pipe_job using task_queue: {self.task_queue} with worker_environment={self.worker_environment}")
-        pipe_job.prepare_for_temporal()
+        pipe_job = pipe_job.prepare_for_temporal()
         executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(
             task_queue=self.task_queue,
             should_auto_connect_temporal=self.should_auto_connect_temporal,

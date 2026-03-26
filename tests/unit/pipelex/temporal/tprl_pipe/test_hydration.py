@@ -6,6 +6,7 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 
 
@@ -72,3 +73,47 @@ class TestHydrateWorkingMemory:
 
         assert hydrated.aliases == {"main_stuff": "greeting"}
         assert "greeting" in hydrated.root
+
+    def test_hydrate_raises_on_missing_registry_class(self) -> None:
+        """Hydration raises PipeJobError when the concept's structure_class_name is not in the registry."""
+        raw = {
+            "root": {
+                "bad_stuff": {
+                    "stuff_code": "test",
+                    "stuff_name": "bad_stuff",
+                    "concept": {
+                        "code": "NonExistent",
+                        "domain_code": "native",
+                        "description": "Missing class",
+                        "structure_class_name": "NonExistentContent",
+                    },
+                    "content": {"text": "hello"},
+                },
+            },
+            "aliases": {},
+        }
+
+        with pytest.raises(PipeJobError, match="bad_stuff"):
+            hydrate_working_memory(raw)
+
+    def test_hydrate_raises_on_validation_error(self) -> None:
+        """Hydration raises PipeJobError when content doesn't match the expected schema."""
+        raw = {
+            "root": {
+                "invalid_stuff": {
+                    "stuff_code": "test",
+                    "stuff_name": "invalid_stuff",
+                    "concept": {
+                        "code": "Text",
+                        "domain_code": "native",
+                        "description": "Plain text",
+                        "structure_class_name": "TextContent",
+                    },
+                    "content": {"completely_wrong_field": 42},
+                },
+            },
+            "aliases": {},
+        }
+
+        with pytest.raises(PipeJobError, match="invalid_stuff"):
+            hydrate_working_memory(raw)

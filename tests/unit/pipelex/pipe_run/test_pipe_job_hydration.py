@@ -36,26 +36,27 @@ def _make_dummy_crate() -> LibraryCrate:
 
 class TestPipeJobHydration:
     def test_prepare_for_temporal_moves_wm_to_raw(self) -> None:
-        """When library_crate is present, prepare_for_temporal() serializes WM to raw dict."""
+        """When library_crate is present, prepare_for_temporal() returns a copy with WM serialized to raw."""
         working_memory = WorkingMemory()
         crate = _make_dummy_crate()
         pipe_job = _make_pipe_job(working_memory=working_memory, library_crate=crate)
 
-        pipe_job.prepare_for_temporal()
+        result = pipe_job.prepare_for_temporal()
 
-        assert pipe_job.working_memory is None
-        assert pipe_job.working_memory_raw is not None
-        assert isinstance(pipe_job.working_memory_raw, dict)
+        assert result.working_memory is None
+        assert result.working_memory_raw is not None
+        assert isinstance(result.working_memory_raw, dict)
 
     def test_prepare_for_temporal_noop_without_crate(self) -> None:
-        """Without library_crate, prepare_for_temporal() is a no-op."""
+        """Without library_crate, prepare_for_temporal() returns self unchanged."""
         working_memory = WorkingMemory()
         pipe_job = _make_pipe_job(working_memory=working_memory, library_crate=None)
 
-        pipe_job.prepare_for_temporal()
+        result = pipe_job.prepare_for_temporal()
 
-        assert pipe_job.working_memory is working_memory
-        assert pipe_job.working_memory_raw is None
+        assert result is pipe_job
+        assert result.working_memory is working_memory
+        assert result.working_memory_raw is None
 
     def test_prepare_for_temporal_empty_wm(self) -> None:
         """Empty WorkingMemory serializes to a dict with empty root."""
@@ -63,10 +64,21 @@ class TestPipeJobHydration:
         crate = _make_dummy_crate()
         pipe_job = _make_pipe_job(working_memory=working_memory, library_crate=crate)
 
-        pipe_job.prepare_for_temporal()
+        result = pipe_job.prepare_for_temporal()
 
-        assert pipe_job.working_memory_raw is not None
-        assert pipe_job.working_memory_raw["root"] == {}
+        assert result.working_memory_raw is not None
+        assert result.working_memory_raw["root"] == {}
+
+    def test_prepare_for_temporal_does_not_mutate_original(self) -> None:
+        """prepare_for_temporal() leaves the original PipeJob unchanged."""
+        working_memory = WorkingMemory()
+        crate = _make_dummy_crate()
+        pipe_job = _make_pipe_job(working_memory=working_memory, library_crate=crate)
+
+        _ = pipe_job.prepare_for_temporal()
+
+        assert pipe_job.working_memory is working_memory
+        assert pipe_job.working_memory_raw is None
 
     def test_get_working_memory_from_typed(self) -> None:
         """get_working_memory() returns the typed WorkingMemory when set."""

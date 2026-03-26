@@ -1,5 +1,3 @@
-Phase 4 of wip/00-master-plan.md
-
 # Plan: Explicit ClassRegistry — No Singleton Scoping in Kajson
 
 ## Context
@@ -55,7 +53,7 @@ If not found in explicit registry, fall through to existing logic (sys.modules �
 - Delete `set_scoped_class_registry()` method
 - `get_class_registry()` simply returns `cls.get_instance()._class_registry` (global only)
 
-**`kajson/composite_class_registry.py`** — Delete file and its tests. No longer used after Phase 4. Since kajson is internal-only, no deprecation needed.
+**`kajson/composite_class_registry.py`** — Keep file, stop using it. Can be removed in a follow-up.
 
 ### 2. Pipelex — Library owns its ClassRegistry (PrivateAttr)
 
@@ -144,8 +142,6 @@ finally:
 
 Key insight: `set_current_library()` sets `_library_id` ContextVar. From that point, all calls to `hub.get_class_registry()` return `workflow_registry`. When `concept_factory` calls `KajsonManager.get_class_registry().register_class(...)`, it still hits the global. We need to migrate those callers.
 
-**Collision policy**: When pre-seeding from global, `register_classes_dict()` copies entries. If `load_from_crate()` later registers a dynamic class with the same name as a global class, the dynamic one wins by overwrite. This is the correct behavior (workflow-local classes should shadow global ones). No conflict resolution needed beyond dict overwrite semantics.
-
 ### 5. Migrate KajsonManager.get_class_registry() callers to hub
 
 All ~20 call sites in Pipelex that use `KajsonManager.get_class_registry()` must switch to `hub.get_class_registry()` (or receive the registry explicitly). This is a mechanical change.
@@ -166,8 +162,6 @@ All ~20 call sites in Pipelex that use `KajsonManager.get_class_registry()` must
 
 Each file: replace `KajsonManager.get_class_registry()` with `get_class_registry()` imported from `pipelex.hub`. Remove unused `KajsonManager` import if nothing else uses it.
 
-**Circular import warning**: `concept.py:159-165` has a TODO noting it uses `KajsonManager` directly to avoid circular import with hub. Migrating to `hub.get_class_registry()` may reintroduce that circular import. Investigate during implementation — may need `TYPE_CHECKING` guard or lazy import.
-
 ### 6. Temporal data converter — explicit parameter
 
 **`pipelex/temporal/temporal_data_converter.py`** — Pass registry to `kajson.loads()`:
@@ -183,16 +177,6 @@ def _kajson_deserialize_from_payload(self, payload: Payload) -> Any:
     return pydantic_gizmo
 ```
 
-### Deserialization timing (critical ordering constraint)
-
-The explicit `class_registry` parameter in the data converter interacts with Temporal's deserialization timing:
-
-- **Initial PipeJob input**: Temporal SDK deserializes workflow input BEFORE `wf_pipe_router.run()` executes. At this point, `_library_id` is NOT set → `hub.get_class_registry()` returns the global registry. Dynamic classes from the crate are NOT registered yet. This is why Phase 3's deferred hydration (`working_memory_raw`) is required — the WM cannot be fully deserialized at this stage.
-
-- **Child workflow PipeOutput results**: When a parent workflow awaits a child workflow result, the parent's `_library_id` IS set (library was loaded in the parent's `wf_pipe_router.run()`). The data converter's `hub.get_class_registry()` returns the parent's scoped registry, which includes dynamic classes. Child results deserialize correctly.
-
-This ordering is correct but fragile — do NOT move `set_current_library()` after `load_from_crate()` or break the sequence in `wf_pipe_router`.
-
 ### 7. Tests
 
 **Kajson tests** (`tests/unit/test_composite_class_registry.py`):
@@ -205,20 +189,6 @@ This ordering is correct but fragile — do NOT move `set_current_library()` aft
 - Verify no breakage
 
 **New test**: test that `kajson.loads()` with explicit `class_registry` finds dynamic classes even when `__module__` is `"builtins"` (the exact bug scenario).
-
-**New test**: explicit registry priority — when a class exists in both the explicit registry AND `sys.modules`, the explicit registry version should be returned (Step 0 wins).
-
-**New test** (`tests/unit/pipelex/pipe_run/test_pipe_job_hydration.py`):
-- `test_prepare_for_temporal_crate_without_wm`: library_crate present but working_memory is None → returns self unchanged.
-
-**New tests** (`tests/unit/pipelex/test_hub_class_registry.py`):
-- `test_get_class_registry_with_library_id_returns_library_registry`: set `_library_id`, verify hub returns the library's registry
-- `test_get_class_registry_without_library_id_returns_global`: no `_library_id` → hub returns global registry
-- `test_get_class_registry_library_without_registry_falls_back_to_global`: `_library_id` set but library has no `_class_registry` → falls back to global
-
-**New test**: `Library._class_registry` is not included in `model_dump()` output (PrivateAttr guarantee).
-
-**New test** (integration): Two workflows with different dynamic class sets running concurrently in the same worker process. Each workflow's registry should be isolated — class registered in workflow A should not appear in workflow B's registry, and vice versa. This is the exact scenario that broke Phase 3.
 
 ## Verification
 
@@ -239,38 +209,3 @@ This ordering is correct but fragile — do NOT move `set_current_library()` aft
 | _temporal | `pipelex/libraries/library.py` | PrivateAttr ClassRegistry on Library |
 | _temporal | `pipelex/libraries/library_manager.py` | Accessor for library's ClassRegistry |
 | _temporal | ~9 files | Migrate `KajsonManager.get_class_registry()` → `hub.get_class_registry()` |
-| kajson | `kajson/composite_class_registry.py` | Delete file + tests (dead code after Phase 4) |
-
-## NOT in scope
-
-- **StoragePayloadCodec (Phase 5)**: payload size limits are an independent concern. Can be built in parallel.
-- **Crate stripping / transitive closure**: future optimization, not needed for correctness.
-- **Remote dependency resolution**: future capability, orthogonal to registry scoping.
-- **Making `class_registry` a required parameter on `kajson.loads()`**: considered but not worth it — only one call site (data converter) needs the explicit param. All other loads happen through the converter.
-- **Removing `KajsonManager` entirely from kajson**: too broad. Phase 4 only removes the scoping concern. `KajsonManager` still manages the global registry and decoder setup.
-- **Rollback mechanism / feature flag**: kajson is internal-only, both repos change together. A git revert of both repos is sufficient rollback.
-
-## What already exists
-
-| What | Where | Reused? |
-|------|-------|---------|
-| `_library_id` ContextVar | `pipelex/hub.py` | YES — reused for library-scoped registry lookup |
-| `LibraryManager.open_library()` / `teardown()` | `pipelex/libraries/library_manager.py` | YES — registry GC'd with Library teardown |
-| `CompositeClassRegistry` overlay pattern | `kajson/composite_class_registry.py` | NO — replaced by flat dict pre-seeding |
-| `KajsonManager._scoped_class_registry` ContextVar | `kajson/kajson_manager.py` | NO — removed |
-| `hub.get_class_registry()` | `pipelex/hub.py` | YES — implementation changes, callers stay same |
-| `wf_pipe_router` try/finally | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` | YES — refactored in place |
-| `prepare_for_temporal()` immutability | `pipelex/pipe_run/pipe_job.py` | YES — already returns copy (current diff) |
-| `hydrate_working_memory()` | `pipelex/temporal/tprl_pipe/hydration.py` | YES — no changes needed for Phase 4 |
-
-## Failure modes
-
-| Codepath | Failure scenario | Test? | Error handling? | User-visible? |
-|----------|-----------------|-------|-----------------|---------------|
-| `hub.get_class_registry()` with `_library_id` set but library deleted | Race between teardown and registry read | No | Falls back to global (silent) | Silent — could return wrong class |
-| `concept.py` circular import after migration | Import error at module load time | Lint catches | N/A — build failure | Build failure (loud) |
-| `temporal_data_converter` initial PipeJob deser without library context | Dynamic class lookup fails | Yes (via raw WM) | Deferred hydration handles it | Correct (by design) |
-| Two concurrent workflows with same class name, different definitions | Registry isolation failure | **No → add test** | Per-workflow library_id isolation | Silent if broken |
-| `loads()` called without explicit `class_registry` in new code | Falls back to sys.modules-only resolution | Partially | Bug #1 persists for that call site | Silent failure |
-
-**Critical gap**: Concurrent workflow isolation has no test and would be a silent failure. Added to test plan above.

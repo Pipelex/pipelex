@@ -422,6 +422,9 @@ convention = "google"
 [tool.uv]
 required-version = ">=0.7.2"
 
+[tool.uv.sources]
+kajson = { path = "../kajson", editable = true }
+
 [tool.hatch.build.targets.wheel]
 packages = ["pipelex"]
 exclude = ["pipelex/cli/dev_cli"]

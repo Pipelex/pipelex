@@ -24,7 +24,7 @@ class PipeRouterChild(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol)
         wfid: str | None = None,
     ) -> PipeOutput:
         log.debug("PipeRouterChild _run_pipe_job within workflow")
-        pipe_job.prepare_for_temporal()
+        pipe_job = pipe_job.prepare_for_temporal()
         executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(task_queue=None)
         return await executor.execute_child_workflow(
             workflow_class=WfPipeRouter,

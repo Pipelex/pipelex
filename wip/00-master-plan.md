@@ -2,7 +2,7 @@
 
 > **Status**: Master plan for phased implementation
 > **Date**: 2026-03-23
-> **Related**: [archive/early-library-as-execution-context.md](archive/early-library-as-execution-context.md), [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md), [phase4-payload-codec-strategy.md](phase4-payload-codec-strategy.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md)
+> **Related**: [archive/early-library-as-execution-context.md](archive/early-library-as-execution-context.md), [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md), [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md), [phase5-payload-codec-strategy.md](phase5-payload-codec-strategy.md), [phase2-crate-propagation-rationale.md](phase2-crate-propagation-rationale.md)
 
 ---
 
@@ -34,7 +34,8 @@ Introduce the LibraryCrate as the universal intermediate representation for libr
 | **1** | LibraryCrate (direct mode) | Universal intermediate between bundles and live library |
 | **2** | LibraryCrate on Temporal | Library loading on workers (Layer 2: pipe resolution) |
 | **3** | Deferred WorkingMemory hydration | Dynamic class registration timing (Layer 1: Kajson deser) |
-| **4** | StoragePayloadCodec | Payload size limits (2MB) for large libraries and WorkingMemory |
+| **4** | Explicit ClassRegistry | Library-owned registries, no singleton scoping in Kajson |
+| **5** | StoragePayloadCodec | Payload size limits (2MB) for large libraries and WorkingMemory |
 
 ---
 
@@ -241,11 +242,50 @@ class PipeJob(BaseModel):
 
 ---
 
-## Phase 4: StoragePayloadCodec
+## Phase 4: Explicit ClassRegistry
+
+**Goal**: Move ClassRegistry scoping out of Kajson (a serialization library) and into Pipelex's Library lifecycle. Fix two bugs that only manifest with separate Temporal worker processes: decoder bypass (dynamic classes with `__module__="builtins"`) and teardown clobber (non-stack-safe `finally` block).
+
+See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for the full design.
+
+### Design
+
+- **Kajson becomes a pure library**: `loads()`/`load()` accept an explicit `class_registry` parameter. ContextVar and `set_scoped_class_registry()` are removed from `KajsonManager`.
+- **Library owns its ClassRegistry**: `Library` gets a `PrivateAttr` `_class_registry`. Each workflow creates a plain `ClassRegistry` pre-seeded from global, attaches it to its Library. GC'd with the Library — no teardown bugs, no memory leaks.
+- **Reuse existing `_library_id` ContextVar**: `hub.get_class_registry()` reads the active library_id, gets that library's ClassRegistry. No new ContextVar, no CompositeClassRegistry.
+- **Explicit at the boundary**: `temporal_data_converter` passes the registry to `kajson.loads()`.
+- **Migrate ~20 callers**: `KajsonManager.get_class_registry()` → `hub.get_class_registry()` (mechanical).
+
+### Key files
+
+| File | Change |
+|------|--------|
+| `kajson/kajson.py` | Add `class_registry` param to `loads()`/`load()` |
+| `kajson/json_decoder.py` | Accept + use explicit registry in decoder |
+| `kajson/kajson_manager.py` | Remove ContextVar, simplify to global-only |
+| `pipelex/libraries/library.py` | PrivateAttr ClassRegistry on Library |
+| `pipelex/hub.py` | `get_class_registry()` reads from library |
+| `pipelex/temporal/tprl_pipe/wf_pipe_router.py` | Plain ClassRegistry, library-associated |
+| `pipelex/temporal/temporal_data_converter.py` | Pass explicit registry to `kajson.loads()` |
+| ~9 Pipelex files | Migrate `KajsonManager.get_class_registry()` → `hub.get_class_registry()` |
+
+### Done when
+
+- [ ] `kajson.loads(data, class_registry=reg)` resolves dynamic classes with `__module__="builtins"` (new unit test)
+- [ ] `KajsonManager` has no ContextVar, no `set_scoped_class_registry`
+- [ ] `Library._class_registry` is a PrivateAttr, GC'd with Library
+- [ ] All ~20 callers migrated from `KajsonManager.get_class_registry()` to `hub.get_class_registry()`
+- [ ] Manual Temporal test: 3-process setup with `dynamic_concept_sequence.mthds` passes
+- [ ] `make agent-check` passes (both repos)
+- [ ] `make agent-test` passes (both repos)
+
+---
+
+## Phase 5: StoragePayloadCodec
 
 **Goal**: Remove the 2MB payload size limit for production workloads with large libraries or WorkingMemory containing images/documents.
 
-**Why last**: Phases 0-3 work for small-to-medium payloads. Phase 4 is needed when payloads grow beyond Temporal's limits.
+**Why last**: Phases 0-4 work for small-to-medium payloads. Phase 5 is needed when payloads grow beyond Temporal's limits.
 
 ### StoragePayloadCodec
 
@@ -328,11 +368,14 @@ Phase 2 (LibraryCrate on Temporal)
     │
     ▼
 Phase 3 (Deferred WM Hydration)        ← requires Phase 2's library_crate on PipeJob
+    │
+    ▼
+Phase 4 (Explicit ClassRegistry)       ← fixes Phase 3 bugs with separate workers
 
-Phase 4 (StoragePayloadCodec)           ← independent, can parallel with Phase 3
+Phase 5 (StoragePayloadCodec)           ← independent, can parallel with Phase 4
 ```
 
-Phase 0 is a prerequisite for Phase 1 (domain-qualified indexing). Phase 1 is a prerequisite for Phase 2 (crate must exist to ship it). Phase 3 builds on Phase 2's crate propagation. Phase 4 is independently useful.
+Phase 0 is a prerequisite for Phase 1 (domain-qualified indexing). Phase 1 is a prerequisite for Phase 2 (crate must exist to ship it). Phase 3 builds on Phase 2's crate propagation. Phase 4 fixes the ClassRegistry scoping bugs that Phase 3's in-process tests mask. Phase 5 is independently useful.
 
 ---
 
