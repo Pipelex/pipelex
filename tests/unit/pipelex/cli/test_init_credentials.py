@@ -119,8 +119,8 @@ class TestInitCredentials:
         result = get_required_vars_for_enabled_backends(str(backends_toml))
         assert result["OPENAI_API_KEY"] == ["OpenAI"]
 
-    def test_prompt_credentials_skips_when_all_set(self, tmp_path: Path, mocker: MockerFixture) -> None:
-        """No prompts issued when all required vars are already set."""
+    def test_prompt_credentials_skips_when_all_set_missing_only(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """No prompts issued when all required vars are already set and missing_only=True."""
         backends_toml = tmp_path / "backends.toml"
         backends_toml.write_text('[openai]\nenabled = true\napi_key = "${OPENAI_API_KEY}"\n\n[internal]\nenabled = true\n')
         mocker.patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"})
@@ -130,10 +130,25 @@ class TestInitCredentials:
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, str(backends_toml), missing_only=True)
         # Should print "already set" message, no Prompt.ask calls
         mock_console.print.assert_called()
         mock_prompt.assert_not_called()
+
+    def test_prompt_credentials_prompts_all_when_not_missing_only(self, tmp_path: Path, mocker: MockerFixture) -> None:
+        """All credentials are prompted even when already set, if missing_only=False."""
+        backends_toml = tmp_path / "backends.toml"
+        backends_toml.write_text('[openai]\nenabled = true\napi_key = "${OPENAI_API_KEY}"\n\n[internal]\nenabled = true\n')
+        mocker.patch.dict(os.environ, {"OPENAI_API_KEY": "sk-test"})
+        mocker.patch(
+            "pipelex.cli.commands.init.credentials.config_manager",
+            global_config_dir=tmp_path,
+        )
+        mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask", return_value="")
+        mock_console: MagicMock = mocker.MagicMock()
+        prompt_credentials(mock_console, str(backends_toml), missing_only=False)
+        # Should still prompt even though the var is set
+        mock_prompt.assert_called_once()
 
     def test_prompt_credentials_writes_entered_values(self, tmp_path: Path, mocker: MockerFixture) -> None:
         """Entered values are written to ~/.pipelex/.env and set in os.environ."""
@@ -152,7 +167,7 @@ class TestInitCredentials:
             return_value="sk-test-value",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, str(backends_toml), missing_only=True)
 
         # Verify .env was written
         env_path = tmp_path / ".env"
@@ -182,7 +197,7 @@ class TestInitCredentials:
             return_value="",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, str(backends_toml), missing_only=True)
 
         # Verify .env was NOT written (no values entered)
         env_path = tmp_path / ".env"
@@ -207,7 +222,7 @@ class TestInitCredentials:
             return_value="sk-new",
         )
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, str(backends_toml), missing_only=True)
 
         result = read_env_file(env_path)
         assert result["EXISTING_KEY"] == "existing_value"
@@ -226,5 +241,5 @@ class TestInitCredentials:
         )
         mock_prompt = mocker.patch("pipelex.cli.commands.init.credentials.Prompt.ask")
         mock_console: MagicMock = mocker.MagicMock()
-        prompt_credentials(mock_console, str(backends_toml))
+        prompt_credentials(mock_console, str(backends_toml), missing_only=True)
         mock_prompt.assert_not_called()

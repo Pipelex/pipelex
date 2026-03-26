@@ -271,9 +271,9 @@ def execute_initialization(
             if selected_backend_keys:
                 customize_routing_profile(selected_backend_keys, target_config_dir=target_config_dir)
 
-    # Step 2.5: Prompt for missing credentials
+    # Step 2.5: Prompt for missing credentials (during full init, only ask for missing ones)
     if check_credentials:
-        prompt_credentials(console, backends_toml_path)
+        prompt_credentials(console, backends_toml_path, missing_only=True)
 
     # Step 3: Set up routing profile if specifically requested
     if needs_routing:
@@ -356,6 +356,7 @@ def init_cmd(
     focus: InitFocus = InitFocus.ALL,
     skip_confirmation: bool = False,
     local: bool = False,
+    missing_only: bool = False,
 ):
     """Initialize Pipelex configuration, inference backends, credentials, routing, and telemetry.
 
@@ -366,6 +367,7 @@ def init_cmd(
         focus: What to initialize - 'all', 'agreement', 'config', 'credentials', 'inference', 'routing', or 'telemetry'
         skip_confirmation: If True, skip the confirmation prompt (used when called from doctor --fix)
         local: If True, create project-level .pipelex/ at the detected project root. Otherwise, create global ~/.pipelex/.
+        missing_only: If True, only prompt for credentials not yet set. Only applies to the 'credentials' focus.
     """
     console = get_console()
 
@@ -382,7 +384,7 @@ def init_cmd(
             console.print("[yellow]No backends.toml found. Please run 'pipelex init' first.[/yellow]")
             console.print()
             return
-        prompt_credentials(console, backends_toml_path)
+        prompt_credentials(console, backends_toml_path, missing_only=missing_only)
         console.print()
         return
 

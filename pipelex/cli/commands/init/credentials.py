@@ -101,43 +101,78 @@ def get_required_vars_for_enabled_backends(backends_toml_path: str) -> dict[str,
     return var_to_backends
 
 
-def prompt_credentials(console: Console, backends_toml_path: str) -> None:
-    """Prompt the user for missing credentials and persist them to ~/.pipelex/.env.
+def _mask_value(value: str) -> str:
+    """Mask a credential value, showing only the last 4 characters.
 
-    Reads the backends.toml to find which env vars are needed by enabled backends,
-    checks which are already set, and prompts only for missing ones.
+    Args:
+        value: The credential value to mask.
+
+    Returns:
+        Masked string like '****abcd'.
+    """
+    if len(value) <= 4:
+        return "****"
+    return "****" + value[-4:]
+
+
+def prompt_credentials(console: Console, backends_toml_path: str, missing_only: bool = False) -> None:
+    """Prompt the user for credentials and persist them to ~/.pipelex/.env.
 
     Args:
         console: Rich Console instance for user interaction.
         backends_toml_path: Path to the backends.toml file.
+        missing_only: If True, only prompt for credentials not yet set in the environment.
+            If False, prompt for all required credentials, allowing override of existing ones.
     """
     var_to_backends = get_required_vars_for_enabled_backends(backends_toml_path)
     if not var_to_backends:
+        if not missing_only:
+            console.print("[yellow]No enabled backends require credentials.[/yellow]")
         return
 
-    # Determine which vars are missing from the environment
-    missing_vars = {var_name: backend_names for var_name, backend_names in var_to_backends.items() if not os.getenv(var_name)}
+    if missing_only:
+        # Filter to only vars missing from the environment
+        vars_to_prompt = {var_name: backend_names for var_name, backend_names in var_to_backends.items() if not os.getenv(var_name)}
 
-    if not missing_vars:
-        console.print("[green]All required credentials are already set.[/green]")
-        return
+        if not vars_to_prompt:
+            console.print("[green]All required credentials are already set.[/green]")
+            return
 
-    console.print()
-    console.print("[bold cyan]Credential Setup[/bold cyan]")
-    console.print(f"[dim]{len(missing_vars)} credential(s) needed for your enabled backends.[/dim]")
-    console.print("[dim]Press Enter to skip any credential — you can set it later.[/dim]")
-    console.print()
+        console.print()
+        console.print("[bold cyan]Credential Setup[/bold cyan]")
+        console.print(f"[dim]{len(vars_to_prompt)} credential(s) needed for your enabled backends.[/dim]")
+        console.print("[dim]Press Enter to skip a credential, type 'done' to stop.[/dim]")
+        console.print()
+    else:
+        vars_to_prompt = var_to_backends
+
+        console.print()
+        console.print("[bold cyan]Credential Setup[/bold cyan]")
+        console.print(f"[dim]{len(vars_to_prompt)} credential(s) required by your enabled backends.[/dim]")
+        console.print("[dim]Press Enter to keep the current value, type 'done' to stop.[/dim]")
+        console.print()
 
     # Read existing .env file to preserve manually-set values
     global_env_path = get_global_env_path()
     entries = read_env_file(global_env_path)
 
     collected_count = 0
-    for var_name, backend_names in sorted(missing_vars.items()):
+    for var_name, backend_names in sorted(vars_to_prompt.items()):
         backends_str = ", ".join(backend_names)
-        value = Prompt.ask(
-            f"  [bold]{escape(var_name)}[/bold] [dim](required by {escape(backends_str)})[/dim]", default="", console=console, password=True
-        )
+
+        if missing_only:
+            prompt_text = f"  [bold]{escape(var_name)}[/bold] [dim](required by {escape(backends_str)})[/dim]"
+        else:
+            current_value = os.getenv(var_name) or entries.get(var_name)
+            if current_value:
+                status = f"[green]current: {escape(_mask_value(current_value))}[/green]"
+            else:
+                status = "[red]not set[/red]"
+            prompt_text = f"  [bold]{escape(var_name)}[/bold] [dim](required by {escape(backends_str)})[/dim] [{status}]"
+
+        value = Prompt.ask(prompt_text, default="", console=console, password=True)
+        if value == "done":
+            break
         if value:
             entries[var_name] = value
             os.environ[var_name] = value
@@ -149,4 +184,7 @@ def prompt_credentials(console: Console, backends_toml_path: str) -> None:
         console.print(f"[green]Saved {collected_count} credential(s) to {global_env_path}[/green]")
     else:
         console.print()
-        console.print("[dim]No credentials entered. You can set them later by running:[/dim] [cyan]pipelex init credentials[/cyan]")
+        if missing_only:
+            console.print("[dim]No credentials entered. You can set them later by running:[/dim] [cyan]pipelex init credentials[/cyan]")
+        else:
+            console.print("[dim]No changes made.[/dim]")

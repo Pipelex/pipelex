@@ -19,6 +19,7 @@ from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cli.agent_cli.commands.pipe_cmd import pipe_cmd
 from pipelex.cli.agent_cli.commands.run.app import run_app
 from pipelex.cli.agent_cli.commands.validate.app import validate_app
+from pipelex.cli.version_check import check_for_update
 from pipelex.tools.misc.package_utils import get_package_version
 
 
@@ -66,11 +67,26 @@ app = typer.Typer(
 )
 
 
+def _warn_if_update_available_stderr() -> None:
+    """Print a version warning to stderr so it doesn't break JSON output."""
+    import sys  # noqa: PLC0415
+
+    latest_version = check_for_update()
+    if latest_version is not None:
+        current_version = get_package_version()
+        print(
+            f"\nA new version of Pipelex is available: {latest_version} (current: {current_version})"
+            f"\nYou can update by running: pip install --upgrade pipelex\n",
+            file=sys.stderr,
+        )
+
+
 def version_callback(value: bool) -> None:
     """Print version and exit when --version is passed."""
     if value:
         package_version = get_package_version()
         typer.echo(f"pipelex-agent {package_version}")
+        _warn_if_update_available_stderr()
         raise typer.Exit
 
 
@@ -99,6 +115,8 @@ def app_callback(
     """Agent CLI callback - no logo, minimal output."""
     from pipelex.cli.agent_cli.commands.agent_output import agent_error  # noqa: PLC0415
     from pipelex.tools.log.log_levels import LogLevel  # noqa: PLC0415
+
+    _warn_if_update_available_stderr()
 
     ctx.ensure_object(dict)
     try:

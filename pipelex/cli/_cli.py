@@ -17,6 +17,7 @@ from pipelex.cli.commands.show_cmd import show_app
 from pipelex.cli.commands.validate.app import validate_app
 from pipelex.cli.commands.which_cmd import which_cmd
 from pipelex.cli.readiness import check_readiness
+from pipelex.cli.version_check import check_for_update
 from pipelex.hub import get_console
 from pipelex.tools.misc.package_utils import get_package_version
 
@@ -74,7 +75,20 @@ def version_callback(value: bool) -> None:
     if value:
         package_version = get_package_version()
         typer.echo(f"pipelex {package_version}")
+        _warn_if_update_available()
         raise typer.Exit
+
+
+def _warn_if_update_available() -> None:
+    """Print a warning if a newer version is available on PyPI."""
+    latest_version = check_for_update()
+    if latest_version is not None:
+        current_version = get_package_version()
+        console = get_console()
+        console.print()
+        console.print(f"[bold yellow]A new version of Pipelex is available: {latest_version} (current: {current_version})[/bold yellow]")
+        console.print("[dim]You can update by running:[/dim] [cyan]pip install --upgrade pipelex[/cyan]")
+        console.print()
 
 
 @app.callback(invoke_without_command=True)
@@ -115,6 +129,8 @@ def app_callback(
                ░██                                     v[cyan]{package_version}[/cyan]
 """
         )
+    _warn_if_update_available()
+
     # Skip checks if no command is being run (e.g., just --help) or if running init/doctor command
     if ctx.invoked_subcommand is None or ctx.invoked_subcommand in {"login", "init", "doctor"}:
         return
@@ -140,6 +156,9 @@ def init_command(
     local: Annotated[
         bool, typer.Option("--local", "-l", help="Create project-level .pipelex/ at the detected project root instead of global ~/.pipelex/")
     ] = False,
+    missing_only: Annotated[
+        bool, typer.Option("--missing", "-m", help="Only prompt for credentials that are not yet set (skip already configured ones)")
+    ] = False,
 ) -> None:
     """Initialize Pipelex configuration in ~/.pipelex (global) or project .pipelex (--local).
 
@@ -149,7 +168,7 @@ def init_command(
 
       config       Reset configuration files and prompt for missing API keys
 
-      credentials  Prompt for missing API keys only (reads enabled backends, saves to ~/.pipelex/.env)
+      credentials  Set API keys for enabled backends (prompts for all; use --missing to skip already set ones)
 
       inference    Reset inference backends selection and prompt for missing API keys
 
@@ -159,7 +178,7 @@ def init_command(
 
       agreement    Review/accept Pipelex Gateway terms of service
     """
-    init_cmd(focus=focus, local=local)
+    init_cmd(focus=focus, local=local, missing_only=missing_only)
 
 
 @app.command(name="doctor", help="Check Pipelex configuration health and suggest fixes")

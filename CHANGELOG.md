@@ -6,6 +6,8 @@
 
 - **Builder Operations module** (`pipelex/builder/operations/`): New standalone operation functions for the build agent — `concept_ops`, `inputs_ops`, `models_ops`, `output_ops`, `pipe_ops`, `runner_code_ops`, `validate_ops`. These decouple build logic from CLI commands so it can be reused by agents and the API.
 - **`dry_run_pipeline`** (`pipelex/pipe_run/dry_run_pipeline.py`): New shared entrypoint to dry-run a pipeline from MTHDS contents and produce a `GraphSpec`. Used by both CLI graph commands and the API.
+- **PyPI Version Check**: Both `pipelex` and `pipelex-agent` CLIs now check PyPI for newer versions on startup and display a warning when an update is available. The check has a 3-second timeout and fails silently on network errors. Agent CLI outputs the warning to stderr to preserve JSON output.
+- **`pipelex init credentials` Override Mode**: `pipelex init credentials` now prompts for all required credentials (showing masked current values), allowing users to update existing API keys. Use `--missing` to only prompt for credentials not yet set.
 
 ### Changed
 
