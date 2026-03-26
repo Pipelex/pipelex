@@ -103,3 +103,14 @@ class TestPipeJobHydration:
         result = pipe_job.get_working_memory()
         assert isinstance(result, WorkingMemory)
         assert len(result.root) == 0
+
+    def test_prepare_for_temporal_crate_without_wm(self) -> None:
+        """library_crate present but working_memory is None returns self unchanged."""
+        crate = _make_dummy_crate()
+        pipe_job = _make_pipe_job(working_memory=None, library_crate=crate)
+
+        result = pipe_job.prepare_for_temporal()
+
+        assert result is pipe_job
+        assert result.working_memory is None
+        assert result.working_memory_raw is None

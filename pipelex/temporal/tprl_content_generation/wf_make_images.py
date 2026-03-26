@@ -1,13 +1,8 @@
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
-
-from pipelex import log
-from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
-from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
+from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
-    from typing_extensions import override
-
     from pipelex import log
     from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
     from pipelex.cogt.image.generated_image import GeneratedImageRawDetails

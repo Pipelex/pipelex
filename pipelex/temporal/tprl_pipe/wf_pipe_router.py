@@ -2,13 +2,9 @@ from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
 
-from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.pipe_run.pipe_job import PipeJob
-
 with workflow.unsafe.imports_passed_through():
-    from kajson.composite_class_registry import CompositeClassRegistry
+    from kajson.class_registry import ClassRegistry
     from kajson.kajson_manager import KajsonManager
-    from temporalio import workflow
 
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.hub import get_library_manager, set_current_library, teardown_current_library
@@ -38,19 +34,25 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
 
         try:
             if library_crate is not None:
-                # 1. Create scoped ClassRegistry (local overlay on global)
+                # 1. Create per-workflow ClassRegistry pre-seeded from global
                 global_registry = KajsonManager.get_class_registry()
-                scoped_registry = CompositeClassRegistry(parent=global_registry)
-                KajsonManager.set_scoped_class_registry(scoped_registry)
+                workflow_registry = ClassRegistry()
+                if isinstance(global_registry, ClassRegistry):
+                    workflow_registry.register_classes_dict(dict(global_registry.root))
+                else:
+                    workflow_log.warning("Global registry is not a ClassRegistry, cannot pre-seed workflow registry")
 
-                # 2. Load crate (registers dynamic classes into scoped registry)
+                # 2. Open library and attach registry to it
                 library_manager = get_library_manager()
                 wf_library_id = f"wf_{workflow.info().workflow_id}"
-                library_manager.open_library(library_id=wf_library_id)
+                _wf_library_id, wf_library = library_manager.open_library(library_id=wf_library_id)
+                wf_library.set_class_registry(workflow_registry)
                 set_current_library(library_id=wf_library_id)
+
+                # 3. Load crate (registers dynamic classes into workflow_registry via hub.get_class_registry())
                 library_manager.load_from_crate(library_id=wf_library_id, crate=library_crate)
 
-                # 3. Hydrate WorkingMemory (now that dynamic classes are registered)
+                # 4. Hydrate WorkingMemory (now that dynamic classes are registered)
                 if workflow_arg.working_memory_raw is not None:
                     workflow_arg.working_memory = hydrate_working_memory(workflow_arg.working_memory_raw)
                     workflow_arg.working_memory_raw = None
@@ -71,8 +73,6 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             if wf_library_id is not None:
                 get_library_manager().teardown(library_id=wf_library_id)
                 teardown_current_library()
-            if library_crate is not None:
-                KajsonManager.set_scoped_class_registry(None)
 
         workflow_log.debug("Workflow complete")
         return pipe_output

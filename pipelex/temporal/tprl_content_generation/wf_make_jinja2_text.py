@@ -1,11 +1,8 @@
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
-
-from pipelex.cogt.content_generation.assignment_models import TemplatingAssignment
+from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
-    from typing_extensions import override
-
     from pipelex.cogt.content_generation.assignment_models import (
         TemplatingAssignment,
     )

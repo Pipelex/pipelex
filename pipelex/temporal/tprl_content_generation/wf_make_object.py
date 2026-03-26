@@ -2,12 +2,10 @@ from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
 
-from pipelex.base_exceptions import PipelexError
-from pipelex.cogt.content_generation.assignment_models import ObjectAssignment, TextThenObjectAssignment
-
 with workflow.unsafe.imports_passed_through():
     from pydantic import BaseModel
 
+    from pipelex.base_exceptions import PipelexError
     from pipelex.cogt.content_generation.assignment_models import (
         ObjectAssignment,
         TextThenObjectAssignment,

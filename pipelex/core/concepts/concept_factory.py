@@ -1,6 +1,6 @@
 from typing import cast
 
-from kajson.kajson_manager import KajsonManager
+from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import BaseModel
 
 from pipelex.core.concepts.concept import Concept
@@ -19,6 +19,14 @@ from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.types import StrEnum
+
+
+def _get_class_registry() -> ClassRegistryAbstract:
+    """Lazy import to break circular dependency with hub.py."""
+    import importlib  # noqa: PLC0415
+
+    hub = importlib.import_module("pipelex.hub")
+    return hub.get_class_registry()  # type: ignore[no-any-return]
 
 
 class ConceptDeclarationType(StrEnum):
@@ -320,7 +328,7 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
-        KajsonManager.get_class_registry().register_class(the_generated_class)
+        _get_class_registry().register_class(the_generated_class)
 
         return concept_code
 
@@ -356,7 +364,7 @@ class ConceptFactory:
             msg = f"Error generating structure class for concept '{concept_code}' in domain '{domain_code}': {exc}"
             raise ConceptFactoryError(msg) from exc
         # Register the generated class
-        KajsonManager.get_class_registry().register_class(the_generated_class)
+        _get_class_registry().register_class(the_generated_class)
 
         return concept_code, NativeConceptCode.TEXT.concept_ref
 
@@ -402,7 +410,7 @@ class ConceptFactory:
                 )
                 raise ConceptFactoryError(msg) from exc
 
-            KajsonManager.get_class_registry().register_class(the_generated_class)
+            _get_class_registry().register_class(the_generated_class)
             return concept_code, current_refine
 
         # Get the refined concept's structure class name
@@ -432,7 +440,7 @@ class ConceptFactory:
             raise ConceptFactoryError(msg) from exc
 
         # Register the generated class
-        KajsonManager.get_class_registry().register_class(the_generated_class)
+        _get_class_registry().register_class(the_generated_class)
 
         return concept_code, current_refine
 

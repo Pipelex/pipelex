@@ -3,7 +3,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Annotated
 
 import typer
-from kajson.kajson_manager import KajsonManager
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexError
@@ -191,7 +190,7 @@ def generate_structures_from_blueprints(
                     raise PipelexError(msg) from exc
 
                 # Register the generated class so it can be used as a base class for refined concepts
-                KajsonManager.get_class_registry().register_class(the_generated_class)
+                get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
@@ -240,7 +239,7 @@ def generate_structures_from_blueprints(
                     raise PipelexError(msg) from exc
 
                 # Register the generated class so it can be used as a base class for other refined concepts
-                KajsonManager.get_class_registry().register_class(the_generated_class)
+                get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"
@@ -267,7 +266,7 @@ def generate_structures_from_blueprints(
                     raise PipelexError(msg) from exc
 
                 # Register the generated class so it can be used as a base class for refined concepts
-                KajsonManager.get_class_registry().register_class(the_generated_class)
+                get_class_registry().register_class(the_generated_class)
 
                 concept_snake_case = pascal_case_to_snake_case(concept_code)
                 output_file = output_directory / f"{blueprint.domain}__{concept_snake_case}.py"

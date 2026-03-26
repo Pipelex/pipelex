@@ -1791,14 +1791,10 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.3.1"
-source = { registry = "https://pypi.org/simple" }
+version = "0.4.0"
+source = { git = "https://github.com/Pipelex/kajson.git?branch=release%2Fv0.4.0#ab23c9770367a6f902f7ed8be04a14fe0a07fa4f" }
 dependencies = [
     { name = "pydantic" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/51/dc0529d2b678003e783cc9e79b0ca16db1ca1035935a5623deb822b33b8f/kajson-0.3.1.tar.gz", hash = "sha256:a170883f04a9c5e72a3831ce65720324b078483e0360e6f249400e1c4b8d9ffa", size = 20275, upload-time = "2025-07-11T08:26:13.243Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/3b/3529c470a4cc1051abe2e4cd6a8a714b14eea26a8486bb3e1cd19a5c60d9/kajson-0.3.1-py3-none-any.whl", hash = "sha256:c129b5dd66f757ed8077c49803ea290f91ba6f5699717eb97b65d960bcc83ac4", size = 26721, upload-time = "2025-07-11T08:26:11.622Z" },
 ]
 
 [[package]]
@@ -3591,7 +3587,7 @@ requires-dist = [
     { name = "instructor", extras = ["google-genai"], marker = "extra == 'google-genai'" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
-    { name = "kajson", specifier = "==0.3.1" },
+    { name = "kajson", git = "https://github.com/Pipelex/kajson.git?branch=release%2Fv0.4.0" },
     { name = "linkup-sdk", marker = "extra == 'linkup'", specifier = ">=0.12.0" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mike", marker = "extra == 'docs'", specifier = ">=2.1.3" },

@@ -1,7 +1,6 @@
 from typing import TYPE_CHECKING, Any, Generic, Protocol, TypeVar
 
 from kajson.exceptions import ClassRegistryInheritanceError, ClassRegistryNotFoundError
-from kajson.kajson_manager import KajsonManager
 from typing_extensions import runtime_checkable
 
 from pipelex.core.concepts.helpers import strip_multiplicity_from_concept_ref_or_code
@@ -12,6 +11,7 @@ from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsF
 from pipelex.core.pipes.pipe_blueprint import PipeBlueprint, PipeType
 from pipelex.core.pipes.stuff_spec.stuff_spec import StuffSpec
 from pipelex.core.pipes.stuff_spec.stuff_spec_factory import StuffSpecFactory, StuffSpecFactoryError
+from pipelex.hub import get_class_registry
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
@@ -107,7 +107,7 @@ class PipeFactory(Generic[PipeAbstractType]):
         # The factory class name for that specific type of Pipe is the pipe class name with "Factory" suffix
         factory_class_name = f"{pipe_type.value}Factory"
         try:
-            pipe_factory: type[PipeFactoryProtocol[Any, Any]] = KajsonManager.get_class_registry().get_required_subclass(
+            pipe_factory: type[PipeFactoryProtocol[Any, Any]] = get_class_registry().get_required_subclass(
                 name=factory_class_name,
                 base_class=PipeFactoryProtocol,
             )

@@ -1,11 +1,11 @@
 import pytest
-from kajson.kajson_manager import KajsonManager
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
 from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 
@@ -34,7 +34,7 @@ class TestHydrateWorkingMemory:
     @pytest.fixture(autouse=True)
     def _register_text_content(self) -> None:
         """Ensure TextContent is registered in the ClassRegistry for hydration tests."""
-        registry = KajsonManager.get_class_registry()
+        registry = get_class_registry()
         if not registry.has_class(name="TextContent"):
             registry.register_class(TextContent)
 

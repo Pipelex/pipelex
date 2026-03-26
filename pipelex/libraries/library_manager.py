@@ -3,7 +3,7 @@ from graphlib import CycleError, TopologicalSorter
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from kajson.kajson_manager import KajsonManager
+from kajson.class_registry import ClassRegistry
 from mthds.package.dependency_resolver import ResolvedDependency, determine_exported_pipes, resolve_all_dependencies
 from mthds.package.discovery import find_package_manifest
 from mthds.package.exceptions import DependencyResolveError, ManifestError
@@ -27,7 +27,7 @@ from pipelex.core.pipes.pipe_factory import PipeFactory
 from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.validation import report_validation_error
-from pipelex.hub import get_current_library
+from pipelex.hub import get_class_registry, get_current_library
 from pipelex.libraries.concept.exceptions import ConceptLibraryError
 from pipelex.libraries.exceptions import (
     LibraryError,
@@ -156,6 +156,14 @@ class LibraryManager(LibraryManagerAbstract):
     ############################################################
     # Public library accessors
     ############################################################
+
+    @override
+    def get_library_class_registry(self, library_id: str) -> ClassRegistry | None:
+        """Get the ClassRegistry associated with a library, if any."""
+        library = self._libraries.get(library_id)
+        if library is not None:
+            return library.get_class_registry()
+        return None
 
     @override
     def get_library(self, library_id: str) -> Library:
@@ -1131,7 +1139,7 @@ class LibraryManager(LibraryManagerAbstract):
         """
         # Build namespace with all structure class names
         namespace: dict[str, type] = {}
-        class_registry = KajsonManager.get_class_registry()
+        class_registry = get_class_registry()
 
         for concept in concepts:
             structure_class = class_registry.get_class(name=concept.structure_class_name)
@@ -1162,7 +1170,7 @@ class LibraryManager(LibraryManagerAbstract):
         # TODO: Refactor to inspect ConceptStructureBlueprint directly (concept_ref and item_concept_ref fields)
         # instead of the generated Python types. This would be more direct and wouldn't depend on
         # how types are generated (e.g., Optional wrappers for non-required fields).
-        class_registry = KajsonManager.get_class_registry()
+        class_registry = get_class_registry()
 
         # Build mappings from class names to concept refs
         class_to_concept: dict[str, str] = {}
