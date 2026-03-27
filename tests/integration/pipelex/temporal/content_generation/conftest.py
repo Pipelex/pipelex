@@ -6,15 +6,17 @@ import pytest_asyncio
 from pytest import FixtureRequest
 from temporalio.client import Client as TemporalClient
 
+from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.config import get_config
 from pipelex.hub import get_class_registry, get_report_delegate
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.test_extras.temporal_registry_test_models import Person
 from pipelex.temporal.tprl_content_generation.content_generator_child import ContentGeneratorChild
 from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
-from pipelex.temporal.tprl_content_generation.content_generator_top import ContentGeneratorTop
 from pipelex.temporal.tprl_content_generation.content_generator_top_factory import ContentGeneratorTopFactory
 from tests.integration.pipelex.temporal.test_utils import rprint
 
@@ -42,18 +44,19 @@ def register_test_temporal_models():
 
 @pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
 async def top_crafter(  # noqa: RUF029
-    temporal_client: TemporalClient, generated_content_factory: GeneratedContentFactory
-) -> AsyncGenerator[ContentGeneratorTop, None]:
-    # Code to run before each test
+    pipe_run_mode: PipeRunMode, temporal_client: TemporalClient, generated_content_factory: GeneratedContentFactory
+) -> AsyncGenerator[ContentGeneratorProtocol, None]:
     rprint("\n[magenta]TopCrafter setup[/magenta]")
-    crafter = ContentGeneratorTopFactory.make_content_generator_top(
-        generated_content_factory=generated_content_factory,
-        worker_environment=TemporalWorkerEnvironment.INTERNAL,
-        temporal_client=temporal_client,
-    )
-    # Return it for use in tests
+    crafter: ContentGeneratorProtocol
+    if pipe_run_mode.is_dry:
+        crafter = ContentGeneratorDry()
+    else:
+        crafter = ContentGeneratorTopFactory.make_content_generator_top(
+            generated_content_factory=generated_content_factory,
+            worker_environment=TemporalWorkerEnvironment.INTERNAL,
+            temporal_client=temporal_client,
+        )
     yield crafter
-    # Code to run after each test
     rprint("\n[magenta]TopCrafter teardown[/magenta]")
 
 

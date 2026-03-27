@@ -27,7 +27,7 @@ SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search or temporal)) and not pipelex_api"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -118,7 +118,7 @@ make test-extract             - Run unit tests only for extract (with prints)
 make te                       - Shorthand -> test-extract
 make test-img-gen             - Run unit tests only for img_gen (with prints)
 make test-g					  - Shorthand -> test-img-gen
-make test-temporal            - Run unit tests only for temporal (with prints)
+make test-temporal            - Run temporal tests (SRV=local|testing MODE=live)
 make ttm                      - Shorthand -> test-temporal
 
 make check-unused-imports     - Check for unused imports without fixing
@@ -433,7 +433,7 @@ gha-tests: env
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api or temporal)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
@@ -627,16 +627,33 @@ test-img-gen: env
 tg: test-img-gen
 	@echo "> done: tg = test-img-gen"
 
+SRV ?=
+MODE ?=
+TEMPORAL_PYTEST_MARKERS := $(if $(filter live,$(MODE)),"temporal","temporal and (dry_runnable or not inference)")
+TEMPORAL_TESTS_DIR := tests/integration/pipelex/temporal/
+
 test-temporal: env
 	$(call PRINT_TITLE,"Unit testing Temporal")
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
-			$(VENV_PYTEST) --exitfirst -m "temporal" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s --lf \
+				$(if $(SRV),--temporal-server $(SRV) --temporal-worker external,) \
+				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
+				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
+				$(TEMPORAL_TESTS_DIR); \
 		else \
-			$(VENV_PYTEST) --exitfirst -m "temporal" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s -k "$(TEST)" \
+				$(if $(SRV),--temporal-server $(SRV) --temporal-worker external,) \
+				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
+				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
+				$(TEMPORAL_TESTS_DIR); \
 		fi; \
 	else \
-		$(VENV_PYTEST) --exitfirst -m "temporal" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s \
+			$(if $(SRV),--temporal-server $(SRV) --temporal-worker external,) \
+			$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
+			$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
+			$(TEMPORAL_TESTS_DIR); \
 	fi
 
 ttm: test-temporal

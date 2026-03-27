@@ -4,6 +4,7 @@ import pytest
 from temporalio.client import WorkflowFailureError
 
 from pipelex import pretty_print
+from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_prompt import ImgGenPrompt
@@ -12,9 +13,9 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.hub import get_model_deck
+from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.test_extras.temporal_registry_test_models import Person
-from pipelex.temporal.tprl_content_generation.content_generator_top import ContentGeneratorTop
 from tests.integration.pipelex.temporal.test_data import PipeTestCases
 
 USER_TEXT_FOR_BASE = """
@@ -56,7 +57,8 @@ pytestmark = pytest.mark.filterwarnings("ignore:The `parse_obj` method is deprec
 class TestTprlCrafterTop:
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_llm_text_only(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
+    @pytest.mark.dry_runnable
+    async def test_tprl_make_llm_text_only(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorProtocol):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="$testing-text")
 
         text: str = await top_crafter.make_llm_text(
@@ -70,7 +72,8 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_object_direct(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
+    @pytest.mark.dry_runnable
+    async def test_tprl_make_object_direct(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorProtocol):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_direct: Person = await top_crafter.make_object_direct(
@@ -85,7 +88,8 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_text_then_object(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
+    @pytest.mark.dry_runnable
+    async def test_tprl_make_text_then_object(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorProtocol):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="$testing-text")
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
@@ -102,7 +106,8 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_object_list_direct(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
+    @pytest.mark.dry_runnable
+    async def test_tprl_make_object_list_direct(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorProtocol):
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
         person_list_direct: list[Person] = await top_crafter.make_object_list_direct(
@@ -118,7 +123,8 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_text_then_object_list(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
+    @pytest.mark.dry_runnable
+    async def test_tprl_make_text_then_object_list(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorProtocol):
         llm_setting_main = get_model_deck().get_llm_setting(llm_choice="$testing-text")
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
 
@@ -136,7 +142,8 @@ class TestTprlCrafterTop:
 
     @pytest.mark.img_gen
     @pytest.mark.inference
-    async def test_tprl_craft_image(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
+    @pytest.mark.dry_runnable
+    async def test_tprl_craft_image(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorProtocol):
         image: ImageContent = await top_crafter.make_single_image(
             job_metadata=tprl_job_metadata,
             img_gen_handle="@default-small ",
@@ -147,7 +154,7 @@ class TestTprlCrafterTop:
         pretty_print(image, title="craft_image")
         assert isinstance(image, ImageContent)
 
-    async def test_tprl_jinja2_text(self, top_crafter: ContentGeneratorTop):
+    async def test_tprl_jinja2_text(self, pipe_run_mode: PipeRunMode, top_crafter: ContentGeneratorProtocol):
         context = {
             "the_answer": "elementary, my dear Watson",
         }
@@ -158,11 +165,15 @@ class TestTprlCrafterTop:
         )
         pretty_print(jinja2_text, title="jinja2_text")
         assert isinstance(jinja2_text, str)
-        assert jinja2_text == "The answer is: elementary, my dear Watson"
+        if pipe_run_mode.is_dry:
+            assert "the_answer" in jinja2_text
+        else:
+            assert jinja2_text == "The answer is: elementary, my dear Watson"
 
     @pytest.mark.extract
     @pytest.mark.inference
-    async def test_tprl_extract(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
+    @pytest.mark.dry_runnable
+    async def test_tprl_extract(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorProtocol):
         extract_output: list[PageContent] = await top_crafter.make_extract_pages(
             job_metadata=tprl_job_metadata,
             extract_handle="azure-document-intelligence",
@@ -176,7 +187,15 @@ class TestTprlCrafterTop:
 
     @pytest.mark.llm
     @pytest.mark.inference
-    async def test_tprl_make_llm_text_with_error(self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorTop):
+    async def test_tprl_make_llm_text_with_error(
+        self, tprl_job_metadata: JobMetadata, top_crafter: ContentGeneratorProtocol, capfd: pytest.CaptureFixture[str]
+    ):
+        """Test that a bad model handle causes a WorkflowFailureError.
+
+        capfd captures Temporal Rust core WARN logs (fd-level stderr)
+        that are otherwise an unreadable blob during expected workflow failures.
+        """
+        _ = capfd  # side-effect fixture: captures fd-level stderr from Temporal Rust core
         bad_handle_to_test_failure = "bad_handle_to_test_failure"
         llm_setting_main = LLMSetting(model=bad_handle_to_test_failure, temperature=0.5, max_tokens=100)
         # Filter out Temporal's "Completing activity as failed" traceback for this expected failure

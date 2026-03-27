@@ -232,9 +232,9 @@ typeCheckingMode = "strict"
 minversion = "9.0"
 addopts = [
   "--import-mode=importlib",
-  "-ra",                                                                               # Show all test outcomes (including skips)
+  "-ra",                                                                   # Show all test outcomes (including skips)
   "-m",
-  "not (inference or llm or img_gen or extract or search or pipelex_api or temporal)",
+  "not (inference or llm or img_gen or extract or search or pipelex_api)",
 ]
 asyncio_default_fixture_loop_scope = "session"
 xfail_strict = true

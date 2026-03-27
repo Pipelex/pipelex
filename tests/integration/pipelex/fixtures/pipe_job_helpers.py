@@ -1,3 +1,4 @@
+import uuid
 from collections.abc import Callable, Generator
 from pathlib import Path
 
@@ -14,23 +15,28 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
-PIPE_JOB_HELPERS_PIPELINE_RUN_ID = "pipe_job_helpers_test"
+PIPE_JOB_HELPERS_PIPELINE_RUN_ID_PREFIX = "pipe_job_helpers_test"
 
 
 def build_pipe_job(
     pipe: PipeAbstract,
     library_crate: LibraryCrate | None,
     pipe_run_mode: PipeRunMode = PipeRunMode.DRY,
+    pipeline_run_id: str | None = None,
 ) -> PipeJob:
     """Build a PipeJob with empty working memory and default metadata."""
-    pipeline_run_id = SpecialPipelineId.DRY_RUN_UNTITLED if pipe_run_mode.is_dry else PIPE_JOB_HELPERS_PIPELINE_RUN_ID
+    resolved_pipeline_run_id = SpecialPipelineId.DRY_RUN_UNTITLED if pipe_run_mode.is_dry else (pipeline_run_id or _make_unique_pipeline_run_id())
     return PipeJobFactory.make_pipe_job(
         pipe=pipe,
         pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-        job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=pipeline_run_id),
+        job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=resolved_pipeline_run_id),
         working_memory=WorkingMemoryFactory.make_empty(),
         library_crate=library_crate,
     )
+
+
+def _make_unique_pipeline_run_id() -> str:
+    return f"{PIPE_JOB_HELPERS_PIPELINE_RUN_ID_PREFIX}_{uuid.uuid4().hex[:8]}"
 
 
 def pipe_job_from_library(
@@ -45,20 +51,21 @@ def pipe_job_from_library(
 
     # Open a reporting registry for live mode (required by the reporting manager)
     needs_registry = not pipe_run_mode.is_dry
+    pipeline_run_id = _make_unique_pipeline_run_id()
     if needs_registry:
-        get_report_delegate().open_registry(pipeline_run_id=PIPE_JOB_HELPERS_PIPELINE_RUN_ID)
+        get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
 
     try:
         load_fn(library_id)
 
         pipe = get_required_pipe(pipe_code=pipe_code)
         library_crate = library_manager.get_crate(library_id=library_id)
-        pipe_job = build_pipe_job(pipe=pipe, library_crate=library_crate, pipe_run_mode=pipe_run_mode)
+        pipe_job = build_pipe_job(pipe=pipe, library_crate=library_crate, pipe_run_mode=pipe_run_mode, pipeline_run_id=pipeline_run_id)
 
         yield pipe_job
     finally:
         if needs_registry:
-            get_report_delegate().close_registry(pipeline_run_id=PIPE_JOB_HELPERS_PIPELINE_RUN_ID)
+            get_report_delegate().close_registry(pipeline_run_id=pipeline_run_id)
         library_manager.teardown(library_id=library_id)
         teardown_current_library()
 

@@ -2,6 +2,8 @@ from temporalio import workflow
 
 with workflow.unsafe.imports_passed_through():
     from pipelex import pretty_print
+    from pipelex.cogt.content_generation.content_generator_dry import ContentGeneratorDry
+    from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol  # noqa: TC001
     from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
     from pipelex.cogt.extract.extract_input import ExtractInput
     from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
@@ -51,12 +53,16 @@ POSITIVE_TEXT_FOR_IMAGE = "A group of dogs with sunglasses playing beer pong wit
 @workflow.defn(name="wf_test_content_generator_child")
 class WfTestContentGeneratorChild:
     @workflow.run
-    async def run(self):
+    async def run(self, is_dry_run: bool = False):
         workflow_log.debug("Workflow start")
-        generated_content_factory = GeneratedContentFactory(storage_provider=InMemoryStorageProvider())
-        child_crafter = ContentGeneratorChildFactory.make_content_generator_child(
-            generated_content_factory=generated_content_factory,
-        )
+        content_generator: ContentGeneratorProtocol
+        if is_dry_run:
+            content_generator = ContentGeneratorDry()
+        else:
+            generated_content_factory = GeneratedContentFactory(storage_provider=InMemoryStorageProvider())
+            content_generator = ContentGeneratorChildFactory.make_content_generator_child(
+                generated_content_factory=generated_content_factory,
+            )
 
         job_metadata = JobMetadata(
             user_id="temporal-test",
@@ -64,7 +70,7 @@ class WfTestContentGeneratorChild:
         )
 
         llm_setting_for_text = get_model_deck().get_llm_setting(llm_choice="$testing-text")
-        crafted_text = await child_crafter.make_llm_text(
+        crafted_text = await content_generator.make_llm_text(
             job_metadata=job_metadata,
             llm_setting_main=llm_setting_for_text,
             llm_prompt_for_text=LLMPrompt(user_text=USER_TEXT_FOR_BASE),
@@ -72,7 +78,7 @@ class WfTestContentGeneratorChild:
         pretty_print(crafted_text, title="make_llm_text")
 
         llm_setting_for_object = get_model_deck().get_llm_setting(llm_choice="$testing-structured")
-        crafted_object_direct = await child_crafter.make_object_direct(
+        crafted_object_direct = await content_generator.make_object_direct(
             job_metadata=job_metadata,
             object_class=Person,
             llm_setting_for_object=llm_setting_for_object,
@@ -80,7 +86,7 @@ class WfTestContentGeneratorChild:
         )
         pretty_print(crafted_object_direct, title="make_object_direct")
 
-        crafted_object = await child_crafter.make_text_then_object(
+        crafted_object = await content_generator.make_text_then_object(
             job_metadata=job_metadata,
             object_class=Person,
             llm_setting_main=llm_setting_for_text,
@@ -89,7 +95,7 @@ class WfTestContentGeneratorChild:
         )
         pretty_print(crafted_object, title="make_text_then_object")
 
-        crafted_object_list_direct = await child_crafter.make_object_list_direct(
+        crafted_object_list_direct = await content_generator.make_object_list_direct(
             job_metadata=job_metadata,
             object_class=Person,
             llm_setting_for_object_list=llm_setting_for_object,
@@ -97,7 +103,7 @@ class WfTestContentGeneratorChild:
         )
         pretty_print(crafted_object_list_direct, title="make_object_list_direct")
 
-        crafted_object_list = await child_crafter.make_text_then_object_list(
+        crafted_object_list = await content_generator.make_text_then_object_list(
             job_metadata=job_metadata,
             object_class=Person,
             llm_setting_main=llm_setting_for_text,
@@ -107,7 +113,7 @@ class WfTestContentGeneratorChild:
         pretty_print(crafted_object_list, title="make_text_then_object_list")
 
         # TODO: fix this
-        # crafted_image = await child_crafter.craft_image(
+        # crafted_image = await content_generator.craft_image(
         #     job_metadata=job_metadata,
         #     img_gen_prompt=ImgGenPrompt(positive_text=POSITIVE_TEXT_FOR_IMAGE),
         # )
@@ -115,13 +121,13 @@ class WfTestContentGeneratorChild:
         context = {
             "the_answer": "elementary, my dear Watson",
         }
-        jinja2_text = await child_crafter.make_templated_text(
+        jinja2_text = await content_generator.make_templated_text(
             context=context,
             template="♦️♦️ {{ the_answer }} ♦️♦️",
         )
         pretty_print(jinja2_text, title="templated_text")
 
-        page_contents = await child_crafter.make_extract_pages(
+        page_contents = await content_generator.make_extract_pages(
             extract_input=ExtractInput(
                 image_uri=PipeTestCases.IMG_EXPENSE_REPORT_1,
             ),
