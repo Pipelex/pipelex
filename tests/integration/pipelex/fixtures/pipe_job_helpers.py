@@ -4,7 +4,7 @@ from pathlib import Path
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
-from pipelex.hub import get_library_manager, get_required_pipe, set_current_library, teardown_current_library
+from pipelex.hub import get_library_manager, get_report_delegate, get_required_pipe, set_current_library, teardown_current_library
 from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_job_factory import PipeJobFactory
@@ -14,6 +14,8 @@ from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.system.telemetry.otel_constants import OTelConstants
 
+PIPE_JOB_HELPERS_PIPELINE_RUN_ID = "pipe_job_helpers_test"
+
 
 def build_pipe_job(
     pipe: PipeAbstract,
@@ -21,10 +23,11 @@ def build_pipe_job(
     pipe_run_mode: PipeRunMode = PipeRunMode.DRY,
 ) -> PipeJob:
     """Build a PipeJob with empty working memory and default metadata."""
+    pipeline_run_id = SpecialPipelineId.DRY_RUN_UNTITLED if pipe_run_mode.is_dry else PIPE_JOB_HELPERS_PIPELINE_RUN_ID
     return PipeJobFactory.make_pipe_job(
         pipe=pipe,
         pipe_run_params=PipeRunParamsFactory.make_run_params(pipe_run_mode=pipe_run_mode),
-        job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=SpecialPipelineId.DRY_RUN_UNTITLED),
+        job_metadata=JobMetadata(user_id=OTelConstants.DEFAULT_USER_ID, pipeline_run_id=pipeline_run_id),
         working_memory=WorkingMemoryFactory.make_empty(),
         library_crate=library_crate,
     )
@@ -39,6 +42,12 @@ def pipe_job_from_library(
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()
     set_current_library(library_id=library_id)
+
+    # Open a reporting registry for live mode (required by the reporting manager)
+    needs_registry = not pipe_run_mode.is_dry
+    if needs_registry:
+        get_report_delegate().open_registry(pipeline_run_id=PIPE_JOB_HELPERS_PIPELINE_RUN_ID)
+
     try:
         load_fn(library_id)
 
@@ -48,6 +57,8 @@ def pipe_job_from_library(
 
         yield pipe_job
     finally:
+        if needs_registry:
+            get_report_delegate().close_registry(pipeline_run_id=PIPE_JOB_HELPERS_PIPELINE_RUN_ID)
         library_manager.teardown(library_id=library_id)
         teardown_current_library()
 
