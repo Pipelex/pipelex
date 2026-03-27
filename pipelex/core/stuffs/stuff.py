@@ -117,7 +117,7 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
             actual_code = actual_name.rsplit("__", 1)[-1]
             expected_code = expected_name.rsplit("__", 1)[-1]
             at_least_one_bare = ("__" not in actual_name) or ("__" not in expected_name)
-            names_match = at_least_one_bare and actual_code == expected_code
+            names_match = (actual_name == expected_name) or (at_least_one_bare and actual_code == expected_code)
             if names_match:
                 # Use model_dump() instead of smart_dump() to ensure we get a dict
                 # smart_dump() may return a string for some content types (e.g., TextContent)

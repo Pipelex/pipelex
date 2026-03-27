@@ -12,7 +12,6 @@ from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_connect import connect_to_temporal_selected_server
 from pipelex.temporal.temporal_data_converter import data_converter
 from pipelex.temporal.temporal_hub import temporal_hub
-from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
 
 TEMPORAL_SERVER_NONE = "none"
@@ -20,11 +19,6 @@ TEMPORAL_SERVER_TIME_SKIPPING = "time-skipping"
 
 
 def pytest_addoption(parser: Parser) -> None:
-    parser.addoption(
-        "--temporal-worker",
-        default=TemporalWorkerEnvironment.INTERNAL,
-        help="Which temporal worker environment to use ('internal', 'external')",
-    )
     parser.addoption(
         "--temporal-server",
         default=TEMPORAL_SERVER_NONE,
