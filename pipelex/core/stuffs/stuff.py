@@ -103,10 +103,22 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
             return content
 
         # If isinstance failed, try model validation approach
-        # This handles cases where the same class is loaded from different import paths
+        # This handles cases where the same class is loaded from different import paths,
+        # or where a domain-qualified dynamic class (e.g., "domain__Invoice") matches
+        # a pre-existing class with the bare name (e.g., "Invoice")
         try:
-            # Check if class names match (quick filter before attempting validation)
-            if type(content).__name__ == content_type.__name__:
+            actual_name = type(content).__name__
+            expected_name = content_type.__name__
+            # Check if class names match — exact match or domain-qualified match.
+            # Domain-qualified names have the format "domain__ConceptCode", so we
+            # extract the concept code (after the last "__") for comparison.
+            # Only allow the fallback when at least one side is bare (no domain prefix)
+            # to prevent silent cross-domain conversion between e.g. alpha__Result and beta__Result.
+            actual_code = actual_name.rsplit("__", 1)[-1]
+            expected_code = expected_name.rsplit("__", 1)[-1]
+            at_least_one_bare = ("__" not in actual_name) or ("__" not in expected_name)
+            names_match = at_least_one_bare and actual_code == expected_code
+            if names_match:
                 # Use model_dump() instead of smart_dump() to ensure we get a dict
                 # smart_dump() may return a string for some content types (e.g., TextContent)
                 content_dict = content.smart_dump()

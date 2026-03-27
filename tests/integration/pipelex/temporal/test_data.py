@@ -139,6 +139,161 @@ class DeferredHydrationTestData:
     ]
 
 
+_CRATE_DIR: str = "tests/integration/pipelex/temporal/library_crate"
+
+
+class ConflictConceptAlphaTestData:
+    """Concept 'Result' with score (integer) + label (text).
+
+    Paired with ConflictConceptBetaTestData which defines a different 'Result'.
+    Tests that per-workflow ClassRegistry scoping keeps them isolated.
+    """
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/conflict_concept_alpha.mthds"
+    PIPE_CODE: ClassVar[str] = "alpha_pipeline"
+    DOMAIN: ClassVar[str] = "conflict_alpha"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "conflict_alpha.alpha_pipeline",
+        "conflict_alpha.alpha_generate",
+        "conflict_alpha.alpha_summarize",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "alpha_result",
+        "alpha_summary",
+    ]
+
+    EXPECTED_RESULT_FIELDS: ClassVar[list[str]] = ["score", "label"]
+
+
+class ConflictConceptBetaTestData:
+    """Concept 'Result' with value (text) + confidence (number) + is_valid (text).
+
+    Paired with ConflictConceptAlphaTestData which defines a different 'Result'.
+    Tests that per-workflow ClassRegistry scoping keeps them isolated.
+    """
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/conflict_concept_beta.mthds"
+    PIPE_CODE: ClassVar[str] = "beta_pipeline"
+    DOMAIN: ClassVar[str] = "conflict_beta"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "conflict_beta.beta_pipeline",
+        "conflict_beta.beta_generate",
+        "conflict_beta.beta_summarize",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "beta_result",
+        "beta_summary",
+    ]
+
+    EXPECTED_RESULT_FIELDS: ClassVar[list[str]] = ["value", "confidence", "is_valid"]
+
+
+class ConflictPipeAlphaTestData:
+    """Pipe 'alpha_shared_step' as PipeLLM about colors.
+
+    Paired with ConflictPipeBetaTestData. Tests that per-workflow library scoping
+    via ContextVar resolves the correct pipe_ref for each workflow.
+    """
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/conflict_pipe_alpha.mthds"
+    PIPE_CODE: ClassVar[str] = "pipe_alpha_pipeline"
+    DOMAIN: ClassVar[str] = "pipe_conflict_alpha"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "pipe_conflict_alpha.pipe_alpha_pipeline",
+        "pipe_conflict_alpha.alpha_shared_step",
+        "pipe_conflict_alpha.alpha_finalize",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "step_result",
+        "final_result",
+    ]
+
+
+class ConflictPipeBetaTestData:
+    """Pipe 'beta_shared_step' as PipeLLM about animals.
+
+    Paired with ConflictPipeAlphaTestData. Tests that per-workflow library scoping
+    via ContextVar resolves the correct pipe_ref for each workflow.
+    """
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/conflict_pipe_beta.mthds"
+    PIPE_CODE: ClassVar[str] = "pipe_beta_pipeline"
+    DOMAIN: ClassVar[str] = "pipe_conflict_beta"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "pipe_conflict_beta.pipe_beta_pipeline",
+        "pipe_conflict_beta.beta_shared_step",
+        "pipe_conflict_beta.beta_finalize",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "step_result",
+        "final_result",
+    ]
+
+
+class MultiConceptAlphaTestData:
+    """Profile(name, age) + Summary(headline, body).
+
+    Paired with MultiConceptBetaTestData which defines different Profile and Summary.
+    Tests worst-case: multiple same-named dynamic classes across concurrent workflows.
+    """
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/multi_concept_alpha.mthds"
+    PIPE_CODE: ClassVar[str] = "multi_alpha_pipeline"
+    DOMAIN: ClassVar[str] = "multi_alpha"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "multi_alpha.multi_alpha_pipeline",
+        "multi_alpha.multi_alpha_generate_profile",
+        "multi_alpha.multi_alpha_generate_summary",
+        "multi_alpha.multi_alpha_finalize",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "profile_result",
+        "summary_result",
+        "final_result",
+    ]
+
+    EXPECTED_PROFILE_FIELDS: ClassVar[list[str]] = ["name", "age"]
+    EXPECTED_SUMMARY_FIELDS: ClassVar[list[str]] = ["headline", "body"]
+
+
+class MultiConceptBetaTestData:
+    """Profile(title, department, level) + Summary(content).
+
+    Paired with MultiConceptAlphaTestData which defines different Profile and Summary.
+    Tests worst-case: multiple same-named dynamic classes across concurrent workflows.
+    """
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/multi_concept_beta.mthds"
+    PIPE_CODE: ClassVar[str] = "multi_beta_pipeline"
+    DOMAIN: ClassVar[str] = "multi_beta"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "multi_beta.multi_beta_pipeline",
+        "multi_beta.multi_beta_generate_profile",
+        "multi_beta.multi_beta_generate_summary",
+        "multi_beta.multi_beta_finalize",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "profile_result",
+        "summary_result",
+        "final_result",
+    ]
+
+    EXPECTED_PROFILE_FIELDS: ClassVar[list[str]] = ["title", "department", "level"]
+    EXPECTED_SUMMARY_FIELDS: ClassVar[list[str]] = ["content"]
+
+
 class PipeOcrTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
         # LOCAL

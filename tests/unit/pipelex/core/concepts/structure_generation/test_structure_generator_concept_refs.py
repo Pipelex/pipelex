@@ -61,7 +61,7 @@ class TestStructureGeneratorConceptRefs:
 class Invoice(StructuredContent):
     """Generated Invoice class"""
 
-    customer: "Customer" = Field(..., description="The customer for this invoice")
+    customer: "myapp__Customer" = Field(..., description="The customer for this invoice")
     total: float = Field(..., description="Invoice total")
 '''
         )
@@ -96,7 +96,7 @@ class Invoice(StructuredContent):
 class Invoice(StructuredContent):
     """Generated Invoice class"""
 
-    line_items: List["LineItem"] = Field(..., description="List of line items")
+    line_items: List["myapp__LineItem"] = Field(..., description="List of line items")
     total: float = Field(..., description="Invoice total")
 '''
         )
@@ -130,7 +130,7 @@ class Invoice(StructuredContent):
 class CategoryNode(StructuredContent):
     """Generated CategoryNode class"""
 
-    parent: Optional["Category"] = Field(default=None, description="Optional parent reference")
+    parent: Optional["myapp__Category"] = Field(default=None, description="Optional parent reference")
     name: str = Field(..., description="Category name")
 '''
         )
@@ -160,7 +160,7 @@ class CategoryNode(StructuredContent):
 class Parent(StructuredContent):
     """Generated Parent class"""
 
-    children: Optional[List["Category"]] = Field(default=None, description="Optional child categories")
+    children: Optional[List["myapp__Category"]] = Field(default=None, description="Optional child categories")
 '''
         )
         assert generated_code == expected_code
@@ -195,8 +195,8 @@ class Parent(StructuredContent):
 class Order(StructuredContent):
     """Generated Order class"""
 
-    customer: "Customer" = Field(..., description="Customer from CRM domain")
-    products: List["Product"] = Field(..., description="Products from inventory domain")
+    customer: "crm__Customer" = Field(..., description="Customer from CRM domain")
+    products: List["inventory__Product"] = Field(..., description="Products from inventory domain")
 '''
         )
         assert generated_code == expected_code
@@ -224,7 +224,7 @@ class Order(StructuredContent):
 class Container(StructuredContent):
     """Generated Container class"""
 
-    item: "SomeItem" = Field(..., description="An item reference")
+    item: "unknown_domain__SomeItem" = Field(..., description="An item reference")
 '''
         )
         assert generated_code == expected_code
@@ -284,9 +284,9 @@ class ComplexEntity(StructuredContent):
 
     id: int = Field(..., description="Unique identifier")
     name: str = Field(..., description="Name")
-    owner: Optional["User"] = Field(default=None, description="Owner reference")
+    owner: Optional["myapp__User"] = Field(default=None, description="Owner reference")
     tags: Optional[List[str]] = Field(default=None, description="Tags")
-    related_items: Optional[List["Item"]] = Field(default=None, description="Related items")
+    related_items: Optional[List["myapp__Item"]] = Field(default=None, description="Related items")
     metadata: Optional[Dict[str, str]] = Field(default=None, description="Metadata")
 '''
         )

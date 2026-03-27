@@ -57,15 +57,15 @@ class TestInlineStructureConcepts:
         assert concept.domain_code == "test_domain"
         assert concept.code == "TestFeatureAnalysis"
         assert concept.description == "Analysis of a photo's visual content"
-        assert concept.structure_class_name == "TestFeatureAnalysis"
+        assert concept.structure_class_name == "test_domain__TestFeatureAnalysis"
 
         # Verify the generated class is registered and accessible
-        assert get_class_registry().has_class("TestFeatureAnalysis")
-        generated_class = get_class_registry().get_required_subclass("TestFeatureAnalysis", StructuredContent)
+        assert get_class_registry().has_class("test_domain__TestFeatureAnalysis")
+        generated_class = get_class_registry().get_required_subclass("test_domain__TestFeatureAnalysis", StructuredContent)
 
         # Verify class structure
         assert issubclass(generated_class, StructuredContent)
-        assert generated_class.__name__ == "TestFeatureAnalysis"
+        assert generated_class.__name__ == "test_domain__TestFeatureAnalysis"
 
         # Test instantiation of generated class
         instance = generated_class(
@@ -112,7 +112,7 @@ class TestInlineStructureConcepts:
         )
 
         # Should default to TextContent since TestAutoDetect is not a registered class
-        assert concept.structure_class_name == "TestAutoDetect"
+        assert concept.structure_class_name == "test_domain__TestAutoDetect"
         assert concept.refines == "native.Text"
 
     def test_inline_structure_with_complex_types(self):
@@ -152,10 +152,10 @@ class TestInlineStructureConcepts:
         # Verify concept creation
         assert concept.code == "ComplexDocument"
         assert concept.domain_code == "test_domain"
-        assert concept.structure_class_name == "ComplexDocument"
+        assert concept.structure_class_name == "test_domain__ComplexDocument"
 
         # Verify the generated class works
-        generated_class = get_class_registry().get_required_subclass("ComplexDocument", StructuredContent)
+        generated_class = get_class_registry().get_required_subclass("test_domain__ComplexDocument", StructuredContent)
 
         # Test instantiation with complex types
         instance = generated_class(
@@ -216,12 +216,12 @@ not a registered subclass of StuffContent",
         )
 
         # Both should be created successfully
-        assert concept1.structure_class_name == "Person"
-        assert concept2.structure_class_name == "Product"
+        assert concept1.structure_class_name == "test_domain__Person"
+        assert concept2.structure_class_name == "test_domain__Product"
 
         # Both classes should be registered and independent
-        person_class = get_class_registry().get_required_subclass("Person", StructuredContent)
-        product_class = get_class_registry().get_required_subclass("Product", StructuredContent)
+        person_class = get_class_registry().get_required_subclass("test_domain__Person", StructuredContent)
+        product_class = get_class_registry().get_required_subclass("test_domain__Product", StructuredContent)
 
         assert person_class != product_class
 
@@ -268,11 +268,11 @@ not a registered subclass of StuffContent",
         # Verify concept properties
         assert concept.domain_code == "test_domain"
         assert concept.code == "AnimalInfo"
-        assert concept.structure_class_name == "AnimalInfo"
+        assert concept.structure_class_name == "test_domain__AnimalInfo"
 
         # Verify the generated class is registered and accessible
-        assert get_class_registry().has_class("AnimalInfo")
-        generated_class = get_class_registry().get_required_subclass("AnimalInfo", StructuredContent)
+        assert get_class_registry().has_class("test_domain__AnimalInfo")
+        generated_class = get_class_registry().get_required_subclass("test_domain__AnimalInfo", StructuredContent)
 
         # Test instantiation with quoted data
         instance = generated_class(

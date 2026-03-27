@@ -6,6 +6,7 @@ Uses a bundle with only native Text concepts to avoid the Layer 1 Kajson issue (
 """
 
 import uuid
+from datetime import timedelta
 
 import pytest
 from temporalio.client import Client as TemporalClient
@@ -108,4 +109,5 @@ class TestWfLibraryCrate:
                     arg=pipe_job_without_crate,
                     id=workflow_id,
                     task_queue=task_queue,
+                    execution_timeout=timedelta(seconds=10),
                 )

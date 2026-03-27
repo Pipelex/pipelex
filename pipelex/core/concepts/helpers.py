@@ -87,6 +87,24 @@ def normalize_structure_blueprint(structure_dict: dict[str, str | ConceptStructu
     return normalized
 
 
+def make_qualified_structure_class_name(domain_code: str, concept_code: str) -> str:
+    """Build a domain-qualified class name for dynamically generated structure classes.
+
+    Uses double underscore as separator to produce a valid Python identifier
+    that is distinct from bare concept codes. Dots in hierarchical domain codes
+    are replaced with underscores for Python identifier validity.
+
+    Args:
+        domain_code: The domain code (e.g., "conflict_alpha" or "legal.contracts.shareholder")
+        concept_code: The concept code (e.g., "Result")
+
+    Returns:
+        Domain-qualified class name (e.g., "conflict_alpha__Result")
+    """
+    safe_domain = domain_code.replace(".", "_")
+    return f"{safe_domain}__{concept_code}"
+
+
 def extract_concept_code_from_concept_ref_or_code(concept_ref_or_code: str) -> str:
     """Extract the concept code from a concept reference or code.
 

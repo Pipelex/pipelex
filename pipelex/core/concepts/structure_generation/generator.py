@@ -7,9 +7,10 @@ from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code
+from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code, make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 
@@ -398,9 +399,13 @@ class StructureGenerator:
             # No module path: use forward reference (resolved via model_rebuild at runtime)
             return f'"{class_info.class_name}"'
 
-        # Default: extract concept code and use as forward reference
-        # e.g., "myapp.Customer" -> '"Customer"'
+        # Default: use domain-qualified forward reference when domain is available
+        # e.g., "myapp.Customer" -> '"myapp__Customer"'
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
+        parsed_ref = QualifiedRef.parse(concept_ref)
+        if parsed_ref.domain_path and not NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
+            qualified_name = make_qualified_structure_class_name(parsed_ref.domain_path, concept_code)
+            return f'"{qualified_name}"'
         return f'"{concept_code}"'
 
     def _generate_field(self, field_name: str, field_def: dict[str, Any] | str) -> str:
