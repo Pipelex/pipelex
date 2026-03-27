@@ -65,7 +65,7 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
                     task = loop.create_task(httpx_client.aclose())
                     task.add_done_callback(
                         lambda task_result: log.debug(f"Portkey httpx client cleanup error: {task_result.exception()}")
-                        if task_result.exception()
+                        if not task_result.cancelled() and task_result.exception()
                         else None
                     )
                 except RuntimeError:
