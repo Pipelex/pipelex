@@ -7,22 +7,26 @@ from temporalio.client import Client as TemporalClient
 from temporalio.testing import WorkflowEnvironment
 
 from pipelex.temporal.tasks import Tasks
+from pipelex.temporal.temporal_connect import connect_to_temporal_selected_server
 from pipelex.temporal.temporal_data_converter import data_converter
 from pipelex.temporal.temporal_hub import temporal_hub
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
 
+TEMPORAL_SERVER_NONE = "none"
+TEMPORAL_SERVER_TIME_SKIPPING = "time-skipping"
 
-def pytest_addoption(parser: Parser):
+
+def pytest_addoption(parser: Parser) -> None:
     parser.addoption(
-        "--worker",
+        "--temporal-worker",
         default=TemporalWorkerEnvironment.INTERNAL,
         help="Which temporal worker environment to use ('internal', 'external')",
     )
     parser.addoption(
-        "--workflow-environment",
-        default="local",
-        help="Which workflow environment to use ('local', 'time-skipping', or target to existing server)",
+        "--temporal-server",
+        default=TEMPORAL_SERVER_NONE,
+        help="Which temporal server to use ('none' for in-process, 'time-skipping', or a profile name from temporal_server_configs)",
     )
 
 
@@ -70,22 +74,20 @@ def boot_temporal():
 
 @pytest_asyncio.fixture(scope="session")  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
 async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, None]:
-    """In-process Temporal test server, shared across all temporal tests."""
-    env_type: str = cast("str", request.config.getoption("--workflow-environment"))
+    """Temporal test environment, shared across all temporal tests.
+
+    Uses an in-process server by default (--temporal-server none).
+    Pass a profile name from temporal_server_configs to connect to a real server.
+    """
+    server_option: str = cast("str", request.config.getoption("--temporal-server"))
     workflow_env: WorkflowEnvironment
-    if env_type == "local":
+    if server_option == TEMPORAL_SERVER_NONE:
         workflow_env = await WorkflowEnvironment.start_local(data_converter=data_converter)  # pyright: ignore[reportUnknownMemberType]
-    elif env_type == "time-skipping":
+    elif server_option == TEMPORAL_SERVER_TIME_SKIPPING:
         workflow_env = await WorkflowEnvironment.start_time_skipping(data_converter=data_converter)
     else:
-        from temporalio.client import Client  # noqa: PLC0415
-
-        workflow_env = WorkflowEnvironment.from_client(
-            await Client.connect(
-                env_type,
-                data_converter=data_converter,
-            )
-        )
+        temporal_client = await connect_to_temporal_selected_server(selected_server_config=server_option)
+        workflow_env = WorkflowEnvironment.from_client(temporal_client)
     yield workflow_env
     await workflow_env.shutdown()
 
