@@ -1,4 +1,5 @@
-from typing import AsyncGenerator, Generator, cast
+from collections.abc import Generator
+from typing import AsyncGenerator, cast
 
 import pytest
 import pytest_asyncio
@@ -6,17 +7,26 @@ from pytest import FixtureRequest
 from temporalio.client import Client as TemporalClient
 
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
+from pipelex.config import get_config
 from pipelex.hub import get_class_registry, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
-from pipelex.temporal.temporal_connect import connect_to_temporal
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.test_extras.temporal_registry_test_models import Person
-from pipelex.temporal.test_helpers.temporal_pytest_plugins import TemporalPytestOption
 from pipelex.temporal.tprl_content_generation.content_generator_child import ContentGeneratorChild
 from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory
 from pipelex.temporal.tprl_content_generation.content_generator_top import ContentGeneratorTop
 from pipelex.temporal.tprl_content_generation.content_generator_top_factory import ContentGeneratorTopFactory
 from tests.integration.pipelex.temporal.test_utils import rprint
+
+
+@pytest.fixture(autouse=True)
+def enable_temporal_config():
+    """Enable temporal in config for content_generation tests that go through WorkflowExecutor."""
+    config = get_config()
+    original_enabled = config.temporal.is_enabled
+    config.temporal = config.temporal.model_copy(update={"is_enabled": True})
+    yield
+    config.temporal = config.temporal.model_copy(update={"is_enabled": original_enabled})
 
 
 @pytest.fixture(autouse=True)
@@ -31,29 +41,20 @@ def register_test_temporal_models():
 
 
 @pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
-async def top_crafter(request: FixtureRequest, generated_content_factory: GeneratedContentFactory) -> AsyncGenerator[ContentGeneratorTop, None]:  # noqa: RUF029
+async def top_crafter(  # noqa: RUF029
+    temporal_client: TemporalClient, generated_content_factory: GeneratedContentFactory
+) -> AsyncGenerator[ContentGeneratorTop, None]:
     # Code to run before each test
     rprint("\n[magenta]TopCrafter setup[/magenta]")
-    worker_environment = TemporalWorkerEnvironment(request.config.getoption(TemporalPytestOption.WORKER_ENVIRONMENT))
     crafter = ContentGeneratorTopFactory.make_content_generator_top(
         generated_content_factory=generated_content_factory,
-        worker_environment=worker_environment,
+        worker_environment=TemporalWorkerEnvironment.INTERNAL,
+        temporal_client=temporal_client,
     )
     # Return it for use in tests
     yield crafter
     # Code to run after each test
     rprint("\n[magenta]TopCrafter teardown[/magenta]")
-
-
-@pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]
-async def temporal_client() -> AsyncGenerator[TemporalClient, None]:
-    # Code to run before each test
-    rprint("\n[magenta]TemporalClient setup[/magenta]")
-    client = await connect_to_temporal()
-    # Return it for use in tests
-    yield client
-    # Code to run after each test
-    rprint("\n[magenta]TemporalClient teardown[/magenta]")
 
 
 @pytest.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]

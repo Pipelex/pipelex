@@ -124,7 +124,7 @@ def pytest_configure(config: Config) -> None:
         pytest.exit("Service terms not accepted - run 'pipelex init agreement' first", returncode=1)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def pipe_run_mode(request: FixtureRequest) -> PipeRunMode:
     # Force dry mode when inference is disabled
     if request.config.getoption("--disable-inference", default=False):
