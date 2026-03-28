@@ -113,11 +113,12 @@ Present results as a table:
 | **TestWfPipeCompose** | 2 (1 xfail) | PipeCompose crate structure + deferred hydration of Report concept |
 | **TestWfCombinedPipeline** | 2 (1 xfail) | Combined PipeParallel + PipeCondition nested dispatch |
 
-**Known limitation (xfail tests):** PipeCondition, PipeBatch, and PipeCompose execution tests
-fail in Temporal dry-run mode because their internal sub-workflows (`WfMakeJinja2Text` for
-expression/template evaluation) try to serialize dry-run `StuffArtefact` objects through the
-Temporal data converter. The crate structure tests pass, and PipeParallel execution works.
-These xfail tests will automatically pass once the StuffArtefact serialization issue is fixed.
+**Known limitation (xfail tests):** PipeCondition, PipeBatch, PipeCompose, and CombinedPipeline
+execution tests fail in Temporal dry-run mode because their internal sub-workflows
+(`WfMakeJinja2Text` for expression/template evaluation) try to serialize dry-run
+`StuffArtefact` objects through the Temporal data converter. The crate structure tests pass,
+and PipeParallel execution works. These xfail tests will automatically pass once the
+StuffArtefact serialization issue is fixed.
 
 The test `test_missing_crate_fails_pipe_resolution` is a **negative test** — it intentionally
 submits without a crate and expects `WorkflowFailureError`. The Temporal warning

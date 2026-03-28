@@ -71,8 +71,10 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             raise
         finally:
             if wf_library_id is not None:
-                get_library_manager().teardown(library_id=wf_library_id)
-                teardown_current_library()
+                try:
+                    get_library_manager().teardown(library_id=wf_library_id)
+                finally:
+                    teardown_current_library()
 
         workflow_log.debug("Workflow complete")
         return pipe_output

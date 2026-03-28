@@ -119,8 +119,6 @@ class Stuff(PrettyRenderable, CustomBaseModel, StuffAbstract[Concept, StuffConte
             at_least_one_bare = ("__" not in actual_name) or ("__" not in expected_name)
             names_match = (actual_name == expected_name) or (at_least_one_bare and actual_code == expected_code)
             if names_match:
-                # Use model_dump() instead of smart_dump() to ensure we get a dict
-                # smart_dump() may return a string for some content types (e.g., TextContent)
                 content_dict = content.smart_dump()
                 validated_content = content_type.model_validate(content_dict)
                 log.verbose(f"Model validation passed: converted {type(content).__name__} to {content_type.__name__}")
