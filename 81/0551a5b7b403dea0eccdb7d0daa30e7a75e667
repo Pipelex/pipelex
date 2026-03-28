@@ -1,0 +1,55 @@
+.claude/skills/temporal-e2e-validate/SKILL.md
+  458c75e35325ea66 116-120
+pipelex/kit/agent_rules/commands.md
+  c9e805394ef5c79e 31-33,77-98
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  77a76a6f0625d025 74-77
+tests/integration/pipelex/temporal/library_crate/test_wf_deferred_hydration.py
+  77a76a6f0625d025 14,17-18,20,92-158
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "810551a5b7b403dea0eccdb7d0daa30e7a75e667",
+  "prompts": {
+    "458c75e35325ea66": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da3605ca-2e6b-4c79-b96c-22b7a2dc3c1e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 5,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "77a76a6f0625d025": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "28be2d03-619b-41f0-a6a8-7a25d6ab61fa",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 75,
+      "total_deletions": 4,
+      "accepted_lines": 75,
+      "overriden_lines": 0
+    },
+    "c9e805394ef5c79e": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "65795455-f46a-4801-9d94-a26c22a262af",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 25,
+      "total_deletions": 1,
+      "accepted_lines": 25,
+      "overriden_lines": 0
+    }
+  }
+}
