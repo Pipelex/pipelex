@@ -1,0 +1,39 @@
+tests/integration/pipelex/fixtures/pipe_job_helpers.py
+  f86b15e1a24ba5ef 46,48-58,60-72,100,109
+tests/integration/pipelex/temporal/library_crate/test_wf_deferred_hydration.py
+  f86b15e1a24ba5ef 30,35
+pipelex/test_extras/shared_pytest_plugins.py
+  f86b15e1a24ba5ef 76-79,81
+tests/integration/pipelex/temporal/library_crate/conftest.py
+  f86b15e1a24ba5ef 29,42,46,51,59,65,70,76,84,90,95,101,109,115,120,126,134,140,145,151,156,162,167,173,178,184
+docs/stylesheets/mermaid.css
+  f86b15e1a24ba5ef 2-4,7,13-34,60
+CLAUDE.md
+  f86b15e1a24ba5ef 101-114
+tests/integration/pipelex/temporal/conftest.py
+  f86b15e1a24ba5ef 124-135
+docs/under-the-hood/pipe-routing-and-execution.md
+  f86b15e1a24ba5ef 172,193,199-200,259,261,263-264
+docs/under-the-hood/temporal-integration.md
+  f86b15e1a24ba5ef 41,58-60,71,75,77-78,82,86-87,89-92,95,97-103,133,139,222
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "e276776077f9dd8160195f5a0c6d6df729d12623",
+  "prompts": {
+    "f86b15e1a24ba5ef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "edf8350d-0a90-435e-b8fb-bf499000afc8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 355,
+      "total_deletions": 264,
+      "accepted_lines": 152,
+      "overriden_lines": 10
+    }
+  }
+}
