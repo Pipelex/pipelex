@@ -95,9 +95,11 @@ See [phase0-pipe-namespace-fix.md](phase0-pipe-namespace-fix.md) for the full te
 ```python
 class LibraryCrate(BaseModel):
     """Complete library content, ready to load into a live Library."""
-    concepts: dict[str, ConceptBlueprint]    # concept_ref (domain.Code) -> blueprint
-    pipes: dict[str, PipeBlueprintUnion]     # pipe_ref (domain.pipe_code) -> blueprint
-    fingerprint: str                         # SHA256 of serialized content
+    concepts: dict[str, ConceptBlueprint | str]  # concept_ref -> blueprint or description
+    pipes: dict[str, PipeBlueprintUnion]          # pipe_ref -> blueprint
+    domains: dict[str, DomainBlueprint]           # domain_code -> domain metadata
+    source_map: dict[str, str]                    # ref -> source file path
+    fingerprint: str                              # SHA256 of serialized content
 ```
 
 Flat structure. Domain is implicit in the keys — `scoring.WeightedScore`, `scoring.compute_score`. No `DomainCrate` wrapper.
@@ -328,6 +330,53 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 - [ ] Integration test: large WorkingMemory survives Temporal round-trip
 - [ ] `make agent-check` passes
 - [ ] `make agent-test` passes
+
+---
+
+## E2E Test Coverage
+
+> **Status**: In progress — PipeSequence + PipeParallel fully passing; PipeCondition, PipeBatch, PipeCompose blocked by StuffArtefact serialization issue
+
+**Goal**: Comprehensive Temporal regression test suite covering all pipe controller types (PipeSequence, PipeParallel, PipeCondition, PipeBatch) and non-LLM operators (PipeCompose). Validates that LibraryCrate propagation, deferred hydration, and per-workflow isolation work across all pipe dispatch patterns.
+
+### What was added
+
+5 new `.mthds` bundles in `tests/integration/pipelex/temporal/library_crate/`:
+
+| Bundle | Controller/Operator | Pattern |
+|--------|-------------------|---------|
+| `temporal_condition.mthds` | PipeCondition | Sequence → LLM → Condition → 3 outcome LLMs |
+| `temporal_parallel.mthds` | PipeParallel | Sequence → Parallel (2 branches) → LLM summary |
+| `temporal_batch.mthds` | PipeBatch | Sequence → LLM (list) → Batch fan-out → LLM per-item |
+| `temporal_compose.mthds` | PipeCompose | Sequence → 2 LLMs → Compose construct (+ dynamic Report concept) |
+| `temporal_combined.mthds` | Mixed | Sequence → Parallel → Condition → LLM (nested dispatch) |
+
+5 new test files with 10 tests (5 crate structure + 5 execution):
+- **Passing**: PipeParallel crate + execution, all 5 crate structure tests
+- **xfail** (`run=False`): PipeCondition, PipeBatch, PipeCompose, Combined execution tests
+
+### StuffArtefact serialization issue (blocks non-Sequence controller execution in dry-run)
+
+**Confirmed**: PipeCondition and PipeCompose dispatch `WfMakeJinja2Text` internal sub-workflows for expression/template evaluation. These sub-workflows serialize working memory contents through the Temporal data converter. In dry-run mode, previous PipeLLM steps produce `StuffArtefact` debugging objects in working memory, which are not JSON-serializable. Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
+
+**Likely related**: PipeBatch hangs in dry-run (root cause not fully diagnosed — may be the same StuffArtefact issue in child PipeJob creation, or a different serialization issue in list content extraction).
+
+**Not affected**: PipeSequence and PipeParallel — they dispatch child pipes via `SubPipe.run_pipe()` → `PipeRouterChild` without internal templating sub-workflows.
+
+**Root cause**: `StuffArtefact` is not a Pydantic model — it's a plain object used for dry-run tracing that was never designed for cross-process serialization.
+
+**Fix direction**: Either make `StuffArtefact` serializable (implement `__json__` or convert to Pydantic), or strip StuffArtefact objects from working memory before passing to internal sub-workflows. The skill `temporal-e2e-validate` has xfail tests (`run=False`) that will automatically pass once fixed.
+
+### Test summary
+
+| Controller | Crate structure | Execution (dry-run) | Execution (live) |
+|------------|:-:|:-:|:-:|
+| PipeSequence | pass | pass | pass |
+| PipeParallel | pass | pass | untested |
+| PipeCondition | pass | xfail | untested |
+| PipeBatch | pass | xfail | untested |
+| PipeCompose | pass | xfail | untested |
+| Combined (Parallel+Condition) | pass | xfail | untested |
 
 ---
 
