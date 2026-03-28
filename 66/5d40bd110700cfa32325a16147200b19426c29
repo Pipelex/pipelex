@@ -1,0 +1,49 @@
+tests/integration/pipelex/temporal/library_crate/temporal_combined.mthds
+  b877386d6377fb57 1-76
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_batch.py
+  b877386d6377fb57 1-67
+tests/integration/pipelex/temporal/library_crate/temporal_compose.mthds
+  b877386d6377fb57 1-44
+tests/integration/pipelex/temporal/library_crate/conftest.py
+  b877386d6377fb57 11,19-22,121-173
+tests/integration/pipelex/temporal/library_crate/test_wf_combined_pipeline.py
+  b877386d6377fb57 1-78
+tests/integration/pipelex/temporal/library_crate/temporal_parallel.mthds
+  b877386d6377fb57 1-52
+.claude/skills/temporal-e2e-validate/SKILL.md
+  b877386d6377fb57 1-334
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_condition.py
+  b877386d6377fb57 1-70
+tests/integration/pipelex/temporal/test_data.py
+  b877386d6377fb57 297-409
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_parallel.py
+  b877386d6377fb57 1-66
+tests/integration/pipelex/temporal/library_crate/temporal_batch.mthds
+  b877386d6377fb57 1-40
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_compose.py
+  b877386d6377fb57 1-79
+tests/integration/pipelex/temporal/library_crate/temporal_condition.mthds
+  b877386d6377fb57 1-55
+wip/00-master-plan.md
+  b877386d6377fb57 206-207,238-243,249-250,278-281,283-284
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.20",
+  "base_commit_sha": "665d40bd110700cfa32325a16147200b19426c29",
+  "prompts": {
+    "b877386d6377fb57": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a15501ba-c2af-44a6-9f3a-6509419ab22d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1169,
+      "total_deletions": 33,
+      "accepted_lines": 1148,
+      "overriden_lines": 0
+    }
+  }
+}
