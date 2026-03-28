@@ -38,24 +38,26 @@ Domain is encoded in the dictionary keys (e.g., `scoring.WeightedScore`, `scorin
 
 ### How it propagates
 
-```
-Submitter                           Temporal Worker
-─────────                           ───────────────
-pipeline_run_setup()
-  ├── Load library from bundles
-  └── Build LibraryCrate
+```mermaid
+sequenceDiagram
+    participant S as Submitter
+    participant W as Worker
 
-PipeRouterTop._run_pipe_job()
-  ├── Attach crate to PipeJob
-  ├── Submit WfPipeRouter workflow
-  │                                 WfPipeRouter.run(pipe_job)
-  │                                   ├── load_from_crate(pipe_job.library_crate)
-  │                                   └── pipe.run_pipe(...)
-  │                                       └── Controller dispatches child pipes
-  │                                           └── PipeRouterChild creates child workflow
-  │                                               └── Child PipeJob carries same crate
-  │                                                   └── WfPipeRouter loads crate again
-  │                                                       (idempotent via fingerprint)
+    S->>S: Load library, build LibraryCrate
+    S->>W: PipeJob (crate attached)
+
+    Note over W: WfPipeRouter.run()
+    W->>W: load_from_crate(crate)
+    W->>W: pipe.run_pipe()
+
+    Note over W: Controller dispatches child
+    W->>W: PipeRouterChild → child workflow
+    Note over W: Child WfPipeRouter.run()
+    W->>W: load_from_crate(same crate)
+    W->>W: child pipe.run_pipe()
+
+    W->>S: PipeOutput (dehydrated)
+    S->>S: Hydrate PipeOutput
 ```
 
 Every child workflow receives the crate through its `PipeJob`. Each `WfPipeRouter` loads the crate into its own scoped library. This ensures every workflow — parent or child, on any worker — can resolve all pipes.
@@ -66,30 +68,39 @@ The `LibraryCrate` is a Pydantic model. Temporal serializes it as structured JSO
 
 ---
 
-## Deferred WorkingMemory Hydration
+## Deferred Hydration
 
 ### The chicken-and-egg problem
 
-Temporal auto-deserializes the `PipeJob` workflow input via the Kajson data converter. If `WorkingMemory` contains `Stuff` objects with dynamic concept content classes (e.g., a custom `Greeting` class), Kajson needs those classes registered to deserialize. But the classes only get registered when the `LibraryCrate` is loaded — which happens inside the workflow, after deserialization.
+Temporal's data converter deserializes payloads (workflow inputs and return values) using Kajson, which needs dynamic concept classes registered to reconstruct typed `WorkingMemory`. But those classes only get registered when the `LibraryCrate` is loaded inside the workflow. This creates two deserialization gaps:
+
+1. **Input**: The `PipeJob` workflow input contains `WorkingMemory` with dynamic classes that don't exist yet on the worker.
+2. **Output**: A child workflow's `PipeOutput` return value contains `WorkingMemory` with dynamic classes. The parent's data converter runs in the Temporal SDK's event processing context (outside the workflow coroutine's `ContextVar` scope), so it can't access the parent's per-workflow class registry.
 
 ### The solution
 
-Before Temporal dispatch, `PipeJob.prepare_for_temporal()` serializes `WorkingMemory` to a raw JSON dict:
+Both `PipeJob` and `PipeOutput` carry a `working_memory_raw` field for deferred hydration:
 
 ```python
 class PipeJob(BaseModel):
-    working_memory: WorkingMemory | None = None       # typed (direct mode)
-    working_memory_raw: dict[str, Any] | None = None  # raw JSON (deferred)
+    working_memory: WorkingMemory | None = None
+    working_memory_raw: dict[str, Any] | None = None
     library_crate: LibraryCrate | None = None
+
+class PipeOutput(PipeOutputAbstract[WorkingMemory]):
+    working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
+    working_memory_raw: dict[str, Any] | None = None
 ```
 
-After the worker loads the crate (registering dynamic classes), `WfPipeRouter` hydrates the raw dict:
+**Input dehydration/hydration cycle:**
 
-```python
-if workflow_arg.working_memory_raw is not None:
-    workflow_arg.working_memory = hydrate_working_memory(workflow_arg.working_memory_raw)
-    workflow_arg.working_memory_raw = None
-```
+- Before dispatch, `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (a plain dict via `smart_dump()`).
+- After the worker loads the crate, `WfPipeRouter` hydrates the raw dict back to typed `WorkingMemory`.
+
+**Output dehydration/hydration cycle:**
+
+- Before returning from a workflow, `WfPipeRouter` calls `PipeOutput.prepare_for_temporal()` to dehydrate `WorkingMemory` to `working_memory_raw`.
+- After receiving, `PipeRouterChild` (for child workflows) or `PipeRouterTop` (for top-level workflows) hydrates the raw dict using the scoped class registry.
 
 The hydration function (`pipelex/temporal/tprl_pipe/hydration.py`) iterates the raw dict, uses `StuffContentFactory` to reconstruct typed content objects using the now-registered classes, and preserves aliases.
 
@@ -119,13 +130,13 @@ Each `WfPipeRouter.run()` creates its own scoped state:
 
 ### Kajson integration
 
-The Temporal data converter passes the per-workflow `ClassRegistry` explicitly to `kajson.loads()`:
+The Temporal data converter passes the active `ClassRegistry` to `kajson.loads()`:
 
 ```python
 pydantic_gizmo = kajson.loads(data, class_registry=get_class_registry())
 ```
 
-This ensures dynamic classes with `__module__="builtins"` resolve correctly — the explicit registry is checked first, bypassing the broken `sys.modules["builtins"]` lookup path.
+Inside a workflow coroutine, `get_class_registry()` returns the per-workflow scoped registry (via `_library_id` ContextVar). However, the data converter is also called from the Temporal SDK's event processing context (e.g., when deserializing child workflow return values), where the ContextVar is not set. In that case, it falls back to the global registry. This is why PipeOutput uses deferred hydration — the `working_memory_raw` dict doesn't require class resolution during deserialization.
 
 ---
 
@@ -208,6 +219,7 @@ In dry-run mode, PipeLLM produces `StuffArtefact` debug objects as working memor
 | LibraryCrate model | `pipelex/libraries/library_crate.py` |
 | LibraryCrate factory | `pipelex/libraries/library_crate_factory.py` |
 | PipeJob (crate + raw WM fields) | `pipelex/pipe_run/pipe_job.py` |
+| PipeOutput (raw WM for deferred hydration) | `pipelex/core/pipes/pipe_output.py` |
 | PipeRouterTop (submitter-side dispatch) | `pipelex/temporal/tprl_pipe/pipe_router_top.py` |
 | PipeRouterChild (worker-side child dispatch) | `pipelex/temporal/tprl_pipe/pipe_router_child.py` |
 | WfPipeRouter (workflow entry point) | `pipelex/temporal/tprl_pipe/wf_pipe_router.py` |

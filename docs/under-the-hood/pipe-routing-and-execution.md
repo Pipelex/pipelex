@@ -169,44 +169,39 @@ In distributed execution, the PipeJob is serialized and sent to a Temporal worke
 
 ### Flow
 
-```
-API / CLI Process                           Temporal Worker Process
-─────────────────                           ──────────────────────
-pipeline_run_setup()                        Worker startup:
-  ├── Load library                            ├── Pipelex.make(temporal_enabled=True)
-  ├── Generate dynamic classes                ├── Load base library from PIPELEXPATH
-  ├── Resolve pipe                            └── Set PipeRouterChild as hub router
-  ├── Build LibraryCrate from library
-  ├── Attach crate to PipeJob
-  ├── Serialize WM to working_memory_raw
-  │   (if dynamic concepts present)
-  └── Return PipeJob
-         │
-PipeRouterTop.run(pipe_job)
-  ├── pipe_job.prepare_for_temporal()
-  ├── WorkflowExecutor.execute_workflow(
-  │     WfPipeRouter, pipe_job)
-  │         │
-  │    Kajson serializes PipeJob ──────────►  Temporal deserializes PipeJob
-  │    (crate travels as structured JSON)     (crate deserializes cleanly)
-  │                                                    │
-  │                                          WfPipeRouter.run(pipe_job)
-  │                                            ├── Create per-workflow ClassRegistry
-  │                                            ├── Open per-workflow Library
-  │                                            ├── Load LibraryCrate into library
-  │                                            │   (registers dynamic classes)
-  │                                            ├── Hydrate working_memory_raw → WorkingMemory
-  │                                            └── pipe.run_pipe(...)
-  │                                                ├── Concrete: Activity
-  │                                                └── Controller:
-  │                                                    ├── get_required_pipe()
-  │                                                    └── get_pipe_router().run()
-  │                                                        → PipeRouterChild
-  │                                                        → child workflow
-  │                                                          (crate propagates)
-  │                                                    │
-  │    ◄────────────────────────────────────  Return PipeOutput
-  └── Return PipeOutput
+```mermaid
+sequenceDiagram
+    participant S as Submitter (API/CLI)
+    participant T as Temporal Server
+    participant W as Worker
+
+    Note over S: pipeline_run_setup()
+    S->>S: Load library, generate dynamic classes
+    S->>S: Resolve pipe, build LibraryCrate
+    S->>S: Create PipeJob (crate attached)
+
+    Note over S: PipeRouterTop.run()
+    S->>S: prepare_for_temporal()<br/>(WM → working_memory_raw)
+    S->>T: Submit WfPipeRouter(PipeJob)
+    T->>W: Dispatch workflow
+
+    Note over W: WfPipeRouter.run()
+    W->>W: Create per-workflow ClassRegistry
+    W->>W: Load LibraryCrate (register classes)
+    W->>W: Hydrate working_memory_raw → WM
+    W->>W: pipe.run_pipe()
+
+    alt Concrete pipe
+        W->>W: Execute via Activity
+    else Controller pipe
+        W->>T: Child workflow (crate propagates)
+        T->>W: Child result
+    end
+
+    W->>W: Dehydrate PipeOutput<br/>(WM → working_memory_raw)
+    W->>T: Return dehydrated PipeOutput
+    T->>S: Workflow result
+    S->>S: Hydrate PipeOutput<br/>(working_memory_raw → WM)
 ```
 
 ### Key Components
@@ -261,9 +256,12 @@ For a detailed walkthrough of these mechanisms, see [Temporal Integration](./tem
 
 The submitter builds a `LibraryCrate` — a serializable snapshot of all pipes and concepts — and attaches it to the `PipeJob`. Each `WfPipeRouter` on the worker loads the crate into a per-workflow scoped library, making all pipes resolvable via `get_required_pipe()`.
 
-### Deferred WorkingMemory Hydration
+### Deferred Hydration (Input and Output)
 
-When a `PipeJob` contains dynamic concept classes (from `mthds_content`), the `WorkingMemory` is serialized as a raw JSON dict (`working_memory_raw`) instead of a typed object. After the worker loads the crate and registers the dynamic classes, the raw dict is hydrated into a typed `WorkingMemory`. This avoids the chicken-and-egg problem where deserialization needs classes that only exist after library loading.
+Deferred hydration applies to both **PipeJob inputs** and **PipeOutput return values**. In both cases, `WorkingMemory` is serialized as a raw JSON dict (`working_memory_raw`) instead of a typed object, avoiding deserialization failures when dynamic concept classes aren't registered in the receiving process's class registry.
+
+- **Input**: `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` before dispatch. The worker hydrates it after loading the crate.
+- **Output**: `PipeOutput.prepare_for_temporal()` does the same before returning from a child workflow. The parent (`PipeRouterChild` or `PipeRouterTop`) hydrates after receiving.
 
 ### Per-Workflow ClassRegistry and Library Scoping
 

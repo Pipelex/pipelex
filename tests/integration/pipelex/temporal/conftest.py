@@ -121,3 +121,15 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
 async def temporal_client(env: WorkflowEnvironment) -> TemporalClient:  # noqa: RUF029
     """Temporal client connected to the test server."""
     return env.client
+
+
+@pytest.fixture(scope="class")
+def is_class_registry_isolated(request: FixtureRequest) -> bool:
+    """Whether dynamic classes should be scoped to the library registry (not global).
+
+    When True, simulates a process that hasn't pre-loaded the bundle — dynamic concept
+    classes exist only in the library's scoped ClassRegistry, not in the global
+    KajsonManager registry. This forces code paths that rely on crate-based class
+    loading and deferred hydration.
+    """
+    return cast("str", request.config.getoption("--class-registry")) == "isolated"

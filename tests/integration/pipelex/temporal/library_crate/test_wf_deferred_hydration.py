@@ -27,11 +27,12 @@ from tests.integration.pipelex.temporal.test_data import DeferredHydrationTestDa
 
 
 @pytest.fixture(scope="class")
-def pipe_job_with_dynamic_concept() -> Generator[PipeJob, None, None]:
+def pipe_job_with_dynamic_concept(is_class_registry_isolated: bool) -> Generator[PipeJob, None, None]:
     """Build a PipeJob from the dynamic concept test bundle (mthds_content with inline structure)."""
     yield from pipe_job_from_bundle(
         bundle_file=DeferredHydrationTestData.BUNDLE_FILE,
         pipe_code=DeferredHydrationTestData.PIPE_CODE,
+        isolated_registry=is_class_registry_isolated,
     )
 
 

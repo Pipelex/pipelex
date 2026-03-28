@@ -73,6 +73,12 @@ def pytest_addoption(parser: Parser):
         help="Disable inference for this test session. Uses mock content generator, "
         "skips gateway terms check, and auto-skips tests marked with @pytest.mark.inference.",
     )
+    parser.addoption(
+        "--class-registry",
+        default="shared",
+        choices=("shared", "isolated"),
+        help="Class registry mode: 'shared' leaks dynamic classes to global (default), 'isolated' scopes them to the library registry",
+    )
 
 
 def pytest_configure(config: Config) -> None:
