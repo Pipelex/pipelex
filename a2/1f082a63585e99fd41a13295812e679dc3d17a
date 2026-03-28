@@ -1,0 +1,63 @@
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_compose.py
+  f86b15e1a24ba5ef 19,70
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_parallel.py
+  f86b15e1a24ba5ef 16,61
+pipelex/core/pipes/pipe_output.py
+  f86b15e1a24ba5ef 1,22,26-41
+pipelex/temporal/tprl_pipe/pipe_router_child.py
+  f86b15e1a24ba5ef 12,30,35-40
+tests/integration/pipelex/temporal/library_crate/test_wf_combined_pipeline.py
+  f86b15e1a24ba5ef 20,67
+pipelex/temporal/tprl_pipe/pipe_router_top.py
+  f86b15e1a24ba5ef 15,52,57-61
+tests/integration/pipelex/temporal/conftest.py
+  f86b15e1a24ba5ef 1,30,44
+  580f78027b7e9bd9 33-34,47-48,103-105
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_batch.py
+  f86b15e1a24ba5ef 17,64
+tests/integration/pipelex/temporal/library_crate/helpers.py
+  f86b15e1a24ba5ef 4,12,16-27,32,34,41,43
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  f86b15e1a24ba5ef 79-84
+tests/integration/pipelex/temporal/library_crate/test_wf_library_crate.py
+  f86b15e1a24ba5ef 19,61
+tests/integration/pipelex/temporal/library_crate/test_wf_deferred_hydration.py
+  f86b15e1a24ba5ef 76,147
+wip/phase3-mode2-regression.md
+  580f78027b7e9bd9 1-181
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_condition.py
+  f86b15e1a24ba5ef 18,65
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "a21f082a63585e99fd41a13295812e679dc3d17a",
+  "prompts": {
+    "580f78027b7e9bd9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "529a875b-47c0-4ee5-9479-db0ce726b701",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 190,
+      "total_deletions": 27,
+      "accepted_lines": 188,
+      "overriden_lines": 0
+    },
+    "f86b15e1a24ba5ef": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "edf8350d-0a90-435e-b8fb-bf499000afc8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 90,
+      "total_deletions": 22,
+      "accepted_lines": 75,
+      "overriden_lines": 0
+    }
+  }
+}
