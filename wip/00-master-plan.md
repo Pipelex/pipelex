@@ -203,6 +203,8 @@ WfPipeRouter.run(pipe_job)
 
 ## Phase 3: Deferred WorkingMemory Hydration
 
+> **Status**: Complete
+
 **Goal**: Handle Layer 1 — when `mthds_content` introduces dynamic concept classes that the worker doesn't know about at deserialization time.
 
 **The problem**: Temporal auto-deserializes PipeJob via the Kajson data converter. If WorkingMemory contains Stuff objects with dynamic content classes (e.g., `RawText`), Kajson fails because those classes aren't registered on the worker yet. The crate loading can't happen until the workflow starts, but the workflow input must be deserialized first.
@@ -233,16 +235,18 @@ class PipeJob(BaseModel):
 
 ### Done when
 
-- [ ] Integration test: PipeSequence with `mthds_content` containing a custom concept with inline structure (dynamic class)
-- [ ] `working_memory_raw` hydrates correctly after library setup
-- [ ] Stuff objects have correct typed content after hydration
-- [ ] `working_memory_raw` is visible as plain JSON in Temporal dashboard
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+- [x] Integration test: PipeSequence with `mthds_content` containing a custom concept with inline structure (dynamic class)
+- [x] `working_memory_raw` hydrates correctly after library setup
+- [x] Stuff objects have correct typed content after hydration
+- [x] `working_memory_raw` is visible as plain JSON in Temporal dashboard
+- [x] `make agent-check` passes
+- [x] `make agent-test` passes
 
 ---
 
 ## Phase 4: Explicit ClassRegistry
+
+> **Status**: Complete
 
 **Goal**: Move ClassRegistry scoping out of Kajson (a serialization library) and into Pipelex's Library lifecycle. Fix two bugs that only manifest with separate Temporal worker processes: decoder bypass (dynamic classes with `__module__="builtins"`) and teardown clobber (non-stack-safe `finally` block).
 
@@ -271,13 +275,13 @@ See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for t
 
 ### Done when
 
-- [ ] `kajson.loads(data, class_registry=reg)` resolves dynamic classes with `__module__="builtins"` (new unit test)
-- [ ] `KajsonManager` has no ContextVar, no `set_scoped_class_registry`
-- [ ] `Library._class_registry` is a PrivateAttr, GC'd with Library
-- [ ] All ~20 callers migrated from `KajsonManager.get_class_registry()` to `hub.get_class_registry()`
+- [x] `kajson.loads(data, class_registry=reg)` resolves dynamic classes with `__module__="builtins"` (new unit test)
+- [x] `KajsonManager` has no ContextVar, no `set_scoped_class_registry`
+- [x] `Library._class_registry` is a PrivateAttr, GC'd with Library
+- [x] All ~20 callers migrated from `KajsonManager.get_class_registry()` to `hub.get_class_registry()`
 - [ ] Manual Temporal test: 3-process setup with `dynamic_concept_sequence.mthds` passes
-- [ ] `make agent-check` passes (both repos)
-- [ ] `make agent-test` passes (both repos)
+- [x] `make agent-check` passes (both repos)
+- [x] `make agent-test` passes (both repos)
 
 ---
 

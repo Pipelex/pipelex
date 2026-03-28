@@ -1,0 +1,55 @@
+domain      = "temporal_condition_test"
+description = "PipeCondition within a PipeSequence for Temporal child workflow dispatch testing"
+
+[concept]
+CategoryLabel = "A category label for routing"
+
+[pipe]
+[pipe.temporal_condition_sequence]
+type = "PipeSequence"
+description = "Sequence that generates a category then routes via condition"
+output = "Text"
+steps = [
+  { pipe = "generate_category", result = "category_text" },
+  { pipe = "route_by_category", result = "routed_result" },
+]
+
+[pipe.generate_category]
+type        = "PipeLLM"
+description = "Generate a category label"
+output      = "CategoryLabel"
+model       = "$testing-text"
+prompt      = "Output exactly one word: alpha"
+
+[pipe.route_by_category]
+type                = "PipeCondition"
+description         = "Route based on category text content"
+inputs              = { category_text = "CategoryLabel" }
+output              = "Text"
+expression_template = "{{ category_text.text }}"
+default_outcome     = "handle_default"
+
+[pipe.route_by_category.outcomes]
+alpha = "handle_alpha"
+beta  = "handle_beta"
+
+[pipe.handle_alpha]
+type        = "PipeLLM"
+description = "Handle alpha category"
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Output exactly: handled_alpha"
+
+[pipe.handle_beta]
+type        = "PipeLLM"
+description = "Handle beta category"
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Output exactly: handled_beta"
+
+[pipe.handle_default]
+type        = "PipeLLM"
+description = "Handle default category"
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Output exactly: handled_default"

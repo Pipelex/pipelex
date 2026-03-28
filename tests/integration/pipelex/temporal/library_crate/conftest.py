@@ -8,6 +8,7 @@ from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_mode import PipeRunMode
 from tests.integration.pipelex.fixtures.pipe_job_helpers import pipe_job_from_bundle, pipe_job_from_library
 from tests.integration.pipelex.temporal.test_data import (
+    CombinedPipelineTemporalTestData,
     ConflictConceptAlphaTestData,
     ConflictConceptBetaTestData,
     ConflictPipeAlphaTestData,
@@ -15,6 +16,10 @@ from tests.integration.pipelex.temporal.test_data import (
     LibraryCrateTestData,
     MultiConceptAlphaTestData,
     MultiConceptBetaTestData,
+    PipeBatchTemporalTestData,
+    PipeComposeTemporalTestData,
+    PipeConditionTemporalTestData,
+    PipeParallelTemporalTestData,
 )
 
 # --- Existing fixtures (Phase 2) ---
@@ -111,5 +116,58 @@ def multi_beta_job(pipe_run_mode: PipeRunMode) -> Generator[PipeJob, None, None]
     yield from pipe_job_from_bundle(
         bundle_file=MultiConceptBetaTestData.BUNDLE_FILE,
         pipe_code=MultiConceptBetaTestData.PIPE_CODE,
+        pipe_run_mode=pipe_run_mode,
+    )
+
+
+# --- Controller type coverage fixtures ---
+
+
+@pytest.fixture(scope="class")
+def condition_job(pipe_run_mode: PipeRunMode) -> Generator[PipeJob, None, None]:
+    """PipeJob with PipeCondition inside a PipeSequence."""
+    yield from pipe_job_from_bundle(
+        bundle_file=PipeConditionTemporalTestData.BUNDLE_FILE,
+        pipe_code=PipeConditionTemporalTestData.PIPE_CODE,
+        pipe_run_mode=pipe_run_mode,
+    )
+
+
+@pytest.fixture(scope="class")
+def parallel_job(pipe_run_mode: PipeRunMode) -> Generator[PipeJob, None, None]:
+    """PipeJob with PipeParallel inside a PipeSequence."""
+    yield from pipe_job_from_bundle(
+        bundle_file=PipeParallelTemporalTestData.BUNDLE_FILE,
+        pipe_code=PipeParallelTemporalTestData.PIPE_CODE,
+        pipe_run_mode=pipe_run_mode,
+    )
+
+
+@pytest.fixture(scope="class")
+def batch_job(pipe_run_mode: PipeRunMode) -> Generator[PipeJob, None, None]:
+    """PipeJob with PipeBatch inside a PipeSequence."""
+    yield from pipe_job_from_bundle(
+        bundle_file=PipeBatchTemporalTestData.BUNDLE_FILE,
+        pipe_code=PipeBatchTemporalTestData.PIPE_CODE,
+        pipe_run_mode=pipe_run_mode,
+    )
+
+
+@pytest.fixture(scope="class")
+def compose_job(pipe_run_mode: PipeRunMode) -> Generator[PipeJob, None, None]:
+    """PipeJob with PipeCompose operator and dynamic Report concept."""
+    yield from pipe_job_from_bundle(
+        bundle_file=PipeComposeTemporalTestData.BUNDLE_FILE,
+        pipe_code=PipeComposeTemporalTestData.PIPE_CODE,
+        pipe_run_mode=pipe_run_mode,
+    )
+
+
+@pytest.fixture(scope="class")
+def combined_job(pipe_run_mode: PipeRunMode) -> Generator[PipeJob, None, None]:
+    """PipeJob with PipeParallel + PipeCondition in a single PipeSequence."""
+    yield from pipe_job_from_bundle(
+        bundle_file=CombinedPipelineTemporalTestData.BUNDLE_FILE,
+        pipe_code=CombinedPipelineTemporalTestData.PIPE_CODE,
         pipe_run_mode=pipe_run_mode,
     )

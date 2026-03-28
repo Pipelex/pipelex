@@ -294,6 +294,119 @@ class MultiConceptBetaTestData:
     EXPECTED_SUMMARY_FIELDS: ClassVar[list[str]] = ["content"]
 
 
+class PipeConditionTemporalTestData:
+    """PipeCondition within a PipeSequence for Temporal child workflow dispatch testing."""
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/temporal_condition.mthds"
+    PIPE_CODE: ClassVar[str] = "temporal_condition_sequence"
+    DOMAIN: ClassVar[str] = "temporal_condition_test"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "temporal_condition_test.temporal_condition_sequence",
+        "temporal_condition_test.generate_category",
+        "temporal_condition_test.route_by_category",
+        "temporal_condition_test.handle_alpha",
+        "temporal_condition_test.handle_beta",
+        "temporal_condition_test.handle_default",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "category_text",
+        "routed_result",
+    ]
+
+
+class PipeParallelTemporalTestData:
+    """PipeParallel within a PipeSequence for Temporal concurrent child workflow dispatch testing."""
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/temporal_parallel.mthds"
+    PIPE_CODE: ClassVar[str] = "temporal_parallel_sequence"
+    DOMAIN: ClassVar[str] = "temporal_parallel_test"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "temporal_parallel_test.temporal_parallel_sequence",
+        "temporal_parallel_test.analyze_in_parallel",
+        "temporal_parallel_test.branch_tone",
+        "temporal_parallel_test.branch_length",
+        "temporal_parallel_test.summarize_results",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "tone_result",
+        "length_result",
+        "summary",
+    ]
+
+
+class PipeBatchTemporalTestData:
+    """PipeBatch within a PipeSequence for Temporal fan-out child workflow dispatch testing."""
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/temporal_batch.mthds"
+    PIPE_CODE: ClassVar[str] = "temporal_batch_sequence"
+    DOMAIN: ClassVar[str] = "temporal_batch_test"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "temporal_batch_test.temporal_batch_sequence",
+        "temporal_batch_test.temporal_generate_topics",
+        "temporal_batch_test.batch_temporal_describe_topics",
+        "temporal_batch_test.temporal_describe_topic",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "topics",
+        "notes",
+    ]
+
+
+class PipeComposeTemporalTestData:
+    """PipeCompose operator within a PipeSequence with deferred hydration of Report concept."""
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/temporal_compose.mthds"
+    PIPE_CODE: ClassVar[str] = "temporal_compose_sequence"
+    DOMAIN: ClassVar[str] = "temporal_compose_test"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "temporal_compose_test.temporal_compose_sequence",
+        "temporal_compose_test.generate_title",
+        "temporal_compose_test.generate_body",
+        "temporal_compose_test.compose_report",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "title_text",
+        "body_text",
+        "final_report",
+    ]
+
+    EXPECTED_REPORT_FIELDS: ClassVar[list[str]] = ["title", "body"]
+
+
+class CombinedPipelineTemporalTestData:
+    """Combined PipeParallel + PipeCondition in a PipeSequence for nested Temporal dispatch testing."""
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/temporal_combined.mthds"
+    PIPE_CODE: ClassVar[str] = "temporal_combined_pipeline"
+    DOMAIN: ClassVar[str] = "temporal_combined_test"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "temporal_combined_test.temporal_combined_pipeline",
+        "temporal_combined_test.parallel_generate",
+        "temporal_combined_test.generate_part_a",
+        "temporal_combined_test.generate_part_b",
+        "temporal_combined_test.quality_gate",
+        "temporal_combined_test.handle_failure",
+        "temporal_combined_test.produce_report",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "part_a",
+        "part_b",
+        "final_report",
+    ]
+
+    EXPECTED_REPORT_FIELDS: ClassVar[list[str]] = ["assessment", "confidence"]
+
+
 class PipeOcrTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
         # LOCAL
