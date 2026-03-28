@@ -6,6 +6,7 @@ requires dynamic class registration on the worker before PipeCompose can constru
 """
 
 import uuid
+from datetime import timedelta
 
 import pytest
 from temporalio.client import Client as TemporalClient
@@ -41,7 +42,7 @@ class TestWfPipeCompose:
         report_ref = f"{PipeComposeTemporalTestData.DOMAIN}.Report"
         assert report_ref in crate.concepts, f"Expected concept_ref '{report_ref}' not found in crate"
 
-    @pytest.mark.xfail(run=False, reason="PipeCompose construct dispatches WfMakeJinja2Text which fails to serialize dry-run StuffArtefact")
+    @pytest.mark.xfail(reason="PipeCompose construct dispatches WfMakeJinja2Text which fails to serialize dry-run StuffArtefact")
     async def test_compose_sequence_via_temporal(
         self,
         compose_job: PipeJob,
@@ -61,6 +62,7 @@ class TestWfPipeCompose:
                 arg=compose_job,
                 id=workflow_id,
                 task_queue=task_queue,
+                execution_timeout=timedelta(seconds=30),
             )
 
         assert isinstance(pipe_output, PipeOutput)

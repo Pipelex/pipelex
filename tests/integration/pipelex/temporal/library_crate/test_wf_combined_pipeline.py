@@ -7,6 +7,7 @@ Also exercises Phase 3 deferred hydration via the QualityReport inline structure
 """
 
 import uuid
+from datetime import timedelta
 
 import pytest
 from temporalio.client import Client as TemporalClient
@@ -38,9 +39,7 @@ class TestWfCombinedPipeline:
         """Verify the crate has all pipe_refs from parallel, condition, and LLM pipes."""
         self._assert_crate_structure(combined_job)
 
-    @pytest.mark.xfail(
-        run=False, reason="PipeCondition expression evaluation dispatches WfMakeJinja2Text which fails to serialize dry-run StuffArtefact"
-    )
+    @pytest.mark.xfail(reason="PipeCondition expression evaluation dispatches WfMakeJinja2Text which fails to serialize dry-run StuffArtefact")
     async def test_combined_pipeline_via_temporal(
         self,
         combined_job: PipeJob,
@@ -60,6 +59,7 @@ class TestWfCombinedPipeline:
                 arg=combined_job,
                 id=workflow_id,
                 task_queue=task_queue,
+                execution_timeout=timedelta(seconds=30),
             )
 
         assert isinstance(pipe_output, PipeOutput)

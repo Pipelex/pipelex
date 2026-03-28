@@ -5,6 +5,7 @@ Each batch item is dispatched as a separate child workflow through PipeRouterChi
 """
 
 import uuid
+from datetime import timedelta
 
 import pytest
 from temporalio.client import Client as TemporalClient
@@ -35,7 +36,7 @@ class TestWfPipeBatch:
         """Verify the crate has all pipe_refs including the batch branch pipe."""
         self._assert_crate_structure(batch_job)
 
-    @pytest.mark.xfail(run=False, reason="PipeBatch fan-out hangs in Temporal dry-run — StuffArtefact serialization issue in child workflows")
+    @pytest.mark.xfail(reason="PipeBatch fan-out fails in Temporal dry-run — likely StuffArtefact serialization issue in child workflows")
     async def test_batch_sequence_via_temporal(
         self,
         batch_job: PipeJob,
@@ -55,6 +56,7 @@ class TestWfPipeBatch:
                 arg=batch_job,
                 id=workflow_id,
                 task_queue=task_queue,
+                execution_timeout=timedelta(seconds=30),
             )
 
         assert isinstance(pipe_output, PipeOutput)

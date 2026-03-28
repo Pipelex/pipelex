@@ -353,7 +353,7 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 
 5 new test files with 10 tests (5 crate structure + 5 execution):
 - **Passing**: PipeParallel crate + execution, all 5 crate structure tests
-- **xfail** (`run=False`): PipeCondition, PipeBatch, PipeCompose, Combined execution tests
+- **xfail**: PipeCondition, PipeBatch, PipeCompose, Combined execution tests (with 30s `execution_timeout` to prevent hangs)
 
 ### StuffArtefact serialization issue (blocks non-Sequence controller execution in dry-run)
 
