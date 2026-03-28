@@ -76,5 +76,11 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 finally:
                     teardown_current_library()
 
+        # Dehydrate PipeOutput for Temporal transit: serialize WorkingMemory to
+        # raw dict so the parent's data converter can deserialize without needing
+        # dynamic concept classes in its ClassRegistry.
+        if library_crate is not None:
+            pipe_output = pipe_output.prepare_for_temporal()
+
         workflow_log.debug("Workflow complete")
         return pipe_output

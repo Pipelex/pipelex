@@ -1,6 +1,7 @@
 """Shared test helpers for Temporal LibraryCrate integration tests."""
 
 import uuid
+from typing import Any
 
 from temporalio.client import Client as TemporalClient
 
@@ -8,23 +9,38 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.pipe_run.pipe_job import PipeJob
+from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
+
+
+def rehydrate_pipe_output(pipe_output: PipeOutput) -> PipeOutput:
+    """Rehydrate a deferred PipeOutput received from a Temporal workflow.
+
+    Mirrors the rehydration that pipe_router_top/pipe_router_child perform
+    after receiving a workflow result.
+    """
+    if pipe_output.working_memory_raw is not None:
+        pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
+        pipe_output.working_memory_raw = None
+    return pipe_output
 
 
 async def execute_workflow(
     pipe_job: PipeJob,
     temporal_client: TemporalClient,
     task_queue: str,
+    **kwargs: Any,
 ) -> PipeOutput:
-    """Execute WfPipeRouter and return PipeOutput."""
+    """Execute WfPipeRouter and return PipeOutput, rehydrating if needed."""
     workflow_id = str(uuid.uuid4())
     pipe_output: PipeOutput = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
         workflow=WfPipeRouter.run,
         arg=pipe_job,
         id=workflow_id,
         task_queue=task_queue,
+        **kwargs,
     )
-    return pipe_output
+    return rehydrate_pipe_output(pipe_output)
 
 
 def assert_stuff_names(pipe_output: PipeOutput, expected_names: list[str]) -> None:

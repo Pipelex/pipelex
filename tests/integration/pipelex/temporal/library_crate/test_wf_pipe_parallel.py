@@ -13,6 +13,7 @@ from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
+from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
 from tests.integration.pipelex.temporal.test_data import PipeParallelTemporalTestData
 
 
@@ -57,6 +58,7 @@ class TestWfPipeParallel:
             )
 
         assert isinstance(pipe_output, PipeOutput)
+        rehydrate_pipe_output(pipe_output)
         working_memory = pipe_output.working_memory
         assert working_memory is not None
 

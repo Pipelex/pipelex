@@ -1,4 +1,4 @@
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from mthds.models.pipe_output import PipeOutputAbstract
 from pydantic import Field
@@ -19,8 +19,26 @@ from pipelex.pipeline.pipeline_models import SpecialPipelineId
 
 class PipeOutput(PipeOutputAbstract[WorkingMemory]):
     working_memory: WorkingMemory = Field(default_factory=WorkingMemory)
+    working_memory_raw: dict[str, Any] | None = None
     pipeline_run_id: str = Field(default=SpecialPipelineId.UNTITLED)
     graph_spec: GraphSpec | None = None
+
+    def prepare_for_temporal(self) -> "PipeOutput":
+        """Dehydrate WorkingMemory to raw dict for Temporal transit.
+
+        Returns a copy with working_memory serialized to a plain dict
+        (no dynamic class metadata), leaving the original unchanged.
+        The receiving side must call hydrate_working_memory() to reconstruct
+        the typed WorkingMemory after dynamic classes are registered.
+        """
+        if not self.working_memory.root:
+            return self
+        return self.model_copy(
+            update={
+                "working_memory_raw": self.working_memory.smart_dump(),
+                "working_memory": WorkingMemory(),
+            }
+        )
 
     @property
     def main_stuff(self) -> Stuff:

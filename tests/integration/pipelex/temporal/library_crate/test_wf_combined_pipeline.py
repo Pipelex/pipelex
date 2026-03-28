@@ -17,6 +17,7 @@ from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.temporal.temporal_hub import get_task_manager
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
+from tests.integration.pipelex.temporal.library_crate.helpers import rehydrate_pipe_output
 from tests.integration.pipelex.temporal.test_data import CombinedPipelineTemporalTestData
 
 
@@ -63,6 +64,7 @@ class TestWfCombinedPipeline:
             )
 
         assert isinstance(pipe_output, PipeOutput)
+        rehydrate_pipe_output(pipe_output)
         working_memory = pipe_output.working_memory
         assert working_memory is not None
 

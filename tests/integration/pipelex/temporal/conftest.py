@@ -1,4 +1,4 @@
-from typing import AsyncGenerator, cast
+from typing import AsyncGenerator, Generator, cast
 
 import pytest
 import pytest_asyncio
@@ -26,25 +26,13 @@ def pytest_addoption(parser: Parser) -> None:
     )
 
 
-def _session_owns_pipelex(request: FixtureRequest) -> bool:
-    """True when using a real Temporal server, meaning the session-scoped `env`
-    fixture initialized Pipelex and owns its lifecycle.
-    """
-    server_option: str = cast("str", request.config.getoption("--temporal-server"))
-    return server_option not in {TEMPORAL_SERVER_NONE, TEMPORAL_SERVER_TIME_SKIPPING}
-
-
 @pytest.fixture(scope="module", autouse=True)
-def reset_pipelex_config_fixture(request: FixtureRequest):
+def reset_pipelex_config_fixture() -> Generator[None, None, None]:
     """Override root conftest's fixture for Temporal tests.
 
-    When using a real Temporal server (--temporal-server <profile>), the session-scoped
-    `env` fixture owns the Pipelex lifecycle because it needs config to connect.
-    Skip module-level init/teardown to avoid conflicting with it.
+    Always initializes Pipelex per module so that logging and config are available
+    for boot_temporal and other fixtures, regardless of --temporal-server mode.
     """
-    if _session_owns_pipelex(request):
-        yield
-        return
     Pipelex.make(
         integration_mode=IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST,
     )
@@ -53,11 +41,11 @@ def reset_pipelex_config_fixture(request: FixtureRequest):
 
 
 @pytest.fixture(scope="module", autouse=True)
-def boot_temporal():
+def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, None]:  # noqa: ARG001
     """Boot the temporal layer for temporal tests.
 
-    Runs after reset_pipelex_config_fixture (also module-scoped)
-    has ensured Pipelex is initialized. Creates a TemporalTaskManager, populates
+    Depends on reset_pipelex_config_fixture to ensure Pipelex is initialized
+    before we access logging or config. Creates a TemporalTaskManager, populates
     the task catalog, and registers it on the temporal_hub so that
     get_task_manager() works.
     """
@@ -112,16 +100,12 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
 
     Uses an in-process server by default (--temporal-server none).
     Pass a profile name from temporal_server_configs to connect to a real server.
+
+    Pipelex lifecycle is managed by the module-scoped reset_pipelex_config_fixture.
+    For real server modes, the first module's init provides the config needed to connect.
     """
     server_option: str = cast("str", request.config.getoption("--temporal-server"))
     workflow_env: WorkflowEnvironment
-    needs_early_init = server_option not in {TEMPORAL_SERVER_NONE, TEMPORAL_SERVER_TIME_SKIPPING}
-    if needs_early_init:
-        # Connecting to a real server needs config (for host, namespace, API key).
-        # Pipelex is normally initialized by the module-scoped reset_pipelex_config_fixture,
-        # but this session-scoped fixture runs first, so we bootstrap here.
-        integration_mode = IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST
-        Pipelex.make(integration_mode=integration_mode)
     if server_option == TEMPORAL_SERVER_NONE:
         workflow_env = await WorkflowEnvironment.start_local(data_converter=data_converter)  # pyright: ignore[reportUnknownMemberType]
     elif server_option == TEMPORAL_SERVER_TIME_SKIPPING:
@@ -131,8 +115,6 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
         workflow_env = WorkflowEnvironment.from_client(temporal_client)
     yield workflow_env
     await workflow_env.shutdown()
-    if needs_early_init:
-        Pipelex.teardown_if_needed()
 
 
 @pytest_asyncio.fixture  # pyright: ignore[reportUntypedFunctionDecorator, reportUnknownMemberType]

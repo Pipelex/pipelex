@@ -9,6 +9,7 @@ from pipelex.observer.observer_protocol import ObserverNoOp
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
+from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 
@@ -26,11 +27,17 @@ class PipeRouterChild(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol)
         log.debug("PipeRouterChild _run_pipe_job within workflow")
         pipe_job = pipe_job.prepare_for_temporal()
         executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(task_queue=None)
-        return await executor.execute_child_workflow(
+        pipe_output = await executor.execute_child_workflow(
             workflow_class=WfPipeRouter,
             workflow_id=executor.make_workflow_id(base_id=wfid or "run-pipe-router"),
             workflow_arg=pipe_job,
         )
+        # Rehydrate PipeOutput: reconstruct typed WorkingMemory from raw dict
+        # using the parent workflow's scoped ClassRegistry
+        if pipe_output.working_memory_raw is not None:
+            pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
+            pipe_output.working_memory_raw = None
+        return pipe_output
 
     # async def run_pipe_code(
     #     self,
