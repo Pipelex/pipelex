@@ -1,0 +1,29 @@
+docs/features/mthds-language.md
+  c2486f6f68b1f8db 36
+docs/viewpoint/viewpoint.md
+  c2486f6f68b1f8db 97,121
+docs/index.md
+  c2486f6f68b1f8db 96
+README.md
+  c2486f6f68b1f8db 476
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "7e592663ca291c4a7ef142989b4cf957b7effd9e",
+  "prompts": {
+    "c2486f6f68b1f8db": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0525cc66-2ea7-4673-ae56-4bd05220980d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 5,
+      "total_deletions": 5,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    }
+  }
+}
