@@ -93,7 +93,7 @@ MTHDS is the open standard behind Pipelex methods. It defines the language, the 
 
 !!! info "Explore the ecosystem"
 
-    - **[mthds.ai](https://mthds.ai)** — The MTHDS language specification
+    - **[mthds.ai](https://mthds.ai/latest/)** — The MTHDS language specification
     - **[mthds.sh](https://mthds.sh)** — The Methods Hub for discovering and sharing methods
     - **[MTHDS Plugins](https://github.com/mthds-ai/mthds-plugins)** — Claude Code plugin for building, running, and validating methods
 
