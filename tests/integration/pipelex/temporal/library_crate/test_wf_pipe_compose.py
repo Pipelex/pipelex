@@ -43,7 +43,6 @@ class TestWfPipeCompose:
         report_ref = f"{PipeComposeTemporalTestData.DOMAIN}.Report"
         assert report_ref in crate.concepts, f"Expected concept_ref '{report_ref}' not found in crate"
 
-    @pytest.mark.xfail(reason="PipeComposeBlueprint deserialization fails: Kajson rejects template=None + construct_blueprint combination")
     async def test_compose_sequence_via_temporal(
         self,
         compose_job: PipeJob,

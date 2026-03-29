@@ -1,5 +1,6 @@
 from typing import Any, Literal
 
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
@@ -41,7 +42,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     # Template mode fields (used when template is provided)
     template: str | None = None
     templating_style: TemplatingStyle | None = None
-    category: TemplateCategory = TemplateCategory.BASIC
+    category: TemplateCategory = Field(default=TemplateCategory.BASIC, strict=False)
     extra_context: dict[str, Any] | None = None
 
     # Construct mode field (used when construct is provided)
