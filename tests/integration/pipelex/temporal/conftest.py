@@ -101,8 +101,10 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
     Uses an in-process server by default (--temporal-server none).
     Pass a profile name from temporal_server_configs to connect to a real server.
 
-    Pipelex lifecycle is managed by the module-scoped reset_pipelex_config_fixture.
-    For real server modes, the first module's init provides the config needed to connect.
+    For real server modes, Pipelex is temporarily bootstrapped here to read
+    connection config (session fixtures run before module-scoped ones), then
+    torn down so reset_pipelex_config_fixture can re-initialize per module.
+    The gRPC TemporalClient stays alive independently of the Pipelex lifecycle.
     """
     server_option: str = cast("str", request.config.getoption("--temporal-server"))
     workflow_env: WorkflowEnvironment
@@ -111,7 +113,15 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
     elif server_option == TEMPORAL_SERVER_TIME_SKIPPING:
         workflow_env = await WorkflowEnvironment.start_time_skipping(data_converter=data_converter)
     else:
+        # Session-scoped fixtures run before module-scoped ones, so
+        # reset_pipelex_config_fixture hasn't initialized Pipelex yet.
+        # Bootstrap temporarily to access server connection config.
+        Pipelex.make(
+            integration_mode=IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST,
+        )
         temporal_client = await connect_to_temporal_selected_server(selected_server_config=server_option)
+        # Teardown so the module-scoped fixture can re-initialize cleanly per module.
+        Pipelex.teardown_if_needed()
         workflow_env = WorkflowEnvironment.from_client(temporal_client)
     yield workflow_env
     await workflow_env.shutdown()
