@@ -298,7 +298,7 @@ See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for t
 
 ### Done when
 
-- [ ] **Step 0 — Event Models**: `TraceEvent` hierarchy with discriminated union, serialization round-trips, `TokensUsage` models fixed to `Literal` discriminators
+- [O] **Step 0 — Event Models**: `TraceEvent` hierarchy with discriminated union, serialization round-trips, `TokensUsage` models fixed to `Literal` discriminators
 - [ ] **Step 1 — EventLogProtocol & NDJSON Backend**: `NdjsonEventLog` with emit/read/cleanup/dedup, `InMemoryEventLog` for tests, corrupt-line handling, multiprocess concurrent write safety
 - [ ] **Step 2 — GraphSpec Assembler**: Two-pass assembly (nodes + producer map → edges), structural equivalence with current `GraphTracer` output, `UsageAggregator`
 - [ ] **Step 3 — Emit Integration**: Dual-write in `GraphTracer` (optional `EventLogProtocol`), `ReportingManager` emits `UsageReportEvent`, node/edge IDs include `workflow_id` segment

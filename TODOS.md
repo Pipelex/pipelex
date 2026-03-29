@@ -100,17 +100,17 @@ The sequence counter is **per-writer** (per workflow/file), starting at 0. No ne
 
 ### Checklist
 
-- [ ] Define `TraceEventKind` enum with all event kinds
-- [ ] Define `TraceEvent` base model with shared fields
-- [ ] Define all event subclasses (`PipeStartEvent`, `PipeEndSuccessEvent`, `PipeEndErrorEvent`, `EdgeEvent`, `ControllerOutputEvent`, `BatchItemEvent`, `BatchAggregateEvent`, `ParallelCombineEvent`, `UsageReportEvent`)
-- [ ] Define discriminated union type `AnyTraceEvent` for deserialization
-- [ ] Write serialization round-trip tests for each event type
-- [ ] Write test for discriminated union deserialization (JSON → correct subclass)
-- [ ] Verify `IOSpec`, `ErrorSpec`, `TimingSpec` survive JSON round-trip within events
-- [ ] Fix `model_type` field to `Literal` on `LLMTokensUsage`, `ImgGenTokensUsage`, `ExtractTokensUsage`, `SearchTokensUsage`
-- [ ] Define `AnyTokensUsage` discriminated union using `Field(discriminator="model_type")`
-- [ ] Verify `TokensUsage` union survives round-trip with discriminated union deserialization
-- [ ] `make agent-check` passes
+- [x] Define `TraceEventKind` enum with all event kinds
+- [x] Define `TraceEvent` base model with shared fields
+- [x] Define all event subclasses (`PipeStartEvent`, `PipeEndSuccessEvent`, `PipeEndErrorEvent`, `EdgeEvent`, `ControllerOutputEvent`, `BatchItemEvent`, `BatchAggregateEvent`, `ParallelCombineEvent`, `UsageReportEvent`)
+- [x] Define discriminated union type `AnyTraceEvent` for deserialization
+- [x] Write serialization round-trip tests for each event type
+- [x] Write test for discriminated union deserialization (JSON → correct subclass)
+- [x] Verify `IOSpec`, `ErrorSpec`, `TimingSpec` survive JSON round-trip within events
+- [x] Fix `model_type` field to `Literal` on `LLMTokensUsage`, `ImgGenTokensUsage`, `ExtractTokensUsage`, `SearchTokensUsage`
+- [x] Define `AnyTokensUsage` discriminated union using `Field(discriminator="model_type")`
+- [x] Verify `TokensUsage` union survives round-trip with discriminated union deserialization
+- [x] `make agent-check` passes
 
 ---
 
