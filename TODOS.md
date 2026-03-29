@@ -182,20 +182,20 @@ For unit tests and direct mode (optional — direct mode can also use NDJSON):
 
 ### Checklist
 
-- [ ] Define `EventLogProtocol`
-- [ ] Implement `NdjsonEventLog` write path (emit with file handle caching)
-- [ ] Implement `NdjsonEventLog` read path (glob, parse, deduplicate, sort)
-- [ ] Implement `NdjsonEventLog` cleanup
-- [ ] Implement `InMemoryEventLog`
-- [ ] Test: emit events, read them back, verify order and content
-- [ ] Test: emit duplicate events (same workflow_id + sequence), verify deduplication
-- [ ] Test: emit from "multiple workers" (different workflow_ids), verify all events returned
-- [ ] Test: cleanup removes directory
-- [ ] Test: read from nonexistent run returns empty list
-- [ ] Test: corrupt NDJSON line (truncated JSON) is skipped with warning
-- [ ] Test: multiprocess concurrent writes — spawn workers writing to the same traces_dir (different files), verify no corruption or directory race conditions
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes (existing tests unaffected)
+- [x] Define `EventLogProtocol`
+- [x] Implement `NdjsonEventLog` write path (emit with file handle caching)
+- [x] Implement `NdjsonEventLog` read path (glob, parse, deduplicate, sort)
+- [x] Implement `NdjsonEventLog` cleanup
+- [x] Implement `InMemoryEventLog`
+- [x] Test: emit events, read them back, verify order and content
+- [x] Test: emit duplicate events (same workflow_id + sequence), verify deduplication
+- [x] Test: emit from "multiple workers" (different workflow_ids), verify all events returned
+- [x] Test: cleanup removes directory
+- [x] Test: read from nonexistent run returns empty list
+- [x] Test: corrupt NDJSON line (truncated JSON) is skipped with warning
+- [x] Test: multiprocess concurrent writes — spawn workers writing to the same traces_dir (different files), verify no corruption or directory race conditions
+- [x] `make agent-check` passes
+- [x] `make agent-test` passes (existing tests unaffected)
 
 ---
 
