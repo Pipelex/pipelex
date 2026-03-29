@@ -35,6 +35,7 @@ Introduce the LibraryCrate as the universal intermediate representation for libr
 | **2** | LibraryCrate on Temporal | Library loading on workers (Layer 2: pipe resolution) |
 | **3** | Deferred WorkingMemory hydration | Dynamic class registration timing (Layer 1: Kajson deser) |
 | **4** | Explicit ClassRegistry | Library-owned registries, no singleton scoping in Kajson |
+| **4.5** | Distributed Tracing & Reporting | Cross-worker graph tracing and cost reporting via NDJSON event log |
 | **5** | StoragePayloadCodec | Payload size limits (2MB) for large libraries and WorkingMemory |
 
 ---
@@ -287,6 +288,27 @@ See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for t
 
 ---
 
+## Phase 4.5: Distributed Tracing & Reporting (Local Version)
+
+> **Status**: Not started
+
+**Goal**: Add a file-based event log to GraphTracer so that graph tracing and cost reporting work across Temporal workers. The in-memory path is preserved unchanged for direct mode. See [TODOS.md](../TODOS.md) for the full implementation plan.
+
+**Design**: Dual-write in GraphTracer — when an `EventLogProtocol` is provided, events are emitted to NDJSON files alongside the existing in-memory accumulation. After all workflows complete, an assembler reads events from all files and reconstructs a cross-worker `GraphSpec`. No new tracer class, no call site changes.
+
+### Done when
+
+- [ ] **Step 0 — Event Models**: `TraceEvent` hierarchy with discriminated union, serialization round-trips, `TokensUsage` models fixed to `Literal` discriminators
+- [ ] **Step 1 — EventLogProtocol & NDJSON Backend**: `NdjsonEventLog` with emit/read/cleanup/dedup, `InMemoryEventLog` for tests, corrupt-line handling, multiprocess concurrent write safety
+- [ ] **Step 2 — GraphSpec Assembler**: Two-pass assembly (nodes + producer map → edges), structural equivalence with current `GraphTracer` output, `UsageAggregator`
+- [ ] **Step 3 — Emit Integration**: Dual-write in `GraphTracer` (optional `EventLogProtocol`), `ReportingManager` emits `UsageReportEvent`, node/edge IDs include `workflow_id` segment
+- [ ] **Step 4 — Wire into Pipeline Lifecycle**: `TracingConfig`, `NdjsonEventLog` created in `WfPipeRouter` and `pipeline_run_setup`, assembly in `runner.py` finally block, direct mode unchanged
+- [ ] **Step 5 — Temporal Integration Tests**: PipeSequence/PipeParallel/PipeBatch through Temporal produce correct GraphSpec, usage aggregation across workers, failure/replay resilience
+- [ ] `make agent-check` passes
+- [ ] `make agent-test` passes
+
+---
+
 ## Phase 5: StoragePayloadCodec
 
 **Goal**: Remove the 2MB payload size limit for production workloads with large libraries or WorkingMemory containing images/documents.
@@ -424,11 +446,14 @@ Phase 3 (Deferred WM Hydration)        ← requires Phase 2's library_crate on P
     │
     ▼
 Phase 4 (Explicit ClassRegistry)       ← fixes Phase 3 bugs with separate workers
+    │
+    ▼
+Phase 4.5 (Distributed Tracing)        ← requires Phase 4's library-owned ClassRegistry
 
-Phase 5 (StoragePayloadCodec)           ← independent, can parallel with Phase 4
+Phase 5 (StoragePayloadCodec)           ← independent, can parallel with Phase 4/4.5
 ```
 
-Phase 0 is a prerequisite for Phase 1 (domain-qualified indexing). Phase 1 is a prerequisite for Phase 2 (crate must exist to ship it). Phase 3 builds on Phase 2's crate propagation. Phase 4 fixes the ClassRegistry scoping bugs that Phase 3's in-process tests mask. Phase 5 is independently useful.
+Phase 0 is a prerequisite for Phase 1 (domain-qualified indexing). Phase 1 is a prerequisite for Phase 2 (crate must exist to ship it). Phase 3 builds on Phase 2's crate propagation. Phase 4 fixes the ClassRegistry scoping bugs that Phase 3's in-process tests mask. Phase 4.5 adds cross-worker tracing on top of the working distributed execution from Phase 4. Phase 5 is independently useful.
 
 ---
 
