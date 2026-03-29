@@ -116,9 +116,7 @@ async def validate_bundle_content(
     return {
         "success": True,
         "mthds_contents": mthds_contents,
-        "pipelex_bundle_blueprint": blueprints[0].model_dump(mode="json")
-        if len(blueprints) == 1
-        else [b.model_dump(mode="json") for b in blueprints],
+        "pipelex_bundle_blueprint": [b.model_dump(mode="json") for b in blueprints],
         "validated_pipes": validated_pipes,
         "total_pipes": len(validate_bundle_result.pipes),
     }
