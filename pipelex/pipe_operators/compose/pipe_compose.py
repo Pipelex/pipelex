@@ -165,7 +165,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
-                content_generator=content_generator,
             )
 
     async def _run_template_mode(
@@ -174,7 +173,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
-        content_generator: ContentGeneratorProtocol,  # noqa: ARG002
     ) -> PipeComposeOutput:
         """Run PipeCompose in template mode (produces Text or Html output)."""
         if self.template is None:
@@ -187,6 +185,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.extra_context:
             context.update(**self.extra_context)
 
+        # TODO: dry-run templating is being removed — this direct render_template call is intentional
         jinja2_text = await render_template(
             template=self.template,
             category=self.category,

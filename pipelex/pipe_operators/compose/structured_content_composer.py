@@ -650,6 +650,7 @@ class StructuredContentComposer:
         if self.extra_context:
             context.update(**self.extra_context)
 
+        # TODO: dry-run templating is being removed — this direct render_template call is intentional
         return await render_template(
             template=field_blueprint.template,
             category=TemplateCategory.BASIC,
