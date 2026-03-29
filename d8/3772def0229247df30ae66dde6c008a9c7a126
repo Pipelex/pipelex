@@ -1,0 +1,23 @@
+pipelex/pipe_controllers/condition/pipe_condition.py
+  04500f7dd5e6a051 320
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "d83772def0229247df30ae66dde6c008a9c7a126",
+  "prompts": {
+    "04500f7dd5e6a051": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c2372a2f-d292-48fa-b8d7-9228d509bab2",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 1,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
