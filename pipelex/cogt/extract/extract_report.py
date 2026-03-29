@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ class ExtractTokenCostReportField(StrEnum):
 
 
 class ExtractTokenCostReport(BaseModel):
-    model_type: str = "extract"
+    model_type: Literal["extract"] = "extract"
     job_metadata: JobMetadata
     inference_model_name: str
     platform_model_id: str
@@ -64,7 +64,7 @@ class ExtractTokenCostReport(BaseModel):
 
 
 class ExtractTokensUsage(BaseModel):
-    model_type: str = "extract"
+    model_type: Literal["extract"] = "extract"
     job_metadata: JobMetadata
     inference_model_name: str
     unit_costs: CostsByCategoryDict
