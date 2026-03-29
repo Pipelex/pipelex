@@ -84,14 +84,14 @@ local_storage_path = ".pipelex/storage"
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 
 [pipelex.storage_config.s3]
-# AWS S3 storage settings (requires boto3: `pip install pipelex[s3]`)
+# AWS S3 storage settings (requires boto3: `uv pip install "pipelex[s3]"`)
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 bucket_name = ""
 region = ""
 signed_urls_lifespan_seconds = 3600                           # Set to "disabled" for public URLs
 
 [pipelex.storage_config.gcp]
-# Google Cloud Storage settings (requires google-cloud-storage: `pip install pipelex[gcp-storage]`)
+# Google Cloud Storage settings (requires google-cloud-storage: `uv pip install "pipelex[gcp-storage]"`)
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 bucket_name = ""
 project_id = ""
