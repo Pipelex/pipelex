@@ -59,7 +59,7 @@ From here, Pipelex handles model routing across 60+ models, structured output pa
 # Quick Start
 
 ```bash
-pip install pipelex
+uv tool install pipelex
 pipelex init
 ```
 
@@ -475,12 +475,12 @@ The same `.mthds` file runs from multiple execution targets:
 |---|---|---|
 | **MTHDS Standard** | The open standard specification — language, package system, and typed concepts | [mthds.ai](https://mthds.ai) |
 | **MTHDS Hub** | Discover and share methods — browse packages, search by signature | [mthds.sh](https://mthds.sh) |
-| **Skills Plugin** | Claude Code plugin — commands to build, run, edit, check, fix, and publish methods | [github.com/mthds-ai/mthds-plugins](https://github.com/mthds-ai/mthds-plugins) |
+| **MTHDS Plugins** | Claude Code plugin — commands to build, run, edit, check, fix, and publish methods | [github.com/mthds-ai/mthds-plugins](https://github.com/mthds-ai/mthds-plugins) |
 | **Package System** | Versioned dependencies, lock files with SHA-256 integrity, cross-package references via `->` | [Packages docs](https://mthds.ai/latest/packages/structure/) |
 | **Know-How Graph** | Typed discovery — "I have X, I need Y" — find methods or chains by typed signature | [Know-How Graph](https://mthds.ai/latest/know-how-graph/) |
 
 <details>
-<summary><b>View all 11 Skills Plugin commands</b></summary>
+<summary><b>View MTHDS skills</b></summary>
 
 | Command | Description |
 |---------|-------------|
