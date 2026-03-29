@@ -1,0 +1,27 @@
+.claude/skills/temporal-test-crate/SKILL.md
+  f5e75fb01a754756 113
+pipelex/pipelex.py
+  f5e75fb01a754756 319-325
+pipelex/reporting/reporting_manager.py
+  f5e75fb01a754756 65-67,70
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "9ffb792c44052bab40c0f15fd3e585c573cea3f9",
+  "prompts": {
+    "f5e75fb01a754756": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b0a4e589-bac9-477b-81c0-58cdd892ebc7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 12,
+      "total_deletions": 3,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    }
+  }
+}
