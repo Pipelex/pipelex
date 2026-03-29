@@ -66,7 +66,7 @@ class ValidateBundleError(PipelexError):
         # Dry run errors
         self.dry_run_error_message = dry_run_error_message
 
-        # Path to a saved .mthds file with the last bundle state (set by builder_loop when all fix attempts are exhausted)
+        # Path to a saved .mthds file with the last bundle state (set when all fix attempts are exhausted)
         self.failed_bundle_path: str | None = None
 
         super().__init__(message)

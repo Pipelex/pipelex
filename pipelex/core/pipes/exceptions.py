@@ -16,7 +16,7 @@ class PipeFactoryErrorType(StrEnum):
     Some are auto-fixed in the builder loop (marked below).
     """
 
-    # Errors that are auto-fixed in builder_loop.py
+    # Errors that are auto-fixable by builders
     UNKNOWN_CONCEPT = "unknown_concept"  # AUTO-FIXED: concept not declared in domain
 
     # Generic fallback for unexpected factory errors
@@ -104,7 +104,7 @@ class PipeValidationErrorType(StrEnum):
     Only some are auto-fixed in the builder loop (marked below).
     """
 
-    # Errors that are auto-fixed in builder_loop.py
+    # Errors that are auto-fixable by builders
     MISSING_INPUT_VARIABLE = "missing_input_variable"  # AUTO-FIXED
     EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"  # AUTO-FIXED
     INPUT_STUFF_SPEC_MISMATCH = "input_stuff_spec_mismatch"  # AUTO-FIXED
