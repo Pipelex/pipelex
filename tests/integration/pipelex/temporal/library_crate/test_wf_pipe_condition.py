@@ -38,7 +38,7 @@ class TestWfPipeCondition:
         """Verify the crate has all pipe_refs including condition outcomes."""
         self._assert_crate_structure(condition_job)
 
-    @pytest.mark.xfail(reason="PipeCondition expression evaluation dispatches WfMakeJinja2Text which fails to serialize dry-run StuffArtefact")
+    @pytest.mark.xfail(reason="Condition expression renders correctly but dry-run output stored as 'main_stuff' instead of 'routed_result'")
     async def test_condition_sequence_via_temporal(
         self,
         condition_job: PipeJob,

@@ -7,6 +7,7 @@ from pipelex.cogt.content_generation.content_generator_dry import ContentGenerat
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -172,7 +173,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
-        content_generator: ContentGeneratorProtocol,
+        content_generator: ContentGeneratorProtocol,  # noqa: ARG002
     ) -> PipeComposeOutput:
         """Run PipeCompose in template mode (produces Text or Html output)."""
         if self.template is None:
@@ -185,11 +186,11 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        jinja2_text = await content_generator.make_templated_text(
-            context=context,
+        jinja2_text = await render_template(
             template=self.template,
+            category=self.category,
+            context=context,
             templating_style=self.templating_style,
-            template_category=self.category,
         )
         log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
         assert isinstance(jinja2_text, str)

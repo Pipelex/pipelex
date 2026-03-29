@@ -40,7 +40,6 @@ class TestWfCombinedPipeline:
         """Verify the crate has all pipe_refs from parallel, condition, and LLM pipes."""
         self._assert_crate_structure(combined_job)
 
-    @pytest.mark.xfail(reason="PipeCondition expression evaluation dispatches WfMakeJinja2Text which fails to serialize dry-run StuffArtefact")
     async def test_combined_pipeline_via_temporal(
         self,
         combined_job: PipeJob,
