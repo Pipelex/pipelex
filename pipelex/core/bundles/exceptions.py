@@ -5,7 +5,7 @@ from pipelex.types import StrEnum
 
 
 class PipelexBundleBlueprintFixableErrorType(StrEnum):
-    """Types of fixable validation errors in Pipelex bundle blueprints."""
+    """Types of validation errors in Pipelex bundle blueprints that the build agent can address."""
 
 
 class PipelexBundleBlueprintValidationErrorData(BaseModel):

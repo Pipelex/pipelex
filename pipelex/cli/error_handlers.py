@@ -221,28 +221,6 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
     raise typer.Exit(1) from exc
 
 
-def handle_build_validation_failure(exc: ValidateBundleError) -> NoReturn:
-    """Handle ValidateBundleError that occurs during bundle validation.
-
-    Args:
-        exc: The bundle validation error exception
-    """
-    console = get_console()
-    console.print("\n[bold red]❌ Build failed: bundle validation errors[/bold red]\n")
-    console.print("[yellow]Validation errors were found that could not be resolved.[/yellow]\n")
-
-    _display_validation_error_details(console=console, exc=exc)
-
-    # Display build-specific tips
-    console.print(
-        "[bold green]💡 Tip:[/bold green] Try rephrasing your prompt or simplifying the pipeline requirements. "
-        "Breaking complex methods into smaller steps can also help."
-    )
-    console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
 def handle_telemetry_config_validation_error(exc: TelemetryConfigValidationError) -> NoReturn:
     """Handle and display TelemetryConfigValidationError with migration guidance.
 
