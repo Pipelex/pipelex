@@ -52,32 +52,6 @@ default_output_dir = "."
 default_bundle_file_name = "bundle"
 default_directory_base_name = "pipeline"
 
-[pipelex.builder_config.talent_preset_mappings.llm]
-data-retrieval = "$retrieval"
-hr-expert = "$writing-factual"
-accounting-expert = "$writing-factual"
-creative-writer = "$writing-creative"
-engineer = "$engineering-structured"
-coder = "$engineering-code"
-code-analyzer = "$engineering-codebase-analysis"
-vision-language-model = "$vision"
-visual-designer = "$img-gen-prompting"
-
-[pipelex.builder_config.talent_preset_mappings.img_gen]
-gen-image = "$gen-image"
-gen-image-fast = "$gen-image-fast"
-gen-image-high-quality = "$gen-image-high-quality"
-
-[pipelex.builder_config.talent_preset_mappings.extract]
-pdf-basic-text-extractor = "@default-text-from-pdf"
-image-text-extractor = "@default-extract-image"
-full-document-extractor = "@default-extract-document"
-web-page-extractor = "@default-extract-web-page"
-
-[pipelex.builder_config.talent_preset_mappings.search]
-web-search = "$standard"
-web-search-deep = "$deep"
-
 [pipelex.feature_config]
 # WIP/Experimental feature flags
 is_reporting_enabled = true

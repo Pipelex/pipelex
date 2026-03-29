@@ -37,16 +37,11 @@ pipe/
 operations/
   concept_ops.py               # Parse/serialize concepts to TOML
   inputs_ops.py                # Generate example input JSON
-  models_ops.py                # Model preset and talent operations
+  models_ops.py                # Model preset listing and markdown formatting
   output_ops.py                # Generate output JSON representations
   pipe_ops.py                  # Parse/serialize pipes to TOML
   runner_code_ops.py           # Code generation utilities
   validate_ops.py              # Validation operations
-talents/
-  llm_talent.py                # LLMTalent enum + preset mapping
-  extract_talent.py            # ExtractTalent enum + preset mapping
-  img_gen_talent.py            # ImgGenTalent enum + preset mapping
-  search_talent.py             # SearchTalent enum + preset mapping
 ```
 
 ## Spec Architecture
@@ -80,6 +75,3 @@ Pipe inputs and outputs use multiplicity suffixes on concept names:
 - `Text[]` — variable-length list
 - `Text[N]` — exactly N items
 
-## Talent System
-
-Talents are abstract capability labels mapped to concrete model presets. They remain in `talents/` and are used by the `pipelex-agent models` CLI to help agents choose appropriate presets. PipeSpec subclasses accept model presets directly via a `model: str | None` field, bypassing talent resolution. When modifying talent enums, update both the enum and its preset mapping dict in `pipelex.toml`.
