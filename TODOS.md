@@ -288,26 +288,26 @@ This is the **most important testing step** — it catches any divergence betwee
 
 ### Checklist
 
-- [ ] Implement `GraphSpecAssembler.assemble()` — node construction from start/end events
-- [ ] Implement CONTAINS edge reconstruction (from PipeStartEvent.parent_node_id)
-- [ ] Implement producer map construction (from PipeEndSuccessEvent + ControllerOutputEvent)
-- [ ] Implement pass-through detection (output digest in input digests → skip producer registration)
-- [ ] Implement DATA edge generation (digest correlation, same algorithm as `GraphTracer._generate_data_edges()`)
-- [ ] Implement BATCH_ITEM edge generation from `BatchItemEvent`
-- [ ] Implement BATCH_AGGREGATE edge generation from `BatchAggregateEvent`
-- [ ] Implement PARALLEL_COMBINE edge generation from `ParallelCombineEvent`
-- [ ] Handle CANCELED nodes (PipeStartEvent without matching end event)
-- [ ] Implement `UsageAggregator`
-- [ ] Test: simple sequence (3 pipes in order) → correct nodes, CONTAINS edges, DATA edges
-- [ ] Test: parallel branches → correct PARALLEL_COMBINE edges
-- [ ] Test: batch fan-out/fan-in → correct BATCH_ITEM + BATCH_AGGREGATE edges
-- [ ] Test: condition with selected outcome → correct SELECTED_OUTCOME edge
-- [ ] Test: partial failure (PipeStartEvent + PipeEndErrorEvent, no end for parent) → FAILED + CANCELED nodes
-- [ ] Test: events from multiple workflows (different workflow_id prefixes) assemble correctly
-- [ ] Test: cross-workflow producer map — producer in alphabetically-later workflow_id, consumer in earlier one (validates two-pass assembly ordering)
-- [ ] Test: usage aggregation collects all UsageReportEvent records
+- [x] Implement `GraphSpecAssembler.assemble()` — node construction from start/end events
+- [x] Implement CONTAINS edge reconstruction (from EdgeEvent with CONTAINS kind)
+- [x] Implement producer map construction (from PipeEndSuccessEvent + ControllerOutputEvent)
+- [x] Implement pass-through detection (output digest in input digests → skip producer registration)
+- [x] Implement DATA edge generation (digest correlation, same algorithm as `GraphTracer._generate_data_edges()`)
+- [x] Implement BATCH_ITEM edge generation from `BatchItemEvent`
+- [x] Implement BATCH_AGGREGATE edge generation from `BatchAggregateEvent`
+- [x] Implement PARALLEL_COMBINE edge generation from `ParallelCombineEvent`
+- [x] Handle CANCELED nodes (PipeStartEvent without matching end event)
+- [x] Implement `UsageAggregator`
+- [x] Test: simple sequence (3 pipes in order) → correct nodes, CONTAINS edges, DATA edges
+- [x] Test: parallel branches → correct PARALLEL_COMBINE edges
+- [x] Test: batch fan-out/fan-in → correct BATCH_ITEM + BATCH_AGGREGATE edges
+- [x] Test: condition with selected outcome → correct SELECTED_OUTCOME edge
+- [x] Test: partial failure (PipeStartEvent + PipeEndErrorEvent, no end for parent) → FAILED + CANCELED nodes
+- [x] Test: events from multiple workflows (different workflow_id prefixes) assemble correctly
+- [x] Test: cross-workflow producer map — producer in alphabetically-later workflow_id, consumer in earlier one (validates two-pass assembly ordering)
+- [x] Test: usage aggregation collects all UsageReportEvent records
 - [ ] Equivalence test: compare assembler output with current GraphTracer output using structural equivalence (normalized IDs, ignored TimingSpec)
-- [ ] `make agent-check` passes
+- [x] `make agent-check` passes
 
 ---
 

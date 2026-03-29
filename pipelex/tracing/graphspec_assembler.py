@@ -1,0 +1,424 @@
+"""Reconstructs a GraphSpec from a flat list of trace events.
+
+This is the core algorithm for distributed tracing — equivalent to
+GraphTracer.teardown() but working from serialized events instead of
+in-memory state. Used after Temporal execution to assemble cross-worker
+graphs from NDJSON event files.
+"""
+
+from collections.abc import Sequence
+from datetime import datetime, timezone
+
+from pipelex import log
+from pipelex.graph.graphspec import (
+    EdgeKind,
+    EdgeSpec,
+    ErrorSpec,
+    GraphSpec,
+    IOSpec,
+    NodeIOSpec,
+    NodeKind,
+    NodeSpec,
+    NodeStatus,
+    PipelineRef,
+    TimingSpec,
+)
+from pipelex.tracing.trace_events import (
+    BatchAggregateEvent,
+    BatchItemEvent,
+    ControllerOutputEvent,
+    EdgeEvent,
+    ParallelCombineEvent,
+    PipeEndErrorEvent,
+    PipeEndSuccessEvent,
+    PipeStartEvent,
+    TraceEvent,
+    UsageReportEvent,
+)
+
+
+class _AssemblerNodeData:
+    """Internal mutable data structure for building a node from events.
+
+    Mirrors _MutableNodeData from graph_tracer.py.
+    """
+
+    def __init__(
+        self,
+        node_id: str,
+        pipe_code: str,
+        pipe_type: str,
+        node_kind: NodeKind,
+        started_at: datetime,
+        parent_node_id: str | None,
+        input_specs: list[IOSpec] | None = None,
+    ) -> None:
+        self.node_id = node_id
+        self.pipe_code = pipe_code
+        self.pipe_type = pipe_type
+        self.node_kind = node_kind
+        self.started_at = started_at
+        self.parent_node_id = parent_node_id
+        self.ended_at: datetime | None = None
+        self.status: NodeStatus = NodeStatus.RUNNING
+        self.metrics: dict[str, float] = {}
+        self.error: ErrorSpec | None = None
+        self.input_specs: list[IOSpec] = input_specs or []
+        self.output_specs: list[IOSpec] = []
+
+    def to_node_spec(self) -> NodeSpec:
+        """Convert to immutable NodeSpec."""
+        assert self.started_at is not None
+        assert self.ended_at is not None
+        timing = TimingSpec(
+            started_at=self.started_at,
+            ended_at=self.ended_at,
+        )
+
+        node_io = NodeIOSpec(
+            inputs=self.input_specs,
+            outputs=list(self.output_specs),
+        )
+
+        return NodeSpec(
+            node_id=self.node_id,
+            kind=self.node_kind,
+            pipe_code=self.pipe_code,
+            pipe_type=self.pipe_type,
+            status=self.status,
+            timing=timing,
+            node_io=node_io,
+            error=self.error,
+            metrics=self.metrics,
+        )
+
+
+class GraphSpecAssembler:
+    """Reconstructs a GraphSpec from trace events.
+
+    Two-pass algorithm:
+    - Pass 1: Build nodes, producer map, and collect metadata from all events.
+    - Pass 2: Generate DATA, BATCH_ITEM, BATCH_AGGREGATE, PARALLEL_COMBINE edges
+      using the complete producer map.
+    """
+
+    @staticmethod
+    def assemble(
+        events: Sequence[TraceEvent],
+        graph_id: str,
+        pipeline_ref: PipelineRef | None = None,
+    ) -> GraphSpec:
+        """Assemble a GraphSpec from a flat list of trace events.
+
+        Args:
+            events: Flat list of trace events, pre-sorted by (workflow_id, sequence).
+            graph_id: The graph identifier for the assembled GraphSpec.
+            pipeline_ref: Optional pipeline reference metadata.
+
+        Returns:
+            A complete GraphSpec with nodes and edges.
+        """
+        assembler = _AssemblerState(graph_id=graph_id, pipeline_ref=pipeline_ref or PipelineRef())
+        assembler.pass_one(events)
+        assembler.pass_two()
+        return assembler.build_graph_spec()
+
+
+class _AssemblerState:
+    """Mutable state for a single assembler invocation."""
+
+    def __init__(self, graph_id: str, pipeline_ref: PipelineRef) -> None:
+        self._graph_id = graph_id
+        self._pipeline_ref = pipeline_ref
+        self._earliest_timestamp: datetime | None = None
+
+        # Pass 1 accumulation
+        self._nodes: dict[str, _AssemblerNodeData] = {}
+        self._explicit_edges: list[EdgeSpec] = []
+        self._stuff_producer_map: dict[str, str] = {}
+        self._batch_item_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
+        self._batch_aggregate_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
+        self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
+
+        # Edge ID counter for assembler-generated edges
+        self._edge_sequence: int = 0
+        # Edges generated in Pass 2 (DATA, BATCH_ITEM, etc.)
+        self._generated_edges: list[EdgeSpec] = []
+
+    def pass_one(self, events: Sequence[TraceEvent]) -> None:
+        """Pass 1: Build nodes, producer map, and collect metadata."""
+        for event in events:
+            self._track_earliest_timestamp(event)
+
+            if isinstance(event, PipeStartEvent):
+                self._handle_pipe_start(event)
+            elif isinstance(event, PipeEndSuccessEvent):
+                self._handle_pipe_end_success(event)
+            elif isinstance(event, PipeEndErrorEvent):
+                self._handle_pipe_end_error(event)
+            elif isinstance(event, EdgeEvent):
+                self._handle_edge_event(event)
+            elif isinstance(event, ControllerOutputEvent):
+                self._handle_controller_output(event)
+            elif isinstance(event, BatchItemEvent):
+                self._handle_batch_item(event)
+            elif isinstance(event, BatchAggregateEvent):
+                self._handle_batch_aggregate(event)
+            elif isinstance(event, ParallelCombineEvent):
+                self._handle_parallel_combine(event)
+            elif isinstance(event, UsageReportEvent):
+                pass  # Handled by UsageAggregator
+            else:
+                log.warning(f"Unknown event type: {type(event).__name__}")
+
+        # Mark any still-running nodes as CANCELED
+        self._mark_canceled_nodes()
+
+    def pass_two(self) -> None:
+        """Pass 2: Generate edges using the complete producer map."""
+        self._generate_data_edges()
+        self._generate_batch_item_edges()
+        self._generate_batch_aggregate_edges()
+        self._generate_parallel_combine_edges()
+
+    def build_graph_spec(self) -> GraphSpec:
+        """Build the final GraphSpec from accumulated state."""
+        nodes = [node_data.to_node_spec() for node_data in self._nodes.values()]
+        all_edges = self._explicit_edges + self._get_generated_edges()
+
+        return GraphSpec(
+            graph_id=self._graph_id,
+            created_at=self._earliest_timestamp or datetime.now(timezone.utc),
+            pipeline_ref=self._pipeline_ref,
+            nodes=nodes,
+            edges=all_edges,
+        )
+
+    # ------------------------------------------------------------------
+    # Pass 1 handlers
+    # ------------------------------------------------------------------
+
+    def _track_earliest_timestamp(self, event: TraceEvent) -> None:
+        if self._earliest_timestamp is None or event.timestamp < self._earliest_timestamp:
+            self._earliest_timestamp = event.timestamp
+
+    def _handle_pipe_start(self, event: PipeStartEvent) -> None:
+        node_data = _AssemblerNodeData(
+            node_id=event.node_id,
+            pipe_code=event.pipe_code,
+            pipe_type=event.pipe_type,
+            node_kind=event.node_kind,
+            started_at=event.timestamp,
+            parent_node_id=event.parent_node_id,
+            input_specs=list(event.input_specs),
+        )
+        self._nodes[event.node_id] = node_data
+
+    def _handle_pipe_end_success(self, event: PipeEndSuccessEvent) -> None:
+        node_data = self._nodes.get(event.node_id)
+        if node_data is None:
+            log.warning(f"PipeEndSuccessEvent for unknown node: {event.node_id}")
+            return
+
+        node_data.ended_at = event.ended_at
+        node_data.status = NodeStatus.SUCCEEDED
+        if event.metrics:
+            node_data.metrics = event.metrics
+
+        # Pass-through detection (mirrors graph_tracer.py:476-488)
+        if event.output_spec is not None:
+            input_digests = {spec.digest for spec in node_data.input_specs if spec.digest is not None}
+            if event.output_spec.digest in input_digests:
+                # Pass-through: don't register as output or producer
+                pass
+            else:
+                node_data.output_specs.append(event.output_spec)
+                if event.output_spec.digest:
+                    self._stuff_producer_map[event.output_spec.digest] = event.node_id
+
+    def _handle_pipe_end_error(self, event: PipeEndErrorEvent) -> None:
+        node_data = self._nodes.get(event.node_id)
+        if node_data is None:
+            log.warning(f"PipeEndErrorEvent for unknown node: {event.node_id}")
+            return
+
+        node_data.ended_at = event.ended_at
+        node_data.status = NodeStatus.FAILED
+        node_data.error = event.error
+
+    def _handle_edge_event(self, event: EdgeEvent) -> None:
+        edge = EdgeSpec(
+            edge_id=event.edge_id,
+            source=event.source_node_id,
+            target=event.target_node_id,
+            kind=event.edge_kind,
+            label=event.label,
+            source_stuff_digest=event.source_stuff_digest,
+            target_stuff_digest=event.target_stuff_digest,
+        )
+        self._explicit_edges.append(edge)
+
+    def _handle_controller_output(self, event: ControllerOutputEvent) -> None:
+        node_data = self._nodes.get(event.node_id)
+        if node_data is None:
+            log.warning(f"ControllerOutputEvent for unknown node: {event.node_id}")
+            return
+
+        node_data.output_specs.append(event.output_spec)
+        if event.output_spec.digest:
+            self._stuff_producer_map[event.output_spec.digest] = event.node_id
+
+    def _handle_batch_item(self, event: BatchItemEvent) -> None:
+        if event.list_stuff_code not in self._batch_item_map:
+            self._batch_item_map[event.list_stuff_code] = (event.batch_controller_node_id, [])
+        _existing_controller_id, item_list = self._batch_item_map[event.list_stuff_code]
+        item_list.append((event.item_stuff_code, event.item_index))
+
+    def _handle_batch_aggregate(self, event: BatchAggregateEvent) -> None:
+        if event.output_list_stuff_code not in self._batch_aggregate_map:
+            self._batch_aggregate_map[event.output_list_stuff_code] = (event.batch_controller_node_id, [])
+        _existing_controller_id, item_list = self._batch_aggregate_map[event.output_list_stuff_code]
+        item_list.append((event.item_stuff_code, event.item_index))
+
+    def _handle_parallel_combine(self, event: ParallelCombineEvent) -> None:
+        # branch_producer_node_ids already snapshotted at emit time
+        self._parallel_combine_map[event.combined_stuff_code] = (
+            event.parallel_controller_node_id,
+            list(event.branch_producer_node_ids),
+        )
+
+    def _mark_canceled_nodes(self) -> None:
+        """Mark any still-RUNNING nodes as CANCELED (mirrors graph_tracer.py:160-164)."""
+        for node_data in self._nodes.values():
+            if node_data.status == NodeStatus.RUNNING:
+                node_data.status = NodeStatus.CANCELED
+                node_data.ended_at = datetime.now(timezone.utc)
+
+    # ------------------------------------------------------------------
+    # Pass 2 edge generation
+    # ------------------------------------------------------------------
+
+    def _make_edge_id(self) -> str:
+        edge_id = f"{self._graph_id}:asm_edge_{self._edge_sequence}"
+        self._edge_sequence += 1
+        return edge_id
+
+    def _get_generated_edges(self) -> list[EdgeSpec]:
+        """Return all edges generated in Pass 2 (stored via _add_generated_edge)."""
+        return self._generated_edges
+
+    def _add_generated_edge(
+        self,
+        source_node_id: str,
+        target_node_id: str,
+        edge_kind: EdgeKind,
+        label: str | None = None,
+        source_stuff_digest: str | None = None,
+        target_stuff_digest: str | None = None,
+    ) -> None:
+        edge = EdgeSpec(
+            edge_id=self._make_edge_id(),
+            source=source_node_id,
+            target=target_node_id,
+            kind=edge_kind,
+            label=label,
+            source_stuff_digest=source_stuff_digest,
+            target_stuff_digest=target_stuff_digest,
+        )
+        self._generated_edges.append(edge)
+
+    def _generate_data_edges(self) -> None:
+        """Generate DATA edges by correlating input digests with producer nodes.
+
+        Mirrors GraphTracer._generate_data_edges() (graph_tracer.py:199-222).
+        """
+        for consumer_node_id, node_data in self._nodes.items():
+            for input_spec in node_data.input_specs:
+                if input_spec.digest is None:
+                    continue
+                producer_node_id = self._stuff_producer_map.get(input_spec.digest)
+                if producer_node_id is None:
+                    continue
+                if producer_node_id == consumer_node_id:
+                    continue
+                self._add_generated_edge(
+                    source_node_id=producer_node_id,
+                    target_node_id=consumer_node_id,
+                    edge_kind=EdgeKind.DATA,
+                    label=input_spec.name,
+                )
+
+    def _generate_batch_item_edges(self) -> None:
+        """Generate BATCH_ITEM edges for batch fan-out.
+
+        Mirrors GraphTracer._generate_batch_item_edges() (graph_tracer.py:224-267).
+        """
+        for list_stuff_code, (batch_controller_node_id, item_entries) in self._batch_item_map.items():
+            list_producer_node_id = self._stuff_producer_map.get(list_stuff_code)
+            source_node_id = batch_controller_node_id or list_producer_node_id
+
+            if not source_node_id:
+                # Legacy fallback: scan all nodes for a consumer of the list
+                for node_id, node_data in self._nodes.items():
+                    for input_spec in node_data.input_specs:
+                        if input_spec.digest == list_stuff_code:
+                            source_node_id = node_id
+                            break
+                    if source_node_id:
+                        break
+
+            if not source_node_id:
+                continue
+
+            for item_stuff_code, item_index in item_entries:
+                for consumer_node_id, node_data in self._nodes.items():
+                    for input_spec in node_data.input_specs:
+                        if input_spec.digest == item_stuff_code:
+                            if source_node_id != consumer_node_id:
+                                self._add_generated_edge(
+                                    source_node_id=source_node_id,
+                                    target_node_id=consumer_node_id,
+                                    edge_kind=EdgeKind.BATCH_ITEM,
+                                    label=f"[{item_index}]",
+                                    source_stuff_digest=list_stuff_code,
+                                    target_stuff_digest=item_stuff_code,
+                                )
+                            break
+
+    def _generate_batch_aggregate_edges(self) -> None:
+        """Generate BATCH_AGGREGATE edges from item producers to output list.
+
+        Mirrors GraphTracer._generate_batch_aggregate_edges() (graph_tracer.py:269-301).
+        """
+        for output_list_stuff_code, (batch_controller_node_id, item_entries) in self._batch_aggregate_map.items():
+            target_node_id = batch_controller_node_id or self._stuff_producer_map.get(output_list_stuff_code)
+            if not target_node_id:
+                continue
+
+            for item_stuff_code, item_index in item_entries:
+                item_producer_id = self._stuff_producer_map.get(item_stuff_code)
+                if item_producer_id and item_producer_id != target_node_id:
+                    self._add_generated_edge(
+                        source_node_id=item_producer_id,
+                        target_node_id=target_node_id,
+                        edge_kind=EdgeKind.BATCH_AGGREGATE,
+                        label=f"[{item_index}]",
+                        source_stuff_digest=item_stuff_code,
+                        target_stuff_digest=output_list_stuff_code,
+                    )
+
+    def _generate_parallel_combine_edges(self) -> None:
+        """Generate PARALLEL_COMBINE edges from branch producers to controller.
+
+        Mirrors GraphTracer._generate_parallel_combine_edges() (graph_tracer.py:303-321).
+        """
+        for combined_stuff_code, (parallel_controller_node_id, branch_entries) in self._parallel_combine_map.items():
+            for branch_stuff_code, branch_producer_id in branch_entries:
+                if branch_producer_id != parallel_controller_node_id:
+                    self._add_generated_edge(
+                        source_node_id=branch_producer_id,
+                        target_node_id=parallel_controller_node_id,
+                        edge_kind=EdgeKind.PARALLEL_COMBINE,
+                        source_stuff_digest=branch_stuff_code,
+                        target_stuff_digest=combined_stuff_code,
+                    )
