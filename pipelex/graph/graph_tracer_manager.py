@@ -8,6 +8,7 @@ from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
+from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
 
 
 class GraphTracerManager(metaclass=ABCSingletonMeta):
@@ -94,6 +95,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
+        event_log: "EventLogProtocol | None" = None,
+        workflow_id: str = "direct",
+        pipeline_run_id: str | None = None,
     ) -> GraphContext:
         """Create and initialize a new tracer for a pipeline run.
 
@@ -102,6 +106,10 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             data_inclusion: Configuration controlling which data formats to capture in IOSpec fields.
             pipeline_ref_domain: Optional domain name for the pipeline.
             pipeline_ref_main_pipe: Optional main pipe name.
+            event_log: Optional event log for distributed tracing. When set,
+                the tracer emits trace events as a side effect alongside in-memory accumulation.
+            workflow_id: Temporal workflow ID or "direct" for single-process mode.
+            pipeline_run_id: Pipeline run ID for event emission.
 
         Returns:
             Initial GraphContext to pass through JobMetadata.
@@ -121,6 +129,9 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             data_inclusion=data_inclusion,
             pipeline_ref_domain=pipeline_ref_domain,
             pipeline_ref_main_pipe=pipeline_ref_main_pipe,
+            event_log=event_log,
+            workflow_id=workflow_id,
+            pipeline_run_id=pipeline_run_id,
         )
 
     def close_tracer(self, graph_id: str) -> GraphSpec | None:

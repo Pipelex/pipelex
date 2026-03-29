@@ -20,6 +20,18 @@ from pipelex.graph.graphspec import (
     PipelineRef,
     TimingSpec,
 )
+from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in __init__ annotations
+from pipelex.tracing.trace_events import (
+    BatchAggregateEvent,
+    BatchItemEvent,
+    ControllerOutputEvent,
+    EdgeEvent,
+    ParallelCombineEvent,
+    PipeEndErrorEvent,
+    PipeEndSuccessEvent,
+    PipeStartEvent,
+    TraceEvent,
+)
 
 
 class _MutableNodeData:
@@ -113,11 +125,55 @@ class GraphTracer(GraphTracerProtocol):
         # The branch_producer_node_id is snapshotted at registration time, before register_controller_output
         # overrides _stuff_producer_map to point branch stuff codes to the controller node
         self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
+        # Event log for distributed tracing (None = no event emission, direct mode)
+        self._event_log: EventLogProtocol | None = None
+        # "direct" for single-process mode, full Temporal workflow ID otherwise
+        self._workflow_id: str = "direct"
+        # Pipeline run ID for event emission
+        self._pipeline_run_id: str | None = None
+        # Per-writer monotonic counter for event sequencing
+        self._event_sequence: int = 0
 
     @property
     def is_active(self) -> bool:
         """Whether tracing is currently active."""
         return self._is_active
+
+    @property
+    def _event_pipeline_run_id(self) -> str:
+        """Pipeline run ID for event emission, falling back to graph_id."""
+        return self._pipeline_run_id or self._graph_id or ""
+
+    def _emit_event(self, event: TraceEvent) -> None:
+        """Emit a trace event to the event log.
+
+        Must only be called when self._event_log is not None.
+        """
+        self._event_log.emit(event)  # type: ignore[union-attr]
+
+    def _next_event_sequence(self) -> int:
+        """Return the next monotonic sequence number for event emission."""
+        seq = self._event_sequence
+        self._event_sequence += 1
+        return seq
+
+    def _make_node_id(self) -> str:
+        """Generate a node ID, including workflow_id when in Temporal mode."""
+        if self._workflow_id != "direct":
+            node_id = f"{self._graph_id}:{self._workflow_id}:node_{self._node_sequence}"
+        else:
+            node_id = f"{self._graph_id}:node_{self._node_sequence}"
+        self._node_sequence += 1
+        return node_id
+
+    def _make_edge_id(self) -> str:
+        """Generate an edge ID, including workflow_id when in Temporal mode."""
+        if self._workflow_id != "direct":
+            edge_id = f"{self._graph_id}:{self._workflow_id}:edge_{self._edge_sequence}"
+        else:
+            edge_id = f"{self._graph_id}:edge_{self._edge_sequence}"
+        self._edge_sequence += 1
+        return edge_id
 
     @override
     def setup(
@@ -126,8 +182,23 @@ class GraphTracer(GraphTracerProtocol):
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
+        event_log: "EventLogProtocol | None" = None,
+        workflow_id: str = "direct",
+        pipeline_run_id: str | None = None,
     ) -> GraphContext:
-        """Initialize tracing for a new pipeline run."""
+        """Initialize tracing for a new pipeline run.
+
+        Args:
+            graph_id: Unique identifier for this execution graph.
+            data_inclusion: Configuration controlling which data formats to capture.
+            pipeline_ref_domain: Optional domain name for the pipeline.
+            pipeline_ref_main_pipe: Optional main pipe name.
+            event_log: Optional event log for distributed tracing. When set,
+                every tracing method emits a TraceEvent as a side effect.
+            workflow_id: Temporal workflow ID or "direct" for single-process mode.
+                When not "direct", node/edge IDs include the workflow_id segment.
+            pipeline_run_id: Pipeline run ID for event emission. Required when event_log is set.
+        """
         self._is_active = True
         self._graph_id = graph_id
         self._pipeline_ref = PipelineRef(
@@ -143,6 +214,10 @@ class GraphTracer(GraphTracerProtocol):
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
         self._parallel_combine_map = {}
+        self._event_log = event_log
+        self._workflow_id = workflow_id
+        self._pipeline_run_id = pipeline_run_id
+        self._event_sequence = 0
 
         return GraphContext(
             graph_id=graph_id,
@@ -193,6 +268,10 @@ class GraphTracer(GraphTracerProtocol):
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
         self._parallel_combine_map = {}
+        self._event_log = None
+        self._workflow_id = "direct"
+        self._pipeline_run_id = None
+        self._event_sequence = 0
 
         return graph
 
@@ -347,6 +426,21 @@ class GraphTracer(GraphTracerProtocol):
         # Note: We keep the first batch_controller_node_id registered for this list
         # (all items for the same input list should come from the same batch controller)
 
+        # Emit BatchItemEvent
+        if self._event_log is not None:
+            self._emit_event(
+                BatchItemEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=datetime.now(timezone.utc),
+                    sequence=self._next_event_sequence(),
+                    list_stuff_code=list_stuff_code,
+                    item_stuff_code=item_stuff_code,
+                    item_index=item_index,
+                    batch_controller_node_id=batch_controller_node_id or "",
+                )
+            )
+
     @override
     def register_batch_aggregation(
         self,
@@ -374,6 +468,21 @@ class GraphTracer(GraphTracerProtocol):
         # Note: We keep the first batch_controller_node_id registered for this output list
         # (all items for the same output list should come from the same batch controller)
 
+        # Emit BatchAggregateEvent
+        if self._event_log is not None:
+            self._emit_event(
+                BatchAggregateEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=datetime.now(timezone.utc),
+                    sequence=self._next_event_sequence(),
+                    output_list_stuff_code=output_list_stuff_code,
+                    item_stuff_code=item_stuff_code,
+                    item_index=item_index,
+                    batch_controller_node_id=batch_controller_node_id or "",
+                )
+            )
+
     @override
     def register_parallel_combine(
         self,
@@ -400,6 +509,21 @@ class GraphTracer(GraphTracerProtocol):
                 branch_entries.append((branch_code, producer_id))
         self._parallel_combine_map[combined_stuff_code] = (parallel_controller_node_id, branch_entries)
 
+        # Emit ParallelCombineEvent with snapshotted producer IDs
+        if self._event_log is not None:
+            self._emit_event(
+                ParallelCombineEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=datetime.now(timezone.utc),
+                    sequence=self._next_event_sequence(),
+                    combined_stuff_code=combined_stuff_code,
+                    branch_stuff_codes=branch_stuff_codes,
+                    parallel_controller_node_id=parallel_controller_node_id,
+                    branch_producer_node_ids=branch_entries,
+                )
+            )
+
     @override
     def on_pipe_start(
         self,
@@ -417,9 +541,8 @@ class GraphTracer(GraphTracerProtocol):
             child_context = graph_context.copy_for_child(node_id, graph_context.node_sequence + 1)
             return node_id, child_context
 
-        # Generate node ID
-        node_id = f"{self._graph_id}:node_{self._node_sequence}"
-        self._node_sequence += 1
+        # Generate node ID (includes workflow_id in Temporal mode)
+        node_id = self._make_node_id()
 
         # Create mutable node data
         node_data = _MutableNodeData(
@@ -432,6 +555,23 @@ class GraphTracer(GraphTracerProtocol):
             input_specs=input_specs,
         )
         self._nodes[node_id] = node_data
+
+        # Emit PipeStartEvent
+        if self._event_log is not None:
+            self._emit_event(
+                PipeStartEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=started_at,
+                    sequence=self._next_event_sequence(),
+                    node_id=node_id,
+                    parent_node_id=graph_context.parent_node_id,
+                    pipe_code=pipe_code,
+                    pipe_type=pipe_type,
+                    node_kind=node_kind,
+                    input_specs=input_specs or [],
+                )
+            )
 
         # Add containment edge from parent if this is a child pipe
         if graph_context.parent_node_id is not None:
@@ -487,6 +627,21 @@ class GraphTracer(GraphTracerProtocol):
                 if output_spec.digest:
                     self._stuff_producer_map[output_spec.digest] = node_id
 
+        # Emit PipeEndSuccessEvent
+        if self._event_log is not None:
+            self._emit_event(
+                PipeEndSuccessEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=ended_at,
+                    sequence=self._next_event_sequence(),
+                    node_id=node_id,
+                    ended_at=ended_at,
+                    output_spec=output_spec,
+                    metrics=metrics or {},
+                )
+            )
+
     @override
     def register_controller_output(
         self,
@@ -514,6 +669,19 @@ class GraphTracer(GraphTracerProtocol):
         if output_spec.digest:
             self._stuff_producer_map[output_spec.digest] = node_id
 
+        # Emit ControllerOutputEvent
+        if self._event_log is not None:
+            self._emit_event(
+                ControllerOutputEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=datetime.now(timezone.utc),
+                    sequence=self._next_event_sequence(),
+                    node_id=node_id,
+                    output_spec=output_spec,
+                )
+            )
+
     @override
     def on_pipe_end_error(
         self,
@@ -533,11 +701,26 @@ class GraphTracer(GraphTracerProtocol):
 
         node_data.ended_at = ended_at
         node_data.status = NodeStatus.FAILED
-        node_data.error = ErrorSpec(
+        error = ErrorSpec(
             error_type=error_type,
             message=error_message,
             stack=error_stack,
         )
+        node_data.error = error
+
+        # Emit PipeEndErrorEvent
+        if self._event_log is not None:
+            self._emit_event(
+                PipeEndErrorEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=ended_at,
+                    sequence=self._next_event_sequence(),
+                    node_id=node_id,
+                    ended_at=ended_at,
+                    error=error,
+                )
+            )
 
     @override
     def add_edge(
@@ -553,8 +736,7 @@ class GraphTracer(GraphTracerProtocol):
         if not self._is_active:
             return
 
-        edge_id = f"{self._graph_id}:edge_{self._edge_sequence}"
-        self._edge_sequence += 1
+        edge_id = self._make_edge_id()
 
         edge = EdgeSpec(
             edge_id=edge_id,
@@ -566,6 +748,24 @@ class GraphTracer(GraphTracerProtocol):
             target_stuff_digest=target_stuff_digest,
         )
         self._edges.append(edge)
+
+        # Emit EdgeEvent
+        if self._event_log is not None:
+            self._emit_event(
+                EdgeEvent(
+                    pipeline_run_id=self._event_pipeline_run_id,
+                    workflow_id=self._workflow_id,
+                    timestamp=datetime.now(timezone.utc),
+                    sequence=self._next_event_sequence(),
+                    edge_id=edge_id,
+                    source_node_id=source_node_id,
+                    target_node_id=target_node_id,
+                    edge_kind=edge_kind,
+                    label=label,
+                    source_stuff_digest=source_stuff_digest,
+                    target_stuff_digest=target_stuff_digest,
+                )
+            )
 
     def add_selected_outcome_edge(
         self,

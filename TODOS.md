@@ -405,27 +405,27 @@ Usage events (`UsageReportEvent`) are emitted from inference workers (e.g., `llm
 
 ### Checklist
 
-- [ ] Add `_event_log` and `_workflow_id` fields to `GraphTracer`
-- [ ] Update `GraphTracer.setup()` to accept `event_log` and `workflow_id` params
-- [ ] Add event emission to `on_pipe_start()` (PipeStartEvent + EdgeEvent for CONTAINS)
-- [ ] Add event emission to `on_pipe_end_success()` (PipeEndSuccessEvent)
-- [ ] Add event emission to `on_pipe_end_error()` (PipeEndErrorEvent)
-- [ ] Add event emission to `add_edge()` (EdgeEvent)
-- [ ] Add event emission to `register_controller_output()` (ControllerOutputEvent)
-- [ ] Add event emission to `register_batch_item_extraction()` (BatchItemEvent)
-- [ ] Add event emission to `register_batch_aggregation()` (BatchAggregateEvent)
-- [ ] Add event emission to `register_parallel_combine()` (ParallelCombineEvent with snapshotted producers)
-- [ ] Update node ID generation when `_workflow_id != "direct"` to include workflow_id segment
-- [ ] Update edge ID generation similarly
-- [ ] Update `GraphTracerManager.open_tracer()` to accept and pass through `event_log`, `workflow_id`
-- [ ] Add optional `event_log` to `ReportingManager`, emit `UsageReportEvent` in `report_inference_job()`
-- [ ] Test: GraphTracer with event_log emits correct events for a pipe start/end cycle
-- [ ] Test: CONTAINS edge event emitted when parent_node_id is present
-- [ ] Test: GraphTracer without event_log (direct mode) works exactly as before
-- [ ] Test: controller output registration emits `ControllerOutputEvent`
-- [ ] Test: parallel combine emits `ParallelCombineEvent` with correct snapshotted producer IDs
-- [ ] Test: ReportingManager emits `UsageReportEvent` when event_log is set
-- [ ] `make agent-check` passes
+- [x] Add `_event_log` and `_workflow_id` fields to `GraphTracer`
+- [x] Update `GraphTracer.setup()` to accept `event_log` and `workflow_id` params
+- [x] Add event emission to `on_pipe_start()` (PipeStartEvent + EdgeEvent for CONTAINS)
+- [x] Add event emission to `on_pipe_end_success()` (PipeEndSuccessEvent)
+- [x] Add event emission to `on_pipe_end_error()` (PipeEndErrorEvent)
+- [x] Add event emission to `add_edge()` (EdgeEvent)
+- [x] Add event emission to `register_controller_output()` (ControllerOutputEvent)
+- [x] Add event emission to `register_batch_item_extraction()` (BatchItemEvent)
+- [x] Add event emission to `register_batch_aggregation()` (BatchAggregateEvent)
+- [x] Add event emission to `register_parallel_combine()` (ParallelCombineEvent with snapshotted producers)
+- [x] Update node ID generation when `_workflow_id != "direct"` to include workflow_id segment
+- [x] Update edge ID generation similarly
+- [x] Update `GraphTracerManager.open_tracer()` to accept and pass through `event_log`, `workflow_id`
+- [x] Add optional `event_log` to `ReportingManager`, emit `UsageReportEvent` in `report_inference_job()`
+- [x] Test: GraphTracer with event_log emits correct events for a pipe start/end cycle
+- [x] Test: CONTAINS edge event emitted when parent_node_id is present
+- [x] Test: GraphTracer without event_log (direct mode) works exactly as before
+- [x] Test: controller output registration emits `ControllerOutputEvent`
+- [x] Test: parallel combine emits `ParallelCombineEvent` with correct snapshotted producer IDs
+- [x] Test: ReportingManager emits `UsageReportEvent` when event_log is set
+- [x] `make agent-check` passes
 
 ---
 

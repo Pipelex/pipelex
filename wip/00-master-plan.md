@@ -301,7 +301,7 @@ See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for t
 - [x] **Step 0 — Event Models**: `TraceEvent` hierarchy with discriminated union, serialization round-trips, `TokensUsage` models fixed to `Literal` discriminators
 - [x] **Step 1 — EventLogProtocol & NDJSON Backend**: `NdjsonEventLog` with emit/read/cleanup/dedup, `InMemoryEventLog` for tests, corrupt-line handling, multiprocess concurrent write safety
 - [x] **Step 2 — GraphSpec Assembler**: Two-pass assembly (nodes + producer map → edges), structural equivalence with current `GraphTracer` output, `UsageAggregator`
-- [ ] **Step 3 — Emit Integration**: Dual-write in `GraphTracer` (optional `EventLogProtocol`), `ReportingManager` emits `UsageReportEvent`, node/edge IDs include `workflow_id` segment
+- [x] **Step 3 — Emit Integration**: Dual-write in `GraphTracer` (optional `EventLogProtocol`), `ReportingManager` emits `UsageReportEvent`, node/edge IDs include `workflow_id` segment
 - [ ] **Step 4 — Wire into Pipeline Lifecycle**: `TracingConfig`, `NdjsonEventLog` created in `WfPipeRouter` and `pipeline_run_setup`, assembly in `runner.py` finally block, direct mode unchanged
 - [ ] **Step 5 — Temporal Integration Tests**: PipeSequence/PipeParallel/PipeBatch through Temporal produce correct GraphSpec, usage aggregation across workers, failure/replay resilience
 - [ ] `make agent-check` passes
