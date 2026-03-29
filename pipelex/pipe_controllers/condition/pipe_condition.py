@@ -317,6 +317,7 @@ class PipeCondition(PipeController):
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
+                output_name=output_name,
                 library_crate=library_crate,
             )
         return PipeOutput(working_memory=working_memory)
