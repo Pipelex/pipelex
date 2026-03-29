@@ -118,7 +118,7 @@ make test-extract             - Run unit tests only for extract (with prints)
 make te                       - Shorthand -> test-extract
 make test-img-gen             - Run unit tests only for img_gen (with prints)
 make test-g					  - Shorthand -> test-img-gen
-make test-temporal            - Run temporal tests (SRV=local|testing MODE=live)
+make test-temporal            - Run temporal tests (SRV=local|testing MODE=live REG=isolated)
 make ttm                      - Shorthand -> test-temporal
 
 make check-unused-imports     - Check for unused imports without fixing
@@ -629,6 +629,7 @@ tg: test-img-gen
 
 SRV ?=
 MODE ?=
+REG ?=
 TEMPORAL_PYTEST_MARKERS := $(if $(filter live,$(MODE)),"temporal","temporal and (dry_runnable or not inference)")
 TEMPORAL_TESTS_DIR := tests/integration/pipelex/temporal/
 
@@ -637,20 +638,23 @@ test-temporal: env
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
 			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s --lf \
-				$(if $(SRV),--temporal-server $(SRV) --temporal-worker external,) \
+				$(if $(SRV),--temporal-server $(SRV),) \
+				$(if $(REG),--class-registry $(REG),) \
 				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
 				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
 				$(TEMPORAL_TESTS_DIR); \
 		else \
 			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s -k "$(TEST)" \
-				$(if $(SRV),--temporal-server $(SRV) --temporal-worker external,) \
+				$(if $(SRV),--temporal-server $(SRV),) \
+				$(if $(REG),--class-registry $(REG),) \
 				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
 				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
 				$(TEMPORAL_TESTS_DIR); \
 		fi; \
 	else \
 		$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s \
-			$(if $(SRV),--temporal-server $(SRV) --temporal-worker external,) \
+			$(if $(SRV),--temporal-server $(SRV),) \
+			$(if $(REG),--class-registry $(REG),) \
 			$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
 			$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
 			$(TEMPORAL_TESTS_DIR); \

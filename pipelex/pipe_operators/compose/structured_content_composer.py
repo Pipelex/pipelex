@@ -7,7 +7,7 @@ from pydantic import ValidationError
 from pipelex import log
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.cogt.templating.template_preprocessor import preprocess_template
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
@@ -650,14 +650,11 @@ class StructuredContentComposer:
         if self.extra_context:
             context.update(**self.extra_context)
 
-        # Preprocess the template (handles $ -> {{ }} conversion)
-        preprocessed = preprocess_template(field_blueprint.template)
-
-        # Render the template using the provided content generator (supports dry run mode)
-        return await self.content_generator.make_templated_text(
+        # TODO: dry-run templating is being removed — this direct render_template call is intentional
+        return await render_template(
+            template=field_blueprint.template,
+            category=TemplateCategory.BASIC,
             context=context,
-            template=preprocessed,
-            template_category=TemplateCategory.BASIC,
         )
 
     async def _resolve_nested(self, field_blueprint: ConstructFieldBlueprint, field_name: str) -> StuffContent:

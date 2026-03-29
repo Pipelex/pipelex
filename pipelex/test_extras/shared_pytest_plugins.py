@@ -10,6 +10,14 @@ from pipelex.pipe_run.pipe_run_params import PipeRunMode
 from pipelex.system.environment import is_env_var_set, is_env_var_truthy, set_env
 from pipelex.system.runtime import CODEX_CLOUD_ENV_VAR_KEY, RunMode, runtime_manager
 from pipelex.tools.misc.placeholder import make_placeholder_value, value_is_placeholder
+from pipelex.types import StrEnum
+
+
+class ClassRegistryMode(StrEnum):
+    SHARED = "shared"
+    ISOLATED = "isolated"
+    BOTH = "both"
+
 
 # List of environment variables that may need placeholders in CI
 ENV_VAR_KEYS_WHICH_MAY_NEED_PLACEHOLDERS_IN_CI = [
@@ -75,9 +83,10 @@ def pytest_addoption(parser: Parser):
     )
     parser.addoption(
         "--class-registry",
-        default="shared",
-        choices=("shared", "isolated"),
-        help="Class registry mode: 'shared' leaks dynamic classes to global (default), 'isolated' scopes them to the library registry",
+        default=ClassRegistryMode.BOTH,
+        choices=list(ClassRegistryMode),
+        help="Class registry mode: 'both' runs tests in shared and isolated modes (default), "
+        "'shared' leaks dynamic classes to global, 'isolated' scopes them to the library registry",
     )
 
 

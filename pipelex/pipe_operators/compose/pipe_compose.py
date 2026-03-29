@@ -1,5 +1,6 @@
 from typing import Any, Literal
 
+from pydantic import Field
 from typing_extensions import override
 
 from pipelex import log
@@ -7,6 +8,7 @@ from pipelex.cogt.content_generation.content_generator_dry import ContentGenerat
 from pipelex.cogt.content_generation.content_generator_protocol import ContentGeneratorProtocol
 from pipelex.cogt.content_generation.dry_run_factory import DryRunFactory
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
@@ -40,7 +42,7 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
     # Template mode fields (used when template is provided)
     template: str | None = None
     templating_style: TemplatingStyle | None = None
-    category: TemplateCategory = TemplateCategory.BASIC
+    category: TemplateCategory = Field(default=TemplateCategory.BASIC, strict=False)
     extra_context: dict[str, Any] | None = None
 
     # Construct mode field (used when construct is provided)
@@ -163,7 +165,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
                 output_name=output_name,
-                content_generator=content_generator,
             )
 
     async def _run_template_mode(
@@ -172,7 +173,6 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         working_memory: WorkingMemory,
         pipe_run_params: PipeRunParams,
         output_name: str | None,
-        content_generator: ContentGeneratorProtocol,
     ) -> PipeComposeOutput:
         """Run PipeCompose in template mode (produces Text or Html output)."""
         if self.template is None:
@@ -185,11 +185,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
         if self.extra_context:
             context.update(**self.extra_context)
 
-        jinja2_text = await content_generator.make_templated_text(
-            context=context,
+        # TODO: dry-run templating is being removed — this direct render_template call is intentional
+        jinja2_text = await render_template(
             template=self.template,
+            category=self.category,
+            context=context,
             templating_style=self.templating_style,
-            template_category=self.category,
         )
         log.verbose(f"Jinja2 rendered text:\n{jinja2_text}")
         assert isinstance(jinja2_text, str)

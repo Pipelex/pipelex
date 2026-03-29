@@ -13,6 +13,7 @@ from pipelex.temporal.temporal_connect import connect_to_temporal_selected_serve
 from pipelex.temporal.temporal_data_converter import data_converter
 from pipelex.temporal.temporal_hub import temporal_hub
 from pipelex.temporal.temporal_task_manager import TemporalTaskManager
+from pipelex.test_extras.shared_pytest_plugins import ClassRegistryMode
 
 TEMPORAL_SERVER_NONE = "none"
 TEMPORAL_SERVER_TIME_SKIPPING = "time-skipping"
@@ -113,15 +114,23 @@ async def env(request: FixtureRequest) -> AsyncGenerator[WorkflowEnvironment, No
     elif server_option == TEMPORAL_SERVER_TIME_SKIPPING:
         workflow_env = await WorkflowEnvironment.start_time_skipping(data_converter=data_converter)
     else:
-        # Session-scoped fixtures run before module-scoped ones, so
-        # reset_pipelex_config_fixture hasn't initialized Pipelex yet.
-        # Bootstrap temporarily to access server connection config.
-        Pipelex.make(
-            integration_mode=IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST,
-        )
+        # Bootstrap Pipelex temporarily to read server connection config.
+        # If a module-scoped fixture already initialized Pipelex (happens when
+        # env is lazily triggered after reset_pipelex_config_fixture), skip init
+        # and just read the config from the existing instance.
+
+        # TODO: Pipelex.make() is heavy — it initializes inference, registries, etc.
+        # We only need the config here. Design a lightweight boot path (e.g.
+        # Pipelex.load_config_only()) that parses pipelex.toml without full init.
+        needs_teardown = False
+        if Pipelex.get_optional_instance() is None:
+            Pipelex.make(
+                integration_mode=IntegrationMode.CI if runtime_manager.is_ci_testing else IntegrationMode.PYTEST,
+            )
+            needs_teardown = True
         temporal_client = await connect_to_temporal_selected_server(selected_server_config=server_option)
-        # Teardown so the module-scoped fixture can re-initialize cleanly per module.
-        Pipelex.teardown_if_needed()
+        if needs_teardown:
+            Pipelex.teardown_if_needed()
         workflow_env = WorkflowEnvironment.from_client(temporal_client)
     yield workflow_env
     await workflow_env.shutdown()
@@ -133,13 +142,22 @@ async def temporal_client(env: WorkflowEnvironment) -> TemporalClient:  # noqa: 
     return env.client
 
 
-@pytest.fixture(scope="class")
-def is_class_registry_isolated(request: FixtureRequest) -> bool:
-    """Whether dynamic classes should be scoped to the library registry (not global).
+def pytest_generate_tests(metafunc: pytest.Metafunc) -> None:
+    """Auto-parametrize is_class_registry_isolated based on --class-registry.
 
-    When True, simulates a process that hasn't pre-loaded the bundle — dynamic concept
-    classes exist only in the library's scoped ClassRegistry, not in the global
-    KajsonManager registry. This forces code paths that rely on crate-based class
-    loading and deferred hydration.
+    By default (``--class-registry both``), every test class that requests
+    ``is_class_registry_isolated`` runs twice: once with classes in the global
+    registry (shared) and once scoped to the library (isolated).  Pass
+    ``--class-registry shared`` or ``--class-registry isolated`` to force a
+    single mode (useful for debugging).
     """
-    return cast("str", request.config.getoption("--class-registry")) == "isolated"
+    if "is_class_registry_isolated" not in metafunc.fixturenames:
+        return
+    mode = ClassRegistryMode(metafunc.config.getoption("--class-registry"))
+    match mode:
+        case ClassRegistryMode.BOTH:
+            metafunc.parametrize("is_class_registry_isolated", [False, True], ids=["shared", "isolated"], scope="class")
+        case ClassRegistryMode.ISOLATED:
+            metafunc.parametrize("is_class_registry_isolated", [True], ids=["isolated"], scope="class")
+        case ClassRegistryMode.SHARED:
+            metafunc.parametrize("is_class_registry_isolated", [False], ids=["shared"], scope="class")

@@ -37,7 +37,6 @@ class TestWfPipeBatch:
         """Verify the crate has all pipe_refs including the batch branch pipe."""
         self._assert_crate_structure(batch_job)
 
-    @pytest.mark.xfail(reason="PipeBatch fan-out fails in Temporal dry-run — likely StuffArtefact serialization issue in child workflows")
     async def test_batch_sequence_via_temporal(
         self,
         batch_job: PipeJob,

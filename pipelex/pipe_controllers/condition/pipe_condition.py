@@ -4,13 +4,14 @@ from typing_extensions import override
 
 from pipelex import log
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.memory.working_memory import WorkingMemory, WorkingMemoryStuffNotFoundError
 from pipelex.core.pipes.exceptions import PipeValidationError, PipeValidationErrorType
 from pipelex.core.pipes.inputs.input_stuff_specs import InputStuffSpecs
 from pipelex.core.pipes.inputs.input_stuff_specs_factory import InputStuffSpecsFactory
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.hub import get_content_generator, get_optional_pipe, get_pipe_router, get_required_pipe
+from pipelex.hub import get_optional_pipe, get_pipe_router, get_required_pipe
 from pipelex.pipe_controllers.condition.special_outcome import SpecialOutcome
 from pipelex.pipe_controllers.pipe_controller import PipeController
 from pipelex.pipe_run.exceptions import PipeRunError
@@ -174,10 +175,10 @@ class PipeCondition(PipeController):
     async def _validate_before_run(
         self, job_metadata: JobMetadata, working_memory: WorkingMemory, pipe_run_params: PipeRunParams, output_name: str | None = None
     ):
-        evaluated_expression = await get_content_generator().make_templated_text(
-            context=working_memory.generate_context(),
+        evaluated_expression = await render_template(
             template=self.expression,
-            template_category=TemplateCategory.EXPRESSION,
+            category=TemplateCategory.EXPRESSION,
+            context=working_memory.generate_context(),
         )
         if not evaluated_expression or evaluated_expression == "None":
             error_msg = f"PipeCondition '{self.code}': Conditional expression returned no result"
@@ -205,10 +206,10 @@ class PipeCondition(PipeController):
         Returns:
             The evaluated expression
         """
-        evaluated_expression = await get_content_generator().make_templated_text(
-            context=working_memory.generate_context(),
+        evaluated_expression = await render_template(
             template=self.expression,
-            template_category=TemplateCategory.EXPRESSION,
+            category=TemplateCategory.EXPRESSION,
+            context=working_memory.generate_context(),
         )
 
         log.verbose(f"add_alias: {evaluated_expression} -> {self.add_alias_from_expression_to}")
@@ -316,6 +317,7 @@ class PipeCondition(PipeController):
                 job_metadata=job_metadata,
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
+                output_name=output_name,
                 library_crate=library_crate,
             )
         return PipeOutput(working_memory=working_memory)
