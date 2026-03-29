@@ -15,12 +15,23 @@
 - **Graph rendering refactor**: Extracted dry-run logic from `graph_rendering._dry_run_bundle` into the new shared `dry_run_pipeline` function.
 - **Agent CLI inputs**: Refactored `_inputs_core` to delegate to `builder.operations.inputs_ops.build_inputs_for_pipe` instead of duplicating bundle validation and input rendering logic.
 - **Agent CLI run**: Added graph generation support with ReactFlow HTML output and side-effect metadata tracking in `_run_core`.
+- **Deduplicate `models_cmd` → `models_ops`**: `models_cmd.py` is now a thin CLI wrapper delegating to `list_models()` and `format_models_markdown()` in `models_ops.py`, consistent with other agent CLI commands.
 
 ### Removed
 
 - **`BuilderLoop`** and its iterative build-validate-fix cycle (`builder_loop.py`, `builder.py`, `builder_errors.py`). The build-agent CLI now drives spec construction directly.
 - **`pipelex build pipe`** CLI command and associated MTHDS workflow files (`builder.mthds`, `agentic_builder.mthds`, `pipe_design.mthds`, `concept_fixer.mthds`, `synthesize_image.mthds`).
 - **`pipelex-tools` runtime dependency**: Moved to dev-only dependency; `plxt` is now invoked via subprocess passthrough.
+
+- **Talent system**: Removed talent enums, config mappings (`talent_preset_mappings`), and talent preset tests. Pipe specs accept model presets directly via the `model` field, making the talent indirection unnecessary.
+
+### Fixed
+
+- **Per-bundle dedup in pipeline run setup**: Fixed duplicate bundle loading when the same bundle appears in multiple sources.
+- **HTTP utils**: Use HEAD-first strategy for URL validation to avoid downloading large payloads unnecessarily.
+- **`library_dirs` passthrough**: Fixed `library_dirs` not being forwarded in builder operations (`inputs_ops`, `validate_ops`).
+- **Dry-run status**: Fixed validation status reporting for dry-run results.
+
 
 ## [v0.22.0] - 2026-03-25
 

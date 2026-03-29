@@ -80,13 +80,13 @@ claude
 Tell Claude to install the MTHDS skills marketplace:
 
 ```
-/plugin marketplace add mthds-ai/skills
+/plugin marketplace add mthds-ai/mthds-plugins
 ```
 
 then install the MTHDS skills plugin:
 
 ```
-/plugin install mthds@mthds-ai-skills
+/plugin install mthds@mthds-ai-mthds-plugins
 ```
 
 then you must exit Claude Code and reopen it.
@@ -475,7 +475,7 @@ The same `.mthds` file runs from multiple execution targets:
 |---|---|---|
 | **MTHDS Standard** | The open standard specification — language, package system, and typed concepts | [mthds.ai](https://mthds.ai) |
 | **MTHDS Hub** | Discover and share methods — browse packages, search by signature | [mthds.sh](https://mthds.sh) |
-| **Skills Plugin** | Claude Code plugin — 11 commands to build, run, edit, check, fix, and publish methods | [github.com/mthds-ai/skills](https://github.com/mthds-ai/skills) |
+| **Skills Plugin** | Claude Code plugin — commands to build, run, edit, check, fix, and publish methods | [github.com/mthds-ai/mthds-plugins](https://github.com/mthds-ai/mthds-plugins) |
 | **Package System** | Versioned dependencies, lock files with SHA-256 integrity, cross-package references via `->` | [Packages docs](https://mthds.ai/latest/packages/structure/) |
 | **Know-How Graph** | Typed discovery — "I have X, I need Y" — find methods or chains by typed signature | [Know-How Graph](https://mthds.ai/latest/know-how-graph/) |
 
