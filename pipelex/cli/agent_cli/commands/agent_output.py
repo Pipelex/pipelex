@@ -46,14 +46,14 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
     "GatewayApiKeyMissingError": "Set the PIPELEX_GATEWAY_API_KEY environment variable, or disable pipelex_gateway in backends.toml",
     "GatewayDoNotTrackConflictError": "Unset the DO_NOT_TRACK environment variable, or disable pipelex_gateway in backends.toml",
-    "BinaryNotFoundError": "Install pipelex-tools: pip install pipelex-tools",
+    "BinaryNotFoundError": "Install pipelex-tools: uv tool install pipelex-tools",
     "RemoteConfigFetchError": "Check internet connection and firewall settings, or disable pipelex_gateway in backends.toml",
     "RemoteConfigValidationError": (
         "This is a server-side issue; report it on Discord/GitHub. Disable pipelex_gateway in backends.toml as a workaround"
     ),
     # API runner errors
     "ClientAuthenticationError": "Run 'pipelex-agent doctor' to check credentials, or set the PIPELEX_API_KEY environment variable",
-    "PipelineRequestError": "Check that pipe_code or mthds_content is provided",
+    "PipelineRequestError": "Check that pipe_code or mthds_contents is provided",
     # Graph errors
     "GraphSpecParseError": "Validate graphspec.json structure; ensure it matches the expected GraphSpec schema",
     # Input/type errors

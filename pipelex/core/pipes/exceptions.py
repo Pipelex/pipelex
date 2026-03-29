@@ -13,11 +13,9 @@ class PipeFactoryErrorType(StrEnum):
     """Types of pipe factory errors.
 
     These error types are raised during pipe creation from blueprints.
-    Some are auto-fixed in the builder loop (marked below).
     """
 
-    # Errors that are auto-fixed in builder_loop.py
-    UNKNOWN_CONCEPT = "unknown_concept"  # AUTO-FIXED: concept not declared in domain
+    UNKNOWN_CONCEPT = "unknown_concept"
 
     # Generic fallback for unexpected factory errors
     UNKNOWN_FACTORY_ERROR = "unknown_factory_error"
@@ -26,8 +24,7 @@ class PipeFactoryErrorType(StrEnum):
 class PipeFactoryError(PipelexError):
     """Raised when a pipe cannot be created from a blueprint.
 
-    This error includes structured data about the failure, particularly useful
-    for missing concept errors that can be auto-fixed by the builder loop.
+    This error includes structured data about the failure.
 
     Attributes:
         message: Human-readable error message
@@ -101,19 +98,16 @@ class PipeValidationErrorType(StrEnum):
     """Types of pipe validation errors.
 
     These error types are raised during pipe validation from Pipe/Concept classes.
-    Only some are auto-fixed in the builder loop (marked below).
     """
 
-    # Errors that are auto-fixed in builder_loop.py
-    MISSING_INPUT_VARIABLE = "missing_input_variable"  # AUTO-FIXED
-    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"  # AUTO-FIXED
-    INPUT_STUFF_SPEC_MISMATCH = "input_stuff_spec_mismatch"  # AUTO-FIXED
-    INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"  # AUTO-FIXED
-    INADEQUATE_OUTPUT_MULTIPLICITY = "inadequate_output_multiplicity"  # AUTO-FIXED
+    MISSING_INPUT_VARIABLE = "missing_input_variable"
+    EXTRANEOUS_INPUT_VARIABLE = "extraneous_input_variable"
+    INPUT_STUFF_SPEC_MISMATCH = "input_stuff_spec_mismatch"
+    INADEQUATE_OUTPUT_CONCEPT = "inadequate_output_concept"
+    INADEQUATE_OUTPUT_MULTIPLICITY = "inadequate_output_multiplicity"
 
     CIRCULAR_DEPENDENCY_ERROR = "circular_dependency_error"
 
-    # Errors that are raised but NOT auto-fixed (will fail validation)
     LLM_OUTPUT_CANNOT_BE_IMAGE = "llm_output_cannot_be_image"
     IMG_GEN_INPUT_NOT_TEXT_COMPATIBLE = "img_gen_input_not_text_compatible"
     INVALID_PIPE_CODE_SYNTAX = "invalid_pipe_code_syntax"

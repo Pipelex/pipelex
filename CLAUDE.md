@@ -30,7 +30,9 @@
 
 ### Running Tests
 
-   After you're finished making code changes, you must always run tests using `make agent-test`.
+   After making code changes, run **targeted tests** based on what you changed. See `tests/CLAUDE.md` for the source-to-test mapping and the pytest command template.
+
+   Fall back to the full suite when changes are broad (3+ areas), touch shared infrastructure, or when preparing a release/push/commit to remote:
 
    ```bash
    make agent-test
@@ -144,7 +146,7 @@ This document outlines the core coding standards, best practices, and quality co
 
 #### **Imports at the top of the file**
 
-    - Import all necessary libraries at the top of the file
+    - Avoid as much as possible import statements outside of a module's top-level scope.
     - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
     - Do not bother with ordering the imports or removing unused imports, our Ruff linter will handle it for us.
     - `if TYPE_CHECKING:` blocks must always be the **last** block in the imports section, placed after all regular imports.

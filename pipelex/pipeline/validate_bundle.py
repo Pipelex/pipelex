@@ -9,7 +9,7 @@ from pipelex.core.bundles.exceptions import PipelexBundleBlueprintValidationErro
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.exceptions import PipeFactoryErrorData, PipesAndConceptValidationErrorData
-from pipelex.core.interpreter.exceptions import PipelexInterpreterError
+from pipelex.core.interpreter.exceptions import MthdsDecodeError, PipelexInterpreterError
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.pipes.exceptions import PipeFactoryError, PipeValidationError
 from pipelex.core.pipes.handle_pipe_errors import (
@@ -65,9 +65,6 @@ class ValidateBundleError(PipelexError):
         # Dry run errors
         self.dry_run_error_message = dry_run_error_message
 
-        # Path to a saved .mthds file with the last bundle state (set by builder_loop when all fix attempts are exhausted)
-        self.failed_bundle_path: str | None = None
-
         super().__init__(message)
 
     @property
@@ -88,16 +85,22 @@ class ValidateBundleResult(BaseModel):
 
 async def validate_bundle(
     mthds_file_path: Path | None = None,
-    mthds_content: str | None = None,
+    mthds_contents: list[str] | None = None,
     blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
 ) -> ValidateBundleResult:
-    provided_params = sum([blueprints is not None, mthds_content is not None, mthds_file_path is not None])
+    provided_params = sum(
+        [
+            blueprints is not None,
+            mthds_contents is not None,
+            mthds_file_path is not None,
+        ]
+    )
     if provided_params == 0:
-        msg = "At least one of blueprints, mthds_content, or mthds_file_path must be provided to validate_bundle"
+        msg = "At least one of blueprints, mthds_contents, or mthds_file_path must be provided to validate_bundle"
         raise ValidateBundleError(message=msg)
     if provided_params > 1:
-        msg = "Only one of blueprints, mthds_content, or mthds_file_path can be provided to validate_bundle, not multiple"
+        msg = "Only one of blueprints, mthds_contents, or mthds_file_path can be provided to validate_bundle, not multiple"
         raise ValidateBundleError(message=msg)
 
     library_manager = get_library_manager()
@@ -124,10 +127,9 @@ async def validate_bundle(
             dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
-        elif mthds_content is not None:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
-            loaded_blueprints = [blueprint]
-            loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=[blueprint])
+        elif mthds_contents is not None:
+            loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+            loaded_pipes = library_manager.load_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
             dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
             return ValidateBundleResult(blueprints=loaded_blueprints, pipes=loaded_pipes, dry_run_result=dry_run_results)
 
@@ -172,6 +174,9 @@ async def validate_bundle(
             message=msg,
             pipe_validation_errors=pipe_validation_errors,
         ) from validation_error
+    except MthdsDecodeError as decode_error:
+        msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
+        raise ValidateBundleError(message=msg) from decode_error
     except PipeRunError as pipe_run_error:
         raise ValidateBundleError(
             message=pipe_run_error.message,
@@ -198,6 +203,9 @@ async def validate_bundles_from_directory(directory: Path) -> ValidateBundleResu
 
         loaded_pipes = library_manager.load_libraries(library_id=library_id, library_dirs=[Path(directory)])
         dry_run_results = await dry_run_pipes(pipes=loaded_pipes, raise_on_failure=True)
+    except MthdsDecodeError as decode_error:
+        msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
+        raise ValidateBundleError(message=msg) from decode_error
     except PipelexInterpreterError as interpreter_error:
         raise ValidateBundleError(
             message=interpreter_error.message,
@@ -245,7 +253,7 @@ class LoadConceptsOnlyResult(BaseModel):
 
 def load_concepts_only(
     mthds_file_path: Path | None = None,
-    mthds_content: str | None = None,
+    mthds_contents: list[str] | None = None,
     blueprints: list[PipelexBundleBlueprint] | None = None,
     library_dirs: Sequence[Path] | None = None,
 ) -> LoadConceptsOnlyResult:
@@ -257,7 +265,7 @@ def load_concepts_only(
 
     Args:
         mthds_file_path: Path to a single MTHDS file to load (mutually exclusive with others)
-        mthds_content: MTHDS content string to load (mutually exclusive with others)
+        mthds_contents: List of MTHDS content strings to load (mutually exclusive with others)
         blueprints: Pre-parsed blueprints to load (mutually exclusive with others)
         library_dirs: Optional directories containing additional MTHDS library files
 
@@ -267,12 +275,12 @@ def load_concepts_only(
     Raises:
         ValidateBundleError: If loading fails due to interpreter or validation errors
     """
-    provided_params = sum([blueprints is not None, mthds_content is not None, mthds_file_path is not None])
+    provided_params = sum([blueprints is not None, mthds_contents is not None, mthds_file_path is not None])
     if provided_params == 0:
-        msg = "At least one of blueprints, mthds_content, or mthds_file_path must be provided to load_concepts_only"
+        msg = "At least one of blueprints, mthds_contents, or mthds_file_path must be provided to load_concepts_only"
         raise ValidateBundleError(message=msg)
     if provided_params > 1:
-        msg = "Only one of blueprints, mthds_content, or mthds_file_path can be provided to load_concepts_only, not multiple"
+        msg = "Only one of blueprints, mthds_contents, or mthds_file_path can be provided to load_concepts_only, not multiple"
         raise ValidateBundleError(message=msg)
 
     library_manager = get_library_manager()
@@ -299,10 +307,9 @@ def load_concepts_only(
             loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=blueprints)
             return LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
 
-        elif mthds_content is not None:
-            blueprint = PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=mthds_content)
-            loaded_blueprints = [blueprint]
-            loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=[blueprint])
+        elif mthds_contents is not None:
+            loaded_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
+            loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=loaded_blueprints)
             return LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
 
         else:
@@ -320,6 +327,9 @@ def load_concepts_only(
 
             return LoadConceptsOnlyResult(blueprints=loaded_blueprints, concepts=loaded_concepts)
 
+    except MthdsDecodeError as decode_error:
+        msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
+        raise ValidateBundleError(message=msg) from decode_error
     except PipelexInterpreterError as interpreter_error:
         raise ValidateBundleError(
             message=interpreter_error.message,
@@ -363,6 +373,9 @@ def load_concepts_only_from_directory(directory: Path) -> LoadConceptsOnlyResult
             all_blueprints.append(blueprint)
 
         loaded_concepts = library_manager.load_concepts_only_from_blueprints(library_id=library_id, blueprints=all_blueprints)
+    except MthdsDecodeError as decode_error:
+        msg = f"TOML syntax error at line {decode_error.lineno}, column {decode_error.colno}: {decode_error.message}"
+        raise ValidateBundleError(message=msg) from decode_error
     except PipelexInterpreterError as interpreter_error:
         raise ValidateBundleError(
             message=interpreter_error.message,

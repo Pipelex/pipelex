@@ -2448,7 +2448,7 @@ wheels = [
 
 [[package]]
 name = "mthds"
-version = "0.1.1"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backports-strenum", marker = "python_full_version < '3.11'" },
@@ -2459,9 +2459,9 @@ dependencies = [
     { name = "tomlkit" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/88/f3/dad8e15a09a336e79255420f00d8a1bafbd9e449b4f193534c696f33c1d2/mthds-0.1.1.tar.gz", hash = "sha256:409d744b13987c2890e9fcdb005e35e0b8497b8288ecbfbdda2e26d5401483b9", size = 112278, upload-time = "2026-03-12T18:08:16.805Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c6/e8/69d60b665f10a28c5efede63ccf95bdf75954701023e38138dc97da5862a/mthds-0.2.0.tar.gz", hash = "sha256:95952b489e0a6336667086a3eddb0f761f81d4af29f32de28b4182b33d265fc9", size = 112564, upload-time = "2026-03-24T13:33:51.927Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/5a/8ebd5ec801bd37323c2a0cf8b7b57bc09775fa768ab8c67c475824521ea4/mthds-0.1.1-py3-none-any.whl", hash = "sha256:2742a0d0d886315de4a60866fb7995fcef682b1f56df37026f36c24ebdc86ca0", size = 49146, upload-time = "2026-03-12T18:08:15.338Z" },
+    { url = "https://files.pythonhosted.org/packages/cc/64/3fe70f33f0f9c6237336f368cf0a24d28fce60fc1d486f0df308b36d3beb/mthds-0.2.0-py3-none-any.whl", hash = "sha256:72f6765ef48caff24211c0fc3523f61a7118ae829bd54caf1b9eba7fb4e4f281", size = 49346, upload-time = "2026-03-24T13:33:50.479Z" },
 ]
 
 [[package]]
@@ -3449,7 +3449,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.22.0"
+version = "0.23.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3470,7 +3470,6 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "pillow" },
-    { name = "pipelex-tools" },
     { name = "polyfactory" },
     { name = "portkey-ai" },
     { name = "posthog" },
@@ -3500,6 +3499,7 @@ dev = [
     { name = "boto3-stubs" },
     { name = "moto", extra = ["s3"] },
     { name = "mypy" },
+    { name = "pipelex-tools" },
     { name = "pylint" },
     { name = "pyright" },
     { name = "pytest" },
@@ -3588,7 +3588,7 @@ requires-dist = [
     { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = ">=1.1.0" },
     { name = "mkdocs-redirects", marker = "extra == 'docs'", specifier = "==1.2.2" },
     { name = "moto", extras = ["s3"], marker = "extra == 'dev'", specifier = ">=5.0.0" },
-    { name = "mthds", specifier = ">=0.1.1" },
+    { name = "mthds", specifier = ">=0.2.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==1.19.1" },
     { name = "networkx", specifier = ">=3.4.2" },
     { name = "openai", specifier = ">=1.108.1" },
@@ -3597,7 +3597,7 @@ requires-dist = [
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "pillow", specifier = ">=11.2.1" },
-    { name = "pipelex-tools", specifier = ">=0.3.2" },
+    { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.3.2" },
     { name = "polyfactory", specifier = ">=2.21.0" },
     { name = "portkey-ai", specifier = ">=2.1.0" },
     { name = "posthog", specifier = ">=6.7.0" },
