@@ -11,7 +11,7 @@ from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifes
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
-import pipelex.builder as builder_pkg
+import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
 from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint

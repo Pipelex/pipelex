@@ -222,14 +222,14 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
 
 
 def handle_build_validation_failure(exc: ValidateBundleError) -> NoReturn:
-    """Handle ValidateBundleError that occurs when the builder loop cannot auto-fix validation issues.
+    """Handle ValidateBundleError that occurs during bundle validation.
 
     Args:
-        exc: The bundle validation error exception from the build loop
+        exc: The bundle validation error exception
     """
     console = get_console()
-    console.print("\n[bold red]❌ Pipe build failed: validation errors could not be auto-fixed[/bold red]\n")
-    console.print("[yellow]The builder attempted to fix validation errors automatically but could not resolve all issues.[/yellow]\n")
+    console.print("\n[bold red]❌ Build failed: bundle validation errors[/bold red]\n")
+    console.print("[yellow]Validation errors were found that could not be resolved.[/yellow]\n")
 
     _display_validation_error_details(console=console, exc=exc)
 
