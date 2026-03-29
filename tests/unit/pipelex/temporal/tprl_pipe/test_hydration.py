@@ -1,8 +1,11 @@
+from typing import cast
+
 import pytest
 
 from pipelex.core.concepts.concept import Concept
 from pipelex.core.domains.domain import SpecialDomain
 from pipelex.core.memory.working_memory import WorkingMemory
+from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff import Stuff
 from pipelex.core.stuffs.text_content import TextContent
 from pipelex.hub import get_class_registry
@@ -43,7 +46,7 @@ class TestHydrateWorkingMemory:
         working_memory = WorkingMemory()
         working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello, world!")
 
-        raw = working_memory.smart_dump()
+        raw = working_memory.dump_for_temporal()
         hydrated = hydrate_working_memory(raw)
 
         assert "greeting" in hydrated.root
@@ -55,7 +58,7 @@ class TestHydrateWorkingMemory:
     def test_hydrate_empty(self) -> None:
         """An empty WorkingMemory raw dict hydrates to empty WorkingMemory."""
         working_memory = WorkingMemory()
-        raw = working_memory.smart_dump()
+        raw = working_memory.dump_for_temporal()
 
         hydrated = hydrate_working_memory(raw)
 
@@ -68,11 +71,46 @@ class TestHydrateWorkingMemory:
         working_memory.root["greeting"] = _make_text_stuff("greeting", "Hello!")
         working_memory.aliases["main_stuff"] = "greeting"
 
-        raw = working_memory.smart_dump()
+        raw = working_memory.dump_for_temporal()
         hydrated = hydrate_working_memory(raw)
 
         assert hydrated.aliases == {"main_stuff": "greeting"}
         assert "greeting" in hydrated.root
+
+    def test_hydrate_list_content_round_trip(self) -> None:
+        """ListContent survives dump_for_temporal/hydrate round-trip as a plain list."""
+        working_memory = WorkingMemory()
+        list_stuff = Stuff(
+            stuff_code="test",
+            stuff_name="colors",
+            concept=_make_text_concept(),
+            content=ListContent(
+                items=[
+                    TextContent(text="blue"),
+                    TextContent(text="red"),
+                    TextContent(text="green"),
+                ]
+            ),
+        )
+        working_memory.root["colors"] = list_stuff
+
+        raw = working_memory.dump_for_temporal()
+
+        # Verify the Temporal format uses a plain list, not {"items": [...]}
+        assert isinstance(raw["root"]["colors"]["content"], list)
+
+        hydrated = hydrate_working_memory(raw)
+
+        assert "colors" in hydrated.root
+        stuff = hydrated.root["colors"]
+        content = stuff.content
+        assert isinstance(content, ListContent)
+        list_content = cast("ListContent[TextContent]", content)
+        assert len(list_content.items) == 3
+        assert all(isinstance(item, TextContent) for item in list_content.items)
+        assert list_content.items[0].text == "blue"
+        assert list_content.items[1].text == "red"
+        assert list_content.items[2].text == "green"
 
     def test_hydrate_raises_on_missing_registry_class(self) -> None:
         """Hydration raises PipeJobError when the concept's structure_class_name is not in the registry."""

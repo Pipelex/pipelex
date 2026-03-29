@@ -101,13 +101,17 @@
    The `--class-registry` option controls whether dynamic concept classes leak to the
    global KajsonManager registry or are scoped to the library:
 
-   - `--class-registry shared` (default): dynamic classes go to global registry (standard behavior)
+   - `--class-registry both` (default): runs tests in both shared and isolated modes
+   - `--class-registry shared`: dynamic classes go to global registry (standard behavior)
    - `--class-registry isolated`: dynamic classes are scoped to the library registry,
      keeping the global clean — forces deferred hydration paths, catching regressions
      that only manifest in multi-process deployments
 
    ```bash
-   # Test with isolated class registry (simulates clean worker process)
+   # Default: runs both modes automatically
+   .venv/bin/pytest tests/integration/pipelex/temporal/
+
+   # Force single mode (useful for debugging)
    .venv/bin/pytest tests/integration/pipelex/temporal/ \
      --class-registry isolated
    ```

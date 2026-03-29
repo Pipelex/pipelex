@@ -13,18 +13,20 @@ from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
 
 
-def _hydrate_content(concept: Concept, raw_content: dict[str, Any] | str) -> StuffContent:
+def _hydrate_content(concept: Concept, raw_content: list[Any] | dict[str, Any] | str) -> StuffContent:
     """Hydrate a single StuffContent from a raw value.
 
-    Handles both plain content and ListContent. When the raw value is a dict
-    with an 'items' key containing a list, the content is deserialized as
-    ListContent with each item validated as the concept's structure class.
-    This is necessary because the concept's structure_class_name always refers
-    to the *item* type, even when the stuff holds a list of those items.
+    Handles both plain content and ListContent.  The Temporal serialization
+    format (produced by ``WorkingMemory.dump_for_temporal()``) encodes
+    ListContent as a plain JSON list and single StuffContent as a dict,
+    so the type check is unambiguous — no heuristic required.
+
+    The concept's ``structure_class_name`` always refers to the *item* type,
+    even when the stuff holds a list of those items.
     """
-    if isinstance(raw_content, dict) and "items" in raw_content and isinstance(raw_content["items"], list):
+    if isinstance(raw_content, list):
         item_class = get_class_registry().get_required_subclass(name=concept.structure_class_name, base_class=StuffContent)
-        raw_items = cast("list[dict[str, Any]]", raw_content["items"])
+        raw_items = cast("list[dict[str, Any]]", raw_content)
         items = [item_class.model_validate(raw_item) for raw_item in raw_items]
         return ListContent(items=items)
 

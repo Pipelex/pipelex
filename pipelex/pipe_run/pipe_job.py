@@ -42,7 +42,7 @@ class PipeJob(BaseModel):
         if self.working_memory is not None:
             return self.model_copy(
                 update={
-                    "working_memory_raw": self.working_memory.smart_dump(),
+                    "working_memory_raw": self.working_memory.dump_for_temporal(),
                     "working_memory": None,
                 }
             )
