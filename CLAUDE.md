@@ -30,7 +30,9 @@
 
 ### Running Tests
 
-   After you're finished making code changes, you must always run tests using `make agent-test`.
+   After making code changes, run **targeted tests** based on what you changed. See `tests/CLAUDE.md` for the source-to-test mapping and the pytest command template.
+
+   Fall back to the full suite when changes are broad (3+ areas), touch shared infrastructure, or when preparing a release/push/commit to remote:
 
    ```bash
    make agent-test
