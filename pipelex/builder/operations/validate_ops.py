@@ -147,11 +147,11 @@ async def validate_pipe(
         library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
+    dry_run_output = await dry_run_pipe(the_pipe, raise_on_failure=True)
 
     return {
         "success": True,
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
+        "validated_pipes": [{"pipe_code": pipe_code, "status": dry_run_output.status}],
         "total_pipes": 1,
     }
 
@@ -182,11 +182,11 @@ async def validate_pipe_in_bundle(
 
     # Now get the specific pipe and dry-run only that one
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
+    dry_run_output = await dry_run_pipe(the_pipe, raise_on_failure=True)
 
     return {
         "success": True,
         "bundle_path": str(bundle_path),
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
+        "validated_pipes": [{"pipe_code": pipe_code, "status": dry_run_output.status}],
         "total_pipes": 1,
     }

@@ -44,7 +44,7 @@ async def build_inputs_for_pipe(
     """
     if mthds_contents:
         # validate_bundle opens a library, loads blueprints, and sets it as current
-        validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents)
+        validate_bundle_result = await validate_bundle(mthds_contents=mthds_contents, library_dirs=library_dirs)
         blueprints = validate_bundle_result.blueprints
         if not pipe_code:
             # Find the first blueprint that declares a main_pipe, domain-qualified

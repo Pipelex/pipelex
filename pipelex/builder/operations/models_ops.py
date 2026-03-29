@@ -114,9 +114,12 @@ def _filter_talent_mappings_by_backend(
     for talent_name, preset_name in mappings.items():
         bare_name = _strip_sigil(preset_name)
         setting = presets_dict.get(bare_name)
-        if setting is None:
-            continue
-        spec = _resolve_preset_backend(model_deck, setting.model, model_type)
+        if setting is not None:
+            # Direct preset — resolve via its model handle
+            spec = _resolve_preset_backend(model_deck, setting.model, model_type)
+        else:
+            # May be an alias or waterfall reference — resolve via model_deck
+            spec = model_deck.get_optional_inference_model(model_handle=bare_name, model_type=model_type)
         if spec is not None and spec.backend_name == backend:
             filtered[talent_name] = preset_name
     return filtered
