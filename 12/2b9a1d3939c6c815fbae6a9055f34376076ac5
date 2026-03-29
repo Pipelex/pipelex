@@ -1,0 +1,31 @@
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_compose.py
+  97a1075498b0fed5 46
+pipelex/pipe_controllers/condition/pipe_condition.py
+  97a1075498b0fed5 14,178,180-181,209,211-212
+tests/integration/pipelex/temporal/library_crate/test_wf_pipe_condition.py
+  97a1075498b0fed5 41
+pipelex/pipe_operators/compose/pipe_compose.py
+  97a1075498b0fed5 10,176,189,191-192
+pipelex/pipe_operators/compose/structured_content_composer.py
+  97a1075498b0fed5 10,653-655
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "122b9a1d3939c6c815fbae6a9055f34376076ac5",
+  "prompts": {
+    "97a1075498b0fed5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4adef605-da3c-4906-b824-8d223dd5b050",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 23,
+      "accepted_lines": 18,
+      "overriden_lines": 0
+    }
+  }
+}
