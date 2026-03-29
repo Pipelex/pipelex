@@ -16,6 +16,12 @@
 - **Agent CLI inputs**: Refactored `_inputs_core` to delegate to `builder.operations.inputs_ops.build_inputs_for_pipe` instead of duplicating bundle validation and input rendering logic.
 - **Agent CLI run**: Added graph generation support with ReactFlow HTML output and side-effect metadata tracking in `_run_core`.
 
+### Removed
+
+- **`BuilderLoop`** and its iterative build-validate-fix cycle (`builder_loop.py`, `builder.py`, `builder_errors.py`). The build-agent CLI now drives spec construction directly.
+- **`pipelex build pipe`** CLI command and associated MTHDS workflow files (`builder.mthds`, `agentic_builder.mthds`, `pipe_design.mthds`, `concept_fixer.mthds`, `synthesize_image.mthds`).
+- **`pipelex-tools` runtime dependency**: Moved to dev-only dependency; `plxt` is now invoked via subprocess passthrough.
+
 ## [v0.22.0] - 2026-03-25
 
 ### Added

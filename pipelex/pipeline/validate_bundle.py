@@ -19,7 +19,6 @@ from pipelex.core.pipes.handle_pipe_errors import (
 )
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.core.validation import report_validation_error
-from pipelex.graph.graphspec import GraphSpec
 from pipelex.hub import get_library_manager, resolve_library_dirs, set_current_library
 from pipelex.libraries.library_utils import get_pipelex_mthds_files_from_dirs
 from pipelex.pipe_run.dry_run import DryRunError, DryRunOutput, dry_run_pipes
@@ -66,9 +65,6 @@ class ValidateBundleError(PipelexError):
         # Dry run errors
         self.dry_run_error_message = dry_run_error_message
 
-        # Path to a saved .mthds file with the last bundle state (set by builder_loop when all fix attempts are exhausted)
-        self.failed_bundle_path: str | None = None
-
         super().__init__(message)
 
     @property
@@ -85,7 +81,6 @@ class ValidateBundleResult(BaseModel):
     blueprints: list[PipelexBundleBlueprint]
     pipes: list[PipeAbstract]
     dry_run_result: dict[str, DryRunOutput]
-    graph_spec: GraphSpec | None = None
 
 
 async def validate_bundle(

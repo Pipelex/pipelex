@@ -1,8 +1,8 @@
 from importlib.resources import files
 from pathlib import Path
 
+import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
-from pipelex.builder import builder
 from pipelex.config import get_config
 from pipelex.core.interpreter.helpers import MTHDS_EXTENSION, is_pipelex_file
 from pipelex.tools.misc.file_utils import find_files_in_dir
@@ -76,7 +76,7 @@ def get_pipelex_mthds_files_from_dirs(dirs: set[Path]) -> list[Path]:
             dir_path=str(dir_path),
             pattern=f"*{MTHDS_EXTENSION}",
             excluded_dirs=list(get_config().pipelex.scan_config.excluded_dirs),
-            force_include_dirs=[str(Path(builder.__file__).parent)],
+            force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
         )
 
         # Filter to only include valid Pipelex files
