@@ -1,0 +1,25 @@
+wip/distributed-tracing-and-reporting.md
+  0fa22ef9c7f68bf4 1-686
+TODOS.md
+  0fa22ef9c7f68bf4 1-590
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "af7579ef59d5a53c74178a256175352ce263b492",
+  "prompts": {
+    "0fa22ef9c7f68bf4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f4c7ac32-4c67-4c31-acf8-26ee73ac3feb",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 1724,
+      "total_deletions": 448,
+      "accepted_lines": 1276,
+      "overriden_lines": 0
+    }
+  }
+}
