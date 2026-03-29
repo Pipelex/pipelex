@@ -12,7 +12,7 @@ from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSp
 def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
     """Parse and validate a ConceptSpec from JSON-like data.
 
-    Accepts common aliases for "the_concept_code" and converts structure fields.
+    Accepts common aliases for "concept_code" and converts structure fields.
 
     Args:
         spec_data: Raw data for the concept spec.
@@ -26,11 +26,11 @@ def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
     # Work on a copy to avoid mutating the caller's dict
     spec_data = dict(spec_data)
 
-    # Accept common aliases for "the_concept_code"
-    for alias in ("concept_code", "code", "name", "concept_name"):
+    # Accept common aliases for "concept_code"
+    for alias in ("the_concept_code", "code", "name", "concept_name"):
         if alias in spec_data:
-            if "the_concept_code" not in spec_data:
-                spec_data["the_concept_code"] = spec_data.pop(alias)
+            if "concept_code" not in spec_data:
+                spec_data["concept_code"] = spec_data.pop(alias)
             else:
                 spec_data.pop(alias)
 
@@ -126,6 +126,6 @@ def concept_spec_to_toml(concept_spec: ConceptSpec) -> str:
         concept_item_table.add("structure", structure_table)
 
     # Build the nested structure: [concept.ConceptName]
-    concept_section.add(concept_spec.the_concept_code, concept_item_table)
+    concept_section.add(concept_spec.concept_code, concept_item_table)
     doc.add("concept", concept_section)
     return tomlkit.dumps(doc)

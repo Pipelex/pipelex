@@ -19,7 +19,7 @@ from pipelex.core.stuffs.text_content import TextContent
 SNAKE_CASE_FIELD_NAMES = {"domain", "domain_code", "pipe_code"}
 
 # Field names that require PascalCase format for pipelex concept specs
-PASCAL_CASE_FIELD_NAMES = {"the_concept_code"}
+PASCAL_CASE_FIELD_NAMES = {"concept_code"}
 
 
 class WorkingMemoryFactory(BaseModel):

@@ -53,7 +53,7 @@ def _concept_spec_to_toml(concept_spec: ConceptSpec) -> str:
         concept_item_table.add("structure", structure_table)
 
     # Build the nested structure: [concept.ConceptName]
-    concept_section.add(concept_spec.the_concept_code, concept_item_table)
+    concept_section.add(concept_spec.concept_code, concept_item_table)
     doc.add("concept", concept_section)
     return tomlkit.dumps(doc)
 
@@ -102,11 +102,11 @@ def _parse_concept_spec_from_json(spec_data: dict[str, Any]) -> ConceptSpec:
     Raises:
         ValidationError: If validation fails.
     """
-    # Accept common aliases for "the_concept_code"
+    # Accept common aliases for "concept_code"
     for alias in ("concept_code", "code", "name", "concept_name"):
         if alias in spec_data:
-            if "the_concept_code" not in spec_data:
-                spec_data["the_concept_code"] = spec_data.pop(alias)
+            if "concept_code" not in spec_data:
+                spec_data["concept_code"] = spec_data.pop(alias)
             else:
                 spec_data.pop(alias)
 
@@ -150,7 +150,7 @@ def concept_cmd(
 
     JSON spec format:
     {
-        "the_concept_code": "MyConceptName",
+        "concept_code": "MyConceptName",
         "description": "Description of the concept",
         "refines": "Text",  // Optional: native concept to refine
         "structure": {      // Optional: for structured concepts
@@ -164,7 +164,7 @@ def concept_cmd(
     }
 
     Examples:
-        pipelex-agent concept --spec '{"the_concept_code": "Invoice", "description": "A commercial invoice", "refines": "Text"}'
+        pipelex-agent concept --spec '{"concept_code": "Invoice", "description": "A commercial invoice", "refines": "Text"}'
         pipelex-agent concept --spec-file concept.json
     """
     # Validate that exactly one of spec or spec_file is provided

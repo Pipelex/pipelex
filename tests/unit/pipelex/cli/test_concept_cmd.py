@@ -134,42 +134,42 @@ class TestConceptCodeAliases:
         "refines": "Text",
     }
 
-    def test_canonical_the_concept_code(self) -> None:
-        spec = {**self._BASE, "the_concept_code": "Invoice"}
+    def test_canonical_concept_code(self) -> None:
+        spec = {**self._BASE, "concept_code": "Invoice"}
         result = parse_concept_spec(spec)
-        assert result.the_concept_code == "Invoice"
+        assert result.concept_code == "Invoice"
 
     def test_alias_concept_code(self) -> None:
         spec = {**self._BASE, "concept_code": "Invoice"}
         result = parse_concept_spec(spec)
-        assert result.the_concept_code == "Invoice"
+        assert result.concept_code == "Invoice"
 
     def test_alias_code(self) -> None:
         spec = {**self._BASE, "code": "Invoice"}
         result = parse_concept_spec(spec)
-        assert result.the_concept_code == "Invoice"
+        assert result.concept_code == "Invoice"
 
     def test_alias_name(self) -> None:
         spec = {**self._BASE, "name": "Invoice"}
         result = parse_concept_spec(spec)
-        assert result.the_concept_code == "Invoice"
+        assert result.concept_code == "Invoice"
 
     def test_alias_concept_name(self) -> None:
         spec = {**self._BASE, "concept_name": "Invoice"}
         result = parse_concept_spec(spec)
-        assert result.the_concept_code == "Invoice"
+        assert result.concept_code == "Invoice"
 
     def test_canonical_ignores_alias(self) -> None:
-        """When the_concept_code is present, alias keys are removed so Pydantic doesn't reject them."""
-        spec = {**self._BASE, "the_concept_code": "Canonical", "name": "Alias"}
+        """When concept_code is present, alias keys are removed so Pydantic doesn't reject them."""
+        spec = {**self._BASE, "concept_code": "Canonical", "name": "Alias"}
         result = parse_concept_spec(spec)
-        assert result.the_concept_code == "Canonical"
+        assert result.concept_code == "Canonical"
 
     def test_multiple_aliases_all_cleaned_up(self) -> None:
-        """When the_concept_code and multiple aliases are present, all aliases are removed."""
+        """When concept_code and multiple aliases are present, all aliases are removed."""
         spec = {**self._BASE, "concept_code": "Invoice", "name": "Alt", "code": "Alt2"}
         result = parse_concept_spec(spec)
-        assert result.the_concept_code == "Invoice"
+        assert result.concept_code == "Invoice"
 
 
 class TestStructureFieldStringShorthand:
@@ -177,7 +177,7 @@ class TestStructureFieldStringShorthand:
 
     def test_string_field_becomes_text(self) -> None:
         spec: dict[str, Any] = {
-            "the_concept_code": "Simple",
+            "concept_code": "Simple",
             "description": "A simple concept",
             "structure": {
                 "title": "The title of the item",
@@ -190,7 +190,7 @@ class TestStructureFieldStringShorthand:
 
     def test_mixed_string_and_dict_fields(self) -> None:
         spec: dict[str, Any] = {
-            "the_concept_code": "Mixed",
+            "concept_code": "Mixed",
             "description": "A mixed concept",
             "structure": {
                 "name": "The person's name",
@@ -209,20 +209,20 @@ class TestParseConceptSpecFromJson:
     def test_parse_simple_concept_with_refines(self) -> None:
         """Parse a simple concept that refines Text."""
         spec_data: dict[str, Any] = {
-            "the_concept_code": "Invoice",
+            "concept_code": "Invoice",
             "description": "A commercial invoice",
             "refines": "Text",
         }
         result = parse_concept_spec(spec_data)
 
-        assert result.the_concept_code == "Invoice"
+        assert result.concept_code == "Invoice"
         assert result.description == "A commercial invoice"
         assert result.refines == "Text"
 
     def test_parse_structured_concept(self) -> None:
         """Parse a concept with structure."""
         spec_data: dict[str, Any] = {
-            "the_concept_code": "Person",
+            "concept_code": "Person",
             "description": "A person record",
             "structure": {
                 "name": "The person's name",
@@ -231,7 +231,7 @@ class TestParseConceptSpecFromJson:
         }
         result = parse_concept_spec(spec_data)
 
-        assert result.the_concept_code == "Person"
+        assert result.concept_code == "Person"
         assert result.structure is not None
         assert "name" in result.structure
         assert "age" in result.structure
@@ -245,7 +245,7 @@ class TestParseConceptSpecFromJson:
         during JSON parsing (if Pydantic had extra='ignore').
         """
         spec_data: dict[str, Any] = {
-            "the_concept_code": "Task",
+            "concept_code": "Task",
             "description": "A task with status",
             "structure": {
                 "status": {
@@ -271,7 +271,7 @@ class TestConceptSpecToToml:
         were not included in the TOML output.
         """
         spec_data: dict[str, Any] = {
-            "the_concept_code": "TaskStatus",
+            "concept_code": "TaskStatus",
             "description": "A task with status tracking",
             "structure": {
                 "status": {
@@ -289,7 +289,7 @@ class TestConceptSpecToToml:
     def test_toml_output_simple_refines_concept(self) -> None:
         """TOML output for a simple refines concept."""
         spec_data: dict[str, Any] = {
-            "the_concept_code": "Invoice",
+            "concept_code": "Invoice",
             "description": "A commercial invoice",
             "refines": "Text",
         }
@@ -303,7 +303,7 @@ class TestConceptSpecToToml:
     def test_toml_output_structured_concept_with_multiple_fields(self) -> None:
         """TOML output for a structured concept with multiple field types."""
         spec_data: dict[str, Any] = {
-            "the_concept_code": "Order",
+            "concept_code": "Order",
             "description": "A customer order",
             "structure": {
                 "order_id": {"type": "text", "description": "Order identifier", "required": True},
@@ -365,7 +365,7 @@ class TestConceptStructureSpecChoices:
         """Full roundtrip from JSON input to TOML output should preserve choices."""
         input_json = json.dumps(
             {
-                "the_concept_code": "WorkItem",
+                "concept_code": "WorkItem",
                 "description": "A work item",
                 "structure": {
                     "priority": {

@@ -52,7 +52,7 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     spec_data["type"] = pipe_type
 
     # Accept common aliases for "pipe_code"
-    for alias in ("code", "the_pipe_code", "name"):
+    for alias in ("the_pipe_code", "code", "name", "pipe_name"):
         if alias in spec_data:
             if "pipe_code" not in spec_data:
                 spec_data["pipe_code"] = spec_data.pop(alias)
