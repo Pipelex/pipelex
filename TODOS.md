@@ -306,7 +306,7 @@ This is the **most important testing step** — it catches any divergence betwee
 - [x] Test: events from multiple workflows (different workflow_id prefixes) assemble correctly
 - [x] Test: cross-workflow producer map — producer in alphabetically-later workflow_id, consumer in earlier one (validates two-pass assembly ordering)
 - [x] Test: usage aggregation collects all UsageReportEvent records
-- [ ] Equivalence test: compare assembler output with current GraphTracer output using structural equivalence (normalized IDs, ignored TimingSpec)
+- [x] Equivalence test: compare assembler output with current GraphTracer output using structural equivalence (normalized IDs, ignored TimingSpec)
 - [x] `make agent-check` passes
 
 ---
