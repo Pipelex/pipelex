@@ -62,8 +62,12 @@ class ReportingManager(ReportingProtocol):
 
     def _get_registry(self, pipeline_run_id: str) -> UsageRegistry:
         if pipeline_run_id not in self._usage_registries:
-            msg = f"Registry for pipeline '{pipeline_run_id}' does not exist"
-            raise ReportingManagerError(msg)
+            # Auto-create registry for unknown pipeline IDs. This happens when
+            # Activities report inference jobs on a Temporal worker where
+            # open_registry() was never called (it runs on the API process).
+
+            # TODO: replace with proper distributed reporting system
+            self._usage_registries[pipeline_run_id] = UsageRegistry()
         return self._usage_registries[pipeline_run_id]
 
     def _report_llm_job(self, llm_job: LLMJob):

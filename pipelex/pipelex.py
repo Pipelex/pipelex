@@ -316,6 +316,13 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         if content_generator is None:
             if not needs_inference:
                 content_generator = ContentGeneratorDry()
+            elif get_config().temporal.is_enabled:
+                from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory  # noqa: PLC0415
+
+                generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
+                content_generator = ContentGeneratorChildFactory.make_content_generator_child(
+                    generated_content_factory=generated_content_factory,
+                )
             else:
                 generated_content_factory = GeneratedContentFactory(storage_provider=storage_provider)
                 content_generator = ContentGenerator(generated_content_factory=generated_content_factory)

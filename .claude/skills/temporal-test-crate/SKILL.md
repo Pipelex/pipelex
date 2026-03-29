@@ -110,7 +110,7 @@ ls tests/integration/pipelex/temporal/library_crate/*.mthds
 
 ## Interactive debugging
 
-For tmux-based 3-terminal debugging (server + worker + submitter), use the `/temporal-diagnose` skill instead.
+For tmux-based 3-terminal debugging (server + worker + submitter), use the `/temporal-e2e-validate` skill (Mode 2) instead.
 
 ## Test files
 
