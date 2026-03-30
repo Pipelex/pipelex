@@ -94,7 +94,7 @@ Like Skills, MTHDS files live in directories, are Git-native, and scale from per
 
 MIT-licensed. Designed for portability. The method outlives any vendor or model version.
 
-[mthds.ai](https://mthds.ai) | [github.com/mthds-ai](https://github.com/mthds-ai)
+[mthds.ai](https://mthds.ai/latest/) | [github.com/mthds-ai](https://github.com/mthds-ai)
 
 ## Pipelex: The Reference Runtime
 
@@ -118,6 +118,6 @@ Start with one method: extract invoice data, process applications, analyze repor
 
 ---
 
-[MTHDS Standard](https://mthds.ai) | [Pipelex Runtime](https://github.com/Pipelex/pipelex) | [Documentation](https://docs.pipelex.com) | [Discord](https://go.pipelex.com/discord)
+[MTHDS Standard](https://mthds.ai/latest/) | [Pipelex Runtime](https://github.com/Pipelex/pipelex) | [Documentation](https://docs.pipelex.com) | [Discord](https://go.pipelex.com/discord)
 
 © 2025-2026 Evotis S.A.S. — [Pipelex](https://pipelex.com) is a trademark of Evotis S.A.S.

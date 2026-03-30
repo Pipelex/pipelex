@@ -291,7 +291,7 @@ See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for t
 
 ## Phase 4.5: Distributed Tracing & Reporting (Local Version)
 
-> **Status**: Not started
+> **Status**: In progress — Steps 0-4 complete, Step 5 partially complete
 
 **Goal**: Add a file-based event log to GraphTracer so that graph tracing and cost reporting work across Temporal workers. The in-memory path is preserved unchanged for direct mode. See [TODOS.md](../TODOS.md) for the full implementation plan.
 
@@ -303,8 +303,9 @@ See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for t
 - [x] **Step 1 — EventLogProtocol & NDJSON Backend**: `NdjsonEventLog` with emit/read/cleanup/dedup, `InMemoryEventLog` for tests, corrupt-line handling, multiprocess concurrent write safety
 - [x] **Step 2 — GraphSpec Assembler**: Two-pass assembly (nodes + producer map → edges), structural equivalence with current `GraphTracer` output, `UsageAggregator`
 - [x] **Step 3 — Emit Integration**: Dual-write in `GraphTracer` (optional `EventLogProtocol`), `ReportingManager` emits `UsageReportEvent`, node/edge IDs include `workflow_id` segment
-- [ ] **Step 4 — Wire into Pipeline Lifecycle**: `TracingConfig`, `NdjsonEventLog` created in `WfPipeRouter` and `pipeline_run_setup`, assembly in `runner.py` finally block, direct mode unchanged
-- [ ] **Step 5 — Temporal Integration Tests**: PipeSequence/PipeParallel/PipeBatch through Temporal produce correct GraphSpec, usage aggregation across workers, failure/replay resilience
+- [x] **Step 4 — Wire into Pipeline Lifecycle**: `TracingConfig`, `NdjsonEventLog` created in `WfPipeRouter` and `pipeline_run_setup`, assembly in `runner.py` finally block, direct mode unchanged
+- [ ] **Step 5 — Temporal Integration Tests**: PipeSequence/PipeParallel/PipeBatch through Temporal produce correct GraphSpec (partially done — sequence/parallel/batch passing, replay dedup/failure/graph-output tests remaining)
+- [ ] **Step 6 — Standalone Activity Tracing**: Wire event log into standalone activities via Temporal interceptor, `TracingContext` on `JobMetadata`, activity-level `UsageReportEvent` emission
 - [ ] `make agent-check` passes
 - [ ] `make agent-test` passes
 
@@ -358,7 +359,7 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 
 ## E2E Test Coverage
 
-> **Status**: In progress — PipeSequence + PipeParallel fully passing; PipeCondition, PipeBatch, PipeCompose blocked by StuffArtefact serialization issue
+> **Status**: Complete — all controllers passing
 
 **Goal**: Comprehensive Temporal regression test suite covering all pipe controller types (PipeSequence, PipeParallel, PipeCondition, PipeBatch) and non-LLM operators (PipeCompose). Validates that LibraryCrate propagation, deferred hydration, and per-workflow isolation work across all pipe dispatch patterns.
 
@@ -374,21 +375,13 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 | `temporal_compose.mthds` | PipeCompose | Sequence → 2 LLMs → Compose construct (+ dynamic Report concept) |
 | `temporal_combined.mthds` | Mixed | Sequence → Parallel → Condition → LLM (nested dispatch) |
 
-5 new test files with 10 tests (5 crate structure + 5 execution):
-- **Passing**: PipeParallel crate + execution, all 5 crate structure tests
-- **xfail**: PipeCondition, PipeBatch, PipeCompose, Combined execution tests (with 30s `execution_timeout` to prevent hangs)
+5 new test files with 10 tests (5 crate structure + 5 execution) — all passing.
 
-### StuffArtefact serialization issue (blocks non-Sequence controller execution in dry-run)
+### StuffArtefact serialization issue — Resolved
 
-**Confirmed**: PipeCondition and PipeCompose dispatch `WfMakeJinja2Text` internal sub-workflows for expression/template evaluation. These sub-workflows serialize working memory contents through the Temporal data converter. In dry-run mode, previous PipeLLM steps produce `StuffArtefact` debugging objects in working memory, which are not JSON-serializable. Kajson fails with `TypeError: Type <class 'StuffArtefact'> is not JSON serializable`.
+**Was**: PipeCondition and PipeCompose dispatched `WfMakeJinja2Text` (a `ContentGeneratorChild` Temporal sub-workflow) for expression/template evaluation. These sub-workflows serialized working memory through the Temporal data converter, and `StuffArtefact` (a plain Python object, not a Pydantic model) was not JSON-serializable. PipeBatch had a related hang.
 
-**Likely related**: PipeBatch hangs in dry-run (root cause not fully diagnosed — may be the same StuffArtefact issue in child PipeJob creation, or a different serialization issue in list content extraction).
-
-**Not affected**: PipeSequence and PipeParallel — they dispatch child pipes via `SubPipe.run_pipe()` → `PipeRouterChild` without internal templating sub-workflows.
-
-**Root cause**: `StuffArtefact` is not a Pydantic model — it's a plain object used for dry-run tracing that was never designed for cross-process serialization.
-
-**Fix direction**: Either make `StuffArtefact` serializable (implement `__json__` or convert to Pydantic), or strip StuffArtefact objects from working memory before passing to internal sub-workflows. The skill `temporal-e2e-validate` has xfail tests (`run=False`) that will automatically pass once fixed.
+**Resolution**: Jinja2 templating no longer routes through a `ContentGeneratorChild` Temporal sub-workflow — it happens in-process. Working memory is never serialized across processes for templating, so `StuffArtefact` objects in dry-run mode are no longer a problem. No changes to `StuffArtefact` itself were needed.
 
 ### Test summary
 
@@ -396,10 +389,10 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 |------------|:-:|:-:|:-:|
 | PipeSequence | pass | pass | pass |
 | PipeParallel | pass | pass | untested |
-| PipeCondition | pass | xfail | untested |
-| PipeBatch | pass | xfail | untested |
-| PipeCompose | pass | xfail | untested |
-| Combined (Parallel+Condition) | pass | xfail | untested |
+| PipeCondition | pass | pass | untested |
+| PipeBatch | pass | pass | untested |
+| PipeCompose | pass | pass | untested |
+| Combined (Parallel+Condition) | pass | pass | untested |
 
 ---
 

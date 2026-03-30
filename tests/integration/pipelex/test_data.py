@@ -1,8 +1,5 @@
 from typing import ClassVar
 
-from pipelex.builder.bundle_header_spec import BundleHeaderSpec
-from pipelex.builder.concept.concept_spec import ConceptSpec
-from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.core.concepts.concept_factory import ConceptFactory
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.pipes.variable_multiplicity import VariableMultiplicity
@@ -416,38 +413,3 @@ Extract information from the following text:
         ("Nested unions complex", NESTED_UNIONS_COMPLEX, "ConceptWithNestedUnions"),
         ("Nested unions mixed", NESTED_UNIONS_MIXED, "ConceptWithNestedUnions"),
     ]
-
-
-class AssemblePipelexBundleSpecTestCases:
-    """Test data for assemble_pipelex_bundle_spec tests."""
-
-    CONCEPT_SPECS: ClassVar[list[ConceptSpec]] = [
-        ConceptSpec(
-            the_concept_code="UserBrief",
-            description="A short, natural-language description of what the user wants.",
-            refines="Text",
-        ),
-        ConceptSpec(
-            the_concept_code="PlanDraft",
-            description="Natural-language pipeline plan text describing sequences, inputs, outputs.",
-            refines="Text",
-        ),
-    ]
-
-    PIPE_SPECS: ClassVar[list[PipeLLMSpec]] = [
-        PipeLLMSpec(
-            pipe_code="generate_plan",
-            description="Generate a plan from a user brief.",
-            inputs={"brief": "UserBrief"},
-            output="PlanDraft",
-            model="$engineering-structured",
-            prompt="Generate a plan for: @brief",
-        ),
-    ]
-
-    BUNDLE_HEADER = BundleHeaderSpec(
-        domain_code="test_domain",
-        description="A test domain for assembly testing.",
-        system_prompt=None,
-        main_pipe="generate_plan",
-    )

@@ -14,11 +14,11 @@ npm install -g mthds
 Launch Claude Code and tell it to install the MTHDS plugin:
 
 ```
-/plugin marketplace add mthds-ai/skills
+/plugin marketplace add mthds-ai/mthds-plugins
 ```
 
 ```
-/plugin install mthds@mthds-ai-skills
+/plugin install mthds@mthds-ai-mthds-plugins
 ```
 
 then exit Claude Code and reopen it:

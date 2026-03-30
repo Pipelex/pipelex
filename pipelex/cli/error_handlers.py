@@ -35,7 +35,6 @@ class ErrorContext(StrEnum):
     VALIDATION_BEFORE_SHOW_MODELS = "Pre-validation (show models)"
     VALIDATION_BEFORE_SHOW_BACKENDS = "Pre-validation (show backends)"
     VALIDATION_BEFORE_PIPE_RUN = "Pre-validation (pipe run)"
-    VALIDATION_BEFORE_BUILD_PIPE = "Pre-validation (build pipe)"
     VALIDATION_BEFORE_BUILD_RUNNER = "Pre-validation (build runner)"
     VALIDATION_BEFORE_BUILD_INPUTS = "Pre-validation (build inputs)"
     VALIDATION_BEFORE_BUILD_OUTPUT = "Pre-validation (build output)"
@@ -216,28 +215,6 @@ def handle_validate_bundle_error(exc: ValidateBundleError, bundle_path: Path | N
     console.print(
         "[bold green]💡 Tip:[/bold green] Review the error messages above and check your pipeline configuration. "
         "Make sure all required fields are present and correctly formatted."
-    )
-    console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
-    console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")
-    raise typer.Exit(1) from exc
-
-
-def handle_build_validation_failure(exc: ValidateBundleError) -> NoReturn:
-    """Handle ValidateBundleError that occurs when the builder loop cannot auto-fix validation issues.
-
-    Args:
-        exc: The bundle validation error exception from the build loop
-    """
-    console = get_console()
-    console.print("\n[bold red]❌ Pipe build failed: validation errors could not be auto-fixed[/bold red]\n")
-    console.print("[yellow]The builder attempted to fix validation errors automatically but could not resolve all issues.[/yellow]\n")
-
-    _display_validation_error_details(console=console, exc=exc)
-
-    # Display build-specific tips
-    console.print(
-        "[bold green]💡 Tip:[/bold green] Try rephrasing your prompt or simplifying the pipeline requirements. "
-        "Breaking complex methods into smaller steps can also help."
     )
     console.print(f"[dim]Learn more: {URLs.documentation}[/dim]")
     console.print(f"[dim]Join our Discord for help: {URLs.discord}[/dim]\n")

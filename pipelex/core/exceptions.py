@@ -6,8 +6,7 @@ from pipelex.core.pipes.exceptions import PipeFactoryErrorType, PipeValidationEr
 class PipeFactoryErrorData(BaseModel):
     """Structured error data for Pipe factory errors.
 
-    This model captures errors raised during pipe creation from blueprints,
-    particularly missing concept errors that can be auto-fixed by the builder loop.
+    This model captures errors raised during pipe creation from blueprints.
     """
 
     # === Error Classification ===

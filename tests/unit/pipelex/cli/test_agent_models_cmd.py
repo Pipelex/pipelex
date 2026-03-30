@@ -9,11 +9,13 @@ if TYPE_CHECKING:
     import pytest
     from pytest_mock import MockerFixture
 
+from pipelex.builder.operations.models_ops import ModelCategory
 from pipelex.cli.agent_cli.commands.agent_output import CliOutputFormat
-from pipelex.cli.agent_cli.commands.models_cmd import ModelCategory, agent_models_cmd
+from pipelex.cli.agent_cli.commands.models_cmd import agent_models_cmd
 from pipelex.cogt.model_backends.model_type import ModelType
 
-MODULE_PATH = "pipelex.cli.agent_cli.commands.models_cmd"
+CMD_MODULE_PATH = "pipelex.cli.agent_cli.commands.models_cmd"
+OPS_MODULE_PATH = "pipelex.builder.operations.models_ops"
 
 
 class _FakeSetting:
@@ -95,9 +97,9 @@ def _make_fake_model_deck() -> Any:
 
 def _setup_mocks(mocker: MockerFixture) -> None:
     """Patch the common dependencies for agent_models_cmd."""
-    mocker.patch(f"{MODULE_PATH}.make_pipelex_for_agent_cli")
-    mocker.patch(f"{MODULE_PATH}.get_model_deck", return_value=_make_fake_model_deck())
-    mocker.patch(f"{MODULE_PATH}.Pipelex")
+    mocker.patch(f"{CMD_MODULE_PATH}.make_pipelex_for_agent_cli")
+    mocker.patch(f"{OPS_MODULE_PATH}.get_model_deck", return_value=_make_fake_model_deck())
+    mocker.patch(f"{CMD_MODULE_PATH}.Pipelex")
 
 
 class TestAgentModelsCmd:

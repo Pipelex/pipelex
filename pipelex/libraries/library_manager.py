@@ -11,8 +11,8 @@ from mthds.package.manifest.schema import MTHDS_STANDARD_VERSION, MethodsManifes
 from pydantic import BaseModel, ValidationError
 from typing_extensions import override
 
+import pipelex.builder as builder_pkg  # package import — used for __file__ path
 from pipelex import log
-from pipelex.builder import builder
 from pipelex.cli.installed_methods import find_method_by_full_address
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.concepts.concept_blueprint import ConceptBlueprint
@@ -262,12 +262,12 @@ class LibraryManager(LibraryManagerAbstract):
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=str(library_dir),
                 base_class_names=[StructuredContent.__name__],
-                force_include_dirs=[str(Path(builder.__file__).parent)],
+                force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
             )
             # Only import files that contain @pipe_func decorated functions (uses AST pre-check)
             FuncRegistryUtils.register_funcs_in_folder(
                 folder_path=str(library_dir),
-                force_include_dirs=[str(Path(builder.__file__).parent)],
+                force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
             )
 
         # Auto-discover and register all StructuredContent classes from sys.modules
@@ -338,7 +338,7 @@ class LibraryManager(LibraryManagerAbstract):
             ClassRegistryUtils.import_modules_in_folder(
                 folder_path=str(library_dir),
                 base_class_names=[StructuredContent.__name__],
-                force_include_dirs=[str(Path(builder.__file__).parent)],
+                force_include_dirs=[str(Path(builder_pkg.__file__).parent)],
             )
             # NOTE: We skip FuncRegistryUtils.register_funcs_in_folder() since we're not loading pipes
 

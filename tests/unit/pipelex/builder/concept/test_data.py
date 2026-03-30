@@ -9,7 +9,7 @@ class ConceptBlueprintTestCases:
     SIMPLE_CONCEPT = (
         "simple_concept",
         ConceptSpec(
-            the_concept_code="ConceptCode",
+            concept_code="ConceptCode",
             description="A simple test concept",
             refines=None,
             structure=None,
@@ -24,7 +24,7 @@ class ConceptBlueprintTestCases:
     CONCEPT_WITH_REFINES = (
         "concept_with_refines",
         ConceptSpec(
-            the_concept_code="ConceptCode",
+            concept_code="ConceptCode",
             description="An enhanced text concept",
             refines="Text",
             structure=None,
@@ -39,7 +39,7 @@ class ConceptBlueprintTestCases:
     CONCEPT_WITH_TEXT_FIELD = (
         "concept_with_text_field",
         ConceptSpec(
-            the_concept_code="ConceptCode",
+            concept_code="ConceptCode",
             description="Entity with text field",
             structure={
                 "name": ConceptStructureSpec(
@@ -67,7 +67,7 @@ class ConceptBlueprintTestCases:
     CONCEPT_WITH_INTEGER_FIELD = (
         "concept_with_integer_field",
         ConceptSpec(
-            the_concept_code="ConceptCode",
+            concept_code="ConceptCode",
             description="Entity with integer field",
             structure={
                 "age": ConceptStructureSpec(
@@ -96,7 +96,7 @@ class ConceptBlueprintTestCases:
     CONCEPT_WITH_MULTIPLE_FIELDS = (
         "concept_with_multiple_fields",
         ConceptSpec(
-            the_concept_code="ConceptCode",
+            concept_code="ConceptCode",
             description="Entity with multiple fields",
             structure={
                 "name": ConceptStructureSpec(
@@ -150,7 +150,7 @@ class ConceptBlueprintTestCases:
     CONCEPT_WITH_CONCEPT_REF = (
         "concept_with_concept_ref",
         ConceptSpec(
-            the_concept_code="Invoice",
+            concept_code="Invoice",
             description="An invoice with a customer reference",
             structure={
                 "invoice_number": ConceptStructureSpec(
@@ -378,6 +378,20 @@ class ConceptCodeValidationTestCases:
         "domain_v1.ConceptNameV2",
     )
 
+    # Test case: multi-segment domain path -> splits on last dot
+    MULTI_SEGMENT_DOMAIN = (
+        "multi_segment_domain",
+        "legal.contracts.Invoice",
+        "legal.contracts.Invoice",
+    )
+
+    # Test case: multi-segment domain with snake_case concept -> PascalCase
+    MULTI_SEGMENT_DOMAIN_SNAKE = (
+        "multi_segment_domain_snake",
+        "legal.contracts.non_compete_clause",
+        "legal.contracts.NonCompeteClause",
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, str, str]]] = [
         SNAKE_CASE_NO_DOMAIN,
         PASCAL_CASE_NO_DOMAIN,
@@ -388,4 +402,6 @@ class ConceptCodeValidationTestCases:
         MULTIPLE_UNDERSCORES,
         WITH_NUMBERS_SNAKE,
         WITH_NUMBERS_DOMAIN_SNAKE,
+        MULTI_SEGMENT_DOMAIN,
+        MULTI_SEGMENT_DOMAIN_SNAKE,
     ]

@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.22.0"
+version = "0.23.1"
 description = "Execute composable AI methods declared in the MTHDS open standard"
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -36,7 +36,6 @@ dependencies = [
   "opentelemetry-semantic-conventions",
   "opentelemetry-sdk",
   "pillow>=11.2.1",
-  "pipelex-tools>=0.3.2",                               # plxt CLI for MTHDS/TOML/PLX formatting & linting, needed by client projects too
   "polyfactory>=2.21.0",
   "portkey-ai>=2.1.0",
   "posthog>=6.7.0",
@@ -88,6 +87,7 @@ dev = [
   "boto3-stubs>=1.35.24",
   "moto[s3]>=5.0.0",
   "mypy==1.19.1",
+  "pipelex-tools>=0.3.2",
   "pyright==1.1.408",
   "pylint==4.0.4",
   "pytest>=9.0.2",
@@ -421,10 +421,6 @@ convention = "google"
 
 [tool.uv]
 required-version = ">=0.7.2"
-
-[tool.uv.sources]
-# kajson = { path = "../kajson", editable = true }
-kajson = { git = "https://github.com/Pipelex/kajson.git", branch = "release/v0.4.0" }
 
 [tool.hatch.build.targets.wheel]
 packages = ["pipelex"]

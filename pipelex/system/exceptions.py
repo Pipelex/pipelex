@@ -22,7 +22,7 @@ class MissingDependencyError(PipelexError):
         error_msg = f"Required dependency '{dependency_name}' is not installed."
         if message:
             error_msg += f" {message}"
-        error_msg += f" Please install it with 'pip install pipelex[{extra_name}]'."
+        error_msg += f" Please install it with 'uv pip install \"pipelex[{extra_name}]\"'."
         super().__init__(error_msg)
 
 

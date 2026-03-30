@@ -3,26 +3,83 @@
 import uuid
 from typing import Any
 
+from kajson.class_registry import ClassRegistry
+from kajson.kajson_manager import KajsonManager
 from temporalio.client import Client as TemporalClient
 
+from pipelex import log
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_current_library, get_library_manager, set_current_library, teardown_current_library
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 
-def rehydrate_pipe_output(pipe_output: PipeOutput) -> PipeOutput:
+def rehydrate_pipe_output(pipe_output: PipeOutput, pipe_job: PipeJob | None = None) -> PipeOutput:
     """Rehydrate a deferred PipeOutput received from a Temporal workflow.
 
-    Mirrors the rehydration that pipe_router_top/pipe_router_child perform
-    after receiving a workflow result.
+    When pipe_job is provided and contains a library_crate, mirrors the
+    rehydration that WfPipeRouter performs: creates a temporary library from
+    the crate, loads dynamic classes into a scoped registry, hydrates
+    WorkingMemory, then tears down the temporary library. This ensures each
+    output is hydrated with the correct class registry, even when multiple
+    concurrent workflows define conflicting concept names.
+
+    When pipe_job is None, falls back to hydrating with whatever class
+    registry is currently active (legacy behavior for single-library tests).
     """
-    if pipe_output.working_memory_raw is not None:
+    if pipe_output.working_memory_raw is None:
+        return pipe_output
+
+    library_crate = pipe_job.library_crate if pipe_job is not None else None
+    if library_crate is None:
         pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
         pipe_output.working_memory_raw = None
+        return pipe_output
+
+    # Mirror WfPipeRouter: create per-rehydration library with scoped registry
+    library_manager = get_library_manager()
+    rehydration_library_id = f"rehydrate_{uuid.uuid4().hex[:8]}"
+    prev_library_id = _get_current_library_id_or_none()
+    library_opened = False
+    library_set_as_current = False
+    try:
+        _lib_id, rehydration_library = library_manager.open_library(library_id=rehydration_library_id)
+        library_opened = True
+
+        global_registry = KajsonManager.get_class_registry()
+        scoped_registry = ClassRegistry()
+        if isinstance(global_registry, ClassRegistry):
+            scoped_registry.register_classes_dict(dict(global_registry.root))
+        else:
+            log.warning(f"Global registry is {type(global_registry).__name__}, not ClassRegistry — cannot pre-seed rehydration registry")
+        rehydration_library.set_class_registry(scoped_registry)
+
+        set_current_library(library_id=rehydration_library_id)
+        library_set_as_current = True
+        library_manager.load_from_crate(library_id=rehydration_library_id, crate=library_crate)
+        pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
+        pipe_output.working_memory_raw = None
+    finally:
+        if library_opened:
+            library_manager.teardown(library_id=rehydration_library_id)
+        if library_set_as_current:
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                teardown_current_library()
+
     return pipe_output
+
+
+def _get_current_library_id_or_none() -> str | None:
+    """Get the current library_id without raising if none is set."""
+    try:
+        return get_current_library()
+    except RuntimeError:
+        return None
 
 
 async def execute_workflow(
@@ -40,7 +97,7 @@ async def execute_workflow(
         task_queue=task_queue,
         **kwargs,
     )
-    return rehydrate_pipe_output(pipe_output)
+    return rehydrate_pipe_output(pipe_output, pipe_job)
 
 
 def assert_stuff_names(pipe_output: PipeOutput, expected_names: list[str]) -> None:
