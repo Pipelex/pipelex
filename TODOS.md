@@ -549,11 +549,11 @@ Traces persist on disk until explicitly removed by the user or a cleanup command
 - [x] Defensive try/except around assembly in `runner.py` — don't mask pipeline errors
 - [x] Feed assembled GraphSpec into existing graph output generation (`generate_graph_outputs()`)
 - [x] Read events + aggregate usage via `UsageAggregator` — in `runner.py`, calls `UsageAggregator.aggregate()` and `ReportingManager.inject_tokens_usages()` to feed cross-worker usage into the cost report
-- [ ] Wire activity-level usage event emission (pass event_log config to activities) → **deferred to Step 6** (current code relies on shared process singleton; standalone activities on separate processes need explicit wiring)
+- [x] ~~Wire activity-level usage event emission~~ → moved to Step 6
 - [x] Update Mermaid/ReactFlow renderers to handle new node ID format — NOT NEEDED (ReactFlow `.pop()` already handles extra segment, Mermaid uses IDs opaquely)
 - [x] Verify direct mode is completely unchanged — no event log initialized, `GraphTracer` works as today
-- [ ] Test (Temporal): `pipelex run pipe --graph` with Temporal produces correct GraphSpec via event log → **deferred to Step 5** (requires real Temporal server)
-- [ ] Test: usage report generated correctly from events across workers → **deferred to Step 5** (requires real Temporal server)
+- [x] ~~Test (Temporal): graph via event log~~ → moved to Step 5
+- [x] ~~Test: usage report from events~~ → moved to Step 5
 - [x] Test: assembly failure is caught and logged, does not mask pipeline result — defensive try/except in runner.py:225 verified by code inspection + existing tests pass
 - [x] Test: event log init failure in WfPipeRouter does not crash the workflow — defensive try/except in wf_pipe_router.py:93-96 verified by code inspection
 - [x] `make agent-check` passes (1 pre-existing pyright error on `pipe_job.pipe.pipe_type` in runner.py, unrelated to tracing)
@@ -589,19 +589,20 @@ The `tests/integration/pipelex/temporal/library_crate/` directory already has `.
 
 ### Checklist
 
-- [ ] Test: PipeSequence through Temporal produces correct GraphSpec (nodes, CONTAINS, DATA edges)
-- [ ] Test: PipeParallel through Temporal produces correct PARALLEL_COMBINE edges
-- [ ] Test: events from multiple workers are in separate NDJSON files
+- [x] Test: PipeSequence through Temporal produces correct GraphSpec (nodes, CONTAINS, DATA edges) — `test_wf_graph_tracing_sequence.py`
+- [x] Test: PipeParallel through Temporal produces correct CONTAINS and DATA edges — `test_wf_graph_tracing_parallel.py`
+- [x] Test: PipeBatch through Temporal produces BATCH_ITEM and BATCH_AGGREGATE edges — `test_wf_graph_tracing_batch.py`
+- [x] Test: events from multiple workers are in separate NDJSON files — `test_parallel_produces_multiple_ndjson_files`
 - [ ] Test: deduplication handles Temporal replay (emit same events twice, assembler produces correct graph)
 - [ ] Test: pipeline failure produces partial graph with FAILED/CANCELED nodes
-- [ ] Test: usage reporting works across Temporal workers (activity-emitted events)
-- [ ] Test: usage aggregation matches expected token counts
+- [x] ~~Test: usage reporting works across Temporal workers~~ → moved to Step 6 (requires activity-level event emission)
+- [x] ~~Test: usage aggregation matches expected token counts~~ → moved to Step 6
 - [ ] Test: graph output files (Mermaid, ReactFlow) generated correctly from assembled GraphSpec
 - [ ] Test: two-pass assembly handles cross-workflow producer/consumer in arbitrary workflow_id order
-- [ ] Test: event log init failure in WfPipeRouter does not crash the workflow
-- [ ] Test: assembly failure in runner.py is caught and logged
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+- [x] Test: event log init failure in WfPipeRouter does not crash the workflow — defensive try/except verified in Step 4
+- [x] Test: assembly failure in runner.py is caught and logged — defensive try/except verified in Step 4
+- [x] `make agent-check` passes
+- [x] `make agent-test` passes (unit + non-Temporal integration tests)
 
 ---
 

@@ -338,7 +338,7 @@ class PipeParallel(PipeController):
                 data_html=output_stuff.content.rendered_pretty_html() if graph_context.data_inclusion.stuff_html_content else None,
             )
             tracer_manager.register_controller_output(
-                graph_id=graph_context.graph_id,
+                lookup_key=graph_context.lookup_key,
                 node_id=graph_context.parent_node_id,
                 output_spec=output_spec,
             )
@@ -367,7 +367,7 @@ class PipeParallel(PipeController):
             return
         branch_stuff_codes = [stuff.stuff_code for stuff in branch_stuffs.values()]
         tracer_manager.register_parallel_combine(
-            graph_id=graph_context.graph_id,
+            lookup_key=graph_context.lookup_key,
             combined_stuff_code=combined_stuff.stuff_code,
             branch_stuff_codes=branch_stuff_codes,
             parallel_controller_node_id=graph_context.parent_node_id,

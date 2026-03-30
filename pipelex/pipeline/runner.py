@@ -245,6 +245,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         if graph_spec_result is not None:
             pipe_output.graph_spec = graph_spec_result
 
+        assert pipe_job is not None  # for type checker, success path requires a resolved job
         properties = {
             EventProperty.PIPELINE_RUN_ID: pipeline_run_id,
             EventProperty.PIPE_TYPE: pipe_job.pipe.pipe_type,

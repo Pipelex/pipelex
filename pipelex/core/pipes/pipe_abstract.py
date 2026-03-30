@@ -458,7 +458,7 @@ class PipeAbstract(ABC, BaseModel):
                 if parent_graph_context.data_inclusion.error_stack_traces:
                     error_stack = traceback.format_exc()
                 tracer_manager.on_pipe_end_error(
-                    graph_id=parent_graph_context.graph_id,
+                    lookup_key=parent_graph_context.lookup_key,
                     node_id=graph_node_id,
                     ended_at=datetime.now(timezone.utc),
                     error_type=type(exc).__name__,
@@ -485,7 +485,7 @@ class PipeAbstract(ABC, BaseModel):
                 )
 
             tracer_manager.on_pipe_end_success(
-                graph_id=parent_graph_context.graph_id,
+                lookup_key=parent_graph_context.lookup_key,
                 node_id=graph_node_id,
                 ended_at=datetime.now(timezone.utc),
                 output_spec=output_spec,

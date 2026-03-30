@@ -136,7 +136,7 @@ class PipeBatch(PipeController):
                     # Pass this PipeBatch's node_id so BATCH_ITEM edges can source from the controller
                     batch_controller_node_id = job_metadata.graph_context.parent_node_id
                     tracer_manager.register_batch_item_extraction(
-                        graph_id=job_metadata.graph_context.graph_id,
+                        lookup_key=job_metadata.graph_context.lookup_key,
                         list_stuff_code=input_stuff.stuff_code,
                         item_stuff_code=branch_input_item_code,
                         item_index=branch_index,
@@ -198,7 +198,7 @@ class PipeBatch(PipeController):
                 batch_controller_node_id = job_metadata.graph_context.parent_node_id
                 for agg_index, item_stuff_code in enumerate(branch_output_stuff_codes):
                     tracer_manager.register_batch_aggregation(
-                        graph_id=job_metadata.graph_context.graph_id,
+                        lookup_key=job_metadata.graph_context.lookup_key,
                         output_list_stuff_code=output_stuff.stuff_code,
                         item_stuff_code=item_stuff_code,
                         item_index=agg_index,

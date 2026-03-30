@@ -39,6 +39,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         # Per-workflow tracing state (declared before try for finally block access)
         event_log: NdjsonEventLog | None = None
         wf_graph_tracer_manager: GraphTracerManager | None = None
+        wf_tracer_key: str | None = None
         graph_context = workflow_arg.job_metadata.graph_context
 
         try:
@@ -75,12 +76,23 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 try:
                     event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
                     wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
-                    wf_graph_tracer_manager.open_tracer(
+                    wf_tracer_key = wf_workflow_id
+                    wf_graph_context = wf_graph_tracer_manager.open_tracer(
                         graph_id=graph_context.graph_id,
                         data_inclusion=graph_context.data_inclusion,
                         event_log=event_log,
                         workflow_id=wf_workflow_id,
                         pipeline_run_id=pipeline_run_id,
+                        tracer_key=wf_tracer_key,
+                    )
+                    # Update job_metadata with the per-workflow graph_context (carries tracer_key),
+                    # but preserve parent_node_id from the incoming context so CONTAINS edges
+                    # link back to the parent workflow's controller node.
+                    wf_graph_context = wf_graph_context.model_copy(
+                        update={"parent_node_id": graph_context.parent_node_id},
+                    )
+                    workflow_arg.job_metadata = workflow_arg.job_metadata.model_copy(
+                        update={"graph_context": wf_graph_context},
                     )
                     # Configure ReportingManager for usage event emission
                     report_delegate = get_report_delegate()
@@ -109,9 +121,9 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             raise
         finally:
             # Close per-workflow graph tracer (flushes events to NDJSON)
-            if wf_graph_tracer_manager is not None and graph_context is not None:
+            if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
                 try:
-                    wf_graph_tracer_manager.close_tracer(graph_context.graph_id)
+                    wf_graph_tracer_manager.close_tracer(wf_tracer_key)
                 except Exception as tracer_exc:
                     workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
             if event_log is not None:
