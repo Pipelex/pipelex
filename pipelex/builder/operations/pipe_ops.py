@@ -86,10 +86,15 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
         else:
             spec_data.pop("expression")
 
-    # Accept output as dict with "type" key → extract the type string
+    # Accept output as dict → extract the concept string
+    # Agents sometimes structure the output like inputs (as a dict).
+    # Handle {"type": "ConceptName"} and single-item dicts like {"result": "Text"}.
     if "output" in spec_data and isinstance(spec_data["output"], dict):
-        if "type" in spec_data["output"]:
-            spec_data["output"] = spec_data["output"]["type"]
+        output_dict: dict[str, Any] = spec_data["output"]
+        if "type" in output_dict:
+            spec_data["output"] = output_dict["type"]
+        elif len(output_dict) == 1:
+            spec_data["output"] = next(iter(output_dict.values()))
 
     return spec_class.model_validate(spec_data)
 
