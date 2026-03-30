@@ -9,7 +9,7 @@ class ConceptSpecGenerationTestCases:
 Generate a concept specification for a "BlogPost" concept.
 
 Requirements:
-- the_concept_code: BlogPost
+- concept_code: BlogPost
 - description: A blog post with title, content, and publication date
 - structure: None (leave empty)
 - refines: None (leave empty)
@@ -20,7 +20,7 @@ Requirements:
 Generate a concept specification for a "ProductDescription" concept.
 
 Requirements:
-- the_concept_code: ProductDescription
+- concept_code: ProductDescription
 - description: A detailed description of a product for e-commerce
 - refines: Text (this concept refines the native Text concept)
 - structure: None (leave empty because we're using refines)
@@ -31,7 +31,7 @@ Requirements:
 Generate a concept specification for a "Person" concept with a simple structure.
 
 Requirements:
-- the_concept_code: Person
+- concept_code: Person
 - description: A person with basic information
 - structure: A dictionary with these fields:
   - name: (type: text, description: "The person's full name", required: true)
@@ -44,7 +44,7 @@ Requirements:
 Generate a concept specification for a "Product" concept with a detailed structure.
 
 Requirements:
-- the_concept_code: Product
+- concept_code: Product
 - description: A product in an e-commerce system
 - structure: A dictionary with these fields:
   - name: (type: text, description: "Product name", required: true)
@@ -60,7 +60,7 @@ Requirements:
 Generate a concept specification for a "UserProfile" concept.
 
 Requirements:
-- the_concept_code: UserProfile
+- concept_code: UserProfile
 - description: A user profile with optional settings
 - structure: A dictionary with these fields:
   - username: (type: text, description: "User's username", required: true)
@@ -76,7 +76,7 @@ Requirements:
 Generate a concept specification for a "customer_order" concept.
 
 Requirements:
-- the_concept_code: customer_order
+- concept_code: customer_order
 - description: An order placed by a customer
 - structure: A dictionary with these fields:
   - order_number: (type: text, description: "Unique order identifier", required: true)
@@ -90,7 +90,7 @@ Requirements:
 Generate a concept specification for a "ProductPhoto" concept.
 
 Requirements:
-- the_concept_code: ProductPhoto
+- concept_code: ProductPhoto
 - description: A photograph of a product for display in catalog
 - refines: Image (this concept refines the native Image concept)
 - structure: None (leave empty because we're using refines)
@@ -101,7 +101,7 @@ Requirements:
 Generate a concept specification for an "Event" concept with a date field.
 
 Requirements:
-- the_concept_code: Event
+- concept_code: Event
 - description: An event with scheduling information
 - structure: A dictionary with these fields:
   - title: (type: text, description: "Event title", required: true)

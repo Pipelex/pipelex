@@ -33,7 +33,7 @@ Inline concept structures with nested concepts make Pipelex fully usable with ju
 
 ## Language Specification
 
-For the formal language specification, see [mthds.ai](https://mthds.ai). For package-manifest details, see [Packages](../building-methods/packages.md).
+For the formal language specification, see [mthds.ai](https://mthds.ai/latest/). For package-manifest details, see [Packages](../building-methods/packages.md).
 
 ## Related Documentation
 

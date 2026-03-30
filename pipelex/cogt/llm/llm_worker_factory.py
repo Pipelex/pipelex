@@ -229,10 +229,7 @@ class LLMWorkerFactory:
                 if importlib.util.find_spec("google.genai") is None:
                     lib_name = "google-genai"
                     lib_extra_name = "google"
-                    msg = (
-                        "The google-genai SDK is required in order to use Google Gemini API directly. "
-                        "You can install it with 'pip install google-genai'."
-                    )
+                    msg = "The google-genai SDK is required in order to use Google Gemini API directly."
                     raise MissingDependencyError(
                         lib_name,
                         lib_extra_name,
