@@ -96,8 +96,9 @@ MTHDS is the open standard behind Pipelex methods. It defines the language, the 
 
 !!! info "Explore the ecosystem"
 
-    - **[mthds.ai](https://mthds.ai)** — The MTHDS language specification
+    - **[mthds.ai](https://mthds.ai/latest/)** — The MTHDS language specification
     - **[mthds.sh](https://mthds.sh)** — The Methods Hub for discovering and sharing methods
+    - **[MTHDS Plugins](https://github.com/mthds-ai/mthds-plugins)** — Claude Code plugin for building, running, and validating methods
 
 ---
 
@@ -175,7 +176,7 @@ This tutorial walks you through writing `.mthds` files manually, step by step.
 Set up your project and get free AI access:
 
 ```bash
-pip install pipelex
+uv tool install pipelex
 pipelex init
 pipelex login
 ```
@@ -1745,7 +1746,7 @@ Like Skills, MTHDS files live in directories, are Git-native, and scale from per
 
 MIT-licensed. Designed for portability. The method outlives any vendor or model version.
 
-[mthds.ai](https://mthds.ai) | [github.com/mthds-ai](https://github.com/mthds-ai)
+[mthds.ai](https://mthds.ai/latest/) | [github.com/mthds-ai](https://github.com/mthds-ai)
 
 ## Pipelex: The Reference Runtime
 
@@ -1769,7 +1770,7 @@ Start with one method: extract invoice data, process applications, analyze repor
 
 ---
 
-[MTHDS Standard](https://mthds.ai) | [Pipelex Runtime](https://github.com/Pipelex/pipelex) | [Documentation](https://docs.pipelex.com) | [Discord](https://go.pipelex.com/discord)
+[MTHDS Standard](https://mthds.ai/latest/) | [Pipelex Runtime](https://github.com/Pipelex/pipelex) | [Documentation](https://docs.pipelex.com) | [Discord](https://go.pipelex.com/discord)
 
 © 2025-2026 Evotis S.A.S. — [Pipelex](https://pipelex.com) is a trademark of Evotis S.A.S.
 
@@ -1933,7 +1934,7 @@ Inline concept structures with nested concepts make Pipelex fully usable with ju
 
 ## Language Specification
 
-For the formal language specification, see [mthds.ai](https://mthds.ai). For package-manifest details, see [Packages](../building-methods/packages.md).
+For the formal language specification, see [mthds.ai](https://mthds.ai/latest/). For package-manifest details, see [Packages](../building-methods/packages.md).
 
 ## Related Documentation
 
@@ -13567,7 +13568,7 @@ class BundleHeaderSpec(StructuredContent):
     main_pipe: str    # Must be snake_case, must exist in pipe dict
 
 class ConceptSpec(StructuredContent):
-    the_concept_code: str  # Must be PascalCase
+    concept_code: str  # Must be PascalCase
 ```
 
 Standard mock generators (like Polyfactory) produce random strings like `"uygNjiAuDMOtZEyibgHw"` which fail validation. The dry run system addresses this at two levels:
@@ -13657,7 +13658,7 @@ class DryRunFactory:
 | Format | Generator | Example Output | Used For |
 |--------|-----------|----------------|----------|
 | `SNAKE_CASE` | `generate_snake_case_code()` | `mock_abcd` | `domain_code`, `pipe_code`, `the_field_name` |
-| `PASCAL_CASE` | `generate_pascal_case_code()` | `MockAbcd` | `the_concept_code` |
+| `PASCAL_CASE` | `generate_pascal_case_code()` | `MockAbcd` | `concept_code` |
 | `CONCEPT_REF` | `generate_concept_ref()` | `mock_abcd.MockCdef` | `concept_ref` field (domain.ConceptCode format) |
 | `IGNORE` | Sets field to `Ignore()` | None/default | `default_value`, `structure` fields |
 | `DICT_SNAKE_KEY_PASCAL_VALUE` | `generate_dict_snake_key_pascal_value()` | `{mock_abcd: MockCdef}` | `inputs` dict in PipeSpec |
