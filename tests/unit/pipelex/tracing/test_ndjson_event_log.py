@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
-from pipelex.tracing.trace_events import PipeStartEvent
-from tests.unit.pipelex.tracing.conftest import make_trace_event
+from pipelex.tracing.trace_events import EdgeEvent, PipeStartEvent
+from tests.unit.pipelex.tracing.conftest import make_edge_event, make_trace_event
 
 
 def _worker_fn(traces_dir: str, pipeline_run_id: str, workflow_id: str, num_events: int) -> None:
@@ -44,7 +44,7 @@ class TestNdjsonEventLog:
             assert read_event.pipe_code == "test_pipe"
 
     def test_deduplication(self, tmp_path: Path) -> None:
-        """Duplicate (workflow_id, sequence) pairs are deduplicated."""
+        """Duplicate (workflow_id, event_kind, sequence) triples are deduplicated."""
         event_log = NdjsonEventLog(traces_dir=str(tmp_path))
         event_log.emit(make_trace_event(sequence=0))
         event_log.emit(make_trace_event(sequence=0))
@@ -52,6 +52,19 @@ class TestNdjsonEventLog:
         result = event_log.read_events("run_001")
 
         assert len(result) == 1
+
+    def test_different_event_kinds_not_deduped(self, tmp_path: Path) -> None:
+        """Events with same (workflow_id, sequence) but different event_kind are NOT deduped."""
+        event_log = NdjsonEventLog(traces_dir=str(tmp_path))
+        event_log.emit(make_trace_event(workflow_id="wf_abc", sequence=0))
+        event_log.emit(make_edge_event(workflow_id="wf_abc", sequence=0))
+
+        result = event_log.read_events("run_001")
+
+        assert len(result) == 2
+        event_kinds = {type(evt) for evt in result}
+        assert PipeStartEvent in event_kinds
+        assert EdgeEvent in event_kinds
 
     def test_multiple_workflows(self, tmp_path: Path) -> None:
         """Events from multiple workflows are returned sorted by (workflow_id, sequence)."""

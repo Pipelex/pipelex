@@ -104,6 +104,21 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                         )
                 except Exception as exc:
                     workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")
+                    # Clean up partially initialized resources before nulling (the finally block
+                    # won't be able to clean up after we null these references)
+                    if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
+                        try:
+                            wf_graph_tracer_manager.close_tracer(wf_tracer_key)
+                        except Exception as tracer_exc:
+                            workflow_log.warning(f"Failed to close partially initialized tracer: {tracer_exc}")
+                    if event_log is not None:
+                        try:
+                            event_log.close()
+                        except Exception:  # noqa: S110
+                            pass
+                    report_delegate = get_report_delegate()
+                    if isinstance(report_delegate, ReportingManager):
+                        report_delegate.clear_event_log()
                     event_log = None
                     wf_graph_tracer_manager = None
 
@@ -131,6 +146,10 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     event_log.close()
                 except Exception:  # noqa: S110
                     pass
+                # Clear stale event log state from ReportingManager
+                report_delegate = get_report_delegate()
+                if isinstance(report_delegate, ReportingManager):
+                    report_delegate.clear_event_log()
 
             if wf_library_id is not None:
                 try:

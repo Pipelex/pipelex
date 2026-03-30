@@ -149,7 +149,8 @@ class GraphTracer(GraphTracerProtocol):
 
         Must only be called when self._event_log is not None.
         """
-        self._event_log.emit(event)  # type: ignore[union-attr]
+        assert self._event_log is not None
+        self._event_log.emit(event)
 
     def _next_event_sequence(self) -> int:
         """Return the next monotonic sequence number for event emission."""
@@ -268,6 +269,8 @@ class GraphTracer(GraphTracerProtocol):
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
         self._parallel_combine_map = {}
+        if self._event_log is not None:
+            self._event_log.close()
         self._event_log = None
         self._workflow_id = "direct"
         self._pipeline_run_id = None

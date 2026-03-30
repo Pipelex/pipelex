@@ -30,16 +30,20 @@ class InMemoryEventLog(EventLogProtocol):
         """
         filtered = [evt for evt in self._events if evt.pipeline_run_id == pipeline_run_id]
 
-        seen: set[tuple[str, int]] = set()
+        seen: set[tuple[str, str, int]] = set()
         deduped: list[TraceEvent] = []
         for event in filtered:
-            dedup_key = (event.workflow_id, event.sequence)
+            dedup_key = (event.workflow_id, type(event).__name__, event.sequence)
             if dedup_key not in seen:
                 seen.add(dedup_key)
                 deduped.append(event)
 
         deduped.sort(key=lambda evt: (evt.workflow_id, evt.sequence))
         return deduped
+
+    @override
+    def close(self) -> None:
+        """No-op for in-memory implementation."""
 
     @override
     def cleanup(self, pipeline_run_id: str) -> None:

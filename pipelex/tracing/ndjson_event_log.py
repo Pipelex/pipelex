@@ -75,7 +75,7 @@ class NdjsonEventLog(EventLogProtocol):
 
         ndjson_files = sorted(Path(run_dir).glob("*.ndjson"))
 
-        seen: set[tuple[str, int]] = set()
+        seen: set[tuple[str, str, int]] = set()
         events: list[TraceEvent] = []
 
         for ndjson_path in ndjson_files:
@@ -91,11 +91,15 @@ class NdjsonEventLog(EventLogProtocol):
                         log.warning(f"Skipping corrupt line in {file_path}:{line_number} — {exc}")
                         continue
 
-                    dedup_key = (event.workflow_id, event.sequence)
+                    dedup_key = (event.workflow_id, type(event).__name__, event.sequence)
                     if dedup_key not in seen:
                         seen.add(dedup_key)
                         events.append(event)
 
+        # TODO: causal ordering — sorting by (workflow_id, sequence) groups by lexicographic
+        # workflow ID, not execution order. In parent/child workflow topologies this can cause
+        # incorrect producer map overwrites in GraphSpecAssembler. Consider timestamp-based
+        # or topology-aware ordering.
         events.sort(key=lambda evt: (evt.workflow_id, evt.sequence))
         return events
 
@@ -115,6 +119,7 @@ class NdjsonEventLog(EventLogProtocol):
         if os.path.isdir(run_dir):
             shutil.rmtree(run_dir)
 
+    @override
     def close(self) -> None:
         """Close all cached file handles."""
         for handle in self._file_handles.values():

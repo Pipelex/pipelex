@@ -44,6 +44,10 @@ class ReportingManager(ReportingProtocol):
         self._reporting_config = get_config().pipelex.reporting_config
         self._usage_registries: dict[str, UsageRegistry] = {}
         # Event log for distributed tracing (None = no event emission)
+        # TODO: group the event_log attributes
+        # TODO: per-workflow state isolation — these fields are global mutable state on a singleton,
+        # unsafe when Temporal worker concurrency is enabled (one workflow can overwrite another's
+        # event log context). Needs contextvars or a per-workflow reporting context.
         self._event_log: EventLogProtocol | None = None
         self._event_log_workflow_id: str = "direct"
         self._event_log_pipeline_run_id: str | None = None
@@ -69,6 +73,13 @@ class ReportingManager(ReportingProtocol):
         self._event_log = event_log
         self._event_log_workflow_id = workflow_id
         self._event_log_pipeline_run_id = pipeline_run_id
+        self._event_sequence = 0
+
+    def clear_event_log(self) -> None:
+        """Clear the event log configuration after a workflow completes."""
+        self._event_log = None
+        self._event_log_workflow_id = "direct"
+        self._event_log_pipeline_run_id = None
         self._event_sequence = 0
 
     ############################################################

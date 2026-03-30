@@ -29,9 +29,16 @@ class EventLogProtocol(Protocol):
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
         """Read all events for a pipeline run.
 
-        Returns events deduplicated by (workflow_id, sequence) and sorted
+        Returns events deduplicated by (workflow_id, event_type, sequence) and sorted
         by (workflow_id, sequence) for deterministic ordering.
         Returns an empty list if no events exist for the given run.
+        """
+        ...
+
+    def close(self) -> None:
+        """Close all held resources (file handles, connections).
+
+        Idempotent: safe to call multiple times. Does not delete data.
         """
         ...
 

@@ -247,16 +247,22 @@ class _AssemblerState:
         node_data.error = event.error
 
     def _handle_edge_event(self, event: EdgeEvent) -> None:
-        edge = EdgeSpec(
-            edge_id=event.edge_id,
-            source=event.source_node_id,
-            target=event.target_node_id,
-            kind=event.edge_kind,
-            label=event.label,
-            source_stuff_digest=event.source_stuff_digest,
-            target_stuff_digest=event.target_stuff_digest,
-        )
-        self._explicit_edges.append(edge)
+        # DATA, BATCH_ITEM, BATCH_AGGREGATE, PARALLEL_COMBINE are regenerated
+        # in pass 2 with full cross-worker visibility — skip to avoid duplicates.
+        match event.edge_kind:
+            case EdgeKind.CONTAINS | EdgeKind.SELECTED_OUTCOME | EdgeKind.CONTROL:
+                edge = EdgeSpec(
+                    edge_id=event.edge_id,
+                    source=event.source_node_id,
+                    target=event.target_node_id,
+                    kind=event.edge_kind,
+                    label=event.label,
+                    source_stuff_digest=event.source_stuff_digest,
+                    target_stuff_digest=event.target_stuff_digest,
+                )
+                self._explicit_edges.append(edge)
+            case EdgeKind.DATA | EdgeKind.BATCH_ITEM | EdgeKind.BATCH_AGGREGATE | EdgeKind.PARALLEL_COMBINE:
+                pass  # Regenerated in pass 2
 
     def _handle_controller_output(self, event: ControllerOutputEvent) -> None:
         node_data = self._nodes.get(event.node_id)

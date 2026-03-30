@@ -1003,7 +1003,7 @@ ts: temporal-server
 
 temporal-stop:
 	$(call PRINT_TITLE,"Stopping local Temporal dev server")
-	@PID=$$(lsof -ti :7233 2>/dev/null); \
+	@PID=$$(lsof -tiTCP:7233 -sTCP:LISTEN 2>/dev/null); \
 	if [ -z "$$PID" ]; then \
 		echo "• No process found on port 7233"; \
 	else \
