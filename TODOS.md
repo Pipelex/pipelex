@@ -539,25 +539,25 @@ Traces persist on disk until explicitly removed by the user or a cleanup command
 
 ### Checklist
 
-- [ ] Define `TracingConfig` and wire into main config
-- [ ] Add `[pipelex.tracing]` to `pipelex.toml`
-- [ ] Create NdjsonEventLog in `pipeline_run_setup.py` when Temporal mode + graph enabled
-- [ ] Pass `event_log` and `workflow_id` to `GraphTracerManager.open_tracer()` in `pipeline_run_setup.py`
-- [ ] Create NdjsonEventLog in `WfPipeRouter.run()`, call `open_tracer()` with event_log + workflow_id
-- [ ] Defensive try/except around event log init in `WfPipeRouter` — continue without tracing on failure
-- [ ] Read events + assemble GraphSpec in `runner.py` after Temporal workflow completes (or fails)
-- [ ] Defensive try/except around assembly in `runner.py` — don't mask pipeline errors
-- [ ] Feed assembled GraphSpec into existing graph output generation (`generate_graph_outputs()`)
+- [x] Define `TracingConfig` and wire into main config
+- [x] Add `[pipelex.tracing_config]` to `pipelex.toml`
+- [x] Create NdjsonEventLog in `pipeline_run_setup.py` when Temporal mode + graph enabled
+- [x] Pass `event_log` and `workflow_id` to `GraphTracerManager.open_tracer()` in `pipeline_run_setup.py`
+- [x] Create NdjsonEventLog in `WfPipeRouter.run()`, call `open_tracer()` with event_log + workflow_id
+- [x] Defensive try/except around event log init in `WfPipeRouter` — continue without tracing on failure
+- [x] Read events + assemble GraphSpec in `runner.py` after Temporal workflow completes (or fails)
+- [x] Defensive try/except around assembly in `runner.py` — don't mask pipeline errors
+- [x] Feed assembled GraphSpec into existing graph output generation (`generate_graph_outputs()`)
 - [ ] Read events + aggregate usage via `UsageAggregator`
 - [ ] Wire activity-level usage event emission (pass event_log config to activities)
-- [ ] Update Mermaid/ReactFlow renderers to handle new node ID format
-- [ ] Verify direct mode is completely unchanged — no event log initialized, `GraphTracer` works as today
+- [x] Update Mermaid/ReactFlow renderers to handle new node ID format — NOT NEEDED (ReactFlow `.pop()` already handles extra segment, Mermaid uses IDs opaquely)
+- [x] Verify direct mode is completely unchanged — no event log initialized, `GraphTracer` works as today
 - [ ] Test (Temporal): `pipelex run pipe --graph` with Temporal produces correct GraphSpec via event log
 - [ ] Test: usage report generated correctly from events across workers
 - [ ] Test: assembly failure is caught and logged, does not mask pipeline result
 - [ ] Test: event log init failure in WfPipeRouter does not crash the workflow
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes — all existing tests pass unchanged (direct mode untouched)
+- [x] `make agent-check` passes (1 pre-existing pyright error on `pipe_job.pipe.pipe_type` in runner.py:236, unrelated to tracing)
+- [x] `make agent-test` passes — all existing tests pass unchanged (direct mode untouched)
 
 ---
 

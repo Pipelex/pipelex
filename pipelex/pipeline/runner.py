@@ -8,6 +8,7 @@ from mthds.client.protocol import RunnerProtocol
 from pydantic import ValidationError
 from typing_extensions import override
 
+from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -192,6 +193,36 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
                     graph_spec_result = tracer_manager.close_tracer(pipeline_run_id)
+
+                # In Temporal mode with tracing enabled, assemble from events instead
+                tracing_config = get_config().pipelex.tracing_config
+                if tracing_config.is_enabled and get_config().temporal.is_enabled:
+                    try:
+                        from pipelex.graph.graphspec import PipelineRef  # noqa: PLC0415
+                        from pipelex.tracing.graphspec_assembler import GraphSpecAssembler  # noqa: PLC0415
+                        from pipelex.tracing.ndjson_event_log import NdjsonEventLog  # noqa: PLC0415
+
+                        assembly_event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
+                        try:
+                            events = assembly_event_log.read_events(pipeline_run_id)
+                            if events:
+                                assembled_domain: str | None = None
+                                assembled_main_pipe: str | None = None
+                                if pipe_job is not None:
+                                    assembled_domain = pipe_job.pipe.domain_code
+                                    assembled_main_pipe = pipe_job.pipe.code
+                                graph_spec_result = GraphSpecAssembler.assemble(
+                                    events=events,
+                                    graph_id=pipeline_run_id,
+                                    pipeline_ref=PipelineRef(
+                                        domain=assembled_domain,
+                                        main_pipe=assembled_main_pipe,
+                                    ),
+                                )
+                        finally:
+                            assembly_event_log.close()
+                    except Exception as exc:
+                        log.warning(f"Failed to assemble graph from events, using in-memory graph: {exc}")
 
             # Only teardown library if it was successfully created
             if library_id_resolved is not None:

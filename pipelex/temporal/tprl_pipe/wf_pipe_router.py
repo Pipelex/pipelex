@@ -6,13 +6,17 @@ with workflow.unsafe.imports_passed_through():
     from kajson.class_registry import ClassRegistry
     from kajson.kajson_manager import KajsonManager
 
+    from pipelex.config import get_config
     from pipelex.core.pipes.pipe_output import PipeOutput
-    from pipelex.hub import get_library_manager, set_current_library, teardown_current_library
+    from pipelex.graph.graph_tracer_manager import GraphTracerManager
+    from pipelex.hub import get_library_manager, get_report_delegate, set_current_library, teardown_current_library
     from pipelex.pipe_run.pipe_job import PipeJob
+    from pipelex.reporting.reporting_manager import ReportingManager
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
+    from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 
 
 @workflow.defn(name="wf_pipe_router")
@@ -31,6 +35,11 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         # Set up per-workflow library if a library crate is present
         library_crate = workflow_arg.library_crate
         wf_library_id: str | None = None
+
+        # Per-workflow tracing state (declared before try for finally block access)
+        event_log: NdjsonEventLog | None = None
+        wf_graph_tracer_manager: GraphTracerManager | None = None
+        graph_context = workflow_arg.job_metadata.graph_context
 
         try:
             if library_crate is not None:
@@ -57,6 +66,35 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     workflow_arg.working_memory = hydrate_working_memory(workflow_arg.working_memory_raw)
                     workflow_arg.working_memory_raw = None
 
+            # Set up per-workflow graph tracing if enabled
+            pipeline_run_id = workflow_arg.job_metadata.pipeline_run_id
+            wf_workflow_id = workflow.info().workflow_id
+
+            tracing_config = get_config().pipelex.tracing_config
+            if tracing_config.is_enabled and graph_context is not None:
+                try:
+                    event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
+                    wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
+                    wf_graph_tracer_manager.open_tracer(
+                        graph_id=graph_context.graph_id,
+                        data_inclusion=graph_context.data_inclusion,
+                        event_log=event_log,
+                        workflow_id=wf_workflow_id,
+                        pipeline_run_id=pipeline_run_id,
+                    )
+                    # Configure ReportingManager for usage event emission
+                    report_delegate = get_report_delegate()
+                    if isinstance(report_delegate, ReportingManager):
+                        report_delegate.set_event_log(
+                            event_log=event_log,
+                            workflow_id=wf_workflow_id,
+                            pipeline_run_id=pipeline_run_id,
+                        )
+                except Exception as exc:
+                    workflow_log.warning(f"Failed to set up per-workflow tracing, continuing without: {exc}")
+                    event_log = None
+                    wf_graph_tracer_manager = None
+
             working_memory = workflow_arg.get_working_memory()
             pipe_output = await pipe.run_pipe(
                 job_metadata=workflow_arg.job_metadata,
@@ -70,6 +108,18 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         finally:
+            # Close per-workflow graph tracer (flushes events to NDJSON)
+            if wf_graph_tracer_manager is not None and graph_context is not None:
+                try:
+                    wf_graph_tracer_manager.close_tracer(graph_context.graph_id)
+                except Exception as tracer_exc:
+                    workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
+            if event_log is not None:
+                try:
+                    event_log.close()
+                except Exception:  # noqa: S110
+                    pass
+
             if wf_library_id is not None:
                 try:
                     get_library_manager().teardown(library_id=wf_library_id)

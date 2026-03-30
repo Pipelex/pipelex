@@ -85,6 +85,11 @@ class ReportingConfig(ConfigModel):
     cost_report_unit_scale: float
 
 
+class TracingConfig(ConfigModel):
+    is_enabled: bool
+    traces_dir: str
+
+
 class ObserverConfig(ConfigModel):
     observer_dir: str
 
@@ -177,6 +182,7 @@ class Pipelex(ConfigModel):
     pipe_run_config: PipeRunConfig
     pipeline_execution_config: PipelineExecutionConfig
     reporting_config: ReportingConfig
+    tracing_config: TracingConfig
     observer_config: ObserverConfig
     scan_config: ScanConfig
     builder_config: BuilderConfig
