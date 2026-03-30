@@ -27,6 +27,13 @@ from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 _PIPE_CODE_ALIASES = ("pipe", "the_pipe_code", "code", "name", "pipe_name", "pipe_ref")
 
 
+def _normalize_sub_pipe_dict(data: dict[str, Any]) -> None:
+    """Normalize a step/branch dict: resolve pipe_code aliases and drop extraneous fields."""
+    _normalize_pipe_code_aliases(data)
+    # Agents sometimes add "inputs" to individual steps; silently drop it.
+    data.pop("inputs", None)
+
+
 def _normalize_pipe_code_aliases(data: dict[str, Any]) -> None:
     """Convert any alias of ``pipe_code`` to the canonical field name, in-place."""
     for alias in _PIPE_CODE_ALIASES:
@@ -67,13 +74,13 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     # Accept common aliases for "pipe_code" at the top level
     _normalize_pipe_code_aliases(spec_data)
 
-    # Handle steps/branches conversion — apply the same alias normalization
-    # Deep-copy nested dicts to avoid mutating caller's nested structures
+    # Handle steps/branches conversion — normalize aliases and drop unknown fields.
+    # Deep-copy nested dicts to avoid mutating caller's nested structures.
     if "steps" in spec_data:
         converted_steps = []
         for step in spec_data["steps"]:
             step = dict(step)
-            _normalize_pipe_code_aliases(step)
+            _normalize_sub_pipe_dict(step)
             converted_steps.append(step)
         spec_data["steps"] = converted_steps
 
@@ -81,7 +88,7 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
         converted_branches = []
         for branch in spec_data["branches"]:
             branch = dict(branch)
-            _normalize_pipe_code_aliases(branch)
+            _normalize_sub_pipe_dict(branch)
             converted_branches.append(branch)
         spec_data["branches"] = converted_branches
 

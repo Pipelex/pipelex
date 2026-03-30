@@ -172,6 +172,41 @@ class TestParsePipeSpec:
         assert result.branches[0].pipe_code == "branch_a"
         assert result.branches[1].pipe_code == "branch_b"
 
+    # -- extraneous "inputs" in steps/branches silently dropped -----------
+
+    def test_sequence_steps_extraneous_inputs_dropped(self) -> None:
+        """Agents sometimes add 'inputs' to individual steps; these should be silently ignored."""
+        spec: dict[str, Any] = {
+            "pipe_code": "interview_prep",
+            "description": "Analyze CV-job match",
+            "inputs": {"cv": "Document", "job_offer": "Document"},
+            "output": "Text",
+            "steps": [
+                {"pipe": "extract_cv", "inputs": {"cv": "cv"}, "result": "cv_pages"},
+                {"pipe": "extract_job_offer", "inputs": {"job_offer": "job_offer"}, "result": "job_offer_pages"},
+                {"pipe": "analyze_match", "result": "match_analysis"},
+            ],
+        }
+        result = parse_pipe_spec("PipeSequence", spec)
+        assert isinstance(result, PipeSequenceSpec)
+        assert result.steps[0].pipe_code == "extract_cv"
+        assert result.steps[1].pipe_code == "extract_job_offer"
+
+    def test_parallel_branches_extraneous_inputs_dropped(self) -> None:
+        spec: dict[str, Any] = {
+            "pipe_code": "my_par",
+            "description": "Parallel branches",
+            "inputs": {"doc": "Document"},
+            "output": "Text",
+            "add_each_output": True,
+            "branches": [
+                {"pipe": "branch_a", "inputs": {"doc": "doc"}, "result": "result_a"},
+            ],
+        }
+        result = parse_pipe_spec("PipeParallel", spec)
+        assert isinstance(result, PipeParallelSpec)
+        assert result.branches[0].pipe_code == "branch_a"
+
     # -- PipeCondition expression alias -----------------------------------
 
     _BASE_CONDITION: ClassVar[dict[str, Any]] = {
