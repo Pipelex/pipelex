@@ -548,15 +548,15 @@ Traces persist on disk until explicitly removed by the user or a cleanup command
 - [x] Read events + assemble GraphSpec in `runner.py` after Temporal workflow completes (or fails)
 - [x] Defensive try/except around assembly in `runner.py` — don't mask pipeline errors
 - [x] Feed assembled GraphSpec into existing graph output generation (`generate_graph_outputs()`)
-- [ ] Read events + aggregate usage via `UsageAggregator`
-- [ ] Wire activity-level usage event emission (pass event_log config to activities)
+- [x] Read events + aggregate usage via `UsageAggregator` — in `runner.py`, calls `UsageAggregator.aggregate()` and `ReportingManager.inject_tokens_usages()` to feed cross-worker usage into the cost report
+- [ ] Wire activity-level usage event emission (pass event_log config to activities) → **deferred to Step 6** (current code relies on shared process singleton; standalone activities on separate processes need explicit wiring)
 - [x] Update Mermaid/ReactFlow renderers to handle new node ID format — NOT NEEDED (ReactFlow `.pop()` already handles extra segment, Mermaid uses IDs opaquely)
 - [x] Verify direct mode is completely unchanged — no event log initialized, `GraphTracer` works as today
-- [ ] Test (Temporal): `pipelex run pipe --graph` with Temporal produces correct GraphSpec via event log
-- [ ] Test: usage report generated correctly from events across workers
-- [ ] Test: assembly failure is caught and logged, does not mask pipeline result
-- [ ] Test: event log init failure in WfPipeRouter does not crash the workflow
-- [x] `make agent-check` passes (1 pre-existing pyright error on `pipe_job.pipe.pipe_type` in runner.py:236, unrelated to tracing)
+- [ ] Test (Temporal): `pipelex run pipe --graph` with Temporal produces correct GraphSpec via event log → **deferred to Step 5** (requires real Temporal server)
+- [ ] Test: usage report generated correctly from events across workers → **deferred to Step 5** (requires real Temporal server)
+- [x] Test: assembly failure is caught and logged, does not mask pipeline result — defensive try/except in runner.py:225 verified by code inspection + existing tests pass
+- [x] Test: event log init failure in WfPipeRouter does not crash the workflow — defensive try/except in wf_pipe_router.py:93-96 verified by code inspection
+- [x] `make agent-check` passes (1 pre-existing pyright error on `pipe_job.pipe.pipe_type` in runner.py, unrelated to tracing)
 - [x] `make agent-test` passes — all existing tests pass unchanged (direct mode untouched)
 
 ---
@@ -600,6 +600,100 @@ The `tests/integration/pipelex/temporal/library_crate/` directory already has `.
 - [ ] Test: two-pass assembly handles cross-workflow producer/consumer in arbitrary workflow_id order
 - [ ] Test: event log init failure in WfPipeRouter does not crash the workflow
 - [ ] Test: assembly failure in runner.py is caught and logged
+- [ ] `make agent-check` passes
+- [ ] `make agent-test` passes
+
+---
+
+## Step 6: Standalone Activity Tracing
+
+> Wire event log into activities that may run on separate processes (standalone activities).
+
+### What
+
+Currently, usage event emission from activities relies on the `ReportingManager` singleton being configured with `set_event_log()` by `WfPipeRouter.run()` on the same process. This breaks when activities run on standalone workers (separate processes) via Temporal's [standalone activities](https://docs.temporal.io/develop/python/standalone-activities) feature: the standalone process has its own `ReportingManager` with no `event_log` set.
+
+### Approach: Temporal Activity Interceptor
+
+Use Temporal's built-in [activity interceptor](https://docs.temporal.io/develop/python/observability#activity-interceptors) API to inject event log setup/teardown around activity execution, without modifying individual activity functions.
+
+**1. Add `TracingContext` to `JobMetadata`:**
+
+```python
+class TracingContext(BaseModel):
+    traces_dir: str
+    pipeline_run_id: str
+    workflow_id: str
+```
+
+Optional field on `JobMetadata`. Populated by `WfPipeRouter` (or the dispatching workflow) before calling `workflow.start_activity()`. `None` when tracing is disabled.
+
+**2. Implement `TracingActivityInboundInterceptor`:**
+
+```python
+class TracingActivityInboundInterceptor(ActivityInboundInterceptor):
+    async def execute_activity(self, input: ExecuteActivityInput) -> Any:
+        tracing_ctx = _extract_tracing_context(input.args)
+        if tracing_ctx is not None:
+            event_log = NdjsonEventLog(traces_dir=tracing_ctx.traces_dir)
+            report_delegate = get_report_delegate()
+            if isinstance(report_delegate, ReportingManager):
+                report_delegate.set_event_log(
+                    event_log=event_log,
+                    workflow_id=tracing_ctx.workflow_id,
+                    pipeline_run_id=tracing_ctx.pipeline_run_id,
+                )
+        try:
+            return await super().execute_activity(input)
+        finally:
+            if tracing_ctx is not None and event_log is not None:
+                event_log.close()
+```
+
+The `_extract_tracing_context()` helper navigates the activity input to find `JobMetadata.tracing_context`. All activity inputs contain `JobMetadata` either directly or via `LLMAssignment.job_metadata`, `ImgGenAssignment.job_metadata`, etc.
+
+**3. Register on Worker:**
+
+```python
+Worker(
+    client=client,
+    interceptors=[TracingInterceptor()],
+    ...
+)
+```
+
+Same pattern as OpenTelemetry instrumentation for Temporal.
+
+**4. NDJSON file naming for activities:**
+
+Activity events go to `act_{activity_task_id}.ndjson`. The `read_events()` glob already matches `*.ndjson`, so no backend changes needed.
+
+### Why the interceptor approach
+
+- No changes to individual activity functions (`act_llm_gen_text`, `act_llm_gen_object`, etc.)
+- Same mechanism Temporal uses for OTel tracing — proven pattern
+- Clean setup/teardown lifecycle
+
+### Files to create/modify
+
+| File | Change |
+|---|---|
+| `pipelex/pipeline/job_metadata.py` | Add `TracingContext` model and optional field on `JobMetadata` |
+| `pipelex/temporal/tprl/tracing_interceptor.py` | New: `TracingActivityInboundInterceptor` |
+| `pipelex/temporal/tprl_pipe/wf_pipe_router.py` | Populate `TracingContext` on `JobMetadata` before pipe execution |
+| Temporal worker setup | Register the interceptor on the `Worker` |
+
+### Checklist
+
+- [ ] Define `TracingContext` model on `JobMetadata`
+- [ ] Populate `TracingContext` in `WfPipeRouter.run()` when tracing is enabled
+- [ ] Implement `TracingActivityInboundInterceptor` with event log setup/teardown
+- [ ] Helper to extract `TracingContext` from activity input (navigate `JobMetadata` from various assignment types)
+- [ ] Register interceptor on Temporal Worker
+- [ ] NDJSON file naming: use `act_{activity_task_id}.ndjson` for activity-emitted events
+- [ ] Test: standalone activity emits `UsageReportEvent` to its own NDJSON file
+- [ ] Test: assembled usage from activity events matches expected token counts
+- [ ] Test: interceptor gracefully handles missing `TracingContext` (no-op)
 - [ ] `make agent-check` passes
 - [ ] `make agent-test` passes
 

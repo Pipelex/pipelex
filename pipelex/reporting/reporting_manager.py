@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -171,6 +172,20 @@ class ReportingManager(ReportingProtocol):
             msg = f"Registry for pipeline '{pipeline_run_id}' already exists"
             raise ReportingManagerError(msg)
         self._usage_registries[pipeline_run_id] = UsageRegistry()
+
+    def inject_tokens_usages(self, pipeline_run_id: str, tokens_usages: Sequence[AnyTokensUsage]) -> None:
+        """Inject externally-collected token usage records into a pipeline's registry.
+
+        Used after assembling usage data from distributed trace events, so that
+        generate_report() can produce a complete cost report across all workers.
+
+        Args:
+            pipeline_run_id: The pipeline run to add usage data to.
+            tokens_usages: Token usage records to inject.
+        """
+        registry = self._get_registry(pipeline_run_id)
+        for tokens_usage in tokens_usages:
+            registry.add_tokens_usage(tokens_usage)
 
     def _emit_usage_event(self, inference_job: InferenceJobAbstract, tokens_usage: AnyTokensUsage) -> None:
         """Emit a UsageReportEvent if event log is configured."""

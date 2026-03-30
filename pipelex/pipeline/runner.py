@@ -15,6 +15,7 @@ from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
     get_pipe_router,
+    get_report_delegate,
     get_telemetry_manager,
     teardown_current_library,
 )
@@ -199,8 +200,10 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 if tracing_config.is_enabled and get_config().temporal.is_enabled:
                     try:
                         from pipelex.graph.graphspec import PipelineRef  # noqa: PLC0415
+                        from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
                         from pipelex.tracing.graphspec_assembler import GraphSpecAssembler  # noqa: PLC0415
                         from pipelex.tracing.ndjson_event_log import NdjsonEventLog  # noqa: PLC0415
+                        from pipelex.tracing.usage_aggregator import UsageAggregator  # noqa: PLC0415
 
                         assembly_event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
                         try:
@@ -219,6 +222,15 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                                         main_pipe=assembled_main_pipe,
                                     ),
                                 )
+                                # Aggregate usage from events so generate_report() includes cross-worker costs
+                                usage_data = UsageAggregator.aggregate(events)
+                                if usage_data:
+                                    report_delegate = get_report_delegate()
+                                    if isinstance(report_delegate, ReportingManager):
+                                        report_delegate.inject_tokens_usages(
+                                            pipeline_run_id=pipeline_run_id,
+                                            tokens_usages=usage_data,
+                                        )
                         finally:
                             assembly_event_log.close()
                     except Exception as exc:

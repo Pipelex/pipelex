@@ -107,6 +107,52 @@ class TestReportingEventEmission:
         assert usage_events[0].node_id == "test-graph:node_42"
         assert usage_events[0].workflow_id == self.WORKFLOW_ID
 
+    def test_inject_tokens_usages_adds_to_registry(self) -> None:
+        """inject_tokens_usages adds externally-collected usage data to the pipeline's registry."""
+        manager = ReportingManager()
+        manager.setup()
+        manager.open_registry(self.PIPELINE_RUN_ID)
+
+        tokens_usage = LLMTokensUsage(
+            job_metadata=_make_test_llm_job(self.PIPELINE_RUN_ID).job_metadata,
+            inference_model_name="test-model",
+            inference_model_id="test-model-id",
+            unit_costs={CostCategory.INPUT: 1.0, CostCategory.OUTPUT: 2.0},
+            nb_tokens_by_category={TokenCategory.INPUT: 200, TokenCategory.OUTPUT: 100},
+        )
+
+        manager.inject_tokens_usages(
+            pipeline_run_id=self.PIPELINE_RUN_ID,
+            tokens_usages=[tokens_usage],
+        )
+
+        registry = manager._get_registry(self.PIPELINE_RUN_ID)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        usages = registry.get_current_tokens_usage()
+        assert len(usages) == 1
+        assert usages[0].nb_tokens_by_category[TokenCategory.INPUT] == 200
+
+    def test_inject_tokens_usages_auto_creates_registry(self) -> None:
+        """inject_tokens_usages auto-creates registry if it doesn't exist yet."""
+        manager = ReportingManager()
+        manager.setup()
+
+        tokens_usage = LLMTokensUsage(
+            job_metadata=_make_test_llm_job("new_run").job_metadata,
+            inference_model_name="test-model",
+            inference_model_id="test-model-id",
+            unit_costs={CostCategory.INPUT: 1.0, CostCategory.OUTPUT: 2.0},
+            nb_tokens_by_category={TokenCategory.INPUT: 50, TokenCategory.OUTPUT: 25},
+        )
+
+        manager.inject_tokens_usages(
+            pipeline_run_id="new_run",
+            tokens_usages=[tokens_usage],
+        )
+
+        registry = manager._get_registry("new_run")  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        usages = registry.get_current_tokens_usage()
+        assert len(usages) == 1
+
     def test_no_event_log_works_as_before(self) -> None:
         """ReportingManager without event_log works exactly as before."""
         manager = ReportingManager()
