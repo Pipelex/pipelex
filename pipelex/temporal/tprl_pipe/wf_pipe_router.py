@@ -98,6 +98,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                     report_delegate = get_report_delegate()
                     if isinstance(report_delegate, ReportingManager):
                         report_delegate.set_event_log(
+                            context_key=wf_workflow_id,
                             event_log=event_log,
                             workflow_id=wf_workflow_id,
                             pipeline_run_id=pipeline_run_id,
@@ -118,7 +119,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                             pass
                     report_delegate = get_report_delegate()
                     if isinstance(report_delegate, ReportingManager):
-                        report_delegate.clear_event_log()
+                        report_delegate.clear_event_log(context_key=wf_workflow_id)
                     event_log = None
                     wf_graph_tracer_manager = None
 
@@ -147,9 +148,11 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 except Exception:  # noqa: S110
                     pass
                 # Clear stale event log state from ReportingManager
-                report_delegate = get_report_delegate()
-                if isinstance(report_delegate, ReportingManager):
-                    report_delegate.clear_event_log()
+                # wf_tracer_key is always set when event_log is not None (both assigned in same block)
+                if wf_tracer_key is not None:
+                    report_delegate = get_report_delegate()
+                    if isinstance(report_delegate, ReportingManager):
+                        report_delegate.clear_event_log(context_key=wf_tracer_key)
 
             if wf_library_id is not None:
                 try:

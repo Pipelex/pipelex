@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -20,11 +21,22 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.reporting.reporting_types import AnyTokensUsage, TokensUsage
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
-from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in __init__ annotations
+from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.trace_events import UsageReportEvent
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+@dataclass
+class _EventLogContext:
+    """Per-workflow/run event log state. Private to ReportingManager."""
+
+    event_log: EventLogProtocol
+    workflow_id: str
+    pipeline_run_id: str
+    event_sequence: int = field(default=0)
+
 
 UsageRegistryRoot = list[TokensUsage]
 
@@ -43,15 +55,9 @@ class ReportingManager(ReportingProtocol):
     def __init__(self):
         self._reporting_config = get_config().pipelex.reporting_config
         self._usage_registries: dict[str, UsageRegistry] = {}
-        # Event log for distributed tracing (None = no event emission)
-        # TODO: group the event_log attributes
-        # TODO: per-workflow state isolation — these fields are global mutable state on a singleton,
-        # unsafe when Temporal worker concurrency is enabled (one workflow can overwrite another's
-        # event log context). Needs contextvars or a per-workflow reporting context.
-        self._event_log: EventLogProtocol | None = None
-        self._event_log_workflow_id: str = "direct"
-        self._event_log_pipeline_run_id: str | None = None
-        self._event_sequence: int = 0
+        # Per-context event log state, keyed by graph_context.lookup_key.
+        # Each concurrent workflow/run gets its own isolated context.
+        self._event_log_contexts: dict[str, _EventLogContext] = {}
 
     ############################################################
     # Event log configuration
@@ -59,28 +65,28 @@ class ReportingManager(ReportingProtocol):
 
     def set_event_log(
         self,
+        context_key: str,
         event_log: "EventLogProtocol",
         workflow_id: str,
         pipeline_run_id: str,
     ) -> None:
-        """Configure event log for usage event emission.
+        """Configure event log for a specific workflow/run context.
 
         Args:
+            context_key: Unique key for this context (graph_context.lookup_key).
             event_log: The event log backend for emitting UsageReportEvents.
             workflow_id: Temporal workflow ID or "direct".
             pipeline_run_id: Pipeline run ID for event correlation.
         """
-        self._event_log = event_log
-        self._event_log_workflow_id = workflow_id
-        self._event_log_pipeline_run_id = pipeline_run_id
-        self._event_sequence = 0
+        self._event_log_contexts[context_key] = _EventLogContext(
+            event_log=event_log,
+            workflow_id=workflow_id,
+            pipeline_run_id=pipeline_run_id,
+        )
 
-    def clear_event_log(self) -> None:
-        """Clear the event log configuration after a workflow completes."""
-        self._event_log = None
-        self._event_log_workflow_id = "direct"
-        self._event_log_pipeline_run_id = None
-        self._event_sequence = 0
+    def clear_event_log(self, context_key: str) -> None:
+        """Remove event log configuration for a completed workflow/run."""
+        self._event_log_contexts.pop(context_key, None)
 
     ############################################################
     # Manager lifecycle
@@ -94,10 +100,7 @@ class ReportingManager(ReportingProtocol):
     @override
     def teardown(self):
         self._usage_registries.clear()
-        self._event_log = None
-        self._event_log_workflow_id = "direct"
-        self._event_log_pipeline_run_id = None
-        self._event_sequence = 0
+        self._event_log_contexts.clear()
 
     ############################################################
     # Private methods
@@ -199,29 +202,32 @@ class ReportingManager(ReportingProtocol):
             registry.add_tokens_usage(tokens_usage)
 
     def _emit_usage_event(self, inference_job: InferenceJobAbstract, tokens_usage: AnyTokensUsage) -> None:
-        """Emit a UsageReportEvent if event log is configured."""
-        if self._event_log is None:
+        """Emit a UsageReportEvent if event log is configured for this job's context."""
+        graph_context = inference_job.job_metadata.graph_context
+        if graph_context is None:
+            return
+
+        context = self._event_log_contexts.get(graph_context.lookup_key)
+        if context is None:
             return
 
         # Determine the node_id from graph context (the pipe that dispatched this inference)
         node_id: str = "unknown"
-        graph_context = inference_job.job_metadata.graph_context
-        if graph_context is not None and graph_context.parent_node_id is not None:
+        if graph_context.parent_node_id is not None:
             node_id = graph_context.parent_node_id
 
-        pipeline_run_id = self._event_log_pipeline_run_id or inference_job.job_metadata.pipeline_run_id
-        seq = self._event_sequence
-        self._event_sequence += 1
+        seq = context.event_sequence
+        context.event_sequence += 1
 
         event = UsageReportEvent(
-            pipeline_run_id=pipeline_run_id,
-            workflow_id=self._event_log_workflow_id,
+            pipeline_run_id=context.pipeline_run_id,
+            workflow_id=context.workflow_id,
             timestamp=datetime.now(timezone.utc),
             sequence=seq,
             node_id=node_id,
             tokens_usage=tokens_usage,
         )
-        self._event_log.emit(event)
+        context.event_log.emit(event)
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):

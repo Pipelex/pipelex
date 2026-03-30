@@ -286,6 +286,7 @@ async def pipeline_run_setup(
             report_delegate = get_report_delegate()
             if isinstance(report_delegate, ReportingManager):
                 report_delegate.set_event_log(
+                    context_key=pipeline_run_id,
                     event_log=event_log,
                     workflow_id="direct",
                     pipeline_run_id=pipeline_run_id,
@@ -345,6 +346,13 @@ async def pipeline_run_setup(
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 tracer_manager.close_tracer(pipeline_run_id)
+        # Cleanup event log state from ReportingManager
+        if event_log is not None:
+            from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
+
+            report_delegate = get_report_delegate()
+            if isinstance(report_delegate, ReportingManager):
+                report_delegate.clear_event_log(context_key=pipeline_run_id)
         # Cleanup library
         library_manager.teardown(library_id=library_id)
         teardown_current_library()
