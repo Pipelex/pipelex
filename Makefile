@@ -142,6 +142,8 @@ make view-graph               - Start server and open ReactFlow graph in browser
 
 make temporal-server          - Start a local Temporal dev server (requires 'temporal' CLI)
 make ts                       - Shorthand -> temporal-server
+make temporal-stop            - Kill the local Temporal dev server (port 7233)
+make tstop                    - Shorthand -> temporal-stop
 make temporal-worker          - Start a Temporal worker (separate process)
 make tw                       - Shorthand -> temporal-worker
 make temporal-run             - Run a pipe through Temporal (real LLM calls)
@@ -186,7 +188,7 @@ export HELP
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
-	temporal-server ts temporal-worker tw temporal-run trun temporal-run-dry trund \
+	temporal-server ts temporal-stop tstop temporal-worker tw temporal-run trun temporal-run-dry trund \
 	docs-deploy-root
 
 all help:
@@ -998,6 +1000,17 @@ temporal-server:
 
 ts: temporal-server
 
+temporal-stop:
+	$(call PRINT_TITLE,"Stopping local Temporal dev server")
+	@PID=$$(lsof -ti :7233 2>/dev/null); \
+	if [ -z "$$PID" ]; then \
+		echo "• No process found on port 7233"; \
+	else \
+		kill $$PID && echo "• Killed Temporal server (PID $$PID)"; \
+	fi
+
+tstop: temporal-stop
+
 TEMPORAL_BUNDLE ?= tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds
 TEMPORAL_PIPE ?= simple_text_sequence
 TEMPORAL_LIB ?=
@@ -1010,14 +1023,14 @@ tw: temporal-worker
 
 temporal-run: env
 	$(call PRINT_TITLE,"Running pipe through Temporal")
-	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --mock-inputs --no-logo \
+	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --mock-inputs --no-logo --graph \
 		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
 
 trun: temporal-run
 
 temporal-run-dry: env
 	$(call PRINT_TITLE,"Running pipe through Temporal - dry run")
-	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --dry-run --mock-inputs --no-logo \
+	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --dry-run --mock-inputs --no-logo --graph \
 		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
 
 trund: temporal-run-dry

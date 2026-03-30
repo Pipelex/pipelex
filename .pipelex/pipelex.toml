@@ -66,9 +66,9 @@ palette = "dracula"
 # Tracing Config (NDJSON event log for distributed tracing across Temporal workers)
 ####################################################################################################
 
-# [pipelex.tracing_config]
-# is_enabled = true
-# traces_dir = ".pipelex/traces"
+[pipelex.tracing_config]
+is_enabled = false
+traces_dir = ".pipelex/traces"
 
 ####################################################################################################
 # Storage Config
