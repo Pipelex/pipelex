@@ -6,6 +6,7 @@ from typing_extensions import override
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_context import GraphContext
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
+from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in setup signature
 
 
 class GraphTracerProtocol(Protocol):
@@ -21,6 +22,9 @@ class GraphTracerProtocol(Protocol):
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
+        event_log: "EventLogProtocol | None" = None,
+        workflow_id: str = "direct",
+        pipeline_run_id: str | None = None,
     ) -> GraphContext:
         """Initialize tracing for a new pipeline run.
 
@@ -29,6 +33,9 @@ class GraphTracerProtocol(Protocol):
             data_inclusion: Configuration controlling which data formats to capture in IOSpec fields.
             pipeline_ref_domain: Optional domain name for the pipeline.
             pipeline_ref_main_pipe: Optional main pipe name.
+            event_log: Optional event log for distributed tracing.
+            workflow_id: Temporal workflow ID or "direct" for single-process mode.
+            pipeline_run_id: Pipeline run ID for event emission.
 
         Returns:
             Initial GraphContext to pass through JobMetadata.
@@ -211,6 +218,9 @@ class GraphTracerNoOp(GraphTracerProtocol):
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
+        event_log: "EventLogProtocol | None" = None,
+        workflow_id: str = "direct",
+        pipeline_run_id: str | None = None,
     ) -> GraphContext:
         return GraphContext(
             graph_id=graph_id,

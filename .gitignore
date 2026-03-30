@@ -59,6 +59,7 @@ gcp_credentials.json
 settings.local.json
 structures/
 .pipelex/storage
+.pipelex/traces
 
 # Generated test fixtures (regenerate with `make regenerate-test-models`)
 tests/integration/pipelex/fixtures/_generated_model_sets.py

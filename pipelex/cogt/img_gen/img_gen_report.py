@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ class ImgGenTokenCostReportField(StrEnum):
 
 
 class ImgGenTokenCostReport(BaseModel):
-    model_type: str = "img_gen"
+    model_type: Literal["img_gen"] = "img_gen"
     job_metadata: JobMetadata
     inference_model_name: str
     platform_model_id: str
@@ -64,7 +64,7 @@ class ImgGenTokenCostReport(BaseModel):
 
 
 class ImgGenTokensUsage(BaseModel):
-    model_type: str = "img_gen"
+    model_type: Literal["img_gen"] = "img_gen"
     job_metadata: JobMetadata
     inference_model_name: str
     unit_costs: CostsByCategoryDict

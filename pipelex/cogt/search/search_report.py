@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ class SearchTokenCostReportField(StrEnum):
 
 
 class SearchTokenCostReport(BaseModel):
-    model_type: str = "search"
+    model_type: Literal["search"] = "search"
     job_metadata: JobMetadata
     inference_model_name: str
     platform_model_id: str
@@ -64,7 +64,7 @@ class SearchTokenCostReport(BaseModel):
 
 
 class SearchTokensUsage(BaseModel):
-    model_type: str = "search"
+    model_type: Literal["search"] = "search"
     job_metadata: JobMetadata
     inference_model_name: str
     unit_costs: CostsByCategoryDict

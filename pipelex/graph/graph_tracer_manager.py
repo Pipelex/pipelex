@@ -8,6 +8,7 @@ from pipelex.graph.graph_tracer import GraphTracer
 from pipelex.graph.graph_tracer_protocol import GraphTracerProtocol
 from pipelex.graph.graphspec import EdgeKind, GraphSpec, IOSpec, NodeKind
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
+from pipelex.tracing.event_log_protocol import EventLogProtocol  # noqa: TC001 - used in open_tracer signature
 
 
 class GraphTracerManager(metaclass=ABCSingletonMeta):
@@ -52,22 +53,22 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         return instance
 
     @classmethod
-    def get_instance_tracer(cls, graph_id: str) -> GraphTracerProtocol | None:
-        """Get the graph tracer for a specific graph_id from the singleton instance.
+    def get_instance_tracer(cls, lookup_key: str) -> GraphTracerProtocol | None:
+        """Get the graph tracer for a specific lookup key from the singleton instance.
 
         This provides a way to access the tracer without importing from hub,
         avoiding circular dependency issues.
 
         Args:
-            graph_id: The graph/pipeline run identifier.
+            lookup_key: The tracer lookup key (graph_id or tracer_key).
 
         Returns:
-            The tracer for the given graph_id, or None if not found.
+            The tracer for the given key, or None if not found.
         """
         instance = cls.get_instance()
         if instance is None:
             return None
-        return instance.get_tracer(graph_id)
+        return instance.get_tracer(lookup_key)
 
     ############################################################
     # Private helpers
@@ -94,45 +95,64 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         data_inclusion: DataInclusionConfig,
         pipeline_ref_domain: str | None = None,
         pipeline_ref_main_pipe: str | None = None,
+        event_log: "EventLogProtocol | None" = None,
+        workflow_id: str = "direct",
+        pipeline_run_id: str | None = None,
+        tracer_key: str | None = None,
     ) -> GraphContext:
         """Create and initialize a new tracer for a pipeline run.
 
         Args:
-            graph_id: Unique identifier for this pipeline run.
+            graph_id: Unique identifier for this pipeline run (used in node ID generation).
             data_inclusion: Configuration controlling which data formats to capture in IOSpec fields.
             pipeline_ref_domain: Optional domain name for the pipeline.
             pipeline_ref_main_pipe: Optional main pipe name.
+            event_log: Optional event log for distributed tracing. When set,
+                the tracer emits trace events as a side effect alongside in-memory accumulation.
+            workflow_id: Temporal workflow ID or "direct" for single-process mode.
+            pipeline_run_id: Pipeline run ID for event emission.
+            tracer_key: Lookup key for the tracer in the manager's dict. Defaults to graph_id.
+                In Temporal mode, use the workflow_id to avoid collisions when multiple
+                workflows share the same graph_id on the same process.
 
         Returns:
             Initial GraphContext to pass through JobMetadata.
 
         Raises:
-            ValueError: If a tracer for this graph_id already exists.
+            ValueError: If a tracer for this key already exists.
         """
-        if graph_id in self._tracers:
-            msg = f"Tracer for graph '{graph_id}' already exists"
+        key = tracer_key or graph_id
+        if key in self._tracers:
+            msg = f"Tracer for key '{key}' already exists"
             raise ValueError(msg)
 
         tracer = GraphTracer()
-        self._tracers[graph_id] = tracer
+        self._tracers[key] = tracer
 
-        return tracer.setup(
+        graph_context = tracer.setup(
             graph_id=graph_id,
             data_inclusion=data_inclusion,
             pipeline_ref_domain=pipeline_ref_domain,
             pipeline_ref_main_pipe=pipeline_ref_main_pipe,
+            event_log=event_log,
+            workflow_id=workflow_id,
+            pipeline_run_id=pipeline_run_id,
         )
+        # Set the tracer_key on the GraphContext so downstream lookups use the same key
+        if tracer_key is not None:
+            graph_context = graph_context.model_copy(update={"tracer_key": tracer_key})
+        return graph_context
 
-    def close_tracer(self, graph_id: str) -> GraphSpec | None:
+    def close_tracer(self, tracer_key: str) -> GraphSpec | None:
         """Finalize tracing for a specific pipeline run and return its GraphSpec.
 
         Args:
-            graph_id: The graph/pipeline run identifier.
+            tracer_key: The tracer lookup key (graph_id or workflow_id).
 
         Returns:
-            The completed GraphSpec, or None if no tracer found for this graph_id.
+            The completed GraphSpec, or None if no tracer found for this key.
         """
-        tracer = self._tracers.pop(graph_id, None)
+        tracer = self._tracers.pop(tracer_key, None)
         if tracer is None:
             return None
         return tracer.teardown()
@@ -189,7 +209,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         Returns:
             Tuple of (node_id, child_graph_context) if tracing is active, (None, None) otherwise.
         """
-        tracer = self._get_tracer(graph_context.graph_id)
+        tracer = self._get_tracer(graph_context.lookup_key)
         if tracer is None:
             return None, None
 
@@ -204,7 +224,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_success(
         self,
-        graph_id: str,
+        lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
         output_preview: str | None = None,
@@ -214,7 +234,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         """Record successful completion of a pipe execution.
 
         Args:
-            graph_id: The graph identifier.
+            lookup_key: The tracer lookup key.
             node_id: The node ID returned from on_pipe_start.
             ended_at: When the pipe finished executing.
             output_preview: Optional truncated preview of the output.
@@ -224,7 +244,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         if node_id is None:
             return
 
-        tracer = self._get_tracer(graph_id)
+        tracer = self._get_tracer(lookup_key)
         if tracer is None:
             return
 
@@ -238,7 +258,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def on_pipe_end_error(
         self,
-        graph_id: str,
+        lookup_key: str,
         node_id: str | None,
         ended_at: datetime,
         error_type: str,
@@ -248,7 +268,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         """Record failed completion of a pipe execution.
 
         Args:
-            graph_id: The graph identifier.
+            lookup_key: The tracer lookup key.
             node_id: The node ID returned from on_pipe_start.
             ended_at: When the pipe failed.
             error_type: The exception type name.
@@ -258,7 +278,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         if node_id is None:
             return
 
-        tracer = self._get_tracer(graph_id)
+        tracer = self._get_tracer(lookup_key)
         if tracer is None:
             return
 
@@ -272,7 +292,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def add_edge(
         self,
-        graph_id: str,
+        lookup_key: str,
         source_node_id: str,
         target_node_id: str,
         edge_kind: EdgeKind,
@@ -281,13 +301,13 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         """Add an edge between two nodes.
 
         Args:
-            graph_id: The graph identifier.
+            lookup_key: The tracer lookup key.
             source_node_id: The source node ID.
             target_node_id: The target node ID.
             edge_kind: The type of edge.
             label: Optional label for the edge.
         """
-        tracer = self._get_tracer(graph_id)
+        tracer = self._get_tracer(lookup_key)
         if tracer is None:
             return
 
@@ -300,18 +320,18 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_controller_output(
         self,
-        graph_id: str,
+        lookup_key: str,
         node_id: str,
         output_spec: IOSpec,
     ) -> None:
         """Register an additional output for a controller node.
 
         Args:
-            graph_id: The graph identifier.
+            lookup_key: The tracer lookup key.
             node_id: The controller node ID.
             output_spec: The IOSpec describing the output.
         """
-        tracer = self._get_tracer(graph_id)
+        tracer = self._get_tracer(lookup_key)
         if tracer is None:
             return
         tracer.register_controller_output(
@@ -321,7 +341,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_item_extraction(
         self,
-        graph_id: str,
+        lookup_key: str,
         list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
@@ -330,14 +350,14 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         """Register that a list stuff produced an item stuff during batch iteration.
 
         Args:
-            graph_id: The graph identifier.
+            lookup_key: The tracer lookup key.
             list_stuff_code: The stuff_code of the input list.
             item_stuff_code: The stuff_code of the extracted item.
             item_index: The index of the item in the list.
             batch_controller_node_id: The node_id of the PipeBatch controller performing the fan-out.
                 If provided, this will be used as the source node for BATCH_ITEM edges in controller-centric mode.
         """
-        tracer = self._get_tracer(graph_id)
+        tracer = self._get_tracer(lookup_key)
         if tracer is None:
             return
         tracer.register_batch_item_extraction(
@@ -349,7 +369,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_batch_aggregation(
         self,
-        graph_id: str,
+        lookup_key: str,
         output_list_stuff_code: str,
         item_stuff_code: str,
         item_index: int,
@@ -358,14 +378,14 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         """Register that an item stuff will be aggregated into an output list.
 
         Args:
-            graph_id: The graph identifier.
+            lookup_key: The tracer lookup key.
             output_list_stuff_code: The stuff_code of the output list.
             item_stuff_code: The stuff_code of the item to aggregate.
             item_index: The index of the item in the output list.
             batch_controller_node_id: The node_id of the PipeBatch controller that will produce the output list.
                 If provided, this will be used as the target node for BATCH_AGGREGATE edges.
         """
-        tracer = self._get_tracer(graph_id)
+        tracer = self._get_tracer(lookup_key)
         if tracer is None:
             return
         tracer.register_batch_aggregation(
@@ -377,7 +397,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
 
     def register_parallel_combine(
         self,
-        graph_id: str,
+        lookup_key: str,
         combined_stuff_code: str,
         branch_stuff_codes: list[str],
         parallel_controller_node_id: str,
@@ -385,12 +405,12 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         """Register that branch outputs are combined into a single output in PipeParallel.
 
         Args:
-            graph_id: The graph identifier.
+            lookup_key: The tracer lookup key.
             combined_stuff_code: The stuff_code of the combined output.
             branch_stuff_codes: The stuff_codes of the individual branch outputs.
             parallel_controller_node_id: The node_id of the PipeParallel controller.
         """
-        tracer = self._get_tracer(graph_id)
+        tracer = self._get_tracer(lookup_key)
         if tracer is None:
             return
         tracer.register_parallel_combine(
