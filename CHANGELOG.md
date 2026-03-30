@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.23.1] - 2026-03-30
+
+### Changed
+
+- **Concept spec: `concept_code` replaces `the_concept_code`** as the canonical field name in concept specs and working memory factory.
+- **Deduplicate concept spec parsing**: `concept_cmd` now delegates to the shared `parse_concept_spec` in `concept_ops`, eliminating a stale duplicate with a missing alias and a latent dict-mutation bug.
+- **`concept_ref` / `pipe_ref` aliases**: `parse_concept_spec` and `parse_pipe_spec` now accept `concept_ref` and `pipe_ref` as input aliases for better AI-agent compatibility.
+- **Pipe spec parsing refactor**: `_parse_pipe_spec_from_json` in `pipe_cmd` now delegates to the shared `parse_pipe_spec` for consistent output handling and backward compatibility.
+- **Replace `pip` with `uv`** in install commands across config files and error messages.
+- **Docs links**: Updated mthds.ai links to include `/latest/` path.
+
+### Fixed
+
+- **`concept_cmd` alias bug**: The CLI's `_parse_concept_spec_from_json` incorrectly listed `concept_code` as an alias instead of `the_concept_code`, causing it to miss valid input.
+
 ## [v0.23.0] - 2026-03-29
 
 ### Added
