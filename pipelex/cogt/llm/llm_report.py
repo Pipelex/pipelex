@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ class LLMTokenCostReportField(StrEnum):
 
 
 class LLMTokenCostReport(BaseModel):
-    model_type: str = "llm"
+    model_type: Literal["llm"] = "llm"
     job_metadata: JobMetadata
     inference_model_name: str
     platform_model_id: str
@@ -64,7 +64,7 @@ class LLMTokenCostReport(BaseModel):
 
 
 class LLMTokensUsage(BaseModel):
-    model_type: str = "llm"
+    model_type: Literal["llm"] = "llm"
     job_metadata: JobMetadata
     inference_model_name: str
     unit_costs: CostsByCategoryDict

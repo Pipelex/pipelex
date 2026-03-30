@@ -1,7 +1,8 @@
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, Field
+from kajson.class_registry import ClassRegistry
+from pydantic import BaseModel, Field, PrivateAttr
 
 from pipelex import log
 from pipelex.base_exceptions import PipelexUnexpectedError
@@ -35,6 +36,13 @@ class Library(BaseModel):
     pipe_library: PipeLibrary
     loaded_mthds_paths: list[Path] = Field(default_factory=empty_list_factory_of(Path))
     dependency_libraries: dict[str, "Library"] = Field(default_factory=dict)
+    _class_registry: ClassRegistry | None = PrivateAttr(default=None)
+
+    def get_class_registry(self) -> ClassRegistry | None:
+        return self._class_registry
+
+    def set_class_registry(self, class_registry: ClassRegistry) -> None:
+        self._class_registry = class_registry
 
     def get_domain_library(self) -> DomainLibrary:
         return self.domain_library

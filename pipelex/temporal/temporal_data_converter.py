@@ -40,6 +40,7 @@ from temporalio.converter import (
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.hub import get_class_registry
 from pipelex.temporal.exceptions import TemporalFlowError
 
 
@@ -73,7 +74,7 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
     def _kajson_deserialize_from_payload(self, payload: Payload) -> Any:
         data = payload.data.decode()
         log.verbose(f"unijson_deserialize_payload — data: {data}")
-        pydantic_gizmo = kajson.loads(data)
+        pydantic_gizmo = kajson.loads(data, class_registry=get_class_registry())
         log.verbose(f"unijson_deserialize_payload — pydantic_gizmo: {pydantic_gizmo}")
         return pydantic_gizmo
 

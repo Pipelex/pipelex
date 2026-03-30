@@ -3,15 +3,24 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, List, Literal, Optional
 
-from kajson.kajson_manager import KajsonManager
+from kajson.class_registry_abstract import ClassRegistryAbstract
 from pydantic import Field
 
 from pipelex.core.concepts.concept_structure_blueprint import ConceptStructureBlueprint, ConceptStructureBlueprintFieldType
-from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code
+from pipelex.core.concepts.helpers import extract_concept_code_from_concept_ref_or_code, make_qualified_structure_class_name
 from pipelex.core.concepts.native.concept_native import NativeConceptCode
 from pipelex.core.concepts.structure_generation.exceptions import ConceptStructureGeneratorError, ConceptStructureValidationError, SyntaxErrorData
+from pipelex.core.qualified_ref import QualifiedRef
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.stuff_content import StuffContent
+
+
+def _get_class_registry() -> ClassRegistryAbstract:
+    """Lazy import to break circular dependency with hub.py."""
+    import importlib  # noqa: PLC0415
+
+    hub = importlib.import_module("pipelex.hub")
+    return hub.get_class_registry()  # type: ignore[no-any-return]
 
 
 class ConceptClassInfo:
@@ -390,9 +399,13 @@ class StructureGenerator:
             # No module path: use forward reference (resolved via model_rebuild at runtime)
             return f'"{class_info.class_name}"'
 
-        # Default: extract concept code and use as forward reference
-        # e.g., "myapp.Customer" -> '"Customer"'
+        # Default: use domain-qualified forward reference when domain is available
+        # e.g., "myapp.Customer" -> '"myapp__Customer"'
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
+        parsed_ref = QualifiedRef.parse_stripping_cross_package(concept_ref)
+        if parsed_ref.domain_path and not NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
+            qualified_name = make_qualified_structure_class_name(parsed_ref.domain_path, concept_code)
+            return f'"{qualified_name}"'
         return f'"{concept_code}"'
 
     def _generate_field(self, field_name: str, field_def: dict[str, Any] | str) -> str:
@@ -582,7 +595,7 @@ class StructureGenerator:
         if base_class_name:
             if not NativeConceptCode.is_native_structure_class(base_class_name):
                 # Not a native class, provide it from registry
-                custom_base_class = KajsonManager.get_class_registry().get_class(name=base_class_name)
+                custom_base_class = _get_class_registry().get_class(name=base_class_name)
                 if custom_base_class is None:
                     msg = f"Base class '{base_class_name}' not found in native classes or class registry"
                     raise ConceptStructureValidationError(msg)

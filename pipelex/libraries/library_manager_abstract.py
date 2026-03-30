@@ -2,6 +2,8 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from kajson.class_registry import ClassRegistry
+
 from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
 from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.library_crate import LibraryCrate
@@ -35,6 +37,13 @@ class LibraryManagerAbstract(ABC):
     @abstractmethod
     def get_current_library(self) -> "Library":
         """Get the Library object for the current library."""
+
+    def get_library_class_registry(self, library_id: str) -> ClassRegistry | None:  # noqa: ARG002
+        """Get the ClassRegistry associated with a library, if any.
+
+        Returns None by default. Overridden by LibraryManager.
+        """
+        return None
 
     def get_pipe_source(self, pipe_code: str) -> Path | None:  # noqa: ARG002
         """Get the source file path for a pipe.

@@ -76,6 +76,46 @@
    ```
    Note: `TEST=LF` (or `TEST=lf`) will use pytest's `--lf` flag instead of name filtering.
 
+### Temporal Integration Test Options
+
+   The Temporal integration tests support different server modes via the `--temporal-server` pytest CLI option:
+
+   - `--temporal-server`: Which Temporal server to use
+     - `none` (default): in-process test server — no external dependencies, used in CI
+     - `time-skipping`: in-process server with deterministic time control
+     - A profile name from `temporal_server_configs` in `pipelex.toml` (e.g. `local`, `testing`): connects to a real Temporal server using the profile's host, namespace, and API key settings
+
+   ```bash
+   # CI default: in-process server
+   .venv/bin/pytest tests/integration/pipelex/temporal/
+
+   # Dev with local Temporal server
+   .venv/bin/pytest tests/integration/pipelex/temporal/ \
+     --temporal-server local
+
+   # Dev with cloud/testing server
+   .venv/bin/pytest tests/integration/pipelex/temporal/ \
+     --temporal-server testing
+   ```
+
+   The `--class-registry` option controls whether dynamic concept classes leak to the
+   global KajsonManager registry or are scoped to the library:
+
+   - `--class-registry both` (default): runs tests in both shared and isolated modes
+   - `--class-registry shared`: dynamic classes go to global registry (standard behavior)
+   - `--class-registry isolated`: dynamic classes are scoped to the library registry,
+     keeping the global clean — forces deferred hydration paths, catching regressions
+     that only manifest in multi-process deployments
+
+   ```bash
+   # Default: runs both modes automatically
+   .venv/bin/pytest tests/integration/pipelex/temporal/
+
+   # Force single mode (useful for debugging)
+   .venv/bin/pytest tests/integration/pipelex/temporal/ \
+     --class-registry isolated
+   ```
+
 ---
 
 ### Prerequisites for running command lines: use virtual environment
@@ -146,7 +186,7 @@ This document outlines the core coding standards, best practices, and quality co
 
 #### **Imports at the top of the file**
 
-    - Import all necessary libraries at the top of the file
+    - Avoid as much as possible import statements outside of a module's top-level scope.
     - Do not import libraries in functions or classes unless in very specific cases, to be discussed with the user, as they would required a `# noqa: ...` comment to pass linting
     - Do not bother with ordering the imports or removing unused imports, our Ruff linter will handle it for us.
     - `if TYPE_CHECKING:` blocks must always be the **last** block in the imports section, placed after all regular imports.

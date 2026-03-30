@@ -2,7 +2,6 @@ import asyncio
 import inspect
 from typing import Literal, cast, get_args, get_origin, get_type_hints
 
-from kajson.kajson_manager import KajsonManager
 from pydantic import field_validator
 from typing_extensions import override
 
@@ -16,6 +15,7 @@ from pipelex.core.stuffs.list_content import ListContent
 from pipelex.core.stuffs.stuff_content import StuffContent
 from pipelex.core.stuffs.stuff_factory import StuffFactory
 from pipelex.core.stuffs.text_content import TextContent
+from pipelex.hub import get_class_registry
 from pipelex.pipe_operators.pipe_operator import PipeOperator
 from pipelex.pipe_run.exceptions import PipeRunError
 from pipelex.pipe_run.pipe_run_params import PipeRunParams
@@ -101,7 +101,7 @@ class PipeFunc(PipeOperator[PipeFuncOutput]):
             raise TypeError(msg)
 
         # Validate that the function's return type matches the concept's structure class
-        concept_structure_class = KajsonManager.get_class_registry().get_class(name=self.output.concept.structure_class_name)
+        concept_structure_class = get_class_registry().get_class(name=self.output.concept.structure_class_name)
         if concept_structure_class is None:
             msg = (
                 f"PipeFunc '{self.code}' failed to validate output with library: "

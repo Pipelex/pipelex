@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 from mthds.models.pipeline_inputs import PipelineInputs
 
 from pipelex import log
+from pipelex.config import get_config
 from pipelex.core.interpreter.interpreter import PipelexInterpreter
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.memory.working_memory_factory import WorkingMemoryFactory
@@ -42,6 +43,7 @@ if TYPE_CHECKING:
     from pipelex.core.bundles.pipelex_bundle_blueprint import PipelexBundleBlueprint
     from pipelex.core.pipes.pipe_abstract import PipeAbstract
     from pipelex.graph.graph_context import GraphContext
+    from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
 async def pipeline_run_setup(
@@ -155,25 +157,23 @@ async def pipeline_run_setup(
     if mthds_contents:
         all_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
-        # Check if all bundles were already loaded from library directories
-        bundle_already_loaded = False
+        # Filter out blueprints whose URIs are already loaded
+        blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
         if bundle_uris:
             current_library = library_manager.get_library(library_id=library_id)
-            all_loaded = True
-            for uri in bundle_uris:
+            blueprints_to_load = []
+            for blueprint, uri in zip(all_blueprints, bundle_uris, strict=True):
                 try:
                     resolved_uri = Path(uri).resolve()
                 except (OSError, RuntimeError):
                     resolved_uri = Path(uri)
-                if resolved_uri not in current_library.loaded_mthds_paths:
-                    all_loaded = False
-                    break
-            bundle_already_loaded = all_loaded
-            if bundle_already_loaded:
-                log.verbose(f"All {len(bundle_uris)} bundle(s) already loaded from library directories, skipping duplicate load")
+                if resolved_uri in current_library.loaded_mthds_paths:
+                    log.verbose(f"Bundle '{uri}' already loaded from library directories, skipping")
+                else:
+                    blueprints_to_load.append(blueprint)
 
-        if not bundle_already_loaded:
-            library_manager.load_from_blueprints(library_id=library_id, blueprints=all_blueprints)
+        if blueprints_to_load:
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
 
         # Find the pipe to execute
         if pipe_code:
@@ -207,13 +207,29 @@ async def pipeline_run_setup(
 
     # Initialize graph tracing if requested (after pipe is loaded so we have domain info)
     graph_context: GraphContext | None = None
+    event_log: EventLogProtocol | None = None
     if execution_config.is_generate_graph:
+        # Create event log for distributed tracing when both tracing and Temporal are enabled
+        config = get_config()
+        tracing_config = config.pipelex.tracing_config
+        if tracing_config.is_enabled and config.temporal.is_enabled:
+            try:
+                from pipelex.tracing.ndjson_event_log import NdjsonEventLog  # noqa: PLC0415
+
+                event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
+            except (ImportError, OSError) as exc:
+                log.warning(f"Failed to create NdjsonEventLog, continuing without event tracing: {exc}")
+                event_log = None
+
         graph_tracer_manager = GraphTracerManager.get_or_create_instance()
         graph_context = graph_tracer_manager.open_tracer(
             graph_id=pipeline_run_id,
             data_inclusion=execution_config.graph_config.data_inclusion,
             pipeline_ref_domain=pipe.domain_code,
             pipeline_ref_main_pipe=pipe_code,
+            event_log=event_log,
+            workflow_id="direct",
+            pipeline_run_id=pipeline_run_id,
         )
 
     try:
@@ -260,6 +276,19 @@ async def pipeline_run_setup(
                 pipe_run_mode = PipeRunMode.LIVE
 
         get_report_delegate().open_registry(pipeline_run_id=pipeline_run_id)
+
+        # Set event log on ReportingManager for distributed usage event emission
+        if event_log is not None:
+            from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
+
+            report_delegate = get_report_delegate()
+            if isinstance(report_delegate, ReportingManager):
+                report_delegate.set_event_log(
+                    context_key=pipeline_run_id,
+                    event_log=event_log,
+                    workflow_id="direct",
+                    pipeline_run_id=pipeline_run_id,
+                )
 
         # Initialize OtelContext if telemetry is enabled (not dry mode and tracer available)
         # The trace_id is computed once here; span_id uses OTEL_VIRTUAL_ROOT_PARENT_SPAN_ID for root
@@ -315,6 +344,13 @@ async def pipeline_run_setup(
             tracer_manager = GraphTracerManager.get_instance()
             if tracer_manager is not None:
                 tracer_manager.close_tracer(pipeline_run_id)
+        # Cleanup event log state from ReportingManager
+        if event_log is not None:
+            from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
+
+            report_delegate = get_report_delegate()
+            if isinstance(report_delegate, ReportingManager):
+                report_delegate.clear_event_log(context_key=pipeline_run_id)
         # Cleanup library
         library_manager.teardown(library_id=library_id)
         teardown_current_library()

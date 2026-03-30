@@ -1,11 +1,8 @@
 from temporalio import workflow
 from temporalio.exceptions import ActivityError, ApplicationError
-
-from pipelex.cogt.content_generation.assignment_models import LLMAssignment
+from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
-    from typing_extensions import override
-
     from pipelex.cogt.content_generation.assignment_models import LLMAssignment
     from pipelex.config import get_config
     from pipelex.temporal.log_temporal import workflow_log

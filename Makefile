@@ -27,7 +27,7 @@ SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
-USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search or temporal)) and not pipelex_api"
+USUAL_PYTEST_MARKERS := "(dry_runnable or not (inference or llm or img_gen or extract or search)) and not pipelex_api"
 
 define PRINT_TITLE
     $(eval PROJECT_PART := [$(PROJECT_NAME)])
@@ -118,7 +118,7 @@ make test-extract             - Run unit tests only for extract (with prints)
 make te                       - Shorthand -> test-extract
 make test-img-gen             - Run unit tests only for img_gen (with prints)
 make test-g					  - Shorthand -> test-img-gen
-make test-temporal            - Run unit tests only for temporal (with prints)
+make test-temporal            - Run temporal tests (SRV=local|testing MODE=live REG=isolated)
 make ttm                      - Shorthand -> test-temporal
 
 make check-unused-imports     - Check for unused imports without fixing
@@ -142,6 +142,8 @@ make view-graph               - Start server and open ReactFlow graph in browser
 
 make temporal-server          - Start a local Temporal dev server (requires 'temporal' CLI)
 make ts                       - Shorthand -> temporal-server
+make temporal-stop            - Kill the local Temporal dev server (port 7233)
+make tstop                    - Shorthand -> temporal-stop
 make temporal-worker          - Start a Temporal worker (separate process)
 make tw                       - Shorthand -> temporal-worker
 make temporal-run             - Run a pipe through Temporal (real LLM calls)
@@ -186,7 +188,7 @@ export HELP
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
-	temporal-server ts temporal-worker tw temporal-run trun temporal-run-dry trund \
+	temporal-server ts temporal-stop tstop temporal-worker tw temporal-run trun temporal-run-dry trund \
 	docs-deploy-root
 
 all help:
@@ -293,6 +295,7 @@ up-kit-configs:
 		--exclude='pipelex_override.toml' \
 		--exclude='telemetry_override.toml' \
 		--exclude='storage' \
+		--exclude='traces' \
 		--exclude='x_custom_llm_deck.toml' \
 		--exclude='x_custom_extract_deck.toml' \
 		--exclude='mthds_schema.json' \
@@ -433,7 +436,7 @@ gha-tests: env
 	@echo "• Regenerating test model fixtures with ci profile"
 	$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile ci
 	@echo "• Running unit tests for github actions (excluding inference and gha_disabled)"
-	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api or temporal)" || [ $$? = 5 ]
+	$(VENV_PYTEST) -n auto --exitfirst --quiet -m "(dry_runnable or not inference) and not (gha_disabled or pipelex_api)" || [ $$? = 5 ]
 
 run-all-tests: env
 	$(call PRINT_TITLE,"Running all unit tests")
@@ -627,16 +630,37 @@ test-img-gen: env
 tg: test-img-gen
 	@echo "> done: tg = test-img-gen"
 
+SRV ?=
+MODE ?=
+REG ?=
+TEMPORAL_PYTEST_MARKERS := $(if $(filter live,$(MODE)),"temporal","temporal and (dry_runnable or not inference)")
+TEMPORAL_TESTS_DIR := tests/integration/pipelex/temporal/
+
 test-temporal: env
 	$(call PRINT_TITLE,"Unit testing Temporal")
 	@if [ -n "$(TEST)" ]; then \
 		if [ "$(TEST)" = "LF" ] || [ "$(TEST)" = "lf" ]; then \
-			$(VENV_PYTEST) --exitfirst -m "temporal" -s --lf $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s --lf \
+				$(if $(SRV),--temporal-server $(SRV),) \
+				$(if $(REG),--class-registry $(REG),) \
+				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
+				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
+				$(TEMPORAL_TESTS_DIR); \
 		else \
-			$(VENV_PYTEST) --exitfirst -m "temporal" -s -k "$(TEST)" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+			$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s -k "$(TEST)" \
+				$(if $(SRV),--temporal-server $(SRV),) \
+				$(if $(REG),--class-registry $(REG),) \
+				$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
+				$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
+				$(TEMPORAL_TESTS_DIR); \
 		fi; \
 	else \
-		$(VENV_PYTEST) --exitfirst -m "temporal" -s $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))); \
+		$(VENV_PYTEST) --exitfirst -m $(TEMPORAL_PYTEST_MARKERS) -s \
+			$(if $(SRV),--temporal-server $(SRV),) \
+			$(if $(REG),--class-registry $(REG),) \
+			$(if $(filter live,$(MODE)),--pipe-run-mode live,) \
+			$(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,))) \
+			$(TEMPORAL_TESTS_DIR); \
 	fi
 
 ttm: test-temporal
@@ -977,6 +1001,17 @@ temporal-server:
 
 ts: temporal-server
 
+temporal-stop:
+	$(call PRINT_TITLE,"Stopping local Temporal dev server")
+	@PID=$$(lsof -tiTCP:7233 -sTCP:LISTEN 2>/dev/null); \
+	if [ -z "$$PID" ]; then \
+		echo "• No process found on port 7233"; \
+	else \
+		kill $$PID && echo "• Killed Temporal server (PID $$PID)"; \
+	fi
+
+tstop: temporal-stop
+
 TEMPORAL_BUNDLE ?= tests/integration/pipelex/pipes/controller/pipe_sequence/pipe_sequence_1.mthds
 TEMPORAL_PIPE ?= simple_text_sequence
 TEMPORAL_LIB ?=
@@ -989,14 +1024,14 @@ tw: temporal-worker
 
 temporal-run: env
 	$(call PRINT_TITLE,"Running pipe through Temporal")
-	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --mock-inputs --no-logo \
+	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --mock-inputs --no-logo --graph \
 		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
 
 trun: temporal-run
 
 temporal-run-dry: env
 	$(call PRINT_TITLE,"Running pipe through Temporal - dry run")
-	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --dry-run --mock-inputs --no-logo \
+	$(VENV_PIPELEX) run bundle $(TEMPORAL_BUNDLE) --temporal --dry-run --mock-inputs --no-logo --graph \
 		$(if $(TEMPORAL_PIPE),--pipe $(TEMPORAL_PIPE),)
 
 trund: temporal-run-dry

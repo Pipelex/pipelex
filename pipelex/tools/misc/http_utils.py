@@ -1,5 +1,6 @@
 import httpx
 
+from pipelex import log
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.package_utils import get_package_version
 from pipelex.urls import URLs
@@ -8,6 +9,10 @@ URL_MAX_LENGTH = 2048
 
 # URI schemes that are handled internally and should not be validated
 _SKIP_VALIDATION_PREFIXES = ("data:", "pipelex-storage://")
+
+# HTTP status codes where HEAD rejection is a known server misconfiguration
+# (CDNs, signed URLs, auth-gated endpoints) and a GET fallback is justified.
+_HEAD_REJECTED_CODES = {403, 405}
 
 
 def get_user_agent() -> str:
@@ -40,8 +45,14 @@ def validate_url_resource_exists(url: str) -> None:
 
 def _validate_http_url(url: str) -> None:
     user_agent = get_user_agent()
+    headers = {"User-Agent": user_agent}
     try:
-        with httpx.stream("GET", url, timeout=10, follow_redirects=True, headers={"User-Agent": user_agent}) as response:
+        response = httpx.head(url, timeout=10, follow_redirects=True, headers=headers)
+        if response.status_code in _HEAD_REJECTED_CODES:
+            log.verbose(f"HEAD request to '{url}' returned {response.status_code}, falling back to streaming GET")
+            with httpx.stream("GET", url, timeout=10, follow_redirects=True, headers=headers) as stream_response:
+                stream_response.raise_for_status()
+        else:
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         msg = f"URL '{url}' returned HTTP {exc.response.status_code}"

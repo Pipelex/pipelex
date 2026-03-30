@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
+from kajson.kajson_manager import KajsonManager
 from opentelemetry.trace import Tracer as OTelTracer
 from rich.console import Console
 
@@ -378,7 +379,17 @@ def get_storage_provider() -> StorageProviderAbstract:
 
 
 def get_class_registry() -> ClassRegistryAbstract:
-    return get_pipelex_hub().get_required_class_registry()
+    """Return the active class registry, respecting per-workflow library scoping.
+
+    When a library_id is set in the current async context (e.g. inside a Temporal workflow),
+    returns the library's scoped ClassRegistry. Otherwise, returns the global registry.
+    """
+    library_id = _library_id.get()
+    if library_id is not None:
+        registry = get_library_manager().get_library_class_registry(library_id)
+        if registry is not None:
+            return registry
+    return KajsonManager.get_class_registry()
 
 
 def get_func_registry() -> FuncRegistry:

@@ -12,6 +12,7 @@ from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
 from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
+from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
 
@@ -42,16 +43,22 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
         wfid: str | None = None,
     ) -> PipeOutput:
         log.debug(f"PipeRouterTop _run_pipe_job using task_queue: {self.task_queue} with worker_environment={self.worker_environment}")
+        pipe_job = pipe_job.prepare_for_temporal()
         executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(
             task_queue=self.task_queue,
             should_auto_connect_temporal=self.should_auto_connect_temporal,
             worker_environment=self.worker_environment,
         )
-        return await executor.execute_workflow(
+        pipe_output = await executor.execute_workflow(
             workflow_class=WfPipeRouter,
             workflow_id=self.make_workflow_id(base_id=wfid or self.class_name),
             workflow_arg=pipe_job,
         )
+        # Rehydrate PipeOutput: reconstruct typed WorkingMemory from raw dict
+        if pipe_output.working_memory_raw is not None:
+            pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
+            pipe_output.working_memory_raw = None
+        return pipe_output
 
     # async def run_pipe_code(
     #     self,

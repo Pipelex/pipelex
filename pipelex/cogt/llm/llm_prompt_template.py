@@ -9,10 +9,10 @@ from pipelex.cogt.llm.llm_prompt import LLMPrompt
 from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstract
 from pipelex.cogt.llm.llm_prompt_template_inputs import LLMPromptTemplateInputs
 from pipelex.cogt.templating.template_category import TemplateCategory
+from pipelex.cogt.templating.template_rendering import render_template
 from pipelex.cogt.templating.templating_style import TagStyle, TemplatingStyle
 from pipelex.cogt.templating.text_format import TextFormat
 from pipelex.config import get_config
-from pipelex.hub import get_content_generator
 from pipelex.tools.misc.string_utils import is_none_or_has_text
 
 
@@ -90,25 +90,23 @@ class LLMPromptTemplate(LLMPromptFactoryAbstract):
                 llm_prompt.user_images = user_images
 
         # input variables can be applied to prompt texts used as templates
+        llm_prompt_templating_style = TemplatingStyle(
+            tag_style=TagStyle.XML,
+            text_format=TextFormat.MARKDOWN,
+        )
         if llm_prompt.system_text:
-            llm_prompt.system_text = await get_content_generator().make_templated_text(
-                context=all_template_inputs.root,
+            llm_prompt.system_text = await render_template(
                 template=llm_prompt.system_text,
-                templating_style=TemplatingStyle(
-                    tag_style=TagStyle.XML,
-                    text_format=TextFormat.MARKDOWN,
-                ),
-                template_category=TemplateCategory.LLM_PROMPT,
+                category=TemplateCategory.LLM_PROMPT,
+                context=all_template_inputs.root,
+                templating_style=llm_prompt_templating_style,
             )
         if llm_prompt.user_text:
-            llm_prompt.user_text = await get_content_generator().make_templated_text(
-                context=all_template_inputs.root,
+            llm_prompt.user_text = await render_template(
                 template=llm_prompt.user_text,
-                templating_style=TemplatingStyle(
-                    tag_style=TagStyle.XML,
-                    text_format=TextFormat.MARKDOWN,
-                ),
-                template_category=TemplateCategory.LLM_PROMPT,
+                category=TemplateCategory.LLM_PROMPT,
+                context=all_template_inputs.root,
+                templating_style=llm_prompt_templating_style,
             )
 
         return llm_prompt

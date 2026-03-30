@@ -17,6 +17,10 @@ class PipeRunError(PipelexError):
         super().__init__(message)
 
 
+class PipeJobError(PipelexError):
+    pass
+
+
 class PipeRouterError(PipelexError):
     def __init__(
         self,

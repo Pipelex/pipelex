@@ -1,0 +1,38 @@
+domain      = "conflict_alpha"
+description = "PipeSequence with concept 'Result' having score+label fields (conflicts with beta's Result)"
+
+[concept.Result]
+description = "A scored result with label"
+
+[concept.Result.structure]
+score = { type = "integer", required = true, description = "Numeric score" }
+label = { type = "text", required = true, description = "Category label" }
+
+[pipe]
+[pipe.alpha_pipeline]
+type = "PipeSequence"
+description = "Two-step pipeline producing a scored Result then summarizing it"
+output = "Text"
+steps = [
+  { pipe = "alpha_generate", result = "alpha_result" },
+  { pipe = "alpha_summarize", result = "alpha_summary" },
+]
+
+[pipe.alpha_generate]
+type        = "PipeLLM"
+description = "Generate a scored result"
+output      = "Result"
+model       = "$testing-text"
+prompt      = "Generate a result with score=42 and label='excellent'. Respond with exactly those values."
+
+[pipe.alpha_summarize]
+type = "PipeLLM"
+description = "Summarize the scored result"
+inputs = { alpha_result = "Result" }
+output = "Text"
+model = "$testing-text"
+prompt = """
+Summarize this result:
+Score: @alpha_result.score
+Label: @alpha_result.label
+"""

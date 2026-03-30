@@ -1,3 +1,4 @@
+import asyncio
 from typing import Any
 
 from portkey_ai import AsyncPortkey
@@ -46,6 +47,35 @@ class GatewayExtractWorker(ExtractWorkerAbstract):
 
         self.portkey_client: AsyncPortkey = sdk_instance
         self._tenacity_config = get_config().cogt.tenacity_config
+
+    @override
+    def teardown(self):
+        """Close the portkey client's underlying httpx connection pool.
+
+        The httpx client holds TCP connections bound to a specific event loop.
+        If the worker is reused across event loop boundaries (e.g. between test
+        modules with different class-scoped loops), stale connections cause
+        'Event loop is closed' errors. Closing prevents this.
+        """
+        try:
+            httpx_client = getattr(self.portkey_client, "_client", None)
+            if httpx_client is not None and hasattr(httpx_client, "is_closed") and not httpx_client.is_closed:
+                try:
+                    loop = asyncio.get_running_loop()
+                    task = loop.create_task(httpx_client.aclose())
+                    task.add_done_callback(
+                        lambda task_result: log.debug(f"Portkey httpx client cleanup error: {task_result.exception()}")
+                        if not task_result.cancelled() and task_result.exception()
+                        else None
+                    )
+                except RuntimeError:
+                    # No running event loop, best-effort sync close
+                    try:
+                        asyncio.run(httpx_client.aclose())
+                    except Exception as exc:
+                        log.debug(f"Error closing portkey httpx client during teardown: {exc}")
+        except Exception as exc:
+            log.debug(f"Error during GatewayExtractWorker teardown: {exc}")
 
     def _make_retryer(self) -> AsyncRetrying:
         """Create a fresh AsyncRetrying instance for each extraction call.

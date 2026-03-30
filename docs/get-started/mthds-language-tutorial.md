@@ -10,7 +10,7 @@ This tutorial walks you through writing `.mthds` files manually, step by step.
 Set up your project and get free AI access:
 
 ```bash
-pip install pipelex
+uv tool install pipelex
 pipelex init
 pipelex login
 ```

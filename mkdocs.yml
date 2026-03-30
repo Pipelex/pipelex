@@ -304,6 +304,7 @@ plugins:
         - under-the-hood/test-profile-configuration.md: "Test Profile Configuration"
         - under-the-hood/init-cli-flows.md: "Init CLI Flows"
         - under-the-hood/pipe-routing-and-execution.md: "Pipe Routing & Execution"
+        - under-the-hood/temporal-integration.md: "Temporal Integration"
         Project:
         - contributing.md: "Contributing"
         - contribute/configuration-defaults-and-overrides.md: "Configuration Internals"
@@ -489,6 +490,7 @@ nav:
       - Test Profile Configuration: under-the-hood/test-profile-configuration.md
       - Init CLI Flows: under-the-hood/init-cli-flows.md
       - Pipe Routing & Execution: under-the-hood/pipe-routing-and-execution.md
+      - Temporal Integration: under-the-hood/temporal-integration.md
   - Project:
     - Contributing: contributing.md
     - Configuration Internals: contribute/configuration-defaults-and-overrides.md

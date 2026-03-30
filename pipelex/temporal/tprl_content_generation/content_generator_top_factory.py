@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from temporalio.client import Client as TemporalClient
 from temporalio.common import RetryPolicy
 
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
@@ -17,6 +18,7 @@ class ContentGeneratorTopFactory:
         retry_policy: RetryPolicy | None = None,
         task_queue: str | None = None,
         worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
+        temporal_client: TemporalClient | None = None,
     ) -> ContentGeneratorTop:
         """This factory is only passing your settings or using defaults from pipelex.temporal's config.
         Don't hesitate to create your own factory or your own TopCrafter according to your needs and context.
@@ -27,7 +29,8 @@ class ContentGeneratorTopFactory:
             task_queue=task_queue or worker_config.task_queue,
             workflow_execution_timeout=workflow_execution_timeout or worker_config.workflow_execution_timeout,
             retry_policy=retry_policy or worker_config.retry_policy_config.make_retry_policy(),
-            should_auto_connect_temporal=True,
+            temporal_client=temporal_client,
+            should_auto_connect_temporal=temporal_client is None,
             worker_environment=worker_environment,
         )
 

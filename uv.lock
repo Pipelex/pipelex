@@ -1791,14 +1791,14 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.3.1"
+version = "0.4.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b8/51/dc0529d2b678003e783cc9e79b0ca16db1ca1035935a5623deb822b33b8f/kajson-0.3.1.tar.gz", hash = "sha256:a170883f04a9c5e72a3831ce65720324b078483e0360e6f249400e1c4b8d9ffa", size = 20275, upload-time = "2025-07-11T08:26:13.243Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b5/6e/064f61ba227cbeced716df25d3ce1d7dea921653ce29e864a7dacb345ff2/kajson-0.4.0.tar.gz", hash = "sha256:c510bf9324df4d388929bedaa94b53c5571d51f802d6086a55d4a2583002a8d9", size = 20854, upload-time = "2026-03-30T06:27:12.965Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/9d/3b/3529c470a4cc1051abe2e4cd6a8a714b14eea26a8486bb3e1cd19a5c60d9/kajson-0.3.1-py3-none-any.whl", hash = "sha256:c129b5dd66f757ed8077c49803ea290f91ba6f5699717eb97b65d960bcc83ac4", size = 26721, upload-time = "2025-07-11T08:26:11.622Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/65/1fc56174ccf9716e570254db1906ae6518ad15db4d2fa6b87aa030aa1245/kajson-0.4.0-py3-none-any.whl", hash = "sha256:a1e72baff9d47706384ab569fd1d7dddfbf8583463d0525cb1ad41c894bc2d78", size = 27345, upload-time = "2026-03-30T06:27:11.418Z" },
 ]
 
 [[package]]
@@ -3461,7 +3461,7 @@ wheels = [
 
 [[package]]
 name = "pipelex"
-version = "0.22.0"
+version = "0.23.1"
 source = { editable = "." }
 dependencies = [
     { name = "aiofiles" },
@@ -3482,7 +3482,6 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "pillow" },
-    { name = "pipelex-tools" },
     { name = "polyfactory" },
     { name = "portkey-ai" },
     { name = "posthog" },
@@ -3512,6 +3511,7 @@ dev = [
     { name = "boto3-stubs" },
     { name = "moto", extra = ["s3"] },
     { name = "mypy" },
+    { name = "pipelex-tools" },
     { name = "pylint" },
     { name = "pyright" },
     { name = "pytest" },
@@ -3591,7 +3591,7 @@ requires-dist = [
     { name = "instructor", extras = ["google-genai"], marker = "extra == 'google-genai'" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
-    { name = "kajson", specifier = "==0.3.1" },
+    { name = "kajson", specifier = "==0.4.0" },
     { name = "linkup-sdk", marker = "extra == 'linkup'", specifier = ">=0.12.0" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mike", marker = "extra == 'docs'", specifier = ">=2.1.3" },
@@ -3612,7 +3612,7 @@ requires-dist = [
     { name = "opentelemetry-sdk" },
     { name = "opentelemetry-semantic-conventions" },
     { name = "pillow", specifier = ">=11.2.1" },
-    { name = "pipelex-tools", specifier = ">=0.3.2" },
+    { name = "pipelex-tools", marker = "extra == 'dev'", specifier = ">=0.3.2" },
     { name = "polyfactory", specifier = ">=2.21.0" },
     { name = "portkey-ai", specifier = ">=2.1.0" },
     { name = "posthog", specifier = ">=6.7.0" },

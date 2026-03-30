@@ -1,0 +1,52 @@
+domain      = "temporal_parallel_test"
+description = "PipeParallel within a PipeSequence for Temporal concurrent child workflow dispatch testing"
+
+[concept]
+ToneAnalysis   = "Analysis of text tone"
+LengthAnalysis = "Analysis of text length"
+
+[pipe]
+[pipe.temporal_parallel_sequence]
+type = "PipeSequence"
+description = "Sequence wrapping a parallel dispatch then a summary"
+output = "Text"
+steps = [
+  { pipe = "analyze_in_parallel", result = "parallel_done" },
+  { pipe = "summarize_results", result = "summary" },
+]
+
+[pipe.analyze_in_parallel]
+type = "PipeParallel"
+description = "Two branches running concurrently as separate child workflows"
+output = "Text"
+add_each_output = true
+branches = [
+  { pipe = "branch_tone", result = "tone_result" },
+  { pipe = "branch_length", result = "length_result" },
+]
+
+[pipe.branch_tone]
+type        = "PipeLLM"
+description = "Analyze tone"
+output      = "ToneAnalysis"
+model       = "$testing-text"
+prompt      = "Output exactly: formal_tone"
+
+[pipe.branch_length]
+type        = "PipeLLM"
+description = "Analyze length"
+output      = "LengthAnalysis"
+model       = "$testing-text"
+prompt      = "Output exactly: medium_length"
+
+[pipe.summarize_results]
+type = "PipeLLM"
+description = "Summarize parallel results"
+inputs = { tone_result = "ToneAnalysis", length_result = "LengthAnalysis" }
+output = "Text"
+model = "$testing-text"
+prompt = """
+Combine these results:
+Tone: @tone_result
+Length: @length_result
+"""

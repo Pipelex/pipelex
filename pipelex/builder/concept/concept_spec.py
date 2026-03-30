@@ -238,7 +238,7 @@ class ConceptSpec(StructuredContent):
 
     model_config = ConfigDict(extra="forbid")
 
-    the_concept_code: str = Field(description="Name of the concept. Must be PascalCase.", json_schema_extra={"mock_format": MockFormat.PASCAL_CASE})
+    concept_code: str = Field(description="Name of the concept. Must be PascalCase.", json_schema_extra={"mock_format": MockFormat.PASCAL_CASE})
     description: str = Field(description="Description of the concept, in natural language.")
     structure: dict[str, ConceptStructureSpec] | None = Field(
         default=None,
@@ -257,12 +257,12 @@ class ConceptSpec(StructuredContent):
         examples=["Text", "Html", "Image", "Document", "Number", "Page", "TextAndImages", "ImgGenPrompt", "JSON"],
     )
 
-    @field_validator("the_concept_code", mode="before")
+    @field_validator("concept_code", mode="before")
     @classmethod
     def validate_concept_code(cls, value: str) -> str:
         # Split first to handle domain.ConceptCode format
         if "." in value:
-            domain, concept_code = value.split(".")
+            domain, concept_code = value.rsplit(".", 1)
             # Only normalize the concept code part (not the domain)
             normalized_concept_code = normalize_to_ascii(concept_code)
 
@@ -358,7 +358,7 @@ class ConceptSpec(StructuredContent):
         concept_group = Group()
         if title:
             concept_group.renderables.append(Text(title, style="bold"))
-        concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.the_concept_code}[/green]", style="bold"))
+        concept_group.renderables.append(Text.from_markup(f"Concept: [green]{self.concept_code}[/green]", style="bold"))
         if self.refines:
             concept_group.renderables.append(Text.from_markup(f"Refines: [green]{self.refines}[/green]"))
         concept_group.renderables.append(Text.from_markup(f"\nDescription: [yellow italic]{self.description}[/yellow italic]\n"))

@@ -28,7 +28,7 @@ class TestClassRegistryUtilsUnit:
         # Mock the global class registry
         mock_registry = mocker.MagicMock()
         mocker.patch(
-            "pipelex.system.registries.class_registry_utils.KajsonManager.get_class_registry",
+            "pipelex.system.registries.class_registry_utils.get_class_registry",
             return_value=mock_registry,
         )
 

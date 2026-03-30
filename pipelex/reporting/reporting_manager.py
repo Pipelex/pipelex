@@ -1,3 +1,6 @@
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from pydantic import Field, RootModel
@@ -6,25 +9,35 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import ReportingManagerError
 from pipelex.cogt.extract.extract_job import ExtractJob
-from pipelex.cogt.extract.extract_report import ExtractTokensUsage
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_report import ImgGenTokensUsage
 from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_report import LLMTokensUsage
 from pipelex.cogt.search.search_job import SearchJob
-from pipelex.cogt.search.search_report import SearchTokensUsage
 from pipelex.cogt.usage.cost_registry import CostRegistry
 from pipelex.config import get_config
 from pipelex.pipeline.pipeline_models import SpecialPipelineId
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.reporting.reporting_types import AnyTokensUsage, TokensUsage
 from pipelex.tools.misc.file_utils import ensure_path, get_incremental_file_path
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+from pipelex.tracing.event_log_protocol import EventLogProtocol
+from pipelex.tracing.trace_events import UsageReportEvent
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-TokensUsage = LLMTokensUsage | ImgGenTokensUsage | ExtractTokensUsage | SearchTokensUsage
+
+@dataclass
+class _EventLogContext:
+    """Per-workflow/run event log state. Private to ReportingManager."""
+
+    event_log: EventLogProtocol
+    workflow_id: str
+    pipeline_run_id: str
+    event_sequence: int = field(default=0)
+
+
 UsageRegistryRoot = list[TokensUsage]
 
 
@@ -42,6 +55,38 @@ class ReportingManager(ReportingProtocol):
     def __init__(self):
         self._reporting_config = get_config().pipelex.reporting_config
         self._usage_registries: dict[str, UsageRegistry] = {}
+        # Per-context event log state, keyed by graph_context.lookup_key.
+        # Each concurrent workflow/run gets its own isolated context.
+        self._event_log_contexts: dict[str, _EventLogContext] = {}
+
+    ############################################################
+    # Event log configuration
+    ############################################################
+
+    def set_event_log(
+        self,
+        context_key: str,
+        event_log: "EventLogProtocol",
+        workflow_id: str,
+        pipeline_run_id: str,
+    ) -> None:
+        """Configure event log for a specific workflow/run context.
+
+        Args:
+            context_key: Unique key for this context (graph_context.lookup_key).
+            event_log: The event log backend for emitting UsageReportEvents.
+            workflow_id: Temporal workflow ID or "direct".
+            pipeline_run_id: Pipeline run ID for event correlation.
+        """
+        self._event_log_contexts[context_key] = _EventLogContext(
+            event_log=event_log,
+            workflow_id=workflow_id,
+            pipeline_run_id=pipeline_run_id,
+        )
+
+    def clear_event_log(self, context_key: str) -> None:
+        """Remove event log configuration for a completed workflow/run."""
+        self._event_log_contexts.pop(context_key, None)
 
     ############################################################
     # Manager lifecycle
@@ -55,6 +100,7 @@ class ReportingManager(ReportingProtocol):
     @override
     def teardown(self):
         self._usage_registries.clear()
+        self._event_log_contexts.clear()
 
     ############################################################
     # Private methods
@@ -62,8 +108,12 @@ class ReportingManager(ReportingProtocol):
 
     def _get_registry(self, pipeline_run_id: str) -> UsageRegistry:
         if pipeline_run_id not in self._usage_registries:
-            msg = f"Registry for pipeline '{pipeline_run_id}' does not exist"
-            raise ReportingManagerError(msg)
+            # Auto-create registry for unknown pipeline IDs. This happens when
+            # Activities report inference jobs on a Temporal worker where
+            # open_registry() was never called (it runs on the API process).
+
+            # TODO: replace with proper distributed reporting system
+            self._usage_registries[pipeline_run_id] = UsageRegistry()
         return self._usage_registries[pipeline_run_id]
 
     def _report_llm_job(self, llm_job: LLMJob):
@@ -75,6 +125,7 @@ class ReportingManager(ReportingProtocol):
 
         pipeline_run_id = llm_job.job_metadata.pipeline_run_id
         self._get_registry(pipeline_run_id).add_tokens_usage(llm_tokens_usage)
+        self._emit_usage_event(llm_job, llm_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
             llm_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=llm_tokens_usage)
@@ -89,6 +140,7 @@ class ReportingManager(ReportingProtocol):
 
         pipeline_run_id = img_gen_job.job_metadata.pipeline_run_id
         self._get_registry(pipeline_run_id).add_tokens_usage(img_gen_tokens_usage)
+        self._emit_usage_event(img_gen_job, img_gen_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
             img_gen_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=img_gen_tokens_usage)
@@ -103,6 +155,7 @@ class ReportingManager(ReportingProtocol):
 
         pipeline_run_id = extract_job.job_metadata.pipeline_run_id
         self._get_registry(pipeline_run_id).add_tokens_usage(extract_tokens_usage)
+        self._emit_usage_event(extract_job, extract_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
             extract_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=extract_tokens_usage)
@@ -117,6 +170,7 @@ class ReportingManager(ReportingProtocol):
 
         pipeline_run_id = search_job.job_metadata.pipeline_run_id
         self._get_registry(pipeline_run_id).add_tokens_usage(search_tokens_usage)
+        self._emit_usage_event(search_job, search_tokens_usage)
 
         if self._reporting_config.is_log_costs_to_console:
             search_token_cost_report = CostRegistry.complete_cost_report(tokens_usage=search_tokens_usage)
@@ -132,6 +186,48 @@ class ReportingManager(ReportingProtocol):
             msg = f"Registry for pipeline '{pipeline_run_id}' already exists"
             raise ReportingManagerError(msg)
         self._usage_registries[pipeline_run_id] = UsageRegistry()
+
+    def inject_tokens_usages(self, pipeline_run_id: str, tokens_usages: Sequence[AnyTokensUsage]) -> None:
+        """Inject externally-collected token usage records into a pipeline's registry.
+
+        Used after assembling usage data from distributed trace events, so that
+        generate_report() can produce a complete cost report across all workers.
+
+        Args:
+            pipeline_run_id: The pipeline run to add usage data to.
+            tokens_usages: Token usage records to inject.
+        """
+        registry = self._get_registry(pipeline_run_id)
+        for tokens_usage in tokens_usages:
+            registry.add_tokens_usage(tokens_usage)
+
+    def _emit_usage_event(self, inference_job: InferenceJobAbstract, tokens_usage: AnyTokensUsage) -> None:
+        """Emit a UsageReportEvent if event log is configured for this job's context."""
+        graph_context = inference_job.job_metadata.graph_context
+        if graph_context is None:
+            return
+
+        context = self._event_log_contexts.get(graph_context.lookup_key)
+        if context is None:
+            return
+
+        # Determine the node_id from graph context (the pipe that dispatched this inference)
+        node_id: str = "unknown"
+        if graph_context.parent_node_id is not None:
+            node_id = graph_context.parent_node_id
+
+        seq = context.event_sequence
+        context.event_sequence += 1
+
+        event = UsageReportEvent(
+            pipeline_run_id=context.pipeline_run_id,
+            workflow_id=context.workflow_id,
+            timestamp=datetime.now(timezone.utc),
+            sequence=seq,
+            node_id=node_id,
+            tokens_usage=tokens_usage,
+        )
+        context.event_log.emit(event)
 
     @override
     def report_inference_job(self, inference_job: InferenceJobAbstract):

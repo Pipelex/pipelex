@@ -31,14 +31,23 @@ class PipeComposeBlueprint(PipeBlueprint):
     @model_validator(mode="before")
     @classmethod
     def validate_template_or_construct(cls, values: dict[str, Any]) -> dict[str, Any]:
-        """Validate that exactly one of template or construct is provided."""
+        """Validate that exactly one of template or construct is provided.
+
+        Handles two deserialization paths:
+        - MTHDS loading: 'construct' key with raw dict data → needs make_from_raw
+        - Kajson round-trip: 'construct_blueprint' key with ConstructBlueprint object
+          (Kajson serializes using field names, not aliases)
+        """
         has_template = values.get("template") is not None
         construct_raw = values.get("construct")
+        construct_bp = values.get("construct_blueprint")
 
-        if not has_template and construct_raw is None:
+        has_construct = construct_raw is not None or construct_bp is not None
+
+        if not has_template and not has_construct:
             msg = "PipeComposeBlueprint requires either 'template' or 'construct' to be provided"
             raise ValueError(msg)
-        if has_template and construct_raw is not None:
+        if has_template and has_construct:
             msg = "PipeComposeBlueprint cannot have both 'template' and 'construct' - use one or the other"
             raise ValueError(msg)
 
