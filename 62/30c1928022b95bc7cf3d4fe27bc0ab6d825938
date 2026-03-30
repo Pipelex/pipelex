@@ -1,0 +1,23 @@
+wip/00-master-plan.md
+  dda575c248a3b57c 294,306-308,362,378,380,382,384,392-395
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "6230c1928022b95bc7cf3d4fe27bc0ab6d825938",
+  "prompts": {
+    "dda575c248a3b57c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "1260195c-d91a-47dc-81ba-ae00c060f480",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 13,
+      "total_deletions": 20,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
