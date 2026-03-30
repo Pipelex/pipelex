@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.24.0] - 2026-03-30
+
+### Added
+
+- **DynamoDB event log backend**: New `DynamoDBEventLog` implementation of `EventLogProtocol` for cloud-based trace event storage. Installable via `pip install "pipelex[dynamodb]"`.
+- **Event log DI**: Event log backend is now configurable via `TracingConfig.backend` (`"ndjson"` or `"dynamodb"`) and injectable via `Pipelex.setup(event_log=...)`. Factory function `make_event_log()` selects the backend from config or hub injection.
+- **Hub event_log support**: `PipelexHub.set_event_log()` / `get_event_log()` for dependency injection of custom event log backends.
+- **Environment-specific config**: `RunEnvironment` enum values updated to full names (`"development"`, `"production"`). Config loaded from `ENVIRONMENT` env var (was `ENV`).
+
+### Changed
+
+- **Tracing config structure**: `TracingConfig` now has `backend`, `ndjson` (with `traces_dir`), and `dynamodb` (with `table_name`, `region`) sub-configs. Tracing is enabled by default.
+- **Event log factory replaces hardcoded NdjsonEventLog**: The 3 call sites (`pipeline_run_setup.py`, `wf_pipe_router.py`, `runner.py`) now use `make_event_log()` instead of directly instantiating `NdjsonEventLog`.
+- **Tracing decoupled from Temporal**: Event log is created when `tracing_config.is_enabled`, regardless of whether Temporal is enabled.
+
+### Fixed
+
+- **ObjectAssignment deserialization on Temporal workers**: Removed `__init__` class registry check that blocked deserialization of `ObjectAssignment` before `library_crate` was loaded. Validation moved to `validate_before_execution()` method, following the existing codebase pattern.
+- **Dynamic concept classes in Temporal activities**: `WfPipeRouter` now propagates dynamically registered concept classes from the per-workflow registry to the global registry, so child workflows and activities can access them.
+
 ## [v0.23.1] - 2026-03-30
 
 ### Changed

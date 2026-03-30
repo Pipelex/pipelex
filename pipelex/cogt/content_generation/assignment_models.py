@@ -87,11 +87,17 @@ class ObjectAssignment(BaseModel):
     object_class_name: str
     llm_assignment_for_object: LLMAssignment
 
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
+    def validate_before_execution(self) -> None:
+        """Verify the referenced class exists in the registry.
+
+        Called at execution time, NOT at deserialization time. This distinction
+        is critical for Temporal workers: the library_crate (which registers
+        dynamic concept classes) is loaded after Temporal deserializes the
+        workflow input.
+        """
         if not get_class_registry().has_class(name=self.object_class_name):
-            error_msg = f"Could not create ObjectAssignment for class '{self.object_class_name}' because it is not in the class registry."
-            raise LLMAssignmentError(error_msg)
+            msg = f"Could not create ObjectAssignment for class '{self.object_class_name}' because it is not in the class registry."
+            raise LLMAssignmentError(msg)
 
     @staticmethod
     def make_for_class(
