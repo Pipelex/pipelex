@@ -1,0 +1,27 @@
+CHANGELOG.md
+  0ca624eeb68c0aa4 3-17
+pyproject.toml
+  0ca624eeb68c0aa4 3
+.badges/tests.json
+  0ca624eeb68c0aa4 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "22b187d6f1b312b764dc2f4631992b2970daad0e",
+  "prompts": {
+    "0ca624eeb68c0aa4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fea10622-dc72-4018-8363-24f7d8471b54",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 17,
+      "total_deletions": 2,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    }
+  }
+}
