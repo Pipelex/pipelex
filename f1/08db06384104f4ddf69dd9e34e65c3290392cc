@@ -1,0 +1,25 @@
+.claude/skills/temporal-e2e-validate/SKILL.md
+  efb2b1911cdf07a0 4,6,8-10,14-22,27-32,34,36-38,40,43-46,49-56,72-74,76,82,90,92,110-137,140-141,147-149,151-153,155-157,161,178,180,182,184-186,192,195-197,199-202,208,211,213-219,225,228,230,236-254,256-259,261-262,264-267,273,279,286,288-290,296,302,309,311-314,320,326,333,335,337-359,371,373-375,377,383-392,400-414
+Makefile
+  efb2b1911cdf07a0 145-146,191,1003-1013,1026,1033
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "f108db06384104f4ddf69dd9e34e65c3290392cc",
+  "prompts": {
+    "efb2b1911cdf07a0": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "98114d3e-1081-45b2-9af1-3e12b7974d5d",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 299,
+      "total_deletions": 205,
+      "accepted_lines": 240,
+      "overriden_lines": 0
+    }
+  }
+}
