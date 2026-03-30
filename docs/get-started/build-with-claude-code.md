@@ -18,16 +18,22 @@ Launch Claude Code and tell it to install the MTHDS plugin:
 ```
 
 ```
-/plugin install mthds@mthds-ai-mthds-plugins
+/plugin install mthds@mthds-plugins
 ```
 
-then exit Claude Code and reopen it:
+then reload plugins:
+
+```
+/reload-plugins
+```
+
+If that doesn't work, exit Claude Code and reopen it:
 
 ```
 /exit
 ```
 
-Reopen Claude Code, and build your first method:
+Build your first method:
 
 ```
 /mthds-build A method to analyze a Job offer to build a scorecard, then batch process CVs to score them
