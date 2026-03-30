@@ -402,7 +402,7 @@ class StructureGenerator:
         # Default: use domain-qualified forward reference when domain is available
         # e.g., "myapp.Customer" -> '"myapp__Customer"'
         concept_code = extract_concept_code_from_concept_ref_or_code(concept_ref)
-        parsed_ref = QualifiedRef.parse(concept_ref)
+        parsed_ref = QualifiedRef.parse_stripping_cross_package(concept_ref)
         if parsed_ref.domain_path and not NativeConceptCode.is_native_concept_ref_or_code(concept_ref):
             qualified_name = make_qualified_structure_class_name(parsed_ref.domain_path, concept_code)
             return f'"{qualified_name}"'

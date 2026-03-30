@@ -36,7 +36,7 @@ def get_structure_class_name_from_blueprint(
         raise ValueError(msg)
 
     # Extract concept_code from concept_ref_or_code
-    ref = QualifiedRef.parse(concept_ref_or_code)
+    ref = QualifiedRef.parse_stripping_cross_package(concept_ref_or_code)
     concept_code = ref.local_code
 
     if isinstance(blueprint_or_string_description, str):
@@ -92,16 +92,18 @@ def make_qualified_structure_class_name(domain_code: str, concept_code: str) -> 
 
     Uses double underscore as separator to produce a valid Python identifier
     that is distinct from bare concept codes. Dots in hierarchical domain codes
-    are replaced with underscores for Python identifier validity.
+    are replaced with interpuncts (·, U+00B7) to preserve Python identifier
+    validity without colliding with domains that already contain underscores
+    (e.g., "a.b" → "a·b" stays distinct from "a_b").
 
     Args:
         domain_code: The domain code (e.g., "conflict_alpha" or "legal.contracts.shareholder")
         concept_code: The concept code (e.g., "Result")
 
     Returns:
-        Domain-qualified class name (e.g., "conflict_alpha__Result")
+        Domain-qualified class name (e.g., "legal·contracts·shareholder__Result")
     """
-    safe_domain = domain_code.replace(".", "_")
+    safe_domain = domain_code.replace(".", "·")
     return f"{safe_domain}__{concept_code}"
 
 
@@ -118,5 +120,5 @@ def extract_concept_code_from_concept_ref_or_code(concept_ref_or_code: str) -> s
         msg = f"Invalid concept_ref_or_code: '{concept_ref_or_code}' for extracting concept code"
         raise ValueError(msg)
 
-    ref = QualifiedRef.parse(concept_ref_or_code)
+    ref = QualifiedRef.parse_stripping_cross_package(concept_ref_or_code)
     return ref.local_code

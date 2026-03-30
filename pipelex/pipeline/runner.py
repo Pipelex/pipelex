@@ -233,7 +233,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                                         )
                         finally:
                             assembly_event_log.close()
-                    except Exception as exc:
+                    except (ImportError, OSError) as exc:
                         log.warning(f"Failed to assemble graph from events, using in-memory graph: {exc}")
 
             # Clear event log state from ReportingManager (direct execution path)

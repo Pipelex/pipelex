@@ -61,6 +61,17 @@ class QualifiedRef(BaseModel):
         return cls(domain_path=domain_path, local_code=local_code)
 
     @classmethod
+    def parse_stripping_cross_package(cls, raw: str) -> "QualifiedRef":
+        """Strip any cross-package prefix ('alias->...') then parse.
+
+        Use this when the caller may receive a cross-package reference but only
+        needs the domain + local_code part, not the alias.
+        """
+        if cls.has_cross_package_prefix(raw):
+            _, raw = cls.split_cross_package_ref(raw)
+        return cls.parse(raw)
+
+    @classmethod
     def parse_concept_ref(cls, raw: str) -> "QualifiedRef":
         """Parse a concept ref. Validates domain_path segments are snake_case, local_code is PascalCase.
 

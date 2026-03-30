@@ -37,6 +37,7 @@ Introduce the LibraryCrate as the universal intermediate representation for libr
 | **4** | Explicit ClassRegistry | Library-owned registries, no singleton scoping in Kajson |
 | **4.5** | Distributed Tracing & Reporting | Cross-worker graph tracing and cost reporting via NDJSON event log |
 | **5** | StoragePayloadCodec | Payload size limits (2MB) for large libraries and WorkingMemory |
+| **6** | Cross-Package Dependencies in Crate | Dependency content included in crate; remote fetch from GitHub |
 
 ---
 
@@ -402,23 +403,85 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 
 ---
 
+## Phase 6: Cross-Package Dependencies in Crate
+
+> **Status**: Not started
+
+**Goal**: Include cross-package dependency content in the LibraryCrate so that Temporal workers can execute pipelines that reference concepts and pipes from other packages — without those packages being installed on the worker. Then extend to remote dependencies fetched from GitHub.
+
+See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the full crate-first architectural vision and design rationale.
+
+### Why
+
+Today, cross-package dependencies (`alias->domain.ConceptCode`, `alias::domain.pipe_code`) resolve through child library lookups at loading time. The `LibraryCrate` shipped to Temporal workers does NOT include dependency content — only the main package's blueprints. This means workers must have all dependency packages pre-installed on PIPELEXPATH. Phase 6 removes this requirement: the crate becomes truly self-contained.
+
+### Phase 6a: Local Cross-Package Dependencies
+
+**Goal**: Dependency blueprints are included in the crate. Workers can execute pipelines with cross-package deps without having the dependency packages installed.
+
+**Key changes**:
+
+1. **Extract blueprint collector from `_load_single_dependency`**: Split the current method into two parts:
+   - **Collect**: resolve the dependency, parse its `.mthds` files into blueprints, determine exports
+   - **Load**: create child Library, load domains/concepts/pipes, register aliases
+   The collector produces blueprints that accumulate into `_blueprints[library_id]` alongside the main package's blueprints.
+
+2. **Resolve cross-package aliases in the flattened crate**: Cross-package refs use alias-based syntax (`alias->domain.ConceptCode`). In a flattened crate, there are no child libraries. Options:
+   - Resolve aliases during crate building (replace `alias->domain.ConceptCode` with `domain.ConceptCode` in all blueprints)
+   - Carry alias mappings in the crate (`aliases: dict[str, str]`) for runtime resolution
+   Decision TBD when starting implementation.
+
+3. **Update `load_from_crate()`**: Handle dependency content in the flat crate — register domains, concepts, and pipes from deps.
+
+**Done when**:
+
+- [ ] `_load_single_dependency` split into collect + load
+- [ ] Dependency blueprints accumulate into `_blueprints[library_id]`
+- [ ] `get_crate()` produces a crate that includes dependency content
+- [ ] Cross-package aliases resolved (either at crate build time or via alias map)
+- [ ] `load_from_crate()` handles dependency content correctly
+- [ ] Integration test: PipeSequence referencing a cross-package concept/pipe, executed on Temporal worker without the dependency package on PIPELEXPATH
+- [ ] `make agent-check` passes
+- [ ] `make agent-test` passes
+
+### Phase 6b: Remote Dependencies (GitHub)
+
+**Goal**: Dependencies can be fetched from remote addresses (e.g., `github.com/org/repo/package`). The crate becomes fully self-contained for cloud-native execution where workers are stateless.
+
+**Key changes**:
+
+1. **Remote resolution strategy**: Add a `REMOTE` resolution strategy to the blueprint collector extracted in 6a. Remote fetch clones/downloads the package from GitHub, parses its `.mthds` files into blueprints, and includes them in the collection.
+
+2. **Dependency address format**: Define the address format for remote deps (e.g., `github.com/org/repo@version/path/to/package`). The address goes in the package manifest.
+
+3. **Caching**: Cache fetched packages locally (content-addressed by address + version) to avoid redundant clones.
+
+4. **Transitive deps**: Remote packages may themselves have dependencies (local or remote). The collector recurses.
+
+**Done when**:
+
+- [ ] Remote fetch strategy implemented (git clone or archive download)
+- [ ] Dependency address format defined and parsed
+- [ ] Remote package blueprints included in crate
+- [ ] Local cache for fetched packages
+- [ ] Transitive remote deps resolved
+- [ ] Integration test: pipeline with remote dep from a GitHub repo, executed on Temporal worker
+- [ ] `make agent-check` passes
+- [ ] `make agent-test` passes
+
+---
+
 ## Future Phases (Out of Scope)
 
-These are documented for roadmap visibility but not planned for implementation now. See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the full architectural direction and incremental path.
+These are documented for roadmap visibility but not planned for implementation now. See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the full architectural direction.
 
 ### Crate-First Architecture
 
-The long-term direction is to invert the current loading-driven architecture into a crate-driven one with three cleanly separated phases: **Collect** (resolve deps, fetch remote, gather all blueprints) **Build** (construct one crate, optionally strip to transitive closure) **Load** (same `load_from_crate()` on submitter and worker). This enables the two major capabilities below and makes the crate the central concept in library management.
-
-Phase 2's design decision (blueprint accumulation instead of crate merge) is the first step on this path. See [future-crate-first-architecture.md](future-crate-first-architecture.md) for the decision rationale.
+The long-term direction is to invert the current loading-driven architecture into a crate-driven one with three cleanly separated phases: **Collect** (resolve deps, fetch remote, gather all blueprints) **Build** (construct one crate, optionally strip to transitive closure) **Load** (same `load_from_crate()` on submitter and worker). Phase 6 is the first major step on this path.
 
 ### Crate Stripping (Transitive Closure)
 
-From the entry pipe, walk the transitive closure of pipe and concept dependencies to determine the minimal subset needed. Strip the crate to only those concepts, pipes, and domains. Requires decoupling dependency resolution from library loading so that dependency blueprints are accumulated alongside the main package's blueprints.
-
-### Remote Dependency Resolution
-
-Resolve dependencies from remote package addresses (e.g., `github.com/org/repo/package`). Fetch the package, parse its bundles, include in the crate. Requires extracting a blueprint collector from `_load_single_dependency` so that remote fetch is a new resolution strategy alongside local lookup.
+From the entry pipe, walk the transitive closure of pipe and concept dependencies to determine the minimal subset needed. Strip the crate to only those concepts, pipes, and domains. Builds on Phase 6a's blueprint collector — once all blueprints (main + deps) are accumulated, stripping is a pure data transform before crate construction.
 
 ### Library Fingerprint Validation
 
@@ -450,10 +513,15 @@ Phase 4 (Explicit ClassRegistry)       ← fixes Phase 3 bugs with separate work
     ▼
 Phase 4.5 (Distributed Tracing)        ← requires Phase 4's library-owned ClassRegistry
 
-Phase 5 (StoragePayloadCodec)           ← independent, can parallel with Phase 4/4.5
+Phase 5 (StoragePayloadCodec)           ← independent, can parallel with Phase 4/4.5/6
+
+Phase 6a (Local cross-package deps)    ← requires Phase 2's crate propagation
+    │
+    ▼
+Phase 6b (Remote deps from GitHub)     ← requires Phase 6a's blueprint collector
 ```
 
-Phase 0 is a prerequisite for Phase 1 (domain-qualified indexing). Phase 1 is a prerequisite for Phase 2 (crate must exist to ship it). Phase 3 builds on Phase 2's crate propagation. Phase 4 fixes the ClassRegistry scoping bugs that Phase 3's in-process tests mask. Phase 4.5 adds cross-worker tracing on top of the working distributed execution from Phase 4. Phase 5 is independently useful.
+Phase 0 is a prerequisite for Phase 1 (domain-qualified indexing). Phase 1 is a prerequisite for Phase 2 (crate must exist to ship it). Phase 3 builds on Phase 2's crate propagation. Phase 4 fixes the ClassRegistry scoping bugs that Phase 3's in-process tests mask. Phase 4.5 adds cross-worker tracing on top of the working distributed execution from Phase 4. Phase 5 is independently useful. Phase 6a requires Phase 2's crate propagation (dependency content must travel in the crate). Phase 6b extends 6a with remote fetch. Phase 5 and Phase 6 are independent of each other.
 
 ---
 

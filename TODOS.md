@@ -717,3 +717,17 @@ These are explicitly out of scope for this plan. They're documented in [wip/dist
 | SQLite backend | NDJSON is simpler and sufficient for local dev. SQLite could replace it if deduplication at write time or queryability becomes important. |
 | Per-workflow ReportingManager state | `ReportingManager` is a singleton with global mutable event-log state (`_event_log`, `_event_log_workflow_id`, etc.). With Temporal worker concurrency enabled, one workflow can overwrite another's state via `set_event_log()`. Needs per-workflow state isolation (e.g. contextvars or a per-workflow reporting context). Flagged by codex on PR #796. |
 | Causal event ordering in assembler | `read_events()` sorts by `(workflow_id, sequence)` which groups by lexicographic workflow ID, not execution order. In parent/child workflow topologies, this can cause `_stuff_producer_map` overwrites in the wrong order during `GraphSpecAssembler.pass_one()`, producing incorrect DATA edge sources. Consider sorting by timestamp or processing events in a topology-aware order. Flagged by codex on PR #796. |
+
+---
+
+## Next: Phase 6 — Cross-Package Dependencies in Crate
+
+> See [wip/00-master-plan.md](wip/00-master-plan.md) Phase 6 and [wip/future-crate-first-architecture.md](wip/future-crate-first-architecture.md) for the full design.
+
+**Goal**: Include cross-package dependency content in the LibraryCrate so Temporal workers can execute pipelines with cross-package refs without having those packages installed. Then extend to remote dependencies fetched from GitHub.
+
+**Phase 6a — Local cross-package deps**: Extract blueprint collector from `_load_single_dependency`, accumulate dependency blueprints into the crate, resolve alias-based cross-package refs (`alias->domain.ConceptCode`) in the flattened crate.
+
+**Phase 6b — Remote deps from GitHub**: Add remote fetch as a resolution strategy in the blueprint collector. Clone/download packages from GitHub, parse their bundles into blueprints, include in crate. Cache locally. Handle transitive remote deps.
+
+Implementation plan will be detailed when work begins. Key prerequisite: Phase 2 (crate propagation) is complete.

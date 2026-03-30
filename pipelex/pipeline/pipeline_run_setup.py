@@ -219,7 +219,7 @@ async def pipeline_run_setup(
                 from pipelex.tracing.ndjson_event_log import NdjsonEventLog  # noqa: PLC0415
 
                 event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
-            except Exception as exc:
+            except (ImportError, OSError) as exc:
                 log.warning(f"Failed to create NdjsonEventLog, continuing without event tracing: {exc}")
                 event_log = None
 

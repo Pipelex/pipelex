@@ -94,7 +94,7 @@ class PipeOutput(PipeOutputAbstract[WorkingMemory]):
 
 **Input dehydration/hydration cycle:**
 
-- Before dispatch, `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (a plain dict via `smart_dump()`).
+- Before dispatch, `PipeJob.prepare_for_temporal()` moves `working_memory` to `working_memory_raw` (a plain dict via `dump_for_temporal()`).
 - After the worker loads the crate, `WfPipeRouter` hydrates the raw dict back to typed `WorkingMemory`.
 
 **Output dehydration/hydration cycle:**
