@@ -209,10 +209,10 @@ async def pipeline_run_setup(
     graph_context: GraphContext | None = None
     event_log: EventLogProtocol | None = None
     if execution_config.is_generate_graph:
-        # Create event log for distributed tracing when both tracing and Temporal are enabled
+        # Create event log when tracing is enabled
         config = get_config()
         tracing_config = config.pipelex.tracing_config
-        if tracing_config.is_enabled and config.temporal.is_enabled:
+        if tracing_config.is_enabled:
             try:
                 from pipelex.tracing.event_log_factory import make_event_log  # noqa: PLC0415
 

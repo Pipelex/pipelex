@@ -65,16 +65,20 @@ class DynamoDBEventLog(EventLogProtocol):
 
     @override
     def emit(self, event: TraceEvent) -> None:
-        """Write a single event to DynamoDB. Synchronous and idempotent."""
+        """Write a single event to DynamoDB. Synchronous and idempotent.
+
+        The payload is stored as a JSON string (not a DynamoDB map) to avoid
+        type conversion issues with large integers (e.g. OTel trace IDs) and
+        datetime objects.
+        """
         item: dict[str, Any] = {
             "PK": self._make_pk(event.pipeline_run_id),
             "SK": self._make_sk(event.workflow_id, event.sequence),
             "pipeline_run_id": event.pipeline_run_id,
             "workflow_id": event.workflow_id,
             "sequence": event.sequence,
-            "payload": event.model_dump(mode="python"),
+            "payload": event.model_dump_json(),
         }
-        item = _convert_floats_to_decimal(item)
         self._table.put_item(Item=item)
 
     @override
@@ -108,8 +112,7 @@ class DynamoDBEventLog(EventLogProtocol):
                 log.warning(f"Skipping DynamoDB item with missing payload: PK={item.get('PK')}, SK={item.get('SK')}")
                 continue
             try:
-                payload = _convert_decimals_to_native(payload)
-                event = _any_trace_event_adapter.validate_python(payload)
+                event = _any_trace_event_adapter.validate_json(payload)
                 events.append(event)
             except Exception as exc:
                 log.warning(f"Skipping unparseable DynamoDB item: {exc}")
