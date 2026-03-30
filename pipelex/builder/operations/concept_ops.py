@@ -27,7 +27,7 @@ def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
     spec_data = dict(spec_data)
 
     # Accept common aliases for "concept_code"
-    for alias in ("the_concept_code", "code", "name", "concept_name"):
+    for alias in ("the_concept_code", "code", "name", "concept_name", "concept_ref"):
         if alias in spec_data:
             if "concept_code" not in spec_data:
                 spec_data["concept_code"] = spec_data.pop(alias)

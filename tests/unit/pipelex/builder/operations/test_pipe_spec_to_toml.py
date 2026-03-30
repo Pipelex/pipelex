@@ -2,20 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
-
 from pipelex.builder.operations.pipe_ops import parse_pipe_spec, pipe_spec_to_toml
+from tests.unit.pipelex.builder.operations.test_data import PipeOpsTestData
 
-
-class _BaseLLM:
-    SPEC: ClassVar[dict[str, Any]] = {
-        "pipe_code": "test_pipe",
-        "description": "Test LLM pipe",
-        "model": "$writing-creative",
-        "inputs": {"text": "Text"},
-        "output": "Text",
-        "prompt": "Write about @text",
-    }
+_BASE_LLM = PipeOpsTestData.BASE_LLM_SPEC
 
 
 class TestPipeSpecToToml:
@@ -24,7 +14,7 @@ class TestPipeSpecToToml:
     # -- PipeLLM ----------------------------------------------------------
 
     def test_llm_basic_structure(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC})
+        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
         toml = pipe_spec_to_toml(spec)
         assert "[pipe.test_pipe]" in toml
         assert 'type = "PipeLLM"' in toml
@@ -32,42 +22,42 @@ class TestPipeSpecToToml:
         assert 'output = "Text"' in toml
 
     def test_llm_inputs_as_inline_table(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC})
+        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
         toml = pipe_spec_to_toml(spec)
         assert 'inputs = {text = "Text"}' in toml
 
     def test_llm_model_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC})
+        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
         toml = pipe_spec_to_toml(spec)
         assert 'model = "$writing-creative"' in toml
 
     def test_llm_no_model_omits_field(self) -> None:
-        data = {key: val for key, val in _BaseLLM.SPEC.items() if key != "model"}
+        data = {key: val for key, val in _BASE_LLM.items() if key != "model"}
         spec = parse_pipe_spec("PipeLLM", data)
         toml = pipe_spec_to_toml(spec)
         assert "model" not in toml
 
     def test_llm_system_prompt_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC, "system_prompt": "You are a helpful writer."})
+        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "system_prompt": "You are a helpful writer."})
         toml = pipe_spec_to_toml(spec)
         assert "system_prompt" in toml
         assert "You are a helpful writer." in toml
 
     def test_llm_prompt_in_toml(self) -> None:
-        spec = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC})
+        spec = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
         toml = pipe_spec_to_toml(spec)
         assert "prompt" in toml
         assert "Write about @text" in toml
 
     def test_llm_no_inputs_omits_inputs(self) -> None:
         empty_inputs: dict[str, str] = {}
-        data = {**_BaseLLM.SPEC, "inputs": empty_inputs}
+        data = {**_BASE_LLM, "inputs": empty_inputs}
         spec = parse_pipe_spec("PipeLLM", data)
         toml = pipe_spec_to_toml(spec)
         assert "inputs" not in toml
 
     def test_llm_multiple_inputs(self) -> None:
-        data = {**_BaseLLM.SPEC, "inputs": {"text": "Text", "context": "Document"}}
+        data = {**_BASE_LLM, "inputs": {"text": "Text", "context": "Document"}}
         spec = parse_pipe_spec("PipeLLM", data)
         toml = pipe_spec_to_toml(spec)
         assert 'text = "Text"' in toml

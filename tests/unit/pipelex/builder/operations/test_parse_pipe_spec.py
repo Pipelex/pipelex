@@ -17,17 +17,9 @@ from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_search_spec import PipeSearchSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
+from tests.unit.pipelex.builder.operations.test_data import PipeOpsTestData
 
-
-class _BaseLLM:
-    SPEC: ClassVar[dict[str, Any]] = {
-        "pipe_code": "test_pipe",
-        "description": "Test LLM pipe",
-        "model": "$writing-creative",
-        "inputs": {"text": "Text"},
-        "output": "Text",
-        "prompt": "Write about @text",
-    }
+_BASE_LLM = PipeOpsTestData.BASE_LLM_SPEC
 
 
 class TestParsePipeSpec:
@@ -46,33 +38,25 @@ class TestParsePipeSpec:
     # -- pipe_code aliases ------------------------------------------------
 
     def test_canonical_pipe_code(self) -> None:
-        result = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC})
+        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM})
         assert result.pipe_code == "test_pipe"
 
-    @pytest.mark.parametrize(
-        ("alias", "value"),
-        [
-            ("the_pipe_code", "via_the_pipe_code"),
-            ("code", "via_code"),
-            ("name", "via_name"),
-            ("pipe_name", "via_pipe_name"),
-        ],
-    )
-    def test_pipe_code_alias_accepted(self, alias: str, value: str) -> None:
-        spec = {key: val for key, val in _BaseLLM.SPEC.items() if key != "pipe_code"}
-        spec[alias] = value
+    @pytest.mark.parametrize("alias", ["the_pipe_code", "code", "name", "pipe_name", "pipe_ref"])
+    def test_pipe_code_alias_accepted(self, alias: str) -> None:
+        spec = {key: val for key, val in _BASE_LLM.items() if key != "pipe_code"}
+        spec[alias] = "via_alias"
         result = parse_pipe_spec("PipeLLM", spec)
-        assert result.pipe_code == value
+        assert result.pipe_code == "via_alias"
 
     def test_canonical_pipe_code_takes_precedence_over_alias(self) -> None:
         """When pipe_code is present, aliases are ignored and cleaned up."""
-        spec = {**_BaseLLM.SPEC, "code": "alias_value", "name": "another_alias"}
+        spec = {**_BASE_LLM, "code": "alias_value", "name": "another_alias"}
         result = parse_pipe_spec("PipeLLM", spec)
         assert result.pipe_code == "test_pipe"
 
     def test_first_alias_wins_when_no_canonical(self) -> None:
         """When multiple aliases are present without pipe_code, iteration order wins (the_pipe_code first)."""
-        spec = {key: val for key, val in _BaseLLM.SPEC.items() if key != "pipe_code"}
+        spec = {key: val for key, val in _BASE_LLM.items() if key != "pipe_code"}
         spec["code"] = "second"
         spec["the_pipe_code"] = "first"
         spec["name"] = "third"
@@ -82,26 +66,26 @@ class TestParsePipeSpec:
     # -- output dict tolerance --------------------------------------------
 
     def test_output_as_string(self) -> None:
-        result = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC, "output": "Article"})
+        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": "Article"})
         assert result.output == "Article"
 
     def test_output_dict_with_type_key(self) -> None:
-        result = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC, "output": {"type": "Article"}})
+        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"type": "Article"}})
         assert result.output == "Article"
 
     def test_output_single_item_dict(self) -> None:
         """A single-item dict is unambiguous — extract the value."""
-        result = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC, "output": {"result": "Article"}})
+        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"result": "Article"}})
         assert result.output == "Article"
 
     def test_output_multi_item_dict_raises(self) -> None:
         """A multi-item dict is ambiguous — validation fails."""
         with pytest.raises(ValidationError):
-            parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC, "output": {"a": "Text", "b": "Image"}})
+            parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"a": "Text", "b": "Image"}})
 
     def test_output_type_key_takes_precedence_in_dict(self) -> None:
         """When 'type' key is present in output dict, it wins even if other keys exist."""
-        result = parse_pipe_spec("PipeLLM", {**_BaseLLM.SPEC, "output": {"type": "Article", "extra": "ignored"}})
+        result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"type": "Article", "extra": "ignored"}})
         assert result.output == "Article"
 
     # -- steps/branches 'pipe' → 'pipe_code' alias -----------------------
@@ -215,7 +199,7 @@ class TestParsePipeSpec:
         [
             (
                 "PipeLLM",
-                {**_BaseLLM.SPEC},
+                {**_BASE_LLM},
                 PipeLLMSpec,
             ),
             (

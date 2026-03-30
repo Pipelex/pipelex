@@ -103,7 +103,7 @@ def _parse_concept_spec_from_json(spec_data: dict[str, Any]) -> ConceptSpec:
         ValidationError: If validation fails.
     """
     # Accept common aliases for "concept_code"
-    for alias in ("concept_code", "code", "name", "concept_name"):
+    for alias in ("the_concept_code", "code", "name", "concept_name"):
         if alias in spec_data:
             if "concept_code" not in spec_data:
                 spec_data["concept_code"] = spec_data.pop(alias)
