@@ -422,10 +422,6 @@ convention = "google"
 [tool.uv]
 required-version = ">=0.7.2"
 
-[tool.uv.sources]
-# kajson = { path = "../kajson", editable = true }
-kajson = { git = "https://github.com/Pipelex/kajson.git", branch = "release/v0.4.0" }
-
 [tool.hatch.build.targets.wheel]
 packages = ["pipelex"]
 exclude = ["pipelex/cli/dev_cli"]
