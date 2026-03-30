@@ -1,0 +1,35 @@
+pipelex/pipeline/runner.py
+  3382ebfb75f8dab2 11,197-226
+TODOS.md
+  3382ebfb75f8dab2 542-550,553-554,559-560
+pipelex/pipelex.toml
+  3382ebfb75f8dab2 380-386
+pipelex/system/configuration/configs.py
+  3382ebfb75f8dab2 88-92,185
+pipelex/pipeline/pipeline_run_setup.py
+  3382ebfb75f8dab2 7,46,212,214-225,232-234,282-293
+.pipelex/pipelex.toml
+  3382ebfb75f8dab2 66-72
+pipelex/temporal/tprl_pipe/wf_pipe_router.py
+  3382ebfb75f8dab2 9,11-12,14,19,39-43,69-97,111-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "f8ff8e4e0662705918b762aa621660a2337bfdfc",
+  "prompts": {
+    "3382ebfb75f8dab2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "c1bb7352-b6cf-4daa-bae4-c634a47d77d9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 200,
+      "total_deletions": 67,
+      "accepted_lines": 147,
+      "overriden_lines": 0
+    }
+  }
+}
