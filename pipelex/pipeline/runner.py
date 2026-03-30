@@ -195,17 +195,17 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 if tracer_manager is not None:
                     graph_spec_result = tracer_manager.close_tracer(pipeline_run_id)
 
-                # In Temporal mode with tracing enabled, assemble from events instead
+                # In Temporal mode, assemble from events instead
                 tracing_config = get_config().pipelex.tracing_config
                 if tracing_config.is_enabled and get_config().temporal.is_enabled:
                     try:
                         from pipelex.graph.graphspec import PipelineRef  # noqa: PLC0415
                         from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
+                        from pipelex.tracing.event_log_factory import make_event_log  # noqa: PLC0415
                         from pipelex.tracing.graphspec_assembler import GraphSpecAssembler  # noqa: PLC0415
-                        from pipelex.tracing.ndjson_event_log import NdjsonEventLog  # noqa: PLC0415
                         from pipelex.tracing.usage_aggregator import UsageAggregator  # noqa: PLC0415
 
-                        assembly_event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
+                        assembly_event_log = make_event_log(tracing_config)
                         try:
                             events = assembly_event_log.read_events(pipeline_run_id)
                             if events:

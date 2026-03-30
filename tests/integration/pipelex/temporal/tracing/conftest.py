@@ -34,15 +34,18 @@ def enable_tracing(tracing_tmp_dir: Path) -> Generator[None, None, None]:
     """
     tracing_config = get_config().pipelex.tracing_config
     original_enabled = tracing_config.is_enabled
-    original_dir = tracing_config.traces_dir
+    ndjson_config = tracing_config.ndjson
+    original_dir = ndjson_config.traces_dir if ndjson_config else ""
 
     tracing_config.is_enabled = True
-    tracing_config.traces_dir = str(tracing_tmp_dir)
+    if ndjson_config:
+        ndjson_config.traces_dir = str(tracing_tmp_dir)
 
     yield
 
     tracing_config.is_enabled = original_enabled
-    tracing_config.traces_dir = original_dir
+    if ndjson_config:
+        ndjson_config.traces_dir = original_dir
     GraphTracerManager.clear_instance()
 
 

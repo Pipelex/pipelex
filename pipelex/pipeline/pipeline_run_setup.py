@@ -214,11 +214,11 @@ async def pipeline_run_setup(
         tracing_config = config.pipelex.tracing_config
         if tracing_config.is_enabled and config.temporal.is_enabled:
             try:
-                from pipelex.tracing.ndjson_event_log import NdjsonEventLog  # noqa: PLC0415
+                from pipelex.tracing.event_log_factory import make_event_log  # noqa: PLC0415
 
-                event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
+                event_log = make_event_log(tracing_config)
             except (ImportError, OSError) as exc:
-                log.warning(f"Failed to create NdjsonEventLog, continuing without event tracing: {exc}")
+                log.warning(f"Failed to create event log, continuing without event tracing: {exc}")
                 event_log = None
 
         graph_tracer_manager = GraphTracerManager.get_or_create_instance()

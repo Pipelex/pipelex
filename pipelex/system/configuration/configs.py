@@ -85,9 +85,25 @@ class ReportingConfig(ConfigModel):
     cost_report_unit_scale: float
 
 
+class TracingBackend(StrEnum):
+    NDJSON = "ndjson"
+    DYNAMODB = "dynamodb"
+
+
+class NdjsonTracingConfig(ConfigModel):
+    traces_dir: str
+
+
+class DynamoDBTracingConfig(ConfigModel):
+    table_name: str
+    region: str
+
+
 class TracingConfig(ConfigModel):
     is_enabled: bool
-    traces_dir: str
+    backend: TracingBackend = Field(strict=False)
+    ndjson: NdjsonTracingConfig | None = None
+    dynamodb: DynamoDBTracingConfig | None = None
 
 
 class ObserverConfig(ConfigModel):

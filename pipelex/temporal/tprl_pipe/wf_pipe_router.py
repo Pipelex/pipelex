@@ -16,7 +16,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
-    from pipelex.tracing.ndjson_event_log import NdjsonEventLog
+    from pipelex.tracing.event_log_factory import make_event_log
 
 
 @workflow.defn(name="wf_pipe_router")
@@ -37,7 +37,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         wf_library_id: str | None = None
 
         # Per-workflow tracing state (declared before try for finally block access)
-        event_log: NdjsonEventLog | None = None
+        event_log = None
         wf_graph_tracer_manager: GraphTracerManager | None = None
         wf_tracer_key: str | None = None
         graph_context = workflow_arg.job_metadata.graph_context
@@ -74,7 +74,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             tracing_config = get_config().pipelex.tracing_config
             if tracing_config.is_enabled and graph_context is not None:
                 try:
-                    event_log = NdjsonEventLog(traces_dir=tracing_config.traces_dir)
+                    event_log = make_event_log(tracing_config)
                     wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
                     wf_tracer_key = wf_workflow_id
                     wf_graph_context = wf_graph_tracer_manager.open_tracer(

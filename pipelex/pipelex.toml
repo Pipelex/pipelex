@@ -351,12 +351,19 @@ theme = "dark"
 palette = "dracula"
 
 ####################################################################################################
-# Tracing config (NDJSON event log for distributed tracing across Temporal workers)
+# Tracing config (event log for distributed tracing across Temporal workers)
 ####################################################################################################
 
 [pipelex.tracing_config]
-is_enabled = false
+is_enabled = true
+backend = "ndjson"
+
+[pipelex.tracing_config.ndjson]
 traces_dir = ".pipelex/traces"
+
+[pipelex.tracing_config.dynamodb]
+table_name = ""
+region = ""
 
 ####################################################################################################
 # Dry run config

@@ -42,6 +42,7 @@ from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+from pipelex.tracing.event_log_protocol import EventLogProtocol
 
 
 class PipelexHub:
@@ -80,6 +81,9 @@ class PipelexHub:
         # pipeline
         self._pipeline_manager: PipelineManagerAbstract | None = None
         self._observer: ObserverProtocol | None = None
+
+        # tracing
+        self._event_log: EventLogProtocol | None = None
 
     ############################################################
     # Class methods for singleton management
@@ -144,6 +148,9 @@ class PipelexHub:
 
     def set_storage_provider(self, storage_provider: StorageProviderAbstract | None):
         self._storage_provider = storage_provider
+
+    def set_event_log(self, event_log: EventLogProtocol | None):
+        self._event_log = event_log
 
     def set_class_registry(self, class_registry: ClassRegistryAbstract):
         self._class_registry = class_registry
@@ -237,6 +244,9 @@ class PipelexHub:
             msg = "StorageProvider is not initialized"
             raise RuntimeError(msg)
         return self._storage_provider
+
+    def get_event_log(self) -> EventLogProtocol | None:
+        return self._event_log
 
     def get_telemetry_manager(self) -> TelemetryManagerAbstract:
         if self._telemetry_manager is None:
@@ -376,6 +386,10 @@ def get_secrets_provider() -> SecretsProviderAbstract:
 
 def get_storage_provider() -> StorageProviderAbstract:
     return get_pipelex_hub().get_storage_provider()
+
+
+def get_event_log() -> EventLogProtocol | None:
+    return get_pipelex_hub().get_event_log()
 
 
 def get_class_registry() -> ClassRegistryAbstract:
