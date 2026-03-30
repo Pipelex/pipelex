@@ -1,0 +1,65 @@
+pipelex/cli/agent_cli/commands/concept_cmd.py
+  1f5455cf017357fa 106
+pipelex/builder/operations/concept_ops.py
+  db26c597d1f62e75 30
+tests/unit/pipelex/builder/operations/test_pipe_spec_to_toml.py
+  cde981ddb4d16e66 6,8,17,25,30,35,41,47,54,60
+tests/unit/pipelex/builder/operations/test_parse_concept_spec.py
+  db26c597d1f62e75 7-8,28-30
+  cde981ddb4d16e66 1-6,9-27,31-123
+pipelex/builder/operations/pipe_ops.py
+  db26c597d1f62e75 55
+tests/unit/pipelex/builder/operations/test_parse_pipe_spec.py
+  cde981ddb4d16e66 20,22,41,46,53,59,69,73,78,84,88,202
+  db26c597d1f62e75 44-45,47,49
+tests/unit/pipelex/builder/operations/test_concept_spec_to_toml.py
+  cde981ddb4d16e66 1-229
+tests/unit/pipelex/builder/operations/test_data.py
+  cde981ddb4d16e66 1-14
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "f25fba3b6a5117951c9ec09d0b43b960a03a2c03",
+  "prompts": {
+    "1f5455cf017357fa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "54006229-7dc4-4501-928f-7024cedc0912",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "cde981ddb4d16e66": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "adbd6a3b-5687-4b4e-bf2e-87c18b179e4b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 37,
+      "total_deletions": 39,
+      "accepted_lines": 383,
+      "overriden_lines": 0
+    },
+    "db26c597d1f62e75": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a245c43f-7d44-4678-92e4-923c91b35d57",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 31,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}
