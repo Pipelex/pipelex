@@ -4,8 +4,8 @@
 
 ### Changed
 
-- **Plugin install command**: Updated `mthds-ai-mthds-plugins` → `mthds-plugins` across README and docs.
-- **Plugin reload instructions**: Added `/reload-plugins` as the primary method to activate the plugin, with exit/reopen as fallback.
+- **Claude Code plugin install command**: Fixed as → `/plugin install mthds@mthds-plugins` across README and docs.
+- **Claude Code plugin reload instructions**: Added `/reload-plugins` as the primary method to activate the plugin, with exit/reopen as fallback.
 
 ## [v0.23.1] - 2026-03-30
 
