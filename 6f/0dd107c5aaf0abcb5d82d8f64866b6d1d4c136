@@ -1,0 +1,40 @@
+tests/unit/pipelex/builder/operations/test_parse_pipe_spec.py
+  5c77b917aa3d0398 138-174
+pipelex/builder/operations/concept_ops.py
+  5c77b917aa3d0398 53-55
+tests/unit/pipelex/builder/operations/test_parse_concept_spec.py
+  5c77b917aa3d0398 67-84
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "6f0dd107c5aaf0abcb5d82d8f64866b6d1d4c136",
+  "prompts": {
+    "3a6ce65fb8a7c65d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "06e2f7c5-bcb1-4190-bc86-2c0ff9b7279a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 8,
+      "total_deletions": 10,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "5c77b917aa3d0398": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dac8482d-1e35-4da7-b6f2-405dba00b712",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 58,
+      "total_deletions": 0,
+      "accepted_lines": 58,
+      "overriden_lines": 0
+    }
+  }
+}
