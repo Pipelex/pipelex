@@ -10,6 +10,7 @@ import typer
 from pydantic import ValidationError
 
 from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec
+from pipelex.builder.operations.concept_ops import parse_concept_spec
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
@@ -53,7 +54,7 @@ def _concept_spec_to_toml(concept_spec: ConceptSpec) -> str:
         concept_item_table.add("structure", structure_table)
 
     # Build the nested structure: [concept.ConceptName]
-    concept_section.add(concept_spec.the_concept_code, concept_item_table)
+    concept_section.add(concept_spec.concept_code, concept_item_table)
     doc.add("concept", concept_section)
     return tomlkit.dumps(doc)
 
@@ -90,47 +91,6 @@ def _structure_field_to_dict(field_spec: ConceptStructureSpec) -> dict[str, Any]
     return result
 
 
-def _parse_concept_spec_from_json(spec_data: dict[str, Any]) -> ConceptSpec:
-    """Parse and validate a ConceptSpec from JSON data.
-
-    Args:
-        spec_data: Raw JSON data for the concept spec.
-
-    Returns:
-        Validated ConceptSpec instance.
-
-    Raises:
-        ValidationError: If validation fails.
-    """
-    # Accept common aliases for "the_concept_code"
-    for alias in ("concept_code", "code", "name", "concept_name"):
-        if alias in spec_data:
-            if "the_concept_code" not in spec_data:
-                spec_data["the_concept_code"] = spec_data.pop(alias)
-            else:
-                spec_data.pop(alias)
-
-    # Convert structure if present - need to add field names
-    if spec_data.get("structure"):
-        structure_data = spec_data["structure"]
-        converted_structure: dict[str, Any] = {}
-        for field_name, field_data in structure_data.items():
-            if isinstance(field_data, str):
-                # Simple string means just description, default to text type
-                converted_structure[field_name] = {
-                    "the_field_name": field_name,
-                    "description": field_data,
-                    "type": "text",
-                }
-            else:
-                # Full field spec
-                field_data["the_field_name"] = field_name
-                converted_structure[field_name] = field_data
-        spec_data["structure"] = converted_structure
-
-    return ConceptSpec.model_validate(spec_data)
-
-
 def concept_cmd(
     spec: Annotated[
         str | None,
@@ -150,7 +110,7 @@ def concept_cmd(
 
     JSON spec format:
     {
-        "the_concept_code": "MyConceptName",
+        "concept_code": "MyConceptName",
         "description": "Description of the concept",
         "refines": "Text",  // Optional: native concept to refine
         "structure": {      // Optional: for structured concepts
@@ -164,7 +124,7 @@ def concept_cmd(
     }
 
     Examples:
-        pipelex-agent concept --spec '{"the_concept_code": "Invoice", "description": "A commercial invoice", "refines": "Text"}'
+        pipelex-agent concept --spec '{"concept_code": "Invoice", "description": "A commercial invoice", "refines": "Text"}'
         pipelex-agent concept --spec-file concept.json
     """
     # Validate that exactly one of spec or spec_file is provided
@@ -189,7 +149,7 @@ def concept_cmd(
 
     # Validate and convert spec
     try:
-        concept_spec = _parse_concept_spec_from_json(spec_data)
+        concept_spec = parse_concept_spec(spec_data)
         toml_content = _concept_spec_to_toml(concept_spec)
 
         print(toml_content, end="" if toml_content.endswith("\n") else "\n")

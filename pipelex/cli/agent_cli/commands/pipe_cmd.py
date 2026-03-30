@@ -13,6 +13,7 @@ import tomlkit
 import typer
 from pydantic import ValidationError
 
+from pipelex.builder.operations.pipe_ops import parse_pipe_spec
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -23,7 +24,6 @@ from pipelex.builder.pipe.pipe_llm_spec import PipeLLMSpec
 from pipelex.builder.pipe.pipe_parallel_spec import PipeParallelSpec
 from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
-from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.core.pipes.pipe_blueprint import PipeType
 from pipelex.language.toml_string_utils import format_toml_string
@@ -158,65 +158,9 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
 def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     """Parse and validate a PipeSpec from JSON data.
 
-    Args:
-        pipe_type: The type of pipe (e.g., "PipeLLM", "PipeSequence").
-        spec_data: Raw JSON data for the pipe spec.
-
-    Returns:
-        Validated PipeSpec instance of the correct type.
-
-    Raises:
-        ValueError: If the pipe type is invalid.
-        ValidationError: If validation fails.
+    Thin wrapper around parse_pipe_spec from pipe_ops for backward compatibility.
     """
-    if pipe_type not in pipe_type_to_spec_class:
-        valid_types = list(pipe_type_to_spec_class.keys())
-        msg = f"Invalid pipe type '{pipe_type}'. Must be one of: {valid_types}"
-        raise ValueError(msg)
-
-    spec_class = pipe_type_to_spec_class[pipe_type]
-
-    # Add type to spec_data if not present
-    spec_data["type"] = pipe_type
-
-    # Accept common aliases for "pipe_code"
-    for alias in ("code", "the_pipe_code", "name"):
-        if alias in spec_data:
-            if "pipe_code" not in spec_data:
-                spec_data["pipe_code"] = spec_data.pop(alias)
-            else:
-                spec_data.pop(alias)
-
-    # Handle steps/branches conversion - need to convert pipe to pipe_code
-    if "steps" in spec_data:
-        converted_steps = []
-        for step in spec_data["steps"]:
-            if "pipe" in step and "pipe_code" not in step:
-                step["pipe_code"] = step.pop("pipe")
-            converted_steps.append(step)
-        spec_data["steps"] = converted_steps
-
-    if "branches" in spec_data:
-        converted_branches = []
-        for branch in spec_data["branches"]:
-            if "pipe" in branch and "pipe_code" not in branch:
-                branch["pipe_code"] = branch.pop("pipe")
-            converted_branches.append(branch)
-        spec_data["branches"] = converted_branches
-
-    # Handle expression -> jinja2_expression_template for PipeCondition
-    if pipe_type == "PipeCondition" and "expression" in spec_data:
-        if "jinja2_expression_template" not in spec_data:
-            spec_data["jinja2_expression_template"] = spec_data.pop("expression")
-        else:
-            spec_data.pop("expression")
-
-    # Accept output as dict with "type" key → extract the type string
-    if "output" in spec_data and isinstance(spec_data["output"], dict):
-        if "type" in spec_data["output"]:
-            spec_data["output"] = spec_data["output"]["type"]
-
-    return spec_class.model_validate(spec_data)
+    return parse_pipe_spec(pipe_type, spec_data)
 
 
 def pipe_cmd(

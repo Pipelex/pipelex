@@ -64,7 +64,7 @@ class TestConceptSpecGeneration:
         # The Pydantic validation and field validators have already run
         assert generated_concept_spec is not None
         assert isinstance(generated_concept_spec, ConceptSpec)
-        assert generated_concept_spec.the_concept_code
+        assert generated_concept_spec.concept_code
         assert generated_concept_spec.description
 
-        log.info(f"✓ Successfully generated ConceptSpec for '{topic}': {generated_concept_spec.the_concept_code}")
+        log.info(f"✓ Successfully generated ConceptSpec for '{topic}': {generated_concept_spec.concept_code}")
