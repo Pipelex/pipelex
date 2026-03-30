@@ -29,9 +29,11 @@ CONFIG_SYNC_EXCLUDED_FILES: frozenset[str] = GIT_IGNORED_CONFIG_FILES
 # Directories that should not be synced between .pipelex and kit/configs.
 # These are runtime directories created locally:
 # - storage: Local storage directory for runtime data
+# - traces: Local directory for execution traces
 GIT_IGNORED_CONFIG_DIRS: frozenset[str] = frozenset(
     {
         "storage",
+        "traces",
     }
 )
 

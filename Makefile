@@ -295,6 +295,7 @@ up-kit-configs:
 		--exclude='pipelex_override.toml' \
 		--exclude='telemetry_override.toml' \
 		--exclude='storage' \
+		--exclude='traces' \
 		--exclude='x_custom_llm_deck.toml' \
 		--exclude='x_custom_extract_deck.toml' \
 		--exclude='mthds_schema.json' \
