@@ -43,27 +43,33 @@ def rehydrate_pipe_output(pipe_output: PipeOutput, pipe_job: PipeJob | None = No
     library_manager = get_library_manager()
     rehydration_library_id = f"rehydrate_{uuid.uuid4().hex[:8]}"
     prev_library_id = _get_current_library_id_or_none()
+    library_opened = False
+    library_set_as_current = False
     try:
         _lib_id, rehydration_library = library_manager.open_library(library_id=rehydration_library_id)
+        library_opened = True
 
         global_registry = KajsonManager.get_class_registry()
         scoped_registry = ClassRegistry()
         if isinstance(global_registry, ClassRegistry):
             scoped_registry.register_classes_dict(dict(global_registry.root))
         else:
-            log.warning("Global registry is not a ClassRegistry, cannot pre-seed rehydration registry")
+            log.warning(f"Global registry is {type(global_registry).__name__}, not ClassRegistry — cannot pre-seed rehydration registry")
         rehydration_library.set_class_registry(scoped_registry)
 
         set_current_library(library_id=rehydration_library_id)
+        library_set_as_current = True
         library_manager.load_from_crate(library_id=rehydration_library_id, crate=library_crate)
         pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
         pipe_output.working_memory_raw = None
     finally:
-        library_manager.teardown(library_id=rehydration_library_id)
-        if prev_library_id is not None:
-            set_current_library(library_id=prev_library_id)
-        else:
-            teardown_current_library()
+        if library_opened:
+            library_manager.teardown(library_id=rehydration_library_id)
+        if library_set_as_current:
+            if prev_library_id is not None:
+                set_current_library(library_id=prev_library_id)
+            else:
+                teardown_current_library()
 
     return pipe_output
 
