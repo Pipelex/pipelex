@@ -355,7 +355,7 @@ class TestPipeConditionOutputValidation:
 
         concept_library.teardown()
 
-    @pytest.mark.xfail(reason="Anything output is allowed until we enable the pipe builder to auto-fix")
+    @pytest.mark.xfail(reason="Anything output is currently allowed")
     def test_validate_output_all_pipes_same_output_anything_not_allowed(self, load_empty_library: Callable[[], None]):
         """Test that using Anything output when all mapped pipes have the same output raises an error."""
         load_empty_library()

@@ -1,6 +1,20 @@
 # Changelog
 
-## [Unreleased]
+## [v0.23.1] - 2026-03-30
+
+### Changed
+
+- **Concept spec: `concept_code` replaces `the_concept_code`** as the canonical field name in concept specs and working memory factory.
+- **Shared spec parsing**: `concept_cmd` and `pipe_cmd` now delegate to the shared `parse_concept_spec` and `parse_pipe_spec` helpers, removing stale duplicate parsing logic while preserving compatibility and fixing alias/dict-mutation edge cases.
+- **`concept_ref` / `pipe_ref` aliases**: `parse_concept_spec` and `parse_pipe_spec` now accept `concept_ref` and `pipe_ref` as input aliases for better AI-agent compatibility.
+- **Replace `pip` with `uv`** in install commands across config files and error messages.
+- **Docs links**: Updated mthds.ai links to include `/latest/` path.
+
+### Fixed
+
+- **Concept alias bug**: Concept alias handling previously listed `concept_code` as an alias instead of `the_concept_code`, causing valid input to be silently dropped. Fixed by the new shared `parse_concept_spec` helper.
+
+## [v0.23.0] - 2026-03-29
 
 ### Added
 
@@ -15,6 +29,23 @@
 - **Graph rendering refactor**: Extracted dry-run logic from `graph_rendering._dry_run_bundle` into the new shared `dry_run_pipeline` function.
 - **Agent CLI inputs**: Refactored `_inputs_core` to delegate to `builder.operations.inputs_ops.build_inputs_for_pipe` instead of duplicating bundle validation and input rendering logic.
 - **Agent CLI run**: Added graph generation support with ReactFlow HTML output and side-effect metadata tracking in `_run_core`.
+- **Deduplicate `models_cmd` → `models_ops`**: `models_cmd.py` is now a thin CLI wrapper delegating to `list_models()` and `format_models_markdown()` in `models_ops.py`, consistent with other agent CLI commands.
+
+### Removed
+
+- **`BuilderLoop`** and its iterative build-validate-fix cycle (`builder_loop.py`, `builder.py`, `builder_errors.py`). The build-agent CLI now drives spec construction directly.
+- **`pipelex build pipe`** CLI command and associated MTHDS workflow files (`builder.mthds`, `agentic_builder.mthds`, `pipe_design.mthds`, `concept_fixer.mthds`, `synthesize_image.mthds`).
+- **`pipelex-tools` runtime dependency**: Moved to dev-only dependency; `plxt` is now invoked via subprocess passthrough.
+
+- **Talent system**: Removed talent enums, config mappings (`talent_preset_mappings`), and talent preset tests. Pipe specs accept model presets directly via the `model` field, making the talent indirection unnecessary.
+
+### Fixed
+
+- **Per-bundle dedup in pipeline run setup**: Fixed duplicate bundle loading when the same bundle appears in multiple sources.
+- **HTTP utils**: Use HEAD-first strategy for URL validation to avoid downloading large payloads unnecessarily.
+- **`library_dirs` passthrough**: Fixed `library_dirs` not being forwarded in builder operations (`inputs_ops`, `validate_ops`).
+- **Dry-run status**: Fixed validation status reporting for dry-run results.
+
 
 ## [v0.22.0] - 2026-03-25
 

@@ -19,7 +19,7 @@ class BundleHeaderSpec(StructuredContent):
     main_pipe: str    # Must be snake_case, must exist in pipe dict
 
 class ConceptSpec(StructuredContent):
-    the_concept_code: str  # Must be PascalCase
+    concept_code: str  # Must be PascalCase
 ```
 
 Standard mock generators (like Polyfactory) produce random strings like `"uygNjiAuDMOtZEyibgHw"` which fail validation. The dry run system addresses this at two levels:
@@ -109,7 +109,7 @@ class DryRunFactory:
 | Format | Generator | Example Output | Used For |
 |--------|-----------|----------------|----------|
 | `SNAKE_CASE` | `generate_snake_case_code()` | `mock_abcd` | `domain_code`, `pipe_code`, `the_field_name` |
-| `PASCAL_CASE` | `generate_pascal_case_code()` | `MockAbcd` | `the_concept_code` |
+| `PASCAL_CASE` | `generate_pascal_case_code()` | `MockAbcd` | `concept_code` |
 | `CONCEPT_REF` | `generate_concept_ref()` | `mock_abcd.MockCdef` | `concept_ref` field (domain.ConceptCode format) |
 | `IGNORE` | Sets field to `Ignore()` | None/default | `default_value`, `structure` fields |
 | `DICT_SNAKE_KEY_PASCAL_VALUE` | `generate_dict_snake_key_pascal_value()` | `{mock_abcd: MockCdef}` | `inputs` dict in PipeSpec |

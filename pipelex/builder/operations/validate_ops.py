@@ -116,9 +116,7 @@ async def validate_bundle_content(
     return {
         "success": True,
         "mthds_contents": mthds_contents,
-        "pipelex_bundle_blueprint": blueprints[0].model_dump(mode="json")
-        if len(blueprints) == 1
-        else [b.model_dump(mode="json") for b in blueprints],
+        "pipelex_bundle_blueprint": [b.model_dump(mode="json") for b in blueprints],
         "validated_pipes": validated_pipes,
         "total_pipes": len(validate_bundle_result.pipes),
     }
@@ -149,11 +147,11 @@ async def validate_pipe(
         library_manager.load_libraries(library_id=library_id, library_dirs=effective_dirs)
 
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
+    dry_run_output = await dry_run_pipe(the_pipe, raise_on_failure=True)
 
     return {
         "success": True,
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
+        "validated_pipes": [{"pipe_code": pipe_code, "status": dry_run_output.status}],
         "total_pipes": 1,
     }
 
@@ -184,11 +182,11 @@ async def validate_pipe_in_bundle(
 
     # Now get the specific pipe and dry-run only that one
     the_pipe = get_required_pipe(pipe_code=pipe_code)
-    await dry_run_pipe(the_pipe, raise_on_failure=True)
+    dry_run_output = await dry_run_pipe(the_pipe, raise_on_failure=True)
 
     return {
         "success": True,
         "bundle_path": str(bundle_path),
-        "validated_pipes": [{"pipe_code": pipe_code, "status": "SUCCESS"}],
+        "validated_pipes": [{"pipe_code": pipe_code, "status": dry_run_output.status}],
         "total_pipes": 1,
     }

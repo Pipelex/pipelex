@@ -25,7 +25,9 @@ async def build_runner_code_for_pipe(
         Generated Python runner code as a string.
 
     Raises:
-        Exception: If parsing, validation, or code generation fails.
+        MthdsDecodeError: If MTHDS content has TOML syntax errors.
+        PipeValidationError: If pipe validation fails.
+        DryRunError: If dry-running the pipes fails.
     """
     library_manager = get_library_manager()
     library_id, _ = library_manager.open_library()

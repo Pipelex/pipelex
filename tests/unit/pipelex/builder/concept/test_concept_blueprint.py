@@ -29,13 +29,11 @@ class TestConceptCodeValidation:
 
         # Create a ConceptSpec with the input code
         concept_spec = ConceptSpec(
-            the_concept_code=input_code,
+            concept_code=input_code,
             description="Test concept for code validation",
             refines=None,
             structure=None,
         )
 
         # Verify the concept code was converted correctly
-        assert concept_spec.the_concept_code == expected_code, (
-            f"Expected concept code to be '{expected_code}', but got '{concept_spec.the_concept_code}'"
-        )
+        assert concept_spec.concept_code == expected_code, f"Expected concept code to be '{expected_code}', but got '{concept_spec.concept_code}'"

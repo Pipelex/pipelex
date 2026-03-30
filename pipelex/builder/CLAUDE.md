@@ -1,25 +1,16 @@
 # Builder
 
-Transforms high-level specifications into valid, executable Pipelex pipeline bundles (`.mthds` files). The builder is a spec-to-MTHDS compiler with built-in iterative repair.
+Provides the spec layer for authoring Pipelex pipeline bundles (`.mthds` files). Specs are a convenience authoring format for AI agents — they compile down to blueprints via `to_blueprint()`.
 
 ## Core Flow
 
 ```
 PipelexBundleSpec  →  to_blueprint()  →  PipelexBundleBlueprint  →  MTHDS file
-      ↑                                         |
-      |                                    validate_bundle()
-      |                                         |
-      └──── fix (up to N attempts) ─────── errors? ──→ done
 ```
-
-`BuilderLoop.build_and_fix()` orchestrates: build → validate → fix → re-validate loop.
 
 ## Code Layout
 
 ```
-builder.py                     # reconstruct_bundle_with_pipe_fixes() helper
-builder_loop.py                # BuilderLoop — the main orchestration class
-builder_errors.py              # Error types
 exceptions.py                  # Exception types
 conventions.py                 # File naming defaults (bundle.mthds, inputs.json)
 bundle_spec.py                 # PipelexBundleSpec — top-level spec model
@@ -43,11 +34,14 @@ pipe/
   pipe_parallel_spec.py        # PipeParallel — concurrent controller
   pipe_condition_spec.py       # PipeCondition — branching controller
   pipe_batch_spec.py           # PipeBatch — map-over-list controller
-talents/
-  llm_talent.py                # LLMTalent enum + preset mapping
-  extract_talent.py            # ExtractTalent enum + preset mapping
-  img_gen_talent.py            # ImgGenTalent enum + preset mapping
-  search_talent.py             # SearchTalent enum + preset mapping
+operations/
+  concept_ops.py               # Parse/serialize concepts to TOML
+  inputs_ops.py                # Generate example input JSON
+  models_ops.py                # Model preset listing and markdown formatting
+  output_ops.py                # Generate output JSON representations
+  pipe_ops.py                  # Parse/serialize pipes to TOML
+  runner_code_ops.py           # Code generation utilities
+  validate_ops.py              # Validation operations
 ```
 
 ## Spec Architecture
@@ -81,23 +75,3 @@ Pipe inputs and outputs use multiplicity suffixes on concept names:
 - `Text[]` — variable-length list
 - `Text[N]` — exactly N items
 
-## BuilderLoop Fix Strategies
-
-The loop applies these fixes automatically when validation fails:
-
-| Problem | Fix |
-|---------|-----|
-| Undeclared concept | Generate via LLM ("generate_missing_concepts" pipeline), or remove from PipeParallel.combined_output |
-| UNKNOWN_CONCEPT | Create concept that refines Text |
-| INPUT_STUFF_SPEC_MISMATCH | Rewrite inputs from pipe.needed_inputs() |
-| MISSING/EXTRANEOUS_INPUT_VARIABLE | Sync inputs with pipe.needed_inputs() |
-| INADEQUATE_OUTPUT_CONCEPT (Sequence) | Set output = last step's output |
-| INADEQUATE_OUTPUT_CONCEPT (Condition) | Set output = common output or native.Anything |
-| INADEQUATE_OUTPUT_MULTIPLICITY | Match last step's output multiplicity |
-| Compose multiplicity mismatch | Add `[]` to input concept, change field to list type |
-
-After fixing, `_prune_unreachable_specs()` removes pipes unreachable from `main_pipe` and their unused concepts.
-
-## Talent System
-
-Talents are abstract capability labels mapped to concrete model presets. They remain in `talents/` and are used by the `pipelex-agent models` CLI to help agents choose appropriate presets. PipeSpec subclasses accept model presets directly via a `model: str | None` field, bypassing talent resolution. When modifying talent enums, update both the enum and its preset mapping dict in `pipelex.toml`.

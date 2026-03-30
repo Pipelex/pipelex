@@ -40,8 +40,14 @@ def validate_url_resource_exists(url: str) -> None:
 
 def _validate_http_url(url: str) -> None:
     user_agent = get_user_agent()
+    headers = {"User-Agent": user_agent}
     try:
-        with httpx.stream("GET", url, timeout=10, follow_redirects=True, headers={"User-Agent": user_agent}) as response:
+        response = httpx.head(url, timeout=10, follow_redirects=True, headers=headers)
+        if response.status_code == 405:
+            # Server doesn't support HEAD — fall back to streaming GET (read only status, not body)
+            with httpx.stream("GET", url, timeout=10, follow_redirects=True, headers=headers) as stream_response:
+                stream_response.raise_for_status()
+        else:
             response.raise_for_status()
     except httpx.HTTPStatusError as exc:
         msg = f"URL '{url}' returned HTTP {exc.response.status_code}"

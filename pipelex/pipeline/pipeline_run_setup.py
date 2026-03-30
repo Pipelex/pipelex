@@ -157,25 +157,23 @@ async def pipeline_run_setup(
     if mthds_contents:
         all_blueprints = [PipelexInterpreter.make_pipelex_bundle_blueprint(mthds_content=content) for content in mthds_contents]
 
-        # Check if all bundles were already loaded from library directories
-        bundle_already_loaded = False
+        # Filter out blueprints whose URIs are already loaded
+        blueprints_to_load: list[PipelexBundleBlueprint] = list(all_blueprints)
         if bundle_uris:
             current_library = library_manager.get_library(library_id=library_id)
-            all_loaded = True
-            for uri in bundle_uris:
+            blueprints_to_load = []
+            for blueprint, uri in zip(all_blueprints, bundle_uris, strict=True):
                 try:
                     resolved_uri = Path(uri).resolve()
                 except (OSError, RuntimeError):
                     resolved_uri = Path(uri)
-                if resolved_uri not in current_library.loaded_mthds_paths:
-                    all_loaded = False
-                    break
-            bundle_already_loaded = all_loaded
-            if bundle_already_loaded:
-                log.verbose(f"All {len(bundle_uris)} bundle(s) already loaded from library directories, skipping duplicate load")
+                if resolved_uri in current_library.loaded_mthds_paths:
+                    log.verbose(f"Bundle '{uri}' already loaded from library directories, skipping")
+                else:
+                    blueprints_to_load.append(blueprint)
 
-        if not bundle_already_loaded:
-            library_manager.load_from_blueprints(library_id=library_id, blueprints=all_blueprints)
+        if blueprints_to_load:
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=blueprints_to_load)
 
         # Find the pipe to execute
         if pipe_code:
