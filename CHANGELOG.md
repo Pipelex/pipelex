@@ -12,7 +12,7 @@
 
 ### Fixed
 
-- **`concept_cmd` alias bug**: The CLI's `_parse_concept_spec_from_json` incorrectly listed `concept_code` as an alias instead of `the_concept_code`, causing it to miss valid input.
+- **Concept alias bug**: Concept alias handling previously listed `concept_code` as an alias instead of `the_concept_code`, causing valid input to be silently dropped. Fixed by the new shared `parse_concept_spec` helper.
 
 ## [v0.23.0] - 2026-03-29
 

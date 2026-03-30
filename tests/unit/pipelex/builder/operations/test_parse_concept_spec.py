@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any, ClassVar
 
 import pytest
+from pydantic import ValidationError
 
 from pipelex.builder.concept.concept_spec import ConceptStructureSpecFieldType
 from pipelex.builder.operations.concept_ops import parse_concept_spec
@@ -41,6 +42,12 @@ class TestParseConceptSpec:
         spec = {**self._BASE, "concept_code": "Invoice", "name": "Alt", "code": "Alt2"}
         result = parse_concept_spec(spec)
         assert result.concept_code == "Invoice"
+
+    def test_missing_concept_code_raises(self) -> None:
+        """Spec with no concept_code and no alias should raise ValidationError."""
+        spec: dict[str, Any] = {**self._BASE}
+        with pytest.raises(ValidationError):
+            parse_concept_spec(spec)
 
     # -- does not mutate caller's dict ------------------------------------
 

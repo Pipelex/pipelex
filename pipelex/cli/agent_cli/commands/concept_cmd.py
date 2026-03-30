@@ -9,8 +9,8 @@ import tomlkit
 import typer
 from pydantic import ValidationError
 
-from pipelex.builder.concept.concept_spec import ConceptSpec, ConceptStructureSpec
-from pipelex.builder.operations.concept_ops import parse_concept_spec
+from pipelex.builder.concept.concept_spec import ConceptSpec
+from pipelex.builder.operations.concept_ops import parse_concept_spec, structure_field_to_dict
 from pipelex.cli.agent_cli.commands.agent_output import agent_error
 from pipelex.language.toml_string_utils import format_toml_string
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error_for_agent
@@ -42,7 +42,7 @@ def _concept_spec_to_toml(concept_spec: ConceptSpec) -> str:
     if concept_spec.structure:
         structure_table = tomlkit.table()
         for field_name, field_spec in concept_spec.structure.items():
-            field_dict = _structure_field_to_dict(field_spec)
+            field_dict = structure_field_to_dict(field_spec)
             # If only description is present, use simple string format
             if len(field_dict) == 1 and "description" in field_dict:
                 structure_table.add(field_name, format_toml_string(field_dict["description"]))
@@ -57,38 +57,6 @@ def _concept_spec_to_toml(concept_spec: ConceptSpec) -> str:
     concept_section.add(concept_spec.concept_code, concept_item_table)
     doc.add("concept", concept_section)
     return tomlkit.dumps(doc)
-
-
-def _structure_field_to_dict(field_spec: ConceptStructureSpec) -> dict[str, Any]:
-    """Convert a ConceptStructureSpec to a dictionary for TOML serialization.
-
-    Args:
-        field_spec: The field specification to convert.
-
-    Returns:
-        Dictionary with field properties.
-    """
-    result: dict[str, Any] = {}
-
-    # Type is always needed unless it's just a text description
-    if not field_spec.type.is_text or field_spec.required or field_spec.default_value is not None:
-        result["type"] = field_spec.type
-
-    result["description"] = field_spec.description
-
-    if field_spec.required:
-        result["required"] = True
-
-    if field_spec.default_value is not None:
-        result["default"] = field_spec.default_value
-
-    if field_spec.concept_ref:
-        result["concept_ref"] = field_spec.concept_ref
-
-    if field_spec.choices:
-        result["choices"] = field_spec.choices
-
-    return result
 
 
 def concept_cmd(
@@ -157,6 +125,9 @@ def concept_cmd(
     except ValidationError as exc:
         message, details = format_pydantic_validation_error_for_agent(exc)
         agent_error(message, "ValidationError", cause=exc, validation_details=details)
+
+    except ValueError as exc:
+        agent_error(str(exc), "ValueError", cause=exc)
 
     except Exception as exc:
         agent_error(str(exc), type(exc).__name__, cause=exc)

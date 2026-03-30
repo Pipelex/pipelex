@@ -10,6 +10,7 @@ from typing import Any
 import tomlkit
 from tomlkit.items import Table
 
+from pipelex import log
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -23,15 +24,21 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 
-# Aliases that agents may use instead of "pipe_code" — checked in order, first match wins.
+# Aliases that agents may use instead of "pipe_code". First found is promoted when canonical key is absent; extras are dropped.
 _PIPE_CODE_ALIASES = ("pipe", "the_pipe_code", "code", "name", "pipe_name", "pipe_ref")
 
 
 def _normalize_sub_pipe_dict(data: dict[str, Any]) -> None:
     """Normalize a step/branch dict: resolve pipe_code aliases and drop extraneous fields."""
     _normalize_pipe_code_aliases(data)
-    # Agents sometimes add "inputs" to individual steps; silently drop it.
-    data.pop("inputs", None)
+    # Agents sometimes add "inputs" to individual steps; drop with a warning.
+    if "inputs" in data:
+        log.warning(
+            f"Dropping unsupported 'inputs' field from step/branch dict "
+            f"(pipe_code={data.get('pipe_code', '?')}). "
+            f"Step-level inputs are not supported; inputs are inherited from the parent pipe."
+        )
+        data.pop("inputs")
 
 
 def _normalize_pipe_code_aliases(data: dict[str, Any]) -> None:

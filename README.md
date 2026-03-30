@@ -522,7 +522,7 @@ The package supports the following additional features:
 Install all extras:
 
 ```bash
-pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
+uv pip install "pipelex[anthropic,google,google-genai,mistralai,bedrock,fal,linkup,docling]"
 ```
 
 ---
