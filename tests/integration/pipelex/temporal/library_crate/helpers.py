@@ -7,6 +7,7 @@ from kajson.class_registry import ClassRegistry
 from kajson.kajson_manager import KajsonManager
 from temporalio.client import Client as TemporalClient
 
+from pipelex import log
 from pipelex.core.pipes.pipe_output import PipeOutput
 from pipelex.core.stuffs.structured_content import StructuredContent
 from pipelex.core.stuffs.text_content import TextContent
@@ -41,17 +42,19 @@ def rehydrate_pipe_output(pipe_output: PipeOutput, pipe_job: PipeJob | None = No
     # Mirror WfPipeRouter: create per-rehydration library with scoped registry
     library_manager = get_library_manager()
     rehydration_library_id = f"rehydrate_{uuid.uuid4().hex[:8]}"
-    _lib_id, rehydration_library = library_manager.open_library(library_id=rehydration_library_id)
-
-    global_registry = KajsonManager.get_class_registry()
-    scoped_registry = ClassRegistry()
-    if isinstance(global_registry, ClassRegistry):
-        scoped_registry.register_classes_dict(dict(global_registry.root))
-    rehydration_library.set_class_registry(scoped_registry)
-
     prev_library_id = _get_current_library_id_or_none()
-    set_current_library(library_id=rehydration_library_id)
     try:
+        _lib_id, rehydration_library = library_manager.open_library(library_id=rehydration_library_id)
+
+        global_registry = KajsonManager.get_class_registry()
+        scoped_registry = ClassRegistry()
+        if isinstance(global_registry, ClassRegistry):
+            scoped_registry.register_classes_dict(dict(global_registry.root))
+        else:
+            log.warning("Global registry is not a ClassRegistry, cannot pre-seed rehydration registry")
+        rehydration_library.set_class_registry(scoped_registry)
+
+        set_current_library(library_id=rehydration_library_id)
         library_manager.load_from_crate(library_id=rehydration_library_id, crate=library_crate)
         pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
         pipe_output.working_memory_raw = None

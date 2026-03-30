@@ -43,8 +43,9 @@ def _validate_http_url(url: str) -> None:
     headers = {"User-Agent": user_agent}
     try:
         response = httpx.head(url, timeout=10, follow_redirects=True, headers=headers)
-        if response.status_code == 405:
-            # Server doesn't support HEAD — fall back to streaming GET (read only status, not body)
+        if 400 <= response.status_code < 500:
+            # Server rejected HEAD (common for CDNs, signed URLs, auth-gated endpoints)
+            # — fall back to streaming GET (read only status, not body)
             with httpx.stream("GET", url, timeout=10, follow_redirects=True, headers=headers) as stream_response:
                 stream_response.raise_for_status()
         else:
