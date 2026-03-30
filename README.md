@@ -86,10 +86,16 @@ Tell Claude to install the MTHDS skills marketplace:
 then install the MTHDS skills plugin:
 
 ```
-/plugin install mthds@mthds-ai-mthds-plugins
+/plugin install mthds@mthds-plugins
 ```
 
-then you must exit Claude Code and reopen it.
+then reload plugins:
+
+```
+/reload-plugins
+```
+
+If that doesn't work, exit Claude Code and reopen it:
 
 ```
 /exit
