@@ -262,7 +262,7 @@ class ConceptSpec(StructuredContent):
     def validate_concept_code(cls, value: str) -> str:
         # Split first to handle domain.ConceptCode format
         if "." in value:
-            domain, concept_code = value.split(".")
+            domain, concept_code = value.rsplit(".", 1)
             # Only normalize the concept code part (not the domain)
             normalized_concept_code = normalize_to_ascii(concept_code)
 

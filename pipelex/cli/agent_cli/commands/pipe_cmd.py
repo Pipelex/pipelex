@@ -155,14 +155,6 @@ def _add_type_specific_fields(pipe_spec: PipeSpec, pipe_table: tomlkit.TOMLDocum
         pipe_table.add("function_name", pipe_spec.function_name)
 
 
-def _parse_pipe_spec_from_json(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
-    """Parse and validate a PipeSpec from JSON data.
-
-    Thin wrapper around parse_pipe_spec from pipe_ops for backward compatibility.
-    """
-    return parse_pipe_spec(pipe_type, spec_data)
-
-
 def pipe_cmd(
     pipe_type: Annotated[
         str | None,
@@ -249,7 +241,7 @@ def pipe_cmd(
 
     # Validate and convert spec
     try:
-        pipe_spec = _parse_pipe_spec_from_json(resolved_pipe_type, spec_data)
+        pipe_spec = parse_pipe_spec(resolved_pipe_type, spec_data)
         toml_content = _pipe_spec_to_toml(pipe_spec)
 
         print(toml_content, end="" if toml_content.endswith("\n") else "\n")

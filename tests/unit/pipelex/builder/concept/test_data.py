@@ -378,6 +378,20 @@ class ConceptCodeValidationTestCases:
         "domain_v1.ConceptNameV2",
     )
 
+    # Test case: multi-segment domain path -> splits on last dot
+    MULTI_SEGMENT_DOMAIN = (
+        "multi_segment_domain",
+        "legal.contracts.Invoice",
+        "legal.contracts.Invoice",
+    )
+
+    # Test case: multi-segment domain with snake_case concept -> PascalCase
+    MULTI_SEGMENT_DOMAIN_SNAKE = (
+        "multi_segment_domain_snake",
+        "legal.contracts.non_compete_clause",
+        "legal.contracts.NonCompeteClause",
+    )
+
     TEST_CASES: ClassVar[list[tuple[str, str, str]]] = [
         SNAKE_CASE_NO_DOMAIN,
         PASCAL_CASE_NO_DOMAIN,
@@ -388,4 +402,6 @@ class ConceptCodeValidationTestCases:
         MULTIPLE_UNDERSCORES,
         WITH_NUMBERS_SNAKE,
         WITH_NUMBERS_DOMAIN_SNAKE,
+        MULTI_SEGMENT_DOMAIN,
+        MULTI_SEGMENT_DOMAIN_SNAKE,
     ]
