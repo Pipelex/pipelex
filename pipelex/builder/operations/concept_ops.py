@@ -50,6 +50,9 @@ def parse_concept_spec(spec_data: dict[str, Any]) -> ConceptSpec:
                 # Full field spec — copy to avoid mutating nested caller data
                 field_data = dict(field_data)
                 field_data["the_field_name"] = field_name
+                # Default to "text" when agent omits the type field
+                if "type" not in field_data:
+                    field_data["type"] = "text"
                 converted_structure[field_name] = field_data
         spec_data["structure"] = converted_structure
 

@@ -135,6 +135,43 @@ class TestParsePipeSpec:
         assert result.branches[0].pipe_code == "branch_a"
         assert result.branches[1].pipe_code == "branch_b"
 
+    @pytest.mark.parametrize("alias", ["pipe_ref", "the_pipe_code", "code", "name", "pipe_name"])
+    def test_sequence_steps_all_aliases(self, alias: str) -> None:
+        """All pipe_code aliases must work inside step dicts, not just 'pipe'."""
+        spec: dict[str, Any] = {
+            "pipe_code": "my_seq",
+            "description": "A sequence",
+            "inputs": {"doc": "Document"},
+            "output": "Text",
+            "steps": [
+                {alias: "step_one", "result": "intermediate"},
+                {alias: "step_two", "result": "final"},
+            ],
+        }
+        result = parse_pipe_spec("PipeSequence", spec)
+        assert isinstance(result, PipeSequenceSpec)
+        assert result.steps[0].pipe_code == "step_one"
+        assert result.steps[1].pipe_code == "step_two"
+
+    @pytest.mark.parametrize("alias", ["pipe_ref", "the_pipe_code", "code", "name", "pipe_name"])
+    def test_parallel_branches_all_aliases(self, alias: str) -> None:
+        """All pipe_code aliases must work inside branch dicts, not just 'pipe'."""
+        spec: dict[str, Any] = {
+            "pipe_code": "my_par",
+            "description": "Parallel branches",
+            "inputs": {"doc": "Document"},
+            "output": "Text",
+            "add_each_output": True,
+            "branches": [
+                {alias: "branch_a", "result": "result_a"},
+                {alias: "branch_b", "result": "result_b"},
+            ],
+        }
+        result = parse_pipe_spec("PipeParallel", spec)
+        assert isinstance(result, PipeParallelSpec)
+        assert result.branches[0].pipe_code == "branch_a"
+        assert result.branches[1].pipe_code == "branch_b"
+
     # -- PipeCondition expression alias -----------------------------------
 
     _BASE_CONDITION: ClassVar[dict[str, Any]] = {

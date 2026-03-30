@@ -23,6 +23,19 @@ from pipelex.builder.pipe.pipe_sequence_spec import PipeSequenceSpec
 from pipelex.builder.pipe.pipe_spec import PipeSpec
 from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 
+# Aliases that agents may use instead of "pipe_code" — checked in order, first match wins.
+_PIPE_CODE_ALIASES = ("pipe", "the_pipe_code", "code", "name", "pipe_name", "pipe_ref")
+
+
+def _normalize_pipe_code_aliases(data: dict[str, Any]) -> None:
+    """Convert any alias of ``pipe_code`` to the canonical field name, in-place."""
+    for alias in _PIPE_CODE_ALIASES:
+        if alias in data:
+            if "pipe_code" not in data:
+                data["pipe_code"] = data.pop(alias)
+            else:
+                data.pop(alias)
+
 
 def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     """Parse and validate a PipeSpec from JSON-like data.
@@ -51,22 +64,16 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     # Add type to spec_data if not present
     spec_data["type"] = pipe_type
 
-    # Accept common aliases for "pipe_code"
-    for alias in ("the_pipe_code", "code", "name", "pipe_name", "pipe_ref"):
-        if alias in spec_data:
-            if "pipe_code" not in spec_data:
-                spec_data["pipe_code"] = spec_data.pop(alias)
-            else:
-                spec_data.pop(alias)
+    # Accept common aliases for "pipe_code" at the top level
+    _normalize_pipe_code_aliases(spec_data)
 
-    # Handle steps/branches conversion - need to convert pipe to pipe_code
+    # Handle steps/branches conversion — apply the same alias normalization
     # Deep-copy nested dicts to avoid mutating caller's nested structures
     if "steps" in spec_data:
         converted_steps = []
         for step in spec_data["steps"]:
             step = dict(step)
-            if "pipe" in step and "pipe_code" not in step:
-                step["pipe_code"] = step.pop("pipe")
+            _normalize_pipe_code_aliases(step)
             converted_steps.append(step)
         spec_data["steps"] = converted_steps
 
@@ -74,8 +81,7 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
         converted_branches = []
         for branch in spec_data["branches"]:
             branch = dict(branch)
-            if "pipe" in branch and "pipe_code" not in branch:
-                branch["pipe_code"] = branch.pop("pipe")
+            _normalize_pipe_code_aliases(branch)
             converted_branches.append(branch)
         spec_data["branches"] = converted_branches
 
