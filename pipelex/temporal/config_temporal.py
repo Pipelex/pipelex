@@ -163,9 +163,20 @@ class WorkerConfig(ConfigModel):
         return self.retry_policy_config.make_retry_policy()
 
 
+class PayloadCodecConfig(ConfigModel):
+    """Configuration for the storage-based payload codec that offloads large payloads."""
+
+    is_enabled: bool
+    size_threshold: int
+    storage_prefix: str
+    storage_provider: str
+    storage_root_path: str
+
+
 class Temporal(ConfigModel):
     """Main configuration model for Temporal."""
 
     is_enabled: bool
     temporal_config: TemporalConfig
     worker_config: WorkerConfig
+    payload_codec_config: PayloadCodecConfig

@@ -449,6 +449,13 @@ preferred_agent_target = "claude"
 [temporal]
 is_enabled = false
 
+[temporal.payload_codec_config]
+is_enabled = false
+size_threshold = 1000000
+storage_prefix = "temporal-payloads/"
+storage_provider = "local"
+storage_root_path = ".pipelex/temporal-payload-store"
+
 [temporal.worker_config]
 task_queue = "temporal_task_queue"
 workflow_execution_timeout = "1:00:00"
