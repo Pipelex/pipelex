@@ -1,0 +1,31 @@
+tests/unit/pipelex/graph/test_graph_output_generation.py
+  309ddc5525b390eb 1-192
+wip/01-master-plan.md
+  309ddc5525b390eb 1-188
+tests/unit/pipelex/tracing/test_ndjson_dedup_assembly.py
+  309ddc5525b390eb 1-168
+wip/deferred-items.md
+  309ddc5525b390eb 1-70
+wip/00-master-plan.md
+  309ddc5525b390eb 294,296,307-308,397
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "38e93a95b36102ba063a9ba960abada97b9bf235",
+  "prompts": {
+    "309ddc5525b390eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ca399312-cdb8-4e14-8466-d0bf76a0ffa6",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 672,
+      "total_deletions": 896,
+      "accepted_lines": 628,
+      "overriden_lines": 0
+    }
+  }
+}
