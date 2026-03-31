@@ -28,9 +28,31 @@
 
 ---
 
-## Step 2: Implement `StoragePayloadCodec`
+## Step 2: Write unit tests for `StoragePayloadCodec` (RED)
 
-**What**: Create the codec class that extends `temporalio.converter.PayloadCodec`. It intercepts payloads at the wire boundary — transparent to all application code.
+**What**: Write the unit tests *before* implementing the codec. These tests define the contract. They will fail (RED) until Step 3.
+
+**Details**:
+
+- [x] Create `tests/unit/pipelex/temporal/test_storage_payload_codec.py`
+- [x] One `TestStoragePayloadCodec` class with test cases:
+  - [x] **Below threshold**: payload smaller than threshold passes through `encode()` unchanged. Verify `decode()` also passes it through.
+  - [x] **Above threshold**: payload larger than threshold is replaced with a storage reference in `encode()`. Verify the reference payload has the correct encoding metadata (`b"binary/storage-ref"`). Verify `decode()` reconstructs the original payload exactly.
+  - [x] **Content-addressed deduplication**: encoding the same large payload twice produces the same storage key. The storage provider should contain only one entry.
+  - [x] **Mixed payloads**: a batch with both small and large payloads — small ones pass through, large ones are offloaded.
+  - [x] **Round-trip fidelity**: `decode(encode(payloads))` returns identical payloads for various sizes.
+- Use `InMemoryStorageProvider` for unit tests (no filesystem needed)
+- Markers: no special markers needed (no LLM, no inference)
+- [x] Run tests — confirm they **fail** (import errors or assertion failures)
+
+**Files**:
+- `tests/unit/pipelex/temporal/test_storage_payload_codec.py` — **New**
+
+---
+
+## Step 3: Implement `StoragePayloadCodec` (GREEN)
+
+**What**: Create the codec class that extends `temporalio.converter.PayloadCodec`. Implement until all unit tests from Step 2 pass.
 
 **Details**:
 
@@ -47,13 +69,35 @@
     - If yes, extract key from `payload.data.decode()`, download via `storage_provider.load()` (returns `bytes` via the URI scheme), reconstruct original `Payload` via `ParseFromString`
 - [ ] Verify codec operates on raw protobuf `Payload` objects, *before* Kajson deserialization — no interaction with the deterministic layer
 - Note the existing `StorageProviderAbstract` uses a `pipelex-storage://` URI scheme for `store()`/`load()`. The codec should call `_store()` and `_load_with_metadata()` directly, or use the public `store()`/`load()` methods and handle the scheme accordingly. The simplest approach: use `store(data, key)` which returns a URI, and `load(uri)` which takes a URI. Store the URI (not just the key) in the reference payload.
+- [ ] Run unit tests from Step 2 — confirm they **pass** (GREEN)
 
 **Files**:
 - `pipelex/temporal/storage_payload_codec.py` — **New**
 
 ---
 
-## Step 3: Wire codec into `DataConverter`
+## Step 4: Write integration test for large payload round-trip (RED)
+
+**What**: Write the integration test *before* wiring the codec into the DataConverter/client/worker. This test defines the end-to-end contract. It will fail (RED) until Steps 5–7 complete the wiring.
+
+**Details**:
+
+- [ ] Create `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py`
+- [ ] Implement `TestPayloadCodecRoundTrip` class with test workflow:
+  - [ ] Workflow accepts a large Pydantic model (e.g., a WorkingMemory-like object with a large bytes field > 1MB), passes it to an activity, returns it
+  - [ ] Verify the output matches the input exactly
+- Tests the full chain: client encode -> server stores ref -> worker decode -> activity processes -> worker encode -> server stores ref -> client decode
+- Use the in-process test server (`--temporal-server none`) for CI compatibility
+- Use `LocalStorageProvider` with a `tmp_path` fixture for the storage root
+- Markers: `@pytest.mark.asyncio(loop_scope="class")`
+- [ ] Run test — confirm it **fails** (codec not wired yet, payload exceeds 2MB limit or codec is bypassed)
+
+**Files**:
+- `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py` — **New**
+
+---
+
+## Step 5: Wire codec into `DataConverter`
 
 **What**: Modify `temporal_data_converter.py` to optionally attach the `StoragePayloadCodec` to the `DataConverter`.
 
@@ -70,7 +114,7 @@
 
 ---
 
-## Step 4: Wire codec into client connection (`temporal_connect.py`)
+## Step 6: Wire codec into client connection (`temporal_connect.py`)
 
 **What**: Pass the codec-enabled `DataConverter` to `TemporalClient.connect()`.
 
@@ -89,60 +133,20 @@
 
 ---
 
-## Step 5: Wire codec into worker (`worker_cli.py` / `temporal_task_manager.py`)
+## Step 7: Wire codec into worker + verify integration test (GREEN)
 
-**What**: Ensure the worker uses the same codec-enabled `DataConverter`.
+**What**: Ensure the worker uses the same codec-enabled `DataConverter`, then confirm the integration test from Step 4 passes.
 
 **Details**:
 
 - [ ] Verify worker gets codec-enabled converter from `connect_to_temporal()` (already passes data converter to client)
 - [ ] Check if `Worker` constructor in `make_worker()` needs explicit `data_converter` — it currently inherits from the client. Verify this is sufficient, or pass it explicitly.
 - [ ] If explicit passing is needed, thread the data converter through `make_worker()` or have it read from config directly
+- [ ] Run integration test from Step 4 — confirm it **passes** (GREEN)
 
 **Files**:
 - `pipelex/temporal/temporal_task_manager.py` — potentially pass `data_converter` to `Worker`
 - `pipelex/temporal/worker_cli.py` — no changes expected if client handles it
-
----
-
-## Step 6: Unit tests — codec logic
-
-**What**: Test the codec in isolation (no Temporal server needed).
-
-**Details**:
-
-- [ ] Create `tests/unit/pipelex/temporal/test_storage_payload_codec.py`
-- [ ] One `TestStoragePayloadCodec` class with test cases:
-  - [ ] **Below threshold**: payload smaller than threshold passes through `encode()` unchanged. Verify `decode()` also passes it through.
-  - [ ] **Above threshold**: payload larger than threshold is replaced with a storage reference in `encode()`. Verify the reference payload has the correct encoding metadata. Verify `decode()` reconstructs the original payload exactly.
-  - [ ] **Content-addressed deduplication**: encoding the same large payload twice produces the same storage key. The storage provider should contain only one entry.
-  - [ ] **Mixed payloads**: a batch with both small and large payloads — small ones pass through, large ones are offloaded.
-  - [ ] **Round-trip fidelity**: `decode(encode(payloads))` returns identical payloads for various sizes.
-- Use `InMemoryStorageProvider` for unit tests (no filesystem needed)
-- Markers: no special markers needed (no LLM, no inference)
-
-**Files**:
-- `tests/unit/pipelex/temporal/test_storage_payload_codec.py` — **New**
-
----
-
-## Step 7: Integration test — large WorkingMemory round-trip
-
-**What**: Verify that a large payload survives a full Temporal workflow round-trip.
-
-**Details**:
-
-- [ ] Create `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py`
-- [ ] Implement `TestPayloadCodecRoundTrip` class with test workflow:
-  - [ ] Workflow accepts a large Pydantic model (e.g., a WorkingMemory-like object with a large bytes field > 1MB), passes it to an activity, returns it
-  - [ ] Verify the output matches the input exactly
-- Tests the full chain: client encode -> server stores ref -> worker decode -> activity processes -> worker encode -> server stores ref -> client decode
-- Use the in-process test server (`--temporal-server none`) for CI compatibility
-- Use `LocalStorageProvider` with a `tmp_path` fixture for the storage root
-- Markers: `@pytest.mark.asyncio(loop_scope="class")`
-
-**Files**:
-- `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py` — **New**
 
 ---
 
