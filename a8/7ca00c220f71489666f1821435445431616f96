@@ -1,0 +1,39 @@
+TODOS.md
+  ef518473c1f64efb 31,33,44-45,47-55,72,79-96,100,117,136,138,145
+  869536f045b69daa 37-43,46
+tests/unit/pipelex/temporal/test_storage_payload_codec.py
+  869536f045b69daa 1-152
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.22",
+  "base_commit_sha": "a87ca00c220f71489666f1821435445431616f96",
+  "prompts": {
+    "869536f045b69daa": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f9440c3e-c5e9-4414-b906-5b17d5778950",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 160,
+      "total_deletions": 8,
+      "accepted_lines": 160,
+      "overriden_lines": 0
+    },
+    "ef518473c1f64efb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "2d88d8e5-aa26-44d5-9f8d-a766742b4d6a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 37,
+      "overriden_lines": 0
+    }
+  }
+}
