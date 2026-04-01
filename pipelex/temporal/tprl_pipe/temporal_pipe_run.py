@@ -7,7 +7,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
+from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, StorageTarget
 from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
@@ -47,6 +47,8 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         wfid: str | None = None,
     ) -> PipeOutput:
         """Execute a pipe run via Temporal (blocking — waits for completion)."""
+        if delivery_assignment is None:
+            delivery_assignment = DeliveryAssignment(storage=StorageTarget())
         pipe_run_arg = PipeRunArg(
             pipe_job=pipe_job,
             delivery_assignment=delivery_assignment,
@@ -83,6 +85,8 @@ class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol)
         Returns the workflow_id and a WorkflowHandle that can be awaited later.
         """
         log.debug(f"TemporalPipeRun start using task_queue: {self.task_queue}")
+        if delivery_assignment is None:
+            delivery_assignment = DeliveryAssignment(storage=StorageTarget())
         pipe_run_arg = PipeRunArg(
             pipe_job=pipe_job,
             delivery_assignment=delivery_assignment,

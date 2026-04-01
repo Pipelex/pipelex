@@ -42,6 +42,8 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         wf_tracer_key: str | None = None
         graph_context = workflow_arg.job_metadata.graph_context
 
+        pipe_output: PipeOutput | None = None
+
         try:
             if library_crate is not None:
                 # 1. Create per-workflow ClassRegistry pre-seeded from global
@@ -150,7 +152,9 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             # Close per-workflow graph tracer (flushes events to NDJSON)
             if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
                 try:
-                    wf_graph_tracer_manager.close_tracer(wf_tracer_key)
+                    graph_spec = wf_graph_tracer_manager.close_tracer(wf_tracer_key)
+                    if graph_spec is not None and pipe_output is not None:
+                        pipe_output.graph_spec = graph_spec
                 except Exception as tracer_exc:
                     workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
             if event_log is not None:
@@ -174,6 +178,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
         # Dehydrate PipeOutput for Temporal transit: serialize WorkingMemory to
         # raw dict so the parent's data converter can deserialize without needing
         # dynamic concept classes in its ClassRegistry.
+        assert pipe_output is not None
         if library_crate is not None:
             pipe_output = pipe_output.prepare_for_temporal()
 

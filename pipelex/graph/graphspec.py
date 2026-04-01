@@ -231,10 +231,10 @@ class NodeSpec(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True, populate_by_name=True)
 
     node_id: str = Field(validation_alias="id", serialization_alias="id")
-    kind: NodeKind
+    kind: NodeKind = Field(strict=False)
     pipe_code: str | None = None
     pipe_type: str | None = None
-    status: NodeStatus
+    status: NodeStatus = Field(strict=False)
     timing: TimingSpec | None = None
     node_io: NodeIOSpec = Field(
         default_factory=NodeIOSpec,
