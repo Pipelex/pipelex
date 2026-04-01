@@ -139,3 +139,9 @@ class ExtractAssignment(BaseModel):
     extract_input: ExtractInput
     extract_job_params: ExtractJobParams
     extract_job_config: ExtractJobConfig
+
+
+class RenderPageViewsAssignment(BaseModel):
+    job_metadata: JobMetadata
+    document_uri: str
+    page_views_dpi: int

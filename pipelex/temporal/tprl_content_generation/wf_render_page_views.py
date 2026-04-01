@@ -4,28 +4,28 @@ from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
     from pipelex import log
-    from pipelex.cogt.content_generation.assignment_models import ExtractAssignment
+    from pipelex.cogt.content_generation.assignment_models import RenderPageViewsAssignment
     from pipelex.config import get_config
-    from pipelex.core.stuffs.page_content import PageContent
+    from pipelex.core.stuffs.image_content import ImageContent
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
-    from pipelex.temporal.tprl_content_generation.act_extract_generate import act_extract_gen_extract_pages
+    from pipelex.temporal.tprl_content_generation.act_render_page_views import act_render_page_views
 
 
-@workflow.defn(name="wf_make_extract")
-class WfMakeExtract(WorkflowClass[ExtractAssignment, list[PageContent]]):
+@workflow.defn(name="wf_render_page_views")
+class WfRenderPageViews(WorkflowClass[RenderPageViewsAssignment, list[ImageContent]]):
     @override
     @workflow.run
     async def run(
         self,
-        workflow_arg: ExtractAssignment,
-    ) -> list[PageContent]:
+        workflow_arg: RenderPageViewsAssignment,
+    ) -> list[ImageContent]:
         workflow_log.debug("Workflow start")
         worker_config = get_config().temporal.worker_config
         try:
-            page_content_list = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
-                activity=act_extract_gen_extract_pages,
+            image_content_list = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
+                activity=act_render_page_views,
                 arg=workflow_arg,
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
                 retry_policy=worker_config.retry_policy,
@@ -37,4 +37,4 @@ class WfMakeExtract(WorkflowClass[ExtractAssignment, list[PageContent]]):
             raise
 
         workflow_log.debug("Workflow complete")
-        return page_content_list
+        return image_content_list
