@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.pipe_run.delivery_assignment import DeliveryStatus
 from pipelex.pipe_run.delivery_executor import execute_delivery
+from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
 if TYPE_CHECKING:
@@ -28,15 +30,31 @@ class PipeRun(PipeRunProtocol):
         delivery_assignment: DeliveryAssignment | None = None,
         wfid: str | None = None,
     ) -> PipeOutput:
-        pipe_output = await self._pipe_router.run(pipe_job, wfid=wfid)
+        pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
+        status: DeliveryStatus = DeliveryStatus.COMPLETED
+        pipe_output: PipeOutput | None = None
+        execution_error: PipeRouterError | None = None
 
+        try:
+            pipe_output = await self._pipe_router.run(pipe_job, wfid=wfid)
+        except PipeRouterError as exc:
+            status = DeliveryStatus.FAILED
+            execution_error = exc
+            log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")
+
+        # Deliver results (always — even on failure, to notify consumers)
         if delivery_assignment is not None:
-            pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
-            log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}")
+            log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}, status={status}")
             await execute_delivery(
                 pipe_output=pipe_output,
                 pipeline_run_id=pipeline_run_id,
                 delivery_assignment=delivery_assignment,
+                status=status,
             )
 
+        # Re-raise after delivery so the caller sees the error
+        if execution_error is not None:
+            raise execution_error
+
+        assert pipe_output is not None
         return pipe_output

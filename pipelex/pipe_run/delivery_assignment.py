@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
+from pipelex.types import StrEnum
+
+
+class DeliveryStatus(StrEnum):
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
 
 
 class WebhookTarget(BaseModel):
@@ -10,6 +18,7 @@ class WebhookTarget(BaseModel):
 
     url: str
     headers: dict[str, str] = Field(default_factory=dict)
+    payload: dict[str, Any] = Field(default_factory=dict)
 
 
 class StorageTarget(BaseModel):
@@ -21,8 +30,8 @@ class StorageTarget(BaseModel):
 class DeliveryAssignment(BaseModel):
     """Configures the full delivery behavior for a pipe run.
 
-    A delivery assignment can include both storage and webhook targets.
-    Storage runs first (persist the output), then webhooks (notify consumers).
+    Execution order: storage first (persist output), then webhooks (notify consumers).
+    The result_url from storage is automatically injected into webhook payloads.
     """
 
     storage: StorageTarget | None = None
