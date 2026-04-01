@@ -34,6 +34,7 @@ from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.hub import get_current_library_crate
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.system.runtime import WorkerMode, runtime_manager
 from pipelex.temporal.exceptions import ContentGenerationError
@@ -135,6 +136,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             object_assignment = ObjectAssignment.make_for_class(
                 object_class=object_class,
                 llm_assignment=llm_assignment_for_object,
+                library_crate=get_current_library_crate(),
             )
 
             obj = (
@@ -184,6 +186,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 object_class_name=object_class.__name__,
                 llm_assignment_for_text=llm_assignment_for_text,
                 llm_assignment_factory_to_object=llm_assignment_factory_to_object,
+                library_crate=get_current_library_crate(),
             )
 
             obj = (
@@ -225,6 +228,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             object_assignment = ObjectAssignment.make_for_class(
                 object_class=object_class,
                 llm_assignment=llm_assignment_for_object,
+                library_crate=get_current_library_crate(),
             )
 
             obj_list = (
@@ -275,6 +279,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 object_class_name=object_class.__name__,
                 llm_assignment_for_text=llm_assignment_for_text,
                 llm_assignment_factory_to_object=llm_assignment_factory_to_object,
+                library_crate=get_current_library_crate(),
             )
 
             obj_list = (

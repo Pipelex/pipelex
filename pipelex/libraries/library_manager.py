@@ -214,6 +214,17 @@ class LibraryManager(LibraryManagerAbstract):
         self._crate_cache[library_id] = crate
         return crate
 
+    @override
+    def cache_crate(self, library_id: str, crate: LibraryCrate) -> None:
+        """Explicitly cache a crate for a library_id.
+
+        Used by setup_workflow_library to make the crate retrievable via get_crate()
+        after loading via load_from_crate(). Not called from load_from_crate() itself
+        because that method is also used by load_from_blueprints(), where caching
+        would conflict with blueprint accumulation.
+        """
+        self._crate_cache[library_id] = crate
+
     ############################################################
     # Private methods
     ############################################################
@@ -447,6 +458,7 @@ class LibraryManager(LibraryManagerAbstract):
         library.pipe_library.add_pipes(pipes=all_pipes)
 
         library.validate_library()
+
         return all_pipes
 
     @override

@@ -31,6 +31,7 @@ from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.config import get_config
 from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
+from pipelex.hub import get_current_library_crate
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.temporal.exceptions import ContentGenerationError
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
@@ -107,6 +108,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         object_assignment = ObjectAssignment.make_for_class(
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
+            library_crate=get_current_library_crate(),
         )
         temporal_client = await self.temporal_client()
         obj = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
@@ -150,6 +152,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             object_class_name=object_class.__name__,
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
+            library_crate=get_current_library_crate(),
         )
 
         temporal_client = await self.temporal_client()
@@ -185,6 +188,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         object_assignment = ObjectAssignment.make_for_class(
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
+            library_crate=get_current_library_crate(),
         )
         temporal_client = await self.temporal_client()
         obj_list: list[BaseModel] = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
@@ -229,6 +233,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             object_class_name=object_class.__name__,
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
+            library_crate=get_current_library_crate(),
         )
 
         temporal_client = await self.temporal_client()

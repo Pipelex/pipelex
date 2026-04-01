@@ -116,6 +116,48 @@
      --class-registry isolated
    ```
 
+### Temporal Execution Model — ContextVar Boundaries
+
+   **ContextVars do NOT propagate across Temporal execution boundaries.** This is a critical constraint when writing workflows and activities that use `hub.get_class_registry()` or any ContextVar-based state:
+
+   - **Workflow -> activity:** Activities run in a fresh execution context (separate thread pool). A ContextVar set in a workflow's coroutine is invisible to activities dispatched by that workflow. Activities can also run on a **different worker** or even a **different server**.
+   - **Workflow -> child workflow:** Child workflows run in their own execution context. ContextVars from the parent workflow are not inherited.
+   - **Inline await (same coroutine):** ContextVars DO propagate. For example, `pipe.run_pipe()` called directly (as `await`) in `WfPipeRouter.run()` shares the workflow's ContextVar context.
+
+   **Practical rule:** Any state that an activity needs must be passed explicitly via its arguments (the assignment models). Never rely on ContextVars being visible in activities. If an activity calls `get_class_registry()` to look up dynamic classes, it must set up its own library context using the `LibraryCrate` from its argument.
+
+   Example of what works vs what doesn't:
+
+   ```python
+   # WORKS: inline await in workflow — same coroutine, ContextVar visible
+   setup_workflow_library(crate)
+   await pipe.run_pipe(...)  # get_class_registry() finds scoped registry
+
+   # DOES NOT WORK: activity dispatched by workflow — new context
+   setup_workflow_library(crate)
+   await workflow.start_activity(act_llm_gen_object, arg=assignment)
+   # Inside act_llm_gen_object: get_class_registry() returns GLOBAL registry!
+
+   # WORKS: activity sets up its own context from argument data
+   async def act_llm_gen_object(assignment):
+       setup_workflow_library(assignment.library_crate)
+       try:
+           return await llm_gen_object(assignment)
+       finally:
+           teardown_workflow_library(...)
+   ```
+
+### Temporal E2E Testing — Clean Slate Rule
+
+   When running Mode 2 (3-process) E2E tests, **always start from a clean slate:**
+
+   1. Kill existing tmux sessions (`temporal-worker` first, then `temporal-server`)
+   2. Clear `__pycache__` under `pipelex/temporal/` (stale bytecode causes the worker to run old code)
+   3. **Start a fresh Temporal server** — this is what flushes workflow history. `temporal server start-dev` uses an **in-memory database** by default: killing and restarting the server process is all it takes to get a clean history. There is no persistent state to delete.
+   4. Start a fresh worker
+
+   **Why restarting the server matters:** Stale workflow history causes **nondeterminism errors** when workflow code has changed between runs. The server remembers the old workflow's event history, and when the new worker replays it, it detects that the code produces different decisions. Simply restarting the worker is NOT enough — the server holds the history, and it must be restarted too.
+
 ---
 
 ### Prerequisites for running command lines: use virtual environment

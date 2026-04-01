@@ -26,6 +26,7 @@ from pipelex.core.pipes.pipe_abstract import PipeAbstract
 from pipelex.libraries.concept.concept_library_abstract import ConceptLibraryAbstract
 from pipelex.libraries.domain.domain_library_abstract import DomainLibraryAbstract
 from pipelex.libraries.library import Library
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
 from pipelex.libraries.pipe.pipe_library_abstract import PipeLibraryAbstract
 from pipelex.observer.observer_protocol import ObserverProtocol
@@ -483,6 +484,23 @@ def get_default_library_dirs() -> list[Path] | None:
 def teardown_current_library() -> None:
     """Teardown the library_id for the current async context."""
     _library_id.set(None)
+
+
+def get_current_library_crate() -> LibraryCrate | None:
+    """Get the LibraryCrate for the current async context's library, if any.
+
+    Returns None if no current library is set or if the library has no cached crate.
+    """
+    library_id = _library_id.get()
+    if library_id is None:
+        log.debug("get_current_library_crate: no current library set")
+        return None
+    crate = get_library_manager().get_crate(library_id=library_id)
+    if crate is not None:
+        log.debug(f"get_current_library_crate: found crate for '{library_id}' (fingerprint={crate.fingerprint[:12]}...)")
+    else:
+        log.warning(f"get_current_library_crate: no crate cached for '{library_id}'")
+    return crate
 
 
 def resolve_library_dirs(library_dirs: Sequence[str | Path] | None = None) -> tuple[list[Path], str]:

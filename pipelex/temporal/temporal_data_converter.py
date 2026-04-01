@@ -25,10 +25,14 @@ For examples, see the tests in `test_top_crafter.py`:
      allowing the calling method to cast the list to the required generic type with `cast(List[BaseModelType], obj_list)`.
 """
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from kajson import kajson
+from kajson.kajson_manager import KajsonManager
 from pydantic import BaseModel
+
+if TYPE_CHECKING:
+    from kajson.class_registry_abstract import ClassRegistryAbstract
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import (
     CompositePayloadConverter,
@@ -42,6 +46,7 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.hub import get_class_registry
 from pipelex.temporal.exceptions import TemporalFlowError
+from pipelex.temporal.tprl.workflow_library_setup import get_any_workflow_registry
 
 
 class BaseModelPayloadConverterError(TemporalFlowError):
@@ -71,10 +76,37 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
         else:
             return super().to_payload(value)
 
+    def _get_effective_class_registry(self) -> "ClassRegistryAbstract":
+        """Get the best available class registry for deserialization.
+
+        The Temporal data converter runs during SDK activation processing,
+        which is OUTSIDE the workflow coroutine's async context. This means
+        the ContextVar-based get_class_registry() returns the global registry,
+        which doesn't contain dynamic concept classes.
+
+        Fallback chain:
+        1. ContextVar-based registry (works in activities and inline workflow code)
+        2. Any active workflow's registry from the global dict (works during
+           SDK activation processing when deserializing activity results)
+        3. Global KajsonManager registry (baseline)
+        """
+        registry = get_class_registry()
+        # If get_class_registry() returned a scoped registry (ContextVar was set),
+        # it already has the dynamic classes — use it directly.
+        if registry is not KajsonManager.get_class_registry():
+            return registry
+        # Fallback: check if any workflow has an active scoped registry.
+        # This covers the case where the data converter runs during SDK
+        # activation processing (outside the workflow coroutine's context).
+        workflow_registry = get_any_workflow_registry()
+        if workflow_registry is not None:
+            return workflow_registry
+        return registry
+
     def _kajson_deserialize_from_payload(self, payload: Payload) -> Any:
         data = payload.data.decode()
         log.verbose(f"unijson_deserialize_payload — data: {data}")
-        pydantic_gizmo = kajson.loads(data, class_registry=get_class_registry())
+        pydantic_gizmo = kajson.loads(data, class_registry=self._get_effective_class_registry())
         log.verbose(f"unijson_deserialize_payload — pydantic_gizmo: {pydantic_gizmo}")
         return pydantic_gizmo
 

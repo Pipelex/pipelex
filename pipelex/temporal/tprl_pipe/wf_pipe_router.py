@@ -3,18 +3,16 @@ from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
 
 with workflow.unsafe.imports_passed_through():
-    from kajson.class_registry import ClassRegistry
-    from kajson.kajson_manager import KajsonManager
-
     from pipelex.config import get_config
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.graph.graph_tracer_manager import GraphTracerManager
-    from pipelex.hub import get_library_manager, get_report_delegate, set_current_library, teardown_current_library
+    from pipelex.hub import get_report_delegate
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.reporting.reporting_manager import ReportingManager
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
+    from pipelex.temporal.tprl.workflow_library_setup import setup_workflow_library, teardown_workflow_library
     from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
     from pipelex.tracing.ndjson_event_log import NdjsonEventLog
 
@@ -44,25 +42,12 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
 
         try:
             if library_crate is not None:
-                # 1. Create per-workflow ClassRegistry pre-seeded from global
-                global_registry = KajsonManager.get_class_registry()
-                workflow_registry = ClassRegistry()
-                if isinstance(global_registry, ClassRegistry):
-                    workflow_registry.register_classes_dict(dict(global_registry.root))
-                else:
-                    workflow_log.warning("Global registry is not a ClassRegistry, cannot pre-seed workflow registry")
+                wf_library_id = setup_workflow_library(
+                    library_crate=library_crate,
+                    workflow_id=workflow.info().workflow_id,
+                )
 
-                # 2. Open library and attach registry to it
-                library_manager = get_library_manager()
-                wf_library_id = f"wf_{workflow.info().workflow_id}"
-                _wf_library_id, wf_library = library_manager.open_library(library_id=wf_library_id)
-                wf_library.set_class_registry(workflow_registry)
-                set_current_library(library_id=wf_library_id)
-
-                # 3. Load crate (registers dynamic classes into workflow_registry via hub.get_class_registry())
-                library_manager.load_from_crate(library_id=wf_library_id, crate=library_crate)
-
-                # 4. Hydrate WorkingMemory (now that dynamic classes are registered)
+                # Hydrate WorkingMemory (now that dynamic classes are registered)
                 if workflow_arg.working_memory_raw is not None:
                     workflow_arg.working_memory = hydrate_working_memory(workflow_arg.working_memory_raw)
                     workflow_arg.working_memory_raw = None
@@ -155,10 +140,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                         report_delegate.clear_event_log(context_key=wf_tracer_key)
 
             if wf_library_id is not None:
-                try:
-                    get_library_manager().teardown(library_id=wf_library_id)
-                finally:
-                    teardown_current_library()
+                teardown_workflow_library(wf_library_id=wf_library_id)
 
         # Dehydrate PipeOutput for Temporal transit: serialize WorkingMemory to
         # raw dict so the parent's data converter can deserialize without needing

@@ -14,6 +14,7 @@ from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
 from pipelex.hub import get_class_registry
+from pipelex.libraries.library_crate import LibraryCrate
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -85,11 +86,13 @@ class LLMAssignment(BaseModel):
 class ObjectAssignment(BaseModel):
     object_class_name: str
     llm_assignment_for_object: LLMAssignment
+    library_crate: LibraryCrate | None = None
 
     @staticmethod
     def make_for_class(
         object_class: type[BaseModel],
         llm_assignment: LLMAssignment,
+        library_crate: LibraryCrate | None = None,
     ) -> "ObjectAssignment":
         object_class_name = object_class.__name__
         get_class_registry().register_class(
@@ -101,6 +104,7 @@ class ObjectAssignment(BaseModel):
         return ObjectAssignment(
             object_class_name=object_class_name,
             llm_assignment_for_object=llm_assignment,
+            library_crate=library_crate,
         )
 
 
@@ -108,6 +112,7 @@ class TextThenObjectAssignment(BaseModel):
     object_class_name: str
     llm_assignment_for_text: LLMAssignment
     llm_assignment_factory_to_object: LLMAssignmentFactory
+    library_crate: LibraryCrate | None = None
 
 
 class ImgGenAssignment(BaseModel):

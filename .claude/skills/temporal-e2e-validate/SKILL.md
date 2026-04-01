@@ -80,6 +80,10 @@ regressions.
 
 ### Step 1: Ensure the Temporal dev server is running
 
+Mode 1 uses in-process workers (not the external tmux worker), so stale server history
+is less of a concern here. But if tests fail with nondeterminism errors, kill and
+restart the server — it uses an in-memory database, so restart = clean history.
+
 ```bash
 curl -s http://localhost:8233 > /dev/null 2>&1 && echo "running" || echo "not running"
 ```
@@ -168,34 +172,67 @@ costs, validates serialization and crate propagation. But dry-run produces tiny 
 data, so it **cannot catch payload size issues** (e.g. large image payloads blowing up
 Temporal's data converter).
 
-Ask the user which mode they want. If they say "live", replace `--dry-run --mock-inputs`
-with `--pipe-run-mode live` in all commands below. Live mode makes real LLM and image
-generation calls — it costs money and is slower, but it's the only way to validate that
-real-sized payloads (especially images) flow correctly through Temporal.
+Ask the user which mode they want. If they say "live", omit `--dry-run --mock-inputs`
+in all commands below (there is no `--pipe-run-mode` flag — just remove the dry-run
+flags to run live). Live mode makes real LLM and image generation calls — it costs
+money and is slower, but it's the only way to validate that real-sized payloads
+(especially images) flow correctly through Temporal.
 
 **This matters most for Tiers 4 and 5** (image generation and image flow). In dry-run,
 mock images are trivially small, so payload size bugs don't surface. In live mode,
 generated images are hundreds of KB to several MB — exactly the size that breaks Temporal
 if activity-level storage isn't implemented.
 
-### Step 1: Ensure Temporal server is running
+### Step 0: Clean slate (MANDATORY)
 
-Same as Mode 1 Step 1.
+**Always start from a clean slate.** This means killing and restarting BOTH the worker
+AND the Temporal server. `temporal server start-dev` uses an **in-memory database** —
+killing the server process is all it takes to flush workflow history. There is no
+persistent state file to delete, no `--db-filename` trick needed. Just kill and restart.
 
-### Step 2: Start the worker process
+**Why the server must be restarted (not just the worker):** The server holds workflow
+event history. If workflow code changed since the last run, the server will replay old
+events against new code, producing nondeterminism errors like:
+`Child workflow id of scheduled event 'X' does not match child workflow id of command 'Y'`.
+Restarting only the worker does NOT fix this — the stale history lives in the server.
 
-The worker should NOT have test bundles in its PIPELEXPATH — the whole point is that
-bundles arrive via the LibraryCrate in the PipeJob.
+Stale `__pycache__` files are a separate problem: they cause the worker to run old
+bytecode even after source changes.
 
 ```bash
-tmux has-session -t temporal-worker 2>/dev/null && tmux kill-session -t temporal-worker
+# Kill worker first, then server (order matters: worker shutdown is cleaner
+# when it can still reach the server briefly)
+tmux kill-session -t temporal-worker 2>/dev/null
+tmux kill-session -t temporal-server 2>/dev/null
+
+# Clear Python bytecode caches under temporal modules
+find pipelex/temporal -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null
+
+sleep 2
+```
+
+### Step 1: Start fresh Temporal server and worker
+
+The server MUST be started fresh after Step 0 — it's an in-memory database, so the
+new process starts with zero workflow history. Do NOT skip this even if a server
+appears to be running — that's the stale one with old history.
+
+```bash
+# Start server (in-memory DB — fresh process = clean history)
+tmux new-session -d -s temporal-server 'temporal server start-dev'
+sleep 4
+curl -s http://localhost:8233 > /dev/null 2>&1 && echo "Temporal server: running" || echo "Temporal server: FAILED"
+
+# Start worker (no PIPELEXPATH -- bundles arrive via LibraryCrate in PipeJob)
 tmux new-session -d -c "$PWD" -s temporal-worker \
   '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
 sleep 4
-tmux capture-pane -t temporal-worker -p -S -30
+tmux capture-pane -t temporal-worker -p -S -5
 ```
 
 Look for `Temporal Worker started for 'temporal_task_queue'`.
+
+If either fails, check for port conflicts (`lsof -i :7233` / `lsof -i :8233`).
 
 ### Step 3: Sequential tests — run one at a time, report after each
 
@@ -281,7 +318,7 @@ Live (real image generation — required to catch payload size bugs):
 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
   --pipe generate_crazy_image \
-  --temporal --pipe-run-mode live --no-logo --graph
+  --temporal --no-logo --graph
 ```
 
 After this completes, tell the user: PASS/FAIL, output dir, graph file path.
@@ -322,7 +359,7 @@ Live (real image generation + vision — required to catch payload size bugs):
 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds \
   --pipe image_out_in \
-  --temporal --pipe-run-mode live --no-logo --graph
+  --temporal --no-logo --graph
 ```
 
 After this completes, tell the user: PASS/FAIL, output dir, graph file path.

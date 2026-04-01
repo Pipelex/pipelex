@@ -14,6 +14,7 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
+    from pipelex.temporal.tprl.workflow_library_setup import setup_workflow_library, teardown_workflow_library
     from pipelex.temporal.tprl_content_generation.act_llm_generate import (
         act_llm_gen_object,
         act_llm_gen_object_list,
@@ -29,9 +30,16 @@ class WfMakeObject(WorkflowClass[ObjectAssignment, BaseModel]):
         self,
         workflow_arg: ObjectAssignment,
     ) -> BaseModel:
-        workflow_log.debug("Workflow start")
         worker_config = get_config().temporal.worker_config
+        library_crate = workflow_arg.library_crate
+        wf_library_id: str | None = None
         try:
+            if library_crate is not None:
+                wf_library_id = setup_workflow_library(
+                    library_crate=library_crate,
+                    workflow_id=workflow.info().workflow_id,
+                )
+                workflow_log.info(f"WfMakeObject: library set up with id '{wf_library_id}'")
             obj = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_object,
                 arg=workflow_arg,
@@ -43,7 +51,10 @@ class WfMakeObject(WorkflowClass[ObjectAssignment, BaseModel]):
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
-        workflow_log.debug("Workflow complete")
+        finally:
+            if wf_library_id is not None:
+                teardown_workflow_library(wf_library_id=wf_library_id)
+        workflow_log.debug("WfMakeObject workflow complete")
         return obj
 
 
@@ -57,7 +68,14 @@ class WfMakeObjectList(WorkflowClass[ObjectAssignment, list[BaseModel]]):
     ) -> list[BaseModel]:
         workflow_log.debug("Workflow start")
         worker_config = get_config().temporal.worker_config
+        library_crate = workflow_arg.library_crate
+        wf_library_id: str | None = None
         try:
+            if library_crate is not None:
+                wf_library_id = setup_workflow_library(
+                    library_crate=library_crate,
+                    workflow_id=workflow.info().workflow_id,
+                )
             obj_list: list[BaseModel] = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_object_list,
                 arg=workflow_arg,
@@ -69,6 +87,9 @@ class WfMakeObjectList(WorkflowClass[ObjectAssignment, list[BaseModel]]):
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
+        finally:
+            if wf_library_id is not None:
+                teardown_workflow_library(wf_library_id=wf_library_id)
         workflow_log.debug("Workflow complete")
         return obj_list
 
@@ -83,7 +104,14 @@ class WfMakeTextThenObject(WorkflowClass[TextThenObjectAssignment, BaseModel]):
     ) -> BaseModel:
         workflow_log.debug("Workflow start")
         worker_config = get_config().temporal.worker_config
+        library_crate = workflow_arg.library_crate
+        wf_library_id: str | None = None
         try:
+            if library_crate is not None:
+                wf_library_id = setup_workflow_library(
+                    library_crate=library_crate,
+                    workflow_id=workflow.info().workflow_id,
+                )
             preliminary_text = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_text,
                 arg=workflow_arg.llm_assignment_for_text,
@@ -100,6 +128,7 @@ class WfMakeTextThenObject(WorkflowClass[TextThenObjectAssignment, BaseModel]):
             fup_obj_assignment = ObjectAssignment(
                 llm_assignment_for_object=fup_llm_assignment,
                 object_class_name=workflow_arg.object_class_name,
+                library_crate=workflow_arg.library_crate,
             )
 
             obj: BaseModel = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
@@ -115,6 +144,9 @@ class WfMakeTextThenObject(WorkflowClass[TextThenObjectAssignment, BaseModel]):
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
+        finally:
+            if wf_library_id is not None:
+                teardown_workflow_library(wf_library_id=wf_library_id)
         workflow_log.debug("Workflow complete")
         return obj
 
@@ -129,7 +161,14 @@ class WfMakeTextThenObjectList(WorkflowClass[TextThenObjectAssignment, list[Base
     ) -> list[BaseModel]:
         workflow_log.debug("Workflow start")
         worker_config = get_config().temporal.worker_config
+        library_crate = workflow_arg.library_crate
+        wf_library_id: str | None = None
         try:
+            if library_crate is not None:
+                wf_library_id = setup_workflow_library(
+                    library_crate=library_crate,
+                    workflow_id=workflow.info().workflow_id,
+                )
             preliminary_text = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_llm_gen_text,
                 arg=workflow_arg.llm_assignment_for_text,
@@ -146,6 +185,7 @@ class WfMakeTextThenObjectList(WorkflowClass[TextThenObjectAssignment, list[Base
             object_assignment = ObjectAssignment(
                 object_class_name=workflow_arg.object_class_name,
                 llm_assignment_for_object=llm_assignment_for_object,
+                library_crate=workflow_arg.library_crate,
             )
 
             obj_list: list[BaseModel] = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
@@ -161,6 +201,9 @@ class WfMakeTextThenObjectList(WorkflowClass[TextThenObjectAssignment, list[Base
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
+        finally:
+            if wf_library_id is not None:
+                teardown_workflow_library(wf_library_id=wf_library_id)
 
         workflow_log.debug(f"obj_list: {obj_list}")
         workflow_log.debug("Workflow complete")
