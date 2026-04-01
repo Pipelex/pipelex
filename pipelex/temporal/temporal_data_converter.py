@@ -98,6 +98,11 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
         # Fallback: check if any workflow has an active scoped registry.
         # This covers the case where the data converter runs during SDK
         # activation processing (outside the workflow coroutine's context).
+        # TODO(data-converter-refactor): This fallback is nondeterministic when multiple
+        # workflows are active concurrently — it returns an arbitrary registry from the
+        # global dict. It works today because Temporal typically processes one workflow
+        # activation at a time, but should be replaced with a deterministic mechanism
+        # (e.g., thread-local storage keyed by activation context).
         workflow_registry = get_any_workflow_registry()
         if workflow_registry is not None:
             return workflow_registry

@@ -23,6 +23,8 @@ allowed-tools:
   - Bash(ls *)
   - Bash(which *)
   - Bash(open *)
+  - Bash(lsof *)
+  - Bash(find *)
 ---
 
 # Temporal E2E Validation Suite

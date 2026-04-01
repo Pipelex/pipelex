@@ -12,7 +12,7 @@ from pipelex.libraries.library_crate import LibraryCrate
 # The Temporal data converter runs OUTSIDE the workflow coroutine's async context
 # (during SDK activation processing), so ContextVar-based get_class_registry()
 # returns the global registry. This dict lets the converter find the correct
-# per-workflow registry by falling back to the most recently set up registry.
+# per-workflow registry by falling back to any active workflow's registry.
 _workflow_registries: dict[str, ClassRegistry] = {}
 _workflow_registries_lock = threading.Lock()
 
@@ -59,28 +59,42 @@ def setup_workflow_library(
     else:
         log.warning("Global registry is not a ClassRegistry, cannot pre-seed workflow registry")
 
-    # 2. Open library and attach registry
+    # 2. Open library, attach registry, load crate, cache, and register.
+    # Wrapped in try/except to ensure all-or-nothing: if any step fails,
+    # partial state is cleaned up before re-raising.
     library_manager = get_library_manager()
     wf_library_id = f"wf_{workflow_id}"
-    _wf_library_id, wf_library = library_manager.open_library(library_id=wf_library_id)
-    wf_library.set_class_registry(workflow_registry)
-    set_current_library(library_id=wf_library_id)
 
-    # 3. Load crate (registers dynamic classes into workflow_registry via hub.get_class_registry())
-    library_manager.load_from_crate(library_id=wf_library_id, crate=library_crate)
+    try:
+        _wf_library_id, wf_library = library_manager.open_library(library_id=wf_library_id)
+        wf_library.set_class_registry(workflow_registry)
+        set_current_library(library_id=wf_library_id)
 
-    # 4. Cache the crate so get_crate(wf_library_id) can retrieve it later.
-    # ContentGeneratorChild calls get_current_library_crate() to propagate the crate
-    # to child workflows (WfMakeObject, etc.) via their assignment models.
-    # We cache here (not in load_from_crate) because load_from_crate is also called
-    # by load_from_blueprints, where caching would conflict with blueprint accumulation.
-    library_manager.cache_crate(library_id=wf_library_id, crate=library_crate)
+        # 3. Load crate (registers dynamic classes into workflow_registry via hub.get_class_registry())
+        library_manager.load_from_crate(library_id=wf_library_id, crate=library_crate)
 
-    # 5. Register the workflow's ClassRegistry in the global dict so the Temporal
-    # data converter can find it during activation processing (where ContextVars
-    # are not available).
-    with _workflow_registries_lock:
-        _workflow_registries[wf_library_id] = workflow_registry
+        # 4. Cache the crate so get_crate(wf_library_id) can retrieve it later.
+        # ContentGeneratorChild calls get_current_library_crate() to propagate the crate
+        # to child workflows (WfMakeObject, etc.) via their assignment models.
+        # We cache here (not in load_from_crate) because load_from_crate is also called
+        # by load_from_blueprints, where caching would conflict with blueprint accumulation.
+        library_manager.cache_crate(library_id=wf_library_id, crate=library_crate)
+
+        # 5. Register the workflow's ClassRegistry in the global dict so the Temporal
+        # data converter can find it during activation processing (where ContextVars
+        # are not available).
+        with _workflow_registries_lock:
+            _workflow_registries[wf_library_id] = workflow_registry
+    except BaseException:
+        # Clean up partial setup so callers don't leak resources
+        with _workflow_registries_lock:
+            _workflow_registries.pop(wf_library_id, None)
+        try:
+            library_manager.teardown(library_id=wf_library_id)
+        except Exception as teardown_exc:
+            log.warning(f"Failed to clean up partial workflow library '{wf_library_id}': {teardown_exc}")
+        teardown_current_library()
+        raise
 
     return wf_library_id
 
