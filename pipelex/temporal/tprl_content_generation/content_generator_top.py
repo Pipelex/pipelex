@@ -377,6 +377,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
 
     @override
     @with_conditional_worker
+    @update_job_metadata
     async def make_render_page_views(
         self,
         job_metadata: JobMetadata,

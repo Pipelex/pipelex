@@ -53,9 +53,8 @@ async def img_gen_single_image_and_store(
         secondary_id=img_gen_assignment.job_metadata.pipeline_run_id,
         raw_details=generated_image,
     )
-    if img_gen_assignment.img_gen_prompt:
-        image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text
-        image_content.source_negative_prompt = img_gen_assignment.img_gen_prompt.negative_text
+    image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text
+    image_content.source_negative_prompt = img_gen_assignment.img_gen_prompt.negative_text
     return image_content
 
 
@@ -72,8 +71,7 @@ async def img_gen_image_list_and_store(
             secondary_id=img_gen_assignment.job_metadata.pipeline_run_id,
             raw_details=raw_details,
         )
-        if img_gen_assignment.img_gen_prompt:
-            image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text
-            image_content.source_negative_prompt = img_gen_assignment.img_gen_prompt.negative_text
+        image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text
+        image_content.source_negative_prompt = img_gen_assignment.img_gen_prompt.negative_text
         image_contents.append(image_content)
     return image_contents

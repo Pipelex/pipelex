@@ -3,7 +3,6 @@ from typing import Any
 from pydantic import BaseModel
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMAssignmentError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
@@ -86,12 +85,6 @@ class LLMAssignment(BaseModel):
 class ObjectAssignment(BaseModel):
     object_class_name: str
     llm_assignment_for_object: LLMAssignment
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
-        if not get_class_registry().has_class(name=self.object_class_name):
-            error_msg = f"Could not create ObjectAssignment for class '{self.object_class_name}' because it is not in the class registry."
-            raise LLMAssignmentError(error_msg)
 
     @staticmethod
     def make_for_class(

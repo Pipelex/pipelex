@@ -316,6 +316,7 @@ class ContentGenerator(ContentGeneratorProtocol):
         return await templating_gen_text(templating_assignment=templating_assignment)
 
     @override
+    @update_job_metadata
     async def make_render_page_views(
         self,
         job_metadata: JobMetadata,
