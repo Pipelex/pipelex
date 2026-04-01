@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.25.0] - 2026-04-01
+
+### Added
+
+- **`PipeRouterTop.start_pipe_job()`**: New method to start a Temporal workflow and return the `workflow_id` and `WorkflowHandle` immediately without waiting for completion. Complements the existing blocking `_run_pipe_job()`.
+- **`workflow_id` in start response**: `PipelexPipelineStartResponse` now includes `workflow_id` for callers to track the Temporal workflow.
+- **Pre-generated `pipeline_run_id` support**: `pipeline_run_setup()`, `PipelineFactory`, and `PipelineManager` now accept an optional `pipeline_run_id` parameter. When provided, this ID is used instead of generating a new one — enabling external systems (e.g., API Gateway Lambdas) to create the run record before starting execution.
+
+### Changed
+
+- **`WorkflowHandle` import moved to runtime**: `WorkflowHandle` is now imported at runtime (was `TYPE_CHECKING` only) since it's used in the return type annotation of `start_pipe_job()`.
+
 ## [v0.24.0] - 2026-03-30
 
 ### Added

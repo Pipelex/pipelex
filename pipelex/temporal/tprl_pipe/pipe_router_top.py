@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from temporalio.client import WorkflowHandle
 from temporalio.common import RetryPolicy
 from typing_extensions import override
 
@@ -11,7 +12,7 @@ from pipelex.pipe_run.pipe_job import PipeJob
 from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
-from pipelex.temporal.tprl.workflow_caller import WorkflowExecutor, WorkflowExecutorFactory
+from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 
@@ -59,6 +60,32 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
             pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
             pipe_output.working_memory_raw = None
         return pipe_output
+
+    @with_conditional_worker
+    async def start_pipe_job(
+        self,
+        pipe_job: PipeJob,
+        wfid: str | None = None,
+    ) -> tuple[str, WorkflowHandle[WorkflowClass[PipeJob, PipeOutput], PipeOutput]]:
+        """Start a pipe job without waiting for completion.
+
+        Returns the workflow_id and a WorkflowHandle that can be awaited later
+        for the result.
+        """
+        log.debug(f"PipeRouterTop start_pipe_job using task_queue: {self.task_queue}")
+        pipe_job = pipe_job.prepare_for_temporal()
+        executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(
+            task_queue=self.task_queue,
+            should_auto_connect_temporal=self.should_auto_connect_temporal,
+            worker_environment=self.worker_environment,
+        )
+        workflow_id = self.make_workflow_id(base_id=wfid or self.class_name)
+        handle = await executor.start_workflow(
+            workflow_class=WfPipeRouter,
+            workflow_id=workflow_id,
+            workflow_arg=pipe_job,
+        )
+        return workflow_id, handle
 
     # async def run_pipe_code(
     #     self,

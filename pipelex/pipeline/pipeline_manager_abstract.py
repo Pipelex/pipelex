@@ -21,5 +21,5 @@ class PipelineManagerAbstract(ABC):
         pass
 
     @abstractmethod
-    def add_new_pipeline(self, pipe_code: str | None) -> Pipeline:
+    def add_new_pipeline(self, pipe_code: str | None, pipeline_run_id: str | None = None) -> Pipeline:
         pass

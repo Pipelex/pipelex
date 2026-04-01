@@ -60,6 +60,7 @@ async def pipeline_run_setup(
     pipe_run_mode: PipeRunMode | None = None,
     search_domain_codes: list[str] | None = None,
     user_id: str | None = None,
+    pipeline_run_id: str | None = None,
 ) -> tuple[PipeJob, str, str]:
     """Set up a pipeline for execution.
 
@@ -114,6 +115,10 @@ async def pipeline_run_setup(
         added if not already present.
     user_id:
         Unique identifier for the user (optional).
+    pipeline_run_id:
+        Pre-generated pipeline run ID. If provided, this ID is used instead of
+        generating a new one. Use this when the run record has already been created
+        externally (e.g., by an API Gateway).
 
     Returns:
     -------
@@ -127,7 +132,7 @@ async def pipeline_run_setup(
         msg = "Either pipe_code or mthds_contents must be provided to the pipeline API."
         raise ValueError(msg)
 
-    pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code)
+    pipeline = get_pipeline_manager().add_new_pipeline(pipe_code=pipe_code, pipeline_run_id=pipeline_run_id)
     pipeline_run_id = pipeline.pipeline_run_id
 
     if not library_id:
