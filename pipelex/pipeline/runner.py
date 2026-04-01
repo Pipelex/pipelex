@@ -14,7 +14,7 @@ from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.hub import (
     get_library_manager,
-    get_pipe_router,
+    get_pipe_run,
     get_report_delegate,
     get_telemetry_manager,
     teardown_current_library,
@@ -146,9 +146,9 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
             )
-            pipe_output = await get_pipe_router().run(pipe_job)
+            pipe_output = await get_pipe_run().run(pipe_job)
         except PipeRouterError as exc:
-            # PipeRouterError can only be raised by get_pipe_router().run(), so pipe_job is guaranteed to exist
+            # PipeRouterError can only be raised by get_pipe_run().run(), so pipe_job is guaranteed to exist
             assert pipe_job is not None  # for type checker
             properties = {
                 EventProperty.PIPELINE_RUN_ID: pipeline_run_id,

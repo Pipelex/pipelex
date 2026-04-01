@@ -1,24 +1,26 @@
-from collections.abc import Sequence
 from datetime import timedelta
 
-from temporalio.client import Callback, WorkflowHandle
+from temporalio.client import WorkflowHandle
 from temporalio.common import RetryPolicy
 from typing_extensions import override
 
 from pipelex import log
 from pipelex.config import get_config
 from pipelex.core.pipes.pipe_output import PipeOutput
-from pipelex.observer.observer_protocol import ObserverNoOp
+from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
 from pipelex.pipe_run.pipe_job import PipeJob
-from pipelex.pipe_run.pipe_router_protocol import PipeRouterProtocol
+from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 from pipelex.temporal.temporal_manager import TemporalWorkerEnvironment
 from pipelex.temporal.tprl.conditional_worker import with_conditional_worker
 from pipelex.temporal.tprl.workflow_caller import WorkflowClass, WorkflowExecutor, WorkflowExecutorFactory
 from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
-from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
+from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
+from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 
 
-class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
+class TemporalPipeRun(WorkflowExecutor[PipeRunArg, PipeOutput], PipeRunProtocol):
+    """Temporal-mode PipeRun: dispatches WfPipeRun workflow which orchestrates execution + delivery."""
+
     def __init__(
         self,
         task_queue: str,
@@ -26,8 +28,8 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
         retry_policy: RetryPolicy | None = None,
         should_auto_connect_temporal: bool = False,
         worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
-    ):
-        log.debug(f"PipeRouterTop init with worker_environment: {worker_environment}")
+    ) -> None:
+        log.debug(f"TemporalPipeRun init with worker_environment: {worker_environment}")
         super().__init__(
             workflow_execution_timeout=workflow_execution_timeout,
             retry_policy=retry_policy,
@@ -35,96 +37,82 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
             should_auto_connect_temporal=should_auto_connect_temporal,
             worker_environment=worker_environment,
         )
-        self.observer = ObserverNoOp()
 
     @override
     @with_conditional_worker
-    async def _run_pipe_job(
+    async def run(
         self,
         pipe_job: PipeJob,
+        delivery_assignment: DeliveryAssignment | None = None,
         wfid: str | None = None,
     ) -> PipeOutput:
-        log.debug(f"PipeRouterTop _run_pipe_job using task_queue: {self.task_queue} with worker_environment={self.worker_environment}")
-        pipe_job = pipe_job.prepare_for_temporal()
-        executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(
+        """Execute a pipe run via Temporal (blocking — waits for completion)."""
+        pipe_run_arg = PipeRunArg(
+            pipe_job=pipe_job,
+            delivery_assignment=delivery_assignment,
+        )
+        pipe_run_arg = pipe_run_arg.prepare_for_temporal()
+
+        executor = WorkflowExecutorFactory[PipeRunArg, PipeOutput]().create_executor(
             task_queue=self.task_queue,
             should_auto_connect_temporal=self.should_auto_connect_temporal,
             worker_environment=self.worker_environment,
         )
         pipe_output = await executor.execute_workflow(
-            workflow_class=WfPipeRouter,
+            workflow_class=WfPipeRun,
             workflow_id=self.make_workflow_id(base_id=wfid or self.class_name),
-            workflow_arg=pipe_job,
+            workflow_arg=pipe_run_arg,
         )
-        # Rehydrate PipeOutput: reconstruct typed WorkingMemory from raw dict
+
+        # Rehydrate PipeOutput
         if pipe_output.working_memory_raw is not None:
             pipe_output.working_memory = hydrate_working_memory(pipe_output.working_memory_raw)
             pipe_output.working_memory_raw = None
+
         return pipe_output
 
     @with_conditional_worker
-    async def start_pipe_job(
+    async def start(
         self,
         pipe_job: PipeJob,
+        delivery_assignment: DeliveryAssignment | None = None,
         wfid: str | None = None,
-        callbacks: Sequence[Callback] | None = None,
-    ) -> tuple[str, WorkflowHandle[WorkflowClass[PipeJob, PipeOutput], PipeOutput]]:
-        """Start a pipe job without waiting for completion.
+    ) -> tuple[str, WorkflowHandle[WorkflowClass[PipeRunArg, PipeOutput], PipeOutput]]:
+        """Start a pipe run without waiting for completion.
 
-        Returns the workflow_id and a WorkflowHandle that can be awaited later
-        for the result. Optional callbacks are forwarded to Temporal and called
-        on workflow completion.
+        Returns the workflow_id and a WorkflowHandle that can be awaited later.
         """
-        log.debug(f"PipeRouterTop start_pipe_job using task_queue: {self.task_queue}")
-        pipe_job = pipe_job.prepare_for_temporal()
-        executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(
+        log.debug(f"TemporalPipeRun start using task_queue: {self.task_queue}")
+        pipe_run_arg = PipeRunArg(
+            pipe_job=pipe_job,
+            delivery_assignment=delivery_assignment,
+        )
+        pipe_run_arg = pipe_run_arg.prepare_for_temporal()
+
+        executor = WorkflowExecutorFactory[PipeRunArg, PipeOutput]().create_executor(
             task_queue=self.task_queue,
             should_auto_connect_temporal=self.should_auto_connect_temporal,
             worker_environment=self.worker_environment,
         )
         workflow_id = self.make_workflow_id(base_id=wfid or self.class_name)
         handle = await executor.start_workflow(
-            workflow_class=WfPipeRouter,
+            workflow_class=WfPipeRun,
             workflow_id=workflow_id,
-            workflow_arg=pipe_job,
-            callbacks=callbacks,
+            workflow_arg=pipe_run_arg,
         )
         return workflow_id, handle
 
-    # async def run_pipe_code(
-    #     self,
-    #     pipe_code: str,
-    #     pipe_run_params: PipeRunParams | None = None,
-    #     job_metadata: JobMetadata | None = None,
-    #     working_memory: WorkingMemory | None = None,
-    #     output_name: str | None = None,
-    #     wfid: str | None = None,
-    # ) -> PipeOutputType:  # pyright: ignore[reportInvalidTypeVarUse]
-    #     pipe = get_required_pipe(pipe_code)
-    #     pipe_job = PipeJobFactory.make_pipe_job(
-    #         pipe=pipe,
-    #         job_metadata=job_metadata,
-    #         working_memory=working_memory,
-    #         output_name=output_name,
-    #         pipe_run_params=pipe_run_params,
-    #     )
-    #     pipe_output: PipeOutputType = await self.run(
-    #         pipe_job=pipe_job,
-    #         wfid=wfid,
-    #     )
-    #     return pipe_output
 
-
-def make_tprl_pipe_router_top(
+def make_temporal_pipe_run(
     task_queue: str | None = None,
     workflow_execution_timeout: timedelta | None = None,
     retry_policy: RetryPolicy | None = None,
     should_auto_connect_temporal: bool = True,
     worker_environment: TemporalWorkerEnvironment = TemporalWorkerEnvironment.EXTERNAL,
-) -> PipeRouterTop:
-    """This factory is only passing your settings or using defaults from pipelex.temporal's config."""
+) -> TemporalPipeRun:
+    """Factory: creates a TemporalPipeRun from config defaults."""
     worker_config = get_config().temporal.worker_config
-    return PipeRouterTop(
+    return TemporalPipeRun(
         task_queue=task_queue or worker_config.task_queue,
         workflow_execution_timeout=workflow_execution_timeout or worker_config.workflow_execution_timeout,
         retry_policy=retry_policy or worker_config.retry_policy,

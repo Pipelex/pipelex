@@ -21,6 +21,18 @@ class PipeJobError(PipelexError):
     pass
 
 
+class DeliveryError(PipelexError):
+    pass
+
+
+class WebhookDeliveryError(DeliveryError):
+    pass
+
+
+class StorageDeliveryError(DeliveryError):
+    pass
+
+
 class PipeRouterError(PipelexError):
     def __init__(
         self,

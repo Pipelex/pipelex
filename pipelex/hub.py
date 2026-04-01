@@ -2,7 +2,7 @@ import sys
 from collections.abc import Sequence
 from contextvars import ContextVar
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
@@ -44,6 +44,9 @@ from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstr
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 
+if TYPE_CHECKING:
+    from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
+
 
 class PipelexHub:
     """PipelexHub serves as a central dependency manager to break cyclic imports between components.
@@ -76,7 +79,7 @@ class PipelexHub:
         self._concept_library: ConceptLibraryAbstract | None = None
         self._pipe_library: PipeLibraryAbstract | None = None
         self._pipe_router: PipeRouterProtocol | None = None
-        self._pipe_router_top: PipeRouterProtocol | None = None
+        self._pipe_run: PipeRunProtocol | None = None
 
         # pipeline
         self._pipeline_manager: PipelineManagerAbstract | None = None
@@ -189,8 +192,8 @@ class PipelexHub:
     def set_pipe_router(self, pipe_router: PipeRouterProtocol):
         self._pipe_router = pipe_router
 
-    def set_pipe_router_top(self, pipe_router_top: PipeRouterProtocol):
-        self._pipe_router_top = pipe_router_top
+    def set_pipe_run(self, pipe_run: "PipeRunProtocol") -> None:
+        self._pipe_run = pipe_run
 
     def set_pipeline_manager(self, pipeline_manager: PipelineManagerAbstract):
         self._pipeline_manager = pipeline_manager
@@ -307,21 +310,16 @@ class PipelexHub:
         return self._pipe_library
 
     def get_required_pipe_router(self) -> PipeRouterProtocol:
-        # When Temporal is enabled, auto-switch between top (outside workflow) and child (inside workflow)
-        if self._pipe_router_top is not None:
-            from pipelex.temporal.temporal_workflow_utils import is_in_temporal_workflow  # noqa: PLC0415
-
-            if is_in_temporal_workflow():
-                if self._pipe_router is None:
-                    msg = "PipeRouterChild is not initialized"
-                    raise RuntimeError(msg)
-                return self._pipe_router
-            return self._pipe_router_top
-        # Direct mode: return the single router
         if self._pipe_router is None:
             msg = "PipeRouter is not initialized"
             raise RuntimeError(msg)
         return self._pipe_router
+
+    def get_required_pipe_run(self) -> "PipeRunProtocol":
+        if self._pipe_run is None:
+            msg = "PipeRun is not initialized"
+            raise RuntimeError(msg)
+        return self._pipe_run
 
     def get_required_pipeline_manager(self) -> PipelineManagerAbstract:
         if self._pipeline_manager is None:
@@ -578,6 +576,10 @@ def get_required_concept(concept_ref: str) -> Concept:
 
 def get_pipe_router() -> PipeRouterProtocol:
     return get_pipelex_hub().get_required_pipe_router()
+
+
+def get_pipe_run() -> "PipeRunProtocol":
+    return get_pipelex_hub().get_required_pipe_run()
 
 
 def get_pipeline_manager() -> PipelineManagerAbstract:
