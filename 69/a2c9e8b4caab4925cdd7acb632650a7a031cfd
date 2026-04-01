@@ -1,0 +1,33 @@
+pipelex/cogt/content_generation/content_generator.py
+  093ce72d98a0e6d9 319
+wip/tier2-live-registry-propagation.md
+  093ce72d98a0e6d9 1-123
+pipelex/temporal/tprl_content_generation/content_generator_top.py
+  093ce72d98a0e6d9 380
+pipelex/cogt/content_generation/img_gen_generate.py
+  093ce72d98a0e6d9 56-57,74-75
+pipelex/temporal/tprl_content_generation/content_generator_child.py
+  093ce72d98a0e6d9 451
+pipelex/cogt/content_generation/content_generator_protocol.py
+  093ce72d98a0e6d9 140,148
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.23",
+  "base_commit_sha": "69a2c9e8b4caab4925cdd7acb632650a7a031cfd",
+  "prompts": {
+    "093ce72d98a0e6d9": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f723d047-c8a9-42e4-8afd-375291caa515",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 132,
+      "total_deletions": 14,
+      "accepted_lines": 132,
+      "overriden_lines": 0
+    }
+  }
+}
