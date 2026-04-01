@@ -1,6 +1,7 @@
+from collections.abc import Sequence
 from datetime import timedelta
 
-from temporalio.client import WorkflowHandle
+from temporalio.client import Callback, WorkflowHandle
 from temporalio.common import RetryPolicy
 from typing_extensions import override
 
@@ -66,11 +67,13 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
         self,
         pipe_job: PipeJob,
         wfid: str | None = None,
+        callbacks: Sequence[Callback] | None = None,
     ) -> tuple[str, WorkflowHandle[WorkflowClass[PipeJob, PipeOutput], PipeOutput]]:
         """Start a pipe job without waiting for completion.
 
         Returns the workflow_id and a WorkflowHandle that can be awaited later
-        for the result.
+        for the result. Optional callbacks are forwarded to Temporal and called
+        on workflow completion.
         """
         log.debug(f"PipeRouterTop start_pipe_job using task_queue: {self.task_queue}")
         pipe_job = pipe_job.prepare_for_temporal()
@@ -84,6 +87,7 @@ class PipeRouterTop(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtocol):
             workflow_class=WfPipeRouter,
             workflow_id=workflow_id,
             workflow_arg=pipe_job,
+            callbacks=callbacks,
         )
         return workflow_id, handle
 

@@ -7,10 +7,11 @@
 - **`PipeRouterTop.start_pipe_job()`**: New method to start a Temporal workflow and return the `workflow_id` and `WorkflowHandle` immediately without waiting for completion. Complements the existing blocking `_run_pipe_job()`.
 - **`workflow_id` in start response**: `PipelexPipelineStartResponse` now includes `workflow_id` for callers to track the Temporal workflow.
 - **Pre-generated `pipeline_run_id` support**: `pipeline_run_setup()`, `PipelineFactory`, and `PipelineManager` now accept an optional `pipeline_run_id` parameter. When provided, this ID is used instead of generating a new one — enabling external systems (e.g., API Gateway Lambdas) to create the run record before starting execution.
+- **Temporal completion callbacks passthrough**: `start_pipe_job()` and `WorkflowExecutor.start_workflow()` accept an optional `callbacks` parameter (list of Temporal `Callback` objects) forwarded to `client.start_workflow()`. Enables callers to register webhook URLs that Temporal calls on workflow completion.
 
 ### Changed
 
-- **`WorkflowHandle` import moved to runtime**: `WorkflowHandle` is now imported at runtime (was `TYPE_CHECKING` only) since it's used in the return type annotation of `start_pipe_job()`.
+- **`WorkflowHandle` and `Callback` imports moved to runtime**: Both are now imported at runtime (were `TYPE_CHECKING` only) since they're used in method signatures.
 
 ## [v0.24.0] - 2026-03-30
 
