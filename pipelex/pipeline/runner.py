@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
     from pipelex.core.memory.working_memory import WorkingMemory
     from pipelex.core.pipes.pipe_output import PipeOutput
+    from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_mode import PipeRunMode
     from pipelex.system.configuration.configs import PipelineExecutionConfig
@@ -77,6 +78,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         output_name: str | None = None,
         output_multiplicity: VariableMultiplicity | None = None,
         dynamic_output_concept_code: str | None = None,
+        delivery_assignment: DeliveryAssignment | None = None,
     ) -> PipelexPipelineExecuteResponse:
         """Execute a pipeline and wait for its completion.
 
@@ -146,7 +148,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
             )
-            pipe_output = await get_pipe_run().run(pipe_job)
+            pipe_output = await get_pipe_run().run(pipe_job, delivery_assignment=delivery_assignment)
         except PipeRouterError as exc:
             # PipeRouterError can only be raised by get_pipe_run().run(), so pipe_job is guaranteed to exist
             assert pipe_job is not None  # for type checker
