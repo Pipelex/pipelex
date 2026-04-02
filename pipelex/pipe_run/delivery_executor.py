@@ -11,7 +11,6 @@ from pipelex.graph.graph_factory import generate_graph_outputs
 from pipelex.hub import get_storage_provider
 from pipelex.pipe_run.exceptions import StorageDeliveryError, WebhookDeliveryError
 from pipelex.tools.misc.json_utils import clean_json_dumps
-from pipelex.tools.storage.storage_provider_abstract import PIPELEX_STORAGE_SCHEME
 
 if TYPE_CHECKING:
     from pipelex.core.pipes.pipe_output import PipeOutput
@@ -127,9 +126,7 @@ class DeliveryExecutor:
                 await storage_provider.store(data=data, key=key, content_type=content_type)
                 log.debug(f"Stored: {key}")
 
-            base_uri = f"{PIPELEX_STORAGE_SCHEME}{base_key}"
-            public = await storage_provider.public_url(base_uri)
-            result_url: str = f"{public or base_key}/"
+            result_url: str = f"{base_key}/"
             log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}")
             return result_url
         except Exception as exc:
