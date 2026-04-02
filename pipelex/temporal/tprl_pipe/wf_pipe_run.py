@@ -7,6 +7,7 @@ from typing_extensions import override
 with workflow.unsafe.imports_passed_through():
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
+    from pipelex.pipe_run.graph_assembly import assemble_graph_on_output
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
@@ -54,7 +55,16 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             execution_error = exc
             workflow_log.error(f"WfPipeRouter failed: {exc}")
 
-        # Step 2: Run delivery activity (always — to notify completion Lambda of success or failure)
+        # Step 2: Assemble full graph from trace events (cross-worker)
+        if pipe_output is not None:
+            assemble_graph_on_output(
+                pipe_output=pipe_output,
+                pipeline_run_id=pipeline_run_id,
+                domain_code=pipe_job.pipe.domain_code,
+                main_pipe_code=pipe_job.pipe.code,
+            )
+
+        # Step 3: Run delivery activity (always — to notify completion Lambda of success or failure)
         if delivery_assignment is not None:
             workflow_log.debug(f"Running delivery: pipeline_run_id={pipeline_run_id}, status={status}")
             activity_arg = DeliveryActivityArg(

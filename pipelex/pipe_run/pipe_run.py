@@ -9,6 +9,7 @@ from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import PipeRouterError
+from pipelex.pipe_run.graph_assembly import assemble_graph_on_output
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
 if TYPE_CHECKING:
@@ -43,13 +44,19 @@ class PipeRun(PipeRunProtocol):
             execution_error = exc
             log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")
 
-        # Close graph tracer and set graph_spec on pipe_output BEFORE delivery
-        # (the tracer records nodes/edges in-memory during execution)
+        # Close graph tracer (flushes in-memory nodes to the event log)
         tracer_manager = GraphTracerManager.get_instance()
-        if tracer_manager is not None and pipe_output is not None:
-            graph_spec = tracer_manager.close_tracer(pipeline_run_id)
-            if graph_spec is not None:
-                pipe_output.graph_spec = graph_spec
+        if tracer_manager is not None:
+            tracer_manager.close_tracer(pipeline_run_id)
+
+        # Assemble full graph from trace events
+        if pipe_output is not None:
+            assemble_graph_on_output(
+                pipe_output=pipe_output,
+                pipeline_run_id=pipeline_run_id,
+                domain_code=pipe_job.pipe.domain_code,
+                main_pipe_code=pipe_job.pipe.code,
+            )
 
         # Deliver results — always. Default to storage-only if no assignment provided.
         if delivery_assignment is None:

@@ -574,7 +574,19 @@ def get_required_concept(concept_ref: str) -> Concept:
     return get_pipelex_hub().get_library().concept_library.get_required_concept(concept_ref=concept_ref)
 
 
+_pipe_router_override: ContextVar[PipeRouterProtocol | None] = ContextVar("_pipe_router_override", default=None)
+
+
 def get_pipe_router() -> PipeRouterProtocol:
+    """Return the active pipe router.
+
+    If a PipeRun has set a contextvar override (e.g. direct PipeRouter for
+    dry runs), that router is used. Otherwise falls back to the global router
+    configured at startup (which may be the Temporal router).
+    """
+    override = _pipe_router_override.get()
+    if override is not None:
+        return override
     return get_pipelex_hub().get_required_pipe_router()
 
 

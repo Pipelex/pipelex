@@ -8,7 +8,6 @@ from mthds.client.protocol import RunnerProtocol
 from pydantic import ValidationError
 from typing_extensions import override
 
-from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.config import get_config
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
@@ -39,6 +38,7 @@ if TYPE_CHECKING:
     from pipelex.pipe_run.delivery_assignment import DeliveryAssignment
     from pipelex.pipe_run.pipe_job import PipeJob
     from pipelex.pipe_run.pipe_run_mode import PipeRunMode
+    from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
     from pipelex.system.configuration.configs import PipelineExecutionConfig
 
 
@@ -59,6 +59,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         search_domain_codes: list[str] | None = None,
         user_id: str | None = None,
         execution_config: PipelineExecutionConfig | None = None,
+        pipe_run: PipeRunProtocol | None = None,
     ):
         self.library_id = library_id
         self.library_dirs = library_dirs
@@ -67,6 +68,7 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         self.search_domain_codes = search_domain_codes
         self.user_id = user_id
         self.execution_config = execution_config
+        self._pipe_run = pipe_run
         self._running_tasks: dict[str, asyncio.Task[PipeOutput]] = {}
 
     @override
@@ -127,7 +129,6 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
         pipelex_inputs: PipelineInputs | WorkingMemory | None = cast("PipelineInputs | WorkingMemory | None", inputs)
 
         properties: dict[EventProperty, Any]
-        graph_spec_result = None
         # These variables are set in pipeline_run_setup and needed in finally/except blocks
         pipeline_run_id: str | None = None
         library_id_resolved: str | None = None
@@ -148,7 +149,8 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
                 search_domain_codes=self.search_domain_codes,
                 user_id=self.user_id,
             )
-            pipe_output = await get_pipe_run().run(pipe_job, delivery_assignment=delivery_assignment)
+            effective_pipe_run = self._pipe_run or get_pipe_run()
+            pipe_output = await effective_pipe_run.run(pipe_job, delivery_assignment=delivery_assignment)
         except PipeRouterError as exc:
             # PipeRouterError can only be raised by get_pipe_run().run(), so pipe_job is guaranteed to exist
             assert pipe_job is not None  # for type checker
@@ -190,53 +192,12 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             msg = f"Input validation failed for '{model_name}': {formatted_error}"
             raise PipeExecutionError(message=msg) from exc
         finally:
-            # Close graph tracer if it was opened (capture graph even on failure)
-            # pipeline_run_id may be None if pipeline_run_setup failed early
+            # Close graph tracer if it was opened (cleanup only — the PipeRun is
+            # responsible for capturing the graph spec on pipe_output)
             if execution_config.is_generate_graph and pipeline_run_id is not None:
                 tracer_manager = GraphTracerManager.get_instance()
                 if tracer_manager is not None:
-                    graph_spec_result = tracer_manager.close_tracer(pipeline_run_id)
-
-                # Assemble graph from events when tracing is enabled
-                tracing_config = get_config().pipelex.tracing_config
-                if tracing_config.is_enabled:
-                    try:
-                        from pipelex.graph.graphspec import PipelineRef  # noqa: PLC0415
-                        from pipelex.reporting.reporting_manager import ReportingManager  # noqa: PLC0415
-                        from pipelex.tracing.event_log_factory import make_event_log  # noqa: PLC0415
-                        from pipelex.tracing.graphspec_assembler import GraphSpecAssembler  # noqa: PLC0415
-                        from pipelex.tracing.usage_aggregator import UsageAggregator  # noqa: PLC0415
-
-                        assembly_event_log = make_event_log(tracing_config)
-                        try:
-                            events = assembly_event_log.read_events(pipeline_run_id)
-                            if events:
-                                assembled_domain: str | None = None
-                                assembled_main_pipe: str | None = None
-                                if pipe_job is not None:
-                                    assembled_domain = pipe_job.pipe.domain_code
-                                    assembled_main_pipe = pipe_job.pipe.code
-                                graph_spec_result = GraphSpecAssembler.assemble(
-                                    events=events,
-                                    graph_id=pipeline_run_id,
-                                    pipeline_ref=PipelineRef(
-                                        domain=assembled_domain,
-                                        main_pipe=assembled_main_pipe,
-                                    ),
-                                )
-                                # Aggregate usage from events so generate_report() includes cross-worker costs
-                                usage_data = UsageAggregator.aggregate(events)
-                                if usage_data:
-                                    report_delegate = get_report_delegate()
-                                    if isinstance(report_delegate, ReportingManager):
-                                        report_delegate.inject_tokens_usages(
-                                            pipeline_run_id=pipeline_run_id,
-                                            tokens_usages=usage_data,
-                                        )
-                        finally:
-                            assembly_event_log.close()
-                    except (ImportError, OSError) as exc:
-                        log.warning(f"Failed to assemble graph from events, using in-memory graph: {exc}")
+                    tracer_manager.close_tracer(pipeline_run_id)
 
             # Clear event log state from ReportingManager (direct execution path)
             if pipeline_run_id is not None:
@@ -250,10 +211,6 @@ class PipelexRunner(RunnerProtocol["PipeOutput"]):
             if library_id_resolved is not None:
                 get_library_manager().teardown(library_id=library_id_resolved)
                 teardown_current_library()
-
-        # Assign graph spec to output (only reached on success, when pipe_output is bound)
-        if graph_spec_result is not None:
-            pipe_output.graph_spec = graph_spec_result
 
         assert pipe_job is not None  # for type checker, success path requires a resolved job
         properties = {
