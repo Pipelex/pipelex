@@ -1886,15 +1886,28 @@ wheels = [
 
 [[package]]
 name = "kajson"
-version = "0.4.1"
-source = { registry = "https://pypi.org/simple" }
+version = "0.4.2"
+source = { editable = "../kajson" }
 dependencies = [
     { name = "pydantic" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/cf/58/ced2096f15fcccd5cb6954f67f3bfaaf7e3f5c95ab85de9e03779cec2838/kajson-0.4.1.tar.gz", hash = "sha256:0de2bc94153ab8cc7b3d72dd26701f7320f2dbbd6d19196b8ff2517ef6432265", size = 21643, upload-time = "2026-04-02T02:09:28.213Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/37/8687a8d3f7e983975cdab1d2e66f995df0c0c022c2905093c62b6b611eee/kajson-0.4.1-py3-none-any.whl", hash = "sha256:c46e6f705da7f93777c3d859a2ecc4e81ffa7f0ce9c4ef44ffa3b5a94764fe02", size = 28070, upload-time = "2026-04-02T02:09:26.647Z" },
+
+[package.metadata]
+requires-dist = [
+    { name = "mkdocs", marker = "extra == 'docs'", specifier = "==1.6.1" },
+    { name = "mkdocs-glightbox", marker = "extra == 'docs'", specifier = "==0.4.0" },
+    { name = "mkdocs-material", marker = "extra == 'docs'", specifier = "==9.6.14" },
+    { name = "mkdocs-meta-manager", marker = "extra == 'docs'", specifier = "==1.1.0" },
+    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11.2" },
+    { name = "pydantic", specifier = ">=2.10.6" },
+    { name = "pyright", marker = "extra == 'dev'", specifier = "==1.1.398" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.3" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.1.1" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.14.0" },
+    { name = "pytest-sugar", marker = "extra == 'dev'", specifier = ">=1.0.0" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.6.8" },
 ]
+provides-extras = ["docs", "dev"]
 
 [[package]]
 name = "latex2mathml"
@@ -3697,7 +3710,7 @@ requires-dist = [
     { name = "instructor", extras = ["google-genai"], marker = "extra == 'google-genai'" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "json2html", specifier = ">=1.3.0" },
-    { name = "kajson", specifier = "==0.4.1" },
+    { name = "kajson", editable = "../kajson" },
     { name = "linkup-sdk", marker = "extra == 'linkup'", specifier = ">=0.12.0" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "mike", marker = "extra == 'docs'", specifier = ">=2.1.3" },
