@@ -208,8 +208,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 gateway_model_specs = remote_config.backend_model_specs
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
-                # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
-                if integration_mode.requires_terms_acceptance:
+                # Terms acceptance is only required for actual inference usage, not for
+                # read-only operations like fetching model specs for validation.
+                # Also skip for CI mode — automated pipelines don't require human consent.
+                if needs_inference and integration_mode.requires_terms_acceptance:
                     # Check if terms are accepted
                     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
                     if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:

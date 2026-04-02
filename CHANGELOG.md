@@ -1,5 +1,28 @@
 # Changelog
 
+## [v0.23.4] - 2026-04-02
+
+### Changed
+
+- **Pipe spec output alias**: Removed `output_type` alias from `parse_pipe_spec`, keeping only `output_concept` as the single alias for the `output` field. Simplified the alias resolution logic accordingly.
+
+## [v0.23.3] - 2026-04-02
+
+### Changed
+
+- **Pipe spec output aliases**: `parse_pipe_spec` now accepts `output_concept` and `output_type` as aliases for the `output` field, with smart fallback when both alias and canonical field are present.
+
+### Fixed
+
+- **Gateway terms check**: Terms acceptance is now only required for inference operations, not for read-only operations like model spec fetching during validation.
+
+## [v0.23.2] - 2026-03-30
+
+### Changed
+
+- **Claude Code plugin install command**: Fixed as → `/plugin install mthds@mthds-plugins` across README and docs.
+- **Claude Code plugin reload instructions**: Added `/reload-plugins` as the primary method to activate the plugin, with exit/reopen as fallback.
+
 ## [v0.23.1] - 2026-03-30
 
 ### Changed
