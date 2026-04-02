@@ -1,0 +1,47 @@
+domain      = "large_payload_test"
+description = "Multi-step pipeline that accumulates large WorkingMemory for codec stress testing"
+
+[pipe.large_payload_sequence]
+type = "PipeSequence"
+description = "Three-step pipeline accumulating verbose text output"
+output = "Text"
+steps = [
+  { pipe = "verbose_step_one", result = "step_one_result" },
+  { pipe = "verbose_step_two", result = "step_two_result" },
+  { pipe = "verbose_step_three", result = "step_three_result" },
+]
+
+[pipe.verbose_step_one]
+type        = "PipeLLM"
+description = "First step: generate a detailed story"
+output      = "Text"
+model       = "$testing-text"
+prompt      = "Write a very detailed, multi-paragraph story about a space adventure. Include character names, planet descriptions, and dialogue."
+
+[pipe.verbose_step_two]
+type = "PipeLLM"
+description = "Second step: expand with analysis"
+inputs = { step_one_result = "Text" }
+output = "Text"
+model = "$testing-text"
+prompt = """
+Analyze the following story in great detail. Cover themes, character development, plot structure, and writing style.
+
+@step_one_result.text
+"""
+
+[pipe.verbose_step_three]
+type = "PipeLLM"
+description = "Third step: create a comprehensive summary"
+inputs = { step_one_result = "Text", step_two_result = "Text" }
+output = "Text"
+model = "$testing-text"
+prompt = """
+Based on this story and analysis, write a comprehensive literary review.
+
+Story:
+@step_one_result.text
+
+Analysis:
+@step_two_result.text
+"""

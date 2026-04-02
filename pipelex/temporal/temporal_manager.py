@@ -36,6 +36,8 @@ class TemporalManager:
 
     @classmethod
     def setup(cls, session_id: str) -> None:
+        if cls._shared_instance is not None:
+            cls.teardown()
         cls._shared_instance = cls(session_id=session_id)
         log.debug(f"TemporalManager setup done, session_id={session_id}")
 

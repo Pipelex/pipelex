@@ -36,6 +36,7 @@ from temporalio.converter import (
     DefaultPayloadConverter,
     EncodingPayloadConverter,
     JSONPlainPayloadConverter,
+    PayloadCodec,
 )
 from typing_extensions import override
 
@@ -139,4 +140,16 @@ class PydanticCompositePayloadConverter(CompositePayloadConverter):
         super().__init__(*converters)
 
 
-data_converter = DataConverter(payload_converter_class=PydanticCompositePayloadConverter)
+def make_data_converter(payload_codec: PayloadCodec | None = None) -> DataConverter:
+    """Create a DataConverter with our Pydantic-aware payload converter and an optional codec.
+
+    Args:
+        payload_codec: Optional codec for offloading large payloads to external storage.
+    """
+    return DataConverter(
+        payload_converter_class=PydanticCompositePayloadConverter,
+        payload_codec=payload_codec,
+    )
+
+
+data_converter = make_data_converter()

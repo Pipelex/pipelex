@@ -2,7 +2,7 @@ import sys
 from collections.abc import Sequence
 from contextvars import ContextVar
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing import Any, ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager
@@ -106,13 +106,16 @@ class PipelexHub:
 
     # tools
 
-    def setup_config(self, config_cls: type[ConfigRoot]):
+    def setup_config(self, config_cls: type[ConfigRoot], config_overrides: dict[str, Any] | None = None):
         """Set the global configuration instance.
 
-        # Args:
-        #     config (Config): The configuration instance to set.
+        Args:
+            config_cls: The config root class to validate against.
+            config_overrides: Optional dict deep-merged on top of all TOML layers
+                as the highest-priority override. Useful for tests that need
+                specific config without editing TOML files.
         """
-        config_dict = config_manager.load_config()
+        config_dict = config_manager.load_config(extra_overrides=config_overrides)
         self.set_config(config=config_cls.model_validate(config_dict))
 
     def set_config(self, config: ConfigRoot):

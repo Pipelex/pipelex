@@ -75,30 +75,32 @@ traces_dir = ".pipelex/traces"
 ####################################################################################################
 
 [pipelex.storage_config]
-# Storage method: "local", "in_memory", "s3", or "gcp"
-method = "local"
 # Whether to fetch remote HTTP URLs and store them locally
 is_fetch_remote_content_enabled = true
 # Whether to upload local file paths to storage and replace with pipelex-storage:// URIs
 is_upload_local_content_enabled = true
 
-[pipelex.storage_config.local]
+[pipelex.storage_config.storage_provider_config]
+# Storage method: "local", "in_memory", "s3", or "gcp"
+method = "local"
+
+[pipelex.storage_config.storage_provider_config.local]
 # Local storage settings
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 local_storage_path = ".pipelex/storage"
 
-[pipelex.storage_config.in_memory]
+[pipelex.storage_config.storage_provider_config.in_memory]
 # In-memory storage settings
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 
-[pipelex.storage_config.s3]
+[pipelex.storage_config.storage_provider_config.s3]
 # AWS S3 storage settings (requires boto3: `uv pip install "pipelex[s3]"`)
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 bucket_name = ""
 region = ""
 signed_urls_lifespan_seconds = 3600                           # Set to "disabled" for public URLs
 
-[pipelex.storage_config.gcp]
+[pipelex.storage_config.storage_provider_config.gcp]
 # Google Cloud Storage settings (requires google-cloud-storage: `uv pip install "pipelex[gcp-storage]"`)
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 bucket_name = ""
@@ -207,6 +209,18 @@ is_dump_error_enabled = false
 
 [temporal]
 is_enabled = false
+
+[temporal.payload_codec_config]
+is_enabled = false
+size_threshold = 1_048_576            # in bytes (~1 MB, well under Temporal's 2 MB hard limit)
+storage_prefix = "temporal-payloads/"
+
+[temporal.payload_codec_config.storage_provider_config]
+method = "local"
+
+[temporal.payload_codec_config.storage_provider_config.local]
+uri_format = "{hash}"
+local_storage_path = ".pipelex/temporal-payload-store"
 
 [temporal.worker_config]
 task_queue = "temporal_task_queue"

@@ -154,12 +154,13 @@ class TestTprlCrafterTop:
         pretty_print(image, title="craft_image")
         assert isinstance(image, ImageContent)
 
-    async def test_tprl_jinja2_text(self, pipe_run_mode: PipeRunMode, top_crafter: ContentGeneratorProtocol):
+    async def test_tprl_jinja2_text(self, job_metadata: JobMetadata, pipe_run_mode: PipeRunMode, top_crafter: ContentGeneratorProtocol):
         context = {
             "the_answer": "elementary, my dear Watson",
         }
 
         jinja2_text: str = await top_crafter.make_templated_text(
+            job_metadata=job_metadata,
             context=context,
             template="The answer is: {{ the_answer }}",
         )

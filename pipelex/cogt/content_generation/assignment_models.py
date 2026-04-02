@@ -115,6 +115,7 @@ class ImgGenAssignment(BaseModel):
 
 
 class TemplatingAssignment(BaseModel):
+    job_metadata: JobMetadata
     context: dict[str, Any]
     template: str
     templating_style: TemplatingStyle | None = None

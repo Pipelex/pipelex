@@ -99,9 +99,9 @@ class StorageGcpConfig(ConfigModel):
             raise StorageConfigError(msg)
 
 
-class StorageConfig(ConfigModel):
-    is_fetch_remote_content_enabled: bool
-    is_upload_local_content_enabled: bool
+class StorageProviderConfig(ConfigModel):
+    """Provider-selection config shared by asset storage and payload codec storage."""
+
     method: StorageMethod = Field(strict=False)
     local: StorageLocalConfig | None = None
     in_memory: StorageInMemoryConfig | None = None
@@ -109,7 +109,7 @@ class StorageConfig(ConfigModel):
     gcp: StorageGcpConfig | None = None
 
     @model_validator(mode="after")
-    def validate_storage_config(self) -> Self:
+    def validate_storage_provider_config(self) -> Self:
         match self.method:
             case StorageMethod.LOCAL:
                 if not self.local:
@@ -159,3 +159,39 @@ class StorageConfig(ConfigModel):
                     msg = "gcp config is required to access uri_format"
                     raise StorageConfigError(msg)
                 return self.gcp.uri_format
+
+
+class AssetStorageConfig(ConfigModel):
+    """Storage config for asset content (images, documents, etc.)."""
+
+    is_fetch_remote_content_enabled: bool
+    is_upload_local_content_enabled: bool
+    storage_provider_config: StorageProviderConfig
+
+    @property
+    def method(self) -> StorageMethod:
+        return self.storage_provider_config.method
+
+    @property
+    def local(self) -> StorageLocalConfig | None:
+        return self.storage_provider_config.local
+
+    @property
+    def in_memory(self) -> StorageInMemoryConfig | None:
+        return self.storage_provider_config.in_memory
+
+    @property
+    def s3(self) -> StorageS3Config | None:
+        return self.storage_provider_config.s3
+
+    @property
+    def gcp(self) -> StorageGcpConfig | None:
+        return self.storage_provider_config.gcp
+
+    @property
+    def storage_path(self) -> str:
+        return self.storage_provider_config.storage_path
+
+    @property
+    def uri_format(self) -> str:
+        return self.storage_provider_config.uri_format
