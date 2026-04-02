@@ -8,12 +8,12 @@ kajson to deserialize it across process boundaries without a class registry.
 
 import hashlib
 import json
+import re
 import tempfile
 import threading
 from pathlib import Path
 from typing import Any
 
-from datamodel_code_generator.parser.base import title_to_class_name
 from pydantic import BaseModel
 
 _schema_cache: dict[str, type[BaseModel]] = {}
@@ -41,9 +41,17 @@ def model_class_from_json_schema(schema: dict[str, Any], class_name: str) -> typ
     reconstructed_class.__kajson_class_source__ = source_code  # type: ignore[attr-defined]
 
     with _cache_lock:
+        if cache_key in _schema_cache:
+            return _schema_cache[cache_key]
         _schema_cache[cache_key] = reconstructed_class
 
     return reconstructed_class
+
+
+def _normalize_class_name(title: str) -> str:
+    """Convert a schema title to a PascalCase class name (matching datamodel-code-generator behavior)."""
+    classname = re.sub(r"[^A-Za-z0-9]+", " ", title)
+    return "".join(part for part in classname.title() if not part.isspace())
 
 
 def _generate_source_from_schema(schema: dict[str, Any]) -> str:
@@ -83,7 +91,7 @@ def _exec_and_extract_class(source_code: str, class_name: str) -> type[BaseModel
     # so try both the original name and the normalized version.
     extracted_class = model_classes.get(class_name)
     if extracted_class is None:
-        normalized_name = title_to_class_name(class_name)
+        normalized_name = _normalize_class_name(class_name)
         extracted_class = model_classes.get(normalized_name)
     if extracted_class is None:
         available = list(model_classes.keys())

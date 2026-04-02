@@ -213,7 +213,7 @@ Resolution order:
 | Image generation activity | `pipelex/temporal/tprl_content_generation/act_img_gen_generate.py` |
 | Extract activity | `pipelex/temporal/tprl_content_generation/act_extract_generate.py` |
 | Page view rendering activity | `pipelex/temporal/tprl_content_generation/act_render_page_views.py` |
-| Kajson serialization | `kajson/kajson/kajson.py` |
+| Kajson serialization | `kajson` (external PyPI package) |
 | ImageContent model | `pipelex/core/stuffs/image_content.py` |
 | PageContent model | `pipelex/core/stuffs/page_content.py` |
 
