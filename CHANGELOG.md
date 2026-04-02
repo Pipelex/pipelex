@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.23.4] - 2026-04-02
+
+### Changed
+
+- **Pipe spec output alias**: Removed `output_type` alias from `parse_pipe_spec`, keeping only `output_concept` as the single alias for the `output` field. Simplified the alias resolution logic accordingly.
+
 ## [v0.23.3] - 2026-04-02
 
 ### Changed
