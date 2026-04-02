@@ -17,6 +17,7 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - **Test Profile Configuration** - How to configure which models are used in tests
 - **Dry Run Mock Generation** - How mock objects satisfy field validation constraints
 - **Init CLI Flows** - How `pipelex init` sets up the configuration directory
+- **Distributed Content Generation** - How dynamic classes and large payloads cross Temporal boundaries
 - **Technical Design Decisions** - Why we chose X over Y
 - **Module Deep-Dives** - Detailed explanations of specific subsystems
 
@@ -37,3 +38,4 @@ Welcome to the technical deep-dives of Pipelex. This section is for contributors
 - [:material-console: Init CLI Flows](./init-cli-flows.md){ .md-button }
 - [:material-pipe: Pipe Routing & Execution](./pipe-routing-and-execution.md){ .md-button }
 - [:material-cloud-sync: Temporal Integration](./temporal-integration.md){ .md-button }
+- [:material-swap-horizontal: Distributed Content Generation](./distributed-content-generation.md){ .md-button }
