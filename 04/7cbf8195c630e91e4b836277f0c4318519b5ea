@@ -1,0 +1,25 @@
+docs/under-the-hood/distributed-content-generation.md
+  80163c5b46a29038 216
+pipelex/cogt/content_generation/schema_to_model.py
+  80163c5b46a29038 11,44-45,51-56,94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "047cbf8195c630e91e4b836277f0c4318519b5ea",
+  "prompts": {
+    "80163c5b46a29038": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9534be99-23d3-4b82-bbb8-265d10e3d085",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 3,
+      "accepted_lines": 11,
+      "overriden_lines": 0
+    }
+  }
+}
