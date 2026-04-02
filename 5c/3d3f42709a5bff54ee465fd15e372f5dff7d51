@@ -1,0 +1,76 @@
+tests/unit/pipelex/cogt/content_generation/test_model_dump_subclass.py
+  bd08fcb3c406e05d 1-50
+pipelex/cogt/content_generation/assignment_models.py
+  1abc18d90be6b204 86,95-96,103
+pipelex/cogt/content_generation/llm_generate.py
+  1abc18d90be6b204 7,9,32-35,53-56
+pipelex/temporal/tprl_content_generation/content_generator_child.py
+  1abc18d90be6b204 185,277
+  bd08fcb3c406e05d 157,207,248,299
+tests/unit/pipelex/cogt/content_generation/test_schema_to_model.py
+  1abc18d90be6b204 1-91
+  4a5c876182fa8ff6 92-103
+pipelex/cogt/content_generation/content_generator.py
+  4a5c876182fa8ff6 87-91,141-142,165-166,215-216
+  bd08fcb3c406e05d 92,143,167,217
+  1abc18d90be6b204 119,122,138,193,196,212
+pipelex/cogt/content_generation/schema_to_model.py
+  4a5c876182fa8ff6 81-83,85-87
+  1abc18d90be6b204 1-15,17-80,84,88-99
+tests/unit/pipelex/cogt/content_generation/test_assignment_models_schema.py
+  1abc18d90be6b204 1-78
+pipelex/temporal/tprl_content_generation/wf_make_object.py
+  1abc18d90be6b204 103,149
+.claude/skills/temporal-e2e-validate/SKILL.md
+  4a5c876182fa8ff6 171-174
+pipelex/temporal/tprl_content_generation/content_generator_top.py
+  1abc18d90be6b204 151,231
+pipelex/temporal/temporal_data_converter.py
+  1abc18d90be6b204 61-64,66,71-74,76,85-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "5c3d3f42709a5bff54ee465fd15e372f5dff7d51",
+  "prompts": {
+    "1abc18d90be6b204": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "733be0e6-bbad-456f-a1fb-eb2708657441",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 318,
+      "total_deletions": 30,
+      "accepted_lines": 304,
+      "overriden_lines": 0
+    },
+    "4a5c876182fa8ff6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7476e9bc-0eb6-48ab-bdf1-ff9a6ec4a969",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 59,
+      "total_deletions": 34,
+      "accepted_lines": 33,
+      "overriden_lines": 0
+    },
+    "bd08fcb3c406e05d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "836b340a-3f4f-4204-8e6d-5c7dfcfa261f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 152,
+      "total_deletions": 102,
+      "accepted_lines": 58,
+      "overriden_lines": 0
+    }
+  }
+}
