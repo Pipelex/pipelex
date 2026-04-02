@@ -6,11 +6,10 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_secret
 from pipelex.system.environment import get_required_env
+from pipelex.temporal.codec.codec_factory import make_codec_from_config
 from pipelex.temporal.config_temporal import SecretMethod, TemporalConfigError, TemporalServerConfig
 from pipelex.temporal.exceptions import TemporalServerError
-from pipelex.temporal.storage_payload_codec import StoragePayloadCodec
 from pipelex.temporal.temporal_data_converter import data_converter, make_data_converter
-from pipelex.tools.storage.storage_provider_factory import make_storage_provider_from_config
 
 if TYPE_CHECKING:
     from temporalio.converter import DataConverter
@@ -48,12 +47,7 @@ async def connect_to_temporal_server(server_config: TemporalServerConfig, name: 
     payload_codec_config = get_config().temporal.payload_codec_config
     converter: DataConverter
     if payload_codec_config.is_enabled:
-        storage_provider = make_storage_provider_from_config(payload_codec_config.storage_provider_config)
-        payload_codec = StoragePayloadCodec(
-            storage_provider=storage_provider,
-            size_threshold=payload_codec_config.size_threshold,
-            storage_prefix=payload_codec_config.storage_prefix,
-        )
+        payload_codec = make_codec_from_config()
         converter = make_data_converter(payload_codec=payload_codec)
         log.info(f"Payload codec enabled — threshold={payload_codec_config.size_threshold}, prefix='{payload_codec_config.storage_prefix}'")
     else:

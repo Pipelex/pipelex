@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from hashlib import sha256
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import PayloadCodec
@@ -52,10 +52,13 @@ class StoragePayloadCodec(PayloadCodec):
         if payload.metadata.get("encoding") != JSON_PLAIN_ENCODING:
             return None
         try:
-            data: dict[str, Any] = json.loads(payload.data)
+            data = json.loads(payload.data)
         except (json.JSONDecodeError, UnicodeDecodeError):
             return None
-        job_metadata = data.get("job_metadata")
+        if not isinstance(data, dict):
+            return None
+        typed_data = cast("dict[str, Any]", data)
+        job_metadata = typed_data.get("job_metadata")
         if not isinstance(job_metadata, dict):
             return None
         user_id: str | None = job_metadata.get("user_id")  # type: ignore[assignment]

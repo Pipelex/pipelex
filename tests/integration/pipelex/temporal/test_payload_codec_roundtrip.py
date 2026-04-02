@@ -17,7 +17,7 @@ from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
-from pipelex.temporal.storage_payload_codec import StoragePayloadCodec
+from pipelex.temporal.codec.storage_payload_codec import StoragePayloadCodec
 from pipelex.temporal.temporal_data_converter import make_data_converter
 from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
 

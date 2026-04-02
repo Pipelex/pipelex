@@ -17,7 +17,7 @@ from temporalio.testing import WorkflowEnvironment
 
 from pipelex.pipelex import Pipelex
 from pipelex.system.runtime import IntegrationMode, runtime_manager
-from pipelex.temporal.storage_payload_codec import StoragePayloadCodec
+from pipelex.temporal.codec.storage_payload_codec import StoragePayloadCodec
 from pipelex.temporal.tasks import Tasks
 from pipelex.temporal.temporal_data_converter import make_data_converter
 from pipelex.temporal.temporal_hub import get_task_manager, temporal_hub

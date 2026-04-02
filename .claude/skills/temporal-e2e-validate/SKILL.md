@@ -445,26 +445,23 @@ These tests validate Phase 5: large payloads are transparently offloaded to exte
 storage by the `StoragePayloadCodec`, keeping Temporal's event history small. The worker
 and submitter both use the codec — it's wired at the data converter level.
 
-**Important:** Before running these tiers, the codec must be enabled in the project
-config. After running, restore the original config.
+**Important:** The codec config is managed via `pipelex_temporary_override.toml` — a
+config layer that loads after `pipelex_override.toml` and takes highest priority. This
+file is ephemeral and gitignored. **NEVER modify `pipelex_override.toml`** — that is
+the user's personal config.
 
-**Step 6a: Enable the codec**
+**Step 6a: Create the temporary override to enable the codec**
 
 ```bash
-python3 -c "
-import re, pathlib
-cfg = pathlib.Path('.pipelex/pipelex.toml')
-text = cfg.read_text()
-# Enable payload codec (only the one under [temporal.payload_codec_config])
-text = re.sub(
-    r'(\[temporal\.payload_codec_config\]\n)is_enabled = false',
-    r'\1is_enabled = true',
-    text,
-)
-cfg.write_text(text)
-print('Codec enabled in .pipelex/pipelex.toml')
-"
+cat > .pipelex/pipelex_temporary_override.toml << 'EOF'
+# Temporary override for E2E codec testing — delete when done
+[temporal.payload_codec_config]
+is_enabled = true
+EOF
+echo "Temporary override created"
 ```
+
+This takes precedence over whatever codec setting exists in `pipelex_override.toml`.
 
 **Step 6b: Restart the worker** (so it picks up the new config)
 
@@ -541,24 +538,14 @@ tmux capture-pane -t temporal-worker -p -S -50 | grep -i "payload\|warning\|size
 
 Tell the user: PASS/FAIL, output dir, graph file path, storage file count.
 
-**Step 6c: Restore the original config**
+**Step 6c: Remove the temporary override**
 
 ```bash
-python3 -c "
-import re, pathlib
-cfg = pathlib.Path('.pipelex/pipelex.toml')
-text = cfg.read_text()
-text = re.sub(
-    r'(\[temporal\.payload_codec_config\]\n)is_enabled = true',
-    r'\1is_enabled = false',
-    text,
-)
-cfg.write_text(text)
-print('Codec disabled in .pipelex/pipelex.toml (restored)')
-"
+rm -f .pipelex/pipelex_temporary_override.toml
+echo "Temporary override removed"
 ```
 
-Optionally restart the worker to restore codec-off mode, or leave it if done testing.
+Optionally restart the worker to restore the base codec config, or leave it if done.
 
 ### Step 7: Final report
 
@@ -605,6 +592,7 @@ Propose these to the user — do NOT run them automatically:
 - Kill tmux sessions: `tmux kill-session -t temporal-worker` / `tmux kill-session -t temporal-server`
 - Clean results directory: `rm -rf results/`
 - Clean trace files: `rm -rf .pipelex/traces/`
+- Remove temporary override if still present: `rm -f .pipelex/pipelex_temporary_override.toml`
 
 Leave the server running if the user plans to iterate.
 
