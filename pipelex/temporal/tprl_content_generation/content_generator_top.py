@@ -148,6 +148,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         )
         tto_assignment = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
+            object_class_schema=object_class.model_json_schema(),
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
         )
@@ -227,6 +228,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         )
         tto_assignment = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
+            object_class_schema=object_class.model_json_schema(),
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
         )

@@ -168,8 +168,10 @@ costs, validates serialization and crate propagation. But dry-run produces tiny 
 data, so it **cannot catch payload size issues** (e.g. large image payloads blowing up
 Temporal's data converter).
 
-Ask the user which mode they want. If they say "live", replace `--dry-run --mock-inputs`
-with `--pipe-run-mode live` in all commands below. Live mode makes real LLM and image
+Ask the user which mode they want. If they say "live", simply omit `--dry-run --mock-inputs`
+from all commands below. The `pipelex run bundle` CLI has no `--pipe-run-mode` flag — live
+is the default when neither `--dry-run` nor `--mock-inputs` is specified (note: pytest in
+Mode 1 does accept `--pipe-run-mode live`, but the CLI does not). Live mode makes real LLM and image
 generation calls — it costs money and is slower, but it's the only way to validate that
 real-sized payloads (especially images) flow correctly through Temporal.
 
@@ -281,7 +283,7 @@ Live (real image generation — required to catch payload size bugs):
 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
   --pipe generate_crazy_image \
-  --temporal --pipe-run-mode live --no-logo --graph
+  --temporal --no-logo --graph
 ```
 
 After this completes, tell the user: PASS/FAIL, output dir, graph file path.
@@ -322,7 +324,7 @@ Live (real image generation + vision — required to catch payload size bugs):
 .venv/bin/pipelex run bundle \
   tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds \
   --pipe image_out_in \
-  --temporal --pipe-run-mode live --no-logo --graph
+  --temporal --no-logo --graph
 ```
 
 After this completes, tell the user: PASS/FAIL, output dir, graph file path.

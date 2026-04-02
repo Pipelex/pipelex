@@ -58,14 +58,22 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
     def to_payload(self, value: Any) -> Payload | None:
         if isinstance(value, BaseModel):
             payload_str: str = kajson.dumps(value)
+            metadata: dict[str, bytes] = {"encoding": self.encoding.encode()}
+            class_source = getattr(type(value), "__kajson_class_source__", None)
+            if class_source is not None:
+                metadata["kajson_class_source"] = class_source.encode()
             return Payload(
-                metadata={"encoding": self.encoding.encode()},
+                metadata=metadata,
                 data=payload_str.encode(),
             )
         elif isinstance(value, list) and value and isinstance(value[0], BaseModel):
             list_payload_str: str = kajson.dumps(value)
+            metadata = {"encoding": self.encoding.encode()}
+            class_source = getattr(type(value[0]), "__kajson_class_source__", None)
+            if class_source is not None:
+                metadata["kajson_class_source"] = class_source.encode()
             return Payload(
-                metadata={"encoding": self.encoding.encode()},
+                metadata=metadata,
                 data=list_payload_str.encode(),
             )
         else:
@@ -74,7 +82,13 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
     def _kajson_deserialize_from_payload(self, payload: Payload) -> Any:
         data = payload.data.decode()
         log.verbose(f"unijson_deserialize_payload — data: {data}")
-        pydantic_gizmo = kajson.loads(data, class_registry=get_class_registry())
+        source_bytes = payload.metadata.get("kajson_class_source")
+        class_source_code = source_bytes.decode() if source_bytes else None
+        pydantic_gizmo = kajson.loads(
+            data,
+            class_registry=get_class_registry(),
+            class_source_code=class_source_code,
+        )
         log.verbose(f"unijson_deserialize_payload — pydantic_gizmo: {pydantic_gizmo}")
         return pydantic_gizmo
 

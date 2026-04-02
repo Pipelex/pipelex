@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any
 
 from typing_extensions import override
 
@@ -84,9 +84,12 @@ class ContentGenerator(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
-        obj = await llm_gen_object(object_assignment=object_assignment)
-        log.verbose(f"{self.__class__.__name__} generated object direct: {obj}")
-        return cast("BaseModelTypeVar", obj)
+        raw_obj = await llm_gen_object(object_assignment=object_assignment)
+        log.verbose(f"{self.__class__.__name__} generated object direct: {raw_obj}")
+        # llm_gen_object returns a plain BaseModel reconstructed from the JSON schema.
+        # Validate its data against the original class so the result is a proper subtype
+        # (e.g. StructuredContent) expected by the caller.
+        return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -113,8 +116,10 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_prompt_factory=llm_prompt_factory_for_object or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
         )
 
+        object_class_schema = object_class.model_json_schema()
         workflow_arg = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
+            object_class_schema=object_class_schema,
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
         )
@@ -130,11 +135,12 @@ class ContentGenerator(ContentGeneratorProtocol):
         fup_obj_assignment = ObjectAssignment(
             llm_assignment_for_object=fup_llm_assignment,
             object_class_name=object_class.__name__,
+            object_class_schema=object_class_schema,
         )
 
-        obj = await llm_gen_object(object_assignment=fup_obj_assignment)
-        log.verbose(f"{self.__class__.__name__} generated object after text: {obj}")
-        return cast("BaseModelTypeVar", obj)
+        raw_obj = await llm_gen_object(object_assignment=fup_obj_assignment)
+        log.verbose(f"{self.__class__.__name__} generated object after text: {raw_obj}")
+        return object_class.model_validate(raw_obj.model_dump(serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -156,9 +162,9 @@ class ContentGenerator(ContentGeneratorProtocol):
             object_class=object_class,
             llm_assignment=llm_assignment_for_object,
         )
-        obj_list = await llm_gen_object_list(object_assignment=object_assignment)
-        log.verbose(f"{self.__class__.__name__} generated object list direct: {obj_list}")
-        return cast("list[BaseModelTypeVar]", obj_list)
+        raw_list = await llm_gen_object_list(object_assignment=object_assignment)
+        log.verbose(f"{self.__class__.__name__} generated object list direct: {raw_list}")
+        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in raw_list]
 
     @override
     @update_job_metadata
@@ -184,8 +190,10 @@ class ContentGenerator(ContentGeneratorProtocol):
             llm_setting=llm_setting_for_object_list,
             llm_prompt_factory=llm_prompt_factory_for_object_list or LLMPromptTemplate.make_for_structuring_from_preliminary_text(),
         )
+        object_class_schema = object_class.model_json_schema()
         workflow_arg = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
+            object_class_schema=object_class_schema,
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
         )
@@ -201,11 +209,12 @@ class ContentGenerator(ContentGeneratorProtocol):
         fup_obj_assignment = ObjectAssignment(
             llm_assignment_for_object=fup_llm_assignment,
             object_class_name=object_class.__name__,
+            object_class_schema=object_class_schema,
         )
 
-        obj_list = await llm_gen_object_list(object_assignment=fup_obj_assignment)
-        log.verbose(f"{self.__class__.__name__} generated object list after text: {obj_list}")
-        return cast("list[BaseModelTypeVar]", obj_list)
+        raw_list = await llm_gen_object_list(object_assignment=fup_obj_assignment)
+        log.verbose(f"{self.__class__.__name__} generated object list after text: {raw_list}")
+        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in raw_list]
 
     @override
     async def make_image_content(

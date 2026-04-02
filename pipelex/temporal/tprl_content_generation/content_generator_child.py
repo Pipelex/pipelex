@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any
 
 from pydantic import BaseModel
 from temporalio import workflow
@@ -154,7 +154,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object direct: {obj}")
-        return cast("BaseModelTypeVar", obj)
+        return object_class.model_validate(obj.model_dump(serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -182,6 +182,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             )
             tto_assignment = TextThenObjectAssignment(
                 object_class_name=object_class.__name__,
+                object_class_schema=object_class.model_json_schema(),
                 llm_assignment_for_text=llm_assignment_for_text,
                 llm_assignment_factory_to_object=llm_assignment_factory_to_object,
             )
@@ -203,7 +204,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object after text: {obj}")
-        return cast("BaseModelTypeVar", obj)
+        return object_class.model_validate(obj.model_dump(serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -244,7 +245,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object list direct: {obj_list}")
-        return cast("list[BaseModelTypeVar]", obj_list)
+        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in obj_list]
 
     @override
     @update_job_metadata
@@ -273,6 +274,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             )
             tto_assignment = TextThenObjectAssignment(
                 object_class_name=object_class.__name__,
+                object_class_schema=object_class.model_json_schema(),
                 llm_assignment_for_text=llm_assignment_for_text,
                 llm_assignment_factory_to_object=llm_assignment_factory_to_object,
             )
@@ -294,7 +296,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object list after text: {obj_list}")
-        return cast("list[BaseModelTypeVar]", obj_list)
+        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in obj_list]
 
     @override
     async def make_image_content(
