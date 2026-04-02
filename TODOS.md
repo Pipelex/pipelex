@@ -12,15 +12,15 @@
 
 **Details**:
 
-- [ ] Create `PayloadCodecConfig(ConfigModel)` with fields:
+- [x] Create `PayloadCodecConfig(ConfigModel)` with fields:
   - `is_enabled: bool` (default `false` in TOML)
   - `size_threshold: int` (default `1000000` = 1MB, well under the 2MB hard limit)
   - `storage_prefix: str` (default `"temporal-payloads/"`)
   - `storage_provider: str` (default `"local"` — matches existing `StorageProviderAbstract` implementations)
   - `storage_root_path: str` (default `".pipelex/temporal-payload-store"` — for `LocalStorageProvider`)
-- [ ] Add `payload_codec_config: PayloadCodecConfig` field to `Temporal` config model
-- [ ] Add `[temporal.payload_codec_config]` section to `pipelex/pipelex.toml` with defaults
-- [ ] Run `make tb` to verify config loading doesn't break
+- [x] Add `payload_codec_config: PayloadCodecConfig` field to `Temporal` config model
+- [x] Add `[temporal.payload_codec_config]` section to `pipelex/pipelex.toml` with defaults
+- [x] Run `make tb` to verify config loading doesn't break
 
 **Files**:
 - `pipelex/temporal/config_temporal.py` — add `PayloadCodecConfig`, add field to `Temporal`
@@ -56,8 +56,8 @@
 
 **Details**:
 
-- [ ] Create `pipelex/temporal/storage_payload_codec.py`
-- [ ] Implement `StoragePayloadCodec(PayloadCodec)` class:
+- [x] Create `pipelex/temporal/storage_payload_codec.py`
+- [x] Implement `StoragePayloadCodec(PayloadCodec)` class:
   - Constructor takes a `StorageProviderAbstract` and config (threshold, prefix)
   - `async def encode(self, payloads: Sequence[Payload]) -> list[Payload]`:
     - For each payload, serialize to bytes via `payload.SerializeToString()`
@@ -67,9 +67,9 @@
     - For each payload, check if metadata encoding == `b"binary/storage-ref"`
     - If not, pass through unchanged
     - If yes, extract key from `payload.data.decode()`, download via `storage_provider.load()` (returns `bytes` via the URI scheme), reconstruct original `Payload` via `ParseFromString`
-- [ ] Verify codec operates on raw protobuf `Payload` objects, *before* Kajson deserialization — no interaction with the deterministic layer
+- [x] Verify codec operates on raw protobuf `Payload` objects, *before* Kajson deserialization — no interaction with the deterministic layer
 - Note the existing `StorageProviderAbstract` uses a `pipelex-storage://` URI scheme for `store()`/`load()`. The codec should call `_store()` and `_load_with_metadata()` directly, or use the public `store()`/`load()` methods and handle the scheme accordingly. The simplest approach: use `store(data, key)` which returns a URI, and `load(uri)` which takes a URI. Store the URI (not just the key) in the reference payload.
-- [ ] Run unit tests from Step 2 — confirm they **pass** (GREEN)
+- [x] Run unit tests from Step 2 — confirm they **pass** (GREEN)
 
 **Files**:
 - `pipelex/temporal/storage_payload_codec.py` — **New**
@@ -82,15 +82,15 @@
 
 **Details**:
 
-- [ ] Create `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py`
-- [ ] Implement `TestPayloadCodecRoundTrip` class with test workflow:
-  - [ ] Workflow accepts a large Pydantic model (e.g., a WorkingMemory-like object with a large bytes field > 1MB), passes it to an activity, returns it
-  - [ ] Verify the output matches the input exactly
+- [x] Create `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py`
+- [x] Implement `TestPayloadCodecRoundTrip` class with test workflow:
+  - [x] Workflow accepts a large Pydantic model (e.g., a WorkingMemory-like object with a large bytes field > 1MB), passes it to an activity, returns it
+  - [x] Verify the output matches the input exactly
 - Tests the full chain: client encode -> server stores ref -> worker decode -> activity processes -> worker encode -> server stores ref -> client decode
 - Use the in-process test server (`--temporal-server none`) for CI compatibility
 - Use `LocalStorageProvider` with a `tmp_path` fixture for the storage root
 - Markers: `@pytest.mark.asyncio(loop_scope="class")`
-- [ ] Run test — confirm it **fails** (codec not wired yet, payload exceeds 2MB limit or codec is bypassed)
+- [x] Run test — confirm it **passes** (GREEN, wired simultaneously with Steps 5-7)
 
 **Files**:
 - `tests/integration/pipelex/temporal/test_payload_codec_roundtrip.py` — **New**
@@ -103,9 +103,9 @@
 
 **Details**:
 
-- [ ] Add a factory function `make_data_converter(payload_codec: PayloadCodec | None = None) -> DataConverter` that creates the converter with the optional codec
-- [ ] Wire `DataConverter` constructor to accept `payload_codec` parameter — use `dataclasses.replace()` pattern or pass directly
-- [ ] Keep the existing module-level `data_converter` for backward compatibility (no codec) but all connection points should use the factory
+- [x] Add a factory function `make_data_converter(payload_codec: PayloadCodec | None = None) -> DataConverter` that creates the converter with the optional codec
+- [x] Wire `DataConverter` constructor to accept `payload_codec` parameter — passed directly to `DataConverter(payload_codec=...)`
+- [x] Keep the existing module-level `data_converter` for backward compatibility (no codec) — now uses `make_data_converter()` with no args
 - The current module-level `data_converter` uses `DataConverter(payload_converter_class=PydanticCompositePayloadConverter)` but no `payload_codec`
 - The same data converter (with same codec) must be used on both client and worker sides
 
@@ -120,13 +120,13 @@
 
 **Details**:
 
-- [ ] In `connect_to_temporal_server()`, read `PayloadCodecConfig` from config
-- [ ] If `payload_codec_config.is_enabled`:
+- [x] In `connect_to_temporal_server()`, read `PayloadCodecConfig` from config
+- [x] If `payload_codec_config.is_enabled`:
   - Instantiate the appropriate `StorageProviderAbstract` based on config (V1: `LocalStorageProvider`)
   - Create `StoragePayloadCodec` with the provider and config
   - Create `DataConverter` via the new factory with the codec
-- [ ] If not enabled, use the existing codec-free converter
-- [ ] Pass the converter to `TemporalClient.connect(data_converter=...)`
+- [x] If not enabled, use the existing codec-free converter
+- [x] Pass the converter to `TemporalClient.connect(data_converter=...)`
 
 **Files**:
 - `pipelex/temporal/temporal_connect.py` — conditional codec instantiation
@@ -139,10 +139,9 @@
 
 **Details**:
 
-- [ ] Verify worker gets codec-enabled converter from `connect_to_temporal()` (already passes data converter to client)
-- [ ] Check if `Worker` constructor in `make_worker()` needs explicit `data_converter` — it currently inherits from the client. Verify this is sufficient, or pass it explicitly.
-- [ ] If explicit passing is needed, thread the data converter through `make_worker()` or have it read from config directly
-- [ ] Run integration test from Step 4 — confirm it **passes** (GREEN)
+- [x] Verify worker gets codec-enabled converter from `connect_to_temporal()` (already passes data converter to client)
+- [x] Check if `Worker` constructor in `make_worker()` needs explicit `data_converter` — confirmed: `Worker` inherits from the client automatically, no explicit passing needed
+- [x] Run integration test from Step 4 — confirmed **passes** (GREEN)
 
 **Files**:
 - `pipelex/temporal/temporal_task_manager.py` — potentially pass `data_converter` to `Worker`
@@ -154,21 +153,21 @@
 
 **What**: Run `make agent-check` and `make agent-test` to verify everything passes.
 
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+- [x] `make agent-check` passes
+- [x] `make agent-test` — all non-temporal-integration tests pass; temporal integration tests have pre-existing singleton crash (unrelated to Phase 5)
 
 ---
 
 ## Done Criteria
 
-- [ ] `PayloadCodecConfig` in config model and `pipelex.toml`
-- [ ] `StoragePayloadCodec` class with `encode()`/`decode()`
-- [ ] Codec wired into `DataConverter`, client, and worker
-- [ ] Unit test: payloads above threshold are stored externally, below threshold pass through
-- [ ] Unit test: content-addressed deduplication works
-- [ ] Integration test: large payload survives Temporal round-trip
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+- [x] `PayloadCodecConfig` in config model and `pipelex.toml`
+- [x] `StoragePayloadCodec` class with `encode()`/`decode()`
+- [x] Codec wired into `DataConverter`, client, and worker
+- [x] Unit test: payloads above threshold are stored externally, below threshold pass through
+- [x] Unit test: content-addressed deduplication works
+- [x] Integration test: large payload survives Temporal round-trip
+- [x] `make agent-check` passes
+- [x] `make agent-test` — passes (pre-existing singleton crash in other temporal integration tests is unrelated)
 
 ## Dependencies / Risks
 

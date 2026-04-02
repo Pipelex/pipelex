@@ -1,4 +1,5 @@
-from typing import Mapping
+from pathlib import Path
+from typing import TYPE_CHECKING, Mapping
 
 from temporalio.client import Client as TemporalClient
 
@@ -8,7 +9,12 @@ from pipelex.hub import get_secret
 from pipelex.system.environment import get_required_env
 from pipelex.temporal.config_temporal import SecretMethod, TemporalConfigError, TemporalServerConfig
 from pipelex.temporal.exceptions import TemporalServerError
-from pipelex.temporal.temporal_data_converter import data_converter
+from pipelex.temporal.storage_payload_codec import StoragePayloadCodec
+from pipelex.temporal.temporal_data_converter import data_converter, make_data_converter
+from pipelex.tools.storage.local_storage_provider import LocalStorageProvider
+
+if TYPE_CHECKING:
+    from temporalio.converter import DataConverter
 
 
 async def connect_to_temporal_server(server_config: TemporalServerConfig, name: str | None = None) -> TemporalClient:
@@ -39,6 +45,21 @@ async def connect_to_temporal_server(server_config: TemporalServerConfig, name: 
         rpc_metadata = {}
         tls = False
 
+    # Build the data converter, optionally with a storage-based payload codec.
+    payload_codec_config = get_config().temporal.payload_codec_config
+    converter: DataConverter
+    if payload_codec_config.is_enabled:
+        storage_provider = LocalStorageProvider(root_path=Path(payload_codec_config.storage_root_path))
+        payload_codec = StoragePayloadCodec(
+            storage_provider=storage_provider,
+            size_threshold=payload_codec_config.size_threshold,
+            storage_prefix=payload_codec_config.storage_prefix,
+        )
+        converter = make_data_converter(payload_codec=payload_codec)
+        log.info(f"Payload codec enabled — threshold={payload_codec_config.size_threshold}, prefix='{payload_codec_config.storage_prefix}'")
+    else:
+        converter = data_converter
+
     log.info(f"Connecting to Temporal server: {server_config.full_description}")
     log.info(
         f"""Establishing connection to Temporal...
@@ -57,7 +78,7 @@ async def connect_to_temporal_server(server_config: TemporalServerConfig, name: 
             namespace=server_config.namespace,
             rpc_metadata=rpc_metadata,
             api_key=api_key,
-            data_converter=data_converter,
+            data_converter=converter,
             tls=tls,
         )
     except RuntimeError as exc:

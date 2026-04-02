@@ -23,11 +23,11 @@ def _make_payload(size: int) -> Payload:
 class TestStoragePayloadCodec:
     """Unit tests for StoragePayloadCodec encode/decode behavior."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def storage(self) -> InMemoryStorageProvider:
         return InMemoryStorageProvider()
 
-    @pytest.fixture()
+    @pytest.fixture
     def codec(self, storage: InMemoryStorageProvider) -> StoragePayloadCodec:
         return StoragePayloadCodec(
             storage_provider=storage,
@@ -128,7 +128,7 @@ class TestStoragePayloadCodec:
         assert decoded[1].SerializeToString() == large_bytes
 
     @pytest.mark.parametrize(
-        "topic, size",
+        ("topic", "size"),
         [
             ("small", 10),
             ("at_threshold", TEST_THRESHOLD),

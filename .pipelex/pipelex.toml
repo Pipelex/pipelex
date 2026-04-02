@@ -210,7 +210,7 @@ is_enabled = false
 
 [temporal.payload_codec_config]
 is_enabled = false
-size_threshold = 1000000
+size_threshold = 1_048_576                            # in bytes (~1 MB, well under Temporal's 2 MB hard limit)
 storage_prefix = "temporal-payloads/"
 storage_provider = "local"
 storage_root_path = ".pipelex/temporal-payload-store"

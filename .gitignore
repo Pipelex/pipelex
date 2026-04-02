@@ -60,6 +60,7 @@ settings.local.json
 structures/
 .pipelex/storage
 .pipelex/traces
+.pipelex/temporal-payload-store
 
 # Generated test fixtures (regenerate with `make regenerate-test-models`)
 tests/integration/pipelex/fixtures/_generated_model_sets.py
