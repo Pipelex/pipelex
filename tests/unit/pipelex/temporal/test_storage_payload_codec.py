@@ -169,3 +169,66 @@ class TestStoragePayloadCodec:
 
         assert len(decoded) == 1
         assert decoded[0].SerializeToString() == original_bytes, f"Round-trip failed for {topic} (size={size})"
+
+    # -------------------------------------------------------------------
+    # _extract_job_routing tests
+    # -------------------------------------------------------------------
+
+    async def test_storage_key_includes_routing_when_available(
+        self,
+        codec: StoragePayloadCodec,
+    ) -> None:
+        """When job_metadata is present, storage key includes user_id and pipeline_run_id."""
+        routed_payload = Payload(
+            metadata={"encoding": b"json/plain"},
+            data=b'{"job_metadata": {"user_id": "user42", "pipeline_run_id": "run99"}, "big": "' + b"x" * (TEST_THRESHOLD + 500) + b'"}',
+        )
+
+        encoded = await codec.encode([routed_payload])
+        assert len(encoded) == 1
+        uri = encoded[0].data.decode()
+        assert "user42" in uri
+        assert "run99" in uri
+
+    @pytest.mark.parametrize(
+        ("topic", "payload_data"),
+        [
+            (
+                "non_json_encoding_no_routing",
+                b"x" * (TEST_THRESHOLD + 500),
+            ),
+            (
+                "json_missing_job_metadata_no_routing",
+                b'{"other_key": "value", "pad": "' + b"x" * (TEST_THRESHOLD + 500) + b'"}',
+            ),
+            (
+                "json_non_dict_job_metadata_no_routing",
+                b'{"job_metadata": "not a dict", "pad": "' + b"x" * (TEST_THRESHOLD + 500) + b'"}',
+            ),
+        ],
+    )
+    async def test_storage_key_falls_back_to_flat_when_no_routing(
+        self,
+        storage: InMemoryStorageProvider,
+        topic: str,
+        payload_data: bytes,
+    ) -> None:
+        """Payloads without valid job_metadata use a flat storage key (prefix + hash only)."""
+        codec = StoragePayloadCodec(
+            storage_provider=storage,
+            size_threshold=TEST_THRESHOLD,
+            storage_prefix=TEST_PREFIX,
+        )
+        payload = Payload(
+            metadata={"encoding": b"json/plain" if b"json" in topic.encode() else b"binary/plain"},
+            data=payload_data,
+        )
+
+        encoded = await codec.encode([payload])
+        assert len(encoded) == 1
+        uri = encoded[0].data.decode()
+        # Flat keys have no slashes after the prefix (just prefix + hash)
+        key_after_scheme = uri.split("://", 1)[-1]
+        segments = key_after_scheme.split("/")
+        # prefix is "test-payloads/" so we expect: test-payloads/{hash} = 2 segments
+        assert len(segments) == 2, f"Expected flat key for {topic}, got: {key_after_scheme}"

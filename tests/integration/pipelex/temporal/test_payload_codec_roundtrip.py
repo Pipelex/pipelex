@@ -6,6 +6,7 @@ and reconstructed on the other side of a workflow → activity → return chain.
 
 from __future__ import annotations
 
+import uuid
 from datetime import timedelta
 from typing import TYPE_CHECKING, ClassVar
 
@@ -120,7 +121,7 @@ class TestPayloadCodecRoundTrip:
             data=TestPayloadCodecRoundTripTestData.LARGE_DATA,
         )
 
-        task_queue = "test-payload-codec-roundtrip"
+        task_queue = str(uuid.uuid4())
 
         async with await WorkflowEnvironment.start_local(data_converter=converter) as env:  # pyright: ignore[reportUnknownMemberType]
             temporal_client: TemporalClient = env.client

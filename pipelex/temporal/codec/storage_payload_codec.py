@@ -39,7 +39,7 @@ class StoragePayloadCodec(PayloadCodec):
     ) -> None:
         self._storage = storage_provider
         self._size_threshold = size_threshold
-        self._storage_prefix = storage_prefix
+        self._storage_prefix = storage_prefix if storage_prefix.endswith("/") else f"{storage_prefix}/"
 
     @staticmethod
     def _extract_job_routing(payload: Payload) -> tuple[str, str] | None:

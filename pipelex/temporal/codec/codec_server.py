@@ -55,8 +55,20 @@ async def _apply(
     if request.content_type != "application/json":
         return web.Response(status=415, text="Expected application/json")
 
-    payloads_proto = json_format.Parse(await request.read(), Payloads())
-    result_payloads = await codec_fn(payloads_proto.payloads)
+    try:
+        payloads_proto = json_format.Parse(await request.read(), Payloads())
+    except json_format.ParseError as exc:
+        return web.Response(status=400, text=f"Malformed Payloads JSON: {exc}")
+
+    try:
+        result_payloads = await codec_fn(payloads_proto.payloads)
+    except FileNotFoundError as exc:
+        log.error(f"Codec storage lookup failed: {exc}")
+        return web.Response(status=404, text=f"Storage object not found: {exc}")
+    except OSError as exc:
+        log.error(f"Codec I/O error: {exc}")
+        return web.Response(status=502, text=f"Storage I/O error: {exc}")
+
     result_proto = Payloads(payloads=result_payloads)
 
     response = web.Response()

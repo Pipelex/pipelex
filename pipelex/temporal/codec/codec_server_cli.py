@@ -28,7 +28,7 @@ DEFAULT_CORS_ORIGINS = ["http://localhost:8233"]
 
 
 @app.command()
-def configure(
+def start(
     project: Annotated[str | None, typer.Argument(help="The project name if you don't want to get it from pyproject.toml")] = None,
     host: Annotated[str, typer.Option(help="Host to bind the codec server to")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to bind the codec server to")] = 8081,
