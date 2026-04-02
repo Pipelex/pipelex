@@ -1,0 +1,31 @@
+pipelex/temporal/codec/codec_server_cli.py
+  a8a3a75b2e9f2f63 36
+.claude/skills/temporal-e2e-validate/SKILL.md
+  a8a3a75b2e9f2f63 26-27
+pipelex/temporal/codec/storage_payload_codec.py
+  a8a3a75b2e9f2f63 42
+tests/unit/pipelex/temporal/test_storage_payload_codec.py
+  a8a3a75b2e9f2f63 223
+pipelex/temporal/codec/codec_server.py
+  a8a3a75b2e9f2f63 23,50-56,64,68-69,73,75-76,78
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "7093715357b417713343dd327eb440464bf3c055",
+  "prompts": {
+    "a8a3a75b2e9f2f63": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "20537641-4cb3-4afe-a4c4-44ebb8a613f8",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 20,
+      "accepted_lines": 20,
+      "overriden_lines": 0
+    }
+  }
+}
