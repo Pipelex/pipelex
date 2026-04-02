@@ -39,7 +39,7 @@ class StoragePayloadCodec(PayloadCodec):
         encoded: list[Payload] = []
         for payload in payloads:
             serialized = payload.SerializeToString()
-            if len(payload.data) < self._size_threshold:
+            if len(serialized) < self._size_threshold:
                 encoded.append(payload)
                 continue
             key = self._storage_prefix + sha256(serialized).hexdigest()

@@ -3,11 +3,9 @@ from __future__ import annotations
 import pytest
 from temporalio.api.common.v1 import Payload
 
-from pipelex.temporal.storage_payload_codec import StoragePayloadCodec
+from pipelex.temporal.storage_payload_codec import STORAGE_REF_ENCODING, StoragePayloadCodec
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
-
-STORAGE_REF_ENCODING = b"binary/storage-ref"
-TEST_THRESHOLD = 100
+TEST_THRESHOLD = 1024
 TEST_PREFIX = "test-payloads/"
 
 
@@ -40,7 +38,7 @@ class TestStoragePayloadCodec:
         codec: StoragePayloadCodec,
     ) -> None:
         """Payloads smaller than the threshold pass through encode/decode unchanged."""
-        small_payload = _make_payload(TEST_THRESHOLD - 1)
+        small_payload = _make_payload(TEST_THRESHOLD - 100)
         original_bytes = small_payload.SerializeToString()
 
         encoded = await codec.encode([small_payload])

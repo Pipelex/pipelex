@@ -283,7 +283,7 @@ See [phase4-explicit-class-registry.md](phase4-explicit-class-registry.md) for t
 - [x] `KajsonManager` has no ContextVar, no `set_scoped_class_registry`
 - [x] `Library._class_registry` is a PrivateAttr, GC'd with Library
 - [x] All ~20 callers migrated from `KajsonManager.get_class_registry()` to `hub.get_class_registry()`
-- [ ] Manual Temporal test: 3-process setup with `dynamic_concept_sequence.mthds` passes
+- [x] Manual Temporal test: 3-process setup with `dynamic_concept_sequence.mthds` passes
 - [x] `make agent-check` passes (both repos)
 - [x] `make agent-test` passes (both repos)
 
@@ -347,11 +347,11 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 
 ### Done when
 
-- [ ] Unit test: payloads above threshold are stored externally, below threshold pass through
-- [ ] Unit test: content-addressed deduplication works
-- [ ] Integration test: large WorkingMemory survives Temporal round-trip
-- [ ] `make agent-check` passes
-- [ ] `make agent-test` passes
+- [x] Unit test: payloads above threshold are stored externally, below threshold pass through
+- [x] Unit test: content-addressed deduplication works
+- [x] Integration test: large WorkingMemory survives Temporal round-trip
+- [x] `make agent-check` passes
+- [x] `make agent-test` passes
 
 ---
 
@@ -395,21 +395,6 @@ return WorkingMemory (50MB)       reconstruct original payload        Event Hist
 ---
 
 **Next phases**: See [01-master-plan.md](01-master-plan.md) for Phase 4.5 Step 6 (Standalone Activity Tracing), Phase 6 (Cross-Package Dependencies), and Future Phases.
-
----
-
-## What Exists Already
-
-| What | Where | Status |
-|------|-------|--------|
-| Worker base library loading (Tier 1) | `worker_cli.py` | Done |
-| Kajson data converter | `temporal_data_converter.py` | Done |
-| Storage provider system (local/S3/GCP) | `pipelex/tools/storage/` | Done |
-| Library manager with multi-library + ContextVar | `pipelex/libraries/library_manager.py` | Done |
-| `load_from_blueprints()` | `library_manager.py` | Done (will refactor through crate) |
-| `PipelexInterpreter.make_pipelex_bundle_blueprint()` | interpreter | Done |
-| ConceptBlueprint, PipeBlueprintUnion models | `pipelex/core/` | Done |
-| `concept_ref` on Concept | `pipelex/core/concepts/concept.py` | Done (model for `pipe_ref`) |
 
 ---
 
