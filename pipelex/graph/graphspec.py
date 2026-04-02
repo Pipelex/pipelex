@@ -254,7 +254,7 @@ class EdgeSpec(BaseModel):
     edge_id: str = Field(validation_alias="id", serialization_alias="id")
     source: str
     target: str
-    kind: EdgeKind
+    kind: EdgeKind = Field(strict=False)
     label: str | None = None
     # For batch edges, specify the stuff digests for renderers to connect stuff nodes directly
     source_stuff_digest: str | None = None
