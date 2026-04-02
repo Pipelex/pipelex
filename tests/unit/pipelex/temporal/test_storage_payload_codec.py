@@ -5,6 +5,7 @@ from temporalio.api.common.v1 import Payload
 
 from pipelex.temporal.storage_payload_codec import STORAGE_REF_ENCODING, StoragePayloadCodec
 from pipelex.tools.storage.in_memory_storage_provider import InMemoryStorageProvider
+
 TEST_THRESHOLD = 1024
 TEST_PREFIX = "test-payloads/"
 

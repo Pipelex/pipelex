@@ -179,8 +179,6 @@ Today, cross-package dependencies (`alias->domain.ConceptCode`, `alias::domain.p
 ```
 Phase 4.5 Step 6 (Activity Tracing)    ← requires Phase 4.5's event log infrastructure
 
-Phase 5 (StoragePayloadCodec)           ← independent, can parallel with Phase 6
-
 Phase 6a (Local cross-package deps)    ← requires Phase 2's crate propagation
     │
     ▼
