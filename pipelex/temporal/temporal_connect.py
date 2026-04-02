@@ -7,7 +7,7 @@ from pipelex import log
 from pipelex.config import get_config
 from pipelex.hub import get_secret
 from pipelex.system.environment import get_required_env
-from pipelex.temporal.config_temporal import SecretMethod, TemporalConfigError, TemporalServerConfig
+from pipelex.temporal.config_temporal import SecretMethod, StorageProviderType, TemporalConfigError, TemporalServerConfig
 from pipelex.temporal.exceptions import TemporalServerError
 from pipelex.temporal.storage_payload_codec import StoragePayloadCodec
 from pipelex.temporal.temporal_data_converter import data_converter, make_data_converter
@@ -49,7 +49,9 @@ async def connect_to_temporal_server(server_config: TemporalServerConfig, name: 
     payload_codec_config = get_config().temporal.payload_codec_config
     converter: DataConverter
     if payload_codec_config.is_enabled:
-        storage_provider = LocalStorageProvider(root_path=Path(payload_codec_config.storage_root_path))
+        match payload_codec_config.storage_provider:
+            case StorageProviderType.LOCAL:
+                storage_provider = LocalStorageProvider(root_path=Path(payload_codec_config.storage_root_path))
         payload_codec = StoragePayloadCodec(
             storage_provider=storage_provider,
             size_threshold=payload_codec_config.size_threshold,

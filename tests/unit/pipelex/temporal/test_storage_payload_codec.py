@@ -126,6 +126,26 @@ class TestStoragePayloadCodec:
         assert decoded[0].SerializeToString() == small_bytes
         assert decoded[1].SerializeToString() == large_bytes
 
+    async def test_exactly_at_threshold_is_offloaded(
+        self,
+        storage: InMemoryStorageProvider,
+    ) -> None:
+        """A payload whose serialized size equals the threshold is offloaded, not passed through."""
+        payload = _make_payload(500)
+        serialized_size = len(payload.SerializeToString())
+
+        codec = StoragePayloadCodec(
+            storage_provider=storage,
+            size_threshold=serialized_size,
+            storage_prefix=TEST_PREFIX,
+        )
+
+        encoded = await codec.encode([payload])
+
+        assert len(encoded) == 1
+        assert encoded[0].metadata.get("encoding") == STORAGE_REF_ENCODING
+        assert len(storage.root) == 1
+
     @pytest.mark.parametrize(
         ("topic", "size"),
         [
