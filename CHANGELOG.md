@@ -1,5 +1,15 @@
 # Changelog
 
+## [v0.23.3] - 2026-04-02
+
+### Changed
+
+- **Pipe spec output aliases**: `parse_pipe_spec` now accepts `output_concept` and `output_type` as aliases for the `output` field, with smart fallback when both alias and canonical field are present.
+
+### Fixed
+
+- **Gateway terms check**: Terms acceptance is now only required for inference operations, not for read-only operations like model spec fetching during validation.
+
 ## [v0.23.2] - 2026-03-30
 
 ### Changed
