@@ -126,6 +126,8 @@ class DeliveryExecutor:
                 await storage_provider.store(data=data, key=key, content_type=content_type)
                 log.debug(f"Stored: {key}")
 
+            # TODO: include the full S3 URI (s3://bucket/key/) so result_url is
+            # self-contained and doesn't depend on knowing the bucket externally.
             result_url: str = f"{base_key}/"
             log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}")
             return result_url

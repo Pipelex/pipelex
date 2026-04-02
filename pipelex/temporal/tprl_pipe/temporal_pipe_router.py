@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from temporalio import workflow
 from temporalio.common import RetryPolicy
 from typing_extensions import override
 
@@ -54,11 +55,14 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
 
         if is_in_temporal_workflow():
             # Child workflow dispatch (inside a Temporal workflow)
+            # Use deterministic ID derived from parent workflow to avoid Temporal nondeterminism errors
             log.debug("TemporalPipeRouter: child workflow dispatch")
+            parent_workflow_id = workflow.info().workflow_id
+            child_workflow_id = f"{parent_workflow_id}-{wfid or 'run-pipe-router'}"
             executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(task_queue=None)
             pipe_output = await executor.execute_child_workflow(
                 workflow_class=WfPipeRouter,
-                workflow_id=executor.make_workflow_id(base_id=wfid or "run-pipe-router"),
+                workflow_id=child_workflow_id,
                 workflow_arg=pipe_job,
             )
         else:
