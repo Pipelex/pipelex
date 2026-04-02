@@ -54,9 +54,6 @@ dependencies = [
   "typing-extensions>=4.13.2",
 ]
 
-[tool.uv.sources]
-kajson = { path = "../kajson", editable = true }
-
 [project.urls]
 Homepage = "https://pipelex.com"
 Repository = "https://github.com/Pipelex/pipelex"
