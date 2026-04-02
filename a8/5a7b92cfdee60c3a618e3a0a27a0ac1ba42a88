@@ -1,0 +1,38 @@
+pipelex/temporal/temporal_data_converter.py
+  e5caaf7290a172a6 28,82-85,96-102,104
+wip/tier2-live-bug-recap.md
+  355ab6bfad63a1eb 1-69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "a85a7b92cfdee60c3a618e3a0a27a0ac1ba42a88",
+  "prompts": {
+    "355ab6bfad63a1eb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "05703020-7b75-4418-90f8-8a986de7db57",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 69,
+      "total_deletions": 0,
+      "accepted_lines": 69,
+      "overriden_lines": 0
+    },
+    "e5caaf7290a172a6": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "19c0bb4d-ec63-4142-b566-2163e0501814",
+        "model": "gpt-5.4-medium"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 126,
+      "total_deletions": 56,
+      "accepted_lines": 13,
+      "overriden_lines": 0
+    }
+  }
+}
