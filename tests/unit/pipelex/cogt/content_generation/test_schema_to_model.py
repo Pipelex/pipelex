@@ -1,8 +1,12 @@
 """Unit tests for schema_to_model: reconstructing BaseModel classes from JSON schemas."""
 
+import pytest
 from pydantic import BaseModel, Field
 
-from pipelex.cogt.content_generation.schema_to_model import model_class_from_json_schema
+from pipelex.cogt.content_generation.schema_to_model import (
+    _exec_and_extract_class,  # noqa: PLC2701  # pyright: ignore[reportPrivateUsage]
+    model_class_from_json_schema,
+)
 
 
 class SimpleModel(BaseModel):
@@ -101,3 +105,9 @@ class TestSchemaToModel:
         assert "age" in result_class.model_fields
         instance = result_class(name="Ada", age=40)
         assert instance.name == "Ada"  # type: ignore[attr-defined]
+
+    def test_exec_blocks_dangerous_builtins(self) -> None:
+        """The restricted exec namespace blocks open(), eval(), exec(), and compile()."""
+        malicious_source = "from pydantic import BaseModel\nclass Innocent(BaseModel):\n    name: str = 'ok'\nleaked = open('/etc/passwd')\n"
+        with pytest.raises(NameError, match="open"):
+            _exec_and_extract_class(malicious_source, "Innocent")

@@ -1,6 +1,12 @@
 """Tests for LibraryManager blueprint accumulation, get_crate(), and fingerprint idempotency."""
 
+from typing import cast
+
+import pytest
+from pytest_mock import MockerFixture
+
 from pipelex.hub import get_library_manager, set_current_library, teardown_current_library
+from pipelex.libraries.library import Library
 from pipelex.libraries.library_manager import LibraryManager
 from tests.unit.pipelex.libraries.test_library_crate_data import BlueprintSamples
 
@@ -110,4 +116,36 @@ class TestLibraryCrateAccumulation:
             result = library_manager.get_crate(library_id=library_id)
             assert result is None
         finally:
+            teardown_current_library()
+
+    def test_failed_load_from_crate_does_not_cache_fingerprint(self, mocker: MockerFixture):
+        """A failed load_from_crate() must not cache the fingerprint, allowing retries."""
+        library_manager = get_library_manager()
+        library_id, _ = library_manager.open_library()
+        set_current_library(library_id=library_id)
+        try:
+            library_manager.load_from_blueprints(library_id=library_id, blueprints=[BlueprintSamples.SCORING_BUNDLE])
+
+            crate = library_manager.get_crate(library_id=library_id)
+            assert crate is not None
+
+            # Open a target library to load the crate into
+            target_library_id = "failure-retry-test-lib"
+            library_manager.open_library(library_id=target_library_id)
+
+            # Make validate_library raise to simulate a load failure (Library is a frozen
+            # Pydantic model, so we patch the class method rather than the instance)
+            mocker.patch.object(Library, "validate_library", side_effect=RuntimeError("simulated failure"))
+
+            with pytest.raises(RuntimeError, match="simulated failure"):
+                library_manager.load_from_crate(library_id=target_library_id, crate=crate)
+
+            # Fingerprint must NOT be cached — a retry should attempt loading again
+            concrete_manager = cast("LibraryManager", library_manager)
+            loaded_set = concrete_manager._loaded_fingerprints.get(target_library_id, set())  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+            assert crate.fingerprint not in loaded_set
+
+            library_manager.teardown(library_id=target_library_id)
+        finally:
+            library_manager.teardown(library_id=library_id)
             teardown_current_library()

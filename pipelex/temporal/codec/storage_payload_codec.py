@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from hashlib import sha256
 from typing import TYPE_CHECKING, Any, cast
 
@@ -67,12 +68,19 @@ class StoragePayloadCodec(PayloadCodec):
             return user_id, pipeline_run_id
         return None
 
+    @staticmethod
+    def _sanitize_path_segment(segment: str) -> str:
+        """Sanitize a path segment to prevent traversal and encoding issues."""
+        return re.sub(r"[^A-Za-z0-9_\-]", "_", segment)
+
     def _build_storage_key(self, payload: Payload, hash_hex: str) -> str:
         """Build a storage key, structured by job routing when available."""
         routing = self._extract_job_routing(payload)
         if routing:
             user_id, pipeline_run_id = routing
-            return f"{self._storage_prefix}{user_id}/{pipeline_run_id}/{hash_hex}"
+            safe_user_id = self._sanitize_path_segment(user_id)
+            safe_run_id = self._sanitize_path_segment(pipeline_run_id)
+            return f"{self._storage_prefix}{safe_user_id}/{safe_run_id}/{hash_hex}"
         return f"{self._storage_prefix}{hash_hex}"
 
     @override

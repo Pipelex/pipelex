@@ -24,7 +24,7 @@ allowed-tools:
   - Bash(which *)
   - Bash(open *)
   - Bash(cat *)
-  - Bash(rm *)
+  - Bash(.venv/bin/python *)
 ---
 
 # Temporal E2E Validation Suite
@@ -543,7 +543,7 @@ Tell the user: PASS/FAIL, output dir, graph file path, storage file count.
 **Step 6c: Remove the temporary override**
 
 ```bash
-rm -f .pipelex/pipelex_temporary_override.toml
+.venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"
 echo "Temporary override removed"
 ```
 
@@ -594,7 +594,7 @@ Propose these to the user — do NOT run them automatically:
 - Kill tmux sessions: `tmux kill-session -t temporal-worker` / `tmux kill-session -t temporal-server`
 - Clean results directory: `rm -rf results/`
 - Clean trace files: `rm -rf .pipelex/traces/`
-- Remove temporary override if still present: `rm -f .pipelex/pipelex_temporary_override.toml`
+- Remove temporary override if still present: `.venv/bin/python -c "from pathlib import Path; Path('.pipelex/pipelex_temporary_override.toml').unlink(missing_ok=True)"`
 
 Leave the server running if the user plans to iterate.
 

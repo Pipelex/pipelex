@@ -6,6 +6,7 @@ The generated class carries its own source code as __kajson_class_source__, enab
 kajson to deserialize it across process boundaries without a class registry.
 """
 
+import builtins
 import hashlib
 import json
 import re
@@ -76,9 +77,17 @@ def _generate_source_from_schema(schema: dict[str, Any]) -> str:
         output_path.unlink(missing_ok=True)
 
 
+_BLOCKED_BUILTINS = frozenset({"eval", "exec", "compile", "open", "input", "breakpoint", "exit", "quit"})
+
+
+def _make_restricted_builtins() -> dict[str, Any]:
+    """Build a builtins dict that blocks dangerous functions while keeping imports working."""
+    return {name: obj for name, obj in vars(builtins).items() if name not in _BLOCKED_BUILTINS}
+
+
 def _exec_and_extract_class(source_code: str, class_name: str) -> type[BaseModel]:
     """Execute source code and extract the named BaseModel class."""
-    namespace: dict[str, Any] = {}
+    namespace: dict[str, Any] = {"__builtins__": _make_restricted_builtins()}
     exec(compile(source_code, "<schema_to_model>", "exec"), namespace)
 
     # Collect all BaseModel subclasses from the exec'd namespace

@@ -232,3 +232,45 @@ class TestStoragePayloadCodec:
         segments = key_after_scheme.split("/")
         # prefix is "test-payloads/" so we expect: test-payloads/{hash} = 2 segments
         assert len(segments) == 2, f"Expected flat key for {topic}, got: {key_after_scheme}"
+
+    # -------------------------------------------------------------------
+    # _sanitize_path_segment tests
+    # -------------------------------------------------------------------
+
+    @pytest.mark.parametrize(
+        ("topic", "user_id", "pipeline_run_id", "expected_user", "expected_run"),
+        [
+            ("path_traversal_dotdot", "../../../etc", "run1", "_________etc", "run1"),
+            ("path_traversal_in_run", "user1", "../../secret", "user1", "______secret"),
+            ("slashes_stripped", "user/sub/path", "run/id", "user_sub_path", "run_id"),
+            ("special_chars", "user@evil.com", "run id+test", "user_evil_com", "run_id_test"),
+            ("clean_ids_unchanged", "user42", "run-99_abc", "user42", "run-99_abc"),
+        ],
+    )
+    async def test_storage_key_sanitizes_routing_segments(
+        self,
+        codec: StoragePayloadCodec,
+        topic: str,
+        user_id: str,
+        pipeline_run_id: str,
+        expected_user: str,
+        expected_run: str,
+    ) -> None:
+        """Routing segments are sanitized to prevent path traversal and special char issues."""
+        metadata_json = (
+            f'{{"job_metadata": {{"user_id": "{user_id}", "pipeline_run_id": "{pipeline_run_id}"}}, "big": "' + "x" * (TEST_THRESHOLD + 500) + '"}'
+        )
+        routed_payload = Payload(
+            metadata={"encoding": b"json/plain"},
+            data=metadata_json.encode(),
+        )
+
+        encoded = await codec.encode([routed_payload])
+        assert len(encoded) == 1
+        uri = encoded[0].data.decode()
+        key_after_scheme = uri.split("://", 1)[-1]
+        # Expect: test-payloads/{safe_user}/{safe_run}/{hash} = 4 segments
+        segments = key_after_scheme.split("/")
+        assert len(segments) == 4, f"Expected routed key for {topic}, got: {key_after_scheme}"
+        assert segments[1] == expected_user, f"User segment mismatch for {topic}"
+        assert segments[2] == expected_run, f"Run segment mismatch for {topic}"
