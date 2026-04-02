@@ -1,0 +1,27 @@
+mkdocs.yml
+  a85837dc35476624 308,495
+docs/under-the-hood/index.md
+  a85837dc35476624 20,41
+docs/under-the-hood/distributed-content-generation.md
+  a85837dc35476624 1-226
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "91d5f9d994094e81fc717170076782898d628649",
+  "prompts": {
+    "a85837dc35476624": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bfa068d-8c52-41f3-bcea-04ecfb7d991e",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 230,
+      "total_deletions": 0,
+      "accepted_lines": 230,
+      "overriden_lines": 0
+    }
+  }
+}
