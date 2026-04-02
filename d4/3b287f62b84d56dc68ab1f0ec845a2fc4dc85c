@@ -1,0 +1,25 @@
+Makefile
+  8034819ba5d89dca 298
+pipelex/kit/paths.py
+  8034819ba5d89dca 12,37
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "d43b287f62b84d56dc68ab1f0ec845a2fc4dc85c",
+  "prompts": {
+    "8034819ba5d89dca": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bc5aa551-2704-4e67-b3f6-5bc577b1fca9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
