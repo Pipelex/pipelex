@@ -126,7 +126,8 @@ class DeliveryExecutor:
                 await storage_provider.store(data=data, key=key, content_type=content_type)
                 log.debug(f"Stored: {key}")
 
-            result_url: str = f"{storage_provider.public_url(base_key) or base_key}/"
+            public = await storage_provider.public_url(base_key)
+            result_url: str = f"{public or base_key}/"
             log.info(f"Storage delivery completed: pipeline_run_id={pipeline_run_id}, files={len(result_files)}")
             return result_url
         except Exception as exc:

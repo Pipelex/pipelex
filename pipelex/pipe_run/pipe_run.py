@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING
 from typing_extensions import override
 
 from pipelex import log
+from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
 from pipelex.pipe_run.exceptions import PipeRouterError
@@ -41,6 +42,14 @@ class PipeRun(PipeRunProtocol):
             status = DeliveryStatus.FAILED
             execution_error = exc
             log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")
+
+        # Close graph tracer and set graph_spec on pipe_output BEFORE delivery
+        # (the tracer records nodes/edges in-memory during execution)
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is not None and pipe_output is not None:
+            graph_spec = tracer_manager.close_tracer(pipeline_run_id)
+            if graph_spec is not None:
+                pipe_output.graph_spec = graph_spec
 
         # Deliver results — always. Default to storage-only if no assignment provided.
         if delivery_assignment is None:
