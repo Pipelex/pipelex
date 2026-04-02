@@ -250,6 +250,7 @@ class ContentGeneratorDry(ContentGeneratorProtocol):
     @override
     async def make_templated_text(
         self,
+        job_metadata: JobMetadata,
         context: dict[str, Any],
         template: str,
         templating_style: TemplatingStyle | None = None,

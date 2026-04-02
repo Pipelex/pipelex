@@ -1,7 +1,7 @@
 ---
 name: temporal-e2e-validate
 description: >
-  Full end-to-end validation of Temporal distributed execution (Phases 2-4.5).
+  Full end-to-end validation of Temporal distributed execution (Phases 2-5).
   Two modes: (1) pytest against a real Temporal server for detailed assertions on
   all test cases, and (2) true 3-process setup (server + separate worker process
   + submitter) that validates the actual deployment topology including cross-process
@@ -439,7 +439,128 @@ wait $PID_BETA && echo "Beta: PASS" || echo "Beta: FAIL"
 
 After this, tell the user both results.
 
-### Step 6: Final report
+### Step 6: StoragePayloadCodec tests — does the codec work end-to-end?
+
+These tests validate Phase 5: large payloads are transparently offloaded to external
+storage by the `StoragePayloadCodec`, keeping Temporal's event history small. The worker
+and submitter both use the codec — it's wired at the data converter level.
+
+**Important:** Before running these tiers, the codec must be enabled in the project
+config. After running, restore the original config.
+
+**Step 6a: Enable the codec**
+
+```bash
+python3 -c "
+import re, pathlib
+cfg = pathlib.Path('.pipelex/pipelex.toml')
+text = cfg.read_text()
+# Enable payload codec (only the one under [temporal.payload_codec_config])
+text = re.sub(
+    r'(\[temporal\.payload_codec_config\]\n)is_enabled = false',
+    r'\1is_enabled = true',
+    text,
+)
+cfg.write_text(text)
+print('Codec enabled in .pipelex/pipelex.toml')
+"
+```
+
+**Step 6b: Restart the worker** (so it picks up the new config)
+
+```bash
+tmux has-session -t temporal-worker 2>/dev/null && tmux kill-session -t temporal-worker
+tmux new-session -d -c "$PWD" -s temporal-worker \
+  '.venv/bin/python -m pipelex.temporal.worker_cli --is-not-sandboxed'
+sleep 4
+tmux capture-pane -t temporal-worker -p -S -30 | grep -i "payload codec\|Temporal Worker started"
+```
+
+Look for `Payload codec enabled` and `Temporal Worker started`.
+
+**Tier 6 — Codec transparency: existing pipelines work unchanged**
+
+Re-runs Tier 1 and Tier 2 with the codec on. If the codec is truly transparent, the
+same pipelines produce the same results. The only difference: payloads above 1MB are
+stored in `.pipelex/temporal-payload-store/` instead of inline in Temporal's event history.
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/native_text_sequence.mthds \
+  --pipe native_text_sequence \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/dynamic_concept_sequence.mthds \
+  --pipe dynamic_greeting_sequence \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+After both complete, check that storage was used:
+
+```bash
+ls -la .pipelex/temporal-payload-store/ 2>/dev/null && echo "Storage files found" || echo "No storage files (payloads may be below threshold in dry-run)"
+```
+
+Tell the user: PASS/FAIL for each, and whether storage files were created. In dry-run
+mode, payloads may be below the 1MB threshold, so no storage files is expected. In live
+mode, larger payloads should trigger storage. Either way, the key assertion is that the
+pipelines complete successfully.
+
+**Tier 7 — Large payload stress test**
+
+A 3-step pipeline that accumulates verbose text output across steps. Each step's
+WorkingMemory carries the results of all previous steps, so the payload grows. In live
+mode this produces realistic multi-KB to multi-MB payloads. In dry-run mode, mock
+outputs are small but the codec path is still exercised.
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/large_payload_sequence.mthds \
+  --pipe large_payload_sequence \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+Live (real LLM calls — produces larger payloads, better stress test):
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/temporal/library_crate/large_payload_sequence.mthds \
+  --pipe large_payload_sequence \
+  --temporal --no-logo --graph
+```
+
+After this completes, check storage and worker logs:
+
+```bash
+ls -la .pipelex/temporal-payload-store/ 2>/dev/null | head -20
+tmux capture-pane -t temporal-worker -p -S -50 | grep -i "payload\|warning\|size\|codec" || echo "No payload warnings"
+```
+
+Tell the user: PASS/FAIL, output dir, graph file path, storage file count.
+
+**Step 6c: Restore the original config**
+
+```bash
+python3 -c "
+import re, pathlib
+cfg = pathlib.Path('.pipelex/pipelex.toml')
+text = cfg.read_text()
+text = re.sub(
+    r'(\[temporal\.payload_codec_config\]\n)is_enabled = true',
+    r'\1is_enabled = false',
+    text,
+)
+cfg.write_text(text)
+print('Codec disabled in .pipelex/pipelex.toml (restored)')
+"
+```
+
+Optionally restart the worker to restore codec-off mode, or leave it if done testing.
+
+### Step 7: Final report
 
 List all graph files and present a summary table with results:
 
@@ -454,6 +575,8 @@ ls results/*/reactflow.html
 | Tier 3: Parallel | Branches execute as concurrent child workflows | PASS/FAIL | path | — |
 | Tier 4: ImgGen | Image generation pipeline works through Temporal | PASS/FAIL | path | yes/no |
 | Tier 5: Image flow | Generated image flows as input to next pipe step | PASS/FAIL | path | yes/no |
+| Tier 6: Codec transparency | Existing pipelines work unchanged with codec enabled | PASS/FAIL | path | — |
+| Tier 7: Large payload | Multi-step pipeline with codec stress test | PASS/FAIL | path | — |
 | Concept isolation (alpha) | Conflicting `Result` concepts don't cross-contaminate | PASS/FAIL | path | — |
 | Concept isolation (beta) | (same test, other side) | PASS/FAIL | path | — |
 | Pipe isolation (alpha) | Conflicting `shared_step` pipes use correct version | PASS/FAIL | path | — |
@@ -503,6 +626,8 @@ Leave the server running if the user plans to iterate.
 | `NotImplementedError` during image generation | The image generation or content storage path isn't wired up for the Temporal execution path — activity-level storage is missing |
 | Payload too large / `DataConverterError` on image pipes | Raw image bytes exceed Temporal's payload size limit (~2MB default) — images must be stored and referenced by URI, not passed inline |
 | `ImageContent` missing or has no `uri` field | The image generation activity returned raw image data instead of a stored `ImageContent` with a storage URI |
+| Codec enabled but no storage files | Payloads are below the threshold (1MB default) — expected in dry-run mode where mock data is small. Run live mode for realistic payload sizes |
+| `FileNotFoundError` in codec decode | The codec is trying to load a payload from storage that doesn't exist — storage root path may be misconfigured or files were cleaned up mid-run |
 
 ---
 
@@ -525,6 +650,7 @@ Leave the server running if the user plans to iterate.
 | `temporal_condition.mthds` | PipeCondition — conditional routing via child workflow | `temporal_condition_sequence` |
 | `temporal_compose.mthds` | PipeCompose — operator composition + deferred hydration | `temporal_compose_sequence` |
 | `temporal_combined.mthds` | Nested PipeParallel + PipeCondition | `temporal_combined_pipeline` |
+| `large_payload_sequence.mthds` | Codec stress test — 3-step verbose sequence accumulating large WorkingMemory | `large_payload_sequence` |
 
 **Image payload bundles** — in `tests/integration/pipelex/pipes/pipelines/`:
 

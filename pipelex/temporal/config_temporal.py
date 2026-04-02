@@ -5,6 +5,7 @@ from pydantic import Field, model_validator
 
 from pipelex.system.configuration.config_model import ConfigModel
 from pipelex.temporal.exceptions import TemporalConfigError
+from pipelex.tools.storage.storage_config import StorageProviderConfig
 from pipelex.types import Self, StrEnum
 
 if TYPE_CHECKING:
@@ -163,18 +164,13 @@ class WorkerConfig(ConfigModel):
         return self.retry_policy_config.make_retry_policy()
 
 
-class StorageProviderType(StrEnum):
-    LOCAL = "local"
-
-
 class PayloadCodecConfig(ConfigModel):
     """Configuration for the storage-based payload codec that offloads large payloads."""
 
     is_enabled: bool
     size_threshold: int
     storage_prefix: str
-    storage_provider: StorageProviderType = Field(strict=False)
-    storage_root_path: str
+    storage_provider_config: StorageProviderConfig
 
 
 class Temporal(ConfigModel):

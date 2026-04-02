@@ -407,6 +407,52 @@ class CombinedPipelineTemporalTestData:
     EXPECTED_REPORT_FIELDS: ClassVar[list[str]] = ["assessment", "confidence"]
 
 
+class PayloadCodecPipelineTestData:
+    """Test constants for StoragePayloadCodec integration tests with real pipe execution.
+
+    Reuses existing bundles to prove the codec is transparent — same pipelines
+    work unchanged when payloads are offloaded to storage.
+    """
+
+    # Reuse native_text_sequence for single/multi-step codec tests
+    NATIVE_BUNDLE_FILE: ClassVar[str] = LibraryCrateTestData.BUNDLE_FILE
+    NATIVE_PIPE_CODE: ClassVar[str] = LibraryCrateTestData.PIPE_CODE
+    NATIVE_EXPECTED_STUFF_NAMES: ClassVar[list[str]] = LibraryCrateTestData.EXPECTED_STUFF_NAMES
+
+    # Reuse dynamic_concept_sequence for dynamic concept + codec test
+    DYNAMIC_BUNDLE_FILE: ClassVar[str] = DeferredHydrationTestData.BUNDLE_FILE
+    DYNAMIC_PIPE_CODE: ClassVar[str] = DeferredHydrationTestData.PIPE_CODE
+    DYNAMIC_EXPECTED_STUFF_NAMES: ClassVar[list[str]] = DeferredHydrationTestData.EXPECTED_STUFF_NAMES
+
+    # Codec config
+    SIZE_THRESHOLD: ClassVar[int] = 1024
+    STORAGE_PREFIX: ClassVar[str] = "test-codec-pipeline/"
+
+
+class LargePayloadTestData:
+    """Test constants for large payload stress testing through Temporal with codec."""
+
+    BUNDLE_FILE: ClassVar[str] = f"{_CRATE_DIR}/large_payload_sequence.mthds"
+    PIPE_CODE: ClassVar[str] = "large_payload_sequence"
+    DOMAIN: ClassVar[str] = "large_payload_test"
+
+    EXPECTED_PIPE_REFS: ClassVar[list[str]] = [
+        "large_payload_test.large_payload_sequence",
+        "large_payload_test.verbose_step_one",
+        "large_payload_test.verbose_step_two",
+        "large_payload_test.verbose_step_three",
+    ]
+
+    EXPECTED_STUFF_NAMES: ClassVar[list[str]] = [
+        "step_one_result",
+        "step_two_result",
+        "step_three_result",
+    ]
+
+    SIZE_THRESHOLD: ClassVar[int] = 1024
+    STORAGE_PREFIX: ClassVar[str] = "test-large-payload/"
+
+
 class PipeOcrTestCases:
     PIPE_OCR_IMAGE_TEST_CASES: ClassVar[list[str]] = [
         # LOCAL

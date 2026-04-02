@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import json
 from hashlib import sha256
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from temporalio.api.common.v1 import Payload
 from temporalio.converter import PayloadCodec
 from typing_extensions import override
+
+from pipelex import log
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -13,6 +16,7 @@ if TYPE_CHECKING:
     from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
 STORAGE_REF_ENCODING = b"binary/storage-ref"
+JSON_PLAIN_ENCODING = b"json/plain"
 
 
 class StoragePayloadCodec(PayloadCodec):
@@ -22,6 +26,9 @@ class StoragePayloadCodec(PayloadCodec):
     stored via the provided :class:`StorageProviderAbstract` and replaced with
     a lightweight reference payload.  Payloads below the threshold pass through
     unchanged.  Content-addressed keys (SHA-256) give natural deduplication.
+
+    Storage keys are structured as ``{user_id}/{pipeline_run_id}/{hash}`` when
+    the payload contains ``job_metadata``, enabling per-client cleanup.
     """
 
     def __init__(
@@ -34,6 +41,37 @@ class StoragePayloadCodec(PayloadCodec):
         self._size_threshold = size_threshold
         self._storage_prefix = storage_prefix
 
+    @staticmethod
+    def _extract_job_routing(payload: Payload) -> tuple[str, str] | None:
+        """Extract user_id and pipeline_run_id from a JSON payload's job_metadata.
+
+        Returns:
+            A (user_id, pipeline_run_id) tuple, or None if the payload is not
+            JSON or does not contain job_metadata at the top level.
+        """
+        if payload.metadata.get("encoding") != JSON_PLAIN_ENCODING:
+            return None
+        try:
+            data: dict[str, Any] = json.loads(payload.data)
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return None
+        job_metadata = data.get("job_metadata")
+        if not isinstance(job_metadata, dict):
+            return None
+        user_id: str | None = job_metadata.get("user_id")  # type: ignore[assignment]
+        pipeline_run_id: str | None = job_metadata.get("pipeline_run_id")  # type: ignore[assignment]
+        if isinstance(user_id, str) and isinstance(pipeline_run_id, str):
+            return user_id, pipeline_run_id
+        return None
+
+    def _build_storage_key(self, payload: Payload, hash_hex: str) -> str:
+        """Build a storage key, structured by job routing when available."""
+        routing = self._extract_job_routing(payload)
+        if routing:
+            user_id, pipeline_run_id = routing
+            return f"{self._storage_prefix}{user_id}/{pipeline_run_id}/{hash_hex}"
+        return f"{self._storage_prefix}{hash_hex}"
+
     @override
     async def encode(self, payloads: Sequence[Payload]) -> list[Payload]:
         encoded: list[Payload] = []
@@ -42,8 +80,10 @@ class StoragePayloadCodec(PayloadCodec):
             if len(serialized) < self._size_threshold:
                 encoded.append(payload)
                 continue
-            key = self._storage_prefix + sha256(serialized).hexdigest()
+            hash_hex = sha256(serialized).hexdigest()
+            key = self._build_storage_key(payload, hash_hex)
             uri = await self._storage.store(data=serialized, key=key)
+            log.dev(f"Payload offloaded to storage: key='{key}'")
             ref_payload = Payload(
                 metadata={"encoding": STORAGE_REF_ENCODING},
                 data=uri.encode(),

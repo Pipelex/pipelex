@@ -352,6 +352,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
     @with_conditional_worker
     async def make_templated_text(
         self,
+        job_metadata: JobMetadata,
         context: dict[str, Any],
         template: str,
         templating_style: TemplatingStyle | None = None,
@@ -360,6 +361,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
     ) -> str:
         workflow_id = self.make_workflow_id(base_id=wfid or "jinja2-text")
         templating_assignment = TemplatingAssignment(
+            job_metadata=job_metadata,
             context=context,
             template=template,
             templating_style=templating_style,

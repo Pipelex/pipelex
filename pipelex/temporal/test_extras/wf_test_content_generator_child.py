@@ -122,6 +122,7 @@ class WfTestContentGeneratorChild:
             "the_answer": "elementary, my dear Watson",
         }
         jinja2_text = await content_generator.make_templated_text(
+            job_metadata=job_metadata,
             context=context,
             template="♦️♦️ {{ the_answer }} ♦️♦️",
         )
