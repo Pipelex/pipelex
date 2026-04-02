@@ -8,6 +8,7 @@
 from typing import Any
 
 import tomlkit
+from pydantic import ValidationError
 from tomlkit.items import Table
 
 from pipelex import log
@@ -26,6 +27,9 @@ from pipelex.builder.pipe.pipe_spec_map import pipe_type_to_spec_class
 
 # Aliases that agents may use instead of "pipe_code". First found is promoted when canonical key is absent; extras are dropped.
 _PIPE_CODE_ALIASES = ("pipe", "the_pipe_code", "code", "name", "pipe_name", "pipe_ref")
+
+# Aliases that agents may use instead of "output".
+_OUTPUT_ALIASES = ("output_concept", "output_type")
 
 
 def _normalize_sub_pipe_dict(data: dict[str, Any]) -> None:
@@ -106,6 +110,20 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
         else:
             spec_data.pop("expression")
 
+    # Accept output aliases (e.g. "output_concept", "output_type") → promote to "output".
+    # When both "output" and an alias coexist, try the alias value first (agents often put
+    # the correct concept name in the alias), falling back to the original "output" value.
+    output_fallback: Any | None = None
+    for alias in _OUTPUT_ALIASES:
+        if alias in spec_data:
+            alias_value = spec_data.pop(alias)
+            if "output" not in spec_data:
+                spec_data["output"] = alias_value
+            else:
+                output_fallback = spec_data["output"]
+                spec_data["output"] = alias_value
+            break
+
     # Accept output as dict → extract the concept string
     # Agents sometimes structure the output like inputs (as a dict).
     # Handle {"type": "ConceptName"} and single-item dicts like {"result": "Text"}.
@@ -116,6 +134,13 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
         elif len(output_dict) == 1:
             spec_data["output"] = next(iter(output_dict.values()))
 
+    # When an output alias conflicted with an existing "output", try the alias value first
+    # and fall back to the original value if validation fails.
+    if output_fallback is not None:
+        try:
+            return spec_class.model_validate(spec_data)
+        except ValidationError:
+            spec_data["output"] = output_fallback
     return spec_class.model_validate(spec_data)
 
 
