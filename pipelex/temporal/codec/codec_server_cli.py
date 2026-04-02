@@ -20,7 +20,6 @@ from pipelex.pipelex import Pipelex
 from pipelex.temporal.codec.codec_factory import make_codec_from_config
 from pipelex.temporal.codec.codec_server import build_codec_server
 from pipelex.temporal.exceptions import TemporalConfigError
-from pipelex.tools.misc.toml_utils import load_toml_from_path
 
 app = typer.Typer()
 
@@ -29,20 +28,12 @@ DEFAULT_CORS_ORIGINS = ["http://localhost:8233"]
 
 @app.command()
 def start(
-    project: Annotated[str | None, typer.Argument(help="The project name if you don't want to get it from pyproject.toml")] = None,
     host: Annotated[str, typer.Option(help="Host to bind the codec server to")] = "127.0.0.1",
     port: Annotated[int, typer.Option(help="Port to bind the codec server to")] = 8081,
     cors_origin: Annotated[list[str] | None, typer.Option(help="Allowed CORS origin (repeatable)")] = None,
 ) -> None:
     """Start the Temporal codec server for Web UI payload decoding."""
-    if project is None:
-        pyproject = load_toml_from_path(path="pyproject.toml")
-        project = pyproject.get("project", {}).get("name") or pyproject.get("tool", {}).get("poetry", {}).get("name")
-        if not project:
-            msg = "Project name not found in pyproject.toml"
-            raise ValueError(msg)
-
-    Pipelex.make(temporal_enabled=True)
+    Pipelex.make(temporal_enabled=True, needs_inference=False)
 
     payload_codec_config = get_config().temporal.payload_codec_config
     if not payload_codec_config.is_enabled:

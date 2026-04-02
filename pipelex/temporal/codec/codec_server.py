@@ -20,6 +20,7 @@ from google.protobuf import json_format
 from temporalio.api.common.v1 import Payload, Payloads
 
 from pipelex import log
+from pipelex.tools.storage.exceptions import StorageFileNotFoundError
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -46,6 +47,13 @@ def _make_cors_handler(cors_origins: list[str]) -> Callable[[web.Request], Await
     return cors_options
 
 
+def _error_response(request: web.Request, cors_origins: list[str], status: int, text: str) -> web.Response:
+    """Build an error response with CORS headers so browsers see the diagnostic message."""
+    response = web.Response(status=status, text=text)
+    _set_cors_headers(response, request.headers.get(hdrs.ORIGIN, ""), cors_origins)
+    return response
+
+
 async def _apply(
     codec_fn: Callable[[Sequence[Payload]], Awaitable[list[Payload]]],
     cors_origins: list[str],
@@ -53,21 +61,21 @@ async def _apply(
 ) -> web.Response:
     """Generic handler: parse Payloads JSON, apply codec function, return Payloads JSON."""
     if request.content_type != "application/json":
-        return web.Response(status=415, text="Expected application/json")
+        return _error_response(request, cors_origins, 415, "Expected application/json")
 
     try:
         payloads_proto = json_format.Parse(await request.read(), Payloads())
-    except json_format.ParseError as exc:
-        return web.Response(status=400, text=f"Malformed Payloads JSON: {exc}")
+    except json_format.ParseError:
+        return _error_response(request, cors_origins, 400, "Malformed Payloads JSON")
 
     try:
         result_payloads = await codec_fn(payloads_proto.payloads)
-    except FileNotFoundError as exc:
+    except StorageFileNotFoundError as exc:
         log.error(f"Codec storage lookup failed: {exc}")
-        return web.Response(status=404, text=f"Storage object not found: {exc}")
-    except OSError as exc:
+        return _error_response(request, cors_origins, 404, "Storage object not found")
+    except (OSError, FileNotFoundError) as exc:
         log.error(f"Codec I/O error: {exc}")
-        return web.Response(status=502, text=f"Storage I/O error: {exc}")
+        return _error_response(request, cors_origins, 502, "Storage I/O error")
 
     result_proto = Payloads(payloads=result_payloads)
 

@@ -220,7 +220,7 @@ class TestStoragePayloadCodec:
             storage_prefix=TEST_PREFIX,
         )
         payload = Payload(
-            metadata={"encoding": b"json/plain" if b"json" in topic.encode() else b"binary/plain"},
+            metadata={"encoding": b"json/plain" if topic.startswith("json_") else b"binary/plain"},
             data=payload_data,
         )
 
