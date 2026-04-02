@@ -60,7 +60,7 @@ The reconstruction pipeline:
 
 1. **Generate** — `datamodel-code-generator` converts the JSON schema into Python source code defining a `BaseModel` subclass.
 2. **Execute** — `exec()` compiles the source in an isolated namespace and extracts the named class.
-3. **Cache** — A thread-safe SHA-256 hash cache avoids redundant generation for the same schema.
+3. **Cache** — A thread-safe SHA-256 hash cache (with double-check locking) avoids redundant generation for the same schema.
 4. **Tag** — The generated source code is attached as `__kajson_class_source__` on the class, enabling Kajson to carry it through Temporal payloads.
 
 !!! warning "Class name normalization"
@@ -88,9 +88,17 @@ pydantic_gizmo = kajson.loads(
     class_registry=get_class_registry(),
     class_source_code=class_source_code,
 )
+# Re-attach source so it survives further Temporal hops
+if class_source_code is not None:
+    if isinstance(pydantic_gizmo, BaseModel):
+        type(pydantic_gizmo).__kajson_class_source__ = class_source_code
+    elif isinstance(pydantic_gizmo, list):
+        for item in pydantic_gizmo:
+            if isinstance(item, BaseModel):
+                type(item).__kajson_class_source__ = class_source_code
 ```
 
-The source code rides in Temporal metadata (not the payload data itself), keeping the JSON payload clean and the class reconstruction transparent.
+The source code rides in Temporal metadata (not the payload data itself), keeping the JSON payload clean and the class reconstruction transparent. After `kajson.loads()` reconstructs the object, the converter re-attaches `__kajson_class_source__` to the deserialized class — this ensures the source survives if the object crosses another Temporal boundary (e.g. workflow returning a result to a parent activity that forwards it elsewhere).
 
 ### The type bridge
 
