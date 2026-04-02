@@ -1,0 +1,84 @@
+pipelex/cogt/content_generation/assignment_models.py
+  5b965b83119457e2 118
+pipelex/cogt/content_generation/content_generator.py
+  5b965b83119457e2 313,321
+tests/integration/pipelex/cogt/test_content_generator.py
+  5b965b83119457e2 117,123
+pipelex/temporal/storage_payload_codec.py
+  5b965b83119457e2 3,5,11-12,19,29-31,44-73,83-84,86
+pipelex/tools/storage/storage_provider_factory.py
+  5b965b83119457e2 10,14,18,26,28-29,34,38-39,41-43,46,49-50,52-53,55
+pipelex/temporal/temporal_connect.py
+  5b965b83119457e2 13,51
+tests/integration/pipelex/fixtures/generator_fixtures.py
+  5b965b83119457e2 23-24,26-27,33,35-36,42,44-45,50,52,54
+pipelex/system/configuration/configs.py
+  5b965b83119457e2 15,164
+pipelex/temporal/config_temporal.py
+  5b965b83119457e2 8,173
+tests/integration/pipelex/temporal/library_crate/large_payload_sequence.mthds
+  1ca8e080588fe962 1-47
+tests/pipelex_unit_test.toml
+  5b965b83119457e2 2
+pipelex/temporal/test_extras/wf_test_content_generator_child.py
+  5b965b83119457e2 125
+pipelex/cogt/content_generation/content_generator_dry.py
+  5b965b83119457e2 253
+pipelex/cogt/content_generation/content_generator_protocol.py
+  5b965b83119457e2 133
+pipelex/tools/storage/storage_config.py
+  5b965b83119457e2 102-104,112,162-197
+.pipelex/pipelex.toml
+  5b965b83119457e2 83-85,87,92,96,103,217-223
+tests/integration/pipelex/temporal/test_data.py
+  1ca8e080588fe962 410-455
+pipelex/temporal/tprl_content_generation/content_generator_child.py
+  5b965b83119457e2 420,429
+tests/integration/pipelex/temporal/test_payload_codec_pipeline.py
+  1ca8e080588fe962 1-20,22-233
+pipelex/pipelex.py
+  5b965b83119457e2 245
+pipelex/temporal/tprl_content_generation/content_generator_top.py
+  5b965b83119457e2 355,364
+tests/integration/pipelex/temporal/content_generation/test_tprl_content_generator_top.py
+  5b965b83119457e2 157,163
+.claude/skills/temporal-e2e-validate/SKILL.md
+  1ca8e080588fe962 4,442-563,578-579,629-630,653
+pipelex/pipelex.toml
+  5b965b83119457e2 9,12,16,19,25,458-464
+pipelex/kit/configs/pipelex.toml
+  5b965b83119457e2 83-85,87,92,96,103,217-223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.3",
+  "base_commit_sha": "46586d896306e6c298adcb3217e864e3d21ed6fd",
+  "prompts": {
+    "1ca8e080588fe962": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "07d93ef7-26cb-4139-8fd6-9da8306c1a22",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 457,
+      "total_deletions": 5,
+      "accepted_lines": 453,
+      "overriden_lines": 0
+    },
+    "5b965b83119457e2": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "6686a90c-161f-4c05-97a6-0a594157e468",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 184,
+      "total_deletions": 81,
+      "accepted_lines": 178,
+      "overriden_lines": 0
+    }
+  }
+}
