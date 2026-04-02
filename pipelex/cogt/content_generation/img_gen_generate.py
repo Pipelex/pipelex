@@ -1,7 +1,9 @@
 from pipelex import log
 from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
+from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
+from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.hub import get_img_gen_worker
 
 
@@ -38,3 +40,38 @@ async def img_gen_image(img_gen_assignment: ImgGenAssignment) -> GeneratedImageR
     if img_gen_assignment.nb_images > 1:
         return await img_gen_image_list(img_gen_assignment)
     return await img_gen_single_image(img_gen_assignment)
+
+
+async def img_gen_single_image_and_store(
+    img_gen_assignment: ImgGenAssignment,
+    generated_content_factory: GeneratedContentFactory,
+) -> ImageContent:
+    """Generate a single image and store it, returning an ImageContent with URLs (no raw binary data)."""
+    generated_image = await img_gen_single_image(img_gen_assignment)
+    image_content = await generated_content_factory.make_image_content(
+        primary_id=img_gen_assignment.job_metadata.user_id,
+        secondary_id=img_gen_assignment.job_metadata.pipeline_run_id,
+        raw_details=generated_image,
+    )
+    image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text
+    image_content.source_negative_prompt = img_gen_assignment.img_gen_prompt.negative_text
+    return image_content
+
+
+async def img_gen_image_list_and_store(
+    img_gen_assignment: ImgGenAssignment,
+    generated_content_factory: GeneratedContentFactory,
+) -> list[ImageContent]:
+    """Generate multiple images and store them, returning ImageContent list with URLs (no raw binary data)."""
+    generated_image_list = await img_gen_image_list(img_gen_assignment)
+    image_contents: list[ImageContent] = []
+    for raw_details in generated_image_list:
+        image_content = await generated_content_factory.make_image_content(
+            primary_id=img_gen_assignment.job_metadata.user_id,
+            secondary_id=img_gen_assignment.job_metadata.pipeline_run_id,
+            raw_details=raw_details,
+        )
+        image_content.source_prompt = img_gen_assignment.img_gen_prompt.positive_text
+        image_content.source_negative_prompt = img_gen_assignment.img_gen_prompt.negative_text
+        image_contents.append(image_content)
+    return image_contents

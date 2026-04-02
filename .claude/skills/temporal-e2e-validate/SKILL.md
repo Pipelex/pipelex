@@ -6,12 +6,15 @@ description: >
   all test cases, and (2) true 3-process setup (server + separate worker process
   + submitter) that validates the actual deployment topology including cross-process
   serialization, LibraryCrate propagation, deferred hydration, concurrent
-  isolation, and cross-worker graph tracing with GraphSpec assembly.
+  isolation, image payload storage, and cross-worker graph tracing with GraphSpec
+  assembly. Includes image generation and image flow tests that verify large binary
+  payloads are stored at the activity level (not passed inline through Temporal).
   Use when the user says "validate temporal", "e2e temporal",
   "temporal regression", "temporal validation", "3-process test", "full temporal
-  test", "validate phases", or wants comprehensive verification that distributed
-  execution works end-to-end. Also use proactively after changes to LibraryCrate,
-  deferred hydration, ClassRegistry scoping, graph tracing, or Temporal workflow code.
+  test", "validate phases", "image temporal", or wants comprehensive verification
+  that distributed execution works end-to-end. Also use proactively after changes
+  to LibraryCrate, deferred hydration, ClassRegistry scoping, graph tracing,
+  image generation activities, content storage, or Temporal workflow code.
 allowed-tools:
   - Bash(tmux *)
   - Bash(curl *)
@@ -28,8 +31,10 @@ This skill validates that Pipelex pipelines execute correctly when distributed a
 Temporal workers — separate processes that receive serialized work, run pipes, and return
 results. It covers the full chain: shipping pipe definitions to the worker (Phase 2),
 deserializing dynamic concepts the worker has never seen (Phase 3), isolating concurrent
-workflows so they don't corrupt each other (Phase 4), and assembling an execution graph
-from trace events emitted across workers (Phase 4.5).
+workflows so they don't corrupt each other (Phase 4), assembling an execution graph
+from trace events emitted across workers (Phase 4.5), and verifying that image-heavy
+pipelines (image generation, image-to-LLM flow) don't blow up Temporal's payload
+limits by ensuring images are stored at the activity level.
 
 ## Important: surface results immediately
 
@@ -156,6 +161,25 @@ Each command runs a pipeline through Temporal with `--graph`, which also validat
 the worker emits NDJSON trace events and the submitter assembles them into a GraphSpec
 with an interactive ReactFlow HTML visualization.
 
+### Run mode: dry-run vs live
+
+By default, Mode 2 runs in **dry-run** mode (`--dry-run --mock-inputs`) — fast, no LLM
+costs, validates serialization and crate propagation. But dry-run produces tiny mock
+data, so it **cannot catch payload size issues** (e.g. large image payloads blowing up
+Temporal's data converter).
+
+Ask the user which mode they want. If they say "live", simply omit `--dry-run --mock-inputs`
+from all commands below. The `pipelex run bundle` CLI has no `--pipe-run-mode` flag — live
+is the default when neither `--dry-run` nor `--mock-inputs` is specified (note: pytest in
+Mode 1 does accept `--pipe-run-mode live`, but the CLI does not). Live mode makes real LLM and image
+generation calls — it costs money and is slower, but it's the only way to validate that
+real-sized payloads (especially images) flow correctly through Temporal.
+
+**This matters most for Tiers 4 and 5** (image generation and image flow). In dry-run,
+mock images are trivially small, so payload size bugs don't surface. In live mode,
+generated images are hundreds of KB to several MB — exactly the size that breaks Temporal
+if activity-level storage isn't implemented.
+
 ### Step 1: Ensure Temporal server is running
 
 Same as Mode 1 Step 1.
@@ -226,6 +250,89 @@ ReactFlow visualization.
 ```
 
 After this completes, tell the user: PASS/FAIL, output dir, graph file path.
+
+**Tier 4 — Can the worker handle image generation pipelines?**
+
+**Important:** This tier only catches payload size bugs in **live mode**. In dry-run,
+mock images are tiny and will pass even without activity-level storage. If the user
+wants to validate image payload handling, they must run live.
+
+This is a critical payload-size test. Image generation produces large binary data
+(base64-encoded images) that must be stored at the activity level and passed as
+storage URIs through Temporal — not inline in the workflow payload. If storage is
+missing, this will either fail with a Temporal payload size error or trigger
+`PayloadSizeWarning` in the worker logs.
+
+The `generate_crazy_image` bundle runs a 2-step PipeSequence: an LLM imagines a
+scene description, then PipeImgGen renders it as an image. This exercises the full
+image generation path through Temporal, including the custom `ImagePrompt` concept
+(which refines `Text`).
+
+Dry-run:
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
+  --pipe generate_crazy_image \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+Live (real image generation — required to catch payload size bugs):
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/pipes/pipelines/crazy_image_generation.mthds \
+  --pipe generate_crazy_image \
+  --temporal --no-logo --graph
+```
+
+After this completes, tell the user: PASS/FAIL, output dir, graph file path.
+Also check worker logs for `PayloadSizeWarning`:
+
+```bash
+tmux capture-pane -t temporal-worker -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings"
+```
+
+**Tier 5 — Can generated images flow between pipes in a sequence?**
+
+**Important:** Like Tier 4, this only catches real payload bugs in **live mode**.
+
+This is the "image out → image in" test. A PipeSequence first generates an image
+via PipeImgGen, then passes that image as input to a PipeLLM (vision model) that
+describes it. This exercises:
+- Image generation storage at the activity level
+- Image content serialization through Temporal's data converter
+- Image content deserialization on the worker for the next pipe step
+- Vision model receiving an image reference (URI) rather than inline base64
+
+If activity-level storage is not implemented, this will fail because the raw image
+bytes exceed Temporal's payload limit, or because the worker can't deserialize the
+`ImageContent` object from the previous step.
+
+Dry-run:
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds \
+  --pipe image_out_in \
+  --temporal --dry-run --mock-inputs --no-logo --graph
+```
+
+Live (real image generation + vision — required to catch payload size bugs):
+
+```bash
+.venv/bin/pipelex run bundle \
+  tests/integration/pipelex/pipes/pipelines/test_image_out_in.mthds \
+  --pipe image_out_in \
+  --temporal --no-logo --graph
+```
+
+After this completes, tell the user: PASS/FAIL, output dir, graph file path.
+Also check for payload warnings:
+
+```bash
+tmux capture-pane -t temporal-worker -p -S -50 | grep -i "payload\|warning\|size" || echo "No payload warnings"
+```
 
 If any tier hangs for more than 30 seconds, check worker output:
 
@@ -340,17 +447,19 @@ List all graph files and present a summary table with results:
 ls results/*/reactflow.html
 ```
 
-| Test | What it proved | Status | Graph |
-|------|---------------|--------|-------|
-| Tier 1: Sequence | Worker can unpack crate and run a pipe sequence | PASS/FAIL | path |
-| Tier 2: Hydration | Worker handles dynamic concepts it has never seen | PASS/FAIL | path |
-| Tier 3: Parallel | Branches execute as concurrent child workflows | PASS/FAIL | path |
-| Concept isolation (alpha) | Conflicting `Result` concepts don't cross-contaminate | PASS/FAIL | path |
-| Concept isolation (beta) | (same test, other side) | PASS/FAIL | path |
-| Pipe isolation (alpha) | Conflicting `shared_step` pipes use correct version | PASS/FAIL | path |
-| Pipe isolation (beta) | (same test, other side) | PASS/FAIL | path |
-| Multi-concept (alpha) | Two overlapping concepts with incompatible structures | PASS/FAIL | path |
-| Multi-concept (beta) | (same test, other side) | PASS/FAIL | path |
+| Test | What it proved | Status | Graph | Payload warnings |
+|------|---------------|--------|-------|-----------------|
+| Tier 1: Sequence | Worker can unpack crate and run a pipe sequence | PASS/FAIL | path | — |
+| Tier 2: Hydration | Worker handles dynamic concepts it has never seen | PASS/FAIL | path | — |
+| Tier 3: Parallel | Branches execute as concurrent child workflows | PASS/FAIL | path | — |
+| Tier 4: ImgGen | Image generation pipeline works through Temporal | PASS/FAIL | path | yes/no |
+| Tier 5: Image flow | Generated image flows as input to next pipe step | PASS/FAIL | path | yes/no |
+| Concept isolation (alpha) | Conflicting `Result` concepts don't cross-contaminate | PASS/FAIL | path | — |
+| Concept isolation (beta) | (same test, other side) | PASS/FAIL | path | — |
+| Pipe isolation (alpha) | Conflicting `shared_step` pipes use correct version | PASS/FAIL | path | — |
+| Pipe isolation (beta) | (same test, other side) | PASS/FAIL | path | — |
+| Multi-concept (alpha) | Two overlapping concepts with incompatible structures | PASS/FAIL | path | — |
+| Multi-concept (beta) | (same test, other side) | PASS/FAIL | path | — |
 
 After reporting, propose opening the PipeParallel graph (most interesting cross-worker view):
 
@@ -390,12 +499,16 @@ Leave the server running if the user plans to iterate.
 | Submitter hangs indefinitely | The worker crashed during deserialization — check `tmux capture-pane -t temporal-worker -p -S -200` |
 | Both concurrent jobs succeed but wrong data | ContextVar leak between workflows — per-workflow scoping is broken, one workflow's class definitions bled into the other |
 | No `reactflow.html` generated | GraphSpec assembly failed — either tracing is disabled in `pipelex.toml` or NDJSON events weren't emitted by the worker |
+| `PayloadSizeWarning` in worker logs | Image data (base64) is being passed inline through Temporal payloads instead of being stored at the activity level — the fix is to call storage in the image generation activity before returning results |
+| `NotImplementedError` during image generation | The image generation or content storage path isn't wired up for the Temporal execution path — activity-level storage is missing |
+| Payload too large / `DataConverterError` on image pipes | Raw image bytes exceed Temporal's payload size limit (~2MB default) — images must be stored and referenced by URI, not passed inline |
+| `ImageContent` missing or has no `uri` field | The image generation activity returned raw image data instead of a stored `ImageContent` with a storage URI |
 
 ---
 
 ## Bundle reference
 
-All bundles are in `tests/integration/pipelex/temporal/library_crate/`:
+**Crate/isolation bundles** — in `tests/integration/pipelex/temporal/library_crate/`:
 
 | Bundle | What it tests | Main pipe |
 |--------|--------------|-----------|
@@ -412,3 +525,10 @@ All bundles are in `tests/integration/pipelex/temporal/library_crate/`:
 | `temporal_condition.mthds` | PipeCondition — conditional routing via child workflow | `temporal_condition_sequence` |
 | `temporal_compose.mthds` | PipeCompose — operator composition + deferred hydration | `temporal_compose_sequence` |
 | `temporal_combined.mthds` | Nested PipeParallel + PipeCondition | `temporal_combined_pipeline` |
+
+**Image payload bundles** — in `tests/integration/pipelex/pipes/pipelines/`:
+
+| Bundle | What it tests | Main pipe |
+|--------|--------------|-----------|
+| `crazy_image_generation.mthds` | Image generation pipeline — LLM imagines scene + PipeImgGen renders it, custom ImagePrompt concept | `generate_crazy_image` |
+| `test_image_out_in.mthds` | Image flow — PipeImgGen generates image, then PipeLLM (vision) describes it | `image_out_in` |

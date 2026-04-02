@@ -3,7 +3,6 @@ from typing import Any
 from pydantic import BaseModel
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import LLMAssignmentError
 from pipelex.cogt.extract.extract_input import ExtractInput
 from pipelex.cogt.extract.extract_job_components import ExtractJobConfig, ExtractJobParams
 from pipelex.cogt.img_gen.img_gen_job_components import ImgGenJobConfig, ImgGenJobParams
@@ -14,7 +13,6 @@ from pipelex.cogt.llm.llm_prompt_factory_abstract import LLMPromptFactoryAbstrac
 from pipelex.cogt.llm.llm_setting import LLMSetting
 from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.cogt.templating.templating_style import TemplatingStyle
-from pipelex.hub import get_class_registry
 from pipelex.pipeline.job_metadata import JobMetadata
 
 
@@ -85,34 +83,24 @@ class LLMAssignment(BaseModel):
 
 class ObjectAssignment(BaseModel):
     object_class_name: str
+    object_class_schema: dict[str, Any]
     llm_assignment_for_object: LLMAssignment
-
-    def __init__(self, **kwargs: Any):
-        super().__init__(**kwargs)
-        if not get_class_registry().has_class(name=self.object_class_name):
-            error_msg = f"Could not create ObjectAssignment for class '{self.object_class_name}' because it is not in the class registry."
-            raise LLMAssignmentError(error_msg)
 
     @staticmethod
     def make_for_class(
         object_class: type[BaseModel],
         llm_assignment: LLMAssignment,
     ) -> "ObjectAssignment":
-        object_class_name = object_class.__name__
-        get_class_registry().register_class(
-            class_type=object_class,
-            name=object_class_name,
-            should_warn_if_already_registered=False,
-        )
-
         return ObjectAssignment(
-            object_class_name=object_class_name,
+            object_class_name=object_class.__name__,
+            object_class_schema=object_class.model_json_schema(),
             llm_assignment_for_object=llm_assignment,
         )
 
 
 class TextThenObjectAssignment(BaseModel):
     object_class_name: str
+    object_class_schema: dict[str, Any]
     llm_assignment_for_text: LLMAssignment
     llm_assignment_factory_to_object: LLMAssignmentFactory
 
@@ -139,3 +127,9 @@ class ExtractAssignment(BaseModel):
     extract_input: ExtractInput
     extract_job_params: ExtractJobParams
     extract_job_config: ExtractJobConfig
+
+
+class RenderPageViewsAssignment(BaseModel):
+    job_metadata: JobMetadata
+    document_uri: str
+    page_views_dpi: int

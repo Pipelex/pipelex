@@ -137,7 +137,7 @@ class ContentGeneratorProtocol(Protocol):
         wfid: str | None = None,
     ) -> Coroutine[Any, Any, str]: ...
 
-    async def make_render_page_views(
+    def make_render_page_views(
         self,
         job_metadata: JobMetadata,
         extract_input: ExtractInput,
@@ -145,7 +145,7 @@ class ContentGeneratorProtocol(Protocol):
         extract_job_params: ExtractJobParams | None = None,
         extract_job_config: ExtractJobConfig | None = None,
         wfid: str | None = None,
-    ) -> list[ImageContent]: ...
+    ) -> Coroutine[Any, Any, list[ImageContent]]: ...
 
     def make_extract_pages(
         self,

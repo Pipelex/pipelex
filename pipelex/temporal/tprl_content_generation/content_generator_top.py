@@ -10,6 +10,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     LLMAssignment,
     LLMAssignmentFactory,
     ObjectAssignment,
+    RenderPageViewsAssignment,
     TemplatingAssignment,
     TextThenObjectAssignment,
 )
@@ -45,8 +46,7 @@ from pipelex.temporal.tprl_content_generation.wf_make_object import (
     WfMakeTextThenObject,
     WfMakeTextThenObjectList,
 )
-from pipelex.tools.misc.image_utils import ImageFormat
-from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
+from pipelex.temporal.tprl_content_generation.wf_render_page_views import WfRenderPageViews
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -148,6 +148,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         )
         tto_assignment = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
+            object_class_schema=object_class.model_json_schema(),
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
         )
@@ -227,6 +228,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         )
         tto_assignment = TextThenObjectAssignment(
             object_class_name=object_class.__name__,
+            object_class_schema=object_class.model_json_schema(),
             llm_assignment_for_text=llm_assignment_for_text,
             llm_assignment_factory_to_object=llm_assignment_factory_to_object,
         )
@@ -296,7 +298,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             nb_images=1,
         )
         temporal_client = await self.temporal_client()
-        generated_image_list = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
+        image_content_list = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
             workflow=WfMakeImages.run,
             arg=img_gen_assignment,
             id=workflow_id,
@@ -304,16 +306,12 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
-        if len(generated_image_list) != 1:
-            msg = f"Expected 1 image, got {len(generated_image_list)}"
+        if len(image_content_list) != 1:
+            msg = f"Expected 1 image, got {len(image_content_list)}"
             raise ContentGenerationError(msg)
-        generated_image = generated_image_list[0]
-        log.dev(f"TopCrafter generated image: {generated_image}")
-        return await self.make_image_content(
-            job_metadata=job_metadata,
-            generated_image_raw_details=generated_image,
-            img_gen_prompt=img_gen_prompt,
-        )
+        image_content = image_content_list[0]
+        log.dev(f"TopCrafter generated image: {image_content}")
+        return image_content
 
     @override
     @with_conditional_worker
@@ -339,7 +337,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             nb_images=nb_images,
         )
         temporal_client = await self.temporal_client()
-        generated_image_list = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
+        image_content_list = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
             workflow=WfMakeImages.run,
             arg=img_gen_assignment,
             id=workflow_id,
@@ -347,15 +345,8 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
-        log.dev(f"TopCrafter generated image list: {generated_image_list}")
-        return [
-            await self.make_image_content(
-                job_metadata=job_metadata,
-                generated_image_raw_details=raw_details,
-                img_gen_prompt=img_gen_prompt,
-            )
-            for raw_details in generated_image_list
-        ]
+        log.dev(f"TopCrafter generated image list: {image_content_list}")
+        return image_content_list
 
     @override
     @with_conditional_worker
@@ -387,6 +378,8 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
         return jinja2_text
 
     @override
+    @with_conditional_worker
+    @update_job_metadata
     async def make_render_page_views(
         self,
         job_metadata: JobMetadata,
@@ -401,20 +394,23 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             raise ValueError(msg)
         job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
-        page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.document_uri, dpi=page_views_dpi)
-        page_view_images_resolved: list[ImageContent] = []
-        for page_view_image in page_view_images:
-            image_content = await self.make_image_content(
-                job_metadata=job_metadata,
-                generated_image_raw_details=GeneratedImageRawDetails.make_from_pil_image(
-                    pil_image=page_view_image,
-                    image_format=ImageFormat.PNG,
-                ),
-                img_gen_prompt=None,
-            )
-            page_view_images_resolved.append(image_content)
-
-        return page_view_images_resolved
+        workflow_id = self.make_workflow_id(base_id=wfid or "render-page-views")
+        render_assignment = RenderPageViewsAssignment(
+            job_metadata=job_metadata,
+            document_uri=extract_input.document_uri,
+            page_views_dpi=page_views_dpi,
+        )
+        temporal_client = await self.temporal_client()
+        image_content_list = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
+            workflow=WfRenderPageViews.run,
+            arg=render_assignment,
+            id=workflow_id,
+            task_queue=self.task_queue or get_config().temporal.worker_config.task_queue,
+            execution_timeout=self.execution_timeout,
+            retry_policy=self.retry_policy,
+        )
+        log.dev(f"TopCrafter rendered page views: {image_content_list}")
+        return image_content_list
 
     @override
     @with_conditional_worker
@@ -437,7 +433,7 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             extract_job_config=extract_job_config,
         )
         temporal_client = await self.temporal_client()
-        extract_output = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
+        page_content_list = await temporal_client.execute_workflow(  # pyright: ignore[reportUnknownMemberType]
             workflow=WfMakeExtract.run,
             arg=extract_assignment,
             id=workflow_id,
@@ -445,5 +441,5 @@ class ContentGeneratorTop(WorkflowExecutor[AssignmentType, ResultType], ContentG
             execution_timeout=self.execution_timeout,
             retry_policy=self.retry_policy,
         )
-        log.dev(f"TopCrafter extract output: {extract_output}")
-        return await self.make_page_contents(job_metadata=job_metadata, extract_output=extract_output)
+        log.dev(f"TopCrafter page contents: {page_content_list}")
+        return page_content_list
