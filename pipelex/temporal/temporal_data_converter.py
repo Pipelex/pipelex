@@ -25,7 +25,7 @@ For examples, see the tests in `test_top_crafter.py`:
      allowing the calling method to cast the list to the required generic type with `cast(List[BaseModelType], obj_list)`.
 """
 
-from typing import Any
+from typing import Any, cast
 
 from kajson import kajson
 from pydantic import BaseModel
@@ -59,25 +59,50 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
     def to_payload(self, value: Any) -> Payload | None:
         if isinstance(value, BaseModel):
             payload_str: str = kajson.dumps(value)
+            metadata: dict[str, bytes] = {"encoding": self.encoding.encode()}
+            class_source = getattr(type(value), "__kajson_class_source__", None)
+            if class_source is not None:
+                metadata["kajson_class_source"] = class_source.encode()
             return Payload(
-                metadata={"encoding": self.encoding.encode()},
+                metadata=metadata,
                 data=payload_str.encode(),
             )
         elif isinstance(value, list) and value and isinstance(value[0], BaseModel):
             list_payload_str: str = kajson.dumps(value)
+            metadata = {"encoding": self.encoding.encode()}
+            class_source = getattr(type(value[0]), "__kajson_class_source__", None)
+            if class_source is not None:
+                metadata["kajson_class_source"] = class_source.encode()
             return Payload(
-                metadata={"encoding": self.encoding.encode()},
+                metadata=metadata,
                 data=list_payload_str.encode(),
             )
         else:
             return super().to_payload(value)
 
+    def _restore_class_source(self, value: BaseModel, class_source_code: str) -> None:
+        value_class = cast("Any", type(value))
+        value_class.__kajson_class_source__ = class_source_code
+
     def _kajson_deserialize_from_payload(self, payload: Payload) -> Any:
         data = payload.data.decode()
         log.verbose(f"unijson_deserialize_payload — data: {data}")
-        pydantic_gizmo = kajson.loads(data, class_registry=get_class_registry())
+        source_bytes = payload.metadata.get("kajson_class_source")
+        class_source_code = source_bytes.decode() if source_bytes else None
+        pydantic_gizmo = kajson.loads(
+            data,
+            class_registry=get_class_registry(),
+            class_source_code=class_source_code,
+        )
+        if class_source_code is not None:
+            if isinstance(pydantic_gizmo, BaseModel):
+                self._restore_class_source(pydantic_gizmo, class_source_code)
+            elif isinstance(pydantic_gizmo, list):
+                for item in cast("list[Any]", pydantic_gizmo):
+                    if isinstance(item, BaseModel):
+                        self._restore_class_source(item, class_source_code)
         log.verbose(f"unijson_deserialize_payload — pydantic_gizmo: {pydantic_gizmo}")
-        return pydantic_gizmo
+        return cast("Any", pydantic_gizmo)
 
     @override
     def from_payload(

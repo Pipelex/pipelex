@@ -5,8 +5,8 @@ from typing_extensions import override
 with workflow.unsafe.imports_passed_through():
     from pipelex import log
     from pipelex.cogt.content_generation.assignment_models import ImgGenAssignment
-    from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
     from pipelex.config import get_config
+    from pipelex.core.stuffs.image_content import ImageContent
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
@@ -14,17 +14,17 @@ with workflow.unsafe.imports_passed_through():
 
 
 @workflow.defn(name="wf_make_image")
-class WfMakeImages(WorkflowClass[ImgGenAssignment, list[GeneratedImageRawDetails]]):
+class WfMakeImages(WorkflowClass[ImgGenAssignment, list[ImageContent]]):
     @override
     @workflow.run
     async def run(
         self,
         workflow_arg: ImgGenAssignment,
-    ) -> list[GeneratedImageRawDetails]:
+    ) -> list[ImageContent]:
         workflow_log.debug("Workflow start")
         worker_config = get_config().temporal.worker_config
         try:
-            generated_image_list = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
+            image_content_list = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
                 activity=act_img_gen_images,
                 arg=workflow_arg,
                 start_to_close_timeout=worker_config.workflow_execution_timeout,
@@ -37,4 +37,4 @@ class WfMakeImages(WorkflowClass[ImgGenAssignment, list[GeneratedImageRawDetails
             raise
 
         workflow_log.debug("Workflow complete")
-        return generated_image_list
+        return image_content_list
