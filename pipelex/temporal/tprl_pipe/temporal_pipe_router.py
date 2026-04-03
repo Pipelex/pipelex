@@ -58,7 +58,8 @@ class TemporalPipeRouter(WorkflowExecutor[PipeJob, PipeOutput], PipeRouterProtoc
             # Use deterministic ID derived from parent workflow to avoid Temporal nondeterminism errors
             log.debug("TemporalPipeRouter: child workflow dispatch")
             parent_workflow_id = workflow.info().workflow_id
-            child_workflow_id = f"{parent_workflow_id}-{wfid or 'run-pipe-router'}"
+            child_unique_id = wfid or str(workflow.uuid4())
+            child_workflow_id = f"{parent_workflow_id}-{child_unique_id}"
             executor = WorkflowExecutorFactory[PipeJob, PipeOutput]().create_executor(task_queue=None)
             pipe_output = await executor.execute_child_workflow(
                 workflow_class=WfPipeRouter,
