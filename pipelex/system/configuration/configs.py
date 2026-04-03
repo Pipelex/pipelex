@@ -12,7 +12,7 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.temporal.config_temporal import Temporal
 from pipelex.tools.aws.aws_config import AwsConfig
 from pipelex.tools.log.log_config import LogConfig
-from pipelex.tools.storage.storage_config import AssetStorageConfig
+from pipelex.tools.storage.storage_config import StorageConfig
 from pipelex.types import Self, StrEnum
 
 
@@ -161,7 +161,7 @@ class PipelineExecutionConfig(ConfigModel):
 
 
 class Pipelex(ConfigModel):
-    storage_config: AssetStorageConfig
+    storage_config: StorageConfig
     feature_config: FeatureConfig
     log_config: LogConfig
     aws_config: AwsConfig

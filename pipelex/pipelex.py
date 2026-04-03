@@ -245,7 +245,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         if storage_provider is None:
             storage_config = get_config().pipelex.storage_config
-            storage_provider = make_storage_provider_from_config(storage_config.storage_provider_config)
+            storage_provider = make_storage_provider_from_config(storage_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
 
         # Register stuff templates first (used by mermaid, reactflow, and stuff_viewer)
