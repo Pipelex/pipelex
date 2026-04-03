@@ -5,22 +5,24 @@
 [pipelex.storage_config]
 is_fetch_remote_content_enabled = true
 is_upload_local_content_enabled = true
-method = "local"                       # local, in_memory, s3, gcp
 
-[pipelex.storage_config.local]
+[pipelex.storage_config.storage_provider_config]
+method = "local" # local, in_memory, s3, gcp
+
+[pipelex.storage_config.storage_provider_config.local]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 local_storage_path = ".pipelex/storage"
 
-[pipelex.storage_config.in_memory]
+[pipelex.storage_config.storage_provider_config.in_memory]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 
-[pipelex.storage_config.s3]
+[pipelex.storage_config.storage_provider_config.s3]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 bucket_name = ""
 region = ""
 signed_urls_lifespan_seconds = 3600
 
-[pipelex.storage_config.gcp]
+[pipelex.storage_config.storage_provider_config.gcp]
 uri_format = "{primary_id}/{secondary_id}/{hash}.{extension}"
 bucket_name = ""
 project_id = ""
@@ -455,6 +457,18 @@ preferred_agent_target = "claude"
 
 [temporal]
 is_enabled = false
+
+[temporal.payload_codec_config]
+is_enabled = false
+size_threshold = 1_048_576
+storage_prefix = "temporal-payloads/"
+
+[temporal.payload_codec_config.storage_provider_config]
+method = "local"
+
+[temporal.payload_codec_config.storage_provider_config.local]
+uri_format = "{hash}"
+local_storage_path = ".pipelex/temporal-payload-store"
 
 [temporal.worker_config]
 task_queue = "temporal_task_queue"

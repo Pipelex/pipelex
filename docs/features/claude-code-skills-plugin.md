@@ -37,8 +37,10 @@ Install from [mthds-ai/mthds-plugins](https://github.com/mthds-ai/mthds-plugins)
 then:
 
 ```
-/plugin install mthds@mthds-ai-mthds-plugins
+/plugin install mthds@mthds-plugins
 ```
+
+Then reload plugins with `/reload-plugins` (or exit and reopen Claude Code if that doesn't work).
 
 Once installed, type `/mthds-build` in Claude Code to create your first method from a natural language description.
 

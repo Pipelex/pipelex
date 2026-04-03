@@ -100,6 +100,7 @@ class WfMakeTextThenObject(WorkflowClass[TextThenObjectAssignment, BaseModel]):
             fup_obj_assignment = ObjectAssignment(
                 llm_assignment_for_object=fup_llm_assignment,
                 object_class_name=workflow_arg.object_class_name,
+                object_class_schema=workflow_arg.object_class_schema,
             )
 
             obj: BaseModel = await workflow.start_activity(  # pyright: ignore[reportUnknownMemberType, reportAssignmentType]
@@ -145,6 +146,7 @@ class WfMakeTextThenObjectList(WorkflowClass[TextThenObjectAssignment, list[Base
 
             object_assignment = ObjectAssignment(
                 object_class_name=workflow_arg.object_class_name,
+                object_class_schema=workflow_arg.object_class_schema,
                 llm_assignment_for_object=llm_assignment_for_object,
             )
 

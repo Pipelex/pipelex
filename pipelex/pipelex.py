@@ -96,6 +96,7 @@ class Pipelex(metaclass=MetaSingleton):
         self,
         config_dir_path: Path | None = None,
         config_cls: type[ConfigRoot] | None = None,
+        config_overrides: dict[str, Any] | None = None,
     ) -> None:
         self.is_pipelex_service_enabled = False  # Will be set during setup
         self.config_dir_path = config_dir_path or config_manager.pipelex_config_dir
@@ -104,7 +105,7 @@ class Pipelex(metaclass=MetaSingleton):
 
         # tools
         try:
-            self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig)
+            self.pipelex_hub.setup_config(config_cls=config_cls or PipelexConfig, config_overrides=config_overrides)
         except ValidationError as validation_error:
             validation_error_msg = report_validation_error(category="config", validation_error=validation_error)
             msg = f"Could not setup config because of: {validation_error_msg}"
@@ -210,8 +211,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 gateway_model_specs = remote_config.backend_model_specs
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
-                # Skip terms check for CI mode - automated CI/CD pipelines don't require human consent
-                if integration_mode.requires_terms_acceptance:
+                # Terms acceptance is only required for actual inference usage, not for
+                # read-only operations like fetching model specs for validation.
+                # Also skip for CI mode — automated pipelines don't require human consent.
+                if needs_inference and integration_mode.requires_terms_acceptance:
                     # Check if terms are accepted
                     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
                     if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
@@ -245,7 +248,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         self.pipelex_hub.set_secrets_provider(secrets_provider=secrets_provider)
         if storage_provider is None:
             storage_config = get_config().pipelex.storage_config
-            storage_provider = make_storage_provider_from_config(storage_config)
+            storage_provider = make_storage_provider_from_config(storage_config.storage_provider_config)
         self.pipelex_hub.set_storage_provider(storage_provider)
         self.pipelex_hub.set_event_log(event_log)
 
@@ -475,6 +478,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         telemetry_manager: TelemetryManagerAbstract | None = None,
         observers: dict[str, ObserverProtocol] | None = None,
         library_dirs: list[str] | list[Path] | None = None,
+        config_overrides: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> Self:
         """Create and initialize a Pipelex singleton instance.
@@ -509,6 +513,9 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             library_dirs: Default library directories for pipeline execution. If provided, these
                 directories will be used instead of the PIPELEXPATH environment variable.
                 Per-call library_dirs in execute_pipeline/start_pipeline will override this default.
+            config_overrides: Optional dict deep-merged on top of all TOML config layers
+                as the highest-priority override. Useful for tests that need specific
+                config without editing TOML files.
             **kwargs: Additional configuration options, only supported by your own subclass of Pipelex if you really need one
 
         Returns:
@@ -522,7 +529,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             msg = "Pipelex is already initialized"
             raise PipelexSetupError(msg)
 
-        pipelex_instance = cls()
+        pipelex_instance = cls(config_overrides=config_overrides)
         try:
             pipelex_instance.setup(
                 integration_mode=integration_mode,

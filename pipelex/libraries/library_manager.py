@@ -391,8 +391,6 @@ class LibraryManager(LibraryManagerAbstract):
         if fingerprint in loaded_set:
             log.verbose(f"Crate with fingerprint {fingerprint[:12]}... already loaded into '{library_id}', skipping")
             return []
-        loaded_set.add(fingerprint)
-
         library = self.get_library(library_id=library_id)
 
         # Load domains from crate metadata
@@ -447,6 +445,10 @@ class LibraryManager(LibraryManagerAbstract):
         library.pipe_library.add_pipes(pipes=all_pipes)
 
         library.validate_library()
+
+        # Only cache fingerprint after the entire load succeeds — if loading fails
+        # with an exception, subsequent retries must not be skipped.
+        loaded_set.add(fingerprint)
         return all_pipes
 
     @override

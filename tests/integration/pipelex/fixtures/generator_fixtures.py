@@ -20,38 +20,38 @@ def generated_content_factory(tmp_path: Path) -> GeneratedContentFactory:
 
     Applies test overrides for bucket names and signed URL lifespans.
     """
-    storage_config = get_config().pipelex.storage_config
-    match storage_config.method:
+    storage_provider_config = get_config().pipelex.storage_config.storage_provider_config
+    match storage_provider_config.method:
         case StorageMethod.S3:
-            assert storage_config.s3 is not None
-            patched_s3_config = storage_config.s3.model_copy(
+            assert storage_provider_config.s3 is not None
+            patched_s3_config = storage_provider_config.s3.model_copy(
                 update={
                     "bucket_name": S3_TEST_BUCKET,
                     "signed_urls_lifespan_seconds": TEST_SIGNED_URLS_LIFESPAN,
                 }
             )
-            patched_storage_config = storage_config.model_copy(update={"s3": patched_s3_config})
+            patched_provider_config = storage_provider_config.model_copy(update={"s3": patched_s3_config})
         case StorageMethod.GCP:
-            assert storage_config.gcp is not None
-            patched_gcp_config = storage_config.gcp.model_copy(
+            assert storage_provider_config.gcp is not None
+            patched_gcp_config = storage_provider_config.gcp.model_copy(
                 update={
                     "bucket_name": GCP_TEST_BUCKET,
                     "signed_urls_lifespan_seconds": TEST_SIGNED_URLS_LIFESPAN,
                 }
             )
-            patched_storage_config = storage_config.model_copy(update={"gcp": patched_gcp_config})
+            patched_provider_config = storage_provider_config.model_copy(update={"gcp": patched_gcp_config})
         case StorageMethod.LOCAL:
-            assert storage_config.local is not None
-            patched_local_config = storage_config.local.model_copy(
+            assert storage_provider_config.local is not None
+            patched_local_config = storage_provider_config.local.model_copy(
                 update={
                     "local_storage_path": tmp_path,
                 }
             )
-            patched_storage_config = storage_config.model_copy(update={"local": patched_local_config})
+            patched_provider_config = storage_provider_config.model_copy(update={"local": patched_local_config})
         case StorageMethod.IN_MEMORY:
-            patched_storage_config = storage_config
+            patched_provider_config = storage_provider_config
 
-    storage_provider = make_storage_provider_from_config(patched_storage_config)
+    storage_provider = make_storage_provider_from_config(patched_provider_config)
     return GeneratedContentFactory(storage_provider=storage_provider)
 
 

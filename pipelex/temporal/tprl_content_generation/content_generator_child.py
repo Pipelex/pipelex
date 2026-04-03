@@ -1,4 +1,4 @@
-from typing import Any, cast
+from typing import Any
 
 from pydantic import BaseModel
 from temporalio import workflow
@@ -13,6 +13,7 @@ from pipelex.cogt.content_generation.assignment_models import (
     LLMAssignment,
     LLMAssignmentFactory,
     ObjectAssignment,
+    RenderPageViewsAssignment,
     TemplatingAssignment,
     TextThenObjectAssignment,
 )
@@ -49,8 +50,7 @@ from pipelex.temporal.tprl_content_generation.wf_make_object import (
     WfMakeTextThenObject,
     WfMakeTextThenObjectList,
 )
-from pipelex.tools.misc.image_utils import ImageFormat
-from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
+from pipelex.temporal.tprl_content_generation.wf_render_page_views import WfRenderPageViews
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -154,7 +154,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object direct: {obj}")
-        return cast("BaseModelTypeVar", obj)
+        return object_class.model_validate(obj.model_dump(serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -182,6 +182,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             )
             tto_assignment = TextThenObjectAssignment(
                 object_class_name=object_class.__name__,
+                object_class_schema=object_class.model_json_schema(),
                 llm_assignment_for_text=llm_assignment_for_text,
                 llm_assignment_factory_to_object=llm_assignment_factory_to_object,
             )
@@ -203,7 +204,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object after text: {obj}")
-        return cast("BaseModelTypeVar", obj)
+        return object_class.model_validate(obj.model_dump(serialize_as_any=True))
 
     @override
     @update_job_metadata
@@ -244,7 +245,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object list direct: {obj_list}")
-        return cast("list[BaseModelTypeVar]", obj_list)
+        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in obj_list]
 
     @override
     @update_job_metadata
@@ -273,6 +274,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             )
             tto_assignment = TextThenObjectAssignment(
                 object_class_name=object_class.__name__,
+                object_class_schema=object_class.model_json_schema(),
                 llm_assignment_for_text=llm_assignment_for_text,
                 llm_assignment_factory_to_object=llm_assignment_factory_to_object,
             )
@@ -294,7 +296,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         log.verbose(f"ContentGeneratorChild generated object list after text: {obj_list}")
-        return cast("list[BaseModelTypeVar]", obj_list)
+        return [object_class.model_validate(raw_obj.model_dump(serialize_as_any=True)) for raw_obj in obj_list]
 
     @override
     async def make_image_content(
@@ -338,7 +340,6 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
     ) -> ImageContent:
         img_gen_config = get_config().cogt.img_gen_config
         try:
-            # We're using workflowWfMakeImages which can generate several images but we're asking for only one
             img_gen_assignment = ImgGenAssignment(
                 job_metadata=job_metadata,
                 img_gen_handle=img_gen_handle,
@@ -348,8 +349,8 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 nb_images=1,
             )
 
-            generated_image_list = (
-                await WorkflowExecutorFactory[ImgGenAssignment, list[GeneratedImageRawDetails]]
+            image_content_list = (
+                await WorkflowExecutorFactory[ImgGenAssignment, list[ImageContent]]
                 .create_executor()
                 .execute_child_workflow(
                     workflow_class=WfMakeImages,
@@ -357,10 +358,9 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                     workflow_id=make_child_workflow_id(base_id=wfid or "craft-image"),
                 )
             )
-            if len(generated_image_list) != 1:
-                msg = f"Expected 1 image, got {len(generated_image_list)}"
+            if len(image_content_list) != 1:
+                msg = f"Expected 1 image, got {len(image_content_list)}"
                 raise ContentGenerationError(msg)
-            generated_image = generated_image_list[0]
         except PipelexError as exc:
             raise TemporalError.from_message_exception(exc) from exc
         except ChildWorkflowError as exc:
@@ -368,12 +368,9 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
-        log.verbose(f"ContentGeneratorChild generated image: {generated_image}")
-        return await self.make_image_content(
-            job_metadata=job_metadata,
-            generated_image_raw_details=generated_image,
-            img_gen_prompt=img_gen_prompt,
-        )
+        image_content = image_content_list[0]
+        log.verbose(f"ContentGeneratorChild generated image: {image_content}")
+        return image_content
 
     @override
     @update_job_metadata
@@ -398,8 +395,8 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 nb_images=nb_images,
             )
 
-            generated_image_list = (
-                await WorkflowExecutorFactory[ImgGenAssignment, list[GeneratedImageRawDetails]]
+            image_content_list = (
+                await WorkflowExecutorFactory[ImgGenAssignment, list[ImageContent]]
                 .create_executor()
                 .execute_child_workflow(
                     workflow_class=WfMakeImages,
@@ -414,19 +411,13 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
-        log.verbose(f"ContentGeneratorChild generated image list: {generated_image_list}")
-        return [
-            await self.make_image_content(
-                job_metadata=job_metadata,
-                generated_image_raw_details=raw_details,
-                img_gen_prompt=img_gen_prompt,
-            )
-            for raw_details in generated_image_list
-        ]
+        log.verbose(f"ContentGeneratorChild generated image list: {image_content_list}")
+        return image_content_list
 
     @override
     async def make_templated_text(
         self,
+        job_metadata: JobMetadata,
         context: dict[str, Any],
         template: str,
         templating_style: TemplatingStyle | None = None,
@@ -435,6 +426,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
     ) -> str:
         try:
             templating_assignment = TemplatingAssignment(
+                job_metadata=job_metadata,
                 context=context,
                 template=template,
                 templating_style=templating_style,
@@ -460,6 +452,7 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
         return jinja2_text
 
     @override
+    @update_job_metadata
     async def make_render_page_views(
         self,
         job_metadata: JobMetadata,
@@ -474,20 +467,30 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             raise ValueError(msg)
         job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
-        page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.document_uri, dpi=page_views_dpi)
-        page_view_images_resolved: list[ImageContent] = []
-        for page_view_image in page_view_images:
-            image_content = await self.make_image_content(
+        try:
+            render_assignment = RenderPageViewsAssignment(
                 job_metadata=job_metadata,
-                generated_image_raw_details=GeneratedImageRawDetails.make_from_pil_image(
-                    pil_image=page_view_image,
-                    image_format=ImageFormat.PNG,
-                ),
-                img_gen_prompt=None,
+                document_uri=extract_input.document_uri,
+                page_views_dpi=page_views_dpi,
             )
-            page_view_images_resolved.append(image_content)
-
-        return page_view_images_resolved
+            image_content_list = (
+                await WorkflowExecutorFactory[RenderPageViewsAssignment, list[ImageContent]]
+                .create_executor()
+                .execute_child_workflow(
+                    workflow_class=WfRenderPageViews,
+                    workflow_arg=render_assignment,
+                    workflow_id=make_child_workflow_id(base_id=wfid or "render-page-views"),
+                )
+            )
+        except PipelexError as exc:
+            raise TemporalError.from_message_exception(exc) from exc
+        except ChildWorkflowError as exc:
+            log.error(f"ChildWorkflowError caused by: {exc.cause}")
+            if isinstance(exc.cause, ApplicationError):
+                raise TemporalError.from_app_error(exc=exc.cause) from exc
+            raise
+        log.verbose(f"ContentGeneratorChild rendered page views: {image_content_list}")
+        return image_content_list
 
     @override
     @update_job_metadata
@@ -509,8 +512,8 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
                 extract_job_config=extract_job_config,
             )
 
-            extract_output = (
-                await WorkflowExecutorFactory[ExtractAssignment, ExtractOutput]
+            page_content_list = (
+                await WorkflowExecutorFactory[ExtractAssignment, list[PageContent]]
                 .create_executor()
                 .execute_child_workflow(
                     workflow_class=WfMakeExtract,
@@ -525,5 +528,5 @@ class ContentGeneratorChild(WorkflowExecutor[AssignmentType, ResultType], Conten
             if isinstance(exc.cause, ApplicationError):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
-        log.verbose(f"ContentGeneratorChild generated extract output: {extract_output}")
-        return await self.make_page_contents(job_metadata=job_metadata, extract_output=extract_output)
+        log.verbose(f"ContentGeneratorChild generated page contents: {page_content_list}")
+        return page_content_list

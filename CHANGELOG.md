@@ -1,7 +1,5 @@
 # Changelog
 
-## [v0.25.0] - 2026-04-01
-
 ### Added
 
 - **PipeRun layer**: New `PipeRunProtocol` with `PipeRun` (direct) and `TemporalPipeRun` (Temporal) implementations. Wraps pipe execution + delivery in a single orchestration unit. In Temporal mode, `WfPipeRun` workflow orchestrates `WfPipeRouter` as a child workflow followed by delivery activities.
@@ -10,22 +8,6 @@
 - **Pre-generated `pipeline_run_id` support**: `pipeline_run_setup()`, `PipelineFactory`, and `PipelineManager` accept an optional `pipeline_run_id` parameter for external run record creation.
 - **`workflow_id` in start response**: `PipelexPipelineStartResponse` includes `workflow_id`.
 - **Temporal `callbacks` passthrough**: `WorkflowExecutor.start_workflow()` accepts optional Temporal `Callback` objects.
-
-### Changed
-
-- **`PipeRouterTop` + `PipeRouterChild` merged into `TemporalPipeRouter`**: Single router that auto-detects context (top-level vs child workflow) and dispatches accordingly. Hub no longer needs `_pipe_router_top` — one `_pipe_router` field handles both modes.
-- **`PipelexRunner.execute_pipeline()` uses `get_pipe_run()`**: Runner now delegates to the PipeRun layer instead of calling `get_pipe_router()` directly.
-
-### Removed
-
-- **`PipeRouterTop`** — replaced by `TemporalPipeRouter` + `TemporalPipeRun`.
-- **`PipeRouterChild`** — merged into `TemporalPipeRouter`.
-- **`PipelexHub.set_pipe_router_top()`** — no longer needed; single `set_pipe_router()` suffices.
-
-## [v0.24.0] - 2026-03-30
-
-### Added
-
 - **DynamoDB event log backend**: New `DynamoDBEventLog` implementation of `EventLogProtocol` for cloud-based trace event storage. Installable via `pip install "pipelex[dynamodb]"`.
 - **Event log DI**: Event log backend is now configurable via `TracingConfig.backend` (`"ndjson"` or `"dynamodb"`) and injectable via `Pipelex.setup(event_log=...)`. Factory function `make_event_log()` selects the backend from config or hub injection.
 - **Hub event_log support**: `PipelexHub.set_event_log()` / `get_event_log()` for dependency injection of custom event log backends.
@@ -33,14 +15,45 @@
 
 ### Changed
 
+- **`PipeRouterTop` + `PipeRouterChild` merged into `TemporalPipeRouter`**: Single router that auto-detects context (top-level vs child workflow) and dispatches accordingly. Hub no longer needs `_pipe_router_top` — one `_pipe_router` field handles both modes.
+- **`PipelexRunner.execute_pipeline()` uses `get_pipe_run()`**: Runner now delegates to the PipeRun layer instead of calling `get_pipe_router()` directly.
 - **Tracing config structure**: `TracingConfig` now has `backend`, `ndjson` (with `traces_dir`), and `dynamodb` (with `table_name`, `region`) sub-configs. Tracing is enabled by default.
 - **Event log factory replaces hardcoded NdjsonEventLog**: The 3 call sites (`pipeline_run_setup.py`, `wf_pipe_router.py`, `runner.py`) now use `make_event_log()` instead of directly instantiating `NdjsonEventLog`.
 - **Tracing decoupled from Temporal**: Event log is created when `tracing_config.is_enabled`, regardless of whether Temporal is enabled.
+
+### Removed
+
+- **`PipeRouterTop`** — replaced by `TemporalPipeRouter` + `TemporalPipeRun`.
+- **`PipeRouterChild`** — merged into `TemporalPipeRouter`.
+- **`PipelexHub.set_pipe_router_top()`** — no longer needed; single `set_pipe_router()` suffices.
 
 ### Fixed
 
 - **ObjectAssignment deserialization on Temporal workers**: Removed `__init__` class registry check that blocked deserialization of `ObjectAssignment` before `library_crate` was loaded. Validation moved to `validate_before_execution()` method, following the existing codebase pattern.
 - **Dynamic concept classes in Temporal activities**: `WfPipeRouter` now propagates dynamically registered concept classes from the per-workflow registry to the global registry, so child workflows and activities can access them.
+
+## [v0.23.4] - 2026-04-02
+
+### Changed
+
+- **Pipe spec output alias**: Removed `output_type` alias from `parse_pipe_spec`, keeping only `output_concept` as the single alias for the `output` field. Simplified the alias resolution logic accordingly.
+
+## [v0.23.3] - 2026-04-02
+
+### Changed
+
+- **Pipe spec output aliases**: `parse_pipe_spec` now accepts `output_concept` and `output_type` as aliases for the `output` field, with smart fallback when both alias and canonical field are present.
+
+### Fixed
+
+- **Gateway terms check**: Terms acceptance is now only required for inference operations, not for read-only operations like model spec fetching during validation.
+
+## [v0.23.2] - 2026-03-30
+
+### Changed
+
+- **Claude Code plugin install command**: Fixed as → `/plugin install mthds@mthds-plugins` across README and docs.
+- **Claude Code plugin reload instructions**: Added `/reload-plugins` as the primary method to activate the plugin, with exit/reopen as fallback.
 
 ## [v0.23.1] - 2026-03-30
 
