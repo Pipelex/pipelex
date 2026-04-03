@@ -11,8 +11,8 @@ from pipelex.temporal.tprl_content_generation.wf_make_images import WfMakeImages
 from pipelex.temporal.tprl_content_generation.wf_make_jinja2_text import WfMakeJinja2Text
 from pipelex.temporal.tprl_content_generation.wf_make_llm_text import WfMakeLLMText
 from pipelex.temporal.tprl_content_generation.wf_make_object import WfMakeObject, WfMakeObjectList, WfMakeTextThenObject, WfMakeTextThenObjectList
-from pipelex.temporal.tprl_pipe.act_deliver import act_deliver
 from pipelex.temporal.tprl_content_generation.wf_render_page_views import WfRenderPageViews
+from pipelex.temporal.tprl_pipe.act_deliver import act_deliver
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from pipelex.types import StrEnum

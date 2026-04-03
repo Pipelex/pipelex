@@ -2,7 +2,7 @@ import sys
 from collections.abc import Sequence
 from contextvars import ContextVar
 from pathlib import Path
-from typing import TYPE_CHECKING, ClassVar, Optional, Any
+from typing import TYPE_CHECKING, Any, ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
 from kajson.kajson_manager import KajsonManager

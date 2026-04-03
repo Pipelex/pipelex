@@ -70,12 +70,10 @@ def boot_temporal(reset_pipelex_config_fixture: None) -> Generator[None, None, N
     from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory  # noqa: PLC0415
     from pipelex.hub import get_pipelex_hub, get_storage_provider  # noqa: PLC0415
     from pipelex.temporal.tprl_content_generation.content_generator_child_factory import ContentGeneratorChildFactory  # noqa: PLC0415
-    from pipelex.temporal.tprl_pipe.pipe_router_child import make_tprl_pipe_router_child  # noqa: PLC0415
-    from pipelex.temporal.tprl_pipe.pipe_router_top import make_tprl_pipe_router_top  # noqa: PLC0415
+    from pipelex.temporal.tprl_pipe.temporal_pipe_router import make_temporal_pipe_router  # noqa: PLC0415
 
     pipelex_hub = get_pipelex_hub()
-    pipelex_hub.set_pipe_router_top(make_tprl_pipe_router_top())
-    pipelex_hub.set_pipe_router(make_tprl_pipe_router_child())
+    pipelex_hub.set_pipe_router(make_temporal_pipe_router())
 
     generated_content_factory = GeneratedContentFactory(storage_provider=get_storage_provider())
     content_generator_child = ContentGeneratorChildFactory.make_content_generator_child(
