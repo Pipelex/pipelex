@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from pipelex.tools.typing.pydantic_utils import empty_list_factory_of
 from pipelex.types import StrEnum
@@ -25,6 +25,13 @@ class StorageTarget(BaseModel):
     """Storage configuration for persisting pipe output."""
 
     key_prefix: str | None = None
+
+    @field_validator("key_prefix", mode="after")
+    @classmethod
+    def normalize_key_prefix(cls, value: str | None) -> str | None:
+        if value is not None and value != "" and not value.endswith("/"):
+            return f"{value}/"
+        return value
 
 
 class DeliveryAssignment(BaseModel):

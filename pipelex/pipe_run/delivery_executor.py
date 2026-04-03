@@ -146,13 +146,11 @@ class DeliveryExecutor:
     ) -> None:
         """POST status + result_url to a webhook URL."""
         try:
-            payload: dict[str, Any] = {
-                "pipeline_run_id": pipeline_run_id,
-                "status": str(status),
-            }
+            payload: dict[str, Any] = dict(webhook.payload)
+            payload["pipeline_run_id"] = pipeline_run_id
+            payload["status"] = status
             if result_url is not None:
                 payload["result_url"] = result_url
-            payload.update(webhook.payload)
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(

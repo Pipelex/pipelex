@@ -57,12 +57,15 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
 
         # Step 2: Assemble full graph from trace events (cross-worker)
         if pipe_output is not None:
-            assemble_graph_on_output(
-                pipe_output=pipe_output,
-                pipeline_run_id=pipeline_run_id,
-                domain_code=pipe_job.pipe.domain_code,
-                main_pipe_code=pipe_job.pipe.code,
-            )
+            try:
+                assemble_graph_on_output(
+                    pipe_output=pipe_output,
+                    pipeline_run_id=pipeline_run_id,
+                    domain_code=pipe_job.pipe.domain_code,
+                    main_pipe_code=pipe_job.pipe.code,
+                )
+            except Exception as graph_exc:
+                workflow_log.warning(f"Graph assembly failed, continuing with delivery: {graph_exc}")
 
         # Step 3: Run delivery activity (always — to notify completion Lambda of success or failure)
         if delivery_assignment is not None:

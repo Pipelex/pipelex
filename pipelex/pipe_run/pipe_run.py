@@ -8,7 +8,6 @@ from pipelex import log
 from pipelex.graph.graph_tracer_manager import GraphTracerManager
 from pipelex.pipe_run.delivery_assignment import DeliveryAssignment, DeliveryStatus, StorageTarget
 from pipelex.pipe_run.delivery_executor import DeliveryExecutor
-from pipelex.pipe_run.exceptions import PipeRouterError
 from pipelex.pipe_run.graph_assembly import assemble_graph_on_output
 from pipelex.pipe_run.pipe_run_protocol import PipeRunProtocol
 
@@ -35,11 +34,11 @@ class PipeRun(PipeRunProtocol):
         pipeline_run_id: str = pipe_job.job_metadata.pipeline_run_id
         status: DeliveryStatus = DeliveryStatus.COMPLETED
         pipe_output: PipeOutput | None = None
-        execution_error: PipeRouterError | None = None
+        execution_error: Exception | None = None
 
         try:
             pipe_output = await self._pipe_router.run(pipe_job, wfid=wfid)
-        except PipeRouterError as exc:
+        except Exception as exc:
             status = DeliveryStatus.FAILED
             execution_error = exc
             log.error(f"Pipe execution failed for pipeline_run_id={pipeline_run_id}: {exc}")

@@ -9,8 +9,7 @@ Compatible with the pipelex-api-infra TraceEventDynamoDBAdapter schema.
 Requires: pip install "pipelex[dynamodb]"
 """
 
-from decimal import Decimal
-from typing import Any, cast
+from typing import Any
 
 from pydantic import TypeAdapter
 from typing_extensions import override
@@ -145,51 +144,3 @@ class DynamoDBEventLog(EventLogProtocol):
         with self._table.batch_writer() as writer:
             for item in items:
                 writer.delete_item(Key={"PK": item["PK"], "SK": item["SK"]})
-
-
-def _convert_floats_to_decimal(item: Any) -> dict[str, Any]:
-    """Convert float values to Decimal for DynamoDB compatibility."""
-    result: dict[str, Any] = {}
-    for key, value in cast("dict[str, Any]", item).items():
-        if isinstance(value, dict):
-            result[key] = _convert_floats_to_decimal(value)
-        elif isinstance(value, list):
-            result[key] = [_convert_float_item(element) for element in cast("list[Any]", value)]
-        elif isinstance(value, float):
-            result[key] = Decimal(str(value))
-        else:
-            result[key] = value
-    return result
-
-
-def _convert_float_item(element: Any) -> Any:
-    """Convert a single list element's floats to Decimal."""
-    if isinstance(element, dict):
-        return _convert_floats_to_decimal(element)
-    if isinstance(element, float):
-        return Decimal(str(element))
-    return element
-
-
-def _convert_decimal_item(element: Any) -> Any:
-    """Convert a single list element's Decimals to native types."""
-    if isinstance(element, dict):
-        return _convert_decimals_to_native(element)
-    if isinstance(element, Decimal):
-        return int(element) if element == int(element) else float(element)
-    return element
-
-
-def _convert_decimals_to_native(item: Any) -> dict[str, Any]:
-    """Convert Decimal values back to int or float for Pydantic deserialization."""
-    result: dict[str, Any] = {}
-    for key, value in cast("dict[str, Any]", item).items():
-        if isinstance(value, dict):
-            result[key] = _convert_decimals_to_native(value)
-        elif isinstance(value, list):
-            result[key] = [_convert_decimal_item(element) for element in cast("list[Any]", value)]
-        elif isinstance(value, Decimal):
-            result[key] = int(value) if value == int(value) else float(value)
-        else:
-            result[key] = value
-    return result
