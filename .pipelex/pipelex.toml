@@ -68,14 +68,14 @@ palette = "dracula"
 
 [pipelex.tracing_config]
 is_enabled = true
-backend = "dynamodb"
+backend = "ndjson"
 
 [pipelex.tracing_config.ndjson]
 traces_dir = ".pipelex/traces"
 
 [pipelex.tracing_config.dynamodb]
-table_name = "pipelex-events-staging"
-region = "us-west-2"
+table_name = ""
+region = ""
 
 ####################################################################################################
 # Storage Config
