@@ -29,6 +29,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=mock_output,
+            user_id="test-user",
             pipeline_run_id="plr-123",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -36,7 +37,7 @@ class TestDeliveryExecutor:
 
         mock_storage.store.assert_called()
         stored_keys = [call.kwargs["key"] for call in mock_storage.store.call_args_list]
-        assert any("plr-123/working_memory.json" in key for key in stored_keys)
+        assert any("test-user/plr-123/results/working_memory.json" in key for key in stored_keys)
 
     async def test_execute_webhook_only(self, mocker: MockerFixture) -> None:
         mock_client = mocker.AsyncMock()
@@ -54,6 +55,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
+            user_id="test-user",
             pipeline_run_id="plr-456",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -82,6 +84,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
+            user_id="test-user",
             pipeline_run_id="plr-789",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -101,6 +104,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
+            user_id="test-user",
             pipeline_run_id="plr-fail",
             delivery_assignment=assignment,
             status=DeliveryStatus.FAILED,
@@ -115,6 +119,7 @@ class TestDeliveryExecutor:
 
         await executor.execute(
             pipe_output=None,
+            user_id="test-user",
             pipeline_run_id="plr-noop",
             delivery_assignment=assignment,
             status=DeliveryStatus.COMPLETED,
@@ -136,6 +141,7 @@ class TestDeliveryExecutor:
         with pytest.raises(StorageDeliveryError):
             await executor.execute(
                 pipe_output=mock_output,
+                user_id="test-user",
                 pipeline_run_id="plr-err",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,
@@ -158,6 +164,7 @@ class TestDeliveryExecutor:
         with pytest.raises(WebhookDeliveryError):
             await executor.execute(
                 pipe_output=None,
+                user_id="test-user",
                 pipeline_run_id="plr-err",
                 delivery_assignment=assignment,
                 status=DeliveryStatus.COMPLETED,

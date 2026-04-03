@@ -71,6 +71,7 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
         if delivery_assignment is not None:
             workflow_log.debug(f"Running delivery: pipeline_run_id={pipeline_run_id}, status={status}")
             activity_arg = DeliveryActivityArg(
+                user_id=pipe_job.job_metadata.user_id,
                 pipeline_run_id=pipeline_run_id,
                 delivery_assignment=delivery_assignment,
                 status=status,

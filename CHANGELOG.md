@@ -1,5 +1,7 @@
 # Changelog
 
+## [Unreleased]
+
 ### Added
 
 - **PipeRun layer**: New `PipeRunProtocol` with `PipeRun` (direct) and `TemporalPipeRun` (Temporal) implementations. Wraps pipe execution + delivery in a single orchestration unit. In Temporal mode, `WfPipeRun` workflow orchestrates `WfPipeRouter` as a child workflow followed by delivery activities.

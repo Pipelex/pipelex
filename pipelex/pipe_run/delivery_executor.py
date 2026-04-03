@@ -23,6 +23,7 @@ class DeliveryExecutor:
     async def execute(
         self,
         pipe_output: PipeOutput | None,
+        user_id: str,
         pipeline_run_id: str,
         delivery_assignment: DeliveryAssignment,
         status: DeliveryStatus,
@@ -31,7 +32,7 @@ class DeliveryExecutor:
         # Step 1: Persist the result files to storage (only on success with output)
         result_url: str | None = None
         if delivery_assignment.storage is not None and pipe_output is not None:
-            result_url = await self._store_results(pipe_output, pipeline_run_id, delivery_assignment.storage)
+            result_url = await self._store_results(pipe_output, user_id, pipeline_run_id, delivery_assignment.storage)
 
         # Step 2: Notify webhooks with status + result_url (always, even on failure)
         for webhook in delivery_assignment.webhooks:
@@ -109,6 +110,7 @@ class DeliveryExecutor:
     async def _store_results(
         self,
         pipe_output: PipeOutput,
+        user_id: str,
         pipeline_run_id: str,
         storage: StorageTarget,
     ) -> str:
@@ -116,7 +118,7 @@ class DeliveryExecutor:
         try:
             storage_provider = get_storage_provider()
             prefix: str = storage.key_prefix or ""
-            base_key: str = f"{prefix}{pipeline_run_id}"
+            base_key: str = f"{prefix}{user_id}/{pipeline_run_id}/results"
 
             result_files = await self.generate_result_files(pipe_output)
 

@@ -10,6 +10,7 @@ class DeliveryActivityArg(BaseModel):
     """Input for the act_deliver activity."""
 
     pipe_output: PipeOutput | None = None
+    user_id: str
     pipeline_run_id: str
     delivery_assignment: DeliveryAssignment
     status: DeliveryStatus = DeliveryStatus.COMPLETED
@@ -21,6 +22,7 @@ async def act_deliver(arg: DeliveryActivityArg) -> None:
     executor = DeliveryExecutor()
     await executor.execute(
         pipe_output=arg.pipe_output,
+        user_id=arg.user_id,
         pipeline_run_id=arg.pipeline_run_id,
         delivery_assignment=arg.delivery_assignment,
         status=arg.status,

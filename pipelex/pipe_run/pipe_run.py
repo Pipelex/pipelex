@@ -63,6 +63,7 @@ class PipeRun(PipeRunProtocol):
         log.debug(f"Executing delivery for pipeline_run_id={pipeline_run_id}, status={status}")
         await self._delivery_executor.execute(
             pipe_output=pipe_output,
+            user_id=pipe_job.job_metadata.user_id,
             pipeline_run_id=pipeline_run_id,
             delivery_assignment=delivery_assignment,
             status=status,
