@@ -1,5 +1,5 @@
 
-[pipelex.storage_config.storage_provider_config]
+[pipelex.storage_config]
 method = "local"
 
 [cogt.model_deck_config]
