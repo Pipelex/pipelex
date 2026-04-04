@@ -3,8 +3,8 @@ from typing_extensions import override
 from pipelex.cogt.exceptions import ModelManagerError
 from pipelex.cogt.model_backends.backend import InferenceBackend, PipelexBackend
 from pipelex.cogt.model_backends.backend_library import InferenceBackendLibrary
+from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
-from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 from pipelex.cogt.model_backends.model_type import ModelType
 from pipelex.cogt.model_routing.routing_models import BackendMatchingMethod
 from pipelex.cogt.model_routing.routing_profile import RoutingProfile
@@ -55,14 +55,14 @@ class ModelManager(ModelManagerAbstract):
     def setup(
         self,
         secrets_provider: SecretsProviderAbstract,
-        gateway_model_specs: BackendModelSpecs | None,
+        gateway_config: GatewayConfig | None,
         needs_inference: bool = True,
     ) -> None:
         self.inference_backend_library.load(
             secrets_provider=secrets_provider,
             backends_library_path=str(config_manager.backends_file_path),
             backends_dir_path=str(config_manager.backends_dir_path),
-            gateway_model_specs=gateway_model_specs,
+            gateway_config=gateway_config,
             lenient=not needs_inference,
         )
         enabled_backends = self.inference_backend_library.all_enabled_backends()
