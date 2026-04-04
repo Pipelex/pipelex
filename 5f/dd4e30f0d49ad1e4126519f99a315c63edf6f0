@@ -1,0 +1,27 @@
+pipelex/kit/configs/inference/backends/bedrock.toml
+  6f51ac2b796910cb 63
+.pipelex/inference/backends/bedrock.toml
+  6f51ac2b796910cb 63
+CHANGELOG.md
+  6f51ac2b796910cb 18-21
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "5fdd4e30f0d49ad1e4126519f99a315c63edf6f0",
+  "prompts": {
+    "6f51ac2b796910cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bbec395-82d5-459c-9d69-b7a99b739651",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 4,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
