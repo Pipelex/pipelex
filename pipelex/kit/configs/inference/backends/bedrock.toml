@@ -60,9 +60,8 @@ costs = { input = 3.0, output = 15.0 }
 ["deepseek-v3.1"]
 model_id = "deepseek.v3-v1:0"
 inputs = ["text"]
-outputs = ["text", "structured"]
+outputs = ["text"]
 costs = { input = 0, output = 0 }
-structure_method = "instructor/json"
 max_tokens = 8192
 
 # --- Claude LLMs --------------------------------------------------------------

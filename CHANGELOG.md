@@ -15,6 +15,10 @@
 - **Remote config**: Bumped to v08.
 - **Gateway model docs**: Regenerated, removing retired models (claude-3.7-sonnet, deepseek-v3.1, deepseek-v3.2-speciale, flux-2-pro).
 
+### Fixed
+
+- **deepseek-v3.1 structured output**: Removed unsupported `structured` output capability from the bedrock deepseek-v3.1 model spec — the `bedrock_aioboto3` worker does not implement object generation, so structured calls would fail at runtime.
+
 ## [v0.23.4] - 2026-04-02
 
 ### Changed
