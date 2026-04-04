@@ -1,0 +1,23 @@
+pipelex/kit/agent_rules/commands.md
+  3052f2a386af771d 31-33
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "7428ee8e7b27b1fada59f9bf0514b9a071381082",
+  "prompts": {
+    "3052f2a386af771d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "e3db4064-ae66-47bc-8dba-09eea1d17009",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 1,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
