@@ -196,6 +196,10 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # Use dummy config when inference is not needed (for testing without network access)
                 remote_config = RemoteConfigFetcher.make_dummy_remote_config()
                 gateway_model_specs = remote_config.backend_model_specs
+                gateway_config = GatewayConfig(
+                    model_specs=gateway_model_specs,
+                    aws_region=remote_config.aws_region,
+                )
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
                 # Terms acceptance is only required for actual inference usage, not for
