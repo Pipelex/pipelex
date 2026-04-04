@@ -220,7 +220,7 @@ fal = [
 openai = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"]
 
 # --- Google Models ---
-google = ["nano-banana", "nano-banana-pro"]
+google = ["nano-banana", "nano-banana-pro", "nano-banana-2"]
 
 # --- Qwen Models ---
 qwen = ["qwen-image"]
