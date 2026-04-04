@@ -7,7 +7,7 @@ import io
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 from rich.panel import Panel
@@ -22,6 +22,7 @@ from pipelex.cli.commands.init.ui.types import InitFocus
 from pipelex.cogt.exceptions import InferenceBackendLibraryError
 from pipelex.cogt.model_backends.backend_credentials import BackendCredentialsErrorMsgFactory
 from pipelex.cogt.model_backends.backend_library import BackendCredentialsReport, InferenceBackendLibrary
+from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.config import get_config
 from pipelex.core.validation import report_validation_error
@@ -42,9 +43,6 @@ from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.placeholder import value_is_placeholder
 from pipelex.tools.misc.toml_utils import TomlError, load_toml_from_path
 from pipelex.tools.secrets.env_secrets_provider import EnvSecretsProvider
-
-if TYPE_CHECKING:
-    from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
 
 
 class ConfigLocationInfo(BaseModel):
@@ -669,7 +667,7 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
     log.configure(log_config=get_config().pipelex.log_config)
 
     # Fetch gateway model specs if Gateway is enabled
-    gateway_model_specs: BackendModelSpecs | None = None
+    gateway_config: GatewayConfig | None = None
     if is_pipelex_gateway_enabled():
         pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
         if pipelex_service_config is None:
@@ -678,14 +676,20 @@ def check_models(config_dir: Path | None = None) -> tuple[bool, str, dict[str, B
             return False, "Pipelex Gateway is enabled but terms have not been accepted", backend_file_reports
         try:
             remote_config = RemoteConfigFetcher.fetch_remote_config()
-            gateway_model_specs = remote_config.backend_model_specs
+            gateway_config = GatewayConfig(
+                model_specs=remote_config.backend_model_specs,
+                aws_region=remote_config.aws_region,
+            )
         except (RemoteConfigFetchError, RemoteConfigValidationError) as exc:
             return False, f"Failed to fetch Pipelex Gateway remote configuration: {exc}", backend_file_reports
 
     models_manager = ModelManager()
     secrets_provider = EnvSecretsProvider()
     try:
-        models_manager.setup(secrets_provider=secrets_provider, gateway_model_specs=gateway_model_specs)
+        models_manager.setup(
+            secrets_provider=secrets_provider,
+            gateway_config=gateway_config,
+        )
         models_manager.validate_model_deck()
     except InferenceBackendLibraryError as exc:
         # Backend library error - try to identify which backend

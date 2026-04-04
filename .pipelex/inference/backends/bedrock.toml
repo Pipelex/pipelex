@@ -56,17 +56,16 @@ outputs = ["text"]
 # TODO: find out the actual cost per million tokens for nova on bedrock
 costs = { input = 3.0, output = 15.0 }
 
-# --- Claude LLMs --------------------------------------------------------------
-["claude-3.7-sonnet"]
-sdk = "bedrock_anthropic"
-model_id = "us.anthropic.claude-3-7-sonnet-20250219-v1:0"
-max_tokens = 8192
-inputs = ["text", "images", "pdf"]
+# --- DeepSeek Models ----------------------------------------------------------
+["deepseek-v3.1"]
+model_id = "deepseek.v3-v1:0"
+inputs = ["text"]
 outputs = ["text", "structured"]
-max_prompt_images = 100
-costs = { input = 3.0, output = 15.0 }
-thinking_mode = "manual"
+costs = { input = 0, output = 0 }
+structure_method = "instructor/json"
+max_tokens = 8192
 
+# --- Claude LLMs --------------------------------------------------------------
 [claude-4-sonnet]
 sdk = "bedrock_anthropic"
 model_id = "us.anthropic.claude-sonnet-4-20250514-v1:0"
