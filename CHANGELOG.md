@@ -1,5 +1,20 @@
 # Changelog
 
+## [v0.23.5] - 2026-04-04
+
+### Added
+
+- **Gateway config**: Introduced `GatewayConfig` to bundle gateway model specs with AWS region, propagating it through the backend library so bedrock backends use the correct region.
+- **Config coverage tests**: Integration tests that validate one model per Portkey config for each model type (LLM, image gen, extract, search), with `all_configs_gw` test profile and `make ticc` target.
+- **nano-banana-2 model**: Added `gemini-3.1-flash-image-preview` as `nano-banana-2` with updated Google image gen costs.
+- **DeepSeek models on bedrock**: Added DeepSeek models to the bedrock backend configuration.
+
+### Changed
+
+- **Image gen deck aliases**: Updated aliases to nano-banana model variants and removed `flux-2-pro`.
+- **Remote config**: Bumped to v08.
+- **Gateway model docs**: Regenerated, removing retired models (claude-3.7-sonnet, deepseek-v3.1, deepseek-v3.2-speciale, flux-2-pro).
+
 ## [v0.23.4] - 2026-04-02
 
 ### Changed
