@@ -1,0 +1,35 @@
+tests/integration/pipelex/cogt/config_coverage/test_cc_search.py
+  c3bc73cbe4cc214f 1-34
+tests/integration/pipelex/cogt/config_coverage/test_cc_img_gen.py
+  c3bc73cbe4cc214f 1-27
+tests/integration/pipelex/cogt/config_coverage/test_cc_llm.py
+  c3bc73cbe4cc214f 1-30
+tests/integration/pipelex/cogt/config_coverage/conftest.py
+  c3bc73cbe4cc214f 1-3,5-48
+Makefile
+  c3bc73cbe4cc214f 114,167,550-555
+tests/unit/pipelex/system/pipelex_service/test_remote_config.py
+  c3bc73cbe4cc214f 23,28,46
+tests/integration/pipelex/cogt/config_coverage/test_cc_extract.py
+  c3bc73cbe4cc214f 1-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "9225e9e66014882b004b213893fff8ba1c66696f",
+  "prompts": {
+    "c3bc73cbe4cc214f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a04d5de7-d6a7-455c-b76d-25ff5912712f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 186,
+      "total_deletions": 7,
+      "accepted_lines": 179,
+      "overriden_lines": 1
+    }
+  }
+}
