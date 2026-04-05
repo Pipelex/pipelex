@@ -21,6 +21,7 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import (
     update_inference_setup_completed,
     update_service_terms_acceptance,
 )
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
@@ -119,6 +120,18 @@ def _copy_inference_templates(target_dir: Path) -> None:
     template_routing_path = template_inference_dir / "routing_profiles.toml"
     if template_routing_path.exists():
         shutil.copy2(template_routing_path, target_inference_dir / "routing_profiles.toml")
+
+
+def _copy_telemetry_template(target_dir: Path) -> None:
+    """Copy the telemetry template (defaults to off) to the target directory.
+
+    Args:
+        target_dir: Target config directory (e.g. .pipelex/).
+    """
+    template_path = Path(str(get_kit_configs_dir())) / TELEMETRY_CONFIG_FILE_NAME
+    target_path = target_dir / TELEMETRY_CONFIG_FILE_NAME
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(template_path, target_path)
 
 
 def _configure_backends(
@@ -272,12 +285,11 @@ def agent_init_cmd(
             "-c",
             help=(
                 "Inline JSON string or path to a JSON file. "
-                'Schema: {"backends": list[str], "primary_backend": str, "accept_gateway_terms": bool, "telemetry_mode": str}. '
+                'Schema: {"backends": list[str], "primary_backend": str, "accept_gateway_terms": bool}. '
                 "All fields are optional. "
                 "backends: backend keys to enable (e.g. 'openai', 'anthropic', 'pipelex_gateway'). Omit to keep template defaults. "
                 "primary_backend: required only when 2+ backends are selected and pipelex_gateway is not among them. "
-                "accept_gateway_terms: true/false, required when pipelex_gateway is in backends. "
-                "telemetry_mode: 'off' (default), 'anonymous', or 'identified'."
+                "accept_gateway_terms: true/false, required when pipelex_gateway is in backends."
             ),
         ),
     ] = None,
@@ -304,15 +316,15 @@ def agent_init_cmd(
         {
             "backends": ["pipelex_gateway", "openai"],
             "accept_gateway_terms": true,
-            "primary_backend": "openai",
-            "telemetry_mode": "off"
+            "primary_backend": "openai"
         }
 
     - backends: list of backend keys to enable. Omit to keep all template defaults.
     - accept_gateway_terms: sets gateway terms acceptance (true/false).
     - primary_backend: required when 2+ backends are selected and pipelex_gateway
       is not among them. Auto-derived when only 1 backend or pipelex_gateway is present.
-    - telemetry_mode: "off", "anonymous", or "identified". Defaults to "off".
+
+    Telemetry is always initialized to "off" (can be changed manually in telemetry.toml).
     """
     try:
         # Parse config
@@ -326,6 +338,9 @@ def agent_init_cmd(
 
         # Step 1.5: Copy inference templates (init_config skips inference/)
         _copy_inference_templates(target_dir)
+
+        # Step 1.6: Copy telemetry template (defaults to off)
+        _copy_telemetry_template(target_dir)
 
         # Step 2: Configure backends
         template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
