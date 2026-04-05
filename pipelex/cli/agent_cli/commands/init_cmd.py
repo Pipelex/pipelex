@@ -264,44 +264,6 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     return "custom_routing"
 
 
-def _configure_telemetry(target_dir: Path, config: dict[str, Any]) -> str:
-    """Copy telemetry template to target directory and apply telemetry_mode if specified.
-
-    Args:
-        target_dir: Target config directory.
-        config: Parsed config dict with optional 'telemetry_mode' key.
-
-    Returns:
-        The telemetry mode that was set.
-    """
-    telemetry_config_path = target_dir / TELEMETRY_CONFIG_FILE_NAME
-    template_path = Path(str(get_kit_configs_dir() / TELEMETRY_CONFIG_FILE_NAME))
-
-    if not template_path.exists():
-        agent_error("Telemetry template not found in kit configs", "InitConfigError")
-
-    telemetry_config_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(template_path, telemetry_config_path)
-
-    # Apply telemetry_mode if specified
-    requested_mode: str | None = config.get("telemetry_mode")
-
-    if requested_mode is not None:
-        valid_modes = [mode.value for mode in PostHogMode]
-        if requested_mode not in valid_modes:
-            agent_error(
-                f"Invalid telemetry_mode: '{requested_mode}'. Valid values: {', '.join(valid_modes)}",
-                "ArgumentError",
-            )
-
-        toml_doc = load_toml_with_tomlkit(telemetry_config_path)
-        toml_doc["custom_posthog"]["mode"] = requested_mode  # type: ignore[index]
-        save_toml_to_path(toml_doc, telemetry_config_path)
-        return requested_mode
-
-    return PostHogMode.OFF.value
-
-
 def agent_init_cmd(
     config: Annotated[
         str | None,
@@ -373,10 +335,7 @@ def agent_init_cmd(
         # Step 3: Configure routing
         routing_profile = _configure_routing(backends_enabled, parsed_config, target_dir)
 
-        # Step 4: Configure telemetry
-        telemetry_mode = _configure_telemetry(target_dir, parsed_config)
-
-        # Step 5: Mark inference setup as completed
+        # Step 4: Mark inference setup as completed
         update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
 
         # Output result
@@ -387,7 +346,6 @@ def agent_init_cmd(
                 "config_files_copied": config_files_copied,
                 "backends_enabled": backends_enabled,
                 "routing_profile": routing_profile,
-                "telemetry_mode": telemetry_mode,
                 "inference_setup_completed": True,
             }
         )
