@@ -55,6 +55,7 @@ from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
+    InferenceSetupRequiredError,
 )
 from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
@@ -206,9 +207,18 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
                 # read-only operations like fetching model specs for validation.
                 # Also skip for CI mode — automated pipelines don't require human consent.
                 if needs_inference and integration_mode.requires_terms_acceptance:
-                    # Check if terms are accepted
                     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
-                    if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
+                    # First-run check: fires if inference has never been configured
+                    # AND terms were never accepted (terms_accepted=true means existing
+                    # user who already completed gateway setup before this flag existed).
+                    if pipelex_service_config is None or (
+                        not pipelex_service_config.onboarding.inference_setup_completed and not pipelex_service_config.agreement.terms_accepted
+                    ):
+                        raise InferenceSetupRequiredError
+                    # Gateway terms check: this block only runs when gateway is
+                    # enabled (is_pipelex_service_enabled guard above). BYOK users
+                    # who disabled gateway via init skip this entire block.
+                    if not pipelex_service_config.agreement.terms_accepted:
                         raise GatewayTermsNotAcceptedError
                 # Fetch remote configuration
                 remote_config = RemoteConfigFetcher.fetch_remote_config()

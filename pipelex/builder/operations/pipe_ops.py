@@ -127,7 +127,9 @@ def parse_pipe_spec(pipe_type: str, spec_data: dict[str, Any]) -> PipeSpec:
     # Handle {"type": "ConceptName"} and single-item dicts like {"result": "Text"}.
     if "output" in spec_data and isinstance(spec_data["output"], dict):
         output_dict: dict[str, Any] = spec_data["output"]
-        if "type" in output_dict:
+        if "concept_ref" in output_dict:
+            spec_data["output"] = output_dict["concept_ref"]
+        elif "type" in output_dict:
             spec_data["output"] = output_dict["type"]
         elif len(output_dict) == 1:
             spec_data["output"] = next(iter(output_dict.values()))
