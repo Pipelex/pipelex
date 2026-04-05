@@ -17,3 +17,4 @@ class RemoteConfig(BaseModel):
 
     posthog: PipelexPosthogConfig = Field(description="Posthog configuration")
     backend_model_specs: BackendModelSpecs = Field(description="Model specifications for Pipelex Gateway (model_name -> spec dict)")
+    aws_region: str = Field(description="AWS region")

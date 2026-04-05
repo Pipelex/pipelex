@@ -17,8 +17,11 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, PostHogMode
+from pipelex.system.pipelex_service.pipelex_service_agreement import (
+    update_inference_setup_completed,
+    update_service_terms_acceptance,
+)
+from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
@@ -119,6 +122,18 @@ def _copy_inference_templates(target_dir: Path) -> None:
         shutil.copy2(template_routing_path, target_inference_dir / "routing_profiles.toml")
 
 
+def _copy_telemetry_template(target_dir: Path) -> None:
+    """Copy the telemetry template (defaults to off) to the target directory.
+
+    Args:
+        target_dir: Target config directory (e.g. .pipelex/).
+    """
+    template_path = Path(str(get_kit_configs_dir())) / TELEMETRY_CONFIG_FILE_NAME
+    target_path = target_dir / TELEMETRY_CONFIG_FILE_NAME
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(template_path, target_path)
+
+
 def _configure_backends(
     config: dict[str, Any],
     backends_toml_path: str,
@@ -163,11 +178,12 @@ def _configure_backends(
     update_backends_in_toml(toml_doc, selected_indices, backend_options)
     save_toml_to_path(toml_doc, backends_toml_path)
 
-    # Handle pipelex_gateway terms acceptance
+    # Handle pipelex_gateway terms acceptance (only when explicitly provided)
     if PipelexBackend.GATEWAY in requested_backends:
-        accept_terms: bool = config.get("accept_gateway_terms", False)
-        config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
-        update_service_terms_acceptance(accepted=accept_terms, config_dir=config_manager.global_config_dir)
+        accept_terms = config.get("accept_gateway_terms")
+        if accept_terms is not None:
+            config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
+            update_service_terms_acceptance(accepted=accept_terms, config_dir=config_manager.global_config_dir)
 
     return requested_backends
 
@@ -261,44 +277,6 @@ def _configure_routing(selected_backend_keys: list[str], config: dict[str, Any],
     return "custom_routing"
 
 
-def _configure_telemetry(target_dir: Path, config: dict[str, Any]) -> str:
-    """Copy telemetry template to target directory and apply telemetry_mode if specified.
-
-    Args:
-        target_dir: Target config directory.
-        config: Parsed config dict with optional 'telemetry_mode' key.
-
-    Returns:
-        The telemetry mode that was set.
-    """
-    telemetry_config_path = target_dir / TELEMETRY_CONFIG_FILE_NAME
-    template_path = Path(str(get_kit_configs_dir() / TELEMETRY_CONFIG_FILE_NAME))
-
-    if not template_path.exists():
-        agent_error("Telemetry template not found in kit configs", "InitConfigError")
-
-    telemetry_config_path.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy(template_path, telemetry_config_path)
-
-    # Apply telemetry_mode if specified
-    requested_mode: str | None = config.get("telemetry_mode")
-
-    if requested_mode is not None:
-        valid_modes = [mode.value for mode in PostHogMode]
-        if requested_mode not in valid_modes:
-            agent_error(
-                f"Invalid telemetry_mode: '{requested_mode}'. Valid values: {', '.join(valid_modes)}",
-                "ArgumentError",
-            )
-
-        toml_doc = load_toml_with_tomlkit(telemetry_config_path)
-        toml_doc["custom_posthog"]["mode"] = requested_mode  # type: ignore[index]
-        save_toml_to_path(toml_doc, telemetry_config_path)
-        return requested_mode
-
-    return PostHogMode.OFF.value
-
-
 def agent_init_cmd(
     config: Annotated[
         str | None,
@@ -307,12 +285,11 @@ def agent_init_cmd(
             "-c",
             help=(
                 "Inline JSON string or path to a JSON file. "
-                'Schema: {"backends": list[str], "primary_backend": str, "accept_gateway_terms": bool, "telemetry_mode": str}. '
+                'Schema: {"backends": list[str], "primary_backend": str, "accept_gateway_terms": bool}. '
                 "All fields are optional. "
                 "backends: backend keys to enable (e.g. 'openai', 'anthropic', 'pipelex_gateway'). Omit to keep template defaults. "
                 "primary_backend: required only when 2+ backends are selected and pipelex_gateway is not among them. "
-                "accept_gateway_terms: true/false, required when pipelex_gateway is in backends. "
-                "telemetry_mode: 'off' (default), 'anonymous', or 'identified'."
+                "accept_gateway_terms: true/false, required when pipelex_gateway is in backends."
             ),
         ),
     ] = None,
@@ -339,15 +316,15 @@ def agent_init_cmd(
         {
             "backends": ["pipelex_gateway", "openai"],
             "accept_gateway_terms": true,
-            "primary_backend": "openai",
-            "telemetry_mode": "off"
+            "primary_backend": "openai"
         }
 
     - backends: list of backend keys to enable. Omit to keep all template defaults.
     - accept_gateway_terms: sets gateway terms acceptance (true/false).
     - primary_backend: required when 2+ backends are selected and pipelex_gateway
       is not among them. Auto-derived when only 1 backend or pipelex_gateway is present.
-    - telemetry_mode: "off", "anonymous", or "identified". Defaults to "off".
+
+    Telemetry is always initialized to "off" (can be changed manually in telemetry.toml).
     """
     try:
         # Parse config
@@ -362,6 +339,9 @@ def agent_init_cmd(
         # Step 1.5: Copy inference templates (init_config skips inference/)
         _copy_inference_templates(target_dir)
 
+        # Step 1.6: Copy telemetry template (defaults to off)
+        _copy_telemetry_template(target_dir)
+
         # Step 2: Configure backends
         template_backends_path = str(get_kit_configs_dir() / "inference" / "backends.toml")
         backends_toml_path = str(target_dir / "inference" / "backends.toml")
@@ -370,8 +350,8 @@ def agent_init_cmd(
         # Step 3: Configure routing
         routing_profile = _configure_routing(backends_enabled, parsed_config, target_dir)
 
-        # Step 4: Configure telemetry
-        telemetry_mode = _configure_telemetry(target_dir, parsed_config)
+        # Step 4: Mark inference setup as completed
+        update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
 
         # Output result
         agent_success(
@@ -381,7 +361,7 @@ def agent_init_cmd(
                 "config_files_copied": config_files_copied,
                 "backends_enabled": backends_enabled,
                 "routing_profile": routing_profile,
-                "telemetry_mode": telemetry_mode,
+                "inference_setup_completed": True,
             }
         )
 

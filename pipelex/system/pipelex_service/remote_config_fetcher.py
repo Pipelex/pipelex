@@ -75,6 +75,7 @@ class RemoteConfigFetcher:
                 is_debug_enabled=False,
             ),
             backend_model_specs={},
+            aws_region="us-east-1",
         )
 
     @classmethod

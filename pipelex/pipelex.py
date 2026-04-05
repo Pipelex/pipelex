@@ -28,6 +28,7 @@ from pipelex.cogt.inference.inference_manager import InferenceManager
 from pipelex.cogt.model_backends.backend_credentials import (
     BackendCredentialsErrorMsgFactory,
 )
+from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.models.model_manager import ModelManager
 from pipelex.cogt.models.model_manager_abstract import ModelManagerAbstract
 from pipelex.config import get_config
@@ -54,6 +55,7 @@ from pipelex.system.configuration.configs import PipelexConfig
 from pipelex.system.environment import get_pipelexpath_dirs
 from pipelex.system.pipelex_service.exceptions import (
     GatewayTermsNotAcceptedError,
+    InferenceSetupRequiredError,
 )
 from pipelex.system.pipelex_service.pipelex_service_config import (
     is_pipelex_gateway_enabled,
@@ -83,7 +85,6 @@ from pipelex.types import Self
 from pipelex.urls import URLs
 
 if TYPE_CHECKING:
-    from pipelex.cogt.model_backends.model_spec_factory import BackendModelSpecs
     from pipelex.system.pipelex_service.remote_config import RemoteConfig
 
 PACKAGE_NAME, PACKAGE_VERSION = get_package_info()
@@ -190,26 +191,43 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         effective_needs_model_specs = needs_model_specs if needs_model_specs is not None else needs_inference
 
         remote_config: RemoteConfig | None = None
-        gateway_model_specs: BackendModelSpecs | None = None
+        gateway_config: GatewayConfig | None = None
         if is_pipelex_service_enabled:
             if not effective_needs_model_specs:
                 # Use dummy config when inference is not needed (for testing without network access)
                 remote_config = RemoteConfigFetcher.make_dummy_remote_config()
                 gateway_model_specs = remote_config.backend_model_specs
+                gateway_config = GatewayConfig(
+                    model_specs=gateway_model_specs,
+                    aws_region=remote_config.aws_region,
+                )
                 log.verbose("Using dummy remote config (inference not needed)")
             else:
                 # Terms acceptance is only required for actual inference usage, not for
                 # read-only operations like fetching model specs for validation.
                 # Also skip for CI mode — automated pipelines don't require human consent.
                 if needs_inference and integration_mode.requires_terms_acceptance:
-                    # Check if terms are accepted
                     pipelex_service_config = load_pipelex_service_config_if_exists(config_dir=config_manager.global_config_dir)
-                    if pipelex_service_config is None or not pipelex_service_config.agreement.terms_accepted:
+                    # First-run check: fires if inference has never been configured
+                    # AND terms were never accepted (terms_accepted=true means existing
+                    # user who already completed gateway setup before this flag existed).
+                    if pipelex_service_config is None or (
+                        not pipelex_service_config.onboarding.inference_setup_completed and not pipelex_service_config.agreement.terms_accepted
+                    ):
+                        raise InferenceSetupRequiredError
+                    # Gateway terms check: this block only runs when gateway is
+                    # enabled (is_pipelex_service_enabled guard above). BYOK users
+                    # who disabled gateway via init skip this entire block.
+                    if not pipelex_service_config.agreement.terms_accepted:
                         raise GatewayTermsNotAcceptedError
                 # Fetch remote configuration
                 remote_config = RemoteConfigFetcher.fetch_remote_config()
                 log.verbose("Successfully fetched Pipelex Gateway remote configuration")
                 gateway_model_specs = remote_config.backend_model_specs
+                gateway_config = GatewayConfig(
+                    model_specs=gateway_model_specs,
+                    aws_region=remote_config.aws_region,
+                )
 
         # Disable Pipelex telemetry when inference is not needed (no remote config available)
         is_pipelex_telemetry_enabled = is_pipelex_service_enabled and needs_inference
@@ -272,7 +290,7 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
         try:
             self.models_manager.setup(
                 secrets_provider=secrets_provider,
-                gateway_model_specs=gateway_model_specs,
+                gateway_config=gateway_config,
                 needs_inference=needs_inference,
             )
         except RoutingProfileLibraryNotFoundError as routing_not_found_exc:

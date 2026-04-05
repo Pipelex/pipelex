@@ -220,7 +220,7 @@ fal = [
 openai = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"]
 
 # --- Google Models ---
-google = ["nano-banana", "nano-banana-pro"]
+google = ["nano-banana", "nano-banana-pro", "nano-banana-2"]
 
 # --- Qwen Models ---
 qwen = ["qwen-image"]
@@ -337,3 +337,30 @@ search_models = ["@linkup"]
 [profiles.full]
 description = "All available models"
 include_all = true
+
+################################################################################
+# All Configs GW Profile - One model per Portkey config and model type
+################################################################################
+[profiles.all_configs_gw]
+description = "One model per Portkey config (auto-generated)"
+backends = ["pipelex_gateway"]
+llm_models = [
+  "gpt-4o-mini",
+  "gpt-oss-20b",
+  "claude-4-sonnet",
+  "deepseek-v3.2",
+  "gemini-2.5-pro",
+  "grok-3",
+]
+img_gen_models = [
+  "nano-banana-2",
+  "gpt-image-1",
+  "nano-banana",
+]
+extract_models = [
+  "azure-document-intelligence",
+  "deepseek-ocr",
+]
+search_models = [
+  "linkup-standard",
+]

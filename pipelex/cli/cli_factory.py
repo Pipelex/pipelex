@@ -7,6 +7,7 @@ from pipelex.cli.error_handlers import (
     handle_gateway_api_key_missing_error,
     handle_gateway_do_not_track_conflict_error,
     handle_gateway_terms_not_accepted_error,
+    handle_inference_setup_required_error,
     handle_model_deck_preset_error,
     handle_remote_config_fetch_error,
     handle_remote_config_validation_error,
@@ -18,6 +19,7 @@ from pipelex.system.pipelex_service.exceptions import (
     GatewayApiKeyMissingError,
     GatewayDoNotTrackConflictError,
     GatewayTermsNotAcceptedError,
+    InferenceSetupRequiredError,
     RemoteConfigFetchError,
     RemoteConfigValidationError,
 )
@@ -52,6 +54,8 @@ def make_pipelex_for_cli(
         return Pipelex.make(
             integration_mode=IntegrationMode.CLI, library_dirs=library_dirs, needs_inference=needs_inference, needs_model_specs=needs_model_specs
         )
+    except InferenceSetupRequiredError as exc:
+        handle_inference_setup_required_error(exc)
     except TelemetryConfigValidationError as exc:
         handle_telemetry_config_validation_error(exc)
     except GatewayTermsNotAcceptedError as exc:

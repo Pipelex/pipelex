@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from pydantic import Field
+from tomlkit import table as tomlkit_table
 
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
@@ -15,6 +16,13 @@ class PipelexServiceAgreement(ConfigModel):
     terms_accepted: bool = Field(
         default=False,
         description="Whether the user has accepted Pipelex terms of service",
+    )
+
+
+class PipelexServiceOnboarding(ConfigModel):
+    inference_setup_completed: bool = Field(
+        default=False,
+        description="Whether the user has completed inference setup (gateway or BYOK)",
     )
 
 
@@ -37,6 +45,33 @@ def update_service_terms_acceptance(accepted: bool, config_dir: Path | None = No
 
     # Update terms_accepted
     toml_doc["agreement"]["terms_accepted"] = accepted  # type: ignore[index]
+
+    resolved_config_dir.mkdir(parents=True, exist_ok=True)
+    save_toml_to_path(toml_doc, service_config_path)
+
+
+def update_inference_setup_completed(completed: bool, config_dir: Path | None = None) -> None:
+    """Update the inference setup completed flag in pipelex_service.toml.
+
+    Args:
+        completed: Whether inference setup has been completed.
+        config_dir: Explicit config directory path. If None, uses config_manager.global_config_dir.
+    """
+    resolved_config_dir = config_dir or config_manager.global_config_dir
+    service_config_path = resolved_config_dir / PIPELEX_SERVICE_CONFIG_FILE_NAME
+
+    if path_exists(service_config_path):
+        toml_doc = load_toml_with_tomlkit(service_config_path)
+    else:
+        # Load from the kit template
+        template_path = str(get_kit_configs_dir() / PIPELEX_SERVICE_CONFIG_FILE_NAME)
+        toml_doc = load_toml_with_tomlkit(template_path)
+
+    # Ensure [onboarding] section exists
+    if "onboarding" not in toml_doc:
+        toml_doc["onboarding"] = tomlkit_table()
+
+    toml_doc["onboarding"]["inference_setup_completed"] = completed  # type: ignore[index]
 
     resolved_config_dir.mkdir(parents=True, exist_ok=True)
     save_toml_to_path(toml_doc, service_config_path)

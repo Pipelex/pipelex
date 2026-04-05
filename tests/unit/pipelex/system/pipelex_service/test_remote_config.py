@@ -20,10 +20,12 @@ class TestRemoteConfig:
                 "is_geoip_enabled": True,
                 "is_debug_enabled": False,
             },
+            "aws_region": "us-east-1",
         }
         config = RemoteConfig.model_validate(payload)
         assert "defaults" in config.backend_model_specs
         assert "gpt-4o" in config.backend_model_specs
+        assert config.aws_region == "us-east-1"
 
     def test_remote_config_missing_backend_fails(self) -> None:
         """Test that missing backend key raises validation error."""
@@ -41,6 +43,7 @@ class TestRemoteConfig:
                 "is_geoip_enabled": True,
                 "is_debug_enabled": False,
             },
+            "aws_region": "us-east-1",
         }
         config = RemoteConfig.model_validate(payload)
         assert config.backend_model_specs == {}
