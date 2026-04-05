@@ -3,6 +3,7 @@
 from pipelex.base_exceptions import PipelexConfigError
 from pipelex.hub import get_event_log
 from pipelex.system.configuration.configs import TracingBackend, TracingConfig
+from pipelex.tracing.buffering_event_log import BufferingEventLog
 from pipelex.tracing.dynamodb_event_log import DynamoDBEventLog
 from pipelex.tracing.event_log_protocol import EventLogProtocol
 from pipelex.tracing.ndjson_event_log import NdjsonEventLog
@@ -33,3 +34,8 @@ def make_event_log(tracing_config: TracingConfig) -> EventLogProtocol:
                 table_name=tracing_config.dynamodb.table_name,
                 region=tracing_config.dynamodb.region,
             )
+        case TracingBackend.TEMPORAL_DYNAMODB:
+            if tracing_config.temporal_dynamodb is None:
+                msg = "temporal_dynamodb config is required when backend is 'temporal_dynamodb'"
+                raise PipelexConfigError(msg)
+            return BufferingEventLog()

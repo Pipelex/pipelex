@@ -36,6 +36,10 @@ class DynamoDBEventLog(EventLogProtocol):
     provides natural deduplication for Temporal replay re-emissions.
     Read path: Query on PK, returns events sorted by SK which encodes
     (workflow_id, sequence) — matching the NDJSON ordering contract.
+
+    WARNING: Do not call emit() from inside a Temporal workflow body — the
+    synchronous boto3 HTTP call will block the workflow thread and trigger
+    the deadlock detector. Use BufferingEventLog + act_flush_trace_events instead.
     """
 
     def __init__(self, table_name: str, region: str) -> None:
@@ -64,12 +68,7 @@ class DynamoDBEventLog(EventLogProtocol):
 
     @override
     def emit(self, event: TraceEvent) -> None:
-        """Write a single event to DynamoDB. Synchronous and idempotent.
-
-        The payload is stored as a JSON string (not a DynamoDB map) to avoid
-        type conversion issues with large integers (e.g. OTel trace IDs) and
-        datetime objects.
-        """
+        """Write a single event to DynamoDB. Synchronous and idempotent."""
         item: dict[str, Any] = {
             "PK": self._make_pk(event.pipeline_run_id),
             "SK": self._make_sk(event.workflow_id, event.sequence),
@@ -82,12 +81,7 @@ class DynamoDBEventLog(EventLogProtocol):
 
     @override
     def read_events(self, pipeline_run_id: str) -> list[TraceEvent]:
-        """Read all events for a pipeline run from DynamoDB.
-
-        Query returns items sorted by SK (ScanIndexForward=True), which is
-        EVENT#{workflow_id}#{sequence:010d} — lexicographic sort matches the
-        (workflow_id, sequence) ordering contract.
-        """
+        """Read all events for a pipeline run from DynamoDB."""
         items: list[dict[str, Any]] = []
 
         response = self._table.query(

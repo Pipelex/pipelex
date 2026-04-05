@@ -50,9 +50,14 @@ def model_class_from_json_schema(schema: dict[str, Any], class_name: str) -> typ
 
 
 def _normalize_class_name(title: str) -> str:
-    """Convert a schema title to a PascalCase class name (matching datamodel-code-generator behavior)."""
-    classname = re.sub(r"[^A-Za-z0-9]+", " ", title)
-    return "".join(part for part in classname.title() if not part.isspace())
+    """Convert a schema title to a PascalCase class name (matching datamodel-code-generator behavior).
+
+    Splits on non-alphanumeric sequences, capitalizes the first char of each segment,
+    and preserves existing capitalization within segments (unlike str.title() which
+    lowercases everything after the first char).
+    """
+    segments = re.split(r"[^A-Za-z0-9]+", title)
+    return "".join(segment[0].upper() + segment[1:] if segment else "" for segment in segments)
 
 
 def _generate_source_from_schema(schema: dict[str, Any]) -> str:

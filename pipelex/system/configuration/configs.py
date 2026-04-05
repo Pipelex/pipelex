@@ -88,6 +88,7 @@ class ReportingConfig(ConfigModel):
 class TracingBackend(StrEnum):
     NDJSON = "ndjson"
     DYNAMODB = "dynamodb"
+    TEMPORAL_DYNAMODB = "temporal_dynamodb"
 
 
 class NdjsonTracingConfig(ConfigModel):
@@ -99,11 +100,17 @@ class DynamoDBTracingConfig(ConfigModel):
     region: str
 
 
+class TemporalDynamoDBTracingConfig(ConfigModel):
+    table_name: str
+    region: str
+
+
 class TracingConfig(ConfigModel):
     is_enabled: bool
     backend: TracingBackend = Field(strict=False)
     ndjson: NdjsonTracingConfig | None = None
     dynamodb: DynamoDBTracingConfig | None = None
+    temporal_dynamodb: TemporalDynamoDBTracingConfig | None = None
 
 
 class ObserverConfig(ConfigModel):

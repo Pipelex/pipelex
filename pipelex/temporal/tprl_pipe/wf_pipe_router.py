@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from temporalio import workflow
+from temporalio.common import RetryPolicy
 from temporalio.exceptions import ActivityError, ApplicationError
 from typing_extensions import override
 
@@ -15,7 +18,9 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.temporal_error import TemporalError
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
+    from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
     from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
+    from pipelex.tracing.buffering_event_log import BufferingEventLog
     from pipelex.tracing.event_log_factory import make_event_log
 
 
@@ -149,7 +154,7 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                 raise TemporalError.from_app_error(exc=exc.cause) from exc
             raise
         finally:
-            # Close per-workflow graph tracer (flushes events to NDJSON)
+            # Close per-workflow graph tracer (collects in-memory graph spec)
             if wf_graph_tracer_manager is not None and wf_tracer_key is not None:
                 try:
                     graph_spec = wf_graph_tracer_manager.close_tracer(wf_tracer_key)
@@ -157,13 +162,29 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
                         pipe_output.graph_spec = graph_spec
                 except Exception as tracer_exc:
                     workflow_log.warning(f"Failed to close per-workflow tracer: {tracer_exc}")
+
+            # Flush trace events and clean up event log
             if event_log is not None:
+                # For buffering backends (temporal_dynamodb), flush via activity
+                if isinstance(event_log, BufferingEventLog):
+                    buffered_events = event_log.drain()
+                    if buffered_events:
+                        try:
+                            await workflow.execute_activity(
+                                act_flush_trace_events,
+                                arg=FlushTraceEventsArg(events=buffered_events),
+                                start_to_close_timeout=timedelta(seconds=30),
+                                retry_policy=RetryPolicy(maximum_attempts=3),
+                            )
+                        except Exception as flush_exc:
+                            workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
+
                 try:
                     event_log.close()
                 except Exception:  # noqa: S110
                     pass
+
                 # Clear stale event log state from ReportingManager
-                # wf_tracer_key is always set when event_log is not None (both assigned in same block)
                 if wf_tracer_key is not None:
                     report_delegate = get_report_delegate()
                     if isinstance(report_delegate, ReportingManager):

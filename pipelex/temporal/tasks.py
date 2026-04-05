@@ -13,6 +13,7 @@ from pipelex.temporal.tprl_content_generation.wf_make_llm_text import WfMakeLLMT
 from pipelex.temporal.tprl_content_generation.wf_make_object import WfMakeObject, WfMakeObjectList, WfMakeTextThenObject, WfMakeTextThenObjectList
 from pipelex.temporal.tprl_content_generation.wf_render_page_views import WfRenderPageViews
 from pipelex.temporal.tprl_pipe.act_deliver import act_deliver
+from pipelex.temporal.tprl_pipe.act_flush_trace_events import act_flush_trace_events
 from pipelex.temporal.tprl_pipe.wf_pipe_router import WfPipeRouter
 from pipelex.temporal.tprl_pipe.wf_pipe_run import WfPipeRun
 from pipelex.types import StrEnum
@@ -54,6 +55,7 @@ class Tasks:
             ],
             activity_list=[
                 act_deliver,
+                act_flush_trace_events,
             ],
         ),
     }
