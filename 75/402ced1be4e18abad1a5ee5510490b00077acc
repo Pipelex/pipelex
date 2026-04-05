@@ -1,0 +1,23 @@
+.badges/tests.json
+  4a08d55d26943353 4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "75402ced1be4e18abad1a5ee5510490b00077acc",
+  "prompts": {
+    "4a08d55d26943353": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "3064cb5e-6c6e-48ce-b073-5b9b35725661",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 2,
+      "total_deletions": 2,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
