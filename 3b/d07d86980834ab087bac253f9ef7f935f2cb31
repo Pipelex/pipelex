@@ -1,0 +1,23 @@
+pipelex/cli/agent_cli/commands/init_cmd.py
+  b0adb6beaea7edd6 24,125-136,288,292,319,326-327,342-344
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "3bd07d86980834ab087bac253f9ef7f935f2cb31",
+  "prompts": {
+    "b0adb6beaea7edd6": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "9240ea31-f4d6-4f98-a613-5218d672edfd",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 21,
+      "total_deletions": 6,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    }
+  }
+}
