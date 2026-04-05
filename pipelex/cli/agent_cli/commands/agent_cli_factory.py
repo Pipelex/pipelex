@@ -35,6 +35,10 @@ def make_pipelex_for_agent_cli(
     exceptions but routes them through ``agent_error()`` so the output
     is always machine-parseable JSON on stderr.
 
+    One intentional exception: ``InferenceSetupRequiredError`` prints
+    human-readable markdown to stdout and exits 0, so the calling agent
+    can display setup guidance directly.
+
     Args:
         library_dirs: Optional library directories to use for the Pipelex instance.
         log_level: Log verbosity level (default WARNING for silent agent output).
@@ -45,7 +49,8 @@ def make_pipelex_for_agent_cli(
         Initialized Pipelex instance.
 
     Raises:
-        typer.Exit: If initialization fails (after printing JSON error to stderr).
+        typer.Exit: If initialization fails (after printing JSON error to stderr),
+            or if inference setup is required (after printing markdown to stdout).
     """
     try:
         pipelex_instance = Pipelex.make(
