@@ -348,13 +348,12 @@ llm_models = [
   "gpt-4o-mini",
   "gpt-oss-20b",
   "claude-4-sonnet",
-  "deepseek-v3.1",
   "deepseek-v3.2",
   "gemini-2.5-pro",
   "grok-3",
 ]
 img_gen_models = [
-  "flux-2-pro",
+  "nano-banana-2",
   "gpt-image-1",
   "nano-banana",
 ]
