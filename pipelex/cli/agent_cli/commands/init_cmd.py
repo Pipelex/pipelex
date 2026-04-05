@@ -21,7 +21,6 @@ from pipelex.system.pipelex_service.pipelex_service_agreement import (
     update_inference_setup_completed,
     update_service_terms_acceptance,
 )
-from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, PostHogMode
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
 
@@ -166,11 +165,12 @@ def _configure_backends(
     update_backends_in_toml(toml_doc, selected_indices, backend_options)
     save_toml_to_path(toml_doc, backends_toml_path)
 
-    # Handle pipelex_gateway terms acceptance
+    # Handle pipelex_gateway terms acceptance (only when explicitly provided)
     if PipelexBackend.GATEWAY in requested_backends:
-        accept_terms: bool = config.get("accept_gateway_terms", False)
-        config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
-        update_service_terms_acceptance(accepted=accept_terms, config_dir=config_manager.global_config_dir)
+        accept_terms = config.get("accept_gateway_terms")
+        if accept_terms is not None:
+            config_manager.global_config_dir.mkdir(parents=True, exist_ok=True)
+            update_service_terms_acceptance(accepted=accept_terms, config_dir=config_manager.global_config_dir)
 
     return requested_backends
 
