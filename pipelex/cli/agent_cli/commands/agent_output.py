@@ -43,6 +43,9 @@ AGENT_ERROR_HINTS: dict[str, str] = {
     "MthdsDecodeError": "The MTHDS file has TOML syntax errors; validate TOML syntax before retrying",
     # Configuration/initialization errors
     "TelemetryConfigValidationError": "Run 'pipelex init telemetry' to create a valid telemetry configuration",
+    "InferenceSetupRequiredError": (
+        "First-time inference setup required. Use /mthds-runner-setup for guided setup, or run 'pipelex-agent init' with backend configuration."
+    ),
     "GatewayTermsNotAcceptedError": "Run 'pipelex init config' to accept gateway terms, or disable pipelex_gateway in backends.toml",
     "GatewayApiKeyMissingError": "Set the PIPELEX_GATEWAY_API_KEY environment variable, or disable pipelex_gateway in backends.toml",
     "GatewayDoNotTrackConflictError": "Unset the DO_NOT_TRACK environment variable, or disable pipelex_gateway in backends.toml",
@@ -95,6 +98,7 @@ AGENT_ERROR_DOMAINS: dict[str, str] = {
     "PipeOperatorModelAvailabilityError": "config",
     "ModelDeckPresetValidatonError": "config",
     "TelemetryConfigValidationError": "config",
+    "InferenceSetupRequiredError": "onboarding",
     "GatewayTermsNotAcceptedError": "config",
     "GatewayApiKeyMissingError": "config",
     "GatewayDoNotTrackConflictError": "config",

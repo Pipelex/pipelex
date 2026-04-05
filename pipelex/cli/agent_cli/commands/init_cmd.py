@@ -17,7 +17,10 @@ from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.cogt.model_routing.routing_profile import PipelexRoutingProfile
 from pipelex.kit.paths import get_kit_configs_dir
 from pipelex.system.configuration.config_loader import config_manager
-from pipelex.system.pipelex_service.pipelex_service_agreement import update_service_terms_acceptance
+from pipelex.system.pipelex_service.pipelex_service_agreement import (
+    update_inference_setup_completed,
+    update_service_terms_acceptance,
+)
 from pipelex.system.telemetry.telemetry_config import TELEMETRY_CONFIG_FILE_NAME, PostHogMode
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_with_tomlkit, save_toml_to_path
@@ -373,6 +376,9 @@ def agent_init_cmd(
         # Step 4: Configure telemetry
         telemetry_mode = _configure_telemetry(target_dir, parsed_config)
 
+        # Step 5: Mark inference setup as completed
+        update_inference_setup_completed(completed=True, config_dir=config_manager.global_config_dir)
+
         # Output result
         agent_success(
             {
@@ -382,6 +388,7 @@ def agent_init_cmd(
                 "backends_enabled": backends_enabled,
                 "routing_profile": routing_profile,
                 "telemetry_mode": telemetry_mode,
+                "inference_setup_completed": True,
             }
         )
 
