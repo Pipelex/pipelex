@@ -1,12 +1,27 @@
 from typing import TYPE_CHECKING, Any
 
-from anthropic import APIConnectionError, AsyncAnthropic, AsyncAnthropicBedrock, AuthenticationError, BadRequestError, omit
+from anthropic import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncAnthropic,
+    AsyncAnthropicBedrock,
+    AuthenticationError,
+    BadRequestError,
+    PermissionDeniedError,
+    RateLimitError,
+    omit,
+)
 from anthropic.types import OutputConfigParam, ThinkingConfigParam
 from pydantic.dataclasses import dataclass as pydantic_dataclass
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.inference.error_classification import (
+    ANTHROPIC_BILLING_URL,
+    is_content_policy_violation,
+    is_quota_exhaustion_anthropic,
+)
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams, ReasoningEffort
 from pipelex.cogt.llm.llm_utils import (
@@ -19,6 +34,7 @@ from pipelex.cogt.llm.thinking_mode import ThinkingMode
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.config import get_config
 from pipelex.plugins.anthropic.anthropic_exceptions import (
+    AnthropicCredentialsError,
     AnthropicWorkerConfigurationError,
 )
 from pipelex.plugins.anthropic.anthropic_factory import (
@@ -26,7 +42,6 @@ from pipelex.plugins.anthropic.anthropic_factory import (
     AnthropicSdkVariant,
 )
 from pipelex.reporting.reporting_protocol import ReportingProtocol
-from pipelex.system.exceptions import CredentialsError
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 if TYPE_CHECKING:
@@ -40,10 +55,6 @@ class _ThinkingParams:
     thinking: ThinkingConfigParam | None
     output_config: OutputConfigParam | None
     suppress_temperature: bool
-
-
-class AnthropicCredentialsError(CredentialsError):
-    pass
 
 
 class AnthropicLLMWorker(LLMWorkerInternalAbstract):
@@ -231,12 +242,49 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 output_config=thinking_params.output_config or omit,
             ) as stream:
                 final_message: Message = await stream.get_final_message()
+        except RateLimitError as rate_limit_error:
+            error_message = str(rate_limit_error)
+            if is_quota_exhaustion_anthropic(error_message):
+                msg = f"Anthropic quota exhausted for model '{self.inference_model.desc}': {rate_limit_error}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CAPACITY,
+                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {ANTHROPIC_BILLING_URL}",
+                ) from rate_limit_error
+            msg = f"Anthropic rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action="Rate limited by Anthropic — the system will retry automatically",
+            ) from rate_limit_error
+        except APITimeoutError as timeout_error:
+            msg = f"Anthropic API request timed out for model '{self.inference_model.desc}': {timeout_error}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from timeout_error
         except BadRequestError as exc:
+            error_message = str(exc)
+            if is_content_policy_violation(error_message):
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {exc}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action="Content was rejected by safety filters — revise the prompt",
+                ) from exc
             msg = f"Anthropic bad request error: {exc}"
-            raise LLMCompletionError(msg) from exc
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
         except APIConnectionError as exc:
             msg = f"Anthropic API connection error: {exc}"
-            raise LLMCompletionError(msg) from exc
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+        except PermissionDeniedError as permission_error:
+            error_message = str(permission_error)
+            if is_quota_exhaustion_anthropic(error_message):
+                msg = f"Anthropic quota exhausted: {permission_error}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CAPACITY,
+                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {ANTHROPIC_BILLING_URL}",
+                ) from permission_error
+            msg = f"Anthropic permission denied: {permission_error}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from permission_error
         except AuthenticationError as exc:
             msg = f"Anthropic credentials error: {exc}"
             raise AnthropicCredentialsError(msg) from exc
@@ -294,22 +342,68 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
         requested_max_tokens = job_params.max_tokens or self.default_max_tokens
         effective_max_tokens = min(requested_max_tokens, safe_max_tokens)
 
+        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+
         try:
-            result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-                messages=messages,
-                response_model=schema,
-                max_retries=llm_job.job_config.max_retries,
-                model=self.inference_model.model_id,
-                temperature=job_params.temperature,
-                max_tokens=effective_max_tokens,
-                timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
-            )
+            try:
+                result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+                    messages=messages,
+                    response_model=schema,
+                    max_retries=llm_job.job_config.max_retries,
+                    model=self.inference_model.model_id,
+                    temperature=job_params.temperature,
+                    max_tokens=effective_max_tokens,
+                    timeout=float(timeout_seconds),  # Explicit timeout disables SDK's long-request protection
+                )
+            except InstructorRetryException as exc:
+                msg = (
+                    f"Anthropic structured generation via 'instructor' failed with model: {self.inference_model.desc} "
+                    f"trying to generate schema: {schema} with error: {exc}"
+                )
+                raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+        except RateLimitError as rate_limit_error:
+            error_message = str(rate_limit_error)
+            if is_quota_exhaustion_anthropic(error_message):
+                msg = f"Anthropic quota exhausted for model '{self.inference_model.desc}': {rate_limit_error}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CAPACITY,
+                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {ANTHROPIC_BILLING_URL}",
+                ) from rate_limit_error
+            msg = f"Anthropic rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action="Rate limited by Anthropic — the system will retry automatically",
+            ) from rate_limit_error
+        except APITimeoutError as timeout_error:
+            msg = f"Anthropic API request timed out for model '{self.inference_model.desc}': {timeout_error}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from timeout_error
         except BadRequestError as exc:
+            error_message = str(exc)
+            if is_content_policy_violation(error_message):
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {exc}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action="Content was rejected by safety filters — revise the prompt",
+                ) from exc
             msg = f"Anthropic bad request error: {exc}"
-            raise LLMCompletionError(msg) from exc
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
         except APIConnectionError as exc:
             msg = f"Anthropic API connection error: {exc}"
-            raise LLMCompletionError(msg) from exc
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+        except PermissionDeniedError as permission_error:
+            error_message = str(permission_error)
+            if is_quota_exhaustion_anthropic(error_message):
+                msg = f"Anthropic quota exhausted: {permission_error}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CAPACITY,
+                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {ANTHROPIC_BILLING_URL}",
+                ) from permission_error
+            msg = f"Anthropic permission denied: {permission_error}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from permission_error
         except AuthenticationError as exc:
             msg = f"Anthropic credentials error: {exc}"
             raise AnthropicCredentialsError(msg) from exc

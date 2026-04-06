@@ -3,12 +3,17 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
-from openai import NOT_GIVEN, APIConnectionError, AuthenticationError, BadRequestError, NotFoundError, omit
+from openai import NOT_GIVEN, APIConnectionError, APITimeoutError, AuthenticationError, BadRequestError, NotFoundError, RateLimitError, omit
 from openai.types.shared_params import Reasoning
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, LLMModelNotFoundError, SdkTypeError
+from pipelex.cogt.inference.error_classification import (
+    OPENAI_BILLING_URL,
+    is_content_policy_violation,
+    is_quota_exhaustion_openai,
+)
 from pipelex.cogt.llm.llm_utils import dump_error, dump_kwargs, dump_response_from_structured_gen
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
 from pipelex.cogt.llm.thinking_mode import ThinkingMode
@@ -142,15 +147,41 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
                 f"OpenAI Responses model or deployment not found:\n{self.inference_model.desc}\nmodel: {self.inference_model.desc}\n{not_found_error}"
             )
             raise LLMModelNotFoundError(message=msg, model_handle=self.inference_model.name) from not_found_error
+        except RateLimitError as rate_limit_error:
+            error_message = str(rate_limit_error)
+            if is_quota_exhaustion_openai(error_message):
+                msg = f"OpenAI quota exhausted for model '{self.inference_model.desc}': {rate_limit_error}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CAPACITY,
+                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {OPENAI_BILLING_URL}",
+                ) from rate_limit_error
+            msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action="Rate limited by OpenAI — the system will retry automatically",
+            ) from rate_limit_error
+        except APITimeoutError as timeout_error:
+            msg = f"OpenAI API request timed out for model '{self.inference_model.desc}': {timeout_error}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from timeout_error
         except APIConnectionError as api_connection_error:
             msg = f"OpenAI API connection error: {api_connection_error}"
-            raise LLMCompletionError(msg) from api_connection_error
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from api_connection_error
         except BadRequestError as bad_request_error:
+            error_message = str(bad_request_error)
+            if is_content_policy_violation(error_message):
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {bad_request_error}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action="Content was rejected by safety filters — revise the prompt",
+                ) from bad_request_error
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
-            raise LLMCompletionError(msg) from bad_request_error
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from bad_request_error
         except AuthenticationError as authentication_error:
             msg = f"Authentication error: {authentication_error}"
-            raise LLMCompletionError(msg) from authentication_error
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from authentication_error
 
         if not response.output_text:
             msg = f"OpenAI Responses message content is empty: {response}\nmodel: {self.inference_model.desc}"
@@ -191,16 +222,45 @@ class OpenAIResponsesLLMWorker(LLMWorkerInternalAbstract):
             )  # type: ignore[arg-type,misc]
         except InstructorRetryException as exc:
             msg = f"OpenAI instructor failed with model: {self.inference_model.desc} trying to generate schema: {schema} with error: {exc}"
-            raise LLMCompletionError(msg) from exc
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
         except NotFoundError as exc:
             msg = f"OpenAI Responses model or deployment '{self.inference_model.model_id}' not found: {exc}"
-            raise LLMCompletionError(msg) from exc
+            raise LLMModelNotFoundError(message=msg, model_handle=self.inference_model.name) from exc
+        except RateLimitError as rate_limit_error:
+            error_message = str(rate_limit_error)
+            if is_quota_exhaustion_openai(error_message):
+                msg = f"OpenAI quota exhausted for model '{self.inference_model.desc}': {rate_limit_error}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CAPACITY,
+                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {OPENAI_BILLING_URL}",
+                ) from rate_limit_error
+            msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
+            raise LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action="Rate limited by OpenAI — the system will retry automatically",
+            ) from rate_limit_error
+        except APITimeoutError as timeout_error:
+            msg = f"OpenAI API request timed out for model '{self.inference_model.desc}': {timeout_error}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from timeout_error
+        except APIConnectionError as api_connection_error:
+            msg = f"OpenAI API connection error: {api_connection_error}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT) from api_connection_error
         except BadRequestError as bad_request_error:
+            error_message = str(bad_request_error)
+            if is_content_policy_violation(error_message):
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {bad_request_error}"
+                raise LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action="Content was rejected by safety filters — revise the prompt",
+                ) from bad_request_error
             msg = f"OpenAI bad request error with model: {self.inference_model.desc}:\n{bad_request_error}"
-            raise LLMCompletionError(msg) from bad_request_error
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from bad_request_error
         except AuthenticationError as authentication_error:
             msg = f"Authentication error: {authentication_error}"
-            raise LLMCompletionError(msg) from authentication_error
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from authentication_error
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and hasattr(completion, "usage"):
             completion_usage = completion.usage

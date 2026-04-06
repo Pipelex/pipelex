@@ -81,37 +81,37 @@ Every phase is done when **all** of the following are true:
 
 > These are already Tier 1/2, add the missing pieces.
 
-- [ ] **2.1** Add `RateLimitError` handling to all OpenAI workers
+- [x] **2.1** Add `RateLimitError` handling to all OpenAI workers
   - `openai_completions_llm_worker.py`, `openai_responses_llm_worker.py`, `openai_img_gen_worker.py`, `openai_completions_img_gen_worker.py`
   - Catch `RateLimitError` → `LLMCompletionError` / `ImgGenGenerationError` with `error_category=TRANSIENT`
   - `user_action`: "Rate limited by OpenAI — the system will retry automatically"
 
-- [ ] **2.2** Add `APITimeoutError` handling to all OpenAI workers
+- [x] **2.2** Add `APITimeoutError` handling to all OpenAI workers
   - Same files as 3.1
   - Catch `APITimeoutError` → domain error with `error_category=TRANSIENT`
 
-- [ ] **2.3** Add `AuthenticationError` to `openai_completions_img_gen_worker.py` (currently missing)
+- [x] **2.3** Add `AuthenticationError` to `openai_completions_img_gen_worker.py` (currently missing)
   - With `error_category=CONFIGURATION`
 
-- [ ] **2.4** Add SDK exception handling to `openai_img_gen_worker.py`
+- [x] **2.4** Add SDK exception handling to `openai_img_gen_worker.py`
   - Currently has no try/except — add full pattern matching other OpenAI workers
 
-- [ ] **2.5** Add `RateLimitError` and `APITimeoutError` to `anthropic_llm_worker.py`
+- [x] **2.5** Add `RateLimitError` and `APITimeoutError` to `anthropic_llm_worker.py`
   - Same pattern as OpenAI
 
-- [ ] **2.6** Set `error_category` on all existing exception raises in OpenAI/Anthropic workers
+- [x] **2.6** Set `error_category` on all existing exception raises in OpenAI/Anthropic workers
   - `NotFoundError` → `CONFIGURATION`
   - `APIConnectionError` → `TRANSIENT`
   - `BadRequestError` → `CONTENT` (default), `CONFIGURATION` (if detectable)
   - `AuthenticationError` → `CONFIGURATION`
   - `InstructorRetryException` → `CONTENT`
 
-- [ ] **2.7** Add content policy detection for OpenAI and Anthropic
+- [x] **2.7** Add content policy detection for OpenAI and Anthropic
   - Inspect `BadRequestError` message for "content_policy", "safety", "content_filter" keywords
   - Raise with `error_category=CONTENT`, `user_action`: "Content was rejected by safety filters — revise the prompt"
   - Also check `finish_reason == "content_filter"` in OpenAI response validation
 
-- [ ] **2.8** Add quota/credits exhaustion detection for OpenAI and Anthropic
+- [x] **2.8** Add quota/credits exhaustion detection for OpenAI and Anthropic
   - **Problem:** Rate limit (429) and out-of-credits (429) share the same HTTP status — must inspect the error body to distinguish them
   - **OpenAI:** `RateLimitError` with `"insufficient_quota"` or `"exceeded your current quota"` in message → `CAPACITY`; `AuthenticationError` with `"insufficient_quota"` → `CAPACITY`
   - **Anthropic:** `RateLimitError` or `PermissionDeniedError` with `"quota"` or `"billing"` in message → `CAPACITY`
@@ -120,7 +120,7 @@ Every phase is done when **all** of the following are true:
   - Billing URLs: OpenAI → `platform.openai.com/account/billing`, Anthropic → `console.anthropic.com/settings/billing`
   - **Must be checked before the generic `RateLimitError` → `TRANSIENT` handler** (order matters in except blocks, or use message inspection within a single handler)
 
-- [ ] **2.9** Tests for Phase 2
+- [x] **2.9** Tests for Phase 2
   - Unit tests per worker: mock SDK to raise each exception type, verify correct domain exception + category
   - Test content policy detection on known error message patterns
   - Test quota detection: mock `RateLimitError` with quota message → verify `CAPACITY` category
