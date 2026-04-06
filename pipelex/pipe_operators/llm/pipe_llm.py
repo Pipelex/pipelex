@@ -342,9 +342,8 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             "resolved_model_for_object": llm_setting_for_object.model,
             "is_multiple_output": is_multiple_output,
         }
-        if rendered_llm_prompt is not None:
-            execution_data_dict["rendered_system_prompt"] = rendered_llm_prompt.system_text
-            execution_data_dict["rendered_user_prompt"] = rendered_llm_prompt.user_text
+        execution_data_dict["rendered_system_prompt"] = rendered_llm_prompt.system_text
+        execution_data_dict["rendered_user_prompt"] = rendered_llm_prompt.user_text
         if self.structuring_method is not None:
             execution_data_dict["structuring_method"] = str(self.structuring_method)
         if is_with_preliminary_text:
