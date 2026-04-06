@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.23.6] - 2026-04-06
+
+### Changed
+
+- **Sub-pipe input normalization**: Silently drop unsupported `inputs` field from step/branch dicts instead of logging a warning.
+
 ## [v0.23.5] - 2026-04-04
 
 ### Added

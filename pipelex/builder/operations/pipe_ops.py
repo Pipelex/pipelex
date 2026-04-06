@@ -11,7 +11,6 @@ import tomlkit
 from pydantic import ValidationError
 from tomlkit.items import Table
 
-from pipelex import log
 from pipelex.builder.pipe.pipe_batch_spec import PipeBatchSpec
 from pipelex.builder.pipe.pipe_compose_spec import PipeComposeSpec
 from pipelex.builder.pipe.pipe_condition_spec import PipeConditionSpec
@@ -35,14 +34,9 @@ _OUTPUT_ALIASES = ("output_concept", "output_type")
 def _normalize_sub_pipe_dict(data: dict[str, Any]) -> None:
     """Normalize a step/branch dict: resolve pipe_code aliases and drop extraneous fields."""
     _normalize_pipe_code_aliases(data)
-    # Agents sometimes add "inputs" to individual steps; drop with a warning.
-    if "inputs" in data:
-        log.warning(
-            f"Dropping unsupported 'inputs' field from step/branch dict "
-            f"(pipe_code={data.get('pipe_code', '?')}). "
-            f"Step-level inputs are not supported; inputs are inherited from the parent pipe."
-        )
-        data.pop("inputs")
+    # Agents sometimes add "inputs" to individual steps — silently drop.
+    # Step-level inputs are not supported; inputs set by the pipe definition.
+    data.pop("inputs", None)
 
 
 def _normalize_pipe_code_aliases(data: dict[str, Any]) -> None:
