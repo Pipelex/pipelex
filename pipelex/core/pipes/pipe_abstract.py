@@ -107,7 +107,7 @@ class PipeAbstract(ABC, BaseModel):
         concept_dict = concept.model_dump(mode="json")
         try:
             concept_dict["json_schema"] = concept.get_structure_class().model_json_schema()
-        except Exception:
+        except (TypeError, ValueError):
             concept_dict["json_schema"] = None
         return concept_dict
 

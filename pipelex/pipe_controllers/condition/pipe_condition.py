@@ -242,6 +242,7 @@ class PipeCondition(PipeController):
             return PipeOutput(working_memory=working_memory)
 
         if SpecialOutcome.is_fail(outcome):
+            self._register_execution_data(job_metadata, execution_data_dict)
             msg = f"PipeCondition '{self.code}' failed with outcome: {outcome}. Evaluated expression: {evaluated_expression}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code)
 
