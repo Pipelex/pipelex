@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import model_validator
 from typing_extensions import Self, override
@@ -176,6 +176,15 @@ class PipeExtract(PipeOperator[PipeExtractOutput]):
             name=output_name,
         )
 
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "resolved_model": extract_setting.model,
+            "document_stuff_name": self.document_stuff_name,
+            "should_caption_images": self.should_caption_images,
+            "should_include_page_views": self.should_include_page_views,
+        }
+
+        self._register_execution_data(job_metadata, execution_data_dict)
         return PipeExtractOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,

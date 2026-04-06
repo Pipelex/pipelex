@@ -42,6 +42,7 @@ stuff_json_content = true
 stuff_text_content = true
 stuff_html_content = true
 error_stack_traces = true
+pipe_and_concept_registry = true
 
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 # Control which graph outputs are generated

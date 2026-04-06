@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import Field
 from typing_extensions import override
@@ -233,6 +233,16 @@ class PipeImgGen(PipeOperator[PipeImgGenOutput]):
             name=output_name,
         )
 
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "resolved_model": img_gen_setting.model,
+            "rendered_prompt": img_gen_prompt.positive_text,
+            "rendered_negative_prompt": img_gen_prompt.negative_text,
+            "aspect_ratio": str(img_gen_job_params.aspect_ratio) if img_gen_job_params.aspect_ratio else None,
+            "nb_images": nb_images,
+        }
+
+        self._register_execution_data(job_metadata, execution_data_dict)
         return PipeImgGenOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
