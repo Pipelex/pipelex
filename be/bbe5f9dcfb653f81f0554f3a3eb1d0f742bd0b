@@ -1,0 +1,47 @@
+tests/unit/pipelex/plugins/openai/test_data.py
+  cf416a554562525a 1-62
+tests/unit/pipelex/plugins/openai/test_openai_worker_error_handling.py
+  cf416a554562525a 1-370
+pipelex/plugins/openai/openai_img_gen_worker.py
+  cf416a554562525a 4,7,13-17,62,72-111
+TODO.md
+  cf416a554562525a 84,89,93,96,99,102,109,114,123
+pipelex/plugins/anthropic/anthropic_exceptions.py
+  cf416a554562525a 1-6
+tests/unit/pipelex/cogt/test_error_classification.py
+  cf416a554562525a 1-74
+pipelex/plugins/openai/openai_completions_llm_worker.py
+  cf416a554562525a 4,9-14,147-165,168,170-177,179,182,188-196,239,242-260,263,265-272,274,277
+pipelex/plugins/openai/openai_responses_llm_worker.py
+  cf416a554562525a 6,11-16,150-167,170,172-179,181,184,225,228-249,251-258,260,263
+pipelex/plugins/anthropic/anthropic_llm_worker.py
+  cf416a554562525a 5,9-11,19-24,37,245-262,264-271,273,276-287,345-346,348-381,383-390,392,395-406
+pipelex/cogt/inference/error_classification.py
+  cf416a554562525a 1-45
+tests/unit/pipelex/plugins/anthropic/test_anthropic_worker_error_handling.py
+  cf416a554562525a 1-225
+tests/unit/pipelex/plugins/anthropic/test_data.py
+  cf416a554562525a 1-48
+pipelex/plugins/openai/openai_completions_img_gen_worker.py
+  cf416a554562525a 4,8,13-17,89-106,109,111-118,120-123
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "bebbe5f9dcfb653f81f0554f3a3eb1d0f742bd0b",
+  "prompts": {
+    "cf416a554562525a": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7c6cecef-d811-4827-9bf1-81ac390aeec1",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 1252,
+      "total_deletions": 134,
+      "accepted_lines": 1178,
+      "overriden_lines": 0
+    }
+  }
+}
