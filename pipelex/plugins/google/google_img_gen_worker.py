@@ -14,7 +14,6 @@ from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
-    GOOGLE_BILLING_URL,
     is_content_policy_violation,
     is_quota_exhaustion_google,
 )
@@ -22,6 +21,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.plugins.google.google_img_gen_factory import GoogleImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.urls import URLs
 
 
 class GoogleImgGenWorkerError(PipelexError):
@@ -106,7 +106,7 @@ class GoogleImgGenWorker(ImgGenWorkerAbstract):
                 return ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {GOOGLE_BILLING_URL}",
+                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
                 )
             msg = f"Google rate limit exceeded for model '{self.inference_model.desc}': {exc}"
             return ImgGenGenerationError(

@@ -20,11 +20,11 @@ from pipelex.cogt.exceptions import ExtractJobFailureError, InferenceErrorCatego
 from pipelex.cogt.extract.extract_job import ExtractJob
 from pipelex.cogt.extract.extract_output import ExtractedImageFromPage, ExtractOutput, Page
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
-from pipelex.cogt.inference.error_classification import LINKUP_BILLING_URL
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import TokenCategory
 from pipelex.hub import get_secrets_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.urls import URLs
 
 
 class LinkupExtractWorker(ExtractWorkerAbstract):
@@ -75,7 +75,7 @@ class LinkupExtractWorker(ExtractWorkerAbstract):
             raise ExtractJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Linkup account has insufficient credits — check billing at {LINKUP_BILLING_URL}",
+                user_action=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
             ) from exc
         except LinkupTooManyRequestsError as exc:
             msg = f"Linkup rate limit exceeded: {exc}"

@@ -18,7 +18,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
-    ANTHROPIC_BILLING_URL,
     is_content_policy_violation,
     is_quota_exhaustion_anthropic,
 )
@@ -43,6 +42,7 @@ from pipelex.plugins.anthropic.anthropic_factory import (
 )
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from anthropic.types import Message
@@ -249,7 +249,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {ANTHROPIC_BILLING_URL}",
+                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
                 ) from rate_limit_error
             msg = f"Anthropic rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise LLMCompletionError(
@@ -281,7 +281,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {ANTHROPIC_BILLING_URL}",
+                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
                 ) from permission_error
             msg = f"Anthropic permission denied: {permission_error}"
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from permission_error
@@ -368,7 +368,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {ANTHROPIC_BILLING_URL}",
+                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
                 ) from rate_limit_error
             msg = f"Anthropic rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise LLMCompletionError(
@@ -400,7 +400,7 @@ class AnthropicLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {ANTHROPIC_BILLING_URL}",
+                    user_action=f"Your Anthropic account has exceeded its quota — check billing at {URLs.anthropic_billing}",
                 ) from permission_error
             msg = f"Anthropic permission denied: {permission_error}"
             raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from permission_error

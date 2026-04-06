@@ -11,7 +11,6 @@ from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
-    OPENAI_BILLING_URL,
     is_content_policy_violation,
     is_quota_exhaustion_openai,
 )
@@ -19,6 +18,7 @@ from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from openai.types.images_response import ImagesResponse, Usage
@@ -81,7 +81,7 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
                 raise ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {OPENAI_BILLING_URL}",
+                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
                 ) from rate_limit_error
             msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise ImgGenGenerationError(

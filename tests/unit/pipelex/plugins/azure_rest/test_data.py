@@ -52,7 +52,7 @@ class AzureErrorHandlingTestData:
             500,
             "Internal server error",
             InferenceErrorCategory.TRANSIENT,
-            "api error",
+            "server error",
         ),
     ]
 

@@ -10,7 +10,6 @@ from pipelex import log
 from pipelex.base_exceptions import PipelexError
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError
 from pipelex.cogt.inference.error_classification import (
-    GOOGLE_BILLING_URL,
     is_content_policy_violation,
     is_quota_exhaustion_google,
 )
@@ -25,6 +24,7 @@ from pipelex.config import get_config
 from pipelex.plugins.google.google_factory import GoogleFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessageParam
@@ -126,7 +126,7 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
                 return LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {GOOGLE_BILLING_URL}",
+                    user_action=f"Your Google Cloud account has exceeded its quota — check billing at {URLs.google_billing}",
                 )
             msg = f"Google rate limit exceeded for model '{self.inference_model.desc}': {exc}"
             return LLMCompletionError(
@@ -298,6 +298,8 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             candidate_count=1,
         )
 
+        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 messages=[cast("ChatCompletionMessageParam", contents)],
@@ -313,13 +315,9 @@ class GoogleLLMWorker(LLMWorkerInternalAbstract):
             raise self._classify_google_client_error(exc) from exc
         except LLMCompletionError:
             raise
-        except Exception as structured_gen_exc:
-            from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
-
-            if isinstance(structured_gen_exc, InstructorRetryException):
-                msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {structured_gen_exc}"
-                raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from structured_gen_exc
-            raise
+        except InstructorRetryException as exc:
+            msg = f"Google structured generation failed after retries for model '{self.inference_model.desc}': {exc}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
 
         if not isinstance(result_object, schema):
             msg = f"Google Gemini API returned an object that is not of type {schema}: {result_object}"

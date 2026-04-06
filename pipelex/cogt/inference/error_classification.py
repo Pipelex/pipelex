@@ -4,23 +4,15 @@ Pure functions that inspect error messages to discriminate between
 quota exhaustion vs rate limiting, and detect content policy violations.
 """
 
-OPENAI_BILLING_URL = "https://platform.openai.com/account/billing"
-ANTHROPIC_BILLING_URL = "https://console.anthropic.com/settings/billing"
-GOOGLE_BILLING_URL = "https://console.cloud.google.com/billing"
-MISTRAL_BILLING_URL = "https://console.mistral.ai/billing"
-AWS_BILLING_URL = "https://console.aws.amazon.com/billing"
-LINKUP_BILLING_URL = "https://app.linkup.so/billing"
-FAL_BILLING_URL = "https://fal.ai/dashboard/billing"
-HUGGINGFACE_BILLING_URL = "https://huggingface.co/settings/billing"
-GATEWAY_BILLING_URL = "https://pipelex.com/billing"
-
 _OPENAI_QUOTA_PATTERNS: tuple[str, ...] = (
     "insufficient_quota",
     "exceeded your current quota",
 )
 
 _ANTHROPIC_QUOTA_PATTERNS: tuple[str, ...] = (
-    "quota",
+    "quota exceeded",
+    "quota has been",
+    "credit",
     "billing limit",
     "billing issue",
 )

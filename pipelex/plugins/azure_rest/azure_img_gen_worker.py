@@ -127,8 +127,11 @@ class AzureImgGenWorker(ImgGenWorkerAbstract):
                     ) from exc
                 msg = f"Azure bad request for model '{self.inference_model.desc}': {error_body}"
                 raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+            if status_code >= 500:
+                msg = f"Azure server error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
+                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
             msg = f"Azure API error ({status_code}) for model '{self.inference_model.desc}': {error_body}"
-            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
         except httpx.ConnectError as exc:
             msg = f"Azure connection error for model '{self.inference_model.desc}': {exc}"
             raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc

@@ -8,7 +8,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
-    MISTRAL_BILLING_URL,
     is_content_policy_violation,
     is_quota_exhaustion_mistral,
 )
@@ -22,6 +21,7 @@ from pipelex.plugins.mistral.mistral_exceptions import MistralWorkerConfiguratio
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from mistralai.models import ChatCompletionResponse
@@ -70,7 +70,7 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             return LLMCompletionError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Mistral account has exceeded its quota — check billing at {MISTRAL_BILLING_URL}",
+                user_action=f"Your Mistral account has exceeded its quota — check billing at {URLs.mistral_billing}",
             )
 
         if status_code in {401, 403}:
@@ -214,6 +214,8 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
+        from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+
         try:
             result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
                 response_model=schema,
@@ -226,13 +228,9 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             raise self._classify_mistral_error(exc) from exc
         except LLMCompletionError:
             raise
-        except Exception as structured_gen_exc:
-            from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
-
-            if isinstance(structured_gen_exc, InstructorRetryException):
-                msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {structured_gen_exc}"
-                raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from structured_gen_exc
-            raise
+        except InstructorRetryException as exc:
+            msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {exc}"
+            raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
 
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)

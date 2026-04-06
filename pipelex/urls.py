@@ -32,3 +32,11 @@ class URLs:
     png_example_3 = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/png_example_3.png"
 
     txt_example = "https://pipelex-pytest-assets.s3.eu-west-3.amazonaws.com/txt_example.txt"
+
+    openai_billing = "https://platform.openai.com/account/billing"
+    anthropic_billing = "https://platform.claude.com/settings/billing"
+    google_billing = "https://console.cloud.google.com/billing"
+    mistral_billing = "https://admin.mistral.ai/organization/billing"
+    aws_billing = "https://console.aws.amazon.com/billing"
+    linkup_billing = "https://app.linkup.so/organization/billing"
+    fal_billing = "https://fal.ai/dashboard/usage-billing/billing"

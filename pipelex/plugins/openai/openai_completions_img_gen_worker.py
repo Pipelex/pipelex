@@ -11,7 +11,6 @@ from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
-    OPENAI_BILLING_URL,
     is_content_policy_violation,
     is_quota_exhaustion_openai,
 )
@@ -22,6 +21,7 @@ from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.misc.base64_utils import extract_base64_str_from_base64_url_if_possible
 from pipelex.tools.misc.image_utils import ImageFormat
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
@@ -93,7 +93,7 @@ class OpenAICompletionsImgGenWorker(ImgGenWorkerAbstract):
                 raise ImgGenGenerationError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {OPENAI_BILLING_URL}",
+                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
                 ) from rate_limit_error
             msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise ImgGenGenerationError(

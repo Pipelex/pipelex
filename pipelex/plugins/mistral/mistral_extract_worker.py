@@ -10,13 +10,13 @@ from pipelex.cogt.extract.extract_job_components import ExtractJobParams
 from pipelex.cogt.extract.extract_output import ExtractOutput
 from pipelex.cogt.extract.extract_worker_abstract import ExtractWorkerAbstract
 from pipelex.cogt.inference.error_classification import (
-    MISTRAL_BILLING_URL,
     is_content_policy_violation,
     is_quota_exhaustion_mistral,
 )
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.plugins.mistral.mistral_factory import MistralFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
+from pipelex.urls import URLs
 
 
 class MistralExtractWorker(ExtractWorkerAbstract):
@@ -70,7 +70,7 @@ class MistralExtractWorker(ExtractWorkerAbstract):
             return ExtractJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Mistral account has exceeded its quota — check billing at {MISTRAL_BILLING_URL}",
+                user_action=f"Your Mistral account has exceeded its quota — check billing at {URLs.mistral_billing}",
             )
 
         if status_code in {401, 403}:

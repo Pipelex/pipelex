@@ -8,7 +8,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
-    OPENAI_BILLING_URL,
     is_content_policy_violation,
     is_quota_exhaustion_openai,
 )
@@ -23,6 +22,7 @@ from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsF
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.system.telemetry.otel_constants import InferenceOutputType
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.urls import URLs
 
 if TYPE_CHECKING:
     from openai.types.chat import ChatCompletionMessage
@@ -152,7 +152,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {OPENAI_BILLING_URL}",
+                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
                 ) from rate_limit_error
             msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise LLMCompletionError(
@@ -247,7 +247,7 @@ class OpenAICompletionsLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {OPENAI_BILLING_URL}",
+                    user_action=f"Your OpenAI account has exceeded its quota — check billing at {URLs.openai_billing}",
                 ) from rate_limit_error
             msg = f"OpenAI rate limit exceeded for model '{self.inference_model.desc}': {rate_limit_error}"
             raise LLMCompletionError(

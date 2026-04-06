@@ -15,7 +15,6 @@ from linkup import (
 from typing_extensions import override
 
 from pipelex.cogt.exceptions import InferenceErrorCategory, SearchJobFailureError
-from pipelex.cogt.inference.error_classification import LINKUP_BILLING_URL
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
@@ -26,6 +25,7 @@ from pipelex.core.stuffs.search_result_content import SearchResultContent
 from pipelex.hub import get_secrets_provider
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.urls import URLs
 
 
 class LinkupSearchWorker(SearchWorkerAbstract):
@@ -52,7 +52,7 @@ class LinkupSearchWorker(SearchWorkerAbstract):
             return SearchJobFailureError(
                 msg,
                 error_category=InferenceErrorCategory.CAPACITY,
-                user_action=f"Your Linkup account has insufficient credits — check billing at {LINKUP_BILLING_URL}",
+                user_action=f"Your Linkup account has insufficient credits — check billing at {URLs.linkup_billing}",
             )
         if isinstance(exc, LinkupTooManyRequestsError):
             msg = f"Linkup rate limit exceeded: {exc}"

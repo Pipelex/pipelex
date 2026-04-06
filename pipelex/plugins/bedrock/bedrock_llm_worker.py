@@ -6,7 +6,6 @@ from typing_extensions import override
 from pipelex import log
 from pipelex.cogt.exceptions import CogtError, InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
 from pipelex.cogt.inference.error_classification import (
-    AWS_BILLING_URL,
     is_quota_exhaustion_aws,
 )
 from pipelex.cogt.llm.llm_job import LLMJob
@@ -17,6 +16,7 @@ from pipelex.plugins.bedrock.bedrock_client_protocol import BedrockClientProtoco
 from pipelex.plugins.bedrock.bedrock_factory import BedrockFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
+from pipelex.urls import URLs
 
 
 class BedrockWorkerConfigurationError(CogtError):
@@ -84,7 +84,7 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
                 raise LLMCompletionError(
                     msg,
                     error_category=InferenceErrorCategory.CAPACITY,
-                    user_action=f"Your AWS account has exceeded its service quota — check billing at {AWS_BILLING_URL}",
+                    user_action=f"Your AWS account has exceeded its service quota — check billing at {URLs.aws_billing}",
                 ) from exc
 
             if error_code == "ThrottlingException":
@@ -93,7 +93,7 @@ class BedrockLLMWorker(LLMWorkerInternalAbstract):
                     raise LLMCompletionError(
                         msg,
                         error_category=InferenceErrorCategory.CAPACITY,
-                        user_action=f"Your AWS account has exceeded its quota — check billing at {AWS_BILLING_URL}",
+                        user_action=f"Your AWS account has exceeded its quota — check billing at {URLs.aws_billing}",
                     ) from exc
                 msg = f"AWS rate limit exceeded for model '{self.inference_model.desc}': {error_msg}"
                 raise LLMCompletionError(
