@@ -6,18 +6,13 @@ and injected with GraphSpec data and configuration.
 """
 
 import json
-import re
 from html import escape as html_escape
 
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
 from pipelex.graph.reactflow.standalone_assets import get_standalone_template
+from pipelex.tools.jinja2.jinja2_filters import escape_script_tag
 from pipelex.urls import URLs
-
-
-def _escape_script_json(json_str: str) -> str:
-    """Escape </script> in JSON to prevent premature script tag closure."""
-    return re.sub(r"</script>", r"<\\/script>", json_str, flags=re.IGNORECASE)
 
 
 def _build_viewer_config(config: ReactFlowRenderingConfig) -> dict[str, object]:
@@ -30,6 +25,7 @@ def _build_viewer_config(config: ReactFlowRenderingConfig) -> dict[str, object]:
         "edgeType": config.edge_type,
         "initialZoom": config.initial_zoom,
         "panToTop": config.pan_to_top,
+        "palette": config.style.palette,
     }
 
 
@@ -61,8 +57,8 @@ def generate_reactflow_html(
 
     return (
         template.replace("<!--PIPELEX_TITLE-->", html_escape(page_title))
-        .replace("<!--PIPELEX_GRAPHSPEC-->", _escape_script_json(graphspec_json))
-        .replace("<!--PIPELEX_CONFIG-->", config_json)
+        .replace("<!--PIPELEX_GRAPHSPEC-->", escape_script_tag(graphspec_json))
+        .replace("<!--PIPELEX_CONFIG-->", escape_script_tag(config_json))
         .replace("<!--PIPELEX_LOGO_DARK-->", URLs.logo_white_on_transparent)
         .replace("<!--PIPELEX_LOGO_LIGHT-->", URLs.logo_black_on_transparent)
         .replace("<!--PIPELEX_THEME-->", config.style.theme)
