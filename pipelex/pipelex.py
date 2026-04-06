@@ -36,7 +36,6 @@ from pipelex.core.registry_models import CoreRegistryModels
 from pipelex.core.stuffs.stuff_template_set import STUFF_TEMPLATE_SET
 from pipelex.core.validation import report_validation_error
 from pipelex.graph.mermaidflow.template_set import MERMAID_TEMPLATE_SET
-from pipelex.graph.reactflow.template_set import REACTFLOW_TEMPLATE_SET
 from pipelex.hub import PipelexHub, set_pipelex_hub
 from pipelex.libraries.library_manager import LibraryManager
 from pipelex.libraries.library_manager_abstract import LibraryManagerAbstract
@@ -262,12 +261,6 @@ If you need help, drop by our Discord: we're happy to assist: {URLs.discord}.
             name=stuff_name,
             package=stuff_package,
             templates=stuff_templates,
-        )
-        reactflow_name, reactflow_package, reactflow_templates = REACTFLOW_TEMPLATE_SET
-        TemplateLoader.register_set(
-            name=reactflow_name,
-            package=reactflow_package,
-            templates=reactflow_templates,
         )
         mermaid_name, mermaid_package, mermaid_templates = MERMAID_TEMPLATE_SET
         TemplateLoader.register_set(
