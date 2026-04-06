@@ -17,3 +17,7 @@ terms_accepted = false
 # Note: when using pipelex_gateway, telemetry is enabled to monitor service usage.
 # We collect technical data (model, pipe type...) and quantitative data (token counts...)
 # but NOT your content, pipe codes, or output class names.
+
+[onboarding]
+# Set to true after completing inference setup (gateway or BYOK).
+inference_setup_completed = false

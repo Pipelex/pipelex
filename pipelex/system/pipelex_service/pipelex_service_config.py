@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import Any, cast
 
-from pydantic import ValidationError
+from pydantic import Field, ValidationError
 
 from pipelex.cogt.model_backends.backend import PipelexBackend
 from pipelex.system.configuration.config_loader import config_manager
@@ -10,6 +10,7 @@ from pipelex.system.pipelex_service.exceptions import PipelexServiceConfigValida
 from pipelex.system.pipelex_service.pipelex_service_agreement import (
     PIPELEX_SERVICE_CONFIG_FILE_NAME,
     PipelexServiceAgreement,
+    PipelexServiceOnboarding,
 )
 from pipelex.tools.misc.toml_utils import load_toml_from_path, load_toml_from_path_if_exists
 from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
@@ -17,6 +18,7 @@ from pipelex.tools.typing.pydantic_utils import format_pydantic_validation_error
 
 class PipelexServiceConfig(ConfigModel):
     agreement: PipelexServiceAgreement
+    onboarding: PipelexServiceOnboarding = Field(default_factory=PipelexServiceOnboarding)
 
 
 def load_pipelex_service_config_if_exists(config_dir: Path) -> PipelexServiceConfig | None:

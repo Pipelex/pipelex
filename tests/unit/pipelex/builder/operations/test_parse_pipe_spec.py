@@ -88,6 +88,31 @@ class TestParsePipeSpec:
         result = parse_pipe_spec("PipeLLM", {**_BASE_LLM, "output": {"type": "Article", "extra": "ignored"}})
         assert result.output == "Article"
 
+    # -- output field aliases -----------------------------------------------
+
+    @pytest.mark.parametrize("alias", ["output_concept", "output_type"])
+    def test_output_alias_accepted(self, alias: str) -> None:
+        """Each output alias resolves to the correct output value."""
+        spec = {key: val for key, val in _BASE_LLM.items() if key != "output"}
+        spec[alias] = "Article"
+        result = parse_pipe_spec("PipeLLM", spec)
+        assert result.output == "Article"
+
+    @pytest.mark.parametrize("alias", ["output_concept", "output_type"])
+    def test_output_alias_tried_first_when_canonical_present(self, alias: str) -> None:
+        """When both output and an alias exist, alias value is tried first."""
+        spec = {**_BASE_LLM, alias: "AliasValue"}
+        result = parse_pipe_spec("PipeLLM", spec)
+        assert result.output == "AliasValue"
+
+    def test_first_output_alias_wins(self) -> None:
+        """When multiple output aliases present without canonical, first in tuple order wins."""
+        spec = {key: val for key, val in _BASE_LLM.items() if key != "output"}
+        spec["output_type"] = "SecondAlias"
+        spec["output_concept"] = "FirstAlias"
+        result = parse_pipe_spec("PipeLLM", spec)
+        assert result.output == "FirstAlias"
+
     # -- steps/branches 'pipe' → 'pipe_code' alias -----------------------
 
     def test_sequence_steps_canonical_pipe_code(self) -> None:
