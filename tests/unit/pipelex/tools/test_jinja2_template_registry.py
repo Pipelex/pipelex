@@ -122,8 +122,8 @@ class TestTemplateLoader:
         # Register a test template set for testing
         TemplateLoader.register_set(
             name="test_set",
-            package="pipelex.graph.reactflow.templates",
-            templates=[("reactflow.html.jinja2", "test/template.html.jinja2")],
+            package="pipelex.graph.mermaidflow.templates",
+            templates=[("_basic_body.html.jinja2", "test/template.html.jinja2")],
         )
 
     def test_register_set(self) -> None:
@@ -140,8 +140,8 @@ class TestTemplateLoader:
         # Register again - should be no-op
         TemplateLoader.register_set(
             name="test_set",
-            package="pipelex.graph.reactflow.templates",
-            templates=[("reactflow.html.jinja2", "test/template.html.jinja2")],
+            package="pipelex.graph.mermaidflow.templates",
+            templates=[("_basic_body.html.jinja2", "test/template.html.jinja2")],
         )
         # Should still be registered
         assert "test_set" in TemplateLoader.available_sets()

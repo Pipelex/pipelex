@@ -1,78 +1,75 @@
 """ReactFlow HTML generator for GraphSpec rendering.
 
-This module provides functions to generate standalone HTML files with embedded
-ReactFlow viewers that can render GraphSpec graphs interactively.
+Generates standalone HTML files using the mthds-ui GraphViewer component.
+The pre-built HTML template (with JS+CSS inlined) is loaded from assets/
+and injected with GraphSpec data and configuration.
 """
 
 import json
+import re
+from html import escape as html_escape
 
-from pipelex.cogt.templating.template_category import TemplateCategory
-from pipelex.graph.csp import CSP_NONCE_SENTINEL
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
-from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
-from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
+from pipelex.graph.reactflow.standalone_assets import get_standalone_template
 from pipelex.urls import URLs
 
-# Template key in the registry
-_REACTFLOW_TEMPLATE_KEY = "reactflow/main.html.jinja2"
+
+def _escape_script_json(json_str: str) -> str:
+    """Escape </script> in JSON to prevent premature script tag closure."""
+    return re.sub(r"</script>", r"<\\/script>", json_str, flags=re.IGNORECASE)
+
+
+def _build_viewer_config(config: ReactFlowRenderingConfig) -> dict[str, object]:
+    """Build the viewer config dict from the ReactFlow rendering config."""
+    return {
+        "direction": config.layout_direction.reactflow_code,
+        "showControllers": config.show_batch_controller,
+        "nodesep": config.nodesep,
+        "ranksep": config.ranksep,
+        "edgeType": config.edge_type,
+        "initialZoom": config.initial_zoom,
+        "panToTop": config.pan_to_top,
+    }
 
 
 def generate_reactflow_html(
     graphspec: GraphSpec,
     config: ReactFlowRenderingConfig,
     *,
-    stuff_data_text: dict[str, str] | None = None,
-    stuff_data_html: dict[str, str] | None = None,
+    stuff_data_text: dict[str, str] | None = None,  # noqa: ARG001 — kept for backward compat
+    stuff_data_html: dict[str, str] | None = None,  # noqa: ARG001 — kept for backward compat
     title: str | None = None,
 ) -> str:
-    """Generate single-file HTML with embedded GraphSpec and ReactFlow viewer.
+    """Generate single-file HTML with embedded GraphSpec and mthds-ui GraphViewer.
 
     Args:
         graphspec: The GraphSpec to embed and render.
         config: ReactFlow rendering configuration.
-        stuff_data_text: Optional mapping from stuff IDs to their ASCII text representation.
-        stuff_data_html: Optional mapping from stuff IDs to their HTML representation.
+        stuff_data_text: Unused (kept for backward compatibility). Data is in GraphSpec IOSpec fields.
+        stuff_data_html: Unused (kept for backward compatibility). Data is in GraphSpec IOSpec fields.
         title: Optional page title, overrides config.default_title.
 
     Returns:
-        Complete HTML page as a string with embedded ReactFlow viewer.
+        Complete HTML page as a string with embedded GraphViewer.
     """
-    # Get template from pre-loaded registry (sandbox-safe, no I/O at render time)
-    template_source = TemplateRegistry.get(_REACTFLOW_TEMPLATE_KEY)
+    template = get_standalone_template()
 
-    # Serialize GraphSpec to JSON
-    graphspec_json = json.dumps(graphspec.model_dump(mode="json"), indent=2)
+    graphspec_json = json.dumps(graphspec.model_dump(mode="json", by_alias=True), indent=2)
+    config_json = json.dumps(_build_viewer_config(config))
+    page_title = title or config.default_title
 
-    # Render template (use_registry=True to support {% include %} directives)
-    return render_jinja2_sync(
-        template_source=template_source,
-        template_category=TemplateCategory.HTML,
-        templating_context={
-            "csp_nonce": CSP_NONCE_SENTINEL,
-            "title": title or config.default_title,
-            "logo_dark": URLs.logo_white_on_transparent,
-            "logo_light": URLs.logo_black_on_transparent,
-            "graphspec_json": graphspec_json,
-            "stuff_data_text_json": json.dumps(stuff_data_text or {}),
-            "stuff_data_html_json": json.dumps(stuff_data_html or {}),
-            "use_cdn": config.is_use_cdn,
-            "layout_direction": config.layout_direction.reactflow_code,
-            "nodesep": config.nodesep,
-            "ranksep": config.ranksep,
-            "edge_type": config.edge_type,
-            "initial_zoom": config.initial_zoom,
-            "pan_to_top": config.pan_to_top,
-            "initial_theme": config.style.theme,
-            "initial_palette": config.style.palette,
-            "show_batch_controller": config.show_batch_controller,
-            "show_batch_item_index": config.show_batch_item_index,
-        },
-        use_registry=True,
+    return (
+        template.replace("<!--PIPELEX_TITLE-->", html_escape(page_title))
+        .replace("<!--PIPELEX_GRAPHSPEC-->", _escape_script_json(graphspec_json))
+        .replace("<!--PIPELEX_CONFIG-->", config_json)
+        .replace("<!--PIPELEX_LOGO_DARK-->", URLs.logo_white_on_transparent)
+        .replace("<!--PIPELEX_LOGO_LIGHT-->", URLs.logo_black_on_transparent)
+        .replace("<!--PIPELEX_THEME-->", config.style.theme)
     )
 
 
-async def generate_reactflow_html_async(
+async def generate_reactflow_html_async(  # noqa: RUF029 — async signature kept for call-site compat
     graphspec: GraphSpec,
     config: ReactFlowRenderingConfig,
     *,
@@ -80,49 +77,24 @@ async def generate_reactflow_html_async(
     stuff_data_html: dict[str, str] | None = None,
     title: str | None = None,
 ) -> str:
-    """Generate single-file HTML with embedded GraphSpec and ReactFlow viewer (async version).
+    """Generate single-file HTML with embedded GraphSpec and mthds-ui GraphViewer (async version).
 
-    Use this when inside an async event loop.
+    Delegates to the sync version since no I/O is performed (template is cached).
 
     Args:
         graphspec: The GraphSpec to embed and render.
         config: ReactFlow rendering configuration.
-        stuff_data_text: Optional mapping from stuff IDs to their ASCII text representation.
-        stuff_data_html: Optional mapping from stuff IDs to their HTML representation.
+        stuff_data_text: Unused (kept for backward compatibility).
+        stuff_data_html: Unused (kept for backward compatibility).
         title: Optional page title, overrides config.default_title.
 
     Returns:
-        Complete HTML page as a string with embedded ReactFlow viewer.
+        Complete HTML page as a string with embedded GraphViewer.
     """
-    # Get template from pre-loaded registry (sandbox-safe, no I/O at render time)
-    template_source = TemplateRegistry.get(_REACTFLOW_TEMPLATE_KEY)
-
-    # Serialize GraphSpec to JSON
-    graphspec_json = json.dumps(graphspec.model_dump(mode="json"), indent=2)
-
-    # Render template (use_registry=True to support {% include %} directives)
-    return await render_jinja2_async(
-        template_source=template_source,
-        template_category=TemplateCategory.HTML,
-        templating_context={
-            "csp_nonce": CSP_NONCE_SENTINEL,
-            "title": title or config.default_title,
-            "logo_dark": URLs.logo_white_on_transparent,
-            "logo_light": URLs.logo_black_on_transparent,
-            "graphspec_json": graphspec_json,
-            "stuff_data_text_json": json.dumps(stuff_data_text or {}),
-            "stuff_data_html_json": json.dumps(stuff_data_html or {}),
-            "use_cdn": config.is_use_cdn,
-            "layout_direction": config.layout_direction.reactflow_code,
-            "nodesep": config.nodesep,
-            "ranksep": config.ranksep,
-            "edge_type": config.edge_type,
-            "initial_zoom": config.initial_zoom,
-            "pan_to_top": config.pan_to_top,
-            "initial_theme": config.style.theme,
-            "initial_palette": config.style.palette,
-            "show_batch_controller": config.show_batch_controller,
-            "show_batch_item_index": config.show_batch_item_index,
-        },
-        use_registry=True,
+    return generate_reactflow_html(
+        graphspec=graphspec,
+        config=config,
+        stuff_data_text=stuff_data_text,
+        stuff_data_html=stuff_data_html,
+        title=title,
     )
