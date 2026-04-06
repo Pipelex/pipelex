@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.23.8] - 2026-04-07
+
+### Changed
+
+- **Standalone ReactFlow graph rendering**: Replaced Jinja2 template-based HTML generation with a single standalone HTML asset, simplifying the graph rendering pipeline and removing the Jinja2 template dependency for ReactFlow output.
+
 ## [v0.23.7] - 2026-04-06
 
 ### Added
