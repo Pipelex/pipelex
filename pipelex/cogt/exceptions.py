@@ -279,6 +279,10 @@ class ExtractJobFailureError(CogtError):
     pass
 
 
+class SearchJobFailureError(CogtError):
+    pass
+
+
 class RoutingProfileLibraryNotFoundError(CogtError):
     pass
 

@@ -1,11 +1,12 @@
 from typing import Any
 
 from huggingface_hub import AsyncInferenceClient
+from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 from PIL import Image
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import ImgGenParameterError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, InferenceErrorCategory, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.img_gen.img_gen_args_factory import ImgGenArgsFactory
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
@@ -45,11 +46,37 @@ class HuggingFaceImgGenWorker(ImgGenWorkerAbstract):
         )
         prompt = args_dict.pop("prompt")
         model_id = self.inference_model.model_id
-        return await self.hf_async_client.text_to_image(
-            prompt=prompt,
-            model=model_id,
-            extra_body=args_dict,
-        )
+        try:
+            return await self.hf_async_client.text_to_image(
+                prompt=prompt,
+                model=model_id,
+                extra_body=args_dict,
+            )
+        except InferenceTimeoutError as exc:
+            msg = f"HuggingFace request timed out for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
+        except HfHubHTTPError as exc:
+            status_code: int | None = None
+            if hasattr(exc, "response") and exc.response is not None:
+                status_code = exc.response.status_code
+            if status_code == 429:
+                msg = f"HuggingFace rate limit exceeded for model '{self.inference_model.desc}': {exc}"
+                raise ImgGenGenerationError(
+                    msg,
+                    error_category=InferenceErrorCategory.TRANSIENT,
+                    user_action="Rate limited by HuggingFace — the system will retry automatically",
+                ) from exc
+            if status_code == 402:
+                msg = f"HuggingFace quota exhausted for model '{self.inference_model.desc}': {exc}"
+                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CAPACITY) from exc
+            if status_code in {401, 403}:
+                msg = f"HuggingFace authentication error for model '{self.inference_model.desc}': {exc}"
+                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONFIGURATION) from exc
+            if status_code == 400:
+                msg = f"HuggingFace bad request for model '{self.inference_model.desc}': {exc}"
+                raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.CONTENT) from exc
+            msg = f"HuggingFace API error for model '{self.inference_model.desc}': {exc}"
+            raise ImgGenGenerationError(msg, error_category=InferenceErrorCategory.TRANSIENT) from exc
 
     @override
     async def _gen_image(

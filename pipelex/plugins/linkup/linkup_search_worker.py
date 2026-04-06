@@ -1,9 +1,21 @@
 from datetime import date
 from typing import Any
 
-from linkup import LinkupClient, LinkupSourcedAnswer
+from linkup import (
+    LinkupAuthenticationError,
+    LinkupClient,
+    LinkupInsufficientCreditError,
+    LinkupInvalidRequestError,
+    LinkupNoResultError,
+    LinkupSourcedAnswer,
+    LinkupTimeoutError,
+    LinkupTooManyRequestsError,
+    LinkupUnknownError,
+)
 from typing_extensions import override
 
+from pipelex.cogt.exceptions import InferenceErrorCategory, SearchJobFailureError
+from pipelex.cogt.inference.error_classification import LINKUP_BILLING_URL
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.search.search_depth import SearchDepth
 from pipelex.cogt.search.search_job import SearchJob
@@ -26,6 +38,41 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         api_key = get_secrets_provider().get_secret(secret_id="LINKUP_API_KEY")
         self._linkup_client = LinkupClient(api_key=api_key)
 
+    def _classify_linkup_error(self, exc: Exception) -> SearchJobFailureError:
+        """Classify a Linkup SDK error into a categorized SearchJobFailureError."""
+        if isinstance(exc, LinkupAuthenticationError):
+            msg = f"Linkup authentication error: {exc}"
+            return SearchJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CONFIGURATION,
+                user_action="Check that the LINKUP_API_KEY environment variable is set",
+            )
+        if isinstance(exc, LinkupInsufficientCreditError):
+            msg = f"Linkup credits exhausted: {exc}"
+            return SearchJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.CAPACITY,
+                user_action=f"Your Linkup account has insufficient credits — check billing at {LINKUP_BILLING_URL}",
+            )
+        if isinstance(exc, LinkupTooManyRequestsError):
+            msg = f"Linkup rate limit exceeded: {exc}"
+            return SearchJobFailureError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action="Rate limited by Linkup — the system will retry automatically",
+            )
+        if isinstance(exc, LinkupTimeoutError):
+            msg = f"Linkup request timed out: {exc}"
+            return SearchJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+        if isinstance(exc, LinkupInvalidRequestError):
+            msg = f"Linkup invalid request: {exc}"
+            return SearchJobFailureError(msg, error_category=InferenceErrorCategory.CONTENT)
+        if isinstance(exc, (LinkupNoResultError, LinkupUnknownError)):
+            msg = f"Linkup error: {exc}"
+            return SearchJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+        msg = f"Linkup error: {exc}"
+        return SearchJobFailureError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+
     def _parse_date(self, date_str: str | None) -> date | None:
         if date_str is None:
             return None
@@ -40,18 +87,29 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         search_setting = job_params.search_setting
 
         depth_value = SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1])
-        response: LinkupSourcedAnswer = await self._linkup_client.async_search(
-            query=search_job.query,
-            depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
-            output_type="sourcedAnswer",
-            include_images=search_setting.include_images,
-            include_inline_citations=search_setting.include_inline_citations,
-            max_results=search_setting.max_results,
-            include_domains=job_params.include_domains,
-            exclude_domains=job_params.exclude_domains,
-            from_date=self._parse_date(job_params.from_date),
-            to_date=self._parse_date(job_params.to_date),
-        )
+        try:
+            response: LinkupSourcedAnswer = await self._linkup_client.async_search(
+                query=search_job.query,
+                depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
+                output_type="sourcedAnswer",
+                include_images=search_setting.include_images,
+                include_inline_citations=search_setting.include_inline_citations,
+                max_results=search_setting.max_results,
+                include_domains=job_params.include_domains,
+                exclude_domains=job_params.exclude_domains,
+                from_date=self._parse_date(job_params.from_date),
+                to_date=self._parse_date(job_params.to_date),
+            )
+        except (
+            LinkupAuthenticationError,
+            LinkupInsufficientCreditError,
+            LinkupTooManyRequestsError,
+            LinkupTimeoutError,
+            LinkupInvalidRequestError,
+            LinkupNoResultError,
+            LinkupUnknownError,
+        ) as exc:
+            raise self._classify_linkup_error(exc) from exc
 
         # Per-request cost model: costs are defined per million, so 1 request = 1_000_000
         if search_tokens_usage := search_job.job_report.search_tokens_usage:
@@ -84,19 +142,30 @@ class LinkupSearchWorker(SearchWorkerAbstract):
         search_setting = job_params.search_setting
 
         depth_value = SearchDepth(self.inference_model.model_id.rsplit("/", 1)[-1])
-        response = await self._linkup_client.async_search(
-            query=search_job.query,
-            depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
-            output_type="structured",
-            structured_output_schema=schema,
-            include_images=search_setting.include_images,
-            max_results=search_setting.max_results,
-            include_domains=job_params.include_domains,
-            exclude_domains=job_params.exclude_domains,
-            from_date=self._parse_date(job_params.from_date),
-            to_date=self._parse_date(job_params.to_date),
-            include_sources=True,
-        )
+        try:
+            response = await self._linkup_client.async_search(
+                query=search_job.query,
+                depth=depth_value,  # type: ignore[arg-type]  # pyright: ignore[reportArgumentType]
+                output_type="structured",
+                structured_output_schema=schema,
+                include_images=search_setting.include_images,
+                max_results=search_setting.max_results,
+                include_domains=job_params.include_domains,
+                exclude_domains=job_params.exclude_domains,
+                from_date=self._parse_date(job_params.from_date),
+                to_date=self._parse_date(job_params.to_date),
+                include_sources=True,
+            )
+        except (
+            LinkupAuthenticationError,
+            LinkupInsufficientCreditError,
+            LinkupTooManyRequestsError,
+            LinkupTimeoutError,
+            LinkupInvalidRequestError,
+            LinkupNoResultError,
+            LinkupUnknownError,
+        ) as exc:
+            raise self._classify_linkup_error(exc) from exc
 
         # Per-request cost model: costs are defined per million, so 1 request = 1_000_000
         if search_tokens_usage := search_job.job_report.search_tokens_usage:

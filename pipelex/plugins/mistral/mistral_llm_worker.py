@@ -1,12 +1,17 @@
 from typing import TYPE_CHECKING, Any
 
-from mistralai import Mistral
+from mistralai import Mistral, MistralError
 from mistralai.models import MistralPromptMode, TextChunk, ThinkChunk
 from mistralai.types import UNSET
 from typing_extensions import override
 
 from pipelex import log
-from pipelex.cogt.exceptions import LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.exceptions import InferenceErrorCategory, LLMCapabilityError, LLMCompletionError, SdkTypeError
+from pipelex.cogt.inference.error_classification import (
+    MISTRAL_BILLING_URL,
+    is_content_policy_violation,
+    is_quota_exhaustion_mistral,
+)
 from pipelex.cogt.llm.llm_job import LLMJob
 from pipelex.cogt.llm.llm_job_components import LLMJobParams
 from pipelex.cogt.llm.llm_worker_internal_abstract import LLMWorkerInternalAbstract
@@ -54,6 +59,54 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
             self.instructor_for_objects = from_mistral(client=sdk_instance, mode=instructor_mode, use_async=True)
         else:
             self.instructor_for_objects = from_mistral(client=sdk_instance, use_async=True)
+
+    def _classify_mistral_error(self, exc: MistralError) -> LLMCompletionError:
+        """Classify a Mistral SDK error into a categorized LLMCompletionError."""
+        error_message = str(exc)
+        status_code = exc.status_code
+
+        if is_quota_exhaustion_mistral(error_message, status_code):
+            msg = f"Mistral quota exhausted for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.CAPACITY,
+                user_action=f"Your Mistral account has exceeded its quota — check billing at {MISTRAL_BILLING_URL}",
+            )
+
+        if status_code in {401, 403}:
+            msg = f"Mistral authentication error for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+
+        if status_code == 404:
+            msg = f"Mistral model '{self.inference_model.desc}' not found: {exc}"
+            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONFIGURATION)
+
+        if status_code == 429:
+            msg = f"Mistral rate limit exceeded for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(
+                msg,
+                error_category=InferenceErrorCategory.TRANSIENT,
+                user_action="Rate limited by Mistral — the system will retry automatically",
+            )
+
+        if status_code == 400:
+            if is_content_policy_violation(error_message):
+                msg = f"Content rejected by safety filters for model '{self.inference_model.desc}': {exc}"
+                return LLMCompletionError(
+                    msg,
+                    error_category=InferenceErrorCategory.CONTENT,
+                    user_action="Content was rejected by safety filters — revise the prompt",
+                )
+            msg = f"Mistral bad request error for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT)
+
+        if status_code >= 500:
+            msg = f"Mistral server error for model '{self.inference_model.desc}': {exc}"
+            return LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT)
+
+        # Fallback
+        msg = f"Mistral API error for model '{self.inference_model.desc}': {exc}"
+        return LLMCompletionError(msg, error_category=InferenceErrorCategory.TRANSIENT)
 
     def _resolve_prompt_mode(self, job_params: LLMJobParams) -> "OptionalNullable[MistralPromptMode]":
         """Resolve reasoning parameters to a Mistral prompt_mode value.
@@ -106,13 +159,17 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         messages = await self.mistral_factory.make_simple_messages(llm_job=llm_job)
         prompt_mode = self._resolve_prompt_mode(job_params=job_params)
-        response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
-            messages=messages,
-            model=self.inference_model.model_id,
-            temperature=job_params.temperature,
-            max_tokens=job_params.max_tokens or self.default_max_tokens,
-            prompt_mode=prompt_mode,
-        )
+        try:
+            response: ChatCompletionResponse | None = await self.mistral_client_for_text.chat.complete_async(
+                messages=messages,
+                model=self.inference_model.model_id,
+                temperature=job_params.temperature,
+                max_tokens=job_params.max_tokens or self.default_max_tokens,
+                prompt_mode=prompt_mode,
+            )
+        except MistralError as exc:
+            raise self._classify_mistral_error(exc) from exc
+
         if not response:
             msg = "Mistral response is None"
             raise LLMCompletionError(msg)
@@ -157,13 +214,26 @@ class MistralLLMWorker(LLMWorkerInternalAbstract):
         job_params = llm_job.applied_job_params or llm_job.job_params
         self._validate_no_reasoning_for_structured_gen(job_params=job_params)
         messages = await self.mistral_factory.make_simple_messages_openai_typed(llm_job=llm_job)
-        result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
-            response_model=schema,
-            messages=messages,
-            model=self.inference_model.model_id,
-            temperature=job_params.temperature,
-            max_tokens=job_params.max_tokens or self.default_max_tokens,
-        )
+        try:
+            result_object, completion = await self.instructor_for_objects.chat.completions.create_with_completion(
+                response_model=schema,
+                messages=messages,
+                model=self.inference_model.model_id,
+                temperature=job_params.temperature,
+                max_tokens=job_params.max_tokens or self.default_max_tokens,
+            )
+        except MistralError as exc:
+            raise self._classify_mistral_error(exc) from exc
+        except LLMCompletionError:
+            raise
+        except Exception as structured_gen_exc:
+            from instructor.exceptions import InstructorRetryException  # noqa: PLC0415
+
+            if isinstance(structured_gen_exc, InstructorRetryException):
+                msg = f"Mistral structured generation failed after retries for model '{self.inference_model.desc}': {structured_gen_exc}"
+                raise LLMCompletionError(msg, error_category=InferenceErrorCategory.CONTENT) from structured_gen_exc
+            raise
+
         if (llm_tokens_usage := llm_job.job_report.llm_tokens_usage) and (usage := completion.usage):
             llm_tokens_usage.nb_tokens_by_category = self.mistral_factory.make_nb_tokens_by_category(usage=usage)
 

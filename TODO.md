@@ -133,70 +133,65 @@ Every phase is done when **all** of the following are true:
 
 > The workers with no error handling at all.
 
-- [ ] **3.1** `google_llm_worker.py` — add Google API exception handling
-  - Catch `google.api_core.exceptions`: `NotFound`, `PermissionDenied`, `ResourceExhausted`, `InvalidArgument`, `ServiceUnavailable`, `DeadlineExceeded`
+- [x] **3.1** `google_llm_worker.py` — add Google API exception handling
+  - Catch `google.genai.errors.ClientError` / `ServerError` with status code inspection
   - Map to `LLMCompletionError` with appropriate categories
-  - `ResourceExhausted`: inspect message — `"billing"` or `"quota"` → `CAPACITY`; otherwise → `TRANSIENT` (rate limit)
-  - `PermissionDenied` → `CONFIGURATION`
-  - `ServiceUnavailable`, `DeadlineExceeded` → `TRANSIENT`
+  - 429 with quota patterns → `CAPACITY`; generic 429 → `TRANSIENT`
+  - 401/403 → `CONFIGURATION`, 404 → `CONFIGURATION`, 400 → `CONTENT`
 
-- [ ] **3.2** `google_img_gen_worker.py` — same pattern as 4.1 for image generation
+- [x] **3.2** `google_img_gen_worker.py` — same pattern as 3.1 for image generation
   - Map to `ImgGenGenerationError` with categories
 
-- [ ] **3.3** `mistral_llm_worker.py` — add Mistral SDK exception handling
-  - Identify Mistral SDK exception types (`mistralai.models.sdkerror.SDKError` and HTTP subclasses)
+- [x] **3.3** `mistral_llm_worker.py` — add Mistral SDK exception handling
+  - Catch `MistralError` with `status_code` inspection
   - Map to `LLMCompletionError` with categories
   - Quota detection: HTTP 402 (Payment Required) or 429 with `"quota"` in message → `CAPACITY`
 
-- [ ] **3.4** `mistral_extract_worker.py` — add error handling
+- [x] **3.4** `mistral_extract_worker.py` — add error handling
   - Wrap Mistral OCR API calls
   - Map to `ExtractJobFailureError` with categories
-  - Same quota detection pattern as 4.3
+  - Same quota detection pattern as 3.3
 
-- [ ] **3.5** `bedrock_llm_worker.py` — add AWS error handling
+- [x] **3.5** `bedrock_llm_worker.py` — add AWS error handling
   - Catch `botocore.exceptions.ClientError` with error code inspection
   - `ThrottlingException`: inspect message — `"quota"` or `"limit exceeded"` → `CAPACITY`; otherwise → `TRANSIENT`
   - `AccessDeniedException` → `CONFIGURATION`
   - `ValidationException` → `CONTENT`
   - AWS-specific: `ServiceQuotaExceededException` → `CAPACITY`
 
-- [ ] **3.6** `azure_img_gen_worker.py` — wrap httpx errors
+- [x] **3.6** `azure_img_gen_worker.py` — wrap httpx errors
   - Catch `httpx.HTTPStatusError` with status code inspection
-  - 429: inspect body — `"quota"` or `"billing"` → `CAPACITY`; otherwise → `TRANSIENT`
-  - 402 → `CAPACITY`
-  - 401/403 → `CONFIGURATION`
-  - 400 → `CONTENT`
+  - 429 → `TRANSIENT`, 402 → `CAPACITY`, 401/403 → `CONFIGURATION`, 400 → `CONTENT`
   - Catch `httpx.ConnectError` → `TRANSIENT`
   - Catch `httpx.TimeoutException` → `TRANSIENT`
 
-- [ ] **3.7** `fal_img_gen_worker.py` — add FAL error handling
-  - Identify FAL client exception types
+- [x] **3.7** `fal_img_gen_worker.py` — add FAL error handling
+  - Catch `FalClientHTTPError`, `FalClientTimeoutError`, `MissingCredentialsError`, `FalClientError`
   - Map to `ImgGenGenerationError` with categories
 
-- [ ] **3.8** `huggingface_img_gen_worker.py` — add HuggingFace error handling
-  - Catch `huggingface_hub` HTTP errors
+- [x] **3.8** `huggingface_img_gen_worker.py` — add HuggingFace error handling
+  - Catch `InferenceTimeoutError`, `HfHubHTTPError`
   - Map to `ImgGenGenerationError` with categories
 
-- [ ] **3.9** `docling_extract_worker.py` — add conversion error handling
+- [x] **3.9** `docling_extract_worker.py` — add conversion error handling
   - Wrap `docling` conversion calls
-  - Map to `ExtractJobFailureError`
+  - Map to `ExtractJobFailureError` (ValueError/RuntimeError → CONTENT, FileNotFoundError → CONFIGURATION, OSError → TRANSIENT)
 
-- [ ] **3.10** `linkup_extract_worker.py` and `linkup_search_worker.py` — add Linkup error handling
-  - Identify Linkup SDK exception types
-  - Map to `ExtractJobFailureError` / search errors with categories
+- [x] **3.10** `linkup_extract_worker.py` and `linkup_search_worker.py` — add Linkup error handling
+  - Catch all `linkup` exception types (AuthenticationError, InsufficientCreditError, TooManyRequestsError, etc.)
+  - Map to `ExtractJobFailureError` / `SearchJobFailureError` with categories
 
-- [ ] **3.11** `pypdfium2_worker.py` — add PDF operation error handling
+- [x] **3.11** `pypdfium2_worker.py` — add PDF operation error handling
   - Wrap pypdfium2 calls
-  - Map to `ExtractJobFailureError`
+  - Map to `ExtractJobFailureError` (ValueError/RuntimeError → CONTENT, FileNotFoundError → CONFIGURATION, OSError → TRANSIENT)
 
-- [ ] **3.12** Add quota/credits detection to gateway workers
+- [x] **3.12** Add quota/credits detection to gateway workers
   - `gateway_extract_worker.py`, `gateway_img_gen_worker.py`, `gateway_search_worker.py`
-  - Inspect `portkey_exceptions.APIError` status code and message
-  - 402 or 429 with `"quota"` / `"billing"` / `"insufficient"` → `CAPACITY`
-  - Generic 429 → `TRANSIENT` (already handled by retry logic, but now with category)
-  - `user_action` for CAPACITY: "Your Pipelex Gateway or upstream provider quota is exhausted — check your billing dashboard"
+  - Added `_classify_portkey_error_category()` method to each gateway worker
+  - Inspect `portkey_exceptions.APIStatusError` status code and message
+  - 402 or 429 with quota patterns → `CAPACITY`; RateLimitError → `TRANSIENT`; AuthenticationError → `CONFIGURATION`; BadRequestError → `CONTENT`
 
-- [ ] **3.13** Tests for Phase 3
+- [x] **3.13** Tests for Phase 3
   - Unit tests per worker: mock SDK to raise each exception type, verify domain exception + category
   - At least 2 error scenarios per worker (one transient, one configuration)
   - Quota detection tests: mock 429 with quota message → verify `CAPACITY`; mock 429 without → verify `TRANSIENT`
