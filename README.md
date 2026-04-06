@@ -58,47 +58,12 @@ From here, Pipelex handles model routing across 60+ models, structured output pa
 
 # Quick Start
 
-```bash
-uv tool install pipelex
-pipelex init
-```
-
 ## With Claude Code (Recommended)
 
-Install the `mthds` npm package:
-
-```bash
-npm install -g mthds
-```
-
-Start Claude Code:
-
-```bash
-claude
-```
-
-Tell Claude to install the MTHDS skills marketplace:
+Open Claude Code and paste this. Claude does the rest.
 
 ```
-/plugin marketplace add mthds-ai/mthds-plugins
-```
-
-then install the MTHDS skills plugin:
-
-```
-/plugin install mthds@mthds-plugins
-```
-
-then reload plugins:
-
-```
-/reload-plugins
-```
-
-If that doesn't work, exit Claude Code and reopen it:
-
-```
-/exit
+Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && claude plugin marketplace add mthds-ai/mthds-plugins && claude plugin install mthds@mthds-plugins'. Then tell me to restart Claude Code.
 ```
 
 Build your first method:
@@ -114,6 +79,11 @@ Run it:
 ```
 
 ## Without Claude Code
+
+```bash
+uv tool install pipelex
+pipelex init
+```
 
 1. Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting
 2. Browse methods on the [MTHDS Hub](https://mthds.sh) for inspiration
