@@ -53,30 +53,27 @@ Every phase is done when **all** of the following are true:
 
 ---
 
-## Phase 1: CLI JSON Error Output
+## Phase 1: CLI Error Output
 
-> Unify error output across main CLI and agent CLI.
+> Main CLI (`pipelex`) always uses Rich output. Agent CLI (`pipelex-agent`) uses markdown text by default, or JSON with `--format json`. See `CliOutputFormat` in `agent_output.py`.
 
-- [ ] **1.1** Add `--format` option to main CLI `run` and `validate` commands
-  - Accepts `rich` (default, current behavior) and `json`
-  - When `json`: errors printed as JSON to stderr using `to_error_report()`, success output as JSON to stdout
-
-- [ ] **1.2** Refactor `agent_output.py` to use `to_error_report()`
+- [x] **1.1** Refactor `agent_output.py` to use `to_error_report()`
   - Replace the `AGENT_ERROR_HINTS`, `RETRYABLE_ERROR_TYPES`, `AGENT_ERROR_DOMAINS` lookup dicts
   - Instead, call `exc.to_error_report()` when the exception is a `PipelexError`
   - Keep the lookup dicts as fallback for non-PipelexError exceptions (FileNotFoundError, JSONDecodeError, etc.)
   - Merge agent-specific fields (hint, error_source) on top of the report
 
-- [ ] **1.3** Update `error_handlers.py` to support JSON mode
-  - Each `handle_*` function checks the output format
-  - In JSON mode: calls `to_error_report()` + `clean_json_dumps` to stderr
-  - In rich mode: existing Rich formatting (no changes)
+- [x] **1.2** Update `error_handlers.py` to use `to_error_report()` for Rich output
+  - Each `handle_*` function calls `to_error_report()` to build the error data
+  - Rich formatting uses the report fields for consistent, structured display
+  - No `--format` option on the main CLI — it is always Rich
 
-- [ ] **1.4** Tests for Phase 1
-  - Snapshot tests: representative errors in JSON mode match expected schema
+- [x] **1.3** Tests for Phase 1
+  - Snapshot tests: representative errors in agent CLI JSON mode match expected schema
   - Test that `agent_error()` output includes fields from `to_error_report()`
-  - Test that main CLI `--format json` produces valid JSON on stderr for known error types
-  - Test backward compat: default (no `--format`) still produces Rich output
+  - Test that agent CLI `--format json` produces valid JSON on stderr for known error types
+  - Test that agent CLI default (no `--format`) produces markdown text output
+  - Test that main CLI still produces Rich output (no format option)
 
 ---
 
