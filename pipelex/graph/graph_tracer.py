@@ -1,6 +1,7 @@
 """GraphTracer implementation that builds GraphSpec during pipeline execution."""
 
 from datetime import datetime, timezone
+from typing import Any
 
 from typing_extensions import override
 
@@ -48,6 +49,7 @@ class _MutableNodeData:
         self.error: ErrorSpec | None = None
         self.input_specs: list[IOSpec] = input_specs or []
         self.output_specs: list[IOSpec] = []
+        self.execution_data: dict[str, Any] = {}
 
     def to_node_spec(self) -> NodeSpec:
         """Convert to immutable NodeSpec."""
@@ -76,6 +78,7 @@ class _MutableNodeData:
             node_io=node_io,
             error=self.error,
             metrics=self.metrics,
+            execution_data=self.execution_data,
         )
 
 
@@ -113,6 +116,9 @@ class GraphTracer(GraphTracerProtocol):
         # The branch_producer_node_id is snapshotted at registration time, before register_controller_output
         # overrides _stuff_producer_map to point branch stuff codes to the controller node
         self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
+        # Registries for pipe and concept data (keyed by pipe_ref and concept_ref)
+        self._pipe_registry: dict[str, dict[str, Any]] = {}
+        self._concept_registry: dict[str, dict[str, Any]] = {}
 
     @property
     def is_active(self) -> bool:
@@ -143,6 +149,8 @@ class GraphTracer(GraphTracerProtocol):
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
         self._parallel_combine_map = {}
+        self._pipe_registry = {}
+        self._concept_registry = {}
 
         return GraphContext(
             graph_id=graph_id,
@@ -181,6 +189,8 @@ class GraphTracer(GraphTracerProtocol):
             pipeline_ref=self._pipeline_ref or PipelineRef(),
             nodes=nodes,
             edges=self._edges,
+            pipe_registry=dict(self._pipe_registry),
+            concept_registry=dict(self._concept_registry),
         )
 
         # Reset internal state
@@ -193,6 +203,8 @@ class GraphTracer(GraphTracerProtocol):
         self._batch_item_map = {}
         self._batch_aggregate_map = {}
         self._parallel_combine_map = {}
+        self._pipe_registry = {}
+        self._concept_registry = {}
 
         return graph
 
@@ -409,6 +421,8 @@ class GraphTracer(GraphTracerProtocol):
         node_kind: NodeKind,
         started_at: datetime,
         input_specs: list[IOSpec] | None = None,
+        pipe_data: dict[str, Any] | None = None,
+        concept_data: list[dict[str, Any]] | None = None,
     ) -> tuple[str, GraphContext]:
         """Record the start of a pipe execution."""
         if not self._is_active:
@@ -433,6 +447,18 @@ class GraphTracer(GraphTracerProtocol):
         )
         self._nodes[node_id] = node_data
 
+        # Accumulate pipe and concept registry data (deduplicated)
+        if graph_context.data_inclusion.pipe_and_concept_registry:
+            if pipe_data is not None:
+                pipe_ref = f"{pipe_data.get('domain_code', '')}.{pipe_data.get('code', '')}"
+                if pipe_ref not in self._pipe_registry:
+                    self._pipe_registry[pipe_ref] = pipe_data
+            if concept_data is not None:
+                for concept_item in concept_data:
+                    concept_ref = f"{concept_item.get('domain_code', '')}.{concept_item.get('code', '')}"
+                    if concept_ref not in self._concept_registry:
+                        self._concept_registry[concept_ref] = concept_item
+
         # Add containment edge from parent if this is a child pipe
         if graph_context.parent_node_id is not None:
             self.add_edge(
@@ -450,6 +476,20 @@ class GraphTracer(GraphTracerProtocol):
         return node_id, child_context
 
     @override
+    def register_execution_data(
+        self,
+        node_id: str,
+        execution_data: dict[str, Any],
+    ) -> None:
+        """Register execution metadata for a node."""
+        if not self._is_active:
+            return
+        node_data = self._nodes.get(node_id)
+        if node_data is None:
+            return
+        node_data.execution_data.update(execution_data)
+
+    @override
     def on_pipe_end_success(
         self,
         node_id: str,
@@ -457,6 +497,7 @@ class GraphTracer(GraphTracerProtocol):
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
         output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
     ) -> None:
         """Record successful completion of a pipe execution."""
         if not self._is_active:
@@ -471,6 +512,12 @@ class GraphTracer(GraphTracerProtocol):
         node_data.output_preview = output_preview
         if metrics:
             node_data.metrics = metrics
+
+        # Accumulate output concept data (deduplicated)
+        if output_concept_data is not None:
+            concept_ref = f"{output_concept_data.get('domain_code', '')}.{output_concept_data.get('code', '')}"
+            if concept_ref not in self._concept_registry:
+                self._concept_registry[concept_ref] = output_concept_data
 
         # Store output spec and register in producer map for data flow tracking
         if output_spec is not None:

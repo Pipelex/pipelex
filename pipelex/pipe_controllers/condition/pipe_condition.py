@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 
 from typing_extensions import override
 
@@ -229,9 +229,16 @@ class PipeCondition(PipeController):
         # Select the outcome based on the evaluated expression
         outcome = self.outcome_map.get(evaluated_expression, self.default_outcome)
 
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "evaluated_expression": evaluated_expression,
+            "selected_outcome": str(outcome),
+        }
+
         # Handle continue case
         if SpecialOutcome.is_continue(outcome):
             log.dev(f"PipeCondition '{self.code}' continued with outcome: {outcome}. Evaluated expression: {evaluated_expression}")
+            self._register_execution_data(job_metadata, execution_data_dict)
             return PipeOutput(working_memory=working_memory)
 
         if SpecialOutcome.is_fail(outcome):
@@ -254,7 +261,7 @@ class PipeCondition(PipeController):
             msg = f"Some required stuff(s) not found: {error_details}"
             raise PipeRunError(message=msg, run_mode=pipe_run_params.run_mode, pipe_code=self.code) from exc
 
-        return await get_pipe_router().run(
+        pipe_output = await get_pipe_router().run(
             pipe_job=PipeJobFactory.make_pipe_job(
                 pipe=get_required_pipe(pipe_code=outcome),
                 job_metadata=job_metadata,
@@ -263,6 +270,8 @@ class PipeCondition(PipeController):
                 output_name=output_name,
             ),
         )
+        self._register_execution_data(job_metadata, execution_data_dict)
+        return pipe_output
 
     @override
     async def _dry_run_controller_pipe(
@@ -311,4 +320,9 @@ class PipeCondition(PipeController):
                 working_memory=working_memory,
                 pipe_run_params=pipe_run_params,
             )
+        execution_data_dict: dict[str, Any] = {
+            "evaluated_expression": "dry_run",
+            "selected_outcome": "all_outcomes",
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
         return PipeOutput(working_memory=working_memory)

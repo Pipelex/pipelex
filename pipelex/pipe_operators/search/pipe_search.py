@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from typing_extensions import override
 
@@ -143,6 +143,14 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             stuff=output_stuff,
             name=output_name,
         )
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "rendered_query": query_text,
+            "resolved_model": search_setting.model,
+            "is_structured_output": self.is_structured_output,
+        }
+
+        self._register_execution_data(job_metadata, execution_data_dict)
         return PipeSearchOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -176,6 +184,12 @@ class PipeSearch(PipeOperator[PipeSearchOutput]):
             stuff=output_stuff,
             name=output_name,
         )
+        execution_data_dict: dict[str, Any] = {
+            "rendered_query": "mock",
+            "resolved_model": "mock",
+            "is_structured_output": self.is_structured_output,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
         return PipeSearchOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
