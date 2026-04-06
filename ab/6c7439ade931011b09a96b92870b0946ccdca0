@@ -1,0 +1,241 @@
+pipelex/kit/configs/inference/backends/bedrock.toml
+  6f51ac2b796910cb 63
+pipelex/cli/agent_cli/commands/concept_cmd.py
+  51d775fcd5bd2591 12-13,45,129-131
+pipelex/cli/agent_cli/commands/pipe_cmd.py
+  0ca624eeb68c0aa4 244
+pipelex/cogt/llm/llm_worker_factory.py
+  51d775fcd5bd2591 232
+tests/unit/pipelex/builder/concept/test_data.py
+  0ca624eeb68c0aa4 381-394,405-406
+tests/unit/pipelex/cli/test_pipe_cmd.py
+  0ca624eeb68c0aa4 6-7,14,46,52,57,62,76,91,97,102,121,146,160
+CHANGELOG.md
+  35535645f936a11d 22-27
+  e16501657d19dae8 38-41,44
+  a3b498579a4a1992 50
+  51d775fcd5bd2591 57
+  6f51ac2b796910cb 3-21
+  cf58cdd54d2d52a4 28-37
+  0ca624eeb68c0aa4 45-49,51-56,58
+pipelex/builder/concept/concept_spec.py
+  0ca624eeb68c0aa4 265
+.pipelex/inference/backends/bedrock.toml
+  6f51ac2b796910cb 63
+pipelex/cli/agent_cli/commands/agent_cli_factory.py
+  953d6d11635b3ce3 38-41,52-53
+tests/unit/pipelex/builder/operations/test_parse_pipe_spec.py
+  93547e506dee5b3f 91-115
+  5c77b917aa3d0398 131,138-141,146,149,158-159,167-201
+  51d775fcd5bd2591 130,132,148,150
+tests/unit/pipelex/builder/operations/test_parse_concept_spec.py
+  51d775fcd5bd2591 8,46-51
+  5c77b917aa3d0398 74-91
+pipelex/builder/operations/pipe_ops.py
+  93547e506dee5b3f 31-32,113-114,117-120,126-129
+  5c77b917aa3d0398 35-37,46,88-89,94,102
+  60d7fe130c279688 11,33,115-116,130,143-149
+pyproject.toml
+  6f51ac2b796910cb 3
+pipelex/builder/operations/concept_ops.py
+  5c77b917aa3d0398 53-55
+.pipelex-dev/test_profiles.toml
+  6f51ac2b796910cb 356
+README.md
+  51d775fcd5bd2591 531
+pipelex/pipelex.py
+  bd35f6346f5651d8 206-209
+pipelex/cogt/img_gen/img_gen_worker_factory.py
+  51d775fcd5bd2591 146
+tests/unit/pipelex/system/pipelex_service/test_gateway_terms_check.py
+  bd35f6346f5651d8 2-5,10-18,22-30,32-33,36-38,64-72,74-77,79-89,91-96,99-100,102
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.5",
+  "base_commit_sha": "ab6c7439ade931011b09a96b92870b0946ccdca0",
+  "prompts": {
+    "0ca624eeb68c0aa4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "fea10622-dc72-4018-8363-24f7d8471b54",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 44,
+      "overriden_lines": 0
+    },
+    "215dcbc874c4ad93": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "18230f57-83c3-419a-b357-04b0d58d15b3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 4,
+      "overriden_lines": 0
+    },
+    "35535645f936a11d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "539d2f74-2077-49d9-a4ba-df92e332c98a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "51d775fcd5bd2591": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "da103f76-b0c4-4a41-aa4f-a309da1763b5",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 21,
+      "overriden_lines": 0
+    },
+    "5c77b917aa3d0398": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dac8482d-1e35-4da7-b6f2-405dba00b712",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 97,
+      "overriden_lines": 0
+    },
+    "60d7fe130c279688": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "dfa85e38-b5db-4292-a6e7-f01248165775",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 12,
+      "overriden_lines": 0
+    },
+    "6f51ac2b796910cb": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "7bbec395-82d5-459c-9d69-b7a99b739651",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 23,
+      "overriden_lines": 0
+    },
+    "93547e506dee5b3f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "446690c5-1159-4853-b612-5bc7245e6a09",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 37,
+      "overriden_lines": 0
+    },
+    "953d6d11635b3ce3": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "42a2afeb-ecc8-4be1-a10a-6ed26148a20f",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    },
+    "a3b498579a4a1992": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "87dd2dd0-d8e9-42fc-9745-5c9b893f0082",
+        "model": "gpt-5.4-medium"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    },
+    "bd35f6346f5651d8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "d3466480-a400-42e1-a06b-ebf5658caa28",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 64,
+      "overriden_lines": 0
+    },
+    "cf58cdd54d2d52a4": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "0b12f251-adac-435d-a94b-0e0cb474e53c",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 10,
+      "overriden_lines": 0
+    },
+    "e16501657d19dae8": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d194dc8-bdda-4f32-9d54-715c7d4ab78a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 5,
+      "overriden_lines": 0
+    },
+    "e629f73f164a0508": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5d308e6d-9514-4f6c-8e91-085199e9d2b9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel <lchoquel@users.noreply.github.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
