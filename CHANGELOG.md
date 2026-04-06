@@ -1,5 +1,12 @@
 # Changelog
 
+## [v0.23.7] - 2026-04-06
+
+### Added
+
+- **Graph tracing for pipe run data**: Pipe run data and concept are now included inside the flowchart graph spec, enabling richer visualization of pipe execution results across all pipe types (LLM, extract, compose, search, image gen, sequence, condition, batch, parallel).
+- **Assignment pipe**: New `pipe_assignment` pattern for direct value assignment within pipe execution.
+
 ## [v0.23.6] - 2026-04-06
 
 ### Changed
