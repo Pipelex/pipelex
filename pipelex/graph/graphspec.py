@@ -244,6 +244,7 @@ class NodeSpec(BaseModel):
     error: ErrorSpec | None = None
     tags: dict[str, str] = Field(default_factory=dict)
     metrics: dict[str, float] = Field(default_factory=dict)
+    execution_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class EdgeSpec(BaseModel):
@@ -277,6 +278,8 @@ class GraphSpec(BaseModel):
     nodes: list[NodeSpec] = Field(default_factory=empty_list_factory_of(NodeSpec))
     edges: list[EdgeSpec] = Field(default_factory=empty_list_factory_of(EdgeSpec))
     meta: dict[str, Any] = Field(default_factory=dict)
+    pipe_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)
+    concept_registry: dict[str, dict[str, Any]] = Field(default_factory=dict)
 
     def to_json(self) -> str:
         return self.model_dump_json(serialize_as_any=True, by_alias=True, indent=2)

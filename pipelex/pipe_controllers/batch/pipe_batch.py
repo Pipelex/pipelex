@@ -203,6 +203,13 @@ class PipeBatch(PipeController):
             name=output_name,
         )
 
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "item_count": len(input_content.items),
+            "branch_pipe_code": self.branch_pipe_code,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
+
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,

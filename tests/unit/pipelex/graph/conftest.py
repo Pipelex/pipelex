@@ -12,6 +12,7 @@ def make_defaulted_data_inclusion_config(
     stuff_text_content: bool = False,
     stuff_html_content: bool = False,
     error_stack_traces: bool = False,
+    pipe_and_concept_registry: bool = False,
 ) -> DataInclusionConfig:
     """Create a DataInclusionConfig for testing.
 
@@ -20,6 +21,7 @@ def make_defaulted_data_inclusion_config(
         stuff_text_content: Whether to include plain text stuff data.
         stuff_html_content: Whether to include HTML stuff data.
         error_stack_traces: Whether to include error stack traces.
+        pipe_and_concept_registry: Whether to include pipe and concept registries.
 
     Returns:
         A DataInclusionConfig configured for testing.
@@ -29,6 +31,7 @@ def make_defaulted_data_inclusion_config(
         stuff_text_content=stuff_text_content,
         stuff_html_content=stuff_html_content,
         error_stack_traces=error_stack_traces,
+        pipe_and_concept_registry=pipe_and_concept_registry,
     )
 
 
