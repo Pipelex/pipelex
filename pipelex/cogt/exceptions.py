@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pipelex.base_exceptions import PipelexError
+from typing_extensions import override
+
+from pipelex.base_exceptions import ErrorReport, PipelexError
 from pipelex.types import StrEnum
 
 if TYPE_CHECKING:
@@ -10,12 +12,54 @@ if TYPE_CHECKING:
     from pipelex.cogt.models.model_reference import ModelReferenceKind
 
 
+class InferenceErrorCategory(StrEnum):
+    """Classifies inference errors for retry decisions and error reporting."""
+
+    TRANSIENT = "transient"
+    CONFIGURATION = "configuration"
+    CONTENT = "content"
+    CAPACITY = "capacity"
+
+    @property
+    def is_retryable(self) -> bool:
+        match self:
+            case InferenceErrorCategory.TRANSIENT:
+                return True
+            case InferenceErrorCategory.CONFIGURATION | InferenceErrorCategory.CONTENT | InferenceErrorCategory.CAPACITY:
+                return False
+
+
 class CogtError(PipelexError):
-    pass
+    error_category: InferenceErrorCategory | None = None
+    user_action: str | None = None
+
+    def __init__(
+        self,
+        message: str,
+        error_category: InferenceErrorCategory | None = None,
+        user_action: str | None = None,
+    ):
+        super().__init__(message)
+        if error_category is not None:
+            self.error_category = error_category
+        if user_action is not None:
+            self.user_action = user_action
+
+    @override
+    def to_error_report(self) -> ErrorReport:
+        return ErrorReport(
+            error_type=type(self).__name__,
+            message=self.message,
+            error_category=self.error_category,
+            retryable=self.error_category.is_retryable if self.error_category is not None else None,
+            user_action=self.user_action,
+            model=getattr(self, "model_handle", None),
+            provider=getattr(self, "backend_name", None),
+        )
 
 
 class LLMConfigError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ImageContentError(CogtError):
@@ -39,6 +83,8 @@ class ModelChoiceNotFoundError(CogtError):
 
     Includes available options and migration hints in error message.
     """
+
+    error_category = InferenceErrorCategory.CONFIGURATION
 
     def __init__(
         self,
@@ -78,15 +124,15 @@ class ModelChoiceNotFoundError(CogtError):
 
 
 class LLMSettingsValidationError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ImgGenSettingsValidationError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ModelDeckValidatonError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ModelDeckPresetValidatonError(ModelDeckValidatonError):
@@ -106,6 +152,8 @@ class ModelDeckPresetValidatonError(ModelDeckValidatonError):
 
 
 class ModelNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
     def __init__(self, message: str, model_handle: str):
         self.model_handle = model_handle
         super().__init__(message)
@@ -119,6 +167,8 @@ class ModelWaterfallError(ModelNotFoundError):
 
 
 class LLMHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
     def __init__(self, message: str, preset_id: str, model_handle: str, enabled_backends: set[str] | None = None):
         self.preset_id = preset_id
         self.model_handle = model_handle
@@ -127,6 +177,8 @@ class LLMHandleNotFoundError(CogtError):
 
 
 class ImgGenHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
     def __init__(self, message: str, preset_id: str, model_handle: str):
         self.preset_id = preset_id
         self.model_handle = model_handle
@@ -134,6 +186,8 @@ class ImgGenHandleNotFoundError(CogtError):
 
 
 class ExtractHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
     def __init__(self, message: str, preset_id: str, model_handle: str):
         self.preset_id = preset_id
         self.model_handle = model_handle
@@ -141,6 +195,8 @@ class ExtractHandleNotFoundError(CogtError):
 
 
 class SearchHandleNotFoundError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+
     def __init__(self, message: str, preset_id: str, model_handle: str):
         self.preset_id = preset_id
         self.model_handle = model_handle
@@ -160,7 +216,7 @@ class LLMModelNotFoundError(ModelNotFoundError):
 
 
 class LLMCapabilityError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class LLMCompletionError(CogtError):
@@ -216,7 +272,7 @@ class ImgGenGeneratedTypeError(ImgGenGenerationError):
 
 
 class ExtractCapabilityError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ExtractJobFailureError(CogtError):
@@ -254,14 +310,17 @@ class InferenceBackendCredentialsErrorType(StrEnum):
 
 
 class InferenceBackendCredentialsError(CogtError):
+    error_category = InferenceErrorCategory.CONFIGURATION
+    user_action = "Check that the required API key environment variable is set"
+
     def __init__(
         self,
-        error_type: InferenceBackendCredentialsErrorType,
+        credentials_error_type: InferenceBackendCredentialsErrorType,
         backend_name: str,
         message: str,
         key_name: str,
     ):
-        self.error_type = error_type
+        self.credentials_error_type = credentials_error_type
         self.backend_name = backend_name
         self.key_name = key_name
         super().__init__(message)
@@ -272,7 +331,7 @@ class InferenceBackendLibraryError(CogtError):
 
 
 class RoutingProfileDisabledBackendError(CogtError):
-    pass
+    error_category = InferenceErrorCategory.CONFIGURATION
 
 
 class ModelManagerError(CogtError):
