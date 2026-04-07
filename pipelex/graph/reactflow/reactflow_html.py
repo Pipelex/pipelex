@@ -36,8 +36,6 @@ def generate_reactflow_html(
     graphspec: GraphSpec,
     config: ReactFlowRenderingConfig,
     *,
-    stuff_data_text: dict[str, str] | None = None,  # noqa: ARG001 — kept for backward compat
-    stuff_data_html: dict[str, str] | None = None,  # noqa: ARG001 — kept for backward compat
     title: str | None = None,
 ) -> str:
     """Generate single-file HTML with embedded GraphSpec and mthds-ui GraphViewer.
@@ -45,8 +43,6 @@ def generate_reactflow_html(
     Args:
         graphspec: The GraphSpec to embed and render.
         config: ReactFlow rendering configuration.
-        stuff_data_text: Unused (kept for backward compatibility).
-        stuff_data_html: Unused (kept for backward compatibility).
         title: Optional page title, overrides config.default_title.
 
     Returns:
@@ -77,8 +73,6 @@ async def generate_reactflow_html_async(
     graphspec: GraphSpec,
     config: ReactFlowRenderingConfig,
     *,
-    stuff_data_text: dict[str, str] | None = None,  # noqa: ARG001
-    stuff_data_html: dict[str, str] | None = None,  # noqa: ARG001
     title: str | None = None,
 ) -> str:
     """Generate single-file HTML with embedded GraphSpec and mthds-ui GraphViewer (async version).
@@ -86,8 +80,6 @@ async def generate_reactflow_html_async(
     Args:
         graphspec: The GraphSpec to embed and render.
         config: ReactFlow rendering configuration.
-        stuff_data_text: Unused (kept for backward compatibility).
-        stuff_data_html: Unused (kept for backward compatibility).
         title: Optional page title, overrides config.default_title.
 
     Returns:
