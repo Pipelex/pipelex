@@ -1,18 +1,21 @@
 """ReactFlow HTML generator for GraphSpec rendering.
 
 Generates standalone HTML files using the mthds-ui GraphViewer component.
-The pre-built HTML template (with JS+CSS inlined) is loaded from assets/
-and injected with GraphSpec data and configuration.
+The HTML template uses Jinja2 for data injection, consistent with mermaid rendering.
+JS and CSS bundles are loaded from vendored assets.
 """
 
 import json
-from html import escape as html_escape
 
+from pipelex.cogt.templating.template_category import TemplateCategory
 from pipelex.graph.graphspec import GraphSpec
 from pipelex.graph.reactflow.reactflow_config import ReactFlowRenderingConfig
-from pipelex.graph.reactflow.standalone_assets import get_standalone_template
-from pipelex.tools.jinja2.jinja2_filters import escape_script_tag
+from pipelex.graph.reactflow.standalone_assets import get_standalone_css, get_standalone_js
+from pipelex.tools.jinja2.jinja2_rendering import render_jinja2_async, render_jinja2_sync
+from pipelex.tools.jinja2.jinja2_template_registry import TemplateRegistry
 from pipelex.urls import URLs
+
+_REACTFLOW_TEMPLATE_KEY = "reactflow/main.html.jinja2"
 
 
 def _build_viewer_config(config: ReactFlowRenderingConfig) -> dict[str, object]:
@@ -42,40 +45,43 @@ def generate_reactflow_html(
     Args:
         graphspec: The GraphSpec to embed and render.
         config: ReactFlow rendering configuration.
-        stuff_data_text: Unused (kept for backward compatibility). Data is in GraphSpec IOSpec fields.
-        stuff_data_html: Unused (kept for backward compatibility). Data is in GraphSpec IOSpec fields.
+        stuff_data_text: Unused (kept for backward compatibility).
+        stuff_data_html: Unused (kept for backward compatibility).
         title: Optional page title, overrides config.default_title.
 
     Returns:
         Complete HTML page as a string with embedded GraphViewer.
     """
-    template = get_standalone_template()
+    template_source = TemplateRegistry.get(_REACTFLOW_TEMPLATE_KEY)
 
     graphspec_json = json.dumps(graphspec.model_dump(mode="json", by_alias=True), indent=2)
     config_json = json.dumps(_build_viewer_config(config))
-    page_title = title or config.default_title
 
-    return (
-        template.replace("<!--PIPELEX_TITLE-->", html_escape(page_title))
-        .replace("<!--PIPELEX_GRAPHSPEC-->", escape_script_tag(graphspec_json))
-        .replace("<!--PIPELEX_CONFIG-->", escape_script_tag(config_json))
-        .replace("<!--PIPELEX_LOGO_DARK-->", URLs.logo_white_on_transparent)
-        .replace("<!--PIPELEX_LOGO_LIGHT-->", URLs.logo_black_on_transparent)
-        .replace("<!--PIPELEX_THEME-->", config.style.theme)
+    return render_jinja2_sync(
+        template_source=template_source,
+        template_category=TemplateCategory.HTML,
+        templating_context={
+            "title": title or config.default_title,
+            "logo_dark": URLs.logo_white_on_transparent,
+            "logo_light": URLs.logo_black_on_transparent,
+            "graphspec_json": graphspec_json,
+            "config_json": config_json,
+            "theme": config.style.theme,
+            "viewer_js": get_standalone_js(),
+            "viewer_css": get_standalone_css(),
+        },
     )
 
 
-async def generate_reactflow_html_async(  # noqa: RUF029 — async signature kept for call-site compat
+async def generate_reactflow_html_async(
     graphspec: GraphSpec,
     config: ReactFlowRenderingConfig,
     *,
-    stuff_data_text: dict[str, str] | None = None,
-    stuff_data_html: dict[str, str] | None = None,
+    stuff_data_text: dict[str, str] | None = None,  # noqa: ARG001
+    stuff_data_html: dict[str, str] | None = None,  # noqa: ARG001
     title: str | None = None,
 ) -> str:
     """Generate single-file HTML with embedded GraphSpec and mthds-ui GraphViewer (async version).
-
-    Delegates to the sync version since no I/O is performed (template is cached).
 
     Args:
         graphspec: The GraphSpec to embed and render.
@@ -87,10 +93,22 @@ async def generate_reactflow_html_async(  # noqa: RUF029 — async signature kep
     Returns:
         Complete HTML page as a string with embedded GraphViewer.
     """
-    return generate_reactflow_html(
-        graphspec=graphspec,
-        config=config,
-        stuff_data_text=stuff_data_text,
-        stuff_data_html=stuff_data_html,
-        title=title,
+    template_source = TemplateRegistry.get(_REACTFLOW_TEMPLATE_KEY)
+
+    graphspec_json = json.dumps(graphspec.model_dump(mode="json", by_alias=True), indent=2)
+    config_json = json.dumps(_build_viewer_config(config))
+
+    return await render_jinja2_async(
+        template_source=template_source,
+        template_category=TemplateCategory.HTML,
+        templating_context={
+            "title": title or config.default_title,
+            "logo_dark": URLs.logo_white_on_transparent,
+            "logo_light": URLs.logo_black_on_transparent,
+            "graphspec_json": graphspec_json,
+            "config_json": config_json,
+            "theme": config.style.theme,
+            "viewer_js": get_standalone_js(),
+            "viewer_css": get_standalone_css(),
+        },
     )
