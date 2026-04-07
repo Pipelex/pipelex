@@ -45,5 +45,3 @@ class ReactFlowRenderingConfig(ConfigModel):
     # When True, PipeBatch controller nodes appear in the graph as pipe nodes for batch edges
     # When False, batch edges connect stuff nodes directly (list -> items, items -> list)
     show_batch_controller: bool
-    # When True, batch item nodes display their index suffix (e.g., "topic[0]" instead of "topic")
-    show_batch_item_index: bool
