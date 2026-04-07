@@ -94,7 +94,7 @@ class TestReactFlowHtml:
         assert "Content-Security-Policy" not in html
 
     def test_script_tag_count(self) -> None:
-        """Verify exactly 3 closing script tags (graphspec, config, IIFE)."""
+        """Verify exactly 4 closing script tags (graphspec, config, elkjs CDN, IIFE)."""
         html = generate_reactflow_html(self._empty_graphspec(), self._rf_config())
 
-        assert html.count("</script>") == 3
+        assert html.count("</script>") == 4
