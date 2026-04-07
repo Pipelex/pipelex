@@ -1,4 +1,8 @@
 <!DOCTYPE html>
+<!--
+  Bundled: React (MIT), @xyflow/react (MIT), DOMPurify (MPL-2.0/Apache-2.0), @pipelex/mthds-ui (MIT)
+  External: elkjs (EPL-2.0) loaded from CDN
+-->
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -41,6 +45,9 @@
 
 <script type="application/json" id="pipelex-graphspec">{{ graphspec_json | escape_script_tag | safe }}</script>
 <script type="application/json" id="pipelex-config">{{ config_json | escape_script_tag | safe }}</script>
+
+<!-- elkjs: EPL-2.0 licensed, loaded from CDN (not bundled) -->
+<script src="https://unpkg.com/elkjs@0.11.1/lib/elk.bundled.js"></script>
 
 <script>
 {{ viewer_js | escape_script_tag | safe }}
