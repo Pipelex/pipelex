@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Version manifest for vendored JS dependencies (not a Node.js project)",
+  "dependencies": {
+    "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#v0.2.6"
+  }
+}
