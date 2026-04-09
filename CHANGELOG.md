@@ -33,6 +33,10 @@
 
 - **ObjectAssignment deserialization on Temporal workers**: Removed `__init__` class registry check that blocked deserialization of `ObjectAssignment` before `library_crate` was loaded. Validation moved to `validate_before_execution()` method, following the existing codebase pattern.
 - **Dynamic concept classes in Temporal activities**: `WfPipeRouter` now propagates dynamically registered concept classes from the per-workflow registry to the global registry, so child workflows and activities can access them.
+- **Temporal nondeterminism in child workflow IDs**: Replaced `shortuuid.uuid()` with `workflow.uuid4()` in `TemporalPipeRouter` for deterministic child workflow ID generation. The old code caused TMPRL1100 errors on workflow replay.
+- **Enum fields (`choices`) breaking Temporal serialization**: Concepts with `choices` fields generated `Enum` classes that couldn't be resolved during `model_rebuild` or deserialized across Temporal workflow boundaries. Fixed `_exec_and_extract_class` to include all generated types (models + enums) in the forward reference namespace.
+- **Enum serialization in `ContentGeneratorChild`**: `model_dump()` now uses `mode="json"` to serialize enum values as plain strings, preventing type mismatch when validating across different model class instances.
+- **`Anything[]` hydration in Temporal**: Working memory hydration failed for `Anything` concept lists because `AnythingContent` doesn't exist as a class. Hydration now gracefully falls back to embedded `__class__` metadata or `TextContent` for items without type information.
 
 ## [v0.23.4] - 2026-04-02
 

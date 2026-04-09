@@ -115,7 +115,10 @@ def _exec_and_extract_class(source_code: str, class_name: str) -> type[BaseModel
     # datamodel-code-generator uses `from __future__ import annotations` which turns
     # type annotations into strings. For nested models, we need to rebuild so Pydantic
     # resolves the forward references against all classes in the generated namespace.
+    # Include ALL user-defined types (models + enums) so forward references to
+    # generated Enum classes (e.g. choices fields) can be resolved.
+    all_generated_types: dict[str, Any] = {name: obj for name, obj in namespace.items() if isinstance(obj, type) and not name.startswith("_")}
     for model_cls in model_classes.values():
-        model_cls.model_rebuild(_types_namespace=model_classes)
+        model_cls.model_rebuild(_types_namespace=all_generated_types)
 
     return extracted_class
