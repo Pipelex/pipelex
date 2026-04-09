@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import field_validator
 from typing_extensions import override
@@ -199,6 +199,12 @@ class PipeSequence(PipeController):
                 library_crate=library_crate,
             )
             evolving_memory = pipe_output.working_memory
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "step_count": len(self.sequential_sub_pipes),
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
+
         return PipeOutput(
             working_memory=evolving_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,

@@ -214,6 +214,13 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             name=output_name,
         )
 
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "compose_mode": "template",
+            "rendered_text": jinja2_text,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
+
         return PipeComposeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -262,6 +269,12 @@ class PipeCompose(PipeOperator[PipeComposeOutput]):
             stuff=output_stuff,
             name=output_name,
         )
+
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "compose_mode": "construct",
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
 
         return PipeComposeOutput(
             working_memory=working_memory,

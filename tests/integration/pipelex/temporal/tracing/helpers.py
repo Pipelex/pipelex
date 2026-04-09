@@ -29,6 +29,7 @@ def inject_graph_context(pipe_job: PipeJob, pipeline_run_id: str) -> PipeJob:
         parent_node_id=None,
         node_sequence=0,
         data_inclusion=DataInclusionConfig(
+            pipe_and_concept_registry=True,
             stuff_json_content=False,
             stuff_text_content=False,
             stuff_html_content=False,

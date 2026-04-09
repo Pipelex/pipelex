@@ -13,7 +13,6 @@ from pydantic import BaseModel
 from pipelex import log
 from pipelex.graph.mermaidflow.mermaid_html import render_mermaid_html_async, render_mermaid_html_with_data_async
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
-from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.tools.misc.string_utils import snake_to_title_case
 
@@ -116,25 +115,12 @@ async def generate_graph_outputs(
 
     # Generate ReactFlow HTML
     if inclusion.reactflow_html:
-        # Collect stuff data in alternate formats if configured
-        rf_stuff_data_text: dict[str, str] | None = None
-        rf_stuff_data_html: dict[str, str] | None = None
-        if graph_config.data_inclusion.stuff_text_content:
-            log.verbose("Collecting stuff data text for graph_spec")
-            rf_stuff_data_text = collect_stuff_data_text(graph_spec)
-        else:
-            log.verbose("No stuff data text to collect for graph_spec")
-        if graph_config.data_inclusion.stuff_html_content:
-            rf_stuff_data_html = collect_stuff_data_html(graph_spec)
-
         effective_rf_config = graph_config.reactflow_config
         if direction is not None:
             effective_rf_config = effective_rf_config.model_copy(update={"layout_direction": direction})
         reactflow_html = await generate_reactflow_html_async(
             graph_spec,
             effective_rf_config,
-            stuff_data_text=rf_stuff_data_text,
-            stuff_data_html=rf_stuff_data_html,
             title=page_title,
         )
 

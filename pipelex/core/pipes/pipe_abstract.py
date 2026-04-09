@@ -85,6 +85,37 @@ class PipeAbstract(ABC, BaseModel):
 
         return unique_concepts
 
+    def _register_execution_data(self, job_metadata: JobMetadata, execution_data: dict[str, Any]) -> None:
+        """Register execution metadata with the graph tracer.
+
+        Called by pipe subclasses during execution to capture runtime-resolved data
+        (rendered prompts, resolved models, etc.) for the GraphSpec.
+        """
+        graph_context = job_metadata.graph_context
+        if graph_context is None:
+            return
+        tracer_manager = GraphTracerManager.get_instance()
+        if tracer_manager is None or graph_context.parent_node_id is None:
+            return
+        tracer_manager.register_execution_data(
+            graph_id=graph_context.graph_id,
+            node_id=graph_context.parent_node_id,
+            execution_data=execution_data,
+        )
+
+    def _make_single_concept_data_for_registry(self, concept: Concept) -> dict[str, Any]:
+        """Serialize a single concept for the graph registry, including its JSON Schema."""
+        concept_dict = concept.model_dump(mode="json")
+        try:
+            concept_dict["json_schema"] = concept.get_structure_class().model_json_schema()
+        except (TypeError, ValueError):
+            concept_dict["json_schema"] = None
+        return concept_dict
+
+    def _make_concept_data_for_registry(self) -> list[dict[str, Any]]:
+        """Serialize all unique concepts from this pipe for the graph registry."""
+        return [self._make_single_concept_data_for_registry(concept) for concept in self.concept_dependencies]
+
     @field_validator("code", mode="before")
     @classmethod
     def validate_pipe_code_syntax(cls, code: str) -> str:
@@ -413,6 +444,13 @@ class PipeAbstract(ABC, BaseModel):
                         )
                         input_specs.append(input_spec)
 
+                # Serialize pipe and concept data for registries if enabled
+                pipe_data: dict[str, Any] | None = None
+                concept_data: list[dict[str, Any]] | None = None
+                if parent_graph_context.data_inclusion.pipe_and_concept_registry:
+                    pipe_data = self.model_dump(mode="json")
+                    concept_data = self._make_concept_data_for_registry()
+
                 graph_node_id, child_graph_context = tracer_manager.on_pipe_start(
                     graph_context=parent_graph_context,
                     pipe_code=self.code,
@@ -420,6 +458,8 @@ class PipeAbstract(ABC, BaseModel):
                     node_kind=node_kind,
                     started_at=started_at,
                     input_specs=input_specs or None,
+                    pipe_data=pipe_data,
+                    concept_data=concept_data,
                 )
                 # Update job metadata with child graph context for nested pipes
                 if child_graph_context is not None:
@@ -484,11 +524,17 @@ class PipeAbstract(ABC, BaseModel):
                     data_html=main_stuff.content.rendered_pretty_html() if parent_graph_context.data_inclusion.stuff_html_content else None,
                 )
 
+            # Serialize output concept for registry if enabled
+            output_concept_data: dict[str, Any] | None = None
+            if parent_graph_context.data_inclusion.pipe_and_concept_registry and main_stuff is not None:
+                output_concept_data = self._make_single_concept_data_for_registry(main_stuff.concept)
+
             tracer_manager.on_pipe_end_success(
                 lookup_key=parent_graph_context.lookup_key,
                 node_id=graph_node_id,
                 ended_at=datetime.now(timezone.utc),
                 output_spec=output_spec,
+                output_concept_data=output_concept_data,
             )
 
         pipe_run_params.pop_pipe_from_stack(pipe_code=self.code)

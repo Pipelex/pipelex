@@ -1,6 +1,7 @@
 """Graph tracer manager with singleton pattern for access from PipeAbstract without hub imports."""
 
 from datetime import datetime
+from typing import Any
 
 from pipelex.graph.graph_config import DataInclusionConfig
 from pipelex.graph.graph_context import GraphContext
@@ -195,6 +196,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         node_kind: NodeKind,
         started_at: datetime,
         input_specs: list[IOSpec] | None = None,
+        pipe_data: dict[str, Any] | None = None,
+        concept_data: list[dict[str, Any]] | None = None,
     ) -> tuple[str | None, GraphContext | None]:
         """Record the start of a pipe execution.
 
@@ -205,6 +208,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             node_kind: The kind of node (controller, operator, etc.).
             started_at: When the pipe started executing.
             input_specs: Optional list of IOSpec describing the inputs consumed.
+            pipe_data: Optional serialized pipe instance for the pipe registry.
+            concept_data: Optional list of serialized concept dicts for the concept registry.
 
         Returns:
             Tuple of (node_id, child_graph_context) if tracing is active, (None, None) otherwise.
@@ -220,6 +225,8 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             node_kind=node_kind,
             started_at=started_at,
             input_specs=input_specs,
+            pipe_data=pipe_data,
+            concept_data=concept_data,
         )
 
     def on_pipe_end_success(
@@ -230,6 +237,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
         output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
     ) -> None:
         """Record successful completion of a pipe execution.
 
@@ -240,6 +248,7 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             output_preview: Optional truncated preview of the output.
             metrics: Optional metrics (e.g., token counts).
             output_spec: Optional IOSpec describing the output produced.
+            output_concept_data: Optional serialized concept dict for the actual output concept.
         """
         if node_id is None:
             return
@@ -254,7 +263,28 @@ class GraphTracerManager(metaclass=ABCSingletonMeta):
             output_preview=output_preview,
             metrics=metrics,
             output_spec=output_spec,
+            output_concept_data=output_concept_data,
         )
+
+    def register_execution_data(
+        self,
+        graph_id: str,
+        node_id: str | None,
+        execution_data: dict[str, Any],
+    ) -> None:
+        """Register execution metadata for a node.
+
+        Args:
+            graph_id: The graph identifier.
+            node_id: The node ID to attach execution data to.
+            execution_data: Dictionary of execution metadata.
+        """
+        if node_id is None:
+            return
+        tracer = self._get_tracer(graph_id)
+        if tracer is None:
+            return
+        tracer.register_execution_data(node_id=node_id, execution_data=execution_data)
 
     def on_pipe_end_error(
         self,

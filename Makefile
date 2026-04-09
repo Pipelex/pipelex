@@ -111,6 +111,7 @@ make tp                       - Shorthand -> test-with-prints
 make tb                       - Shorthand -> `make test-with-prints TEST=test_boot`
 make test-inference           - Run unit tests only for inference (with prints)
 make ti                       - Shorthand -> test-inference
+make ticc                     - Shorthand -> test config coverage (all Portkey configs)
 make tip                      - Shorthand -> test-inference-with-prints (parallelized inference tests)
 make test-llm			      - Run unit tests only for llm (with prints)
 make tl                       - Shorthand -> test-llm
@@ -561,6 +562,12 @@ tip: test-inference-with-prints
 
 ti: test-inference-fast
 	@echo "> done: ti-fast = test-inference-fast"
+
+ticc: env
+	$(call PRINT_TITLE,"Config coverage inference testing")
+	@$(VENV_PIPELEX_DEV) preprocess-test-models --generate-fixtures --profile all_configs_gw --quiet
+	$(VENV_PYTEST) -n auto --pipe-run-mode live -m "inference" -s -rfE -k "TestConfigCoverage" $(if $(filter 1,$(VERBOSE)),-v,$(if $(filter 2,$(VERBOSE)),-vv,$(if $(filter 3,$(VERBOSE)),-vvv,)))
+	@echo "> done: ticc = test-inference config coverage (all Portkey configs)"
 
 ti-dry: env
 	$(call PRINT_TITLE,"Unit testing")

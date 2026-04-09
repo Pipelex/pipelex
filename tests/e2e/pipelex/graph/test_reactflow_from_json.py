@@ -75,12 +75,13 @@ class TestReactFlowFromJson:
         # Verify HTML structure
         assert reactflow_html.startswith("<!DOCTYPE html>")
         assert '<script type="application/json" id="pipelex-graphspec">' in reactflow_html
-        assert "ReactFlow" in reactflow_html
-        assert "getLayoutedElements" in reactflow_html
+        assert '<div id="root">' in reactflow_html
         assert f'"{graph_spec.graph_id}"' in reactflow_html
 
         # Verify GraphSpec JSON is embedded
-        assert graph_spec.nodes[0].node_id in reactflow_html
+        first_pipe_code = graph_spec.nodes[0].pipe_code
+        if first_pipe_code is not None:
+            assert first_pipe_code in reactflow_html
 
     @pytest.mark.asyncio(loop_scope="class")
     @pytest.mark.parametrize(

@@ -10,6 +10,7 @@ class DataInclusionConfig(ConfigModel):
     stuff_text_content: bool
     stuff_html_content: bool
     error_stack_traces: bool
+    pipe_and_concept_registry: bool
 
 
 class GraphsInclusionConfig(ConfigModel):

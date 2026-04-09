@@ -18,6 +18,7 @@ from pipelex.cogt.model_backends.backend_factory import (
     InferenceBackendBlueprint,
     InferenceBackendFactory,
 )
+from pipelex.cogt.model_backends.gateway_config import GatewayConfig
 from pipelex.cogt.model_backends.model_spec_factory import (
     BackendModelSpecs,
     InferenceModelSpecBlueprint,
@@ -64,7 +65,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
         backends_library_path: str,
         backends_dir_path: str,
         include_disabled: bool = False,
-        gateway_model_specs: BackendModelSpecs | None = None,
+        gateway_config: GatewayConfig | None = None,
         lenient: bool = False,
     ):
         """Load backend configurations from TOML files.
@@ -76,7 +77,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
             backends_library_path: Path to backends.toml.
             backends_dir_path: Path to directory containing per-backend TOML files.
             include_disabled: Whether to include disabled backends.
-            gateway_model_specs: Remote model specs for Pipelex Gateway backend.
+            gateway_config: Gateway configuration for Pipelex Gateway backend.
             lenient: When True, skip backends with credential errors instead of raising.
         """
         try:
@@ -155,14 +156,15 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
                 # Handle pipelex_gateway specially - use remote config
                 backend_config_source: str
                 if PipelexBackend.is_gateway_backend(backend_name):
-                    if gateway_model_specs is None:
+                    if gateway_config is None:
                         if lenient:
                             log.verbose(f"Skipping backend '{backend_name}': gateway model specs not available")
                             continue
                         msg = "Pipelex Gateway backend is enabled but remote model specs were not provided"
                         raise InferenceBackendLibraryError(msg)
+                    extra_config["aws_region"] = gateway_config.aws_region
                     model_specs_dict, backend_config_source = self._load_gateway_model_specs(
-                        gateway_model_specs=gateway_model_specs,
+                        gateway_config=gateway_config,
                         backends_dir_path=backends_dir_path,
                         substitute_vars_with_provider=substitute_vars_with_provider,
                     )
@@ -226,14 +228,14 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
     def _load_gateway_model_specs(
         self,
-        gateway_model_specs: BackendModelSpecs,
+        gateway_config: GatewayConfig,
         backends_dir_path: str,
         substitute_vars_with_provider: Any,
     ) -> tuple[BackendModelSpecs, str]:
         """Load model specs for pipelex_gateway from remote config.
 
         Args:
-            gateway_model_specs: dict of the model specs from the Pipelex Gateway.
+            gateway_config: Gateway configuration for Pipelex Gateway backend.
             backends_dir_path: Path to directory containing local override file.
             substitute_vars_with_provider: Function to substitute variables.
 
@@ -249,7 +251,7 @@ class InferenceBackendLibrary(RootModel[InferenceBackendLibraryRoot]):
 
         # Merge remote config with local overrides
         model_specs_dict = GatewayConfigMerger.merge(
-            gateway_model_specs=gateway_model_specs,
+            gateway_model_specs=gateway_config.model_specs,
             local_overrides=local_overrides,
         )
 

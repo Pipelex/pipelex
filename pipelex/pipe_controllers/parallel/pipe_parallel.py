@@ -211,6 +211,14 @@ class PipeParallel(PipeController):
             output_stuffs=output_stuffs,
         )
 
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "branch_count": len(self.parallel_sub_pipes),
+            "add_each_output": self.add_each_output,
+            "combined_output_concept": self.combined_output.concept_ref if self.combined_output else None,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
+
         return PipeOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,
@@ -300,6 +308,13 @@ class PipeParallel(PipeController):
             job_metadata=job_metadata,
             output_stuffs=output_stuffs,
         )
+
+        execution_data_dict: dict[str, Any] = {
+            "branch_count": len(self.parallel_sub_pipes),
+            "add_each_output": self.add_each_output,
+            "combined_output_concept": self.combined_output.concept_ref if self.combined_output else None,
+        }
+        self._register_execution_data(job_metadata, execution_data_dict)
 
         return PipeOutput(
             working_memory=working_memory,

@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Protocol
+from typing import Any, Protocol
 
 from typing_extensions import override
 
@@ -58,6 +58,8 @@ class GraphTracerProtocol(Protocol):
         node_kind: NodeKind,
         started_at: datetime,
         input_specs: list[IOSpec] | None = None,
+        pipe_data: dict[str, Any] | None = None,
+        concept_data: list[dict[str, Any]] | None = None,
     ) -> tuple[str, GraphContext]:
         """Record the start of a pipe execution.
 
@@ -68,6 +70,8 @@ class GraphTracerProtocol(Protocol):
             node_kind: The kind of node (controller, operator, etc.).
             started_at: When the pipe started executing.
             input_specs: Optional list of IOSpec describing the inputs consumed.
+            pipe_data: Optional serialized pipe instance for the pipe registry.
+            concept_data: Optional list of serialized concept dicts for the concept registry.
 
         Returns:
             Tuple of (node_id for this pipe, updated GraphContext for children).
@@ -81,6 +85,7 @@ class GraphTracerProtocol(Protocol):
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
         output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
     ) -> None:
         """Record successful completion of a pipe execution.
 
@@ -90,6 +95,7 @@ class GraphTracerProtocol(Protocol):
             output_preview: Optional truncated preview of the output.
             metrics: Optional metrics (e.g., token counts).
             output_spec: Optional IOSpec describing the output produced.
+            output_concept_data: Optional serialized concept dict for the actual output concept.
         """
         ...
 
@@ -204,6 +210,19 @@ class GraphTracerProtocol(Protocol):
         """
         ...
 
+    def register_execution_data(
+        self,
+        node_id: str,
+        execution_data: dict[str, Any],
+    ) -> None:
+        """Register execution metadata for a node.
+
+        Args:
+            node_id: The node ID to attach execution data to.
+            execution_data: Dictionary of execution metadata (rendered prompts, resolved models, etc.).
+        """
+        ...
+
 
 class GraphTracerNoOp(GraphTracerProtocol):
     """No-operation implementation of GraphTracerProtocol.
@@ -240,6 +259,8 @@ class GraphTracerNoOp(GraphTracerProtocol):
         node_kind: NodeKind,
         started_at: datetime,
         input_specs: list[IOSpec] | None = None,
+        pipe_data: dict[str, Any] | None = None,
+        concept_data: list[dict[str, Any]] | None = None,
     ) -> tuple[str, GraphContext]:
         node_id = graph_context.make_node_id()
         child_context = graph_context.copy_for_child(node_id, graph_context.node_sequence + 1)
@@ -253,6 +274,15 @@ class GraphTracerNoOp(GraphTracerProtocol):
         output_preview: str | None = None,
         metrics: dict[str, float] | None = None,
         output_spec: IOSpec | None = None,
+        output_concept_data: dict[str, Any] | None = None,
+    ) -> None:
+        pass
+
+    @override
+    def register_execution_data(
+        self,
+        node_id: str,
+        execution_data: dict[str, Any],
     ) -> None:
         pass
 
