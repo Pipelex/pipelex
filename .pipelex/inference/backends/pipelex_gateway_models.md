@@ -21,14 +21,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </thead>
 <tbody>
 <tr>
-<td>claude-3.7-sonnet</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
 <td>claude-4-opus</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -85,23 +77,7 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 <td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
 </tr>
 <tr>
-<td>deepseek-v3.1</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
 <td>deepseek-v3.2</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
-<td>deepseek-v3.2-speciale</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">❌</td>
@@ -512,12 +488,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 </thead>
 <tbody>
 <tr>
-<td>flux-2-pro</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
-<td style="text-align:center;background-color:rgba(76,175,80,0.15)">✅</td>
-</tr>
-<tr>
 <td>gpt-image-1</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
 <td style="text-align:center;background-color:rgba(33,150,243,0.15)">✅</td>
@@ -558,6 +528,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-22T11:04:09Z
+> Last updated: 2026-04-09T14:00:47Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

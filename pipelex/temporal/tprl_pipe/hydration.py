@@ -14,12 +14,16 @@ from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
 
 
-def _hydrate_list_item(raw_item: dict[str, Any] | str) -> StuffContent:
+def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffContent:
     """Hydrate a single list item for Anything[] results.
 
     Tries __class__ metadata first, falls back to TextContent for plain text or
     dicts with a 'text' key (the common case for Anything outputs).
     """
+    # Already hydrated (Temporal data converter may deserialize items directly)
+    if isinstance(raw_item, StuffContent):
+        return raw_item
+
     if isinstance(raw_item, str):
         return TextContent(text=raw_item)
 
@@ -29,11 +33,12 @@ def _hydrate_list_item(raw_item: dict[str, Any] | str) -> StuffContent:
         clean_item = {key: val for key, val in raw_item.items() if key not in {"__class__", "__module__"}}
         return cast("StuffContent", item_class.model_validate(clean_item))
 
-    # No __class__ metadata — fall back to TextContent (the common Anything case)
+    # No __class__ metadata — fall back to TextContent for simple text dicts.
+    # This handles legacy payloads serialized before __class__ metadata was added.
     if "text" in raw_item:
         return TextContent.model_validate(raw_item)
 
-    msg = f"Cannot hydrate Anything list item: no __class__ metadata and not a TextContent dict. Keys: {list(raw_item.keys())}"
+    msg = f"Cannot hydrate Anything list item: no __class__ metadata and no recognized content structure. Keys: {list(raw_item.keys())}"
     raise PipeJobError(msg)
 
 

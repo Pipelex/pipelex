@@ -483,5 +483,13 @@ class WorkingMemory(WorkingMemoryAbstract[Stuff], ContextProviderAbstract):
             content = stuff.content
             if isinstance(content, ListContent) and stuff_name in raw_root:
                 list_content = cast("ListContent[StuffContent]", content)
-                raw_root[stuff_name]["content"] = [item.model_dump(serialize_as_any=True) for item in list_content.items]
+                serialized_items: list[dict[str, Any]] = []
+                for item in list_content.items:
+                    item_dict = item.model_dump(serialize_as_any=True)
+                    # Preserve type metadata for items under Anything concepts so
+                    # the hydration side can reconstruct the correct content class.
+                    item_dict["__class__"] = type(item).__name__
+                    item_dict["__module__"] = type(item).__module__
+                    serialized_items.append(item_dict)
+                raw_root[stuff_name]["content"] = serialized_items
         return raw
