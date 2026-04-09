@@ -98,24 +98,6 @@
      --temporal-server testing
    ```
 
-   The `--class-registry` option controls whether dynamic concept classes leak to the
-   global KajsonManager registry or are scoped to the library:
-
-   - `--class-registry both` (default): runs tests in both shared and isolated modes
-   - `--class-registry shared`: dynamic classes go to global registry (standard behavior)
-   - `--class-registry isolated`: dynamic classes are scoped to the library registry,
-     keeping the global clean — forces deferred hydration paths, catching regressions
-     that only manifest in multi-process deployments
-
-   ```bash
-   # Default: runs both modes automatically
-   .venv/bin/pytest tests/integration/pipelex/temporal/
-
-   # Force single mode (useful for debugging)
-   .venv/bin/pytest tests/integration/pipelex/temporal/ \
-     --class-registry isolated
-   ```
-
 ---
 
 ### Prerequisites for running command lines: use virtual environment
@@ -315,7 +297,7 @@ When adding validation or fields, decide which layer they belong to. Language ru
 - When adding new configs, place them where it makes most sense, ask the user if you need arbitrage
 - As per our python standards, use StrEnum for multiple-value enums. In that case they must not be strict pydantic fields, i.e. add `= Field(strict=False)`
 - **Important**: NEVER EVER set default values for config attributes in the class definition. All the default values are defined in the main config file `pipelex/pipelex.toml`. The only exception si for Optional values which must be set to `None` in the class definition.
-- If (and only if) you add some config that will clearly make sense for client projects to override, for instance if it's a case of user preference, then you can also add a copy of the settings to the project override config file `.pipelex/pipelex.toml` with the same defaults, not commented out.
+- If (and only if) you add some config that will clearly make sense for client projects to override, for instance if it's a case of user preference, then you can also add a copy of the settings to the project override config file `.pipelex/pipelex.toml` but leaving them commented out, as an invitation to override.
 - The different `pipelex.toml` files and the python model `configs.py` must be up to date with each other in terms of structure and attributes, otherwise the loading of teh config fails. To check quickly that you're good, just run `make tb` which tests the boot sequence, which includes the config loading.
 
 ## Writing tests
