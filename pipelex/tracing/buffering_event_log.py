@@ -20,6 +20,14 @@ class BufferingEventLog(EventLogProtocol):
 
     def __init__(self) -> None:
         self._buffer: list[TraceEvent] = []
+        self._sequence: int = 0
+
+    @override
+    def next_sequence(self) -> int:
+        """Return the next sequence number. Shared by all emitters."""
+        seq = self._sequence
+        self._sequence += 1
+        return seq
 
     @override
     def emit(self, event: TraceEvent) -> None:

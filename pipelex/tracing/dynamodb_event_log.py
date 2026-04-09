@@ -51,8 +51,16 @@ class DynamoDBEventLog(EventLogProtocol):
 
         self._table_name = table_name
         self._region = region
+        self._sequence: int = 0
         dynamodb: Any = boto3.resource("dynamodb", region_name=self._region)  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
         self._table: Any = dynamodb.Table(self._table_name)  # pyright: ignore[reportUnknownMemberType]
+
+    @override
+    def next_sequence(self) -> int:
+        """Return the next sequence number. Shared by all emitters."""
+        seq = self._sequence
+        self._sequence += 1
+        return seq
 
     @staticmethod
     def _make_pk(pipeline_run_id: str) -> str:

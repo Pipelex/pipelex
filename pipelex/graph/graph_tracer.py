@@ -153,7 +153,13 @@ class GraphTracer(GraphTracerProtocol):
         self._event_log.emit(event)
 
     def _next_event_sequence(self) -> int:
-        """Return the next monotonic sequence number for event emission."""
+        """Return the next monotonic sequence number for event emission.
+
+        Delegates to the event log's shared counter so that all emitters
+        (GraphTracer, ReportingManager) produce unique sequences.
+        """
+        if self._event_log is not None:
+            return self._event_log.next_sequence()
         seq = self._event_sequence
         self._event_sequence += 1
         return seq

@@ -18,6 +18,15 @@ class EventLogProtocol(Protocol):
     all events from a child workflow are flushed before it returns to its parent.
     """
 
+    def next_sequence(self) -> int:
+        """Return the next monotonically increasing sequence number.
+
+        All emitters sharing the same event log must use this method to
+        obtain sequence numbers, ensuring events never collide on the
+        (workflow_id, sequence) key regardless of storage backend.
+        """
+        ...
+
     def emit(self, event: TraceEvent) -> None:
         """Append a single event to the log.
 

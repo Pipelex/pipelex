@@ -31,6 +31,14 @@ class NdjsonEventLog(EventLogProtocol):
     def __init__(self, traces_dir: str) -> None:
         self._traces_dir = traces_dir
         self._file_handles: dict[tuple[str, str], IO[str]] = {}
+        self._sequence: int = 0
+
+    @override
+    def next_sequence(self) -> int:
+        """Return the next sequence number. Shared by all emitters."""
+        seq = self._sequence
+        self._sequence += 1
+        return seq
 
     # ------------------------------------------------------------------
     # Write
