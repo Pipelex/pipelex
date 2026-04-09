@@ -7,9 +7,9 @@ from typing_extensions import override
 with workflow.unsafe.imports_passed_through():
     from pipelex.core.pipes.pipe_output import PipeOutput
     from pipelex.pipe_run.delivery_assignment import DeliveryStatus
-    from pipelex.pipe_run.graph_assembly import assemble_graph_on_output
     from pipelex.temporal.log_temporal import workflow_log
     from pipelex.temporal.tprl.workflow_caller import WorkflowClass
+    from pipelex.temporal.tprl_pipe.act_assemble_graph import AssembleGraphArg, act_assemble_graph
     from pipelex.temporal.tprl_pipe.act_deliver import DeliveryActivityArg, act_deliver
     from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
     from pipelex.temporal.tprl_pipe.pipe_run_arg import PipeRunArg
@@ -56,14 +56,21 @@ class WfPipeRun(WorkflowClass[PipeRunArg, PipeOutput]):
             workflow_log.error(f"WfPipeRouter failed: {exc}")
 
         # Step 2: Assemble full graph from trace events (cross-worker)
+        # Runs as an activity because DynamoDB reads are I/O forbidden in workflows.
         if pipe_output is not None:
             try:
-                assemble_graph_on_output(
-                    pipe_output=pipe_output,
-                    pipeline_run_id=pipeline_run_id,
-                    domain_code=pipe_job.pipe.domain_code,
-                    main_pipe_code=pipe_job.pipe.code,
+                graph_spec = await workflow.execute_activity(
+                    act_assemble_graph,
+                    arg=AssembleGraphArg(
+                        pipeline_run_id=pipeline_run_id,
+                        domain_code=pipe_job.pipe.domain_code,
+                        main_pipe_code=pipe_job.pipe.code,
+                    ),
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=RetryPolicy(maximum_attempts=3),
                 )
+                if graph_spec is not None:
+                    pipe_output.graph_spec = graph_spec
             except Exception as graph_exc:
                 workflow_log.warning(f"Graph assembly failed, continuing with delivery: {graph_exc}")
 

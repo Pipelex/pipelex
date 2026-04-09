@@ -21,7 +21,6 @@ with workflow.unsafe.imports_passed_through():
     from pipelex.temporal.tprl_pipe.act_flush_trace_events import FlushTraceEventsArg, act_flush_trace_events
     from pipelex.temporal.tprl_pipe.hydration import hydrate_working_memory
     from pipelex.tracing.buffering_event_log import BufferingEventLog
-    from pipelex.tracing.event_log_factory import make_event_log
 
 
 @workflow.defn(name="wf_pipe_router")
@@ -92,7 +91,9 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
             tracing_config = get_config().pipelex.tracing_config
             if tracing_config.is_enabled and graph_context is not None:
                 try:
-                    event_log = make_event_log(tracing_config)
+                    # Use BufferingEventLog inside workflows (no I/O allowed).
+                    # Events are flushed to the real backend via act_flush_trace_events.
+                    event_log = BufferingEventLog()
                     wf_graph_tracer_manager = GraphTracerManager.get_or_create_instance()
                     wf_tracer_key = wf_workflow_id
                     wf_graph_context = wf_graph_tracer_manager.open_tracer(
@@ -165,19 +166,18 @@ class WfPipeRouter(WorkflowClass[PipeJob, PipeOutput]):
 
             # Flush trace events and clean up event log
             if event_log is not None:
-                # For buffering backends (temporal_dynamodb), flush via activity
-                if isinstance(event_log, BufferingEventLog):
-                    buffered_events = event_log.drain()
-                    if buffered_events:
-                        try:
-                            await workflow.execute_activity(
-                                act_flush_trace_events,
-                                arg=FlushTraceEventsArg(events=buffered_events),
-                                start_to_close_timeout=timedelta(seconds=30),
-                                retry_policy=RetryPolicy(maximum_attempts=3),
-                            )
-                        except Exception as flush_exc:
-                            workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
+                # Drain buffered events and flush to the real backend via activity
+                buffered_events = event_log.drain()
+                if buffered_events:
+                    try:
+                        await workflow.execute_activity(
+                            act_flush_trace_events,
+                            arg=FlushTraceEventsArg(events=buffered_events),
+                            start_to_close_timeout=timedelta(seconds=30),
+                            retry_policy=RetryPolicy(maximum_attempts=3),
+                        )
+                    except Exception as flush_exc:
+                        workflow_log.warning(f"Failed to flush trace events: {flush_exc}")
 
                 try:
                     event_log.close()

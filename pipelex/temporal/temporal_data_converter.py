@@ -104,6 +104,22 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
         log.verbose(f"unijson_deserialize_payload — pydantic_gizmo: {pydantic_gizmo}")
         return cast("Any", pydantic_gizmo)
 
+    @staticmethod
+    def _unwrap_optional_base_model(type_hint: type[Any] | None) -> bool:
+        """Check if type_hint is Optional[BaseModel] / BaseModel | None."""
+        if type_hint is None:
+            return False
+        args = getattr(type_hint, "__args__", None)
+        if args is None:
+            return False
+        # Optional[X] is Union[X, None] — check if any non-None arg is a BaseModel subclass
+        for arg in args:
+            if arg is type(None):
+                continue
+            if isinstance(arg, type) and issubclass(arg, BaseModel):
+                return True
+        return False
+
     @override
     def from_payload(
         self,
@@ -112,6 +128,10 @@ class BaseModelPayloadConverter(JSONPlainPayloadConverter):
     ) -> Any:
         # BaseModel case
         if isinstance(type_hint, type) and issubclass(type_hint, BaseModel):  # pyright: ignore[reportUnnecessaryIsInstance]
+            return self._kajson_deserialize_from_payload(payload=payload)
+
+        # Optional[BaseModel] case (e.g. GraphSpec | None)
+        if self._unwrap_optional_base_model(type_hint):
             return self._kajson_deserialize_from_payload(payload=payload)
 
         # BaseModel list case
