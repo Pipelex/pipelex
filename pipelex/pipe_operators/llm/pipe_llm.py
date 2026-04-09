@@ -1,4 +1,4 @@
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from pydantic import ValidationError, model_validator
 from typing_extensions import override
@@ -235,6 +235,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
         # we acknowledge the code here with llm_prompt_1 and llm_prompt_2 is overly complex and should be refactored.
 
         the_content: StuffContent
+        rendered_llm_prompt: LLMPrompt | None = None
 
         if (
             Concept.are_concept_compatible(concept_1=output_stuff_spec.concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True)
@@ -246,6 +247,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 output_structure_prompt=None,
                 extra_params=llm_prompt_run_params.params,
             )
+            rendered_llm_prompt = llm_prompt_1_for_text
             try:
                 generated_text: str = await content_generator.make_llm_text(
                     job_metadata=job_metadata,
@@ -309,6 +311,7 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
                 output_structure_prompt=output_structure_prompt,
                 extra_params=llm_prompt_run_params.params,
             )
+            rendered_llm_prompt = llm_prompt_1_for_object
             the_content = await self._llm_gen_object_stuff_content(
                 job_metadata=job_metadata,
                 pipe_run_params=pipe_run_params,
@@ -333,6 +336,27 @@ class PipeLLM(PipeOperator[PipeLLMOutput]):
             name=output_name,
         )
 
+        # Capture execution data for the graph tracer
+        execution_data_dict: dict[str, Any] = {
+            "resolved_model": llm_setting_main.model,
+            "resolved_model_for_object": llm_setting_for_object.model,
+            "is_multiple_output": is_multiple_output,
+        }
+        execution_data_dict["rendered_system_prompt"] = rendered_llm_prompt.system_text
+        execution_data_dict["rendered_user_prompt"] = rendered_llm_prompt.user_text
+        if self.structuring_method is not None:
+            execution_data_dict["structuring_method"] = str(self.structuring_method)
+        if is_with_preliminary_text:
+            execution_data_dict["structuring_path"] = "text_then_object"
+        elif is_multiple_output:
+            execution_data_dict["structuring_path"] = "object_list"
+        else:
+            output_is_text = Concept.are_concept_compatible(
+                concept_1=output_stuff_spec.concept, concept_2=get_native_concept(NativeConceptCode.TEXT), strict=True
+            )
+            execution_data_dict["structuring_path"] = "text" if output_is_text else "object_direct"
+
+        self._register_execution_data(job_metadata, execution_data_dict)
         return PipeLLMOutput(
             working_memory=working_memory,
             pipeline_run_id=job_metadata.pipeline_run_id,

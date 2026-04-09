@@ -314,6 +314,7 @@ stuff_json_content = true
 stuff_text_content = true
 stuff_html_content = true
 error_stack_traces = true
+pipe_and_concept_registry = true
 
 [pipelex.pipeline_execution_config.graph_config.graphs_inclusion]
 graphspec_json = true
@@ -343,8 +344,6 @@ default_title = "Pipelex Graph"
 # When true, PipeBatch controller nodes appear in the graph as pipe nodes for batch edges
 # When false, batch edges connect stuff nodes directly (list -> items, items -> list)
 show_batch_controller = false
-# When true, batch item nodes display their index suffix (e.g., "topic[0]" instead of "topic")
-show_batch_item_index = false
 
 [pipelex.pipeline_execution_config.graph_config.reactflow_config.style]
 theme = "dark"

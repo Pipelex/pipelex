@@ -27,11 +27,10 @@ choice_default = "$gen-image"
 
 [img_gen.aliases]
 best-gpt = "gpt-image-1.5"
-best-gemini = "nano-banana-pro"
-best-blackforestlabs = "flux-2-pro"
+best-gemini = "nano-banana-2"
 
-default-general = "flux-2-pro"
-default-premium = "nano-banana-pro"
+default-general = "nano-banana"
+default-premium = "nano-banana-2"
 default-small = "gpt-image-1-mini"
 
 ####################################################################################################

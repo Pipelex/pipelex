@@ -268,8 +268,7 @@ class TestGraphWithFullData:
         assert reactflow_path.stat().st_size > 0
         html_content = reactflow_path.read_text(encoding="utf-8")
         assert '<script type="application/json" id="pipelex-graphspec">' in html_content
-        assert "ReactFlow" in html_content
-        assert "getLayoutedElements" in html_content
+        assert '<div id="root">' in html_content
         assert f'"{graph_spec.graph_id}"' in html_content  # GraphSpec should contain graph_id
 
         # Final summary

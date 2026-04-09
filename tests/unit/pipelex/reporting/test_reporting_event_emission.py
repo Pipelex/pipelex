@@ -21,6 +21,7 @@ from pipelex.tracing.in_memory_event_log import InMemoryEventLog
 from pipelex.tracing.trace_events import UsageReportEvent
 
 DATA_INCLUSION_OFF = DataInclusionConfig(
+    pipe_and_concept_registry=False,
     stuff_json_content=False,
     stuff_text_content=False,
     stuff_html_content=False,

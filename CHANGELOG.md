@@ -1,5 +1,43 @@
 # Changelog
 
+## [v0.23.8] - 2026-04-07
+
+### Changed
+
+- **Standalone ReactFlow graph rendering**: Replaced Jinja2 template-based HTML generation with a single standalone HTML asset, simplifying the graph rendering pipeline and removing the Jinja2 template dependency for ReactFlow output.
+
+## [v0.23.7] - 2026-04-06
+
+### Added
+
+- **Graph tracing for pipe run data**: Pipe run data and concept are now included inside the flowchart graph spec, enabling richer visualization of pipe execution results across all pipe types (LLM, extract, compose, search, image gen, sequence, condition, batch, parallel).
+- **Assignment pipe**: New `pipe_assignment` pattern for direct value assignment within pipe execution.
+
+## [v0.23.6] - 2026-04-06
+
+### Changed
+
+- **Sub-pipe input normalization**: Silently drop unsupported `inputs` field from step/branch dicts instead of logging a warning.
+
+## [v0.23.5] - 2026-04-04
+
+### Added
+
+- **Gateway config**: Introduced `GatewayConfig` to bundle gateway model specs with AWS region, propagating it through the backend library so bedrock backends use the correct region.
+- **Config coverage tests**: Integration tests that validate one model per Portkey config for each model type (LLM, image gen, extract, search), with `all_configs_gw` test profile and `make ticc` target.
+- **nano-banana-2 model**: Added `gemini-3.1-flash-image-preview` as `nano-banana-2` with updated Google image gen costs.
+- **DeepSeek models on bedrock**: Added DeepSeek models to the bedrock backend configuration.
+
+### Changed
+
+- **Image gen deck aliases**: Updated aliases to nano-banana model variants and removed `flux-2-pro`.
+- **Remote config**: Bumped to v08.
+- **Gateway model docs**: Regenerated, removing retired models (claude-3.7-sonnet, deepseek-v3.1, deepseek-v3.2-speciale, flux-2-pro).
+
+### Fixed
+
+- **deepseek-v3.1 structured output**: Removed unsupported `structured` output capability from the bedrock deepseek-v3.1 model spec — the `bedrock_aioboto3` worker does not implement object generation, so structured calls would fail at runtime.
+
 ## [v0.23.4] - 2026-04-02
 
 ### Changed
