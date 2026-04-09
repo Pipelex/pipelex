@@ -8,6 +8,7 @@ graphs from NDJSON event files.
 
 from collections.abc import Sequence
 from datetime import datetime, timezone
+from typing import Any
 
 from pipelex import log
 from pipelex.graph.graphspec import (
@@ -28,6 +29,7 @@ from pipelex.tracing.trace_events import (
     BatchItemEvent,
     ControllerOutputEvent,
     EdgeEvent,
+    ExecutionDataEvent,
     ParallelCombineEvent,
     PipeEndErrorEvent,
     PipeEndSuccessEvent,
@@ -65,6 +67,7 @@ class _AssemblerNodeData:
         self.error: ErrorSpec | None = None
         self.input_specs: list[IOSpec] = input_specs or []
         self.output_specs: list[IOSpec] = []
+        self.execution_data: dict[str, Any] = {}
 
     def to_node_spec(self) -> NodeSpec:
         """Convert to immutable NodeSpec."""
@@ -90,6 +93,7 @@ class _AssemblerNodeData:
             node_io=node_io,
             error=self.error,
             metrics=self.metrics,
+            execution_data=self.execution_data,
         )
 
 
@@ -140,6 +144,10 @@ class _AssemblerState:
         self._batch_aggregate_map: dict[str, tuple[str | None, list[tuple[str, int]]]] = {}
         self._parallel_combine_map: dict[str, tuple[str, list[tuple[str, str]]]] = {}
 
+        # Registries (accumulated from events, deduplicated)
+        self._pipe_registry: dict[str, dict[str, Any]] = {}
+        self._concept_registry: dict[str, dict[str, Any]] = {}
+
         # Edge ID counter for assembler-generated edges
         self._edge_sequence: int = 0
         # Edges generated in Pass 2 (DATA, BATCH_ITEM, etc.)
@@ -166,6 +174,8 @@ class _AssemblerState:
                 self._handle_batch_aggregate(event)
             elif isinstance(event, ParallelCombineEvent):
                 self._handle_parallel_combine(event)
+            elif isinstance(event, ExecutionDataEvent):
+                self._handle_execution_data(event)
             elif isinstance(event, UsageReportEvent):
                 pass  # Handled by UsageAggregator
             else:
@@ -192,6 +202,8 @@ class _AssemblerState:
             pipeline_ref=self._pipeline_ref,
             nodes=nodes,
             edges=all_edges,
+            pipe_registry=dict(self._pipe_registry),
+            concept_registry=dict(self._concept_registry),
         )
 
     # ------------------------------------------------------------------
@@ -214,6 +226,16 @@ class _AssemblerState:
         )
         self._nodes[event.node_id] = node_data
 
+        # Accumulate pipe and concept registry data (deduplicated)
+        if event.pipe_data:
+            pipe_ref = f"{event.pipe_data.get('domain_code', '')}.{event.pipe_data.get('code', '')}"
+            if pipe_ref not in self._pipe_registry:
+                self._pipe_registry[pipe_ref] = event.pipe_data
+        for concept_item in event.concept_data:
+            concept_ref = f"{concept_item.get('domain_code', '')}.{concept_item.get('code', '')}"
+            if concept_ref not in self._concept_registry:
+                self._concept_registry[concept_ref] = concept_item
+
     def _handle_pipe_end_success(self, event: PipeEndSuccessEvent) -> None:
         node_data = self._nodes.get(event.node_id)
         if node_data is None:
@@ -224,6 +246,12 @@ class _AssemblerState:
         node_data.status = NodeStatus.SUCCEEDED
         if event.metrics:
             node_data.metrics = event.metrics
+
+        # Accumulate output concept data (deduplicated)
+        if event.output_concept_data:
+            concept_ref = f"{event.output_concept_data.get('domain_code', '')}.{event.output_concept_data.get('code', '')}"
+            if concept_ref not in self._concept_registry:
+                self._concept_registry[concept_ref] = event.output_concept_data
 
         # Pass-through detection (mirrors graph_tracer.py:476-488)
         if event.output_spec is not None:
@@ -273,6 +301,13 @@ class _AssemblerState:
         node_data.output_specs.append(event.output_spec)
         if event.output_spec.digest:
             self._stuff_producer_map[event.output_spec.digest] = event.node_id
+
+    def _handle_execution_data(self, event: ExecutionDataEvent) -> None:
+        node_data = self._nodes.get(event.node_id)
+        if node_data is None:
+            log.warning(f"ExecutionDataEvent for unknown node: {event.node_id}")
+            return
+        node_data.execution_data.update(event.execution_data)
 
     def _handle_batch_item(self, event: BatchItemEvent) -> None:
         if event.list_stuff_code not in self._batch_item_map:

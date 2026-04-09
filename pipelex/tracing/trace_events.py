@@ -6,7 +6,7 @@ for NDJSON file storage and cross-worker graph assembly.
 """
 
 from datetime import datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -27,6 +27,7 @@ class TraceEventKind(StrEnum):
     BATCH_ITEM = "batch_item"
     BATCH_AGGREGATE = "batch_aggregate"
     PARALLEL_COMBINE = "parallel_combine"
+    EXECUTION_DATA = "execution_data"
     USAGE_REPORT = "usage_report"
 
 
@@ -62,6 +63,8 @@ class PipeStartEvent(TraceEvent):
     pipe_type: str
     node_kind: NodeKind
     input_specs: list[IOSpec] = Field(default_factory=empty_list_factory_of(IOSpec))
+    pipe_data: dict[str, Any] = Field(default_factory=dict)
+    concept_data: list[dict[str, Any]] = Field(default_factory=empty_list_factory_of(dict))
 
 
 class PipeEndSuccessEvent(TraceEvent):
@@ -72,6 +75,7 @@ class PipeEndSuccessEvent(TraceEvent):
     ended_at: datetime
     output_spec: IOSpec | None = None
     metrics: dict[str, float] = Field(default_factory=dict)
+    output_concept_data: dict[str, Any] = Field(default_factory=dict)
 
 
 class PipeEndErrorEvent(TraceEvent):
@@ -138,6 +142,14 @@ class ParallelCombineEvent(TraceEvent):
     branch_producer_node_ids: list[tuple[str, str]]
 
 
+class ExecutionDataEvent(TraceEvent):
+    """Emitted when a pipe registers execution metadata (rendered prompts, resolved models, etc.)."""
+
+    event_kind: Literal[TraceEventKind.EXECUTION_DATA] = TraceEventKind.EXECUTION_DATA
+    node_id: str
+    execution_data: dict[str, Any] = Field(default_factory=dict)
+
+
 class UsageReportEvent(TraceEvent):
     """Emitted when an inference job reports token usage."""
 
@@ -159,6 +171,7 @@ AnyTraceEvent = Annotated[
     | BatchItemEvent
     | BatchAggregateEvent
     | ParallelCombineEvent
+    | ExecutionDataEvent
     | UsageReportEvent,
     Field(discriminator="event_kind"),
 ]
