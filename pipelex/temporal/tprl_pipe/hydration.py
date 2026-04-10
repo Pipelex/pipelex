@@ -14,18 +14,44 @@ from pipelex.hub import get_class_registry
 from pipelex.pipe_run.exceptions import PipeJobError
 
 
+def _validate_as_known_class(item_class: type[StuffContent], raw_item: Any) -> StuffContent:
+    """Validate raw_item into item_class, tolerating cross-exec instances.
+
+    When a child workflow ships a ListContent back, ``dump_for_temporal`` embeds
+    ``__class__`` metadata on each item. kajson (in the Temporal data converter)
+    eagerly rebuilds class instances from that metadata *before* the parent
+    workflow runs ``load_from_crate``. That later crate load re-execs the
+    dynamic source and replaces the class in the registry — same name, new
+    Python identity. Pydantic's ``model_validate`` then rejects the old
+    instance because ``type(raw_item) is not item_class``. To bridge the gap,
+    we round-trip through ``model_dump()`` when we detect a cross-exec
+    instance.
+    """
+    if type(raw_item) is item_class:
+        return raw_item
+    if isinstance(raw_item, StuffContent):
+        return item_class.model_validate(raw_item.model_dump())
+    return item_class.model_validate(raw_item)
+
+
 def _hydrate_list_item(raw_item: dict[str, Any] | str | StuffContent) -> StuffContent:
     """Hydrate a single list item for Anything[] results.
 
     Tries __class__ metadata first, falls back to TextContent for plain text or
     dicts with a 'text' key (the common case for Anything outputs).
     """
-    # Already hydrated (Temporal data converter may deserialize items directly)
-    if isinstance(raw_item, StuffContent):
-        return raw_item
-
     if isinstance(raw_item, str):
         return TextContent(text=raw_item)
+
+    # Already hydrated by kajson via the Temporal data converter. The instance
+    # may come from a previous exec of the dynamic source — normalize through
+    # the registry's current class so downstream type checks stay consistent.
+    if isinstance(raw_item, StuffContent):
+        class_name_from_instance = type(raw_item).__name__
+        item_class_or_none = get_class_registry().get_class(name=class_name_from_instance)
+        if item_class_or_none is not None and issubclass(item_class_or_none, StuffContent):
+            return _validate_as_known_class(item_class_or_none, raw_item)
+        return raw_item
 
     class_name = raw_item.get("__class__")
     if class_name is not None:
@@ -57,9 +83,11 @@ def _hydrate_content(concept: Concept, raw_content: list[Any] | dict[str, Any] |
         registry = get_class_registry()
         item_class_or_none = registry.get_class(name=concept.structure_class_name)
         if item_class_or_none is not None and issubclass(item_class_or_none, StuffContent):
-            # Known content class (e.g. TextContent, PageContent)
-            raw_items = cast("list[dict[str, Any]]", raw_content)
-            items = [item_class_or_none.model_validate(raw_item) for raw_item in raw_items]
+            # Known content class (e.g. TextContent, PageContent, or a dynamic
+            # structured concept class). Use _validate_as_known_class so that
+            # cross-exec instances rebuilt by kajson during Temporal transit
+            # get normalized through a dict round-trip.
+            items = [_validate_as_known_class(item_class_or_none, raw_item) for raw_item in raw_content]
         else:
             # Anything or unknown concept — resolve each item by its embedded type metadata
             raw_items = cast("list[dict[str, Any]]", raw_content)
