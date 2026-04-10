@@ -60,6 +60,8 @@ class StructuredContentComposer:
         self.extra_context = extra_context or {}
         self.content_generator = content_generator or get_content_generator()
         self.pipe_run_params = pipe_run_params
+        # Populated by compose() so callers (e.g. graph tracer) can record runtime-resolved values.
+        self.resolved_field_values: dict[str, Any] = {}
 
     async def compose(self) -> StuffContent:
         """Compose the StructuredContent asynchronously.
@@ -68,6 +70,7 @@ class StructuredContentComposer:
             Populated StructuredContent instance
         """
         field_values = await self._resolve_all_fields()
+        self.resolved_field_values = field_values
         try:
             return self.output_class.model_validate(field_values)
         except ValidationError as exc:
