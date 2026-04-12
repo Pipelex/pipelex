@@ -198,77 +198,219 @@ Every phase is done when **all** of the following are true:
 
 ---
 
-## Phase 4: Retry Standardization
+## Phase 4: Markdown-Default Agent CLI Output
 
-> Extract the gateway workers' retry pattern into a shared utility.
+> Make all agent CLI commands return markdown by default, with `--format json` for structured output.
+> Currently `models`, `doctor`, `check-model` already support this. This phase extends it to
+> `run`, `validate`, and error output. Commands where JSON IS the payload (`inputs`, `concept`,
+> `pipe`) are excluded -- their output format is inherent to the command's purpose.
+>
+> **Scope:**
+> - `run` (pipe, bundle, method): success output as markdown, `--format json` for structured
+> - `validate` (pipe, bundle, method): success output as markdown, `--format json` for structured
+> - `agent_error()`: markdown by default to stderr, `--format json` for structured
+> - `init`: success output as markdown (simple confirmation)
+> - **Excluded:** `inputs` (returns JSON template), `concept`/`pipe` (returns TOML), `fmt`/`lint` (passthrough)
 
-- [ ] **4.1** Create shared retry decorator/mixin
-  - Extract from `gateway_extract_worker.py`'s tenacity pattern
-  - Parameterized: retry on `TRANSIENT` category, fail fast on others
-  - Configurable max retries, backoff from worker config
-  - Logs each retry with attempt number, wait duration, error category
+- [ ] **4.1** Add `agent_error_markdown()` function to `agent_output.py`
+  - Markdown rendering of errors, parallel to `agent_error()` which remains the JSON path
+  - Format: heading with error type, message body, hint as a tip callout, error_source as code block
+  - Must still print to stderr and `raise typer.Exit(1) from cause`
 
-- [ ] **4.2** Apply to all remote API workers
-  - OpenAI, Anthropic, Google, Mistral, Azure, FAL, HuggingFace, Linkup
-  - Replace any existing ad-hoc retry logic
-  - Skip for local workers (docling, pypdfium2)
+- [ ] **4.2** Add format-aware error dispatch
+  - Introduce a way for commands to pass the current `CliOutputFormat` to the error path
+  - Options: thread-local / context var, or pass format explicitly to a new `agent_error_dispatch(format, ...)` wrapper
+  - `agent_error()` (JSON) and `agent_error_markdown()` are the two backends
+  - Keep `agent_error()` as the default when format is unknown (e.g., errors during init before format is parsed)
 
-- [ ] **4.3** Add retry to `gateway_img_gen_worker.py` (currently missing unlike gateway extract/search)
+- [ ] **4.3** Add `--format` option to `run` commands
+  - Add `output_format: CliOutputFormat = CliOutputFormat.MARKDOWN` option to `pipe_cmd.py`, `bundle_cmd.py`, `method_cmd.py`
+  - Follow existing pattern from `models_cmd.py`: `match/case` on format
+  - JSON path: existing `agent_success(result)` unchanged
+  - Markdown path: new `_format_run_markdown(result)` function
+  - Run markdown should render: main_stuff content (markdown representation if available, else formatted JSON), output file path, graph file path
 
-- [ ] **4.4** Tests for Phase 4
-  - Unit test: transient error retries up to max, then raises
-  - Unit test: configuration error fails immediately (no retry)
-  - Unit test: retry logging includes attempt number and wait duration
-  - Integration test: verify gateway img gen worker retries on transient errors
+- [ ] **4.4** Add `--format` option to `validate` commands
+  - Same pattern as 4.3 for `validate/pipe_cmd.py`, `bundle_cmd.py`, `method_cmd.py`
+  - Markdown path: new `_format_validate_markdown(result)` function
+  - Validate markdown should render: pass/fail summary, list of validated pipes with status, error details if any
+
+- [ ] **4.5** Add `--format` option to `init` command
+  - Same pattern for `init_cmd.py`
+  - Markdown path: simple confirmation with target dir, backends enabled, routing profile
+
+- [ ] **4.6** Wire format into error handlers in `agent_cli_factory.py`
+  - `make_pipelex_for_agent_cli()` catches init errors before format is known -- keep JSON for these
+  - Command-level error handlers should respect the format option
+
+- [ ] **4.7** Update `agent_cli/CLAUDE.md` to document the new output contract
+  - Default format is markdown for all commands except inputs/concept/pipe/fmt/lint
+  - `--format json` available on run, validate, init, models, doctor, check-model
+  - Errors respect the same format option
+  - Document the markdown structure for each command
+
+- [ ] **4.8** Tests for Phase 4
+  - Test that `run` with no `--format` produces markdown to stdout
+  - Test that `run --format json` produces valid JSON to stdout
+  - Test that `validate` with no `--format` produces markdown
+  - Test that errors produce markdown to stderr by default
+  - Test that errors with `--format json` produce JSON to stderr
+  - Test that `inputs` command is unaffected (always JSON)
 
 ---
 
-## Phase 5: Enrich Error Messages
+## Phase 5: Retry Architecture
 
-> Now that infrastructure is in place, make every error message actionable.
+> Move retry responsibility from workers to PipeRouter — the dispatch layer that sits between
+> pipeline orchestration and pipe execution. Workers classify errors, PipeRouter retries.
+>
+> **Design principle — three retry layers, each with a distinct role:**
+>
+> | Layer | What | Retries on | Controlled by |
+> |-------|------|-----------|---------------|
+> | SDK transport | Connection resets, DNS, 503 | Built into OpenAI/Anthropic/Google SDKs | SDK defaults |
+> | **PipeRouter (new)** | **TRANSIENT CogtErrors after SDK retries exhausted** | **Rate limits, timeouts, brief outages** | **`pipelex.toml` config** |
+> | Temporal (future) | Longer failures, workflow-level retry | Service outages, cascading errors | Temporal retry policy |
+>
+> The PipeRouter retry is complementary to Temporal: it handles fast transients (seconds),
+> Temporal handles longer failures (minutes). Without Temporal, PipeRouter retry is the only
+> application-level retry — Pipelex must remain usable and resilient standalone.
+>
+> **Where in the code:** `PipeRouterProtocol.run()` in `pipe_run/pipe_router_protocol.py:47-67`.
+> Currently catches `PipeRunError` only. The new logic adds a retry loop around
+> `_run_pipe_job()` that catches `CogtError` with `is_retryable=True`.
 
-- [ ] **5.1** Audit all `user_action` strings across workers
-  - Every error path should have a user_action that tells the user (or agent) exactly what to do
-  - Group by category:
-    - TRANSIENT: "will retry automatically" or "try again in a moment"
-    - CONFIGURATION: specific fix ("check API key", "enable backend X", "model Y not available on your plan")
-    - CONTENT: "revise the prompt", "reduce input size", "content flagged by safety filters"
-    - CAPACITY: "upgrade your plan" or "wait for quota reset"
+- [ ] **5.1** Remove tenacity from gateway workers
+  - `gateway_extract_worker.py`: remove `_make_retryer()`, `_is_retryable_portkey_error()`,
+    `_log_retry()`, tenacity imports, and the `async for attempt in self._make_retryer()` wrapper
+  - `gateway_search_worker.py`: same removal
+  - Remove `TenacityConfig` from `config_cogt.py` and the `tenacity_config` field from `Cogt`
+  - Remove corresponding entries from `pipelex.toml` config files
+  - Remove `tenacity` from project dependencies if no longer used anywhere
+  - Remove `tools/misc/tenacity_utils.py` if no longer referenced
+  - Verify errors still propagate with correct `InferenceErrorCategory` (existing tests should cover)
 
-- [ ] **5.2** Add `provider` field to worker exceptions
-  - Set by each worker: "openai", "anthropic", "google", "mistral", "azure", "fal", "huggingface", "linkup", "docling", "pypdfium2"
-  - Included in `to_error_report()`
+- [ ] **5.2** Audit all workers for ad-hoc retry logic
+  - Confirm no worker does business-level retries outside of SDK internals
+  - Instructor's `max_retries` for structured generation is acceptable (it retries on schema
+    validation failure, not transport errors) — document this with a code comment
+  - Document any remaining retry behavior in a code comment at the worker level
 
-- [ ] **5.3** Migrate `AGENT_ERROR_HINTS` for inference errors
-  - Move inference-related hints from `agent_output.py` lookup dict into the exception classes themselves (via `user_action`)
-  - Keep non-inference hints (FileNotFoundError, JSONDecodeError, etc.) in the lookup dict
+- [ ] **5.3** Add transient retry config to `PipelineExecutionConfig`
+  - Add to `PipelineExecutionConfig` in `system/configuration/configs.py`:
+    ```
+    max_transient_retries: int          # 0 = disabled (default for backward compat)
+    transient_retry_base_wait: float    # seconds, e.g. 2.0
+    transient_retry_max_wait: float     # seconds, e.g. 30.0
+    transient_retry_backoff_multiplier: float  # e.g. 2.0
+    ```
+  - Add defaults in `pipelex/pipelex.toml` (disabled: `max_transient_retries = 0`)
+  - Add commented-out overrides in `.pipelex/pipelex.toml` project config (invitation to enable)
+  - Config flows through existing path: `get_config().pipelex.pipeline_execution_config`
+    which is already passed to `PipelexRunner` and accessible from `PipeRouterProtocol.run()`
 
-- [ ] **5.4** Tests for Phase 5
-  - Test that every `CogtError` subclass used by workers has a non-None `user_action`
-  - Test that every worker exception includes `provider` in `to_error_report()`
+- [ ] **5.4** Add transient retry loop to `PipeRouterProtocol.run()`
+  - Modify `pipe_run/pipe_router_protocol.py` `run()` method:
+    - Wrap `_run_pipe_job()` call in a retry loop
+    - Catch `CogtError` where `error_category.is_retryable` is True
+    - On retryable error: log attempt number + wait duration + error category, sleep with
+      exponential backoff, continue loop
+    - On non-retryable error (`CONFIGURATION`, `CONTENT`, `CAPACITY`): fail immediately (no retry)
+    - On max retries exhausted: raise the last error as-is (preserve the cause chain)
+    - On `PipeRunError` (existing handling): no change, still wraps as `PipeRouterError`
+    - `_before_run()` is called once (before the loop), not on each retry
+    - `_after_failing_run()` is called once (after all retries exhausted or non-retryable)
+  - The retry config comes from `PipelineExecutionConfig` — need to thread it through.
+    Options: add to `PipeJob`, or access via `get_config()` directly in the protocol.
+
+- [ ] **5.5** Thread retry config to PipeRouter
+  - Decide how `PipeRouterProtocol.run()` accesses `PipelineExecutionConfig`:
+    - Option A: Add `execution_config` to `PipeJob` (explicit, but changes the model)
+    - Option B: Access via `get_config()` in the protocol (simple, uses existing singleton)
+  - Implement the chosen approach
+
+- [ ] **5.6** Tests for Phase 5
+  - Unit test: `CogtError` with `TRANSIENT` retries up to max, then raises
+  - Unit test: `CogtError` with `CONFIGURATION` fails immediately (no retry)
+  - Unit test: `CogtError` with `CONTENT` fails immediately
+  - Unit test: `CogtError` with `CAPACITY` fails immediately
+  - Unit test: `PipeRunError` (non-CogtError) is unaffected by retry logic
+  - Unit test: `max_transient_retries = 0` disables retry (backward compat)
+  - Unit test: retry logging includes attempt number, wait duration, error category
+  - Unit test: backoff increases with each attempt
+  - Verify gateway workers raise with correct category on first failure (no silent retries)
+  - Existing worker error handling tests should still pass unchanged
 
 ---
 
-## Phase 6: Temporal Bridge
+## Phase 6: ErrorReport Everywhere
 
-> Make `TemporalError` use the new category system. Now that all workers carry error categories, the Temporal integration can leverage them for retry decisions and structured error details.
+> Extend the structured error reporting from inference-only (`CogtError`) to the full exception hierarchy.
+> This eliminates the fragile string-keyed dicts in `agent_output.py` and gives every error path
+> a self-describing report.
 
-- [ ] **6.1** Update `TemporalError.from_message_exception()` in `_temporal/pipelex/temporal/tprl/temporal_error.py`
-  - If the `PipelexError` has `error_category`, use `is_retryable` to set `non_retryable` on the `ApplicationError`
-  - Pass `error_category` as the `type` field (or keep class name as type and add category to details)
-  - Preserve existing behavior for exceptions without a category (fall back to `non_retryable_error_types` config list)
+- [ ] **6.1** Set default `error_category` on uncategorized `CogtError` subclasses
+  - These subclasses currently inherit `error_category = None` and produce empty reports when raised
+    without an instance-level override:
+    - CONFIGURATION: `RoutingProfileLibraryNotFoundError`, `InferenceBackendLibraryNotFoundError`,
+      `InferenceBackendLibraryValidationError`, `ModelManagerError`, `ModelDeckNotFoundError`,
+      `ModelDeckValidationError`, `RoutingProfileLibraryError`, `InferenceModelSpecError`
+    - CONTENT: `LLMPromptSpecError`, `LLMPromptTemplateInputsError`, `LLMPromptParameterError`,
+      `PromptImageFactoryError`, `PromptImageFormatError`, `PromptDocumentFactoryError`,
+      `ImgGenPromptError`, `ImgGenParameterError`
+    - Leave as None (set per-instance by workers): `LLMCompletionError`, `ImgGenGenerationError`,
+      `ExtractJobFailureError`, `SearchJobFailureError` — these are correctly dynamic
+  - Decide case-by-case for: `ImageContentError`, `CostRegistryError`, `ReportingManagerError`,
+    `SdkTypeError`, `ExtractOutputError`, `GeneratedImageError`, `LLMAssignmentError`,
+    `InferenceBackendLibraryError`
 
-- [ ] **6.2** Update `RetryPolicyConfig.non_retryable_error_types` usage
-  - Document that the config list is a fallback for exceptions that don't carry a category
-  - Long-term: as workers gain categories, the config list shrinks
+- [ ] **6.2** Add `error_domain` and `user_action` to key non-CogtError exceptions
+  - Add optional class-level `error_domain` field to `PipelexError` (values: "input", "config", "runtime")
+  - Update `PipelexError.to_error_report()` to include `error_domain` in the report
+  - Set defaults on key exceptions:
+    - `PipelineExecutionError`: domain="runtime", user_action="Check pipe_stack to identify which pipe failed"
+    - `PipeExecutionError`: domain="runtime"
+    - `ValidateBundleError`: domain="input", user_action="Check the validation_errors array for specific issues"
+    - `PipelexInterpreterError`: domain="input"
+    - `PipelexSetupError`: domain="config"
+    - `PipelexConfigError`: domain="config"
+    - Service errors (`InferenceSetupRequiredError`, `GatewayTermsNotAcceptedError`, etc.): domain="config"
+  - Files to modify: `base_exceptions.py`, `pipeline/exceptions.py`, `pipe_run/exceptions.py`,
+    `core/interpreter/exceptions.py`, `system/pipelex_service/exceptions.py`
 
-- [ ] **6.3** Add `to_error_report()` data as `ApplicationError` details
-  - Temporal's `ApplicationError` accepts `details` (arbitrary serializable data)
-  - Pack the `to_error_report()` dict into details so workflows and clients can inspect structured error info
-  - Update `TemporalError.from_app_error()` to extract and expose these details
+- [ ] **6.3** Migrate inference-related hints from `AGENT_ERROR_HINTS` into exception classes
+  - For each inference error type in `AGENT_ERROR_HINTS`, move the hint string to `user_action` on the class
+  - Keep non-inference hints in the dict (FileNotFoundError, JSONDecodeError, etc. — we can't add
+    attributes to built-in exceptions)
+  - Update `agent_error()` to prefer `report.user_action` over dict lookup (already partially done)
 
-- [ ] **6.4** Tests for Phase 6
-  - Unit test: `TemporalError.from_message_exception()` with a `CogtError` that has `error_category=TRANSIENT` → `non_retryable=False`
-  - Unit test: `TemporalError.from_message_exception()` with `error_category=CONFIGURATION` → `non_retryable=True`
-  - Unit test: `TemporalError.from_app_error()` round-trips the error report details
-  - Unit test: exceptions without category fall back to config list behavior
+- [ ] **6.4** Migrate `AGENT_ERROR_DOMAINS` into exception classes
+  - For each error type in `AGENT_ERROR_DOMAINS`, set the corresponding `error_domain` on the class
+  - Update `agent_error()` to prefer `report.error_domain` over dict lookup
+  - The dicts become fallback-only for non-PipelexError exceptions
+
+- [ ] **6.5** Add drift-detection test
+  - Unit test that discovers all `PipelexError` subclasses caught in agent CLI handlers
+    and verifies they either have class-level metadata OR an entry in the fallback dicts
+  - This prevents the "new exception added, forgot to update dicts" failure mode
+
+- [ ] **6.6** Tests for Phase 6
+  - Test `to_error_report()` on non-CogtError exceptions includes `error_domain`
+  - Test that `agent_error()` output for inference errors gets hint from class, not dict
+  - Test that `agent_error()` output for non-PipelexError still gets hint from dict fallback
+  - Test default categories on previously-uncategorized CogtError subclasses
+
+---
+
+## Phase 7: Temporal Bridge (deferred — belongs on Temporal branch)
+
+> This phase prepares the Temporal integration to use `InferenceErrorCategory` for retry decisions
+> and `to_error_report()` for structured error details. It should be implemented on the Temporal
+> integration branch where it can be tested end-to-end.
+>
+> Prerequisites from this branch: Phases 4-6 complete, all exceptions carry structured reports.
+
+- [ ] **7.1** Update `TemporalError.from_message_exception()` to use `error_category.is_retryable`
+- [ ] **7.2** Pack `to_error_report()` dict into `ApplicationError` details
+- [ ] **7.3** Document that `RetryPolicyConfig.non_retryable_error_types` is a fallback for exceptions without category
+- [ ] **7.4** Tests for the Temporal bridge
