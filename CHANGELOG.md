@@ -1,5 +1,17 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- **Inference error classification**: New `InferenceErrorCategory` enum (`transient`, `configuration`, `content`, `capacity`) with per-provider helpers that distinguish quota exhaustion from rate limits and detect content policy violations — covers OpenAI, Anthropic, Google, Mistral, AWS Bedrock, and Gateway.
+- **Structured `ErrorReport`**: `PipelexError.to_error_report()` returns a dataclass with error type, category, retryable flag, user action hint, model, and provider.
+
+### Changed
+
+- **All inference workers attach error category and user action**: Every worker across all providers now raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
+- **CLI error output wired to `ErrorReport`**: Error handlers use `to_error_report()` for consistent, structured display.
+
 ## [v0.23.7] - 2026-04-06
 
 ### Added
