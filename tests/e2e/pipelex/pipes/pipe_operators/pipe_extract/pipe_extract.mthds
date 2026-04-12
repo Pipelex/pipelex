@@ -1,0 +1,9 @@
+domain      = "pipe_extract_e2e"
+description = "Test PipeExtract for web page fetching"
+
+[pipe.extract_web_page_e2e]
+type        = "PipeExtract"
+description = "Fetch full page content from a web URL"
+inputs      = { document = "Document" }
+output      = "Page[]"
+model       = "@default-extract-web-page"
