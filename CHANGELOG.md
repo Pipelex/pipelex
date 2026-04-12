@@ -12,6 +12,12 @@
 - **All inference workers attach error category and user action**: Every worker across all providers now raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
 - **CLI error output wired to `ErrorReport`**: Error handlers use `to_error_report()` for consistent, structured display.
 
+## [v0.23.8] - 2026-04-07
+
+### Changed
+
+- **Standalone ReactFlow graph rendering**: Replaced Jinja2 template-based HTML generation with a single standalone HTML asset, simplifying the graph rendering pipeline and removing the Jinja2 template dependency for ReactFlow output.
+
 ## [v0.23.7] - 2026-04-06
 
 ### Added

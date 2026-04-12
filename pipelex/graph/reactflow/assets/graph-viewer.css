@@ -1,0 +1,1836 @@
+/* this gets exported as style.css and can be used for the default theming */
+/* these are the necessary styles for React/Svelte Flow, they get used by base.css and style.css */
+.react-flow {
+  direction: ltr;
+
+  --xy-edge-stroke-default: #b1b1b7;
+  --xy-edge-stroke-width-default: 1;
+  --xy-edge-stroke-selected-default: #555;
+
+  --xy-connectionline-stroke-default: #b1b1b7;
+  --xy-connectionline-stroke-width-default: 1;
+
+  --xy-attribution-background-color-default: rgba(255, 255, 255, 0.5);
+
+  --xy-minimap-background-color-default: #fff;
+  --xy-minimap-mask-background-color-default: rgba(240, 240, 240, 0.6);
+  --xy-minimap-mask-stroke-color-default: transparent;
+  --xy-minimap-mask-stroke-width-default: 1;
+  --xy-minimap-node-background-color-default: #e2e2e2;
+  --xy-minimap-node-stroke-color-default: transparent;
+  --xy-minimap-node-stroke-width-default: 2;
+
+  --xy-background-color-default: transparent;
+  --xy-background-pattern-dots-color-default: #91919a;
+  --xy-background-pattern-lines-color-default: #eee;
+  --xy-background-pattern-cross-color-default: #e2e2e2;
+  background-color: var(--xy-background-color, var(--xy-background-color-default));
+  --xy-node-color-default: inherit;
+  --xy-node-border-default: 1px solid #1a192b;
+  --xy-node-background-color-default: #fff;
+  --xy-node-group-background-color-default: rgba(240, 240, 240, 0.25);
+  --xy-node-boxshadow-hover-default: 0 1px 4px 1px rgba(0, 0, 0, 0.08);
+  --xy-node-boxshadow-selected-default: 0 0 0 0.5px #1a192b;
+  --xy-node-border-radius-default: 3px;
+
+  --xy-handle-background-color-default: #1a192b;
+  --xy-handle-border-color-default: #fff;
+
+  --xy-selection-background-color-default: rgba(0, 89, 220, 0.08);
+  --xy-selection-border-default: 1px dotted rgba(0, 89, 220, 0.8);
+
+  --xy-controls-button-background-color-default: #fefefe;
+  --xy-controls-button-background-color-hover-default: #f4f4f4;
+  --xy-controls-button-color-default: inherit;
+  --xy-controls-button-color-hover-default: inherit;
+  --xy-controls-button-border-color-default: #eee;
+  --xy-controls-box-shadow-default: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+
+  --xy-edge-label-background-color-default: #ffffff;
+  --xy-edge-label-color-default: inherit;
+  --xy-resize-background-color-default: #3367d9;
+}
+.react-flow.dark {
+  --xy-edge-stroke-default: #3e3e3e;
+  --xy-edge-stroke-width-default: 1;
+  --xy-edge-stroke-selected-default: #727272;
+
+  --xy-connectionline-stroke-default: #b1b1b7;
+  --xy-connectionline-stroke-width-default: 1;
+
+  --xy-attribution-background-color-default: rgba(150, 150, 150, 0.25);
+
+  --xy-minimap-background-color-default: #141414;
+  --xy-minimap-mask-background-color-default: rgba(60, 60, 60, 0.6);
+  --xy-minimap-mask-stroke-color-default: transparent;
+  --xy-minimap-mask-stroke-width-default: 1;
+  --xy-minimap-node-background-color-default: #2b2b2b;
+  --xy-minimap-node-stroke-color-default: transparent;
+  --xy-minimap-node-stroke-width-default: 2;
+
+  --xy-background-color-default: #141414;
+  --xy-background-pattern-dots-color-default: #777;
+  --xy-background-pattern-lines-color-default: #777;
+  --xy-background-pattern-cross-color-default: #777;
+  --xy-node-color-default: #f8f8f8;
+  --xy-node-border-default: 1px solid #3c3c3c;
+  --xy-node-background-color-default: #1e1e1e;
+  --xy-node-group-background-color-default: rgba(240, 240, 240, 0.25);
+  --xy-node-boxshadow-hover-default: 0 1px 4px 1px rgba(255, 255, 255, 0.08);
+  --xy-node-boxshadow-selected-default: 0 0 0 0.5px #999;
+
+  --xy-handle-background-color-default: #bebebe;
+  --xy-handle-border-color-default: #1e1e1e;
+
+  --xy-selection-background-color-default: rgba(200, 200, 220, 0.08);
+  --xy-selection-border-default: 1px dotted rgba(200, 200, 220, 0.8);
+
+  --xy-controls-button-background-color-default: #2b2b2b;
+  --xy-controls-button-background-color-hover-default: #3e3e3e;
+  --xy-controls-button-color-default: #f8f8f8;
+  --xy-controls-button-color-hover-default: #fff;
+  --xy-controls-button-border-color-default: #5b5b5b;
+  --xy-controls-box-shadow-default: 0 0 2px 1px rgba(0, 0, 0, 0.08);
+
+  --xy-edge-label-background-color-default: #141414;
+  --xy-edge-label-color-default: #f8f8f8;
+}
+.react-flow__background {
+  background-color: var(--xy-background-color-props, var(--xy-background-color, var(--xy-background-color-default)));
+  pointer-events: none;
+  z-index: -1;
+}
+.react-flow__container {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+}
+.react-flow__pane {
+  z-index: 1;
+}
+.react-flow__pane.draggable {
+    cursor: grab;
+  }
+.react-flow__pane.dragging {
+    cursor: grabbing;
+  }
+.react-flow__pane.selection {
+    cursor: pointer;
+  }
+.react-flow__viewport {
+  transform-origin: 0 0;
+  z-index: 2;
+  pointer-events: none;
+}
+.react-flow__renderer {
+  z-index: 4;
+}
+.react-flow__selection {
+  z-index: 6;
+}
+.react-flow__nodesselection-rect:focus,
+.react-flow__nodesselection-rect:focus-visible {
+  outline: none;
+}
+.react-flow__edge-path {
+  stroke: var(--xy-edge-stroke, var(--xy-edge-stroke-default));
+  stroke-width: var(--xy-edge-stroke-width, var(--xy-edge-stroke-width-default));
+  fill: none;
+}
+.react-flow__connection-path {
+  stroke: var(--xy-connectionline-stroke, var(--xy-connectionline-stroke-default));
+  stroke-width: var(--xy-connectionline-stroke-width, var(--xy-connectionline-stroke-width-default));
+  fill: none;
+}
+.react-flow .react-flow__edges {
+  position: absolute;
+}
+.react-flow .react-flow__edges svg {
+    overflow: visible;
+    position: absolute;
+    pointer-events: none;
+  }
+.react-flow__edge {
+  pointer-events: visibleStroke;
+}
+.react-flow__edge.selectable {
+    cursor: pointer;
+  }
+.react-flow__edge.animated path {
+    stroke-dasharray: 5;
+    animation: dashdraw 0.5s linear infinite;
+  }
+.react-flow__edge.animated path.react-flow__edge-interaction {
+    stroke-dasharray: none;
+    animation: none;
+  }
+.react-flow__edge.inactive {
+    pointer-events: none;
+  }
+.react-flow__edge.selected,
+  .react-flow__edge:focus,
+  .react-flow__edge:focus-visible {
+    outline: none;
+  }
+.react-flow__edge.selected .react-flow__edge-path,
+  .react-flow__edge.selectable:focus .react-flow__edge-path,
+  .react-flow__edge.selectable:focus-visible .react-flow__edge-path {
+    stroke: var(--xy-edge-stroke-selected, var(--xy-edge-stroke-selected-default));
+  }
+.react-flow__edge-textwrapper {
+    pointer-events: all;
+  }
+.react-flow__edge .react-flow__edge-text {
+    pointer-events: none;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+  }
+/* Arrowhead marker styles - use CSS custom properties as default */
+.react-flow__arrowhead polyline {
+  stroke: var(--xy-edge-stroke, var(--xy-edge-stroke-default));
+}
+.react-flow__arrowhead polyline.arrowclosed {
+  fill: var(--xy-edge-stroke, var(--xy-edge-stroke-default));
+}
+.react-flow__connection {
+  pointer-events: none;
+}
+.react-flow__connection .animated {
+    stroke-dasharray: 5;
+    animation: dashdraw 0.5s linear infinite;
+  }
+svg.react-flow__connectionline {
+  z-index: 1001;
+  overflow: visible;
+  position: absolute;
+}
+.react-flow__nodes {
+  pointer-events: none;
+  transform-origin: 0 0;
+}
+.react-flow__node {
+  position: absolute;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+  pointer-events: all;
+  transform-origin: 0 0;
+  box-sizing: border-box;
+  cursor: default;
+}
+.react-flow__node.selectable {
+    cursor: pointer;
+  }
+.react-flow__node.draggable {
+    cursor: grab;
+    pointer-events: all;
+  }
+.react-flow__node.draggable.dragging {
+      cursor: grabbing;
+    }
+.react-flow__nodesselection {
+  z-index: 3;
+  transform-origin: left top;
+  pointer-events: none;
+}
+.react-flow__nodesselection-rect {
+    position: absolute;
+    pointer-events: all;
+    cursor: grab;
+  }
+.react-flow__handle {
+  position: absolute;
+  pointer-events: none;
+  min-width: 5px;
+  min-height: 5px;
+  width: 6px;
+  height: 6px;
+  background-color: var(--xy-handle-background-color, var(--xy-handle-background-color-default));
+  border: 1px solid var(--xy-handle-border-color, var(--xy-handle-border-color-default));
+  border-radius: 100%;
+}
+.react-flow__handle.connectingfrom {
+    pointer-events: all;
+  }
+.react-flow__handle.connectionindicator {
+    pointer-events: all;
+    cursor: crosshair;
+  }
+.react-flow__handle-bottom {
+    top: auto;
+    left: 50%;
+    bottom: 0;
+    transform: translate(-50%, 50%);
+  }
+.react-flow__handle-top {
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -50%);
+  }
+.react-flow__handle-left {
+    top: 50%;
+    left: 0;
+    transform: translate(-50%, -50%);
+  }
+.react-flow__handle-right {
+    top: 50%;
+    right: 0;
+    transform: translate(50%, -50%);
+  }
+.react-flow__edgeupdater {
+  cursor: move;
+  pointer-events: all;
+}
+.react-flow__pane.selection .react-flow__panel {
+  pointer-events: none;
+}
+.react-flow__panel {
+  position: absolute;
+  z-index: 5;
+  margin: 15px;
+}
+.react-flow__panel.top {
+    top: 0;
+  }
+.react-flow__panel.bottom {
+    bottom: 0;
+  }
+.react-flow__panel.top.center, .react-flow__panel.bottom.center {
+      left: 50%;
+      transform: translateX(-15px) translateX(-50%);
+    }
+.react-flow__panel.left {
+    left: 0;
+  }
+.react-flow__panel.right {
+    right: 0;
+  }
+.react-flow__panel.left.center, .react-flow__panel.right.center {
+      top: 50%;
+      transform: translateY(-15px) translateY(-50%);
+    }
+.react-flow__attribution {
+  font-size: 10px;
+  background: var(--xy-attribution-background-color, var(--xy-attribution-background-color-default));
+  padding: 2px 3px;
+  margin: 0;
+}
+.react-flow__attribution a {
+    text-decoration: none;
+    color: #999;
+  }
+@keyframes dashdraw {
+  from {
+    stroke-dashoffset: 10;
+  }
+}
+.react-flow__edgelabel-renderer {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+  left: 0;
+  top: 0;
+}
+.react-flow__viewport-portal {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  left: 0;
+  top: 0;
+  -webkit-user-select: none;
+     -moz-user-select: none;
+          user-select: none;
+}
+.react-flow__minimap {
+  background: var(
+    --xy-minimap-background-color-props,
+    var(--xy-minimap-background-color, var(--xy-minimap-background-color-default))
+  );
+}
+.react-flow__minimap-svg {
+    display: block;
+  }
+.react-flow__minimap-mask {
+    fill: var(
+      --xy-minimap-mask-background-color-props,
+      var(--xy-minimap-mask-background-color, var(--xy-minimap-mask-background-color-default))
+    );
+    stroke: var(
+      --xy-minimap-mask-stroke-color-props,
+      var(--xy-minimap-mask-stroke-color, var(--xy-minimap-mask-stroke-color-default))
+    );
+    stroke-width: var(
+      --xy-minimap-mask-stroke-width-props,
+      var(--xy-minimap-mask-stroke-width, var(--xy-minimap-mask-stroke-width-default))
+    );
+  }
+.react-flow__minimap-node {
+    fill: var(
+      --xy-minimap-node-background-color-props,
+      var(--xy-minimap-node-background-color, var(--xy-minimap-node-background-color-default))
+    );
+    stroke: var(
+      --xy-minimap-node-stroke-color-props,
+      var(--xy-minimap-node-stroke-color, var(--xy-minimap-node-stroke-color-default))
+    );
+    stroke-width: var(
+      --xy-minimap-node-stroke-width-props,
+      var(--xy-minimap-node-stroke-width, var(--xy-minimap-node-stroke-width-default))
+    );
+  }
+.react-flow__background-pattern.dots {
+    fill: var(
+      --xy-background-pattern-color-props,
+      var(--xy-background-pattern-color, var(--xy-background-pattern-dots-color-default))
+    );
+  }
+.react-flow__background-pattern.lines {
+    stroke: var(
+      --xy-background-pattern-color-props,
+      var(--xy-background-pattern-color, var(--xy-background-pattern-lines-color-default))
+    );
+  }
+.react-flow__background-pattern.cross {
+    stroke: var(
+      --xy-background-pattern-color-props,
+      var(--xy-background-pattern-color, var(--xy-background-pattern-cross-color-default))
+    );
+  }
+.react-flow__controls {
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--xy-controls-box-shadow, var(--xy-controls-box-shadow-default));
+}
+.react-flow__controls.horizontal {
+    flex-direction: row;
+  }
+.react-flow__controls-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 26px;
+    width: 26px;
+    padding: 4px;
+    border: none;
+    background: var(--xy-controls-button-background-color, var(--xy-controls-button-background-color-default));
+    border-bottom: 1px solid
+      var(
+        --xy-controls-button-border-color-props,
+        var(--xy-controls-button-border-color, var(--xy-controls-button-border-color-default))
+      );
+    color: var(
+      --xy-controls-button-color-props,
+      var(--xy-controls-button-color, var(--xy-controls-button-color-default))
+    );
+    cursor: pointer;
+    -webkit-user-select: none;
+       -moz-user-select: none;
+            user-select: none;
+  }
+.react-flow__controls-button svg {
+      width: 100%;
+      max-width: 12px;
+      max-height: 12px;
+      fill: currentColor;
+    }
+.react-flow__edge.updating .react-flow__edge-path {
+      stroke: #777;
+    }
+.react-flow__edge-text {
+    font-size: 10px;
+  }
+.react-flow__node.selectable:focus,
+  .react-flow__node.selectable:focus-visible {
+    outline: none;
+  }
+.react-flow__node-input,
+.react-flow__node-default,
+.react-flow__node-output,
+.react-flow__node-group {
+  padding: 10px;
+  border-radius: var(--xy-node-border-radius, var(--xy-node-border-radius-default));
+  width: 150px;
+  font-size: 12px;
+  color: var(--xy-node-color, var(--xy-node-color-default));
+  text-align: center;
+  border: var(--xy-node-border, var(--xy-node-border-default));
+  background-color: var(--xy-node-background-color, var(--xy-node-background-color-default));
+}
+.react-flow__node-input.selectable:hover, .react-flow__node-default.selectable:hover, .react-flow__node-output.selectable:hover, .react-flow__node-group.selectable:hover {
+      box-shadow: var(--xy-node-boxshadow-hover, var(--xy-node-boxshadow-hover-default));
+    }
+.react-flow__node-input.selectable.selected,
+    .react-flow__node-input.selectable:focus,
+    .react-flow__node-input.selectable:focus-visible,
+    .react-flow__node-default.selectable.selected,
+    .react-flow__node-default.selectable:focus,
+    .react-flow__node-default.selectable:focus-visible,
+    .react-flow__node-output.selectable.selected,
+    .react-flow__node-output.selectable:focus,
+    .react-flow__node-output.selectable:focus-visible,
+    .react-flow__node-group.selectable.selected,
+    .react-flow__node-group.selectable:focus,
+    .react-flow__node-group.selectable:focus-visible {
+      box-shadow: var(--xy-node-boxshadow-selected, var(--xy-node-boxshadow-selected-default));
+    }
+.react-flow__node-group {
+  background-color: var(--xy-node-group-background-color, var(--xy-node-group-background-color-default));
+}
+.react-flow__nodesselection-rect,
+.react-flow__selection {
+  background: var(--xy-selection-background-color, var(--xy-selection-background-color-default));
+  border: var(--xy-selection-border, var(--xy-selection-border-default));
+}
+.react-flow__nodesselection-rect:focus,
+  .react-flow__nodesselection-rect:focus-visible,
+  .react-flow__selection:focus,
+  .react-flow__selection:focus-visible {
+    outline: none;
+  }
+.react-flow__controls-button:hover {
+      background: var(
+        --xy-controls-button-background-color-hover-props,
+        var(--xy-controls-button-background-color-hover, var(--xy-controls-button-background-color-hover-default))
+      );
+      color: var(
+        --xy-controls-button-color-hover-props,
+        var(--xy-controls-button-color-hover, var(--xy-controls-button-color-hover-default))
+      );
+    }
+.react-flow__controls-button:disabled {
+      pointer-events: none;
+    }
+.react-flow__controls-button:disabled svg {
+        fill-opacity: 0.4;
+      }
+.react-flow__controls-button:last-child {
+    border-bottom: none;
+  }
+.react-flow__controls.horizontal .react-flow__controls-button {
+    border-bottom: none;
+    border-right: 1px solid
+      var(
+        --xy-controls-button-border-color-props,
+        var(--xy-controls-button-border-color, var(--xy-controls-button-border-color-default))
+      );
+  }
+.react-flow__controls.horizontal .react-flow__controls-button:last-child {
+    border-right: none;
+  }
+.react-flow__resize-control {
+  position: absolute;
+}
+.react-flow__resize-control.left,
+.react-flow__resize-control.right {
+  cursor: ew-resize;
+}
+.react-flow__resize-control.top,
+.react-flow__resize-control.bottom {
+  cursor: ns-resize;
+}
+.react-flow__resize-control.top.left,
+.react-flow__resize-control.bottom.right {
+  cursor: nwse-resize;
+}
+.react-flow__resize-control.bottom.left,
+.react-flow__resize-control.top.right {
+  cursor: nesw-resize;
+}
+/* handle styles */
+.react-flow__resize-control.handle {
+  width: 5px;
+  height: 5px;
+  border: 1px solid #fff;
+  border-radius: 1px;
+  background-color: var(--xy-resize-background-color, var(--xy-resize-background-color-default));
+  translate: -50% -50%;
+}
+.react-flow__resize-control.handle.left {
+  left: 0;
+  top: 50%;
+}
+.react-flow__resize-control.handle.right {
+  left: 100%;
+  top: 50%;
+}
+.react-flow__resize-control.handle.top {
+  left: 50%;
+  top: 0;
+}
+.react-flow__resize-control.handle.bottom {
+  left: 50%;
+  top: 100%;
+}
+.react-flow__resize-control.handle.top.left {
+  left: 0;
+}
+.react-flow__resize-control.handle.bottom.left {
+  left: 0;
+}
+.react-flow__resize-control.handle.top.right {
+  left: 100%;
+}
+.react-flow__resize-control.handle.bottom.right {
+  left: 100%;
+}
+/* line styles */
+.react-flow__resize-control.line {
+  border-color: var(--xy-resize-background-color, var(--xy-resize-background-color-default));
+  border-width: 0;
+  border-style: solid;
+}
+.react-flow__resize-control.line.left,
+.react-flow__resize-control.line.right {
+  width: 1px;
+  transform: translate(-50%, 0);
+  top: 0;
+  height: 100%;
+}
+.react-flow__resize-control.line.left {
+  left: 0;
+  border-left-width: 1px;
+}
+.react-flow__resize-control.line.right {
+  left: 100%;
+  border-right-width: 1px;
+}
+.react-flow__resize-control.line.top,
+.react-flow__resize-control.line.bottom {
+  height: 1px;
+  transform: translate(0, -50%);
+  left: 0;
+  width: 100%;
+}
+.react-flow__resize-control.line.top {
+  top: 0;
+  border-top-width: 1px;
+}
+.react-flow__resize-control.line.bottom {
+  border-bottom-width: 1px;
+  top: 100%;
+}
+.react-flow__edge-textbg {
+  fill: var(--xy-edge-label-background-color, var(--xy-edge-label-background-color-default));
+}
+.react-flow__edge-text {
+  fill: var(--xy-edge-label-color, var(--xy-edge-label-color-default));
+}
+
+/* ReactFlow base styles — resolved by the consumer's bundler */
+/* Default theme — consumers can override any var on an ancestor element */
+.react-flow-container {
+  --color-bg: #0a0a0a;
+  --color-bg-dots: rgba(255, 255, 255, 0.35);
+  --color-text-muted: #94a3b8;
+  --color-controller-text: #94a3b8;
+  --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", "Monaco", "Menlo", monospace;
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+.react-flow-container {
+  position: absolute;
+  inset: 0;
+  background: var(--color-bg);
+}
+.react-flow__node {
+  font-family: var(--font-sans);
+  cursor: pointer;
+}
+.react-flow__background {
+  background: var(--color-bg) !important;
+}
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+.react-flow__edge-text {
+  font-size: 11px;
+  fill: var(--color-text-muted);
+}
+.react-flow__edge-textbg {
+  fill: var(--color-bg);
+}
+/* Selected node highlight */
+.react-flow__node.selected {
+  box-shadow:
+    0 0 0 3px var(--color-accent),
+    var(--shadow-lg) !important;
+  z-index: 1000 !important;
+}
+/* Pipe cards handle their own selection styling — suppress the wrapper outline */
+.react-flow__node-pipeCard {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  padding: 0 !important;
+}
+.react-flow__node-pipeCard.selected {
+  box-shadow: none !important;
+  outline: none !important;
+}
+.react-flow__node-pipeCard.selected .pipe-card {
+  box-shadow:
+    0 0 0 2px var(--color-accent, #3b82f6),
+    0 4px 16px rgba(0, 0, 0, 0.6);
+}
+.react-flow__node-controllerGroup.selected {
+  box-shadow:
+    0 0 0 2px var(--color-accent),
+    var(--shadow-lg) !important;
+}
+.react-flow__node-controllerGroup {
+  cursor: default !important;
+}
+/* ─── Controller Group Node ──────────────────────────────────────────── */
+.controller-group-node {
+  --controller-border: 2px dashed rgba(148, 163, 184, 0.3);
+  --controller-bg: rgba(148, 163, 184, 0.04);
+  --controller-header-color: #64748b;
+
+  width: 100%;
+  height: 100%;
+  position: relative;
+  border: var(--controller-border);
+  border-radius: 12px;
+  background: var(--controller-bg);
+}
+.controller-group-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  pointer-events: none;
+  user-select: none;
+}
+.controller-group-icon {
+  font-size: 13px;
+  color: var(--controller-header-color);
+  line-height: 1;
+}
+.controller-group-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--controller-header-color);
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+}
+.controller-group-label {
+  font-size: 11px;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-weight: 500;
+  color: var(--color-controller-text, #94a3b8);
+  white-space: nowrap;
+  margin-left: auto;
+}
+
+/* Collapse / expand toggle for parallel & batch controllers */
+.controller-group-collapse {
+  all: unset;
+  position: absolute;
+  bottom: 4px;
+  right: 8px;
+  font-size: 10px;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  color: var(--controller-header-color, #94a3b8);
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  pointer-events: auto;
+  z-index: 10;
+  white-space: nowrap;
+}
+.controller-group-collapse:hover {
+  color: #e2e8f0;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* Sequence — solid thin border, calm flow */
+.controller-group--sequence {
+  --controller-border: 1.5px solid rgba(148, 163, 184, 0.25);
+  --controller-bg: rgba(148, 163, 184, 0.03);
+  --controller-header-color: #94a3b8;
+}
+
+/* Parallel — double border, forking lanes */
+.controller-group--parallel {
+  --controller-border: 3px double rgba(139, 233, 253, 0.35);
+  --controller-bg: rgba(139, 233, 253, 0.03);
+  --controller-header-color: #8be9fd;
+}
+
+/* Condition — dashed with diamond accent */
+.controller-group--condition {
+  --controller-border: 2px dashed rgba(251, 191, 36, 0.35);
+  --controller-bg: rgba(251, 191, 36, 0.03);
+  --controller-header-color: #fbbf24;
+}
+
+/* Batch — dotted border, loop/repeat */
+.controller-group--batch {
+  --controller-border: 2px dotted rgba(167, 139, 250, 0.35);
+  --controller-bg: rgba(167, 139, 250, 0.03);
+  --controller-header-color: #a78bfa;
+}
+
+/* ─── Pipe Card Node ─────────────────────────────────────────────────── */
+/* All tokens overridable via CSS custom properties on an ancestor.      */
+.pipe-card {
+  --pipe-card-accent: #ff6b6b;
+  --pipe-card-bg: rgba(148, 163, 184, 0.08);
+  --pipe-card-text: #e2e8f0;
+  --pipe-card-text-bright: #f8fafc;
+  --pipe-card-text-muted: #94a3b8;
+  --pipe-card-text-dim: #64748b;
+  --pipe-card-pill-bg: rgba(255, 255, 255, 0.06);
+  --pipe-card-pill-border: rgba(255, 255, 255, 0.08);
+  --pipe-card-pill-text: #cbd5e1;
+  --pipe-card-radius: 8px;
+
+  border-left: 4px solid var(--pipe-card-accent);
+  border-radius: var(--pipe-card-radius);
+  padding: 12px 14px;
+  background: var(--pipe-card-bg);
+  font-family: var(--font-sans, "Inter", -apple-system, sans-serif);
+  color: var(--pipe-card-text);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+  transition: box-shadow 0.2s;
+  /* Fill the ReactFlow wrapper whose size is locked to ELK's layout dimensions */
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.pipe-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+/* Direction-aware sizing: LR = narrow + tall, TB = wide + short */
+.pipe-card--lr {
+  min-width: 180px;
+  max-width: 240px;
+}
+.pipe-card--tb {
+  min-width: 280px;
+  max-width: 400px;
+}
+
+/* Header: badge + code + status */
+.pipe-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pipe-card-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+  line-height: 1.4;
+  background: var(--pipe-card-accent);
+  color: #0e0e0e;
+}
+.pipe-card-code {
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--pipe-card-accent);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pipe-card-status {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.pipe-card-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.pipe-card-status-dot--pulse {
+  animation: pipe-card-pulse 1.5s ease-in-out infinite;
+}
+@keyframes pipe-card-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(1.3);
+  }
+}
+
+/* Description */
+.pipe-card-description {
+  font-size: 11.5px;
+  color: var(--pipe-card-text-muted);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* I/O section — base (appearance only, layout set per-direction below) */
+.pipe-card-io-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--pipe-card-text-dim);
+  flex-shrink: 0;
+}
+.pipe-card-io-pills {
+  display: flex;
+  gap: 4px;
+  min-width: 0;
+}
+.pipe-card-io-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 10px;
+  background: var(--pipe-card-pill-bg);
+  border: 1px solid var(--pipe-card-pill-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  line-height: 1.4;
+  min-width: 0;
+}
+.pipe-card-io-pill-name {
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  color: var(--pipe-card-pill-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pipe-card-io-pill-concept {
+  color: var(--pipe-card-text-dim);
+  font-size: 9px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pipe-card-io-more {
+  all: unset;
+  font-size: 10px;
+  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  color: var(--pipe-card-text-muted);
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+.pipe-card-io-more:hover {
+  color: var(--pipe-card-text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ─── LR: label on top, pills stacked vertically, hard-truncated ─────── */
+/* Truncation priority: concept shrinks first → name truncates last.     */
+.pipe-card--lr .pipe-card-io {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pipe-card--lr .pipe-card-io-pills {
+  flex-direction: column;
+  align-items: flex-start; /* pills size to content, not stretch */
+  gap: 4px;
+}
+.pipe-card--lr .pipe-card-io-pill {
+  max-width: 100%;
+  overflow: hidden;
+}
+.pipe-card--lr .pipe-card-io-pill-name {
+  flex: 0 1 auto; /* natural width, shrinks only after concept is gone */
+  min-width: 30px;
+}
+.pipe-card--lr .pipe-card-io-pill-concept {
+  flex: 0 100 auto; /* natural width, shrinks 100x faster than name */
+  min-width: 0; /* allow shrinking to zero */
+}
+.pipe-card--lr .pipe-card-io-more {
+  align-self: flex-start;
+}
+
+/* ─── TB: label on the left, pills wrap horizontally to the right ────── */
+.pipe-card--tb .pipe-card-io {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 6px;
+}
+.pipe-card--tb .pipe-card-io-label {
+  padding-top: 4px;
+  min-width: 52px;
+}
+.pipe-card--tb .pipe-card-io-pills {
+  flex: 1 1 0;
+  flex-wrap: wrap;
+  min-width: 0;
+}
+.pipe-card--tb .pipe-card-io-pill {
+  max-width: 100%;
+}
+.pipe-card--tb .pipe-card-io-pill-name {
+  max-width: 140px;
+}
+.pipe-card--tb .pipe-card-io-pill-concept {
+  max-width: 100px;
+}
+
+/* ─── StuffViewer component styles ────────────────────────────────────────── */
+/* Uses CSS custom properties for consumer theming. Defaults match graph-core.css. */
+
+.stuff-viewer {
+  --sv-bg: var(--color-bg, #0a0a0a);
+  --sv-surface: var(--color-surface, #16213e);
+  --sv-surface-hover: var(--color-surface-hover, #1f2b47);
+  --sv-border: var(--color-border, #2a3a5a);
+  --sv-text: var(--color-text, #e2e8f0);
+  --sv-text-muted: var(--color-text-muted, #94a3b8);
+  --sv-accent: var(--color-accent, #3b82f6);
+  --sv-success: #10b981;
+  --sv-success-bg: rgba(16, 185, 129, 0.2);
+  --sv-radius: 4px;
+  --sv-font-sans: var(
+    --font-sans,
+    "Inter",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif
+  );
+  --sv-font-mono: var(--font-mono, "JetBrains Mono", "Monaco", "Menlo", monospace);
+
+  font-family: var(--sv-font-sans);
+  color: var(--sv-text);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────────── */
+
+.stuff-viewer-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 12px 16px 8px;
+  border-bottom: 1px solid var(--sv-border);
+  flex-shrink: 0;
+}
+
+.stuff-viewer-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sv-text);
+  margin: 0;
+}
+
+.stuff-viewer-subtitle {
+  font-size: 12px;
+  color: var(--sv-text-muted);
+  margin: 0;
+}
+
+/* ─── Toolbar: tabs + action buttons ─────────────────────────────────────── */
+
+.stuff-viewer-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.stuff-viewer-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.stuff-viewer-tab {
+  padding: 5px 10px;
+  border-radius: var(--sv-radius);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--sv-surface-hover);
+  color: var(--sv-text-muted);
+  border: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.stuff-viewer-tab:hover {
+  background: var(--sv-border);
+  color: var(--sv-text);
+}
+
+.stuff-viewer-tab--active {
+  background: var(--sv-accent);
+  color: #fff;
+}
+
+/* ─── Action buttons ─────────────────────────────────────────────────────── */
+
+.stuff-viewer-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.stuff-viewer-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--sv-radius);
+  cursor: pointer;
+  background: var(--sv-surface-hover);
+  color: var(--sv-text-muted);
+  border: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.stuff-viewer-action-btn:hover {
+  background: var(--sv-border);
+  color: var(--sv-text);
+}
+
+.stuff-viewer-action-btn--copied {
+  background: var(--sv-success-bg);
+  color: var(--sv-success);
+}
+
+.stuff-viewer-action-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
+/* ─── Content area ───────────────────────────────────────────────────────── */
+
+.stuff-viewer-content {
+  flex: 1;
+  overflow: auto;
+  padding: 12px 16px 16px;
+  min-height: 0;
+}
+
+/* Pre-formatted text (JSON and Pretty tabs) */
+.stuff-viewer-pre {
+  font-family: var(--sv-font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  margin: 0;
+  color: var(--sv-text-muted);
+}
+
+.stuff-viewer-pre--nowrap {
+  white-space: pre;
+  word-wrap: normal;
+  line-height: 1;
+  overflow-x: auto;
+  padding-right: 20px;
+}
+
+/* HTML content */
+.stuff-viewer-html {
+  font-family: var(--sv-font-sans);
+  font-size: 11px;
+  color: var(--sv-text-muted);
+  line-height: 1.5;
+}
+
+.stuff-viewer-html table {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.stuff-viewer-html th,
+.stuff-viewer-html td {
+  border: 1px solid var(--sv-border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.stuff-viewer-html th {
+  background: var(--sv-surface-hover);
+  color: var(--sv-text);
+  font-weight: 600;
+}
+
+.stuff-viewer-html tr:hover {
+  background: var(--sv-surface-hover);
+}
+
+.stuff-viewer-html a {
+  color: var(--sv-accent);
+  text-decoration: none;
+}
+
+.stuff-viewer-html a:hover {
+  text-decoration: underline;
+}
+
+.stuff-viewer-html ul {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+}
+
+/* PDF embed */
+.stuff-viewer-pdf {
+  min-height: 400px;
+  height: 100%;
+}
+
+.stuff-viewer-pdf embed {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+  border: none;
+}
+
+/* Image content */
+.stuff-viewer-image {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+
+.stuff-viewer-image img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+}
+
+/* Placeholder for missing data */
+.stuff-viewer-placeholder {
+  color: var(--sv-text-muted);
+  font-style: italic;
+  font-size: 13px;
+}
+
+/* ─── Detail Panel — sliding side panel for node inspection ─────────────── */
+
+.detail-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 380px;
+  height: 100%;
+  background: #111118;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  font-family: "Inter", -apple-system, sans-serif;
+  color: #e2e8f0;
+  overflow: hidden;
+  transition: transform 0.2s ease;
+}
+
+.detail-panel--closed {
+  transform: translateX(100%);
+  pointer-events: none;
+}
+
+.detail-panel-close {
+  all: unset;
+  cursor: pointer;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1;
+  z-index: 1;
+}
+
+.detail-panel-close:hover {
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.detail-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ─── Shared detail components ──────────────────────────────────────────── */
+
+.detail-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+
+.detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.detail-badge--operator {
+  background: #ff6b6b;
+  color: #0e0e0e;
+}
+
+.detail-badge--controller {
+  background: #bd93f9;
+  color: #0e0e0e;
+}
+
+.detail-pipe-code {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ff6b6b;
+}
+
+.detail-pipe-code--controller {
+  color: #bd93f9;
+}
+
+.detail-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.detail-status-label {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.detail-duration {
+  font-size: 11px;
+  color: #64748b;
+  font-family: "JetBrains Mono", "Monaco", monospace;
+}
+
+.detail-description {
+  font-size: 12px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+/* ─── IO Pills ──────────────────────────────────────────────────────────── */
+
+.detail-io-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.detail-io-name {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  color: #e2e8f0;
+}
+
+.detail-io-concept {
+  color: #64748b;
+  font-size: 10px;
+}
+
+.detail-io-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ─── Blueprint-specific sections ───────────────────────────────────────── */
+
+.detail-prompt-block {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  font-size: 11px;
+  color: #94a3b8;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 10px 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200px;
+  overflow-y: auto;
+  line-height: 1.5;
+}
+
+.detail-kv-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  padding: 3px 0;
+}
+
+.detail-kv-key {
+  color: #64748b;
+}
+
+.detail-kv-value {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  color: #e2e8f0;
+}
+
+/* ─── Concept schema table ──────────────────────────────────────────────── */
+
+.detail-schema-table {
+  width: 100%;
+  font-size: 11px;
+  border-collapse: collapse;
+}
+
+.detail-schema-table th {
+  text-align: left;
+  font-weight: 700;
+  color: #64748b;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.detail-schema-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  color: #94a3b8;
+}
+
+.detail-schema-field {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  color: #e2e8f0;
+}
+
+.detail-schema-type {
+  color: #8be9fd;
+}
+
+.detail-schema-required {
+  color: #ff6b6b;
+  font-size: 9px;
+}
+
+/* ─── Error section ─────────────────────────────────────────────────────── */
+
+.detail-error {
+  background: rgba(255, 85, 85, 0.08);
+  border: 1px solid rgba(255, 85, 85, 0.2);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+
+.detail-error-type {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ff5555;
+  margin-bottom: 4px;
+}
+
+.detail-error-message {
+  font-size: 11px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.detail-error-stack {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 8px;
+  max-height: 150px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* ─── Steps list (PipeSequence, PipeCondition outcomes) ─────────────────── */
+
+.detail-steps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.detail-step-index {
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+  min-width: 16px;
+}
+
+.detail-step-code {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  color: #e2e8f0;
+}
+
+/* ─── Tags/Metrics ──────────────────────────────────────────────────────── */
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.detail-tag {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.detail-tag-key {
+  color: #64748b;
+}
+
+.detail-tag-value {
+  color: #e2e8f0;
+  font-family: "JetBrains Mono", "Monaco", monospace;
+}
+
+/* ─── Concept panel header ──────────────────────────────────────────────── */
+
+.detail-concept-code {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  font-size: 14px;
+  font-weight: 600;
+  color: #50fa7b;
+}
+
+.detail-concept-domain {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.detail-refines {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.detail-refines-code {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  color: #8be9fd;
+}
+
+/* ─── Not available fallback ────────────────────────────────────────────── */
+
+.detail-not-available {
+  font-size: 12px;
+  color: #64748b;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* ─── Standalone GraphViewer chrome (toolbar, theme, layout) ─────────── */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  font-family: "Inter", -apple-system, sans-serif;
+}
+
+/* ─── Theme system ──────────────────────────────────────────────────── */
+
+body[data-theme="dark"], body:not([data-theme]) {
+  --chrome-bg: #0d1117;
+  --chrome-surface: #161b22;
+  --chrome-border: rgba(255,255,255,0.08);
+  --chrome-text: #e2e8f0;
+  --chrome-text-muted: #8b949e;
+  background: #0a0a0f;
+  color: #e2e8f0;
+}
+
+body[data-theme="light"] {
+  --chrome-bg: #ffffff;
+  --chrome-surface: #f6f8fa;
+  --chrome-border: rgba(0,0,0,0.1);
+  --chrome-text: #1f2328;
+  --chrome-text-muted: #656d76;
+  background: #ffffff;
+  color: #1f2328;
+}
+
+@media (prefers-color-scheme: light) {
+  body[data-theme="system"] {
+    --chrome-bg: #ffffff;
+    --chrome-surface: #f6f8fa;
+    --chrome-border: rgba(0,0,0,0.1);
+    --chrome-text: #1f2328;
+    --chrome-text-muted: #656d76;
+    background: #ffffff;
+    color: #1f2328;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  body[data-theme="system"] {
+    --chrome-bg: #0d1117;
+    --chrome-surface: #161b22;
+    --chrome-border: rgba(255,255,255,0.08);
+    --chrome-text: #e2e8f0;
+    --chrome-text-muted: #8b949e;
+    background: #0a0a0f;
+    color: #e2e8f0;
+  }
+}
+
+/* ─── Layout ────────────────────────────────────────────────────────── */
+
+#app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+#root {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+/* ─── Toolbar ───────────────────────────────────────────────────────── */
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--chrome-surface);
+  border-bottom: 1px solid var(--chrome-border);
+  flex-shrink: 0;
+  z-index: 20;
+}
+
+.toolbar-spacer { flex: 1; }
+
+.toolbar-btn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  color: var(--chrome-text-muted);
+  transition: background 0.15s, color 0.15s;
+}
+
+.toolbar-btn:hover {
+  background: var(--chrome-border);
+  color: var(--chrome-text);
+}
+
+.toolbar-zoom {
+  display: flex;
+  gap: 2px;
+}
+
+/* Direction toggle */
+.direction-icon { display: none; }
+.direction-icon.active { display: inline-flex; }
+
+/* Controllers toggle */
+.toggle-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--chrome-text-muted);
+  user-select: none;
+}
+
+.toggle-switch input { display: none; }
+
+.toggle-track {
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--chrome-border);
+  position: relative;
+  transition: background 0.15s;
+}
+
+.toggle-switch input:checked + .toggle-track {
+  background: #50FA7B44;
+}
+
+.toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--chrome-text-muted);
+  transition: left 0.15s, background 0.15s;
+}
+
+.toggle-switch input:checked + .toggle-track .toggle-knob {
+  left: 14px;
+  background: #50FA7B;
+}
+
+.toggle-label {
+  font-size: 11px;
+}
+
+/* Theme toggle */
+.theme-btn {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--chrome-text-muted);
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+
+.theme-btn:hover {
+  background: var(--chrome-border);
+}
+
+.theme-label {
+  text-transform: capitalize;
+}
+
+/* ─── Header branding ───────────────────────────────────────────────── */
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-logo {
+  height: 18px;
+  opacity: 0.7;
+}
+
+body[data-theme="dark"] .header-logo.light-logo,
+body:not([data-theme]) .header-logo.light-logo {
+  display: none;
+}
+
+body[data-theme="light"] .header-logo.dark-logo {
+  display: none;
+}
+
+body[data-theme="light"] .header-logo.light-logo {
+  display: inline;
+}
+
+@media (prefers-color-scheme: light) {
+  body[data-theme="system"] .header-logo.dark-logo {
+    display: none;
+  }
+  body[data-theme="system"] .header-logo.light-logo {
+    display: inline;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  body[data-theme="system"] .header-logo.light-logo {
+    display: none;
+  }
+}
+
+.header-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--chrome-text-muted);
+}

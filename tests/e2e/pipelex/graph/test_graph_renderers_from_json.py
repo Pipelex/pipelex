@@ -16,7 +16,6 @@ from pipelex.graph.mermaidflow.mermaid_html import (
     render_mermaid_html_with_data_async,
 )
 from pipelex.graph.mermaidflow.mermaidflow_factory import MermaidflowFactory
-from pipelex.graph.mermaidflow.stuff_collector import collect_stuff_data_html, collect_stuff_data_text
 from pipelex.graph.reactflow.reactflow_html import generate_reactflow_html_async
 from pipelex.tools.misc.chart_utils import FlowchartDirection
 from pipelex.tools.misc.file_utils import get_incremental_directory_path, load_text_from_path
@@ -102,20 +101,10 @@ class TestGraphRenderersFromJson:
 
         # ==================== REACTFLOW OUTPUTS ====================
 
-        # Collect stuff data in alternate formats if configured
-        rf_stuff_data_text: dict[str, str] | None = None
-        rf_stuff_data_html: dict[str, str] | None = None
-        if graph_config.data_inclusion.stuff_text_content:
-            rf_stuff_data_text = collect_stuff_data_text(graph_spec)
-        if graph_config.data_inclusion.stuff_html_content:
-            rf_stuff_data_html = collect_stuff_data_html(graph_spec)
-
         # Generate ReactFlow HTML directly from GraphSpec
         reactflow_html = await generate_reactflow_html_async(
             graph_spec,
             graph_config.reactflow_config,
-            stuff_data_text=rf_stuff_data_text,
-            stuff_data_html=rf_stuff_data_html,
             title=f"ReactFlow: {topic}",
         )
         reactflow_path = output_dir / "reactflow.html"
