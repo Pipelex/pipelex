@@ -117,6 +117,7 @@ keywords_to_hilight = []
 
 [pipelex.aws_config]
 api_key_method = "env"
+bedrock_access_variant = "bedrock_token"
 
 ####################################################################################################
 # Cogt inference config

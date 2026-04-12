@@ -18,13 +18,21 @@ class AwsKeyMethod(StrEnum):
     ENV = "env"
 
 
+class BedrockAccessVariant(StrEnum):
+    AWS_ACCESS = "aws_access"
+    BEDROCK_TOKEN = "bedrock_token"
+
+
 AWS_ACCESS_KEY_ID_VAR_NAME = "AWS_ACCESS_KEY_ID"
 AWS_SECRET_ACCESS_KEY_VAR_NAME = "AWS_SECRET_ACCESS_KEY"
 AWS_REGION_VAR_NAME = "AWS_REGION"
 
+BEDROCK_TOKEN_VAR_NAME = "AWS_BEARER_TOKEN_BEDROCK"
+
 
 class AwsConfig(ConfigModel):
     api_key_method: AwsKeyMethod = Field(strict=False)
+    bedrock_access_variant: BedrockAccessVariant = Field(strict=False)
 
     def get_aws_access_keys(self) -> tuple[str, str, str]:
         return self.get_aws_access_keys_with_method(api_key_method=self.api_key_method)
@@ -54,3 +62,10 @@ class AwsConfig(ConfigModel):
                 log.verbose("Getting AWS region from environment (priority override) or from aws_config.")
 
         return aws_access_key_id, aws_secret_access_key, aws_region
+
+    def get_bedrock_token(self) -> str:
+        match self.api_key_method:
+            case AwsKeyMethod.ENV:
+                return get_required_env(BEDROCK_TOKEN_VAR_NAME)
+            case AwsKeyMethod.SECRET_PROVIDER:
+                return get_secret(BEDROCK_TOKEN_VAR_NAME)

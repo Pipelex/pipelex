@@ -19,6 +19,7 @@ from pipelex.cogt.model_backends.backend import InferenceBackend
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
 from pipelex.config import get_config
 from pipelex.plugins.plugin_sdk_registry import Plugin
+from pipelex.tools.aws.aws_config import BedrockAccessVariant
 from pipelex.tools.uri.prepared_file import PreparedFile, PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 from pipelex.types import StrEnum
 
@@ -55,12 +56,18 @@ class AnthropicFactory:
                 )
             case AnthropicSdkVariant.BEDROCK_ANTHROPIC:
                 aws_config = get_config().pipelex.aws_config
-                aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
-                return AsyncAnthropicBedrock(
-                    aws_secret_key=aws_secret_access_key,
-                    aws_access_key=aws_access_key_id,
-                    aws_region=aws_region,
-                )
+                match aws_config.bedrock_access_variant:
+                    case BedrockAccessVariant.AWS_ACCESS:
+                        aws_access_key_id, aws_secret_access_key, aws_region = aws_config.get_aws_access_keys()
+                        return AsyncAnthropicBedrock(
+                            aws_secret_key=aws_secret_access_key,
+                            aws_access_key=aws_access_key_id,
+                            aws_region=aws_region,
+                        )
+                    case BedrockAccessVariant.BEDROCK_TOKEN:
+                        return AsyncAnthropicBedrock(
+                            api_key=aws_config.get_bedrock_token(),
+                        )
 
     @staticmethod
     def _make_image_block_param(prepped_image: PreparedFile) -> ImageBlockParam:
