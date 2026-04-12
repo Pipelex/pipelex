@@ -28,12 +28,12 @@ for_object = "@default-general"
 
 [llm.aliases]
 best-gpt = "gpt-5.2"
-best-claude = "claude-4.5-opus"
+best-claude = "claude-4.6-opus"
 best-gemini = "gemini-3.0-pro"
 best-mistral = "mistral-large"
 
 # Default aliases (first choice from waterfalls)
-default-general = "claude-4.5-sonnet"
+default-general = "claude-4.6-sonnet"
 default-premium = "claude-4.6-opus"
 default-premium-vision = "claude-4.6-opus"
 default-premium-structured = "claude-4.6-opus"
