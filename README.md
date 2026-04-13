@@ -58,23 +58,12 @@ From here, Pipelex handles model routing across 60+ models, structured output pa
 
 # Quick Start
 
-```bash
-uv tool install pipelex
-pipelex init
-```
-
 ## With Claude Code (Recommended)
 
 Paste this into Claude Code:
 
 ```
 Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && claude plugin marketplace add mthds-ai/mthds-plugins && claude plugin install mthds@mthds-plugins'. Then tell me to restart Claude Code.
-```
-
-Then build your first method:
-
-```
-/mthds-build A method to summarize articles with key takeaways for different audiences
 ```
 
 ## With Codex
@@ -85,21 +74,18 @@ Paste this into Codex:
 Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && bash <(curl -fsSL https://raw.githubusercontent.com/mthds-ai/mthds-plugins/main/bin/install-codex.sh)'. Then tell me to run /plugins, search for MTHDS, and install it.
 ```
 
-## Without an AI Agent
+Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting and flowchart visualization.
 
-1. Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting
-2. Install the tools and plugin manually:
-   ```bash
-   npm install -g mthds
-   mthds-agent bootstrap
-   claude plugin marketplace add mthds-ai/mthds-plugins
-   claude plugin install mthds@mthds-plugins
-   ```
-3. Browse methods on the [MTHDS Hub](https://mthds.sh) for inspiration
-4. Author your own `.mthds` methods based on these examples
-5. Validate with `pipelex validate bundle your_method.mthds`
-6. Run them with `pipelex run bundle your_method.mthds`
-7. View the flowchart in VS Code thanks to the extension
+## Manual Install
+
+```bash
+uv tool install pipelex
+pipelex init
+npm install -g mthds
+mthds-agent bootstrap
+```
+
+Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting and flowchart visualization.
 
 ## Configure AI Access
 
