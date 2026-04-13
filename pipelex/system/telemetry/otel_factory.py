@@ -5,16 +5,7 @@ This module provides helpers for instrumenting LLM operations with OpenTelemetry
 
 import base64
 import hashlib
-from typing import Any
-
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
-from opentelemetry.sdk.resources import Resource as OTelResource
-from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor as OTelBatchSpanProcessor
-from opentelemetry.semconv._incubating.attributes import deployment_attributes  # noqa: PLC2701
-from opentelemetry.semconv.attributes import service_attributes
-from opentelemetry.trace import Tracer as OTelTracer
-from posthog import Posthog  # type: ignore[attr-defined]
+from typing import TYPE_CHECKING, Any
 
 from pipelex.core.memory.working_memory import WorkingMemory
 from pipelex.core.pipes.pipe_output import PipeOutput
@@ -22,12 +13,17 @@ from pipelex.system.environment import get_optional_env
 from pipelex.system.runtime import RunEnvironment
 from pipelex.system.telemetry.exceptions import LangfuseCredentialsError
 from pipelex.system.telemetry.otel_constants import OTelConstants
-from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter
 from pipelex.system.telemetry.telemetry_config import LangfuseConfig, OtlpExporterConfig, TelemetryRedactionConfig
 from pipelex.tools.log.log import log
 from pipelex.tools.misc.hash_utils import hash_md5_to_int
 from pipelex.tools.misc.json_utils import JsonContent, pure_json_str
 from pipelex.tools.misc.package_utils import get_package_version
+
+if TYPE_CHECKING:
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+    from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider
+    from opentelemetry.trace import Tracer as OTelTracer
+    from posthog import Posthog  # type: ignore[attr-defined]
 
 
 class OtelFactory:
@@ -154,7 +150,7 @@ class OtelFactory:
         return value is not None and value.startswith("${")
 
     @classmethod
-    def make_langfuse_exporter(cls, langfuse_config: LangfuseConfig) -> OTLPSpanExporter:
+    def make_langfuse_exporter(cls, langfuse_config: LangfuseConfig) -> "OTLPSpanExporter":
         """Create a Langfuse OTLP exporter using config credentials.
 
         Credentials can be provided via config (with env var substitution) or
@@ -187,6 +183,8 @@ class OtelFactory:
         # Build Basic auth header
         langfuse_auth = base64.b64encode(f"{public_key}:{secret_key}".encode()).decode()
 
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # noqa: PLC0415
+
         return OTLPSpanExporter(
             endpoint=f"{endpoint}/api/public/otel/v1/traces",
             headers={"Authorization": f"Basic {langfuse_auth}"},
@@ -196,14 +194,14 @@ class OtelFactory:
     def make_ai_tracer(
         cls,
         user_id: str | None,
-        custom_posthog_client: Posthog | None,
+        custom_posthog_client: "Posthog | None",
         custom_redaction_config: TelemetryRedactionConfig,
-        pipelex_posthog_client: Posthog | None,
+        pipelex_posthog_client: "Posthog | None",
         pipelex_gateway_redaction_config: TelemetryRedactionConfig,
         pipelex_distinct_id: str | None,
         otlp_exporters: list[OtlpExporterConfig] | None,
         langfuse_config: LangfuseConfig | None,
-    ) -> tuple[OTelTracer, OTelTracerProvider]:
+    ) -> "tuple[OTelTracer, OTelTracerProvider]":
         """Create an isolated OpenTelemetry Tracer for GenAI instrumentation.
 
         This creates a dedicated TracerProvider that does NOT register itself as the
@@ -229,6 +227,15 @@ class OtelFactory:
             A tuple of (Tracer, TracerProvider). The caller should call
             provider.shutdown() during teardown to flush pending spans.
         """
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # noqa: PLC0415
+        from opentelemetry.sdk.resources import Resource as OTelResource  # noqa: PLC0415
+        from opentelemetry.sdk.trace import TracerProvider as OTelTracerProvider  # noqa: PLC0415
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor as OTelBatchSpanProcessor  # noqa: PLC0415
+        from opentelemetry.semconv._incubating.attributes import deployment_attributes  # noqa: PLC0415, PLC2701
+        from opentelemetry.semconv.attributes import service_attributes  # noqa: PLC0415
+
+        from pipelex.system.telemetry.posthog_span_exporter import PostHogSpanExporter  # noqa: PLC0415
+
         # Define Resource (Identity)
         resource = OTelResource.create(
             attributes={

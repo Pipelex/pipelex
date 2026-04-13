@@ -38,7 +38,7 @@ from pipelex.system.configuration.config_root import ConfigRoot
 from pipelex.system.console_target import ConsoleTarget
 from pipelex.system.environment import PIPELEXPATH_ENV_KEY, get_pipelexpath_dirs
 from pipelex.system.registries.func_registry import FuncRegistry
-from pipelex.system.telemetry.telemetry_manager import TelemetryManagerAbstract
+from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
 
