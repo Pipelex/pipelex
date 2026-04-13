@@ -65,62 +65,41 @@ pipelex init
 
 ## With Claude Code (Recommended)
 
-Install the `mthds` npm package:
-
-```bash
-npm install -g mthds
-```
-
-Start Claude Code:
-
-```bash
-claude
-```
-
-Tell Claude to install the MTHDS skills marketplace:
+Paste this into Claude Code:
 
 ```
-/plugin marketplace add mthds-ai/mthds-plugins
+Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && claude plugin marketplace add mthds-ai/mthds-plugins && claude plugin install mthds@mthds-plugins'. Then tell me to restart Claude Code.
 ```
 
-then install the MTHDS skills plugin:
-
-```
-/plugin install mthds@mthds-plugins
-```
-
-then reload plugins:
-
-```
-/reload-plugins
-```
-
-If that doesn't work, exit Claude Code and reopen it:
-
-```
-/exit
-```
-
-Build your first method:
+Then build your first method:
 
 ```
 /mthds-build A method to summarize articles with key takeaways for different audiences
 ```
 
-Run it:
+## With Codex
+
+Paste this into Codex:
 
 ```
-/mthds-run
+Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && bash <(curl -fsSL https://raw.githubusercontent.com/mthds-ai/mthds-plugins/main/bin/install-codex.sh)'. Then tell me to run /plugins, search for MTHDS, and install it.
 ```
 
-## Without Claude Code
+## Without an AI Agent
 
 1. Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting
-2. Browse methods on the [MTHDS Hub](https://mthds.sh) for inspiration
-3. Author your own `.mthds` methods based on these examples
-4. Validate with `pipelex validate bundle your_method.mthds`
-5. Run them with `pipelex run bundle your_method.mthds`
-6. View the flowchart in VS Code thanks to the extension
+2. Install the tools and plugin manually:
+   ```bash
+   npm install -g mthds
+   mthds-agent bootstrap
+   claude plugin marketplace add mthds-ai/mthds-plugins
+   claude plugin install mthds@mthds-plugins
+   ```
+3. Browse methods on the [MTHDS Hub](https://mthds.sh) for inspiration
+4. Author your own `.mthds` methods based on these examples
+5. Validate with `pipelex validate bundle your_method.mthds`
+6. Run them with `pipelex run bundle your_method.mthds`
+7. View the flowchart in VS Code thanks to the extension
 
 ## Configure AI Access
 
