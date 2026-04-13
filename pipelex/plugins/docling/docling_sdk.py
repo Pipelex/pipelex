@@ -1,6 +1,5 @@
-from docling.document_converter import DocumentConverter
-
-
 class DoclingSdk:
     def __init__(self):
-        self.document_converter = DocumentConverter()
+        from docling.document_converter import DocumentConverter  # noqa: PLC0415
+
+        self.document_converter: DocumentConverter = DocumentConverter()
