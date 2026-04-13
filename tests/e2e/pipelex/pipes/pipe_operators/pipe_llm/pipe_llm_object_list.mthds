@@ -1,0 +1,29 @@
+domain      = "pipe_llm_object_list_e2e"
+description = "Test PipeLLM with structured object list output"
+
+# [concept.MoodboardPrompt]
+# description = "A vivid image generation prompt for a fashion moodboard panel"
+# refines     = "Text"
+[concept]
+MoodboardPrompt = "A vivid image generation prompt for a fashion moodboard panel"
+
+[pipe.craft_prompts]
+type = "PipeLLM"
+description = "Generate diverse moodboard image prompts from fashion inspiration"
+inputs = { inspiration = "Text" }
+output = "MoodboardPrompt[]"
+model = "@default-small-creative"
+prompt = """
+You are a fashion art director creating a moodboard. Given the following fashion inspiration, generate exactly 5 distinct image generation prompts. Each prompt should capture a different visual facet of the aesthetic:
+
+1. A hero outfit or look
+2. A texture or fabric close-up
+3. A color palette scene
+4. A setting or environment that evokes the mood
+5. An accessory or detail shot
+
+Fashion inspiration:
+@inspiration
+
+For each prompt, write a vivid, detailed image generation prompt that would produce a beautiful moodboard panel. Focus on colors, textures, lighting, and composition.
+"""

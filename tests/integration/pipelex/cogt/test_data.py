@@ -122,6 +122,7 @@ class LLMTestConstants:
     USER_TEXT_SHORT = "In one short sentence, who is Bill Gates?"
     USER_TEXT_SUPER_SHORT = "In one short sentence (< 5 words), who is Bill Gates?"
     USER_TEXT_TO_EXTRACT_PERSON = "It's Robert, the nice plumber, he turns 57 next week."
+    USER_TEXT_TO_GEN_PERSON_LIST = "List the following people: Alice is 30, Bob is 25, and Charlie is 35."
     USER_TEXT_TRICKY_1 = """
 When my son was 7 he was 3ft tall. When he was 8 he was 4ft tall. When he was 9 he was 5ft tall.
 How tall do you think he was when he was 12? and at 15?
