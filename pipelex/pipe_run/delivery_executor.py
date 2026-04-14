@@ -118,7 +118,7 @@ class DeliveryExecutor:
         try:
             storage_provider = get_storage_provider()
             prefix: str = storage.key_prefix or ""
-            base_key: str = f"{prefix}{user_id}/{pipeline_run_id}/results"
+            base_key: str = f"{user_id}/{prefix}{pipeline_run_id}"
 
             result_files = await self.generate_result_files(pipe_output)
 
