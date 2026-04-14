@@ -1,0 +1,31 @@
+CHANGELOG.md
+  bc44a554bc99839b 14
+Makefile
+  bc44a554bc99839b 27-28,181,950-963
+.claude/skills/sync-graph-viewer/SKILL.md
+  bc44a554bc99839b 1-243
+pipelex/graph/reactflow/assets/graph-viewer.js
+  bc44a554bc99839b 1,3,6,8-9,14-17
+pipelex/graph/reactflow/assets/graph-viewer.css
+  bc44a554bc99839b 889-890,895-899,901,903-905,1253-1288,1291-1296,1328-1382,1401,1418-1426,1556-1581,1587-1588,1595,1601-1654,1656-1657,1659-1666
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.2.8",
+  "base_commit_sha": "33eba3116f5ac9554af88ab897657a10614a1b75",
+  "prompts": {
+    "bc44a554bc99839b": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8dcf265b-28da-4e3e-8f5e-ad04b698daf7",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 499,
+      "total_deletions": 18,
+      "accepted_lines": 495,
+      "overriden_lines": 0
+    }
+  }
+}
