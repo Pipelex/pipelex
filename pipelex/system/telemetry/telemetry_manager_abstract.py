@@ -1,13 +1,15 @@
 from abc import abstractmethod
 from contextlib import contextmanager
-from typing import Any, Generator
+from typing import TYPE_CHECKING, Any, Generator
 
-from opentelemetry.trace import Tracer as OTelTracer
 from typing_extensions import override
 
 from pipelex.system.registries.singleton import ABCSingletonMeta, MetaSingleton
 from pipelex.system.runtime import IntegrationMode
 from pipelex.system.telemetry.events import EventName, EventProperty
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer as OTelTracer
 
 
 class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
@@ -26,7 +28,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         return MetaSingleton.get_subclass_instance(TelemetryManagerAbstract)  # type: ignore[type-abstract]
 
     @classmethod
-    def get_instance_tracer(cls) -> OTelTracer | None:
+    def get_instance_tracer(cls) -> "OTelTracer | None":
         """Get the tracer from the singleton instance.
 
         This provides a way to access the tracer without importing from hub,
@@ -116,7 +118,7 @@ class TelemetryManagerAbstract(metaclass=ABCSingletonMeta):
         pass
 
     @abstractmethod
-    def get_otel_tracer(self) -> OTelTracer | None:
+    def get_otel_tracer(self) -> "OTelTracer | None":
         """Get the OpenTelemetry tracer for GenAI spans, if configured."""
 
     @property
@@ -197,7 +199,7 @@ class TelemetryManagerNoOp(TelemetryManagerAbstract):
         return False
 
     @override
-    def get_otel_tracer(self) -> OTelTracer | None:
+    def get_otel_tracer(self) -> "OTelTracer | None":
         return None
 
     @property

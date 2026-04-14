@@ -3,16 +3,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING, Any, cast
 
-import openai
-from openai.types.chat import (
-    ChatCompletionContentPartImageParam,
-    ChatCompletionContentPartParam,
-    ChatCompletionContentPartTextParam,
-    ChatCompletionMessageParam,
-    ChatCompletionSystemMessageParam,
-    ChatCompletionUserMessageParam,
-)
-from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL
 from portkey_ai import (
     createHeaders,  # type: ignore[reportUnknownVariableType]
 )
@@ -35,6 +25,8 @@ from pipelex.plugins.openai.openai_completions_factory import OpenAICompletionsF
 from pipelex.tools.uri.prepared_file import PreparedFileBase64, PreparedFileHttpUrl, PreparedFileLocalPath
 
 if TYPE_CHECKING:
+    import openai
+    from openai.types.chat import ChatCompletionMessageParam
     from portkey_ai.api_resources.utils import GenericResponse
 
     from pipelex.cogt.inference.inference_job_abstract import InferenceJobAbstract
@@ -51,6 +43,15 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         llm_job: LLMJob,
     ) -> list[ChatCompletionMessageParam]:
         """Override to use image_url format for documents which Portkey/Gateway translates correctly."""
+        from openai.types.chat import (  # noqa: PLC0415
+            ChatCompletionContentPartImageParam,
+            ChatCompletionContentPartParam,
+            ChatCompletionContentPartTextParam,
+            ChatCompletionSystemMessageParam,
+            ChatCompletionUserMessageParam,
+        )
+        from openai.types.chat.chat_completion_content_part_image_param import ImageURL as OpenAIImageURL  # noqa: PLC0415
+
         llm_prompt = llm_job.llm_prompt
         messages: list[ChatCompletionMessageParam] = []
         user_contents: list[ChatCompletionContentPartParam] = []
@@ -102,6 +103,8 @@ class GatewayCompletionsFactory(OpenAICompletionsFactory):
         plugin: Plugin,
         backend: InferenceBackend,
     ) -> openai.AsyncOpenAI:
+        import openai  # noqa: PLC0415
+
         is_debug_enabled = GatewayFactory.is_debug_enabled(backend=backend)
         endpoint = GatewayFactory.get_endpoint(backend=backend)
         api_key = GatewayFactory.get_api_key(backend=backend)

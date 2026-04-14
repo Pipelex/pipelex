@@ -1,5 +1,6 @@
 from collections.abc import Callable, Generator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 import shortuuid
@@ -18,8 +19,10 @@ from pipelex.system.pipelex_service.pipelex_service_config import (
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
 from pipelex.system.pipelex_service.remote_config_fetcher import RemoteConfigFetcher
 from pipelex.system.runtime import IntegrationMode, runtime_manager
-from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
+
+if TYPE_CHECKING:
+    from pipelex.system.telemetry.telemetry_manager import TelemetryManager
 
 pytest_plugins = [
     "pipelex.test_extras.shared_pytest_plugins",
@@ -54,7 +57,7 @@ def _cached_load_pipelex_service_config(config_dir: Path) -> PipelexServiceConfi
     return _pipelex_service_config_cache[config_dir]
 
 
-def _fast_telemetry_teardown(self: TelemetryManager) -> None:
+def _fast_telemetry_teardown(self: "TelemetryManager") -> None:
     """Skip expensive OTel/PostHog shutdown during tests (~0.49s per call).
 
     Preserves exception capture cleanup (restores sys.excepthook) and
@@ -89,6 +92,8 @@ def cache_configs_for_session(session_mocker: MockerFixture):
         _cached_load_pipelex_service_config,
     )
     # Skip expensive telemetry shutdown (OTel + PostHog flush) during tests
+    from pipelex.system.telemetry.telemetry_manager import TelemetryManager  # noqa: PLC0415
+
     session_mocker.patch.object(TelemetryManager, "teardown", _fast_telemetry_teardown)
 
 

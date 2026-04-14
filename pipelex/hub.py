@@ -2,10 +2,9 @@ import sys
 from collections.abc import Sequence
 from contextvars import ContextVar
 from pathlib import Path
-from typing import ClassVar, Optional
+from typing import TYPE_CHECKING, ClassVar, Optional
 
 from kajson.class_registry_abstract import ClassRegistryAbstract
-from opentelemetry.trace import Tracer as OTelTracer
 from rich.console import Console
 
 from pipelex import log
@@ -41,6 +40,9 @@ from pipelex.system.registries.func_registry import FuncRegistry
 from pipelex.system.telemetry.telemetry_manager_abstract import TelemetryManagerAbstract
 from pipelex.tools.secrets.secrets_provider_abstract import SecretsProviderAbstract
 from pipelex.tools.storage.storage_provider_abstract import StorageProviderAbstract
+
+if TYPE_CHECKING:
+    from opentelemetry.trace import Tracer as OTelTracer
 
 
 class PipelexHub:
@@ -374,7 +376,7 @@ def get_telemetry_manager() -> TelemetryManagerAbstract:
     return get_pipelex_hub().get_telemetry_manager()
 
 
-def get_otel_tracer() -> OTelTracer | None:
+def get_otel_tracer() -> "OTelTracer | None":
     return get_telemetry_manager().get_otel_tracer()
 
 

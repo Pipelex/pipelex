@@ -35,7 +35,6 @@ from pipelex.core.stuffs.image_content import ImageContent
 from pipelex.core.stuffs.page_content import PageContent
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
-from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer
 from pipelex.tools.typing.pydantic_utils import BaseModelTypeVar
 
 
@@ -321,6 +320,8 @@ class ContentGenerator(ContentGeneratorProtocol):
             raise ValueError(msg)
         job_params = extract_job_params or ExtractJobParams.make_default_extract_job_params()
         page_views_dpi = job_params.page_views_dpi or get_config().cogt.extract_config.default_page_views_dpi
+        from pipelex.tools.pdf.pypdfium2_renderer import pypdfium2_renderer  # noqa: PLC0415
+
         page_view_images = await pypdfium2_renderer.render_pdf_pages_from_uri(pdf_uri=extract_input.document_uri, dpi=page_views_dpi)
         page_view_images_resolved: list[ImageContent] = []
         for page_view_image in page_view_images:
