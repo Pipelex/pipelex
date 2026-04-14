@@ -24,6 +24,8 @@ VENV_PYLINT := "$(VIRTUAL_ENV)/bin/pylint"
 VENV_PLXT := RUST_LOG=warn "$(VIRTUAL_ENV)/bin/plxt"
 VENV_PIPELEX_DEV := "$(VIRTUAL_ENV)/bin/pipelex-dev"
 SKELETON_DIR := "$(HOME)/.pipelex-skeleton/"
+MTHDS_UI_DIR := $(CURDIR)/../mthds-ui
+GRAPH_VIEWER_ASSETS_DIR := $(CURDIR)/pipelex/graph/reactflow/assets
 
 UV_MIN_VERSION = $(shell grep -m1 'required-version' pyproject.toml | sed -E 's/.*= *"([^<>=, ]+).*/\1/')
 
@@ -176,6 +178,7 @@ export HELP
 	update-gateway-models update-gateway-models-quiet ugm check-gateway-models cgm up \
 	test-count check-test-badge \
 	serve-graph serve-graph-bg stop-graph-server view-graph sg vg \
+	sync-graph-viewer sgv \
 	docs-deploy-root
 
 all help:
@@ -943,6 +946,20 @@ sg: serve-graph
 
 vg: view-graph
 	@echo "> done: vg = view-graph"
+
+sync-graph-viewer:
+	$(call PRINT_TITLE,"Rebuilding mthds-ui standalone bundle and syncing into pipelex")
+	@test -d "$(MTHDS_UI_DIR)" || { echo "ERROR: $(MTHDS_UI_DIR) not found. Clone mthds-ui side-by-side with pipelex."; exit 1; }
+	@cd "$(MTHDS_UI_DIR)" && { [ -d node_modules ] || npm install; }
+	@cd "$(MTHDS_UI_DIR)" && npm run build:standalone
+	@test -f "$(MTHDS_UI_DIR)/dist/standalone/graph-viewer.js"  || { echo "ERROR: graph-viewer.js not produced"; exit 1; }
+	@test -f "$(MTHDS_UI_DIR)/dist/standalone/graph-viewer.css" || { echo "ERROR: graph-viewer.css not produced"; exit 1; }
+	@cp "$(MTHDS_UI_DIR)/dist/standalone/graph-viewer.js"  "$(GRAPH_VIEWER_ASSETS_DIR)/graph-viewer.js"
+	@cp "$(MTHDS_UI_DIR)/dist/standalone/graph-viewer.css" "$(GRAPH_VIEWER_ASSETS_DIR)/graph-viewer.css"
+	@echo "Synced graph-viewer.js and graph-viewer.css into $(GRAPH_VIEWER_ASSETS_DIR)"
+
+sgv: sync-graph-viewer
+	@echo "> done: sgv = sync-graph-viewer"
 
 ##########################################################################################
 ### SHORTHANDS

@@ -11,6 +11,7 @@
 
 - **All inference workers attach error category and user action**: Every worker across all providers now raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
 - **CLI error output wired to `ErrorReport`**: Error handlers use `to_error_report()` for consistent, structured display.
+- **Standalone React Flow viewer upgraded to `mthds-ui` v0.3.4**: the detail panel is now draggable from its left edge to resize, and picks up upstream polish for detail-panel content layout (field blocks, nested headers, sticky headers, expandable prompt blocks), pipe card direction variants, and the local-file stuff viewer. A new `make sync-graph-viewer` target (alias `make sgv`) rebuilds the `mthds-ui` standalone bundle and syncs it into `pipelex/graph/reactflow/assets/`.
 
 ## [v0.23.8] - 2026-04-07
 
