@@ -76,16 +76,30 @@ Install mthds: run bash -c 'npm install -g mthds && mthds-agent bootstrap && bas
 
 Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting and flowchart visualization.
 
-## Manual Install
+## From the Terminal
+
+```bash
+npm install -g mthds
+mthds-agent bootstrap
+pipelex init
+```
+
+Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting and flowchart visualization.
+
+Verify everything is set up correctly:
+
+```bash
+pipelex doctor
+```
+
+## Python Package Only
+
+If you just need the Pipelex runtime without agent integration:
 
 ```bash
 uv tool install pipelex
 pipelex init
-npm install -g mthds
-mthds-agent bootstrap
 ```
-
-Install the [VS Code extension](https://go.pipelex.com/vscode) for `.mthds` syntax highlighting and flowchart visualization.
 
 ## Configure AI Access
 
