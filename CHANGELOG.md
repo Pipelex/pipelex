@@ -1,5 +1,11 @@
 # Changelog
 
+## [v0.23.9] - 2026-04-14
+
+### Changed
+
+- **README install instructions**: Replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section
+
 ## [v0.23.8] - 2026-04-07
 
 ### Changed
