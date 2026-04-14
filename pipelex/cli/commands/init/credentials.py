@@ -10,6 +10,7 @@ from rich.markup import escape
 from rich.prompt import Prompt
 
 from pipelex.system.configuration.config_loader import config_manager
+from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.tools.misc.dict_utils import extract_vars_from_strings_recursive
 from pipelex.tools.misc.file_utils import path_exists
 from pipelex.tools.misc.toml_utils import load_toml_from_path
@@ -135,6 +136,8 @@ def prompt_credentials(console: Console, backends_toml_path: str) -> None:
     collected_count = 0
     for var_name, backend_names in sorted(missing_vars.items()):
         backends_str = ", ".join(backend_names)
+        if var_name == PipelexDetails.PIPELEX_GATEWAY_API_KEY_VAR:
+            console.print("  [dim]Get a free API key at[/dim] [cyan]https://app.pipelex.com[/cyan]")
         value = Prompt.ask(
             f"  [bold]{escape(var_name)}[/bold] [dim](required by {escape(backends_str)})[/dim]", default="", console=console, password=True
         )
