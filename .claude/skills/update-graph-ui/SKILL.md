@@ -35,17 +35,28 @@ Report the currently pinned version and the currently synced version.
 Ask the user which version to update to, or check the latest tag:
 
 ```bash
-git ls-remote --tags https://github.com/Pipelex/mthds-ui.git | grep -oP 'refs/tags/v\K[0-9.]+' | sort -V | tail -1
+git ls-remote --tags https://github.com/Pipelex/mthds-ui.git | grep -o 'refs/tags/v[0-9.]*' | sed 's|refs/tags/v||' | sort -V | tail -1
 ```
 
 Show the user the latest available version and ask for confirmation.
 
 ### 3. Update package.json
 
-Edit `package.json` to change the version tag:
+Edit `package.json` to change the version tag and update the pinned SHA:
+
+```bash
+git ls-remote https://github.com/Pipelex/mthds-ui.git refs/tags/v<NEW_VERSION>
+```
+
+Use the SHA from the output to update both fields:
 
 ```json
-"@pipelex/mthds-ui": "github:Pipelex/mthds-ui#v<NEW_VERSION>"
+"dependencies": {
+  "@pipelex/mthds-ui": "github:Pipelex/mthds-ui#v<NEW_VERSION>"
+},
+"//dependencies": {
+  "@pipelex/mthds-ui": "v<NEW_VERSION> = <COMMIT_SHA>"
+}
 ```
 
 ### 4. Sync assets
