@@ -45,10 +45,12 @@ Show the user the latest available version and ask for confirmation.
 Edit `package.json` to change the version tag and update the pinned SHA:
 
 ```bash
-git ls-remote https://github.com/Pipelex/mthds-ui.git refs/tags/v<NEW_VERSION>
+git ls-remote https://github.com/Pipelex/mthds-ui.git refs/tags/v<NEW_VERSION> refs/tags/v<NEW_VERSION>^{}
 ```
 
-Use the SHA from the output to update both fields:
+If two lines appear (annotated tag), use the `^{}` dereferenced SHA (the commit).
+If one line appears (lightweight tag), use that SHA directly.
+Update both fields:
 
 ```json
 "dependencies": {
