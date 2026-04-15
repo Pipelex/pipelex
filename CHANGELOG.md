@@ -9,6 +9,7 @@
 
 ### Changed
 
+- **`make rules` now generates both `CLAUDE.md` and `AGENTS.md` by default**: the `pipelex.kit_config.preferred_agent_target` setting has been renamed to `preferred_agent_targets` and is now a list. The default is `["claude", "agents"]`. Cursor remains exclusive (`["cursor"]`) and cannot be combined with single-file targets. Downstream projects overriding this setting must rename the key and wrap the value in a list.
 - **All inference workers attach error category and user action**: Every worker across all providers now raises exceptions with an `InferenceErrorCategory` and actionable `user_action` hint.
 - **CLI error output wired to `ErrorReport`**: Error handlers use `to_error_report()` for consistent, structured display.
 - **Standalone React Flow viewer upgraded to `mthds-ui` v0.3.4**: the detail panel is now draggable from its left edge to resize, and picks up upstream polish for detail-panel content layout (field blocks, nested headers, sticky headers, expandable prompt blocks), pipe card direction variants, and the local-file stuff viewer. A new `make sync-graph-viewer` target (alias `make sgv`) rebuilds the `mthds-ui` standalone bundle and syncs it into `pipelex/graph/reactflow/assets/`.
