@@ -886,15 +886,23 @@ svg.react-flow__connectionline {
   }
 }
 
-/* Description */
+/* Description — per-direction clamping. LR gets up to 3 lines (tall/narrow card),
+   TB gets 1 line (wide card, horizontal layout). Both truncate with ellipsis. */
 .pipe-card-description {
   font-size: 11.5px;
   color: var(--pipe-card-text-muted);
   line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
   overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.pipe-card--lr .pipe-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+.pipe-card--tb .pipe-card-description {
+  white-space: nowrap;
 }
 
 /* I/O section — base (appearance only, layout set per-direction below) */
@@ -1576,18 +1584,86 @@ svg.react-flow__connectionline {
 .detail-kv-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start; /* top-align so the label stays next to the first line of a wrapped value */
+  gap: 12px;
   font-size: 11px;
   padding: 3px 0;
 }
 
 .detail-kv-key {
   color: #64748b;
+  flex-shrink: 0; /* label stays at its natural width */
 }
 
 .detail-kv-value {
   font-family: "JetBrains Mono", "Monaco", monospace;
   color: #e2e8f0;
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: right;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* ─── Field block: labeled multi-line text (for long resolved values) ─── */
+
+.detail-field-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-field-block-label {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.detail-field-block-value {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  font-size: 11px;
+  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+/* ─── Nested construct sub-section header ───────────────────────────────── */
+/* Rendered before each nested sub-construct's recursive contents. The left
+ * border + indent provides a visual "branch" cue so the tree structure is
+ * obvious without needing collapse state. */
+
+.detail-nested-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  padding: 4px 0 4px 8px;
+  border-left: 2px solid rgba(80, 250, 123, 0.35);
+}
+
+.detail-nested-header-name {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #e2e8f0;
+}
+
+.detail-nested-header-meta {
+  font-family: "JetBrains Mono", "Monaco", monospace;
+  font-size: 9px;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* ─── Concept schema table ──────────────────────────────────────────────── */
