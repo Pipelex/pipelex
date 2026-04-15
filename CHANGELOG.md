@@ -2,8 +2,15 @@
 
 ## [Unreleased]
 
+### Added
+
+- **Graph UI asset sync workflow**: `package.json` pins `@pipelex/mthds-ui` to a git tag, `make sync-graph-ui` clones and builds standalone assets, `make check-graph-ui-sync` verifies version alignment
+- **CI check**: `graph-ui-check.yml` workflow validates graph viewer assets match the pinned version on PRs to main
+- **`/update-graph-ui` skill**: automates bumping the mthds-ui version, syncing assets, and running tests
+
 ### Changed
 
+- **Graph viewer updated to mthds-ui v0.3.0**: resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display
 - **README install instructions**: Replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section
 
 ## [v0.23.8] - 2026-04-07
