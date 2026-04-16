@@ -7,11 +7,15 @@
 - **Graph UI asset sync workflow**: `package.json` pins `@pipelex/mthds-ui` to a git tag, `make sync-graph-ui` clones and builds standalone assets, `make check-graph-ui-sync` verifies version alignment
 - **CI check**: `graph-ui-check.yml` workflow validates graph viewer assets match the pinned version on PRs to main
 - **`/update-graph-ui` skill**: automates bumping the mthds-ui version, syncing assets, and running tests
+- **claude-opus-4-7 model**: Registered on anthropic, bedrock, and gateway backends with 128k max output tokens, $5/$25 per MTok pricing, adaptive thinking, and PDF/vision support
+- **`XHIGH` reasoning effort level**: New effort tier across all providers, mapped to Anthropic's `xhigh` (recommended for coding/agentic work), OpenAI's `xhigh`, and best-available equivalents for Google and Mistral
+- **`TEMPERATURE_UNSUPPORTED` constraint**: New listed constraint for models that reject sampling parameters entirely, checked in both Anthropic and OpenAI completions workers
 
 ### Changed
 
 - **Graph viewer updated to mthds-ui v0.3.0**: resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display
 - **README install instructions**: Replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section
+- **Anthropic adaptive thinking rejects `reasoning_budget`**: `_build_thinking_params_for_budget` now raises `LLMCapabilityError` for adaptive thinking models, guiding users to `reasoning_effort` instead — extended thinking (`type: "enabled"`) is removed on Opus 4.7+
 
 ## [v0.23.8] - 2026-04-07
 

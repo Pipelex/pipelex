@@ -148,7 +148,7 @@ thinking_mode = "adaptive"
 # --- Claude 4.7 Series --------------------------------------------------------
 ["claude-4.7-opus"]
 sdk = "bedrock_anthropic"
-model_id = "global.anthropic.claude-opus-4-7-v1"
+model_id = "global.anthropic.claude-opus-4-7"
 max_tokens = 128000
 inputs = ["text", "images", "pdf"]
 outputs = ["text", "structured"]
