@@ -1,0 +1,71 @@
+pipelex/plugins/anthropic/anthropic_config.py
+  9837d1ea2b21b603 13
+.pipelex/inference/backends/bedrock.toml
+  9837d1ea2b21b603 137-148
+pipelex/plugins/anthropic/anthropic_llm_worker.py
+  9837d1ea2b21b603 19,197-203,231,236,305,312
+.pipelex-dev/test_profiles.toml
+  9837d1ea2b21b603 70
+pipelex/cogt/llm/llm_job_components.py
+  9837d1ea2b21b603 14
+pipelex/kit/configs/inference/backends/bedrock.toml
+  9837d1ea2b21b603 137-148
+pipelex/pipelex.toml
+  9837d1ea2b21b603 154,166,175,184,196,205
+pipelex/kit/configs/inference/backends/pipelex_gateway_models.md
+  9837d1ea2b21b603 80-81,88,539
+pipelex/kit/configs/inference/backends/pipelex_gateway_models_plain.md
+  9837d1ea2b21b603 31-32,202
+pipelex/kit/configs/inference/backends/anthropic.toml
+  9837d1ea2b21b603 112-122
+pipelex/cogt/model_backends/constraints.py
+  9837d1ea2b21b603 6
+.pipelex/inference/backends/anthropic.toml
+  9837d1ea2b21b603 112-122
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.0",
+  "base_commit_sha": "cdabd29a8e05e52e04ff56ab2be5f72543540904",
+  "prompts": {
+    "9837d1ea2b21b603": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f35377f2-9758-430c-8afa-a9ed241200e3",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 93,
+      "total_deletions": 59,
+      "accepted_lines": 81,
+      "overriden_lines": 0
+    },
+    "a828313c5327ae7f": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bb8f4c8b-f87b-446a-9af2-5aff95742517",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 3859,
+      "overriden_lines": 2
+    },
+    "d6b33bda7f92d222": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "5e427c1f-c301-4ba7-bf04-c1b58c8d27c9",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Louis Choquel",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
