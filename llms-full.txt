@@ -11050,6 +11050,7 @@ The AWS configuration controls how Pipelex authenticates with AWS services. It s
 ```toml
 [pipelex.aws_config]
 api_key_method = "env"  # or "secret_provider"
+bedrock_access_variant = "bedrock_token" # or "aws_access"
 ```
 
 ### Environment Variables Method (`"env"`)
