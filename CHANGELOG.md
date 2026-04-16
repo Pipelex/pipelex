@@ -9,6 +9,7 @@
 - **`TEMPERATURE_UNSUPPORTED` constraint**: New listed constraint for models that reject sampling parameters entirely, checked in both Anthropic and OpenAI completions workers
 - **claude-4.6-sonnet model**: Registered on anthropic, bedrock, and gateway backends
 - **LLM deck cheap presets**: Added cheap variants for writing-factual, retrieval, and engineering-code presets, with retrieval tiers from `gemini-2.5-flash-lite` to `claude-4.7-opus`
+- **Bedrock bearer token authentication**: New `bedrock_access_variant` config option supports `"bedrock_token"` auth using `AWS_BEARER_TOKEN_BEDROCK` env var, alongside the existing `"aws_access"` method (default)
 
 ### Changed
 
