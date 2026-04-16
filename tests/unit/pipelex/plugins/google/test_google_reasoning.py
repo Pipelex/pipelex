@@ -14,6 +14,7 @@ _GOOGLE_LEVEL_MAP: dict[str, str] = {
     "low": "low",
     "medium": "medium",
     "high": "high",
+    "xhigh": "high",
     "max": "high",
 }
 
@@ -54,6 +55,7 @@ class TestGoogleReasoning:
             (ReasoningEffort.LOW, 1024),
             (ReasoningEffort.MEDIUM, 5000),
             (ReasoningEffort.HIGH, 16384),
+            (ReasoningEffort.XHIGH, 32768),
             (ReasoningEffort.MAX, 65536),
         ],
     )
@@ -89,6 +91,7 @@ class TestGoogleReasoning:
             (ReasoningEffort.LOW, genai_types.ThinkingLevel.LOW),
             (ReasoningEffort.MEDIUM, genai_types.ThinkingLevel.MEDIUM),
             (ReasoningEffort.HIGH, genai_types.ThinkingLevel.HIGH),
+            (ReasoningEffort.XHIGH, genai_types.ThinkingLevel.HIGH),
             (ReasoningEffort.MAX, genai_types.ThinkingLevel.HIGH),
         ],
     )

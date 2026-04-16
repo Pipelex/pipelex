@@ -12,6 +12,7 @@ _MISTRAL_LEVEL_MAP: dict[str, str] = {
     "low": "reasoning",
     "medium": "reasoning",
     "high": "reasoning",
+    "xhigh": "reasoning",
     "max": "reasoning",
 }
 
@@ -67,6 +68,7 @@ class TestMistralReasoning:
             (ReasoningEffort.LOW, "reasoning"),
             (ReasoningEffort.MEDIUM, "reasoning"),
             (ReasoningEffort.HIGH, "reasoning"),
+            (ReasoningEffort.XHIGH, "reasoning"),
             (ReasoningEffort.MAX, "reasoning"),
         ],
     )

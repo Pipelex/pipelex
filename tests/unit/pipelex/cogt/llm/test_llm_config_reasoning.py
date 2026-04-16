@@ -5,8 +5,8 @@ from pipelex.cogt.llm.llm_job_components import LLMJobConfig, ReasoningEffort
 from pipelex.system.exceptions import ConfigValidationError
 
 _DEFAULT_EFFORT_TO_BUDGET_MAPS: dict[str, dict[str, int]] = {
-    "anthropic": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "max": 65536},
-    "gemini": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "max": 65536},
+    "anthropic": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "xhigh": 32768, "max": 65536},
+    "gemini": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "xhigh": 32768, "max": 65536},
 }
 
 _DEFAULT_OPENAI_LEVEL_MAP: dict[str, str] = {
@@ -15,6 +15,7 @@ _DEFAULT_OPENAI_LEVEL_MAP: dict[str, str] = {
     "low": "low",
     "medium": "medium",
     "high": "high",
+    "xhigh": "xhigh",
     "max": "xhigh",
 }
 
@@ -24,6 +25,7 @@ _DEFAULT_ANTHROPIC_LEVEL_MAP: dict[str, str] = {
     "low": "low",
     "medium": "medium",
     "high": "high",
+    "xhigh": "xhigh",
     "max": "max",
 }
 
@@ -33,6 +35,7 @@ _DEFAULT_GOOGLE_LEVEL_MAP: dict[str, str] = {
     "low": "low",
     "medium": "medium",
     "high": "high",
+    "xhigh": "high",
     "max": "high",
 }
 
@@ -42,6 +45,7 @@ _DEFAULT_MISTRAL_LEVEL_MAP: dict[str, str] = {
     "low": "reasoning",
     "medium": "reasoning",
     "high": "reasoning",
+    "xhigh": "reasoning",
     "max": "reasoning",
 }
 
@@ -108,7 +112,7 @@ class TestLLMConfigReasoning:
 
     def test_validator_invalid_effort_level_raises(self):
         invalid_maps = {
-            "anthropic": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "max": 65536, "ultra": 999999},
+            "anthropic": {"none": 0, "minimal": 512, "low": 1024, "medium": 5000, "high": 16384, "xhigh": 32768, "max": 65536, "ultra": 999999},
         }
         with pytest.raises(ConfigValidationError, match="Invalid reasoning effort levels"):
             _make_llm_config(effort_to_budget_maps=invalid_maps)
@@ -134,6 +138,7 @@ class TestLLMConfigReasoning:
             ReasoningEffort.LOW,
             ReasoningEffort.MEDIUM,
             ReasoningEffort.HIGH,
+            ReasoningEffort.XHIGH,
             ReasoningEffort.MAX,
         ],
     )
@@ -220,6 +225,7 @@ class TestLLMConfigReasoning:
             "low": "low",
             "medium": "medium",
             "high": "high",
+            "xhigh": "xhigh",
             "max": "xhigh",
             "ultra": "super",
         }
@@ -280,6 +286,7 @@ class TestLLMConfigReasoning:
             "low": "disabled",
             "medium": "disabled",
             "high": "disabled",
+            "xhigh": "disabled",
             "max": "disabled",
         }
         config = _make_llm_config(
