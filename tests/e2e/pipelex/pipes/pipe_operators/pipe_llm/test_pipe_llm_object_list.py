@@ -11,7 +11,7 @@ from pipelex.pipeline.runner import PipelexRunner
 @pytest.mark.llm
 @pytest.mark.inference
 @pytest.mark.dry_runnable
-@pytest.mark.asyncio
+@pytest.mark.asyncio(loop_scope="class")
 class TestPipeLLMObjectList:
     async def test_craft_prompts(self, pipe_run_mode: PipeRunMode) -> None:
         """Test a PipeLLM pipe that generates a list of structured MoodboardPrompt objects."""

@@ -66,6 +66,14 @@ class AwsConfig(ConfigModel):
     def get_bedrock_token(self) -> str:
         match self.api_key_method:
             case AwsKeyMethod.ENV:
-                return get_required_env(BEDROCK_TOKEN_VAR_NAME)
+                try:
+                    return get_required_env(BEDROCK_TOKEN_VAR_NAME)
+                except EnvVarNotFoundError as exc:
+                    msg = f"Error getting Bedrock token from environment: {exc}"
+                    raise AwsCredentialsError(msg) from exc
             case AwsKeyMethod.SECRET_PROVIDER:
-                return get_secret(BEDROCK_TOKEN_VAR_NAME)
+                try:
+                    return get_secret(BEDROCK_TOKEN_VAR_NAME)
+                except SecretNotFoundError as exc:
+                    msg = "Error getting Bedrock token from secrets provider."
+                    raise AwsCredentialsError(msg) from exc

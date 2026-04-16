@@ -46,7 +46,7 @@ class PipeOperator(PipeAbstract, Generic[PipeOperatorOutputType]):
                 list_content: ListContent[StuffContent] = main_stuff.as_list_content()  # pyright: ignore[reportUnknownVariableType, reportUnknownMemberType]
                 nb_items = len(list_content.items)
                 if nb_items == 0:
-                    output_concept_with_multiplicity = "empty list"
+                    output_concept_with_multiplicity += " [empty list]"
                 elif nb_items == 1:
                     output_concept_with_multiplicity += " [1 item]"
                 else:

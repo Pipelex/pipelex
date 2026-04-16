@@ -16,7 +16,8 @@ jobs:
       - name: Check graph UI assets are in sync
         run: |
           PINNED_VERSION=$(grep -o '"github:Pipelex/mthds-ui#[^"]*"' package.json | sed 's/.*#//;s/"//')
-          SYNCED_VERSION=$(cat pipelex/graph/reactflow/assets/.graph-ui-version 2>/dev/null | tr -d '[:space:]' || echo "NONE")
+          SYNCED_VERSION=$(cat pipelex/graph/reactflow/assets/.graph-ui-version 2>/dev/null | tr -d '[:space:]')
+          SYNCED_VERSION="${SYNCED_VERSION:-NONE}"
           if [ "$PINNED_VERSION" != "$SYNCED_VERSION" ]; then
             echo "::error::Graph UI assets are out of date! Pinned: $PINNED_VERSION, Synced: $SYNCED_VERSION. Run 'make sync-graph-ui' to update."
             exit 1
