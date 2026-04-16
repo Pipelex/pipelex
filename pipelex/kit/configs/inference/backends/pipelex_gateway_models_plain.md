@@ -7,9 +7,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 ## Language Models (LLM)
 
-- **claude-3.7-sonnet**
-  - inputs: text, images, pdf
-  - outputs: text, structured
 - **claude-4-opus**
   - inputs: text, images, pdf
   - outputs: text, structured
@@ -31,13 +28,10 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **claude-4.6-opus**
   - inputs: text, images, pdf
   - outputs: text, structured
-- **deepseek-v3.1**
-  - inputs: text
+- **claude-4.6-sonnet**
+  - inputs: text, images, pdf
   - outputs: text, structured
 - **deepseek-v3.2**
-  - inputs: text
-  - outputs: text, structured
-- **deepseek-v3.2-speciale**
   - inputs: text
   - outputs: text, structured
 - **gemini-2.5-flash**
@@ -184,9 +178,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 ## Image Generation Models
 
-- **flux-2-pro**
-  - inputs: text, images
-  - outputs: image
 - **gpt-image-1**
   - inputs: text, images
   - outputs: image
@@ -208,6 +199,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-03-21T13:07:30Z
+> Last updated: 2026-04-14T09:23:56Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.

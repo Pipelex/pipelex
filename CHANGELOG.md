@@ -1,9 +1,32 @@
 # Changelog
 
-## [v0.23.9] - 2026-04-14
+## [v0.24.0] - 2026-04-16
+
+### Added
+
+- **claude-opus-4-7 model**: Registered on anthropic, bedrock, and gateway backends with 128k max output tokens, $5/$25 per MTok pricing, adaptive thinking, and PDF/vision support
+- **`XHIGH` reasoning effort level**: New effort tier across all providers, mapped to Anthropic's `xhigh` (recommended for coding/agentic work), OpenAI's `xhigh`, and best-available equivalents for Google and Mistral
+- **`TEMPERATURE_UNSUPPORTED` constraint**: New listed constraint for models that reject sampling parameters entirely, checked in both Anthropic and OpenAI completions workers
+- **claude-4.6-sonnet model**: Registered on anthropic, bedrock, and gateway backends
+- **LLM deck cheap presets**: Added cheap variants for writing-factual, retrieval, and engineering-code presets, with retrieval tiers from `gemini-2.5-flash-lite` to `claude-4.7-opus`
+- **Bedrock bearer token authentication**: New `bedrock_access_variant` config option supports `"bedrock_token"` auth using `AWS_BEARER_TOKEN_BEDROCK` env var, alongside the existing `"aws_access"` method (default)
 
 ### Changed
 
+- **Anthropic adaptive thinking rejects `reasoning_budget`**: `_build_thinking_params_for_budget` now raises `LLMCapabilityError` for adaptive thinking models, guiding users to `reasoning_effort` instead — extended thinking (`type: "enabled"`) is removed on Opus 4.7+
+- **LLM deck**: Updated `best-claude` alias to `claude-4.7-opus`, switched `img-gen-prompting-cheap` to `@default-small-creative`, removed deprecated builder presets, standardized cheap preset descriptions
+
+## [v0.23.9] - 2026-04-14
+
+### Added
+
+- **Graph UI asset sync workflow**: `package.json` pins `@pipelex/mthds-ui` to a git tag, `make sync-graph-ui` clones and builds standalone assets, `make check-graph-ui-sync` verifies version alignment
+- **CI check**: `graph-ui-check.yml` workflow validates graph viewer assets match the pinned version on PRs to main
+- **`/update-graph-ui` skill**: automates bumping the mthds-ui version, syncing assets, and running tests
+
+### Changed
+
+- **Graph viewer updated to mthds-ui v0.3.0**: resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display
 - **README install instructions**: Replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section
 
 ## [v0.23.8] - 2026-04-07
