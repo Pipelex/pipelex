@@ -151,6 +151,7 @@ minimal = "minimal"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "xhigh"
 max = "xhigh"
 
 [cogt.llm_config.anthropic_config]
@@ -162,6 +163,7 @@ minimal = "low"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "xhigh"
 max = "max"
 
 [cogt.llm_config.google_config.effort_to_level_map]
@@ -170,6 +172,7 @@ minimal = "low"
 low = "low"
 medium = "medium"
 high = "high"
+xhigh = "high"
 max = "high"
 
 [cogt.llm_config.mistral_config.effort_to_level_map]
@@ -178,6 +181,7 @@ minimal = "reasoning"
 low = "reasoning"
 medium = "reasoning"
 high = "reasoning"
+xhigh = "reasoning"
 max = "reasoning"
 
 [cogt.llm_config.llm_job_config]
@@ -189,6 +193,7 @@ minimal = 512
 low = 1024
 medium = 5000
 high = 16384
+xhigh = 32768
 max = 65536
 
 [cogt.llm_config.effort_to_budget_maps.gemini]
@@ -197,6 +202,7 @@ minimal = 512
 low = 1024
 medium = 5000
 high = 16384
+xhigh = 32768
 max = 65536
 
 [cogt.llm_config.generic_templates]
