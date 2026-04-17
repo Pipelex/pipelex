@@ -14749,6 +14749,7 @@
 <ul>
 <li><strong>Anthropic adaptive thinking rejects <code>reasoning_budget</code></strong>: <code>_build_thinking_params_for_budget</code> now raises <code>LLMCapabilityError</code> for adaptive thinking models, guiding users to <code>reasoning_effort</code> instead — extended thinking (<code>type: "enabled"</code>) is removed on Opus 4.7+</li>
 <li><strong>LLM deck</strong>: Updated <code>best-claude</code> alias to <code>claude-4.7-opus</code>, switched <code>img-gen-prompting-cheap</code> to <code>@default-small-creative</code>, removed deprecated builder presets, standardized cheap preset descriptions</li>
+<li><strong>Google <code>MINIMAL</code> reasoning level</strong>: <code>ReasoningEffort.MINIMAL</code> now maps to Google's <code>ThinkingLevel.MINIMAL</code> (was previously collapsed to <code>LOW</code>); <code>GoogleThinkingLevel</code> enum gains <code>MINIMAL</code> and the default <code>google_config.effort_to_level_map</code> updates accordingly</li>
 </ul>
 <h2 id="v0239-2026-04-14">[v0.23.9] - 2026-04-14</h2>
 <h3 id="added_1">Added</h3>
