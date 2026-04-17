@@ -31,6 +31,9 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **claude-4.6-sonnet**
   - inputs: text, images, pdf
   - outputs: text, structured
+- **claude-4.7-opus**
+  - inputs: text, images, pdf
+  - outputs: text, structured
 - **deepseek-v3.2**
   - inputs: text
   - outputs: text, structured
@@ -43,10 +46,25 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 - **gemini-2.5-pro**
   - inputs: text, images, pdf
   - outputs: text, structured
-- **gemini-3.0-flash-preview**
+- **gemini-3.0-flash**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gemini-3.0-pro**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-3.1-flash-lite**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-3.1-pro**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-flash-latest**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-flash-lite-latest**
+  - inputs: text, images, pdf
+  - outputs: text, structured
+- **gemini-pro-latest**
   - inputs: text, images, pdf
   - outputs: text, structured
 - **gpt-4.1**
@@ -199,6 +217,6 @@ For configuration details, see the [documentation](https://docs.pipelex.com/late
 
 
 > **AUTO-GENERATED FILE** - Do not edit manually.
-> Last updated: 2026-04-14T09:23:56Z
+> Last updated: 2026-04-17T12:49:19Z
 >
 > Run `pipelex-dev update-gateway-models` or `make ugm` to regenerate.
