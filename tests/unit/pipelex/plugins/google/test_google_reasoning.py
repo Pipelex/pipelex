@@ -10,7 +10,7 @@ from pipelex.plugins.google.google_llm_worker import GoogleLLMWorker
 
 _GOOGLE_LEVEL_MAP: dict[str, str] = {
     "none": "disabled",
-    "minimal": "low",
+    "minimal": "minimal",
     "low": "low",
     "medium": "medium",
     "high": "high",
@@ -87,7 +87,7 @@ class TestGoogleReasoning:
     @pytest.mark.parametrize(
         ("effort", "expected_level"),
         [
-            (ReasoningEffort.MINIMAL, genai_types.ThinkingLevel.LOW),
+            (ReasoningEffort.MINIMAL, genai_types.ThinkingLevel.MINIMAL),
             (ReasoningEffort.LOW, genai_types.ThinkingLevel.LOW),
             (ReasoningEffort.MEDIUM, genai_types.ThinkingLevel.MEDIUM),
             (ReasoningEffort.HIGH, genai_types.ThinkingLevel.HIGH),

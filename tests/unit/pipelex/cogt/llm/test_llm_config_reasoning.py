@@ -31,7 +31,7 @@ _DEFAULT_ANTHROPIC_LEVEL_MAP: dict[str, str] = {
 
 _DEFAULT_GOOGLE_LEVEL_MAP: dict[str, str] = {
     "none": "disabled",
-    "minimal": "low",
+    "minimal": "minimal",
     "low": "low",
     "medium": "medium",
     "high": "high",

@@ -169,7 +169,7 @@ max = "max"
 
 [cogt.llm_config.google_config.effort_to_level_map]
 none = "disabled"
-minimal = "low"
+minimal = "minimal"
 low = "low"
 medium = "medium"
 high = "high"

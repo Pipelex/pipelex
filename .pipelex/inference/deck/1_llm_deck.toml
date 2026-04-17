@@ -29,20 +29,20 @@ for_object = "@default-general"
 [llm.aliases]
 best-gpt = "gpt-5.2"
 best-claude = "claude-4.7-opus"
-best-gemini = "gemini-3.0-pro"
+best-gemini = "gemini-pro-latest"
 best-mistral = "mistral-large"
 
 # Default aliases (first choice from waterfalls)
 default-general = "claude-4.6-sonnet"
-default-premium = "claude-4.6-opus"
-default-premium-vision = "claude-4.6-opus"
-default-premium-structured = "claude-4.6-opus"
-default-large-context-code = "gemini-3.0-pro"
-default-large-context-text = "gemini-2.5-flash"
+default-premium = "claude-4.7-opus"
+default-premium-vision = "claude-4.7-opus"
+default-premium-structured = "claude-4.7-opus"
+default-large-context-code = "gemini-pro-latest"
+default-large-context-text = "gemini-flash-latest"
 default-small = "gpt-4o-mini"
 default-small-structured = "gpt-4o-mini"
-default-small-vision = "gemini-3.0-flash-preview"
-default-small-creative = "gemini-3.0-flash-preview"
+default-small-vision = "gemini-flash-latest"
+default-small-creative = "gemini-flash-latest"
 
 ####################################################################################################
 # LLM Presets
@@ -58,7 +58,7 @@ writing-creative-cheap = { model = "@default-small-creative", temperature = 0.9,
 
 # Retrieval
 retrieval = { model = "@default-large-context-text", temperature = 0.1, description = "Data retrieval from large text corpora" }
-retrieval-cheap = { model = "gemini-2.5-flash-lite", temperature = 0.1, description = "Cheap data retrieval from large text corpora" }
+retrieval-cheap = { model = "gemini-flash-lite-latest", temperature = 0.1, description = "Cheap data retrieval from large text corpora" }
 retrieval-premium = { model = "claude-4.7-opus", temperature = 0.1, description = "Premium data retrieval with highest accuracy" }
 
 # Engineering
