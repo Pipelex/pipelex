@@ -30,6 +30,12 @@
 - **Graph viewer updated to mthds-ui v0.3.0**: resizable detail panel, escape-to-close, sticky header, prompt expand/collapse with copy button, concept refinement display
 - **README install instructions**: Replaced step-by-step Claude Code setup with single copy-paste messages for Claude Code and Codex, added manual install section
 
+### Security
+
+- **pytest bumped to 9.0.3** to patch CVE-2025-71176 (GHSA-6w46-j5rx-g56g): vulnerable `/tmp/pytest-of-{user}` directory handling on UNIX could let a local user cause DoS or gain privileges. Dev-only dependency; `pyproject.toml` minimum bumped from `>=9.0.2` to `>=9.0.3`.
+- **cryptography bumped to 46.0.7** to patch CVE-2026-39892 (GHSA-p423-j2cm-9vmq): non-contiguous Python buffers passed to hashing APIs (e.g. `Hash.update()`) could read past the end of the buffer on Python >3.11. Transitive dependency via `google-auth` and `moto`; lockfile-only bump.
+- **transformers CVE-2026-1839 (GHSA-69w3-r845-3855) risk-accepted, alert dismissed.** The vulnerability requires calling `transformers.Trainer._load_rng_state()` with an attacker-controlled checkpoint file. Pipelex only pulls `transformers` transitively through `docling-ibm-models` for PDF layout inference; the `Trainer` class is never imported or executed. Upgrade path is blocked upstream: `docling-ibm-models` 3.13.0 pins `transformers!=5.0.*,!=5.1.*,!=5.2.*,!=5.3.*,<6.0.0,>=4.42.0`, explicitly excluding the patched 5.0.0rc3 release. Revisit when `docling-ibm-models` adds support for `transformers>=5.4`.
+
 ## [v0.23.8] - 2026-04-07
 
 ### Changed
