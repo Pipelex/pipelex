@@ -1,0 +1,38 @@
+version: 2
+updates:
+  # Python dependencies via uv/pip ecosystem
+  - package-ecosystem: "pip"
+    directory: "/"
+    # Target dev: merges to main trigger PyPI publish, so dep bumps must go through
+    # a proper versioned release (dev -> release/vX.Y.Z -> main), not a direct main merge.
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 10
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      runtime-minor-patch:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+    # Runtime majors get individual PRs so breaking changes are reviewed separately.
+
+  # GitHub Actions — keeps SHA-pinned actions fresh.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    target-branch: "dev"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    groups:
+      actions-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"

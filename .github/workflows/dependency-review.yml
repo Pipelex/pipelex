@@ -1,0 +1,35 @@
+name: Dependency Review
+
+on:
+  pull_request:
+    branches:
+      - main
+      - dev
+      - 'release/v*'
+      - 'pre-release/v*'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  dependency-review:
+    name: Review new dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Dependency Review
+        uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9 # v4.7.1
+        with:
+          # Fail the PR if it introduces any new vulnerable dependency at this
+          # severity or higher. "moderate" matches the Dependabot alert levels
+          # we just triaged (pytest, cryptography were both "medium"/"moderate").
+          fail-on-severity: moderate
+          # Respect existing Dependabot alert dismissals so historical
+          # risk-accepted items (like transformers CVE-2026-1839) don't block.
+          allow-ghsas: GHSA-69w3-r845-3855
+          comment-summary-in-pr: on-failure
