@@ -7,7 +7,7 @@ from pipelex.system.pipelex_service.exceptions import (
 )
 from pipelex.system.pipelex_service.pipelex_details import PipelexDetails
 from pipelex.system.pipelex_service.remote_config import RemoteConfig
-from pipelex.system.runtime import IntegrationMode
+from pipelex.system.runtime import IntegrationMode, runtime_manager
 from pipelex.system.telemetry.otel_constants import OTelConstants
 from pipelex.system.telemetry.telemetry_config import PostHogMode, TelemetryConfig, load_telemetry_config
 from pipelex.system.telemetry.telemetry_manager import TelemetryManager
@@ -30,6 +30,14 @@ class TelemetryFactory:
         telemetry_config: TelemetryConfig | None = None,
         injected_telemetry_manager: TelemetryManagerAbstract | None = None,
     ) -> TelemetryManagerAbstract:
+        # Silently disable Pipelex Gateway telemetry when running under any test
+        # mode (UNIT_TEST, CI_TEST, CODEX_CLOUD_TEST). Without a backend that can
+        # route test events to a separate analytics project, suppressing at the
+        # client is the only way to keep production metrics clean.
+        if is_pipelex_telemetry_enabled and runtime_manager.is_unit_testing:
+            log.verbose("Pipelex Gateway telemetry disabled: test run mode detected")
+            is_pipelex_telemetry_enabled = False
+
         gateway_api_key: str | None = None
         if is_pipelex_telemetry_enabled:
             # Cannot inject custom TelemetryManager when gateway is enabled
