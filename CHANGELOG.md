@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **Pipelex Gateway telemetry leaked from test runs**: `TelemetryFactory.make_telemetry_manager` now silently disables the Pipelex Gateway PostHog stream when `runtime_manager.is_unit_testing` is true (covers `RunMode.UNIT_TEST`, `CI_TEST`, `CODEX_CLOUD_TEST`). Previously any test session with a `PIPELEX_GATEWAY_API_KEY` set would publish `pipe_run` / `pipe_complete` / `$exception` events to Pipelex's production PostHog, polluting real-user metrics with test data.
+- **Typo in `tests/pipelex_unit_test.toml`**: `pipelex.feature_config.is_reporting_eabled` → `is_reporting_enabled`. The typo caused `ConfigValidationError` (extra forbidden field) when any unit test triggered config loading.
+
 ### Security
 
 - **pytest bumped to 9.0.3** to patch CVE-2025-71176 (GHSA-6w46-j5rx-g56g): vulnerable `/tmp/pytest-of-{user}` directory handling on UNIX could let a local user cause DoS or gain privileges. Dev-only dependency; `pyproject.toml` minimum bumped from `>=9.0.2` to `>=9.0.3`.
