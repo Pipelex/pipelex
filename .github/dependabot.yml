@@ -1,38 +1,18 @@
 version: 2
 updates:
-  # Python dependencies via uv/pip ecosystem
-  - package-ecosystem: "pip"
-    directory: "/"
-    # Target dev: merges to main trigger PyPI publish, so dep bumps must go through
-    # a proper versioned release (dev -> release/vX.Y.Z -> main), not a direct main merge.
-    target-branch: "dev"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 10
-    groups:
-      dev-dependencies:
-        dependency-type: "development"
-        update-types:
-          - "minor"
-          - "patch"
-      runtime-minor-patch:
-        dependency-type: "production"
-        update-types:
-          - "minor"
-          - "patch"
-    # Runtime majors get individual PRs so breaking changes are reviewed separately.
-
-  # GitHub Actions — keeps SHA-pinned actions fresh.
+  # GitHub Actions only — keeps SHA-pinned actions fresh on a monthly cadence.
+  # Python dependencies are NOT tracked here by design: as a library, Pipelex
+  # does not benefit from routine version bumps. Security-driven updates still
+  # fire automatically via Dependabot alerts + security updates (repo settings),
+  # and `.github/workflows/dependency-review.yml` blocks PRs that introduce
+  # newly vulnerable deps. Major version bumps for runtime deps are made
+  # manually when they unlock features or fix real bugs.
   - package-ecosystem: "github-actions"
     directory: "/"
     target-branch: "dev"
     schedule:
-      interval: "weekly"
-      day: "monday"
-    open-pull-requests-limit: 5
+      interval: "monthly"
+    open-pull-requests-limit: 3
     groups:
-      actions-minor-patch:
-        update-types:
-          - "minor"
-          - "patch"
+      actions:
+        patterns: ["*"]

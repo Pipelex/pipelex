@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased]
+
+### Security
+
+- **Dependabot narrowed to GitHub Actions only, monthly cadence**. Python dependency version-update PRs are disabled by design: as a library, Pipelex does not benefit from routine bumps — they create churn and occasionally break downstream projects. Security-driven updates still fire via Dependabot alerts + security updates (repo settings), and `dependency-review.yml` continues to block PRs introducing newly vulnerable deps. Major runtime deps are bumped manually when they unlock features or fix real bugs.
+- **OpenSSF Scorecard workflow added** (`.github/workflows/scorecard.yml`). Grades security posture across branch protection, pinned dependencies, token permissions, signed releases, and other checks. Runs weekly and on push to `main`, publishes results to the GitHub code scanning dashboard and the public OpenSSF registry so adopters can inspect the project's security grade at https://scorecard.dev.
+
 ## [v0.24.1] - 2026-04-22
 
 ### Security
