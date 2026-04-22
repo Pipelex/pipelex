@@ -1,6 +1,6 @@
 [project]
 name = "pipelex"
-version = "0.24.0"
+version = "0.24.1"
 description = "Execute composable AI methods declared in the MTHDS open standard"
 authors = [{ name = "Evotis S.A.S.", email = "oss@pipelex.com" }]
 maintainers = [{ name = "Pipelex staff", email = "oss@pipelex.com" }]
@@ -63,11 +63,24 @@ Changelog = "https://docs.pipelex.com/changelog/"
 [project.optional-dependencies]
 anthropic = ["anthropic>=0.78.0"]
 bedrock = ["boto3>=1.34.131", "aioboto3>=13.4.0"]
-docling = ["docling>=2.64.0"]
+docling = [
+  "docling>=2.64.0",
+  "lxml>=6.1.0",
+]
 fal = ["fal-client>=0.4.1"]
-gcp-storage = ["google-cloud-storage>=2.10.0"]
-google = ["google-auth-oauthlib>=1.2.1"]
-google-genai = ["google-genai", "instructor[google-genai]"]
+gcp-storage = [
+  "google-cloud-storage>=2.10.0",
+  "cryptography>=46.0.7",
+]
+google = [
+  "google-auth-oauthlib>=1.2.1",
+  "cryptography>=46.0.7",
+]
+google-genai = [
+  "google-genai",
+  "instructor[google-genai]",
+  "cryptography>=46.0.7",
+]
 huggingface = ["huggingface_hub>=0.23,<1.0.0"]
 linkup = ["linkup-sdk>=0.12.0"]
 mistralai = ["mistralai>=1.12.0"]
@@ -84,12 +97,13 @@ docs = [
 
 dev = [
   "boto3-stubs>=1.35.24",
+  "cryptography>=46.0.7",
   "moto[s3]>=5.0.0",
   "mypy==1.19.1",
   "pipelex-tools>=0.3.2",
   "pyright==1.1.408",
   "pylint==4.0.4",
-  "pytest>=9.0.2",
+  "pytest>=9.0.3",
   "pytest-asyncio>=0.24.0",
   "pytest-cov>=6.1.1",
   "pytest-mock>=3.14.0",
