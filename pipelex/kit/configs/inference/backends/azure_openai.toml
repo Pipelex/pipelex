@@ -234,7 +234,7 @@ costs = { input = 10, output = 40 }
 prompt = "positive_only"
 num_images = "gpt"
 aspect_ratio = "gpt"
-background = "gpt"
+background = "available"
 inference = "gpt"
 safety_checker = "unavailable"
 output_format = "gpt"
@@ -251,7 +251,7 @@ costs = { input = 2.5, output = 8 }
 prompt = "positive_only"
 num_images = "gpt"
 aspect_ratio = "gpt"
-background = "gpt"
+background = "available"
 inference = "gpt"
 safety_checker = "unavailable"
 output_format = "gpt"
@@ -268,7 +268,24 @@ costs = { input = 8, output = 32 }
 prompt = "positive_only"
 num_images = "gpt"
 aspect_ratio = "gpt"
-background = "gpt"
+background = "available"
+inference = "gpt"
+safety_checker = "unavailable"
+output_format = "gpt"
+
+[gpt-image-2]
+sdk = "azure_rest_img_gen"
+model_type = "img_gen"
+model_id = "gpt-image-2-2026-04-21"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 8, output = 30 }
+
+[gpt-image-2.rules]
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "unavailable"
 inference = "gpt"
 safety_checker = "unavailable"
 output_format = "gpt"

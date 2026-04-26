@@ -263,3 +263,35 @@ model_id = "gpt-image-1.5"
 inputs = ["text"]
 outputs = ["image"]
 costs = { input = 8, output = 32 }
+
+[gpt-image-2-2026-04-21]
+sdk = "openai_img_gen"
+model_type = "img_gen"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 8, output = 30 }
+
+[gpt-image-2-2026-04-21.rules]
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "unavailable"
+inference = "gpt"
+safety_checker = "unavailable"
+output_format = "gpt"
+
+[gpt-image-2]
+sdk = "openai_img_gen"
+model_type = "img_gen"
+inputs = ["text"]
+outputs = ["image"]
+costs = { input = 8, output = 30 }
+
+[gpt-image-2.rules]
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "gpt"
+background = "unavailable"
+inference = "gpt"
+safety_checker = "unavailable"
+output_format = "gpt"

@@ -224,7 +224,7 @@ fal = [
 ]
 
 # --- OpenAI Models ---
-openai = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5"]
+openai = ["gpt-image-1", "gpt-image-1-mini", "gpt-image-1.5", "gpt-image-2"]
 
 # --- Google Models ---
 google = ["nano-banana", "nano-banana-pro", "nano-banana-2"]

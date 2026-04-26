@@ -217,10 +217,20 @@ class ImgGenArgsFactory:
 
     @classmethod
     def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background) -> dict[str, Any]:
-        """Map background setting to provider-specific parameter."""
+        """Map background setting to provider-specific parameter.
+
+        Raises:
+            ImgGenParameterError: If the model does not support background configuration
+                (taxonomy is UNAVAILABLE) and a transparent background was requested.
+        """
         match background_taxonomy:
-            case BackgroundTaxonomy.GPT:
+            case BackgroundTaxonomy.AVAILABLE:
                 return {"background": background.value}
+            case BackgroundTaxonomy.UNAVAILABLE:
+                if background.is_certainly_transparent:
+                    msg = "Model does not support transparent background"
+                    raise ImgGenParameterError(msg)
+                return {}
 
     @classmethod
     def make_args_from_aspect_ratio(cls, aspect_ratio_taxonomy: AspectRatioTaxonomy, aspect_ratio: AspectRatio) -> dict[str, Any]:

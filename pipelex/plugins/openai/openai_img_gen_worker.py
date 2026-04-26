@@ -1,17 +1,19 @@
 from typing import TYPE_CHECKING, Any
 
 import openai
+from openai import Omit, omit
 from typing_extensions import override
 
-from pipelex.cogt.exceptions import ImgGenGenerationError, SdkTypeError
+from pipelex.cogt.exceptions import ImgGenGenerationError, ImgGenParameterError, SdkTypeError
 from pipelex.cogt.image.generated_image import GeneratedImageRawDetails
 from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
 from pipelex.cogt.img_gen.img_gen_job_components import Quality
+from pipelex.cogt.img_gen.img_gen_model_rules import BackgroundTaxonomy, ImgGenArgTopic
 from pipelex.cogt.img_gen.img_gen_worker_abstract import ImgGenWorkerAbstract
 from pipelex.cogt.model_backends.model_spec import InferenceModelSpec
 from pipelex.cogt.usage.token_category import NbTokensByCategoryDict, TokenCategory
-from pipelex.plugins.openai.openai_img_gen_factory import OpenAIImgGenFactory
+from pipelex.plugins.openai.openai_img_gen_factory import GptImage1BackgroundType, OpenAIImgGenFactory
 from pipelex.reporting.reporting_protocol import ReportingProtocol
 
 if TYPE_CHECKING:
@@ -33,6 +35,16 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
 
         self.openai_client = sdk_instance
 
+    def _resolve_background_taxonomy(self) -> BackgroundTaxonomy:
+        """Read the per-model `background` rule. Defaults to GPT for models without a rules table."""
+        rules = self.inference_model.rules
+        if rules is None:
+            return BackgroundTaxonomy.AVAILABLE
+        rule_value = rules.get(ImgGenArgTopic.BACKGROUND)
+        if rule_value is None:
+            return BackgroundTaxonomy.AVAILABLE
+        return BackgroundTaxonomy(rule_value)
+
     @override
     async def _gen_image(
         self,
@@ -50,14 +62,27 @@ class OpenAIImgGenWorker(ImgGenWorkerAbstract):
         image_size, width, height = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio=img_gen_job.job_params.aspect_ratio)
         output_format = OpenAIImgGenFactory.output_format_for_gpt_image_1(output_format=img_gen_job.job_params.output_format)
         moderation = OpenAIImgGenFactory.moderation_for_gpt_image_1(is_moderated=img_gen_job.job_params.is_moderated)
-        background = OpenAIImgGenFactory.background_for_gpt_image_1(background=img_gen_job.job_params.background)
         quality = OpenAIImgGenFactory.quality_for_gpt_image_1(quality=img_gen_job.job_params.quality or Quality.LOW)
         output_compression = OpenAIImgGenFactory.output_compression_for_gpt_image_1()
+
+        background_taxonomy = self._resolve_background_taxonomy()
+        background_arg: GptImage1BackgroundType | Omit
+        match background_taxonomy:
+            case BackgroundTaxonomy.AVAILABLE:
+                background_arg = OpenAIImgGenFactory.background_for_gpt_image_1(
+                    background=img_gen_job.job_params.background,
+                )
+            case BackgroundTaxonomy.UNAVAILABLE:
+                if img_gen_job.job_params.background.is_certainly_transparent:
+                    msg = f"Model '{self.inference_model.name}' does not support transparent background"
+                    raise ImgGenParameterError(msg)
+                background_arg = omit
+
         images_response: ImagesResponse = await self.openai_client.images.generate(
             prompt=img_gen_job.img_gen_prompt.positive_text,
             model=self.inference_model.model_id,
             moderation=moderation,
-            background=background,
+            background=background_arg,
             quality=quality,
             size=image_size,
             output_format=output_format,

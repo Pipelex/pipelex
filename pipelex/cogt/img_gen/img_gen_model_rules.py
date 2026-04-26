@@ -117,10 +117,13 @@ class SafetyCheckerTaxonomy(StrEnum):
 class BackgroundTaxonomy(StrEnum):
     """Taxonomy for background transparency/removal parameters.
 
-    - GPT: supports `background` parameter for transparency control
+    - AVAILABLE: supports `background` parameter for transparency control
+    - UNAVAILABLE: model does not support setting background; the parameter is skipped
+      and requesting a transparent background raises ImgGenParameterError
     """
 
-    GPT = "gpt"
+    AVAILABLE = "available"
+    UNAVAILABLE = "unavailable"
 
 
 class OutputFormatTaxonomy(StrEnum):
