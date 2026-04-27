@@ -4,6 +4,7 @@ from pipelex import pretty_print, pretty_print_url
 from pipelex.cogt.content_generation.generated_content_factory import GeneratedContentFactory
 from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, ImgGenJobParams
 from pipelex.cogt.img_gen.img_gen_job_factory import ImgGenJobFactory
+from pipelex.cogt.img_gen.img_gen_model_rules import BackgroundTaxonomy, ImgGenArgTopic
 from pipelex.hub import get_img_gen_worker, get_report_delegate
 from pipelex.pipeline.job_metadata import JobMetadata
 from pipelex.tools.misc.image_utils import ImageFormat
@@ -63,6 +64,9 @@ class TestImageGeneration:
         generated_content_factory: GeneratedContentFactory,
     ):
         img_gen_worker_async = get_img_gen_worker(img_gen_handle=img_gen_combo.handle)
+        rules = img_gen_worker_async.inference_model.rules
+        if rules and rules.get(ImgGenArgTopic.BACKGROUND) == BackgroundTaxonomy.UNAVAILABLE:
+            pytest.skip(f"Model '{img_gen_worker_async.inference_model.name}' does not support transparent background")
         img_gen_job_params = ImgGenJobParams(
             aspect_ratio=AspectRatio.SQUARE,
             is_raw=None,

@@ -11,16 +11,18 @@ from typing import Any
 
 from pipelex import log
 from pipelex.cogt.exceptions import ImgGenParameterError
+from pipelex.cogt.image.image_size import ImageSize
 from pipelex.cogt.image.prompt_image import PromptImage
 from pipelex.cogt.image.prompt_image_utils import prep_prompt_images
 from pipelex.cogt.img_gen.img_gen_job import ImgGenJob
-from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, Quality
+from pipelex.cogt.img_gen.img_gen_job_components import AspectRatio, Background, InputFidelity, Quality
 from pipelex.cogt.img_gen.img_gen_model_rules import (
     AspectRatioTaxonomy,
     BackgroundTaxonomy,
     ImgGenArgTopic,
     ImgGenModelRules,
     InferenceTaxonomy,
+    InputFidelityTaxonomy,
     InputImagesTaxonomy,
     ModelNameTaxonomy,
     NumImagesTaxonomy,
@@ -93,6 +95,8 @@ class ImgGenArgsFactory:
                         cls.make_args_from_aspect_ratio(
                             aspect_ratio_taxonomy=aspect_ratio_taxonomy,
                             aspect_ratio=job_params.aspect_ratio,
+                            size=job_params.size,
+                            model_name=model_id,
                         )
                     )
                 case ImgGenArgTopic.BACKGROUND:
@@ -101,6 +105,7 @@ class ImgGenArgsFactory:
                         cls.make_args_from_background(
                             background_taxonomy=background_taxonomy,
                             background=job_params.background,
+                            model_name=model_id,
                         )
                     )
                 case ImgGenArgTopic.INFERENCE:
@@ -154,6 +159,15 @@ class ImgGenArgsFactory:
                         input_images=img_gen_job.img_gen_prompt.input_images,
                     )
                     args_dict.update(input_images_args)
+                case ImgGenArgTopic.INPUT_FIDELITY:
+                    input_fidelity_taxonomy = InputFidelityTaxonomy(taxonomy_value)
+                    args_dict.update(
+                        cls.make_args_from_input_fidelity(
+                            input_fidelity_taxonomy=input_fidelity_taxonomy,
+                            input_fidelity=job_params.input_fidelity,
+                            model_name=model_id,
+                        )
+                    )
 
         # Validate that input_images were processed if provided
         if img_gen_job.img_gen_prompt.input_images:
@@ -163,6 +177,10 @@ class ImgGenArgsFactory:
                     "This model may not support image-to-image generation, or the configuration is incomplete."
                 )
                 raise ImgGenParameterError(msg)
+
+        if job_params.input_fidelity is not None and ImgGenArgTopic.INPUT_FIDELITY not in model_rules:
+            msg = f"Model '{model_id}' does not support input_fidelity"
+            raise ImgGenParameterError(msg)
 
         return args_dict
 
@@ -216,7 +234,7 @@ class ImgGenArgsFactory:
                 return {"model": model_id}
 
     @classmethod
-    def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background) -> dict[str, Any]:
+    def make_args_from_background(cls, background_taxonomy: BackgroundTaxonomy, background: Background, model_name: str) -> dict[str, Any]:
         """Map background setting to provider-specific parameter.
 
         Raises:
@@ -228,12 +246,18 @@ class ImgGenArgsFactory:
                 return {"background": background.value}
             case BackgroundTaxonomy.UNAVAILABLE:
                 if background.is_certainly_transparent:
-                    msg = "Model does not support transparent background"
+                    msg = f"Model '{model_name}' does not support transparent background"
                     raise ImgGenParameterError(msg)
                 return {}
 
     @classmethod
-    def make_args_from_aspect_ratio(cls, aspect_ratio_taxonomy: AspectRatioTaxonomy, aspect_ratio: AspectRatio) -> dict[str, Any]:
+    def make_args_from_aspect_ratio(
+        cls,
+        aspect_ratio_taxonomy: AspectRatioTaxonomy,
+        aspect_ratio: AspectRatio,
+        size: ImageSize | None,
+        model_name: str,
+    ) -> dict[str, Any]:
         """Map aspect ratio to provider-specific parameter name and value format.
 
         Raises:
@@ -282,9 +306,20 @@ class ImgGenArgsFactory:
                     case AspectRatio.LANDSCAPE_3_2 | AspectRatio.PORTRAIT_2_3:
                         msg = f"Aspect ratio '{aspect_ratio}' is not supported by Flux-1.1 Ultra image generation model"
                         raise ImgGenParameterError(msg)
-            case AspectRatioTaxonomy.GPT:
+            case AspectRatioTaxonomy.GPT | AspectRatioTaxonomy.OPENAI_GPT_IMAGE_LEGACY:
                 key = "size"
-                value = OpenAIImgGenFactory.image_size_for_gpt_image_1(aspect_ratio)[0]
+                value = OpenAIImgGenFactory.size_for_legacy_openai_image(
+                    model_name=model_name,
+                    aspect_ratio=aspect_ratio,
+                    size=size,
+                )[0]
+            case AspectRatioTaxonomy.OPENAI_GPT_IMAGE_2:
+                key = "size"
+                value = OpenAIImgGenFactory.size_for_gpt_image_2(
+                    model_name=model_name,
+                    aspect_ratio=aspect_ratio,
+                    size=size,
+                )[0]
             case AspectRatioTaxonomy.QWEN_IMAGE:
                 width: int
                 height: int
@@ -385,6 +420,11 @@ class ImgGenArgsFactory:
         match safety_checker_taxonomy:
             case SafetyCheckerTaxonomy.UNAVAILABLE:
                 pass
+            case SafetyCheckerTaxonomy.OPENAI_MODERATION:
+                moderation = OpenAIImgGenFactory.moderation_for_openai_image(is_moderated=is_moderated)
+                if not isinstance(moderation, str):
+                    return args_dict
+                args_dict["moderation"] = moderation
             case SafetyCheckerTaxonomy.AVAILABLE:
                 if is_moderated is not None:
                     args_dict["enable_safety_checker"] = is_moderated
@@ -432,6 +472,8 @@ class ImgGenArgsFactory:
             case OutputFormatTaxonomy.GPT:
                 key = "output_format"
                 value = output_format.value
+            case OutputFormatTaxonomy.UNAVAILABLE:
+                return {}
         return {key: value}
 
     @classmethod
@@ -491,3 +533,23 @@ class ImgGenArgsFactory:
                         msg = f"Unexpected PreparedFile type for Flux 2 API: {type(prepped).__name__}"
                         raise ImgGenParameterError(msg)
                 return args
+
+    @classmethod
+    def make_args_from_input_fidelity(
+        cls,
+        input_fidelity_taxonomy: InputFidelityTaxonomy,
+        input_fidelity: InputFidelity | None,
+        model_name: str,
+    ) -> dict[str, Any]:
+        """Map input fidelity settings for image editing."""
+        if input_fidelity is None:
+            return {}
+
+        match input_fidelity_taxonomy:
+            case InputFidelityTaxonomy.OPENAI_IMAGE:
+                return {
+                    "input_fidelity": OpenAIImgGenFactory.input_fidelity_for_openai_image(input_fidelity=input_fidelity),
+                }
+            case InputFidelityTaxonomy.UNAVAILABLE:
+                msg = f"Model '{model_name}' does not support input_fidelity"
+                raise ImgGenParameterError(msg)

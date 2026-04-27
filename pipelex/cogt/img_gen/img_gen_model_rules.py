@@ -32,6 +32,7 @@ class ImgGenArgTopic(StrEnum):
     OUTPUT_FORMAT = "output_format"
     SPECIFIC = "specific"
     INPUT_IMAGES = "input_images"
+    INPUT_FIDELITY = "input_fidelity"
 
 
 class NumImagesTaxonomy(StrEnum):
@@ -73,7 +74,8 @@ class AspectRatioTaxonomy(StrEnum):
     Different providers use different parameter names and value formats:
     - FLUX: uses `image_size` with values like "square_hd", "landscape_4_3"
     - FLUX_11_ULTRA: uses `aspect_ratio` with values like "1:1", "4:3"
-    - GPT: uses `size` with pixel dimensions like "1024x1024"
+    - OPENAI_GPT_IMAGE_LEGACY: uses fixed OpenAI GPT Image sizes
+    - OPENAI_GPT_IMAGE_2: validates and forwards exact OpenAI GPT Image 2 sizes
     - QWEN_IMAGE: uses `width` and `height` with pixel dimensions mapped from aspect ratios
       (e.g., "1:1" -> 1328x1328, "16:9" -> 1664x928, "9:16" -> 928x1664,
        "4:3" -> 1472x1140, "3:4" -> 1140x1472, "3:2" -> 1584x1056, "2:3" -> 1056x1584)
@@ -82,6 +84,8 @@ class AspectRatioTaxonomy(StrEnum):
     FLUX = "flux"
     FLUX_11_ULTRA = "flux_11_ultra"
     GPT = "gpt"
+    OPENAI_GPT_IMAGE_LEGACY = "openai_gpt_image_legacy"
+    OPENAI_GPT_IMAGE_2 = "openai_gpt_image_2"
     QWEN_IMAGE = "qwen_image"
 
 
@@ -107,10 +111,12 @@ class SafetyCheckerTaxonomy(StrEnum):
     """Taxonomy for safety checker availability.
 
     - AVAILABLE: model supports `enable_safety_checker` and `safety_tolerance` parameters
+    - OPENAI_MODERATION: model supports OpenAI `moderation` parameter
     - UNAVAILABLE: model does not expose safety checker configuration
     """
 
     AVAILABLE = "available"
+    OPENAI_MODERATION = "openai_moderation"
     UNAVAILABLE = "unavailable"
 
 
@@ -140,6 +146,7 @@ class OutputFormatTaxonomy(StrEnum):
     FLUX_1 = "flux_1"
     FLUX_2 = "flux_2"
     GPT = "gpt"
+    UNAVAILABLE = "unavailable"
 
 
 class ModelNameTaxonomy(StrEnum):
@@ -163,6 +170,17 @@ class InputImagesTaxonomy(StrEnum):
     GPT_IMAGE = "gpt_image"
     BFL_FLUX_2 = "bfl_flux_2"
     NONE = "none"
+
+
+class InputFidelityTaxonomy(StrEnum):
+    """Taxonomy for image-editing fidelity controls.
+
+    - OPENAI_IMAGE: OpenAI GPT Image edit `input_fidelity`, values "low" or "high"
+    - UNAVAILABLE: model does not support input fidelity configuration
+    """
+
+    OPENAI_IMAGE = "openai_image"
+    UNAVAILABLE = "unavailable"
 
 
 ImgGenModelRules = dict[ImgGenArgTopic, str]

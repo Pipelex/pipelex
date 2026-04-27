@@ -245,53 +245,95 @@ thinking_mode = "manual"
 [gpt-image-1]
 sdk = "openai_img_gen"
 model_type = "img_gen"
-inputs = ["text"]
+inputs = ["text", "images"]
 outputs = ["image"]
 costs = { input = 10, output = 40 }
+
+[gpt-image-1.rules]
+model_name = "standard"
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "openai_gpt_image_legacy"
+background = "available"
+inference = "gpt"
+safety_checker = "openai_moderation"
+output_format = "gpt"
+input_images = "gpt_image"
+input_fidelity = "openai_image"
 
 [gpt-image-1-mini]
 sdk = "openai_img_gen"
 model_type = "img_gen"
-inputs = ["text"]
+inputs = ["text", "images"]
 outputs = ["image"]
 costs = { input = 2.5, output = 8 }
+
+[gpt-image-1-mini.rules]
+model_name = "standard"
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "openai_gpt_image_legacy"
+background = "available"
+inference = "gpt"
+safety_checker = "openai_moderation"
+output_format = "gpt"
+input_images = "gpt_image"
+input_fidelity = "openai_image"
 
 ["gpt-image-1.5"]
 sdk = "openai_img_gen"
 model_type = "img_gen"
 model_id = "gpt-image-1.5"
-inputs = ["text"]
+inputs = ["text", "images"]
 outputs = ["image"]
 costs = { input = 8, output = 32 }
+
+["gpt-image-1.5".rules]
+model_name = "standard"
+prompt = "positive_only"
+num_images = "gpt"
+aspect_ratio = "openai_gpt_image_legacy"
+background = "available"
+inference = "gpt"
+safety_checker = "openai_moderation"
+output_format = "gpt"
+input_images = "gpt_image"
+input_fidelity = "openai_image"
 
 [gpt-image-2-2026-04-21]
 sdk = "openai_img_gen"
 model_type = "img_gen"
-inputs = ["text"]
+inputs = ["text", "images"]
 outputs = ["image"]
 costs = { input = 8, output = 30 }
 
 [gpt-image-2-2026-04-21.rules]
+model_name = "standard"
 prompt = "positive_only"
 num_images = "gpt"
-aspect_ratio = "gpt"
+aspect_ratio = "openai_gpt_image_2"
 background = "unavailable"
 inference = "gpt"
 safety_checker = "unavailable"
-output_format = "gpt"
+output_format = "unavailable"
+input_images = "gpt_image"
+input_fidelity = "unavailable"
 
 [gpt-image-2]
 sdk = "openai_img_gen"
 model_type = "img_gen"
-inputs = ["text"]
+inputs = ["text", "images"]
 outputs = ["image"]
 costs = { input = 8, output = 30 }
 
 [gpt-image-2.rules]
+model_name = "standard"
 prompt = "positive_only"
 num_images = "gpt"
-aspect_ratio = "gpt"
+aspect_ratio = "openai_gpt_image_2"
 background = "unavailable"
 inference = "gpt"
 safety_checker = "unavailable"
-output_format = "gpt"
+output_format = "unavailable"
+input_images = "gpt_image"
+input_fidelity = "unavailable"
